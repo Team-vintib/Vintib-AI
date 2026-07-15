@@ -1,0 +1,105 @@
+# MR(Merge Request) 시점에만 동작하는 검증 전용 CI.
+# 배포(CD)는 포함하지 않음. 기술 스택은 아직 미확정 상태이므로,
+# 여기 적힌 이미지/버전은 "지금 각 파트 빌드 설정 파일(build.gradle,
+# package.json, requirements.txt)에 실제로 pin된 값"을 그대로 반영한 것.
+# 스택이 최종 확정/변경되면 해당 파트의 build 설정 파일과 함께
+# 아래 image 태그만 맞춰서 갱신하면 됨.
+
+stages:
+  - test
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+variables:
+  GIT_DEPTH: "1"
+
+# ---------- BE (Java 21 / Spring Boot 4.1.0 / Gradle) ----------
+be-test:
+  stage: test
+  image: eclipse-temurin:21-jdk-jammy
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - "BE/**/*"
+  services:
+    # docker-compose.yml과 동일 버전. application.yml이 DB_HOST/REDIS_HOST 등을
+    # 환경변수로 읽으므로, @SpringBootTest가 실제 컨테이너에 붙어 동작함.
+    - name: postgres:18-alpine
+      alias: postgres
+    - name: redis:8.8-alpine
+      alias: redis
+  variables:
+    POSTGRES_DB: vintage_auction
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    DB_NAME: vintage_auction
+    DB_USERNAME: postgres
+    DB_PASSWORD: postgres
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+  cache:
+    key: "be-gradle-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - BE/.gradle/
+  before_script:
+    - cd BE
+    - chmod +x gradlew
+  script:
+    - ./gradlew build --no-daemon --build-cache -Dgradle.user.home=.gradle
+
+# ---------- FE (Vue 3.5 / Vite / TypeScript) ----------
+fe-test:
+  stage: test
+  image: node:22-alpine
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - "FE/**/*"
+  cache:
+    key: "fe-npm-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - FE/node_modules/
+  before_script:
+    - cd FE
+    # package-lock.json이 아직 커밋되어 있지 않아 npm ci 대신 npm install 사용.
+    # 락파일이 생기면 npm ci로 바꿔서 재현 가능한 설치로 전환할 것.
+    - npm install
+  script:
+    - npm run lint
+    - npm run type-check
+    # 유닛 테스트 프레임워크(vitest 등)가 아직 설치되어 있지 않아
+    # lint + type-check + build를 현재 시점의 검증 게이트로 사용.
+    # 테스트 프레임워크 도입 시 여기에 test 스크립트 추가.
+    - npm run build
+
+# ---------- AI (Python 3.12 / FastAPI) ----------
+ai-test:
+  stage: test
+  image: python:3.12-slim
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - "AI/**/*"
+  cache:
+    key: "ai-pip-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - AI/.cache/pip
+  before_script:
+    - cd AI
+    - pip install --cache-dir .cache/pip -r requirements-dev.txt
+  script:
+    - ruff check .
+    - black --check .
+    # AI/에 아직 tests/ 디렉터리가 없어 pytest가 "no tests collected"(exit 5)를
+    # 반환함. 테스트가 추가되기 전까지는 이를 정상으로 처리하고,
+    # 그 외 실패(코드/의존성 문제 등)는 그대로 파이프라인을 실패시킴.
+    - >
+      pytest -q || code=$?; if [ "${code:-0}" -eq 5 ]; then
+        echo "No tests collected yet under AI/ - skipping as pass.";
+      elif [ "${code:-0}" -ne 0 ]; then
+        exit "${code}";
+      fi
