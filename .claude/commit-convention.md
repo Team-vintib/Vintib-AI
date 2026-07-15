@@ -15,6 +15,7 @@
 
 - 이슈 키는 대괄호로 감싸 맨 앞에 위치 (JIRA가 이슈 키를 인식하는 표준 패턴)
 - subject는 한글 기준 50자 이내
+- body는 작성하지 않는다.
 
 ### type
 
@@ -41,4 +42,6 @@
 - 브랜치: `feature/{JIRA이슈번호}-{작업내용}` (예: `feature/108-login-api`), `hotfix/{이슈번호}-{작업내용}`
 - `main`, `develop-*`는 직접 커밋 금지 — 반드시 MR로만 반영
 - MR은 리뷰어 2인 이상 승인 필요, 병합 방식은 Merge
+- MR 템플릿: `.gitlab/merge_request_templates/Default.md` — GitLab에서 새 MR 생성 시 자동 적용됨.
+  구성: 작업 내용 / 관련 이슈(JIRA 키) / 변경 사항(체크리스트) / 테스트(선택)
 - 자세한 브랜치 전략·MR 템플릿·리뷰 규칙은 Notion 원본 문서 참고
