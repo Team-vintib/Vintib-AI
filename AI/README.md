@@ -39,7 +39,12 @@ AI/
 ├── config.py         # pydantic-settings 기반 환경설정
 ├── requirements.txt
 ├── requirements-dev.txt
-└── pyproject.toml    # ruff/black 설정
+├── pyproject.toml    # ruff/black 설정
+└── test/              # 모델 선정(비교·평가) 단계의 스파이크 코드, 프로덕션 코드 아님
 ```
 
 기능별(가상 시착, 설명 생성 등) 모듈 분리는 실제 구현 시작 시 진행.
+
+모델 선정(비교·평가) 단계의 실험 코드는 `test/`에 별도로 둔다.
+프로덕션 기능 모듈 구조에는 포함되지 않으며, 노트북 특성상 `ruff check .`에서 제외된다.
+후보 모델 로드/비교는 `test/model_selection/*.ipynb` 참고.

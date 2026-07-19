@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+extend-exclude = ["test/**/*.ipynb"]
 
 [tool.black]
 line-length = 100
