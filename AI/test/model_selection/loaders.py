@@ -98,6 +98,10 @@ class EmbeddingBundle:
     name: str
     model: Any
     device: str
+    # sentence-transformers/kanana는 토크나이징을 model.encode() 내부에서 알아서 하지만,
+    # 순수 transformers AutoModel(예: KoSimCSE)은 토크나이저를 직접 호출해야 해서 필요하다.
+    # 그런 모델이 아니면 None으로 둔다.
+    tokenizer: Any = None
 
 
 def load_kanana_embedding(model_id: str) -> EmbeddingBundle:
@@ -117,3 +121,27 @@ def load_bge_m3(model_id: str):
     device = select_device()
     use_fp16 = device == "cuda"  # fp16 mainly pays off on CUDA; skip on cpu/mps
     return BGEM3FlagModel(model_id, use_fp16=use_fp16, device=device)
+
+
+def load_sentence_transformer(model_id: str) -> EmbeddingBundle:
+    """sentence-transformers 라이브러리 자체 포맷(모듈 구성에 1_Pooling 등 포함)으로
+    배포된 임베딩 모델 공용 로더 — ko-sroberta-multitask/KURE-v1/BGE-m3-ko 등에 쓴다.
+    kanana(trust_remote_code 커스텀 코드)/bge-m3(FlagEmbedding 별도 라이브러리)처럼
+    특수한 로딩이 필요 없는 모델은 전부 이걸로 통일한다."""
+    from sentence_transformers import SentenceTransformer
+
+    device = select_device()
+    model = SentenceTransformer(model_id, device=device)
+    return EmbeddingBundle(name=model_id, model=model, device=device)
+
+
+def load_transformers_embedding(model_id: str) -> EmbeddingBundle:
+    """sentence-transformers 래핑이 없는 순수 transformers 체크포인트(예: BM-K/KoSimCSE-roberta)
+    용 로더. 이런 모델은 pooling 방식(예: CLS 토큰 vs mean pooling)이 모델마다/모델 카드
+    공식 사용법마다 달라 여기서 정하지 않는다 — tokenizer까지 담아 반환하고, 실제 풀링은
+    호출부(임베딩 함수)가 모델별로 알아서 하게 둔다."""
+    device = select_device()
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    model = AutoModel.from_pretrained(model_id).to(device)
+    model.eval()
+    return EmbeddingBundle(name=model_id, model=model, device=device, tokenizer=tokenizer)
