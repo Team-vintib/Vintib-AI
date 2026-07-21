@@ -31,3 +31,13 @@ ACTIVE_EMBEDDING = "kanana-nano-embedding"  # <- 여기 키만 바꾸면 스왑
 
 # 인기 기반 랭킹(popularity ranking)은 모델이 아닌 단순 카운트 로직이라
 # 여기 레지스트리 대상이 아님 — recommendation.ipynb 마지막 마크다운 셀 참고.
+
+# --- Feature 2 (라이브 댓글 관리): 의도 분류 게이트 (정상/악성/반복질문) ---
+# 반복질문 여부를 위한 라벨링 데이터가 아직 없어(Notion "라이브 댓글 관리 — 분산 Agent
+# 아키텍처 설계" 문서 "필요 데이터" 참고) 둘 다 zero-shot/규칙 기반 후보다.
+# 라벨 데이터가 쌓이면 전용 다중클래스 헤드 파인튜닝으로 교체 검토.
+INTENT_STRATEGIES = {
+    "kor_unsmile_plus_rule": "kor_unsmile로 악성 판정 + 규칙 기반(물음표/키워드)으로 반복질문 후보 탐지. 추가 모델 로딩 없음, 가장 빠름.",
+    "kanana_zero_shot": "kanana-1.5-instruct 프롬프트로 정상/악성/반복질문 3-way 분류. 생성 모델 1회 호출이라 상대적으로 느림.",
+}
+ACTIVE_INTENT = "kor_unsmile_plus_rule"  # <- 여기 키만 바꾸면 스왑 (chat_agent.py에서 사용)
