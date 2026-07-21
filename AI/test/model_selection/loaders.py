@@ -20,11 +20,11 @@ from transformers import (
 
 
 def select_device() -> str:
-    """Best available device on this machine. Dev box is a Mac: mps > cuda > cpu."""
-    if torch.backends.mps.is_available():
-        return "mps"
+    """Best available device on this machine. Dev laptop is Windows + RTX 4070: cuda > mps > cpu."""
     if torch.cuda.is_available():
         return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
     return "cpu"
 
 
