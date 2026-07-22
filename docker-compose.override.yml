@@ -1,0 +1,27 @@
+# 로컬 개발 전용 — `docker compose up -d` 시 자동 병합된다.
+#
+# 여기서만 호스트 포트를 연다. IDE에서 DB 클라이언트를 붙이거나
+# Spring 을 컨테이너 밖(로컬 JVM)에서 띄워 붙일 수 있게 하기 위함이다.
+#
+# ⚠️ EC2 에서는 이 파일이 병합되면 안 된다.
+#    운영 기동은 반드시 아래 형태로 -f 를 명시한다.
+#    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  postgres:
+    ports:
+      - "${DB_PORT:-5432}:5432"
+
+  redis:
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  backend:
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+
+  ai:
+    ports:
+      - "${AI_PORT:-8000}:8000"
