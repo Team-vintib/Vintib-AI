@@ -46,8 +46,8 @@ cloth_img = Image.open("image/cloth.jpg").convert("RGB").resize((1024, 1024))
 body_specs = {
     "height_cm": 150,
     "build": "athletic",
-    "shoulder_width": "broad",     # narrow / average / broad
-    "waist": "wide",               # slim / average / wide
+    "shoulder_width": "broad",  # narrow / average / broad
+    "waist": "wide",  # slim / average / wide
 }
 
 print("=== 프롬프트 구성 ===")

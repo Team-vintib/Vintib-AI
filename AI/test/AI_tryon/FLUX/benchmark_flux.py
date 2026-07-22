@@ -63,11 +63,11 @@ prompt = (
 results = []
 
 test_configs = [
-    {"steps": 4,  "resolution": (1024, 1024)},
+    {"steps": 4, "resolution": (1024, 1024)},
     {"steps": 10, "resolution": (1024, 1024)},
     {"steps": 20, "resolution": (1024, 1024)},
     {"steps": 30, "resolution": (1024, 1024)},
-    {"steps": 20, "resolution": (512, 512)},   # 해상도 비교용
+    {"steps": 20, "resolution": (512, 512)},  # 해상도 비교용
 ]
 
 for cfg in test_configs:
@@ -89,7 +89,7 @@ for cfg in test_configs:
     torch.cuda.synchronize()
     infer_time = time.time() - infer_start
 
-    peak_vram_gb = torch.cuda.max_memory_allocated() / (1024 ** 3)
+    peak_vram_gb = torch.cuda.max_memory_allocated() / (1024**3)
 
     output_name = f"bench_steps{steps}_{w}x{h}.png"
     image.save(output_name)

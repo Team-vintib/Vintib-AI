@@ -35,7 +35,7 @@ pipe = Flux2KleinPipeline.from_pretrained(
     torch_dtype=torch.bfloat16,
 )
 # pipe.enable_sequential_cpu_offload()
-pipe.enable_model_cpu_offload() 
+pipe.enable_model_cpu_offload()
 print("파이프라인 조립 완료, VRAM 오프로딩 활성화")
 
 print("=== Step 4: 이미지 생성 (저해상도 테스트) ===")

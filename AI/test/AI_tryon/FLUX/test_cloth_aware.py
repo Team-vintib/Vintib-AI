@@ -4,7 +4,6 @@ from diffusers import Flux2KleinPipeline, Flux2Transformer2DModel
 from diffusers import GGUFQuantizationConfig
 from transformers import AutoModelForCausalLM, BitsAndBytesConfig
 
-
 # =========================================================
 # 0. 핏(Fit) 계산 엔진 — 규칙 기반
 #    사람 사이즈 vs 옷 사이즈를 비교해서
@@ -111,9 +110,9 @@ cloth_img = Image.open("image/cloth.jpg").convert("RGB").resize((1024, 1024))
 body_specs = {
     "height_cm": 190,
     "build": "athletic",
-    "shoulder_width": "broad",   # narrow / average / broad
-    "waist": "wide",             # slim / average / wide
-    "size_label": "XL",           # 사람의 체형에 맞는 옷 사이즈 (예: 평소 입는 사이즈)
+    "shoulder_width": "broad",  # narrow / average / broad
+    "waist": "wide",  # slim / average / wide
+    "size_label": "XL",  # 사람의 체형에 맞는 옷 사이즈 (예: 평소 입는 사이즈)
 }
 
 # ---- 옷 스펙 (상품 정보에서 가져온다고 가정) ----
