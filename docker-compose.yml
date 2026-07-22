@@ -10,7 +10,10 @@ services:
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # PostgreSQL 18부터 마운트 지점이 /var/lib/postgresql/data → /var/lib/postgresql 로 바뀌었다.
+      # 이미지가 메이저 버전별 하위 디렉터리(/var/lib/postgresql/18/docker)를 직접 관리하며,
+      # 예전 경로에 마운트하면 기동 자체가 실패한다.
+      - postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-vintage_auction}"]
       interval: 5s
