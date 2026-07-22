@@ -102,5 +102,7 @@ def rerank_sessions(
     배치 후보 생성(콘텐츠 기반 방송 대표 벡터 유사도)은 이 함수 호출 전에 이미 끝났다고
     가정한다 — 여기 들어오는 `signals`는 이미 "후보로 뽑힌" 방송들이다.
     """
-    scored = [(s, score_session(s, weights=weights, max_viewer_count=max_viewer_count)) for s in signals]
+    scored = [
+        (s, score_session(s, weights=weights, max_viewer_count=max_viewer_count)) for s in signals
+    ]
     return sorted(scored, key=lambda x: x[1], reverse=True)

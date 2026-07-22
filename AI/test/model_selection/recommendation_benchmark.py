@@ -179,14 +179,18 @@ def _load_clip_pair() -> tuple[EmbeddingBundle, EmbeddingBundle]:
     )
 
 
-def _embed_clip_text(bundle: tuple[EmbeddingBundle, EmbeddingBundle], texts: list[str]) -> torch.Tensor:
+def _embed_clip_text(
+    bundle: tuple[EmbeddingBundle, EmbeddingBundle], texts: list[str]
+) -> torch.Tensor:
     """CLIP 텍스트 타워(`bundle[0]`) — sentence-transformers의 CLIPModel은 str 리스트를
     넣으면 자동으로 텍스트 인코딩 경로를 탄다."""
     text_bundle, _ = bundle
     return torch.as_tensor(text_bundle.model.encode(texts, convert_to_numpy=True))
 
 
-def _embed_clip_images(bundle: tuple[EmbeddingBundle, EmbeddingBundle], images: list[Any]) -> torch.Tensor:
+def _embed_clip_images(
+    bundle: tuple[EmbeddingBundle, EmbeddingBundle], images: list[Any]
+) -> torch.Tensor:
     """CLIP 이미지 타워(`bundle[1]`) — PIL.Image 리스트를 넣으면 자동으로 이미지 인코딩
     경로를 탄다. 텍스트 타워(`_embed_clip_text`)와 같은 벡터 공간이라 코사인 유사도로 바로
     비교 가능하다(두 모델이 별개로 로드됐다는 사실은 여기서만 알면 되고, 호출부는 신경쓸
@@ -431,19 +435,28 @@ def run_all_recommendations(
     for name, candidate in candidates.items():
         try:
             results.append(benchmark_recommendation(candidate, corpus, queries, warmup=warmup))
-        except Exception as exc:  # noqa: BLE001 — 스파이크 코드: 한 후보 실패해도 나머지는 계속 돈다
+        except (
+            Exception
+        ) as exc:  # noqa: BLE001 — 스파이크 코드: 한 후보 실패해도 나머지는 계속 돈다
             print(f"[{name}] 추천 벤치마크 실패: {exc}")
     return results
 
 
-def print_report(results: list[RecommendationResult], *, k_values: tuple[int, ...] = (3, 5)) -> None:
+def print_report(
+    results: list[RecommendationResult], *, k_values: tuple[int, ...] = (3, 5)
+) -> None:
     """`run_all_recommendations()` 결과를 표로 출력한다.
 
     이 함수는 "어떤 모델이 맞다"는 결론을 내리지 않는다 — 최종 판단은 사람이 한다(다른 두
     벤치마크 모듈과 동일한 스탠스). 코퍼스가 실제 카탈로그가 아니라 플레이스홀더라는 점도
     항상 함께 봐야 한다.
     """
-    header_parts = [f"{'모델':28s}", f"{'로드(s)':>8s}", f"{'메모리(MB)':>10s}", f"{'평균(ms)':>10s}"]
+    header_parts = [
+        f"{'모델':28s}",
+        f"{'로드(s)':>8s}",
+        f"{'메모리(MB)':>10s}",
+        f"{'평균(ms)':>10s}",
+    ]
     header_parts += [f"{'recall@' + str(k):>10s}" for k in k_values]
     header_parts += [f"{'precision@' + str(k):>12s}" for k in k_values]
     header = " ".join(header_parts)
