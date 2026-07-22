@@ -1,0 +1,20 @@
+spring:
+  jpa:
+    hibernate:
+      # ERD 확정(-296) 전까지 로컬은 자동 반영. 확정 후 마이그레이션 도구 도입 검토.
+      ddl-auto: update
+    show-sql: true
+
+logging:
+  level:
+    com.ssafy.backend: debug
+    org.hibernate.SQL: debug
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, env, beans
+  endpoint:
+    health:
+      show-details: always
