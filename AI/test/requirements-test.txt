@@ -1,0 +1,29 @@
+# Deps for the model-selection spike notebooks only (AI/test/model_selection/).
+# NOT installed by CI (the ai-test job only installs AI/requirements-dev.txt) and NOT
+# part of the FastAPI service's runtime deps — kept separate on purpose.
+#
+# Lower-bound pins on purpose (unlike requirements.txt's exact pins): this is throwaway
+# spike code where exact reproducibility isn't the goal, and exact pins on fast-moving
+# ML libraries would just go stale / fight the HF repos' own minimum-version requirements.
+
+# transformers pinned below 5.0: the 5.x line's stricter config validation rejects
+# kakaocorp/kanana-1.5-*-instruct's published config (hidden_size not a multiple of
+# num_attention_heads, which is valid for this architecture but 5.x's validator
+# doesn't account for it). Loads fine on 4.57.x. Revisit this pin when Kanana or
+# transformers ships a fix.
+#
+# Dev laptop has an RTX 4070 (driver reports CUDA 13.1 as its max supported runtime),
+# so pull torch from the CUDA 13.0 build index instead of the CPU-only PyPI default.
+# --extra-index-url keeps PyPI as the source for every other package here; only torch
+# has a same-version, higher-priority (PEP 440 local version) match on this index.
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch>=2.4
+transformers>=4.46,<5
+accelerate>=0.34
+sentence-transformers>=3.2
+FlagEmbedding>=1.3
+requests>=2.32
+
+jupyterlab>=4.2
+ipykernel>=6.29
+nbformat>=5.10

@@ -10,6 +10,7 @@ target-version = "py312"
 extend-exclude = [
 "test/AI_tryon/tryondiffusion",
 "test/AI_tryon/catvton",
+"test/**/*.ipynb",
 ]
 
 [tool.black]
