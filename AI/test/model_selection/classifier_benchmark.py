@@ -257,7 +257,9 @@ def run_all(
     for name, model_id in models.items():
         try:
             results.append(benchmark_model(name, model_id, samples, warmup=warmup))
-        except Exception as exc:  # noqa: BLE001 — 스파이크 코드: 한 후보 실패해도 나머지는 계속 돈다
+        except (
+            Exception
+        ) as exc:  # noqa: BLE001 — 스파이크 코드: 한 후보 실패해도 나머지는 계속 돈다
             print(f"[{name}] 벤치마크 실패: {exc}")
     return results
 
@@ -283,7 +285,9 @@ def print_report(results: list[BenchResult]) -> None:
                 f"({r.per_class_correct.get(label, 0)}/{r.per_class_total[label]})"
             )
     print()
-    print(f"주의: 현재 샘플 수({len(results[0].latencies_ms) if results else 0}건)로는 p95/p99가 통계적으로 무의미합니다.")
+    print(
+        f"주의: 현재 샘플 수({len(results[0].latencies_ms) if results else 0}건)로는 p95/p99가 통계적으로 무의미합니다."
+    )
     print("      최소 200~300건, 실제 채팅 분포에 맞춘 클래스 비율로 재실행하세요.")
 
 

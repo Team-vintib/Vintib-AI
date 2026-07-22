@@ -332,7 +332,9 @@ def run_all_embeddings(
     for name, candidate in candidates.items():
         try:
             results.append(benchmark_embedding(candidate, groups, warmup=warmup))
-        except Exception as exc:  # noqa: BLE001 — 스파이크 코드: 한 후보 실패해도 나머지는 계속 돈다
+        except (
+            Exception
+        ) as exc:  # noqa: BLE001 — 스파이크 코드: 한 후보 실패해도 나머지는 계속 돈다
             print(f"[{name}] 임베딩 벤치마크 실패: {exc}")
     return results
 
