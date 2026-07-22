@@ -1,0 +1,21 @@
+spring:
+  jpa:
+    hibernate:
+      # 운영에서는 스키마를 자동 변경하지 않는다.
+      ddl-auto: validate
+    show-sql: false
+
+logging:
+  level:
+    root: info
+    com.ssafy.backend: info
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      # 컨테이너 healthcheck 용도로만 노출. 내부 구성 정보는 숨긴다.
+      show-details: never

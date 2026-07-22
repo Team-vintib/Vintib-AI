@@ -2,6 +2,9 @@ spring:
   application:
     name: backend
 
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:vintage_auction}
     username: ${DB_USERNAME:postgres}
@@ -9,8 +12,6 @@ spring:
     driver-class-name: org.postgresql.Driver
 
   jpa:
-    hibernate:
-      ddl-auto: update
     open-in-view: false
     properties:
       hibernate:
@@ -23,3 +24,9 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+
+# Spring 은 FastAPI 만 바라본다. 추론용 노트북 연결은 AI 팀 영역.
+ai:
+  base-url: ${AI_BASE_URL:http://localhost:8000}
+  connect-timeout: 2s
+  read-timeout: 5s
