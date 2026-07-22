@@ -1,16 +1,32 @@
+# 베이스 정의 — 운영(EC2) 기준으로 안전한 기본값을 담는다.
+#
+# ⚠️ 이 파일에는 호스트 포트 publish를 절대 추가하지 않는다.
+#    Docker는 포트 publish 시 iptables를 직접 조작해 UFW를 우회하므로,
+#    여기에 ports를 적으면 PostgreSQL·Redis·FastAPI가 그대로 외부에 노출된다.
+#
+# 로컬 개발 : docker compose up -d
+#             → docker-compose.override.yml 이 자동 병합되어 개발용 포트가 열린다.
+# EC2 운영  : docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#             → override 를 타지 않도록 반드시 -f 를 명시한다.
+
 services:
   postgres:
     image: postgres:18-alpine
-    container_name: vintage-auction-postgres
+    container_name: vintib-postgres
     restart: unless-stopped
+    command: ["postgres", "-c", "shared_buffers=1GB"]
     environment:
       POSTGRES_DB: ${DB_NAME:-vintage_auction}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-    ports:
-      - "${DB_PORT:-5432}:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # PostgreSQL 18부터 마운트 지점이 /var/lib/postgresql/data → /var/lib/postgresql 로 바뀌었다.
+      # 이미지가 메이저 버전별 하위 디렉터리(/var/lib/postgresql/18/docker)를 직접 관리하며,
+      # 예전 경로에 마운트하면 기동 자체가 실패한다.
+      - postgres-data:/var/lib/postgresql
+    networks:
+      - vintib-net
+    mem_limit: 2g
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-vintage_auction}"]
       interval: 5s
@@ -19,17 +35,90 @@ services:
 
   redis:
     image: redis:8.8-alpine
-    container_name: vintage-auction-redis
+    container_name: vintib-redis
     restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    # noeviction 필수 — 입찰 분산락·포인트 보류 상태가 메모리 압박으로 유실되면 안 된다.
+    command:
+      - redis-server
+      - --maxmemory
+      - 768mb
+      - --maxmemory-policy
+      - noeviction
+      - --appendonly
+      - "yes"
     volumes:
       - redis-data:/data
+    networks:
+      - vintib-net
+    mem_limit: 1g
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  backend:
+    build:
+      context: ./BE
+    image: vintib-backend:${IMAGE_TAG:-local}
+    container_name: vintib-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-vintage_auction}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AI_BASE_URL: http://ai:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - vintib-net
+    mem_limit: 3g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  ai:
+    build:
+      context: ./AI
+    image: vintib-ai:${IMAGE_TAG:-local}
+    container_name: vintib-ai
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-vintage_auction}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    networks:
+      - vintib-net
+    mem_limit: 1g
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+networks:
+  vintib-net:
+    driver: bridge
 
 volumes:
   postgres-data:

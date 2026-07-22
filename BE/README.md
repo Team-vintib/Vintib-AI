@@ -12,7 +12,7 @@
 - 라이브 방송/채팅 시그널링 및 상태 관리 (LIVE, CHAT)
 - 실시간 경매 (AUCT) — 입찰, 포인트 홀드, 자동 연장, 낙찰 처리
 - 포인트·구매·배송·정산 (POINT, BUY, PAY, SHIP, ORDER, SETTLE, REFUND)
-- AI 서버(FastAPI)와의 연동 (가상 시착 요청, 상품 설명 초안 등)
+- AI 서버(FastAPI)와의 연동 (가상 시착, 추천, 라이브 댓글 관리)
 
 ## 기술 스택
 
@@ -20,26 +20,104 @@
 - Spring Web, Spring Data JPA (+ QueryDSL 검토), Spring Security, Validation, Lombok
 - 실시간: Spring WebSocket(STOMP) — 채팅/경매 이벤트
 - Redis(Spring Data Redis): 입찰 동시성 제어(분산 락 도입 검토), 서버 간 이벤트 Pub/Sub, 캐시
-- PostgreSQL Driver
-- 파일 저장: S3 or MinIO (미확정)
+- PostgreSQL 18 Driver
+- 파일 저장: **S3 미제공** — EC2 로컬 볼륨 기준으로 설계 (방식 미확정)
 
 > Spring Initializr(start.spring.io)가 현재 3.x 라인을 더 이상 제공하지 않아 최신 4.1.0으로 생성함.
 
 ## 실행 방법
 
-1. 루트의 `docker-compose.yml`로 Postgres/Redis 실행: `docker compose up -d postgres redis`
-2. `.env.example`을 `.env`로 복사 후 값 조정
-3. `./gradlew bootRun`
+### 1) 전부 컨테이너로 (권장 — EC2와 동일 구성)
+
+레포 루트에서:
+
+```bash
+cp .env.example .env && docker compose up -d
+```
+
+`docker-compose.override.yml`이 자동 병합되어 로컬 개발용 포트가 열린다.
+
+| 서비스 | 로컬 주소 |
+| --- | --- |
+| Spring Boot | http://localhost:8080 |
+| FastAPI | http://localhost:8000 |
+| PostgreSQL | localhost:5432 |
+| Redis | localhost:6379 |
+
+배선 확인:
+
+```bash
+curl -s http://localhost:8080/actuator/health && curl -s http://localhost:8080/api/health
+```
+
+`/actuator/health`는 PostgreSQL·Redis를, `/api/health`는 FastAPI 도달 여부를 보여준다.
+
+### 2) 인프라만 컨테이너 + Spring은 IDE에서
+
+```bash
+docker compose up -d postgres redis ai
+```
+
+이후 `BE/`에서 `./gradlew bootRun` (기본 프로파일 `local`).
+
+### 3) EC2 운영 기동
+
+override를 타지 않도록 `-f`를 반드시 명시한다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+> [!WARNING]
+> 베이스 `docker-compose.yml`에는 호스트 포트를 절대 추가하지 않는다. Docker는 포트 publish 시 iptables를 직접 조작해 UFW를 우회하므로, PostgreSQL·Redis·FastAPI가 그대로 외부에 노출된다. 로컬용 포트는 `docker-compose.override.yml`에만 둔다.
+
+## 프로파일
+
+| 프로파일 | ddl-auto | actuator 노출 | 용도 |
+| --- | --- | --- | --- |
+| `local` | `update` | health, info, metrics, env, beans | 개발 |
+| `prod` | `validate` | health (상세 숨김) | EC2 |
+
+## DB 설계
+
+테이블 23개 기준. 상세는 [`docs/db/`](./docs/db)에 있다.
+
+| 문서 | 내용 |
+| --- | --- |
+| [ERD·상태 설계](./docs/db/erd.md) | ERD, 상태 전이, 정책을 DB 제약으로 옮긴 근거, 미확인 가정 |
+| [데이터 사전](./docs/db/data-dictionary.md) | 테이블별 컬럼·타입·제약·기본값·설명 (자동 생성) |
+| [`schema.sql`](./docs/db/schema.sql) | 스키마 원본 — 단일 기준 |
+
+> [!IMPORTANT]
+> `data-dictionary.md`와 `docs/db/img/`는 **자동 생성물이다.** 직접 고치지 말고 `bash docs/db/regen.sh` / `bash docs/db/export-erd.sh`로 다시 뽑는다.
+
+경매 동시성 정책(`LIVE-004`, `AUCT-004/006/008/009`)은 애플리케이션 검증뿐 아니라 **DB 제약으로도 막혀 있다.** 입찰 로직을 손볼 때는 [`erd.md` §4](./docs/db/erd.md)를 먼저 읽을 것 — 특히 포인트 보류 해제 순서를 잘못 잡으면 제약이 무력화된다.
 
 ## 디렉터리 구조
 
 ```
-BE/
-├── build.gradle
-├── settings.gradle
-├── src/main/java/com/ssafy/backend/BackendApplication.java
-├── src/main/resources/application.yml
-└── src/test/java/com/ssafy/backend/
+BE/src/main/java/com/ssafy/backend/
+├── BackendApplication.java
+├── global/                     # 도메인 무관 공통 — BE 2인 공유
+│   ├── response/               # ApiResponse<T>, ErrorResponse   (서윤, -295)
+│   ├── exception/              # ErrorCode, CustomException, GlobalExceptionHandler (서윤, -295)
+│   ├── config/                 # SecurityConfig(임시 스텁), AiClientConfig
+│   ├── client/                 # AiClient — Spring → FastAPI
+│   └── health/                 # HealthController
+└── domain/                     # 도메인별 패키지 (기능 착수 시 생성)
+    └── {auth,member,product,point,order}/   ← 서윤
+        {live,auction,chat,home,search}/     ← 정윤
 ```
 
-도메인별 패키지(controller/service/domain 등)는 아직 나누지 않음. 구조 확정 시 이 섹션 갱신.
+도메인 패키지는 `domain/{도메인}/` 아래에 `controller` / `service` / `repository` / `entity` / `dto`로 나눈다.
+
+> `global/` 아래는 두 사람이 공유한다. 특히 `ErrorCode`는 단일 enum을 함께 쓰므로 도메인별 접두어 구역(C/U/L/A/W/O/T)을 지키고, 자기 구역에만 추가한다.
+
+## 공통 응답 규격
+
+성공·실패 모두 `ApiResponse<T>` 한 겹으로 감싼다.
+
+```json
+{ "success": true,  "data": { }, "error": null }
+{ "success": false, "data": null, "error": { "code": "A002", "message": "입찰 금액이 현재 최고가보다 낮습니다.", "errors": null } }
+```
