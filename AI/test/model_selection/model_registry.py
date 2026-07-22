@@ -26,7 +26,10 @@ ACTIVE_GENERATIVE = "kanana-2.1b"  # <- 여기 키만 바꾸면 스왑
 EMBEDDING_MODELS = {
     "kanana-nano-embedding": "kakaocorp/kanana-nano-2.1b-embedding",  # loaders.load_kanana_embedding() 사용
     "bge-m3": "BAAI/bge-m3",  # loaders.load_bge_m3() 사용 — 다른 라이브러리
-    "clip-vit-b32-multilingual": "sentence-transformers/clip-ViT-B-32-multilingual-v1",  # loaders.load_sentence_transformer() 사용, 이미지 코퍼스 임베딩용(recommendation_benchmark.py)
+    # CLIP은 텍스트/이미지 타워를 따로 로드해야 하는 2-모델 조합이다(recommendation_benchmark.py
+    # 참고) — 아래 두 항목은 같은 벡터 공간을 공유하도록 sentence-transformers가 공식 배포한 쌍이다.
+    "clip-vit-b32-multilingual": "sentence-transformers/clip-ViT-B-32-multilingual-v1",  # 텍스트 타워(다국어 지식증류). 원본 CLIP 텍스트 인코더는 영어 전용이라 한국어 쿼리엔 이 버전을 씀
+    "clip-vit-b32": "sentence-transformers/clip-ViT-B-32",  # 이미지 타워(원본 CLIP). 멀티링구얼 버전은 텍스트 전용이라 이미지 인코딩 자체를 지원하지 않음
 }
 ACTIVE_EMBEDDING = "kanana-nano-embedding"  # <- 여기 키만 바꾸면 스왑
 

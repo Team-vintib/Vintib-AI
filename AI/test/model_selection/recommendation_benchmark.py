@@ -166,16 +166,33 @@ def _embed_bge_m3(bundle, texts: list[str]) -> torch.Tensor:
     return torch.as_tensor(bundle.encode(texts)["dense_vecs"])
 
 
-def _embed_clip_text(bundle: EmbeddingBundle, texts: list[str]) -> torch.Tensor:
-    """CLIP 텍스트 타워 — sentence-transformers의 CLIPModel은 str 리스트를 넣으면
-    자동으로 텍스트 인코딩 경로를 탄다."""
-    return torch.as_tensor(bundle.model.encode(texts, convert_to_numpy=True))
+def _load_clip_pair() -> tuple[EmbeddingBundle, EmbeddingBundle]:
+    """CLIP은 텍스트/이미지를 한 모델로 못 돌린다 — `clip-vit-b32-multilingual`(텍스트 전용
+    지식증류 모델)은 이미지 인코딩 자체를 지원하지 않는다("Modality 'image' is not supported"
+    에러로 실측 확인됨). sentence-transformers 공식 사용법대로, **같은 벡터 공간을 공유하도록
+    학습된** 원본 이미지 타워(`clip-vit-b32`)와 다국어 텍스트 타워(`clip-vit-b32-multilingual`)를
+    각각 로드해 튜플로 묶는다 — `RecommendationCandidate.load`는 `Callable[[], Any]`라
+    번들 하나 대신 튜플을 반환해도 나머지 벤치마크 로직은 그대로 재사용된다."""
+    return (
+        load_sentence_transformer(EMBEDDING_MODELS["clip-vit-b32-multilingual"]),  # [0] 텍스트 타워
+        load_sentence_transformer(EMBEDDING_MODELS["clip-vit-b32"]),  # [1] 이미지 타워
+    )
 
 
-def _embed_clip_images(bundle: EmbeddingBundle, images: list[Any]) -> torch.Tensor:
-    """CLIP 이미지 타워 — PIL.Image 리스트를 넣으면 자동으로 이미지 인코딩 경로를 탄다.
-    텍스트 타워(`_embed_clip_text`)와 같은 벡터 공간이라 코사인 유사도로 바로 비교 가능하다."""
-    return torch.as_tensor(bundle.model.encode(images, convert_to_numpy=True))
+def _embed_clip_text(bundle: tuple[EmbeddingBundle, EmbeddingBundle], texts: list[str]) -> torch.Tensor:
+    """CLIP 텍스트 타워(`bundle[0]`) — sentence-transformers의 CLIPModel은 str 리스트를
+    넣으면 자동으로 텍스트 인코딩 경로를 탄다."""
+    text_bundle, _ = bundle
+    return torch.as_tensor(text_bundle.model.encode(texts, convert_to_numpy=True))
+
+
+def _embed_clip_images(bundle: tuple[EmbeddingBundle, EmbeddingBundle], images: list[Any]) -> torch.Tensor:
+    """CLIP 이미지 타워(`bundle[1]`) — PIL.Image 리스트를 넣으면 자동으로 이미지 인코딩
+    경로를 탄다. 텍스트 타워(`_embed_clip_text`)와 같은 벡터 공간이라 코사인 유사도로 바로
+    비교 가능하다(두 모델이 별개로 로드됐다는 사실은 여기서만 알면 되고, 호출부는 신경쓸
+    필요 없다)."""
+    _, image_bundle = bundle
+    return torch.as_tensor(image_bundle.model.encode(images, convert_to_numpy=True))
 
 
 @dataclass
@@ -227,15 +244,20 @@ CANDIDATE_RECOMMENDATIONS: dict[str, RecommendationCandidate] = {
     ),
     "clip_vit_b32_multilingual": RecommendationCandidate(
         name="clip_vit_b32_multilingual",
-        model_id=EMBEDDING_MODELS["clip-vit-b32-multilingual"],
+        model_id=(
+            f"{EMBEDDING_MODELS['clip-vit-b32-multilingual']} (text) + "
+            f"{EMBEDDING_MODELS['clip-vit-b32']} (image)"
+        ),
         note=(
             "신규 후보 — LAB-10이 전제한 'CLIP 기반 이미지 임베딩'을 실제로 검증하는 첫 후보. "
-            "원본 openai/clip-vit-base-patch32는 텍스트 타워가 영어 전용이라 한국어 쿼리에 약할 "
-            "수 있어, 멀티링구얼 지식증류로 텍스트 타워만 다국어로 확장한 sentence-transformers "
-            "공식 변형을 대신 쓴다(이미지 타워는 원본 CLIP과 동일)."
+            "2-모델 조합이다: 원본 openai/clip-vit-base-patch32는 텍스트 타워가 영어 전용이라 "
+            "한국어 쿼리에 약할 수 있어, 멀티링구얼 지식증류로 텍스트 타워만 다국어로 확장한 "
+            "sentence-transformers 공식 변형(clip-vit-b32-multilingual)으로 쿼리를 인코딩하고, "
+            "이미지는 그 변형이 지원하지 않아(텍스트 전용 모델) 원본 이미지 타워(clip-vit-b32)로 "
+            "인코딩한다 — 두 모델이 같은 벡터 공간을 공유하도록 학습됐기 때문에 가능한 조합."
         ),
         corpus_modality="image",
-        load=partial(load_sentence_transformer, EMBEDDING_MODELS["clip-vit-b32-multilingual"]),
+        load=_load_clip_pair,
         embed_query_fn=_embed_clip_text,
         embed_corpus_fn=_embed_clip_images,
     ),
