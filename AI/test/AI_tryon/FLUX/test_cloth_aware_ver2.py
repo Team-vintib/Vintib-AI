@@ -4,7 +4,6 @@ from diffusers import Flux2KleinPipeline, Flux2Transformer2DModel
 from diffusers import GGUFQuantizationConfig
 from transformers import AutoModelForCausalLM, BitsAndBytesConfig
 
-
 # =========================================================
 # 0. 핏(Fit) 계산 엔진 — 규칙 기반
 # =========================================================
@@ -63,7 +62,10 @@ def build_fit_prompt_segment(body_size: str, cloth_size: str):
 #    (참고용 근사치이며, 정밀한 신체 비율 계산이 아님)
 # =========================================================
 
-def pre_warp_body(img: Image.Image, height_scale: float = 1.0, width_scale: float = 1.0) -> Image.Image:
+
+def pre_warp_body(
+    img: Image.Image, height_scale: float = 1.0, width_scale: float = 1.0
+) -> Image.Image:
     w, h = img.size
     new_w, new_h = int(w * width_scale), int(h * height_scale)
     resized = img.resize((new_w, new_h))
@@ -81,9 +83,8 @@ def estimate_warp_scale(body_specs: dict, reference_height_cm: float = 170.0):
     shoulder_map = {"narrow": 0.92, "average": 1.0, "broad": 1.1}
     waist_map = {"slim": 0.92, "average": 1.0, "wide": 1.1}
 
-    width_scale = (
-        shoulder_map.get(body_specs["shoulder_width"], 1.0)
-        * waist_map.get(body_specs["waist"], 1.0)
+    width_scale = shoulder_map.get(body_specs["shoulder_width"], 1.0) * waist_map.get(
+        body_specs["waist"], 1.0
     )
     height_scale = max(0.85, min(1.15, height_scale))
     width_scale = max(0.85, min(1.2, width_scale))
