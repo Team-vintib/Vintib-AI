@@ -1,6 +1,6 @@
 ---
 name: scaffold
-description: Scaffold a new BE domain package (controller/service/entity/repository/dto) following this project's conventions. Use after a plan in .claude/plans/be/ is approved, when starting to implement a new domain's API endpoints defined in the API spec.
+description: Scaffold a new BE domain package (controller/service/domain/repository/dto) following this project's conventions. Use after a plan in .claude/plans/be/ is approved, when starting to implement a new domain's API endpoints defined in the API spec.
 ---
 
 # BE 도메인 스캐폴드
@@ -15,15 +15,11 @@ description: Scaffold a new BE domain package (controller/service/entity/reposit
 com.ssafy.backend.<domain>/
 ├── controller/
 ├── service/
-├── entity/         # JPA 엔티티
+├── domain/       # JPA 엔티티
 ├── repository/
 └── dto/
-    ├── request/
-    └── response/
 ```
 
-- 엔티티 서브패키지명은 `entity`를 쓴다 (`domain`이 아님). 이 프로젝트에서 "도메인"은 이미 AUTH/PROD/LIVE 같은 기능 단위(모듈)를 가리키는 말로 쓰이고 있어서, 그 안에 또 `domain` 서브패키지를 두면 같은 단어가 두 가지 뜻으로 겹쳐 헷갈린다.
-- `<domain>` 패키지는 `com.ssafy.backend.<domain>` 바로 아래에 둔다 — 그 위에 `com.ssafy.backend.domain.<domain>`처럼 한 단계 더 감싸지 않는다.
 - `<domain>`은 소문자 영문 도메인명 (예: AUTH→`auth`, PROD→`product`, LIVE→`live`, AUCT→`auction`, POINT→`point`). 계획 파일에 적힌 도메인 코드 기준으로 정하고, 애매하면 사용자에게 확인한다.
 - 계획의 "구현 목록"에 있는 항목만 만든다 — 명세서에 없는 엔드포인트나 필드를 미리 만들지 않는다.
 
@@ -34,8 +30,8 @@ com.ssafy.backend.<domain>/
 ```java
 package com.ssafy.backend.<domain>.controller;
 
-import com.ssafy.backend.<domain>.dto.request.<Domain>Request;
-import com.ssafy.backend.<domain>.dto.response.<Domain>Response;
+import com.ssafy.backend.<domain>.dto.<Domain>RequestDto;
+import com.ssafy.backend.<domain>.dto.<Domain>ResponseDto;
 import com.ssafy.backend.<domain>.service.<Domain>Service;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -50,7 +46,7 @@ public class <Domain>Controller {
     private final <Domain>Service <domain>Service;
 
     @PostMapping
-    public ResponseEntity<<Domain>Response> create(@Valid @RequestBody <Domain>Request request) {
+    public ResponseEntity<<Domain>ResponseDto> create(@Valid @RequestBody <Domain>RequestDto request) {
         return ResponseEntity.ok(<domain>Service.create(request));
     }
 }
@@ -61,9 +57,9 @@ public class <Domain>Controller {
 ```java
 package com.ssafy.backend.<domain>.service;
 
-import com.ssafy.backend.<domain>.entity.<Entity>;
-import com.ssafy.backend.<domain>.dto.request.<Domain>Request;
-import com.ssafy.backend.<domain>.dto.response.<Domain>Response;
+import com.ssafy.backend.<domain>.domain.<Entity>;
+import com.ssafy.backend.<domain>.dto.<Domain>RequestDto;
+import com.ssafy.backend.<domain>.dto.<Domain>ResponseDto;
 import com.ssafy.backend.<domain>.repository.<Entity>Repository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -77,7 +73,7 @@ public class <Domain>Service {
     private final <Entity>Repository <entity>Repository;
 
     @Transactional
-    public <Domain>Response create(<Domain>Request request) {
+    public <Domain>ResponseDto create(<Domain>RequestDto request) {
         // TODO: 명세서 기준으로 구현
         throw new UnsupportedOperationException();
     }
@@ -86,10 +82,10 @@ public class <Domain>Service {
 
 클래스 레벨 `@Transactional(readOnly = true)` + 쓰기 메서드에만 `@Transactional`을 얹는 패턴을 기본으로 한다.
 
-### Entity
+### Entity (domain)
 
 ```java
-package com.ssafy.backend.<domain>.entity;
+package com.ssafy.backend.<domain>.domain;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -120,7 +116,7 @@ public class <Entity> {
 ```java
 package com.ssafy.backend.<domain>.repository;
 
-import com.ssafy.backend.<domain>.entity.<Entity>;
+import com.ssafy.backend.<domain>.domain.<Entity>;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface <Entity>Repository extends JpaRepository<<Entity>, Long> {
@@ -129,23 +125,23 @@ public interface <Entity>Repository extends JpaRepository<<Entity>, Long> {
 
 ### DTO
 
-요청/응답 DTO는 record + Bean Validation으로 작성한다. 엔드포인트마다 별도 DTO를 만든다 (하나로 돌려쓰지 않는다). `Request`/`Response`라는 이름 자체가 이미 DTO임을 나타내므로 `Dto` 접미사는 붙이지 않는다 (패키지도 이미 `dto`라 중복). request/response는 각각 `dto/request`, `dto/response` 서브패키지에 둔다.
+요청/응답 DTO는 record + Bean Validation으로 작성한다. 엔드포인트마다 별도 DTO를 만든다 (하나로 돌려쓰지 않는다).
 
 ```java
-package com.ssafy.backend.<domain>.dto.request;
+package com.ssafy.backend.<domain>.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
-public record <Domain>Request(
+public record <Domain>RequestDto(
         @NotBlank String example
 ) {
 }
 ```
 
 ```java
-package com.ssafy.backend.<domain>.dto.response;
+package com.ssafy.backend.<domain>.dto;
 
-public record <Domain>Response(
+public record <Domain>ResponseDto(
         Long id
 ) {
 }
