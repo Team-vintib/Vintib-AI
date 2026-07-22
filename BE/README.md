@@ -78,6 +78,21 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 | `local` | `update` | health, info, metrics, env, beans | 개발 |
 | `prod` | `validate` | health (상세 숨김) | EC2 |
 
+## DB 설계
+
+테이블 23개 기준. 상세는 [`docs/db/`](./docs/db)에 있다.
+
+| 문서 | 내용 |
+| --- | --- |
+| [ERD·상태 설계](./docs/db/erd.md) | ERD, 상태 전이, 정책을 DB 제약으로 옮긴 근거, 미확인 가정 |
+| [데이터 사전](./docs/db/data-dictionary.md) | 테이블별 컬럼·타입·제약·기본값·설명 (자동 생성) |
+| [`schema.sql`](./docs/db/schema.sql) | 스키마 원본 — 단일 기준 |
+
+> [!IMPORTANT]
+> `data-dictionary.md`와 `docs/db/img/`는 **자동 생성물이다.** 직접 고치지 말고 `bash docs/db/regen.sh` / `bash docs/db/export-erd.sh`로 다시 뽑는다.
+
+경매 동시성 정책(`LIVE-004`, `AUCT-004/006/008/009`)은 애플리케이션 검증뿐 아니라 **DB 제약으로도 막혀 있다.** 입찰 로직을 손볼 때는 [`erd.md` §4](./docs/db/erd.md)를 먼저 읽을 것 — 특히 포인트 보류 해제 순서를 잘못 잡으면 제약이 무력화된다.
+
 ## 디렉터리 구조
 
 ```
