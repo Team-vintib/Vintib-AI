@@ -26,6 +26,7 @@ ACTIVE_GENERATIVE = "kanana-2.1b"  # <- 여기 키만 바꾸면 스왑
 EMBEDDING_MODELS = {
     "kanana-nano-embedding": "kakaocorp/kanana-nano-2.1b-embedding",  # loaders.load_kanana_embedding() 사용
     "bge-m3": "BAAI/bge-m3",  # loaders.load_bge_m3() 사용 — 다른 라이브러리
+    "clip-vit-b32-multilingual": "sentence-transformers/clip-ViT-B-32-multilingual-v1",  # loaders.load_sentence_transformer() 사용, 이미지 코퍼스 임베딩용(recommendation_benchmark.py)
 }
 ACTIVE_EMBEDDING = "kanana-nano-embedding"  # <- 여기 키만 바꾸면 스왑
 

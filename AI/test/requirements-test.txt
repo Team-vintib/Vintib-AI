@@ -29,6 +29,12 @@ requests>=2.32
 pandas>=2.2
 matplotlib>=3.9
 
+# recommendation_benchmark.py의 CLIP 이미지 코퍼스 플레이스홀더(ashraq/fashion-product-images-small,
+# 실제 상품 이미지가 아직 없어 공개 데이터셋으로 대체) 로딩용. sentence-transformers는 이미 있지만
+# HF datasets 다운로드 자체는 별도 라이브러리가 필요하다.
+datasets>=2.20
+Pillow>=10.0
+
 jupyterlab>=4.2
 ipykernel>=6.29
 nbformat>=5.10
