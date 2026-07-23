@@ -2,7 +2,11 @@
 
 > 대상 DB: PostgreSQL 18 · 테이블 23개
 > DDL: [`schema.sql`](./schema.sql) — 실제 PostgreSQL 18에 적용 검증 완료
-> 데이터 사전(-52)은 이 문서를 근거로 작성한다.
+> 데이터 사전: [`data-dictionary.md`](./data-dictionary.md) — 이 스키마에서 자동 생성
+>
+> 아래 다이어그램은 mermaid 원본이다. GitLab·Notion은 그대로 렌더링하지만,
+> mermaid를 못 쓰는 곳(발표자료 등)을 위해 [`img/`](./img)에 SVG·PNG를 함께 둔다.
+> 이미지는 파생물이므로 직접 고치지 말고 `bash BE/docs/db/export-erd.sh`로 다시 뽑는다.
 
 ## 0. 이 문서를 읽는 사람에게
 
@@ -18,6 +22,8 @@
 ---
 
 ## 1. 전체 ERD
+
+[이미지로 보기](./img/erd-full.png)
 
 ```mermaid
 erDiagram
@@ -59,6 +65,8 @@ erDiagram
 ```
 
 ## 2. 핵심 관계 — 입찰 1건이 건드리는 것
+
+[이미지로 보기](./img/erd-bid-core.png)
 
 경매 로직의 중심이다. 입찰 한 번에 `bid` 생성 → 이전 `point_hold` 해제 → 새 `point_hold` 생성 → `auction` 현재가·최고입찰자 갱신이 **하나의 트랜잭션 안에서** 일어난다.
 
@@ -108,6 +116,8 @@ erDiagram
 ## 3. 상태 enum 확정
 
 ### 3-1. 상품 판매 상태 `product.sale_status`
+
+[이미지로 보기](./img/product-status.png)
 
 ```mermaid
 stateDiagram-v2

@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew test *)",
+      "Bash(./gradlew compileJava *)",
+      "Bash(./gradlew build *)",
+      "Bash(./gradlew compileTestJava *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(sed -n 's/.*\"file_path\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p')\n[ -z \"$f\" ] && exit 0\nfn=$(printf '%s' \"$f\" | sed 's/\\\\\\\\/\\//g; s/\\\\/\\//g' | sed 's#^\\([A-Za-z]\\):/#/\\1/#' | tr '[:upper:]' '[:lower:]')\nroot=$(pwd -P)\nrootlc=$(printf '%s' \"$root\" | tr '[:upper:]' '[:lower:]')\nfor part in be fe ai; do\n  case \"$fn\" in\n    \"$rootlc/$part/\"*)\n      msg=\"루트 세션에서는 파트(BE/FE/AI) 코드를 직접 수정할 수 없습니다. 필요하면 .claude/requests/$part/ 에 요청 문서를 남기고, 실제 반영은 해당 파트 세션에서 진행하세요.\"\n      esc=$(printf '%s' \"$msg\" | sed 's/\"/\\\\\"/g')\n      printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"%s\"}}\\n' \"$esc\"\n      exit 0\n      ;;\n  esac\ndone\n"
+          }
+        ]
+      }
+    ]
+  }
+}
