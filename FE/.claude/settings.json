@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(sed -n 's/.*\"file_path\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p')\n[ -z \"$f\" ] && exit 0\nfn=$(printf '%s' \"$f\" | sed 's/\\\\\\\\/\\//g; s/\\\\/\\//g' | sed 's#^\\([A-Za-z]\\):/#/\\1/#' | tr '[:upper:]' '[:lower:]')\nroot=$(cd .. && pwd -P)\nrootlc=$(printf '%s' \"$root\" | tr '[:upper:]' '[:lower:]')\nfor other in be ai; do\n  case \"$fn\" in\n    \"$rootlc/$other/\"*)\n      msg=\"다른 파트($other) 코드는 직접 수정할 수 없습니다. .claude/requests/$other/ 에 요청 문서를 남겨 주세요.\"\n      esc=$(printf '%s' \"$msg\" | sed 's/\"/\\\\\"/g')\n      printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"%s\"}}\\n' \"$esc\"\n      exit 0\n      ;;\n  esac\ndone\n"
+          }
+        ]
+      }
+    ]
+  }
+}
