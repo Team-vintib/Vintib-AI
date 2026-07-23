@@ -7,6 +7,7 @@ WinCLIP zero-shot / few-shot 얼룩 탐지 - 개선판 검증 스크립트
    - 없으면 REFERENCE_IMAGES = [] 로 두면 zero-shot으로 동작
 3) 여러 scale 조합을 SCALE_OPTIONS에 넣으면 한 번에 비교됨
 """
+
 import torch
 import numpy as np
 from PIL import Image
@@ -15,13 +16,13 @@ from anomalib.models.image.winclip.torch_model import WinClipModel
 
 # ---------------- 설정 ----------------
 TARGET_IMAGE = "contaminated clothing.jpg"
-REFERENCE_IMAGES = [ 
+REFERENCE_IMAGES = [
     "normal_shirt_1.jpg",
     "normal_shirt_2.jpg",
     "normal_shirt_3.jpg",
 ]
-CLASS_NAME = "white dress shirt"   # 검사 대상에 맞게 구체적으로
-SCALE_OPTIONS = [(2, 3), (1, 2)]   # 기본값 vs 더 촘촘한 윈도우
+CLASS_NAME = "white dress shirt"  # 검사 대상에 맞게 구체적으로
+SCALE_OPTIONS = [(2, 3), (1, 2)]  # 기본값 vs 더 촘촘한 윈도우
 # ---------------------------------------
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -37,9 +38,9 @@ def run_one(class_name, scales, target_path, reference_paths):
     model = WinClipModel(class_name=class_name, scales=scales).to(device).eval()
 
     if reference_paths:
-        ref_tensors = torch.stack(
-            [load_tensor(model.transform, p)[0] for p in reference_paths]
-        ).to(device)
+        ref_tensors = torch.stack([load_tensor(model.transform, p)[0] for p in reference_paths]).to(
+            device
+        )
         model.k_shot = len(reference_paths)
         model.setup(class_name=class_name, reference_images=ref_tensors)
 
@@ -61,9 +62,7 @@ def run_one(class_name, scales, target_path, reference_paths):
 results = []
 mode = "few-shot" if REFERENCE_IMAGES else "zero-shot"
 for scales in SCALE_OPTIONS:
-    pil_img, amap, score, peak_rel = run_one(
-        CLASS_NAME, scales, TARGET_IMAGE, REFERENCE_IMAGES
-    )
+    pil_img, amap, score, peak_rel = run_one(CLASS_NAME, scales, TARGET_IMAGE, REFERENCE_IMAGES)
     label = f"{mode}, scales={scales}"
     print(f"[{label}] score={score:.3f}  peak_rel(y,x)={peak_rel}")
     results.append((label, pil_img, amap, score))

@@ -6,6 +6,7 @@ WinCLIP zero-shot / few-shot 얼룩 탐지 - 시각화 정합성 수정판
 기준으로 계산되므로, 원본 전체 이미지가 아니라 '모델이 실제로 본 크롭 이미지'
 위에 겹쳐 그려야 위치가 정확히 맞습니다.
 """
+
 import torch
 import numpy as np
 from PIL import Image

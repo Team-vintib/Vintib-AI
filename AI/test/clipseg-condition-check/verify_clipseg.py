@@ -1,6 +1,7 @@
 """
 CLIPSeg: 텍스트 프롬프트 기반 오염/손상 영역 세그멘테이션 PoC
 """
+
 import torch
 import numpy as np
 from PIL import Image
