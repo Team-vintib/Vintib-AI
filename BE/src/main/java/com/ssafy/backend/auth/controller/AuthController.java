@@ -2,9 +2,12 @@ package com.ssafy.backend.auth.controller;
 
 import com.ssafy.backend.auth.dto.request.EmailCodeVerifyRequest;
 import com.ssafy.backend.auth.dto.request.EmailVerificationRequest;
+import com.ssafy.backend.auth.dto.request.ReissueRequest;
+import com.ssafy.backend.auth.dto.request.SignInRequest;
 import com.ssafy.backend.auth.dto.request.SignUpRequest;
 import com.ssafy.backend.auth.dto.response.EmailVerificationTokenResponse;
 import com.ssafy.backend.auth.dto.response.SignUpResponse;
+import com.ssafy.backend.auth.dto.response.TokenResponse;
 import com.ssafy.backend.auth.service.AuthService;
 import com.ssafy.backend.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +17,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -62,5 +66,39 @@ public class AuthController {
     public ResponseEntity<ApiResponse<SignUpResponse>> signUp(@Valid @RequestBody SignUpRequest request) {
         SignUpResponse response = authService.signUp(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "로그인", description = "이메일/비밀번호가 일치하면 Access/Refresh 토큰을 발급한다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그인 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "이메일 또는 비밀번호 불일치")
+    })
+    @PostMapping("/signin")
+    public ResponseEntity<ApiResponse<TokenResponse>> signIn(@Valid @RequestBody SignInRequest request) {
+        TokenResponse response = authService.signIn(request.email(), request.password());
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "토큰 재발급", description = "유효한 Refresh 토큰으로 새 Access/Refresh 토큰을 발급한다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "재발급 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Refresh 토큰이 유효하지 않거나 만료됨")
+    })
+    @PostMapping("/reissue")
+    public ResponseEntity<ApiResponse<TokenResponse>> reissue(@Valid @RequestBody ReissueRequest request) {
+        TokenResponse response = authService.reissue(request.refreshToken());
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "로그아웃", description = "저장된 Refresh 토큰을 무효화한다. Access 토큰은 만료까지 유효할 수 있다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그아웃 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요")
+    })
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(Authentication authentication) {
+        Long memberId = (Long) authentication.getPrincipal();
+        authService.logout(memberId);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 }
