@@ -171,7 +171,7 @@ def rasterize(image_size: tuple[int, int], polygons: list[Polygon]) -> np.ndarra
 
 
 @dataclass(frozen=True)
-class _DatasetSpec:
+class DatasetSpec:
     source: str
     images_root: Path
     labels_root: Path
@@ -180,9 +180,14 @@ class _DatasetSpec:
     parser: Callable[[Path], list[Polygon]]
 
 
-def _dataset_specs(dataset_root: Path) -> list[_DatasetSpec]:
+def dataset_specs(dataset_root: Path) -> list[DatasetSpec]:
+    """collect_samples()와 dataset_quality_report.py가 공유하는 데이터셋별 스펙.
+
+    dataset_quality_report.py는 collect_samples()가 조용히 건너뛰는 매칭/파싱 실패
+    건수까지 점검해야 해서 이 스펙을 직접 순회한다.
+    """
     return [
-        _DatasetSpec(
+        DatasetSpec(
             source="integrated",
             images_root=dataset_root / "의류 통합 데이터" / "Sample" / "01.원천데이터" / "상품",
             labels_root=dataset_root / "의류 통합 데이터" / "Sample" / "02.라벨링데이터",
@@ -190,7 +195,7 @@ def _dataset_specs(dataset_root: Path) -> list[_DatasetSpec]:
             label_ext=".json",
             parser=parse_integrated_dataset_label,
         ),
-        _DatasetSpec(
+        DatasetSpec(
             source="tryon3d",
             images_root=(
                 dataset_root
@@ -208,7 +213,7 @@ def _dataset_specs(dataset_root: Path) -> list[_DatasetSpec]:
             label_ext=".json",
             parser=parse_tryon3d_label,
         ),
-        _DatasetSpec(
+        DatasetSpec(
             source="kfashion",
             images_root=dataset_root / "K-Fashion 이미지" / "원천데이터" / "원천데이터_1",
             labels_root=dataset_root / "K-Fashion 이미지" / "라벨링데이터",
@@ -226,7 +231,7 @@ def collect_samples(dataset_root: Path = DATASET_ROOT) -> list[Sample]:
     파일명(stem)으로 이루어진다.
     """
     samples: list[Sample] = []
-    for spec in _dataset_specs(dataset_root):
+    for spec in dataset_specs(dataset_root):
         if not spec.images_root.exists():
             continue
         for image_path in spec.images_root.rglob("*"):
