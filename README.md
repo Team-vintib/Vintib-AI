@@ -49,7 +49,3 @@ docker compose up -d
 ```
 
 이후 각 팀 폴더 README의 실행 방법을 따른다.
-
-## 팀원
-
-- TBD
