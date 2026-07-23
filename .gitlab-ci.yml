@@ -31,12 +31,12 @@ be-test:
     - name: redis:8.8-alpine
       alias: redis
   variables:
-    POSTGRES_DB: vintage_auction
+    POSTGRES_DB: vintib
     POSTGRES_USER: postgres
     POSTGRES_PASSWORD: postgres
     DB_HOST: postgres
     DB_PORT: "5432"
-    DB_NAME: vintage_auction
+    DB_NAME: vintib
     DB_USERNAME: postgres
     DB_PASSWORD: postgres
     REDIS_HOST: redis

@@ -169,9 +169,10 @@ BE/
 ├── settings.gradle
 ├── src/main/java/com/ssafy/backend/
 │   ├── BackendApplication.java
-│   ├── auth/                    # 회원가입/이메일 인증 (AUTH) — 서윤
+│   ├── auth/                    # 회원가입/로그인/이메일 인증/JWT (AUTH) — 서윤
 │   │   ├── controller/
 │   │   ├── service/
+│   │   ├── jwt/                 # JwtTokenProvider, JwtAuthenticationFilter/EntryPoint
 │   │   └── dto/
 │   ├── member/                  # 회원 엔티티/레포지토리 (USER) — 서윤
 │   │   ├── entity/
@@ -197,6 +198,15 @@ BE/
 ```
 
 > `global/` 아래는 두 사람이 공유한다. 특히 `ErrorCode`는 단일 enum을 함께 쓰므로 도메인별 접두어 구역(C/U/L/A/W/O/T)을 지키고, 자기 구역에만 추가한다.
+
+## 인증 방식
+
+로그인(`POST /api/auth/signin`) 시 Access/Refresh 토큰을 발급한다. 이후 요청은 `Authorization: Bearer <accessToken>` 헤더로 인증한다.
+
+- Access Token: 15분, Refresh Token: 14일(둘 다 서명 검증 + Refresh는 Redis 저장값과 대조)
+- 토큰 재발급: `POST /api/auth/reissue` (바디에 refreshToken)
+- 로그아웃: `POST /api/auth/logout` — Redis에 저장된 Refresh Token만 삭제(Access Token은 자연 만료까지 유효)
+- `/api/auth/signup`, `/api/auth/signin`, `/api/auth/reissue`, `/api/auth/email/**`, `/api/health`, `/actuator/**`, swagger 경로는 인증 없이 접근 가능. 그 외 모든 API는 인증 필요.
 
 ## 공통 응답 규격
 
