@@ -18,6 +18,10 @@ i15a108.p.ssafy.io {
 		reverse_proxy ai:8000
 	}
 
+	handle /results/* {         
+		reverse_proxy ai:8000     
+	}                            
+
 	# 헬스체크·REST·(추후)WebSocket 전부 백엔드로
 	handle {
 		reverse_proxy backend:8080
