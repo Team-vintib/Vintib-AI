@@ -49,6 +49,24 @@ AI/
 프로덕션 기능은 `app/<도메인>/` 단위로 추가한다(도메인 우선 구조). 자세한 규약은 `CLAUDE.md`
 "프로덕션 모듈 구조" 참고.
 
+## 추천 브랜드 그래프 아티팩트 빌드 (오프라인)
+
+추천 API(`/recommend/graph`, `/recommend/{entity}/{id}/similar`)는 오프라인에서 사전계산한
+아티팩트를 읽어 서빙한다. 아티팩트가 없으면 503을 반환한다. 서빙 자체는 표준 라이브러리만
+쓰지만, 아티팩트 생성에는 CLIP 등 무거운 의존성이 필요하다.
+
+1. `pip install -r requirements-pipeline.txt` (CLIP/numpy/umap/pyyaml — CI엔 설치되지 않음)
+2. `app/recommend/data/brands.example.yaml`을 `brands.yaml`로 복사하고, `data/images/<id>/`에
+   브랜드별 상품 이미지를 넣는다. (`brands.yaml`·`images/`·`artifacts/`는 gitignore)
+3. 빌드:
+   ```bash
+   python -m app.recommend.pipeline.build_artifact \
+       --data app/recommend/data --entity brand --out app/recommend/artifacts
+   ```
+4. `uvicorn app.main:app` 실행 후 `/recommend/graph?entity=brand` 확인.
+
+`--entity seller`로 같은 파이프라인을 상점 유사도에도 재사용할 수 있다(그룹 키만 상점 id로).
+
 모델 선정(비교·평가) 단계의 실험 코드는 `test/`에 별도로 둔다.
 프로덕션 기능 모듈 구조에는 포함되지 않으며, 노트북 특성상 `ruff check .`에서 제외된다.
 후보 모델 로드/비교는 `test/model_selection/*.ipynb` 참고.

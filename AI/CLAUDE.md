@@ -33,6 +33,8 @@
   - `schemas.py` — 요청/응답 pydantic 모델. (BE dto)
   - `pipeline/` (선택) — 오프라인 배치(임베딩·전처리 등, AI 특유). 무거운 ML import는 함수 내부 지연 import.
   - `dependencies.py`/`models.py`/`artifacts/`(gitignore) 등은 필요 시 추가.
+- **서빙 경로(router/service)는 표준 라이브러리·경량 의존성만** 두고, 무거운 오프라인 의존성(torch·CLIP·umap 등)은 서비스 런타임(`requirements.txt`)에서 분리한다. 예: 추천 파이프라인 의존성은 `requirements-pipeline.txt`(CI 미설치)에 두고, 서빙은 사전계산 아티팩트만 읽는다.
+- 도메인 테스트는 `app/<도메인>/tests/`에 두고, 무거운 의존성이 필요한 테스트는 `pytest.importorskip`로 가드한다(순수 로직/서빙 테스트는 CI에서 그대로 실행). `pyproject.toml`의 `[tool.pytest.ini_options] pythonpath=["."]`로 `import app...`이 해석된다.
 - 새 도메인은 위 파일 규약대로 만들고 `app/main.py`에 router를 prefix/tags와 함께 등록한다.
 - `test/`(PoC·스파이크)와 `app/`(프로덕션)은 명확히 분리한다 — `test/` 코드를 프로덕션에서 import하지 않는다.
 

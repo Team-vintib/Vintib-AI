@@ -39,25 +39,23 @@
 - 무거운 계산(CLIP 임베딩, 레이아웃)은 전부 오프라인. 서빙은 사전계산 결과 조회만 → 저지연.
 - 브랜드 노드 수는 작음(수십~수백) → MVP는 인메모리 numpy로 충분. 아티팩트 포맷은 후속 pgvector 이관과 호환되게 설계.
 
-### 2. 오프라인 파이프라인 (구현은 후속)
-- **시드 데이터**: `AI/test/recommendation-brand-graph/data/brands/<brand>/*.jpg` + `brands.yaml`(id, name, 대표 이미지 목록). 빈티지 대표 브랜드 수십 개를 큐레이션.
+### 2. 오프라인 파이프라인 (구현 완료 — 2026-07-24, `AI/app/recommend/pipeline/`)
+- **시드 데이터**: `AI/app/recommend/data/brands.yaml`(id, name, images, thumbnail) + `data/images/<id>/*.jpg`. `brands.example.yaml` 참고, 실제 파일은 gitignore. 빈티지 대표 브랜드 수십 개를 큐레이션.
 - 단계별 모듈(설계):
   - `embed.py` — CLIP 이미지 임베딩. `model_selection/model_registry.py`의 CLIP 후보(`clip-ViT-B-32`) 재사용, heavy import는 함수 내부 lazy.
   - `aggregate.py` — 브랜드별 상품 임베딩 평균/중심 벡터(medoid 대안, 이상치 제거 옵션).
   - `similarity.py` — 코사인 유사도 행렬 → kNN 엣지(k≈6~10, 임계값 필터).
   - `layout.py` — 2D 투영(UMAP 우선, 미설치 시 PCA/t-SNE 폴백, 결정적 seed).
   - `build_artifact.py` — 오케스트레이션 → 아티팩트 저장.
-- **아티팩트 스키마**(entity_type별):
-  - `vectors.parquet`(id, name, vector, product_count, thumbnail)
-  - `layout.json`(id, x, y)  · `edges.json`(source, target, weight)  · `meta.json`(entity_type, embedding_model, built_at, n)
+- **아티팩트 스키마**(entity_type별, JSON — 서빙이 numpy 없이 읽도록): `meta.json`(entity_type, embedding_model, dim, count, built_at) · `nodes.json`([id,name,x,y,size,thumbnail]) · `edges.json`([source,target,weight]) · `neighbors.json`({id:[[nid,score]]}, 상위 N 사전계산). 유사도·이웃을 오프라인에서 미리 계산해 서빙 요청 시 행렬 연산이 없다.
 
 ### 3. 온라인 서빙 (greenfield — AI 첫 production 모듈)
-- 위치: `AI/app/recommend/`(router · service · schema). `AI/main.py`에 라우터 등록.
+- 위치: `AI/app/recommend/`(router · service · schemas · artifact · pipeline/). `AI/app/main.py`에 라우터 등록.
 - 엔드포인트(초안):
   - `GET /recommend/graph?entity=brand&focus={id}&k={n}` → 맵: `nodes[{id,name,x,y,size,thumbnail}]`, `edges[{source,target,weight}]`. `focus` 없으면 전체 맵, 있으면 focus 중심 kNN 서브그래프.
   - `GET /recommend/{entity}/{id}/similar?k={n}` → 유사 엔티티 랭킹(포커스 패널·카드 리스트 재사용).
-- service: 아티팩트를 numpy로 인메모리 로드/캐시, similar/graph 질의 처리.
-- **의존성 규율(AI CI)**: production `requirements.txt`엔 `numpy`만 추가. CLIP/UMAP 등 heavy 라이브러리는 오프라인 전용이라 `test/requirements-test.txt`에만. ML 테스트는 `pytest.importorskip` 가드, 순수 로직 테스트(유사도/스키마)는 CI에서 그대로 실행.
+- service: 아티팩트(JSON)를 표준 라이브러리로 인메모리 로드/캐시, similar/graph 질의 처리(요청 시점 행렬 연산 없음). 아티팩트 미생성 시 503.
+- **의존성 규율(AI CI)**: 서빙은 표준 라이브러리만 사용 → production `requirements.txt` 변경 없음. numpy/CLIP/UMAP/PyYAML 등 오프라인 파이프라인 의존성은 `AI/requirements-pipeline.txt`(신설, CI 미설치)로 분리. ML 테스트는 `pytest.importorskip` 가드, 순수 로직/서빙 테스트는 CI에서 그대로 실행.
 
 ### 4. 엔티티 추상화 (브랜드 → 상점 전환)
 - 파이프라인 전 구간을 추상 "EntityGroup"으로 파라미터화 → `aggregate` 단계의 `group_by` 키만 `brand_id ↔ seller_id`로 교체.
