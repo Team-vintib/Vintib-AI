@@ -48,6 +48,7 @@ CLI 진입점(`python recommendation_benchmark.py`)은 선택 사항이다 — �
 
 from __future__ import annotations
 
+import math
 import statistics
 import time
 import tracemalloc
@@ -330,6 +331,30 @@ class RecommendationResult:
         ]
         return statistics.mean(per_query) if per_query else 0.0
 
+    def ndcg_at_k(self, k: int) -> float:
+        """top-K NDCG(이진 relevance — 카테고리 일치 여부)의 macro-average.
+
+        `-292`(추천 모델 파인튜닝) 평가용: recall/precision은 "몇 개 맞았는지"만 보고 순서는
+        안 보므로, 파인튜닝이 "정답을 더 위로 끌어올렸는지"를 보려면 순위에 민감한 지표가
+        하나 더 필요하다. recall_at_k/precision_at_k와 동일하게 코퍼스에 정답 카테고리
+        아이템이 없는 쿼리는 분모가 0이라 제외한다. `test_recommendation_benchmark.py`에
+        경계 케이스(완벽한 랭킹/최하위 랭킹/top-K 밖/정답 없음)가 검증돼 있다.
+        """
+        per_query = []
+        for qr in self.query_rankings:
+            total_relevant = qr.ranked_categories.count(qr.target_category)
+            if total_relevant == 0:
+                continue
+            ideal_hits = min(k, total_relevant)
+            idcg = sum(1.0 / math.log2(i + 2) for i in range(ideal_hits))
+            dcg = sum(
+                1.0 / math.log2(i + 2)
+                for i, cat in enumerate(qr.ranked_categories[:k])
+                if cat == qr.target_category
+            )
+            per_query.append(dcg / idcg if idcg > 0 else 0.0)
+        return statistics.mean(per_query) if per_query else 0.0
+
 
 def benchmark_recommendation(
     candidate: RecommendationCandidate,
@@ -459,6 +484,7 @@ def print_report(
     ]
     header_parts += [f"{'recall@' + str(k):>10s}" for k in k_values]
     header_parts += [f"{'precision@' + str(k):>12s}" for k in k_values]
+    header_parts += [f"{'ndcg@' + str(k):>10s}" for k in k_values]
     header = " ".join(header_parts)
     print(header)
     print("-" * len(header))
@@ -472,6 +498,7 @@ def print_report(
         ]
         row_parts += [f"{r.recall_at_k(k):10.1%}" for k in k_values]
         row_parts += [f"{r.precision_at_k(k):12.1%}" for k in k_values]
+        row_parts += [f"{r.ndcg_at_k(k):10.1%}" for k in k_values]
         print(" ".join(row_parts))
     print()
     print("주의: 코퍼스는 실제 상품 카탈로그가 아니라 공개 데이터셋 플레이스홀더입니다.")

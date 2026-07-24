@@ -1,0 +1,89 @@
+# AI — 가상 시착 / 상품 설명 초안 / 라이브 발언 정보 추출 / 추천
+
+담당 범위와 기술 스택(Python 3.12+, FastAPI 0.139.0)은 루트 `CLAUDE.md` 참고. 이 문서는
+`AI/` 폴더 안에서만 적용되는 실행/CI/코딩 규칙을 다룬다.
+
+## 디렉터리 구조
+
+- `main.py` — FastAPI 서비스 진입점(현재 `/health`만 있는 스켈레톤).
+- `requirements.txt` — 프로덕션 런타임 의존성.
+- `requirements-dev.txt` — CI/개발 도구(`ruff`, `black`, `pytest`, `httpx`) + `requirements.txt`.
+- `test/` — PoC·스파이크 코드 전용. **프로덕션 코드가 아니다.** `test/requirements-test.txt`에
+  무거운 ML 의존성(torch, transformers, sentence-transformers, FlagEmbedding, datasets 등)이
+  모여 있는데, **CI에는 설치되지 않는다**(아래 CI 섹션 참고) — 로컬에서 별도로
+  `pip install -r test/requirements-test.txt`가 필요하다.
+- `pyproject.toml` — `ruff`/`black`(`line-length=100`, `target-version=py312`) 설정과
+  `pytest` 설정. `test/AI_tryon/{tryondiffusion,catvton}`, `test/**/*.ipynb`는 외부/서드파티
+  코드·노트북이라 lint/format 대상에서 제외되어 있다.
+
+## CI 규칙 — 커밋 전 반드시 로컬에서 통과시킬 것
+
+`.gitlab-ci.yml`의 `ai-test` 잡은 `AI/**` 변경이 있는 MR마다 다음을 실행한다:
+
+1. `pip install -r AI/requirements-dev.txt`만 설치(무거운 ML 라이브러리 설치 안 함)
+2. `ruff check .`
+3. `black --check .`
+4. `pytest -q` — 테스트가 하나도 없으면(exit 5) 통과 처리, 그 외 실패는 파이프라인을 그대로 실패시킴
+
+커밋 전에 로컬에서 동일한 절차를 그대로 돌려서 확인한다:
+
+```bash
+cd AI
+pip install -r requirements-dev.txt   # ruff==0.15.22, black==26.5.1, pytest==9.1.1 고정
+ruff check .
+black --check .   # 실패하면 black . 로 자동 정렬 후 diff를 리뷰
+pytest -q
+```
+
+- **`AI/test/`에 파일을 새로 추가/수정했다면 위 3개(ruff/black/pytest)를 빠짐없이 돌릴 것.**
+  특히 `black --check`는 새로 만든 파일을 깜빡하고 안 돌리기 쉽다 — 실제로
+  `test_recommendation_benchmark.py`/`test_dataset.py`를 black 없이 커밋했다가 CI의
+  `black --check .` 단계에서 실패한 적이 있다. 새 파일을 추가하는 커밋에서는 항상 위
+  4단계를 순서대로 실행한 뒤 커밋할 것.
+- 로컬 Python이 3.12보다 낮으면(`target-version=py312`) black이 "Python 3.X cannot parse
+  code formatted for Python 3.12" 경고를 띄울 수 있다 — 포맷팅 자체는 정상 동작하니 경고는
+  무시해도 되지만, 가능하면 3.12 인터프리터로 맞추는 게 안전하다.
+
+## 테스트 작성 규칙 — 무거운 ML 의존성 가드 필수
+
+CI는 `AI/requirements-dev.txt`만 설치하고 `AI/test/requirements-test.txt`(torch 등)는 설치하지
+않는다. `AI/test/` 아래에서 이런 무거운 라이브러리를 import하는 모듈을 대상으로 pytest 테스트를
+작성할 때는, 테스트 파일 최상단에서 `pytest.importorskip(...)`으로 감싸 CI(라이브러리 없는
+환경)에서 에러 없이 스킵되게 해야 한다:
+
+```python
+import pytest
+
+torch = pytest.importorskip("torch")
+
+from my_module import Something  # noqa: E402 — importorskip 이후 import
+```
+
+순수 로직(표준 라이브러리만 사용하는 데이터 분리/전처리 함수 등)을 테스트할 때는 이 가드가
+필요 없다 — CI에서 그대로 실행된다.
+
+- 가드 적용 예: `test/model_selection/test_recommendation_benchmark.py`(torch 필요)
+- 가드 불필요 예: `test/recommendation-embedding-finetune/test_dataset.py`(순수 로직만, 무거운
+  의존성은 함수 내부에서 지연 import)
+
+## `AI/test/` 코드 관례 (PoC/스파이크)
+
+- 모델 후보·설정은 `model_selection/model_registry.py`처럼 중앙 레지스트리에
+  `{"이름": "HF 모델ID 또는 로컬 경로"}` 딕셔너리 + `ACTIVE_*` 상수로 관리한다 — 키 하나만
+  바꾸면 스왑되는 패턴.
+- 모델 로딩은 `loaders.py`류의 공용 헬퍼로 분리하고, 무거운 라이브러리는 함수 내부에서 지연
+  import한다(모듈 최상단 import로 인한 불필요한 로딩 지연 방지, import 시점 네트워크 I/O 방지).
+- 파인튜닝/데이터 검증형 스파이크는 `<feature>-finetune-check/`, `<feature>-condition-check/`
+  같은 디렉터리명을 쓰고, `dataset.py`(전처리/분리) + 학습 스크립트 + 평가 스크립트로 3분할한다.
+- 재현성: 랜덤 시드·split 비율은 파일 상단 상수(`SEED`, `VAL_RATIO` 등)로 노출하고, 학습·평가
+  스크립트가 같은 상수를 공유해 val split을 재현한다.
+- 검증셋을 구성할 때는 항목(row) 단위로 먼저 train/val을 나누고, (anchor, positive/negative)
+  쌍은 그 이후 각 split 내부에서만 만든다 — 순서를 반대로 하면 같은 아이템이 양쪽 split에
+  걸쳐 평가 지표가 부풀려진다.
+- 학습 산출물(모델 체크포인트, 재생성 가능한 데이터셋 등)은 `.gitignore`에 반영되어 있는지
+  확인할 것 — PoC 결과물을 통째로 커밋하면 저장소가 급격히 커진다.
+
+## 커밋/브랜치 규칙
+
+루트 `.claude/commit-convention.md` 참고. `[JIRA-KEY] type: subject` 형식, push는 항상
+사용자가 직접 실행한다.
