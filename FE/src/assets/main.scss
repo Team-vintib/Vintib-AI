@@ -1,4 +1,44 @@
-* {
+:root {
+  color-scheme: light;
+
+  --color-page: #F7F6F2;
+  --color-surface: #FFFFFF;
+  --color-surface-secondary: #F0F0EB;
+  --color-text-primary: #171815;
+  --color-text-secondary: #686A64;
+  --color-text-muted: #92948E;
+  --color-text-inverse: #FFFFFF;
+  --color-border: #E1E0DA;
+  --color-border-strong: #C9C8C1;
+  --color-primary: #294335;
+  --color-primary-hover: #1F352A;
+  --color-primary-soft: #E7EEE9;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-modal: 16px;
+
+  --button-height-small: 36px;
+  --button-height-standard: 48px;
+  --button-height-major: 52px;
+
+  --content-max-width: 1320px;
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -6,10 +46,20 @@
 
 body {
   min-height: 100vh;
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    'Pretendard',
-    sans-serif;
+  background: var(--color-page);
+  color: var(--color-text-primary);
+  font-family: Pretendard, 'Noto Sans KR', Inter, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+#app {
+  min-height: 100vh;
 }
