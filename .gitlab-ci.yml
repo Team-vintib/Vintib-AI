@@ -7,10 +7,14 @@
 
 stages:
   - test
+  - deploy
 
 workflow:
   rules:
+    # MR 검증
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # develop-BE 병합 시 자동 배포 (-262)
+    - if: '$CI_COMMIT_BRANCH == "develop-BE"'
 
 variables:
   GIT_DEPTH: "1"
@@ -103,3 +107,32 @@ ai-test:
       elif [ "${code:-0}" -ne 0 ]; then
         exit "${code}";
       fi
+
+# ---------- 배포 (develop-BE 병합 시 EC2 자동 배포) ----------
+# 전용 러너(tag: deploy)에서만 실행된다. 그 러너에만 호스트 docker.sock 과
+# 배포 디렉터리가 마운트되어 있어, 일반 테스트 잡은 호스트 도커에 접근하지 못한다.
+#
+# 필요한 CI/CD Variables (Settings → CI/CD → Variables):
+#   DB_PASSWORD  운영 DB 비밀번호. Masked 권장.
+#                ⚠️ EC2 PostgreSQL 볼륨을 처음 만들 때 쓴 값과 반드시 같아야 한다.
+#                ⚠️ "Protected" 로 두려면 develop-BE 도 protected 브랜치여야 한다.
+deploy:
+  stage: deploy
+  image: docker:cli
+  tags:
+    - deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop-BE"'
+  variables:
+    # 커밋 SHA 로 이미지를 태깅해 롤백 시 직전 태그를 되살릴 수 있게 한다.
+    IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+    DB_NAME: vintage_auction
+    DB_USERNAME: postgres
+  before_script:
+    # docker:cli 에 compose 플러그인·rsync 가 없을 수 있어 명시적으로 설치한다.
+    - apk add --no-cache rsync docker-cli-compose
+  script:
+    - sh infra/ci/deploy.sh
+  environment:
+    name: production
+    url: https://i15a108.p.ssafy.io
