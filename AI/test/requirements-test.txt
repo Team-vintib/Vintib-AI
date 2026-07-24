@@ -1,4 +1,4 @@
-# Deps for the model-selection spike notebooks only (AI/test/model_selection/).
+# Deps for AI/test/ spike code (model-selection notebooks, garment-mask-finetune-check/, etc.).
 # NOT installed by CI (the ai-test job only installs AI/requirements-dev.txt) and NOT
 # part of the FastAPI service's runtime deps — kept separate on purpose.
 #
@@ -18,6 +18,10 @@
 # has a same-version, higher-priority (PEP 440 local version) match on this index.
 --extra-index-url https://download.pytorch.org/whl/cu130
 torch>=2.4
+# garment-mask-finetune-check/의 세그멘테이션 헤드 파인튜닝용(deeplabv3_mobilenet_v3_large).
+# compare_with_schp_baseline.py는 여기에 더해 catvton 자체 의존성(diffusers, opencv-python,
+# huggingface_hub 등, AI_tryon/catvton/requirements_catvton.txt 참고)도 필요하다.
+torchvision>=0.19
 transformers>=4.46,<5
 accelerate>=0.34
 sentence-transformers>=3.2
