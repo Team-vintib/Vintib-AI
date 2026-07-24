@@ -10,6 +10,8 @@
 torch>=2.4
 sentence-transformers>=3.2
 Pillow>=10.0
+# 상품 텍스트 임베딩(kanana-nano, embed_catalog.py). 커스텀 모델 코드 실행(trust_remote_code)에 필요.
+transformers>=4.44
 
 numpy>=1.26
 # 2D 레이아웃. 미설치 시 layout.py가 PCA(numpy)로 폴백하므로 필수는 아니다.
