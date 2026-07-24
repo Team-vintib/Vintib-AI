@@ -4,14 +4,24 @@
 # HTTP(80)→HTTPS(443) 리다이렉트한 뒤 백엔드 컨테이너로 프록시한다.
 # backend 는 호스트에 포트를 열지 않고 vintib-net 내부에서 backend:8080 으로만 접근한다.
 #
+# /ai/* 는 AI 게이트웨이(ai:8000)로 라우팅한다.
+# 워커(로컬 노트북)는 Redis에 직접 붙지 않고 이 경로로만 job을 주고받는다.
+#
 # WebRTC(OpenVidu v3)는 2주차에 붙인다. 그때 이 파일에 미디어 라우팅을 추가하거나
 # OpenVidu 내장 Caddy 와 정합을 맞춘다.
 
 i15a108.p.ssafy.io {
 	encode zstd gzip
 
+	# AI 게이트웨이 (워커 poll/result, job 접수/조회)
+	handle /ai/* {
+		reverse_proxy ai:8000
+	}
+
 	# 헬스체크·REST·(추후)WebSocket 전부 백엔드로
-	reverse_proxy backend:8080
+	handle {
+		reverse_proxy backend:8080
+	}
 
 	# 접근 로그 (컨테이너 stdout → docker logs)
 	log {
