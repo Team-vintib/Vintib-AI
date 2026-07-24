@@ -52,8 +52,5 @@ tasks.named('test') {
 		exceptionFormat = 'full'
 		showCauses = true
 		showStackTraces = true
-		// [임시 진단] Hibernate 가 연결 실패 사유를 예외가 아닌 WARN 로그로만 남기므로,
-		// 애플리케이션 로그를 함께 출력해야 실제 원인이 보인다.
-		showStandardStreams = true
 	}
 }

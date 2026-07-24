@@ -44,12 +44,14 @@ fi
 # ---------- 2. .env 생성 (GitLab CI/CD Variables) ----------
 # ⚠️ DB_PASSWORD 는 PostgreSQL 볼륨을 처음 만들 때의 값과 같아야 한다.
 #    값을 바꾸면 볼륨을 지우거나 ALTER USER 를 해야 백엔드가 붙는다.
+# 운영 비밀번호는 PROD_DB_PASSWORD 로 받는다. DB_PASSWORD 라는 이름을 쓰면
+# 프로젝트 변수가 be-test 의 테스트용 DB_PASSWORD 까지 덮어써 테스트가 깨진다.
 log ".env 생성"
 umask 077
 cat > "$DEPLOY_DIR/.env" <<ENV
 DB_NAME=${DB_NAME}
 DB_USERNAME=${DB_USERNAME}
-DB_PASSWORD=${DB_PASSWORD}
+DB_PASSWORD=${PROD_DB_PASSWORD}
 SPRING_PROFILES_ACTIVE=prod
 SERVER_PORT=8080
 IMAGE_TAG=${IMAGE_TAG}

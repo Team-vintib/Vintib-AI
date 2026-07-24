@@ -43,12 +43,17 @@ volumes = [
 
 | 변수 | 값 | 비고 |
 | --- | --- | --- |
-| `DB_PASSWORD` | 운영 DB 비밀번호 | **Masked** 권장 |
+| `PROD_DB_PASSWORD` | 운영 DB 비밀번호 | **Masked** 권장 |
 
 `DB_NAME`·`DB_USERNAME`·`SPRING_PROFILES_ACTIVE`·`IMAGE_TAG` 는 `.gitlab-ci.yml` 에서 넣으므로 등록하지 않아도 된다.
 
+> [!CAUTION]
+> **변수 이름을 `DB_PASSWORD` 로 두면 안 된다.** GitLab 은 **프로젝트 CI/CD Variables 가 `.gitlab-ci.yml` 의 job 변수보다 우선**한다. 이름이 겹치면 `be-test` 가 쓰는 테스트용 `DB_PASSWORD: postgres` 까지 운영 비밀번호로 덮어써져, 테스트가 `password authentication failed` 로 전부 실패한다.
+>
+> 이때 서비스 컨테이너는 `POSTGRES_PASSWORD`(이름이 안 겹침)로 초기화되므로 **DB 는 `postgres` 비밀번호인데 접속은 운영 비밀번호로 시도**하는 상태가 된다. 게다가 Hibernate 는 연결 실패 사유를 예외 체인에 붙이지 않고 `Unable to determine Dialect without JDBC metadata` 만 남겨서 원인 파악이 매우 어렵다.
+
 > [!WARNING]
-> **`DB_PASSWORD` 는 EC2 PostgreSQL 볼륨을 처음 만들 때 쓴 값과 반드시 같아야 한다.** PostgreSQL 은 볼륨 최초 생성 시점의 비밀번호만 유지한다. 다른 값을 넣으면 백엔드가 DB 에 붙지 못한다. 비밀번호를 정말 바꾸려면 컨테이너 안에서 `ALTER USER` 를 실행하거나 볼륨을 삭제해야 한다(데이터 손실).
+> **`PROD_DB_PASSWORD` 는 EC2 PostgreSQL 볼륨을 처음 만들 때 쓴 값과 반드시 같아야 한다.** PostgreSQL 은 볼륨 최초 생성 시점의 비밀번호만 유지한다. 다른 값을 넣으면 백엔드가 DB 에 붙지 못한다. 비밀번호를 정말 바꾸려면 컨테이너 안에서 `ALTER USER` 를 실행하거나 볼륨을 삭제해야 한다(데이터 손실).
 >
 > 변수를 **Protected** 로 설정하려면 `develop-BE` 도 protected 브랜치여야 한다. 아니면 배포 잡에서 값이 비어 배포가 실패한다.
 
