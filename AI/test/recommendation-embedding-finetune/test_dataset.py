@@ -21,7 +21,11 @@ from dataset import CatalogItem, build_pairs, split_items
 
 def _make_items(article_type: str, master_category: str, count: int) -> list[CatalogItem]:
     return [
-        CatalogItem(text=f"{article_type} item {i}", article_type=article_type, master_category=master_category)
+        CatalogItem(
+            text=f"{article_type} item {i}",
+            article_type=article_type,
+            master_category=master_category,
+        )
         for i in range(count)
     ]
 

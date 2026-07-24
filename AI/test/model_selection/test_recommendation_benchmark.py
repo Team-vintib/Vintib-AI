@@ -46,7 +46,9 @@ class TestRecallAtK:
     def test_macro_average_across_queries(self):
         r = _result(
             QueryRanking(query="q1", target_category="A", ranked_categories=["A", "B", "C"]),  # 1.0
-            QueryRanking(query="q2", target_category="B", ranked_categories=["A", "C", "B"]),  # 0.0 (top-2 밖)
+            QueryRanking(
+                query="q2", target_category="B", ranked_categories=["A", "C", "B"]
+            ),  # 0.0 (top-2 밖)
         )
         assert r.recall_at_k(2) == pytest.approx(0.5)
 
