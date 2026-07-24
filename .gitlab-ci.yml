@@ -63,6 +63,11 @@ be-test:
     - 'getent hosts "$DB_HOST" || { echo "DNS 해석 실패 - $DB_HOST"; exit 1; }'
     - 'timeout 30 bash -c "until (echo > /dev/tcp/$DB_HOST/$DB_PORT) 2>/dev/null; do sleep 1; done" || { echo "TCP 연결 실패 - $DB_HOST:$DB_PORT"; exit 1; }'
     - 'timeout 30 bash -c "until (echo > /dev/tcp/$REDIS_HOST/$REDIS_PORT) 2>/dev/null; do sleep 1; done" || { echo "TCP 연결 실패 - $REDIS_HOST:$REDIS_PORT"; exit 1; }'
+    # [임시 진단] 애플리케이션과 동일한 자격증명으로 실제 로그인이 되는지 확인한다.
+    # Hibernate 는 연결 실패 사유를 예외 체인에 붙이지 않아 원인 파악이 불가능하다.
+    - 'apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq postgresql-client >/dev/null 2>&1 || true'
+    - 'PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME" -d "$DB_NAME" -c "SELECT current_database(), current_user" || echo ">>> psql 로그인 실패 (위 메시지가 실제 원인)"'
+    - 'PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME" -d postgres -c "\l" || echo ">>> 기본 DB 접속도 실패"'
   script:
     - ./gradlew build --no-daemon --build-cache -Dgradle.user.home=.gradle
 
