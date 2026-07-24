@@ -1,15 +1,41 @@
 # EC2(i15a108.p.ssafy.io) 운영 전용.
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# backend 만 루프백(127.0.0.1)에 바인딩한다.
-#   - 호스트의 리버스 프록시(OpenVidu v3 내장 Caddy 등)가 TLS 종단 후 여기로 프록시한다.
-#   - 0.0.0.0 이 아닌 127.0.0.1 바인딩이므로 Docker 의 UFW 우회 문제가 발생하지 않는다.
-# postgres / redis / ai 는 어떤 포트도 열지 않는다 (vintib-net 내부 통신 전용).
+# 외부에 노출되는 것은 caddy(80/443) 뿐이다.
+#   - caddy 가 TLS 종단(Let's Encrypt) 후 vintib-net 내부의 backend:8080 으로 프록시한다.
+#   - backend / postgres / redis / ai 는 어떤 호스트 포트도 열지 않는다 (내부 통신 전용).
+#     → Docker 의 UFW 우회 문제(publish 시 iptables 직접 조작) 자체를 만들지 않는다.
+#
+# ⚠️ 이 서버에는 SSAFY Gerrit(8988/8989/29418)이 함께 돈다. caddy 는 80/443 만 쓰므로
+#    충돌하지 않지만, 포트를 추가할 때 8988/8989/29418 을 절대 점유하지 않는다.
 
 services:
-  backend:
+  caddy:
+    image: caddy:2-alpine
+    container_name: vintib-caddy
+    restart: unless-stopped
     ports:
-      - "127.0.0.1:${SERVER_PORT:-8080}:8080"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data      # 발급받은 인증서 영속화 (Let's Encrypt 레이트리밋 회피)
+      - caddy-config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - vintib-net
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  backend:
+    # 운영에서는 호스트 포트를 열지 않는다 (caddy 가 앞단). base 의 포트 미publish 를 그대로 둔다.
     environment:
       SPRING_PROFILES_ACTIVE: prod
     logging:
@@ -38,3 +64,7 @@ services:
       options:
         max-size: "20m"
         max-file: "5"
+
+volumes:
+  caddy-data:
+  caddy-config:
