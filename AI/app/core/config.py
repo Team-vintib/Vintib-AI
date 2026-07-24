@@ -16,5 +16,9 @@ class Settings(BaseSettings):
     redis_host: str = "localhost"
     redis_port: int = 6379
 
+    # 추천 아티팩트(사전계산 그래프) 루트 디렉터리. 비어 있으면
+    # app/recommend/artifacts/ 를 기본값으로 사용한다.
+    recommend_artifact_dir: str = ""
+
 
 settings = Settings()

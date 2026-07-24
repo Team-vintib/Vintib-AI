@@ -16,3 +16,7 @@ extend-exclude = [
 [tool.black]
 line-length = 100
 target-version = ["py312"]
+
+[tool.pytest.ini_options]
+# AI/ 를 import 경로에 추가해 `pytest` 실행 시 `import app...` 가 해석되게 한다.
+pythonpath = ["."]

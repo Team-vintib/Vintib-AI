@@ -1,0 +1,18 @@
+# 추천 브랜드 그래프 오프라인 파이프라인(app/recommend/pipeline/) 전용 의존성.
+# 서비스 런타임(requirements.txt)과 무관하며 CI에도 설치되지 않는다 —
+# 아티팩트 생성(build_artifact) 시 로컬/배치에서만 설치한다.
+#
+# 서빙 경로(app/recommend/service.py)는 표준 라이브러리만 사용하므로 아래 의존성이 없어도
+# FastAPI 앱은 그대로 뜨고, 아티팩트가 없으면 503을 반환한다.
+
+# CLIP 이미지 임베딩. dev 노트북 GPU(RTX 4070) 사용 시 아래 인덱스에서 torch를 받는다.
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch>=2.4
+sentence-transformers>=3.2
+Pillow>=10.0
+
+numpy>=1.26
+# 2D 레이아웃. 미설치 시 layout.py가 PCA(numpy)로 폴백하므로 필수는 아니다.
+umap-learn>=0.5
+# brands.yaml 파싱.
+PyYAML>=6.0

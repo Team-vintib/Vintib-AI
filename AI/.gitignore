@@ -21,3 +21,8 @@ htmlcov/
 .env
 .env.*
 !.env.example
+
+# 추천 오프라인 파이프라인 산출물/입력 (아티팩트·원본 이미지)
+app/recommend/artifacts/
+app/recommend/data/images/
+app/recommend/data/brands.yaml
