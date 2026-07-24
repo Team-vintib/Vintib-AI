@@ -40,7 +40,7 @@ be-test:
       alias: cache
   variables:
     # postgres 서비스 컨테이너가 읽는 값. 여기서 DB·계정이 만들어진다.
-    POSTGRES_DB: vintage_auction
+    POSTGRES_DB: vintib
     POSTGRES_USER: postgres
     POSTGRES_PASSWORD: postgres
   cache:
@@ -154,7 +154,7 @@ deploy:
   variables:
     # 커밋 SHA 로 이미지를 태깅해 롤백 시 직전 태그를 되살릴 수 있게 한다.
     IMAGE_TAG: $CI_COMMIT_SHORT_SHA
-    DB_NAME: vintage_auction
+    DB_NAME: vintib
     DB_USERNAME: postgres
   before_script:
     # docker:cli 에 compose 플러그인·rsync 가 없을 수 있어 명시적으로 설치한다.

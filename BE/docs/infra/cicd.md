@@ -48,9 +48,12 @@ volumes = [
 `DB_NAME`·`DB_USERNAME`·`SPRING_PROFILES_ACTIVE`·`IMAGE_TAG` 는 `.gitlab-ci.yml` 에서 넣으므로 등록하지 않아도 된다.
 
 > [!CAUTION]
-> **변수 이름을 `DB_PASSWORD` 로 두면 안 된다.** GitLab 은 **프로젝트 CI/CD Variables 가 `.gitlab-ci.yml` 의 job 변수보다 우선**한다. 이름이 겹치면 `be-test` 가 쓰는 테스트용 `DB_PASSWORD: postgres` 까지 운영 비밀번호로 덮어써져, 테스트가 `password authentication failed` 로 전부 실패한다.
+> **변수 이름에 `DB_PASSWORD`·`DB_NAME` 같은 범용 이름을 쓰지 않는다.** GitLab 은 **프로젝트(및 그룹·인스턴스) CI/CD Variables 가 `.gitlab-ci.yml` 의 job 변수보다 우선**한다. 이름이 겹치면 테스트용 값이 운영값으로 덮어써져, 서비스 컨테이너는 `POSTGRES_*`(이름이 안 겹침)로 초기화되는데 접속만 운영값으로 시도하는 어긋남이 생긴다.
 >
-> 이때 서비스 컨테이너는 `POSTGRES_PASSWORD`(이름이 안 겹침)로 초기화되므로 **DB 는 `postgres` 비밀번호인데 접속은 운영 비밀번호로 시도**하는 상태가 된다. 게다가 Hibernate 는 연결 실패 사유를 예외 체인에 붙이지 않고 `Unable to determine Dialect without JDBC metadata` 만 남겨서 원인 파악이 매우 어렵다.
+> `be-test` 는 `before_script` 에서 `DB_*`/`REDIS_*`/`SPRING_PROFILES_ACTIVE` 를 `export` 로 덮어써 자체 방어한다(export 는 변수 주입 뒤에 실행되므로 항상 이긴다). 값은 `POSTGRES_*` 에서 파생시켜 서비스가 실제로 만든 DB·계정과 어긋날 수 없게 했다. 하지만 `deploy` 잡은 여전히 영향을 받으므로 이름 규칙은 지켜야 한다.
+
+> [!NOTE]
+> **DB 연결 실패는 예외 메시지만으로 원인을 알 수 없다.** Hibernate 가 원인 `SQLException` 을 삼키고 `Unable to determine Dialect without JDBC metadata` 로 덮어쓴다. 그래서 `be-test` 는 (1) Gradle 실행 전에 `psql` 로 실제 로그인을 미리 해 보고, (2) `build.gradle` 의 `showStandardStreams = true` 로 테스트 JVM 로그를 빌드 로그에 흘려서 `FATAL: password authentication failed` 같은 원문 오류가 보이게 해 두었다.
 
 > [!WARNING]
 > **`PROD_DB_PASSWORD` 는 EC2 PostgreSQL 볼륨을 처음 만들 때 쓴 값과 반드시 같아야 한다.** PostgreSQL 은 볼륨 최초 생성 시점의 비밀번호만 유지한다. 다른 값을 넣으면 백엔드가 DB 에 붙지 못한다. 비밀번호를 정말 바꾸려면 컨테이너 안에서 `ALTER USER` 를 실행하거나 볼륨을 삭제해야 한다(데이터 손실).
