@@ -16,15 +16,3 @@ extend-exclude = [
 [tool.black]
 line-length = 100
 target-version = ["py312"]
-extend-exclude = '''
-(
-  test/AI_tryon/tryondiffusion
-  | test/AI_tryon/catvton
-)
-'''
-
-[tool.pytest.ini_options]
-norecursedirs = [
-    "test/AI_tryon/catvton/densepose",
-    "test/AI_tryon/catvton/detectron2",
-]
