@@ -1,6 +1,6 @@
 package com.ssafy.backend.auth.jwt;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
