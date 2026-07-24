@@ -29,21 +29,25 @@
 1. `python -m venv .venv` 후 가상환경 활성화
 2. `pip install -r requirements-dev.txt`
 3. `.env.example`을 `.env`로 복사 후 값 조정
-4. `uvicorn main:app --reload --port 8000`
+4. `AI/`에서 `uvicorn app.main:app --reload --port 8000` (`.env`는 실행 CWD 기준 로드)
 
 ## 디렉터리 구조
 
 ```
 AI/
-├── main.py          # FastAPI 앱 진입점 (/health 엔드포인트만 존재)
-├── config.py         # pydantic-settings 기반 환경설정
+├── app/                  # 프로덕션 코드 (도메인 우선 구조)
+│   ├── main.py           #   FastAPI 앱 진입점 + 도메인 router 등록 (+ /health)
+│   ├── core/             #   앱 공통(설정 등, cross-cutting) — config.py
+│   ├── shared/           #   도메인 공용 유틸(모델 레지스트리·임베딩 로더 등)
+│   └── recommend/        #   추천 도메인(자체완결): router.py / service.py / schemas.py / pipeline/
 ├── requirements.txt
 ├── requirements-dev.txt
-├── pyproject.toml    # ruff/black 설정
-└── test/              # 모델 선정(비교·평가) 단계의 스파이크 코드, 프로덕션 코드 아님
+├── pyproject.toml        # ruff/black 설정
+└── test/                 # 모델 선정(비교·평가) 단계의 스파이크 코드, 프로덕션 코드 아님
 ```
 
-기능별(가상 시착, 설명 생성 등) 모듈 분리는 실제 구현 시작 시 진행.
+프로덕션 기능은 `app/<도메인>/` 단위로 추가한다(도메인 우선 구조). 자세한 규약은 `CLAUDE.md`
+"프로덕션 모듈 구조" 참고.
 
 모델 선정(비교·평가) 단계의 실험 코드는 `test/`에 별도로 둔다.
 프로덕션 기능 모듈 구조에는 포함되지 않으며, 노트북 특성상 `ruff check .`에서 제외된다.

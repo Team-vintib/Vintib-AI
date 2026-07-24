@@ -5,7 +5,9 @@
 
 ## 디렉터리 구조
 
-- `main.py` — FastAPI 서비스 진입점(현재 `/health`만 있는 스켈레톤).
+- `app/` — **프로덕션 코드**(도메인 우선 구조, 아래 "프로덕션 모듈 구조" 참고). 진입점은
+  `app/main.py`(`uvicorn app.main:app`), 앱 공통 설정은 `app/core/`, 도메인 공용 유틸은
+  `app/shared/`, 기능은 `app/<도메인>/` 단위.
 - `requirements.txt` — 프로덕션 런타임 의존성.
 - `requirements-dev.txt` — CI/개발 도구(`ruff`, `black`, `pytest`, `httpx`) + `requirements.txt`.
 - `test/` — PoC·스파이크 코드 전용. **프로덕션 코드가 아니다.** `test/requirements-test.txt`에
@@ -15,6 +17,24 @@
 - `pyproject.toml` — `ruff`/`black`(`line-length=100`, `target-version=py312`) 설정과
   `pytest` 설정. `test/AI_tryon/{tryondiffusion,catvton}`, `test/**/*.ipynb`는 외부/서드파티
   코드·노트북이라 lint/format 대상에서 제외되어 있다.
+
+## 프로덕션 모듈 구조 (도메인 우선)
+
+프로덕션 코드는 `app/` 아래 **도메인 우선(domain-first)** 으로 둔다. 기능(추천·가상시착·상품설명
+등)마다 자체완결 패키지 `app/<도메인>/`을 만들고, 도메인 내부에서 파일로 레이어를 나눈다. 최상위를
+`api/`/`domain/`처럼 레이어로 쪼개지 않는다. BE(`domain/<name>/…` + `global/`)와 대응된다.
+
+- `app/main.py` — FastAPI 앱 생성 + 각 도메인 router 등록(`app.include_router(...)`)과 `/health`.
+- `app/core/` — 앱 전역 공통(cross-cutting). 설정(`config.py`), 이후 DB/Redis 클라이언트 등. (BE `global/` 대응)
+- `app/shared/` — 여러 도메인이 공유하는 유틸(모델 레지스트리·임베딩 로더 등). `test/`에서 승격 시 여기로.
+- `app/<도메인>/` — 자체완결 기능 패키지. 내부 파일 규약:
+  - `router.py` — API 레이어. `APIRouter`·엔드포인트, 요청 검증·응답 변환만. 로직은 service에 위임. (BE controller)
+  - `service.py` — 도메인 비즈니스 로직. (BE service)
+  - `schemas.py` — 요청/응답 pydantic 모델. (BE dto)
+  - `pipeline/` (선택) — 오프라인 배치(임베딩·전처리 등, AI 특유). 무거운 ML import는 함수 내부 지연 import.
+  - `dependencies.py`/`models.py`/`artifacts/`(gitignore) 등은 필요 시 추가.
+- 새 도메인은 위 파일 규약대로 만들고 `app/main.py`에 router를 prefix/tags와 함께 등록한다.
+- `test/`(PoC·스파이크)와 `app/`(프로덕션)은 명확히 분리한다 — `test/` 코드를 프로덕션에서 import하지 않는다.
 
 ## CI 규칙 — 커밋 전 반드시 로컬에서 통과시킬 것
 
