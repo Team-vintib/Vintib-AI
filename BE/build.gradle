@@ -52,5 +52,11 @@ tasks.named('test') {
 		exceptionFormat = 'full'
 		showCauses = true
 		showStackTraces = true
+
+		// ⚠️ 예외 체인만으로는 부족하다. DB 접속에 실패하면 Hibernate 가 원인 SQLException 을
+		//    삼키고 "Unable to determine Dialect without JDBC metadata" 로 덮어써서,
+		//    인증 실패인지 DB 이름 오류인지 구분할 수 없다. 진짜 원인(PSQLException)은
+		//    테스트 JVM 의 로그로만 나오므로 표준 출력을 빌드 로그로 넘긴다.
+		showStandardStreams = true
 	}
 }
