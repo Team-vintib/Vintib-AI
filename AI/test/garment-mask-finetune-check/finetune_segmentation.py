@@ -20,10 +20,9 @@ import random
 from pathlib import Path
 
 import torch
+from dataset import CLASS_NAMES, DATASET_ROOT, GarmentSegDataset, collect_samples
 from torch.utils.data import DataLoader, random_split
 from torchvision.models.segmentation import deeplabv3_mobilenet_v3_large
-
-from dataset import CLASS_NAMES, DATASET_ROOT, GarmentSegDataset, collect_samples
 
 # ---- 설정 ----
 IMAGE_SIZE = (512, 512)

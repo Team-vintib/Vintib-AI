@@ -16,18 +16,17 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from huggingface_hub import snapshot_download
-from PIL import Image
-
 from dataset import CLASS_NAMES, DATASET_ROOT, collect_samples, rasterize
 from finetune_segmentation import CHECKPOINT_PATH, IMAGE_SIZE, build_model
+from huggingface_hub import snapshot_download
+from PIL import Image
 
 # catvton은 정식 배포 패키지가 아니라 리포에 통째로 벤더링된 코드라
 # model.cloth_masker를 import하려면 그 루트를 sys.path에 넣어야 한다.
 CATVTON_ROOT = Path(__file__).resolve().parent.parent / "AI_tryon" / "catvton"
 sys.path.insert(0, str(CATVTON_ROOT))
 
-from model.cloth_masker import AutoMasker  # noqa: E402
+from model.cloth_masker import AutoMasker
 
 # 우리 4-클래스를 AutoMasker의 mask_type으로 근사 매핑한다(완전히 같은 개념은 아님 —
 # 특히 '원피스'는 전용 옵션이 없어 몸통 전체를 덮는 'overall'로 근사).

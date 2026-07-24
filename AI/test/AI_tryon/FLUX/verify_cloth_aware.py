@@ -1,7 +1,6 @@
 import torch
+from diffusers import Flux2KleinPipeline, Flux2Transformer2DModel, GGUFQuantizationConfig
 from PIL import Image
-from diffusers import Flux2KleinPipeline, Flux2Transformer2DModel
-from diffusers import GGUFQuantizationConfig
 from transformers import AutoModelForCausalLM, BitsAndBytesConfig
 
 # =========================================================
