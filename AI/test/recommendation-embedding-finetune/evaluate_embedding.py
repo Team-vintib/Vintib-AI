@@ -21,6 +21,41 @@ val 아이템을 그대로 코퍼스로 쓰면서 그 중 일부를 쿼리로도
 
 주의: 코퍼스가 `ashraq/fashion-product-images-small` 플레이스홀더라는 점은
 `recommendation_benchmark.py`와 동일하게 유효하다 — 실제 카탈로그가 아니다.
+
+검증셋 기준 (Validation-set criteria)
+--------------------------------------
+1. **출처**: `dataset.py.load_catalog()`의 전체 아이템 중 `split_items()`가 나눈 val
+   split만 사용한다(train은 절대 섞지 않음 — 파인튜닝이 학습 때 본 적 없는 데이터로만
+   평가해야 "일반화"를 잰 게 된다).
+2. **분리 기준**: `article_type`별 층화 샘플링, `val_ratio=0.2`, `seed=42`(둘 다
+   `dataset.SEED`/`dataset.VAL_RATIO` 상수 — 재현 가능). 상품명 중복은 `load_catalog()`
+   단계에서 이미 제거됨(같은 텍스트가 train/val 양쪽에 나타나는 리키지 방지, 실측 검증됨
+   — `test_dataset.py::TestSplitThenBuildPairsIntegration`).
+3. **쿼리/코퍼스 분리**: val 안에서도 `article_type`별로 `query_ratio=0.3`만큼을 쿼리
+   전용으로 떼어내고, 코퍼스에는 넣지 않는다(트리비얼 자기매칭 방지, 위 섹션 참고).
+4. **최소 표본 기준**: `article_type`당 val 아이템이 2개 미만이면(쿼리 1 + 코퍼스 1을
+   못 만듦) 그 카테고리는 통째로 제외하고 경고를 출력한다.
+5. **코퍼스 난이도**: `-180`이 5개 카테고리짜리 좁은 코퍼스에서 3개 모델 성능이 전부
+   동일한 "천장 효과"로 결론을 못 냈다 — 이 스크립트는 `load_catalog()`가 스캔한
+   범위의 **모든** `article_type`(수십 개)을 카테고리로 쓰기 때문에 구조적으로 더
+   어렵다. 그래도 실행 시 `build_eval_corpus_and_queries()`가 출력하는 코퍼스/쿼리
+   카테고리 수가 여전히 한 자릿수라면 결과를 신뢰하지 말 것(코퍼스가 너무 좁아 -180과
+   같은 천장 효과가 재현될 수 있음).
+
+성공 기준 / 결과 해석
+----------------------
+`print_report()` 표를 사람이 다음 기준으로 판단한다(자동 판정 없음 — 다른 벤치마크
+모듈과 동일한 스탠스, `recommendation_benchmark.print_report` 참고):
+- **회귀 없음이 최소 조건**: `bge_m3_catalog_ft`가 `bge_m3_baseline` 대비 recall@K/
+  precision@K/NDCG@K 중 하나라도 뚜렷이 나빠지면(예: 5%p 이상 하락) 그 파인튜닝은
+  채택 후보에서 제외한다.
+- **개선 판단은 NDCG 우선**: recall/precision은 순서를 안 보므로 동점이 나올 수 있다
+  (`test_recommendation_benchmark.py::test_rewards_higher_rank_more_than_recall_does`가
+  이 차이를 보여준다) — NDCG@K가 baseline보다 뚜렷이 높으면(예: 5%p 이상) "파인튜닝이
+  순위를 개선했다"는 증거로 본다.
+- **`model_registry.ACTIVE_EMBEDDING` 승격 조건**: 위 두 조건을 만족하고, 4번 항목의
+  코퍼스 난이도 경고가 없을 때만 승격을 검토한다 — `-180`이 걸어둔 "재검증 후 판단"
+  조건을 그대로 계승한다.
 """
 
 from __future__ import annotations
