@@ -52,13 +52,13 @@ import math
 import statistics
 import time
 import tracemalloc
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Any, Callable, Iterable, Literal
+from typing import Any, Literal
 
 import torch
 import torch.nn.functional as F
-
 from loaders import EmbeddingBundle, load_bge_m3, load_kanana_embedding, load_sentence_transformer
 from model_registry import EMBEDDING_MODELS
 
@@ -460,9 +460,7 @@ def run_all_recommendations(
     for name, candidate in candidates.items():
         try:
             results.append(benchmark_recommendation(candidate, corpus, queries, warmup=warmup))
-        except (
-            Exception
-        ) as exc:  # noqa: BLE001 — 스파이크 코드: 한 후보 실패해도 나머지는 계속 돈다
+        except Exception as exc:
             print(f"[{name}] 추천 벤치마크 실패: {exc}")
     return results
 

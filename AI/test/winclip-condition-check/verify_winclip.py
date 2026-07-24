@@ -8,11 +8,11 @@ WinCLIP zero-shot / few-shot 얼룩 탐지 - 개선판 검증 스크립트
 3) 여러 scale 조합을 SCALE_OPTIONS에 넣으면 한 번에 비교됨
 """
 
-import torch
-import numpy as np
-from PIL import Image
 import matplotlib.pyplot as plt
+import numpy as np
+import torch
 from anomalib.models.image.winclip.torch_model import WinClipModel
+from PIL import Image
 
 # ---------------- 설정 ----------------
 TARGET_IMAGE = "contaminated clothing.jpg"

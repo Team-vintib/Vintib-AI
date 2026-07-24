@@ -68,9 +68,9 @@ from pathlib import Path
 import dataset as ds
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "model_selection"))
-from loaders import load_bge_m3  # noqa: E402 — sys.path 조정 이후 import
-from model_registry import EMBEDDING_MODELS  # noqa: E402
-from recommendation_benchmark import (  # noqa: E402
+from loaders import load_bge_m3
+from model_registry import EMBEDDING_MODELS
+from recommendation_benchmark import (
     CorpusItem,
     RecommendationCandidate,
     RecommendationQuery,

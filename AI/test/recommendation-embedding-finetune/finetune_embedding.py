@@ -38,7 +38,7 @@ from pathlib import Path
 import dataset as ds
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "model_selection"))
-from model_registry import EMBEDDING_MODELS  # noqa: E402 — sys.path 조정 이후 import
+from model_registry import EMBEDDING_MODELS
 
 BASE_MODEL_ID = EMBEDDING_MODELS["bge-m3"]
 

@@ -19,7 +19,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from recommendation_benchmark import QueryRanking, RecommendationResult  # noqa: E402
+from recommendation_benchmark import QueryRanking, RecommendationResult
 
 
 def _result(*rankings: QueryRanking) -> RecommendationResult:

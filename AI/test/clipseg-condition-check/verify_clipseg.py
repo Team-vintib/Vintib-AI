@@ -2,11 +2,11 @@
 CLIPSeg: 텍스트 프롬프트 기반 오염/손상 영역 세그멘테이션 PoC
 """
 
-import torch
-import numpy as np
-from PIL import Image
 import matplotlib.pyplot as plt
-from transformers import CLIPSegProcessor, CLIPSegForImageSegmentation
+import numpy as np
+import torch
+from PIL import Image
+from transformers import CLIPSegForImageSegmentation, CLIPSegProcessor
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"device: {device}")

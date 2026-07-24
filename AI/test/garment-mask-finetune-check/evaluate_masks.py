@@ -13,10 +13,9 @@ Notion LAB-1(프로토타입 모델 실험 기록)의 시착 기능 평가지표
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, random_split
-
 from dataset import CLASS_NAMES, DATASET_ROOT, GarmentSegDataset, collect_samples
 from finetune_segmentation import CHECKPOINT_PATH, IMAGE_SIZE, SEED, VAL_RATIO, build_model
+from torch.utils.data import DataLoader, random_split
 
 
 def compute_iou(pred: np.ndarray, target: np.ndarray, num_classes: int) -> list[float]:

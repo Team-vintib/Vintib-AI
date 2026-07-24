@@ -7,12 +7,12 @@ WinCLIP zero-shot / few-shot 얼룩 탐지 - 시각화 정합성 수정판
 위에 겹쳐 그려야 위치가 정확히 맞습니다.
 """
 
-import torch
-import numpy as np
-from PIL import Image
-from torchvision.transforms import Compose, Resize, CenterCrop
 import matplotlib.pyplot as plt
+import numpy as np
+import torch
 from anomalib.models.image.winclip.torch_model import WinClipModel
+from PIL import Image
+from torchvision.transforms import CenterCrop, Compose, Resize
 
 # ---------------- 설정 ----------------
 TARGET_IMAGE = "normal_shirt_1.jpg"
