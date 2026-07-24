@@ -5,6 +5,13 @@ spring:
       ddl-auto: update
     show-sql: true
 
+springdoc:
+  # 로컬에서만 노출. http://localhost:8080/swagger-ui.html (→ /swagger-ui/index.html)
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true
+
 logging:
   level:
     com.ssafy.backend: debug
