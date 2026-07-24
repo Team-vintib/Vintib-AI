@@ -13,7 +13,7 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"test/**/*.py" = ["E402", "BLE001", "F401"]
+"test/**" = ["E402", "BLE001", "F401"]
 
 [tool.black]
 line-length = 100
