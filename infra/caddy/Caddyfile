@@ -1,0 +1,21 @@
+# 리버스 프록시 + TLS 종단 (S15P11A108-297)
+#
+# Caddy 가 i15a108.p.ssafy.io 에 대해 Let's Encrypt 인증서를 자동 발급·갱신하고,
+# HTTP(80)→HTTPS(443) 리다이렉트한 뒤 백엔드 컨테이너로 프록시한다.
+# backend 는 호스트에 포트를 열지 않고 vintib-net 내부에서 backend:8080 으로만 접근한다.
+#
+# WebRTC(OpenVidu v3)는 2주차에 붙인다. 그때 이 파일에 미디어 라우팅을 추가하거나
+# OpenVidu 내장 Caddy 와 정합을 맞춘다.
+
+i15a108.p.ssafy.io {
+	encode zstd gzip
+
+	# 헬스체크·REST·(추후)WebSocket 전부 백엔드로
+	reverse_proxy backend:8080
+
+	# 접근 로그 (컨테이너 stdout → docker logs)
+	log {
+		output stdout
+		format console
+	}
+}
