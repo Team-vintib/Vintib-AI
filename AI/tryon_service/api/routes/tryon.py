@@ -14,14 +14,15 @@ from pydantic import BaseModel, Field
 
 
 class TryOnStatus(str, Enum):
-    PENDING = "pending"       # 큐에 적재됨, 아직 처리 전
+    PENDING = "pending"  # 큐에 적재됨, 아직 처리 전
     PROCESSING = "processing"  # 워커가 추론 중
-    COMPLETED = "completed"    # 완료, 결과 조회 가능
-    FAILED = "failed"          # 실패 (재시도 소진 포함)
+    COMPLETED = "completed"  # 완료, 결과 조회 가능
+    FAILED = "failed"  # 실패 (재시도 소진 포함)
 
 
 class MaskFitType(str, Enum):
     """빈티지 의류 핏 옵션 (기존 AutoMasker.fit_type과 동일)"""
+
     REGULAR = "regular"
     OVERSIZED = "oversized"
     CROPPED = "cropped"
@@ -33,6 +34,7 @@ class TryOnRequestCreate(BaseModel):
     실제 이미지 파일(person_image, cloth_image)은 별도 multipart/form-data로 받는다
     (see api/routes/tryon.py의 UploadFile 파라미터).
     """
+
     mask_type: str = Field(default="upper", description="upper/lower/overall/inner/outer")
     fit_type: MaskFitType = Field(default=MaskFitType.REGULAR)
     num_inference_steps: int = Field(default=30, ge=10, le=50)
@@ -41,6 +43,7 @@ class TryOnRequestCreate(BaseModel):
 
 class TryOnRequestAccepted(BaseModel):
     """요청 접수 직후 즉시 반환하는 응답 (동기 대기 없음)"""
+
     request_id: str
     status: TryOnStatus = TryOnStatus.PENDING
     queued_at: datetime
@@ -49,6 +52,7 @@ class TryOnRequestAccepted(BaseModel):
 
 class TryOnResult(BaseModel):
     """결과 조회 API의 응답"""
+
     request_id: str
     status: TryOnStatus
     result_image_url: Optional[str] = None

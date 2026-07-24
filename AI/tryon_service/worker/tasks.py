@@ -141,7 +141,9 @@ def run_tryon_inference(
         torch.cuda.empty_cache()
         raise self.retry(exc=exc)
 
-    except Exception as exc:  # noqa: BLE001 — 추론 실패는 원인 무관하게 상태 기록 후 재시도/DLQ 이관해야 함
+    except (
+        Exception
+    ) as exc:  # noqa: BLE001 — 추론 실패는 원인 무관하게 상태 기록 후 재시도/DLQ 이관해야 함
         logger.exception(f"[{request_id}] 추론 실패")
         if self.request.retries >= _MAX_RETRIES:
             _send_to_dead_letter(request_id, str(exc))
