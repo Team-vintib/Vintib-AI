@@ -19,8 +19,10 @@
 - Java 21, Spring Boot 4.1.0 (Gradle, Groovy DSL)
 - Spring Web, Spring Data JPA (+ QueryDSL 검토), Spring Security, Validation, Lombok
 - 실시간: Spring WebSocket(STOMP) — 채팅/경매 이벤트
-- Redis(Spring Data Redis): 입찰 동시성 제어(분산 락 도입 검토), 서버 간 이벤트 Pub/Sub, 캐시
+- Redis(Spring Data Redis): 입찰 동시성 제어(분산 락 도입 검토), 서버 간 이벤트 Pub/Sub, 캐시, 이메일 인증코드/토큰 저장
 - PostgreSQL 18 Driver
+- Spring Mail: 이메일 인증코드 발송
+- springdoc-openapi(Swagger UI): API 문서화 (`/swagger-ui/index.html`, `/v3/api-docs`)
 - 파일 저장: **S3 미제공** — EC2 로컬 볼륨 기준으로 설계 (방식 미확정)
 
 > Spring Initializr(start.spring.io)가 현재 3.x 라인을 더 이상 제공하지 않아 최신 4.1.0으로 생성함.
@@ -96,20 +98,37 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ## 디렉터리 구조
 
 ```
-BE/src/main/java/com/ssafy/backend/
-├── BackendApplication.java
-├── global/                     # 도메인 무관 공통 — BE 2인 공유
-│   ├── response/               # ApiResponse<T>, ErrorResponse   (서윤, -295)
-│   ├── exception/              # ErrorCode, CustomException, GlobalExceptionHandler (서윤, -295)
-│   ├── config/                 # SecurityConfig(임시 스텁), AiClientConfig
-│   ├── client/                 # AiClient — Spring → FastAPI
-│   └── health/                 # HealthController
-└── domain/                     # 도메인별 패키지 (기능 착수 시 생성)
-    └── {auth,member,product,point,order}/   ← 서윤
-        {live,auction,chat,home,search}/     ← 정윤
+BE/
+├── build.gradle
+├── settings.gradle
+├── src/main/java/com/ssafy/backend/
+│   ├── BackendApplication.java
+│   ├── auth/                    # 회원가입/이메일 인증 (AUTH) — 서윤
+│   │   ├── controller/
+│   │   ├── service/
+│   │   └── dto/
+│   ├── member/                  # 회원 엔티티/레포지토리 (USER) — 서윤
+│   │   ├── entity/
+│   │   └── repository/
+│   └── global/                  # 도메인 무관 공통 — BE 2인 공유
+│       ├── client/              # AiClient — Spring → FastAPI
+│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig
+│       ├── entity/              # BaseTimeEntity 등 공통 베이스 엔티티
+│       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
+│       ├── health/              # HealthController
+│       └── response/            # ApiResponse, ErrorResponse
+├── src/main/resources/application.yml
+└── src/test/java/com/ssafy/backend/
 ```
 
-도메인 패키지는 `domain/{도메인}/` 아래에 `controller` / `service` / `repository` / `entity` / `dto`로 나눈다.
+도메인 패키지는 {domain}/ 아래에 controller / service / repository / entity / dto로 나눈다. 상세 규칙은 `.claude/skills/scaffold` 참고.
+
+담당 분배:
+
+```
+{auth,member,product,point,order}/   ← 서윤
+{live,auction,chat,home,search}/     ← 정윤
+```
 
 > `global/` 아래는 두 사람이 공유한다. 특히 `ErrorCode`는 단일 enum을 함께 쓰므로 도메인별 접두어 구역(C/U/L/A/W/O/T)을 지키고, 자기 구역에만 추가한다.
 
