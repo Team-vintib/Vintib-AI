@@ -27,23 +27,23 @@
 
 ## 구현 목록
 
-- [ ] `build.gradle`에 `io.jsonwebtoken:jjwt-api`, `jjwt-impl`, `jjwt-jackson` 추가
-- [ ] `application.yml`에 `jwt.secret`, `jwt.access-token-validity`, `jwt.refresh-token-validity` 추가 (env var 기반), 루트/BE `.env.example`에 `JWT_SECRET`/`JWT_ACCESS_TOKEN_EXPIRATION`/`JWT_REFRESH_TOKEN_EXPIRATION` 추가
-- [ ] `ErrorCode`에 `INVALID_CREDENTIALS`(401), `INVALID_TOKEN`(401), `EXPIRED_TOKEN`(401) 추가
-- [ ] `MemberRepository`에 `findByEmail` 추가
-- [ ] `auth` 도메인에 `JwtTokenProvider` 추가 — Access/Refresh 토큰 생성, 파싱, 서명 검증, 만료 검증
-- [ ] `AuthService`에 `signIn` 메서드 추가 — 이메일/비밀번호 검증(`PasswordEncoder.matches`) 후 토큰 발급 + Refresh Token Redis 저장
-- [ ] `AuthService`에 `reissue`, `logout` 메서드 추가
-- [ ] `SignInRequest`, `TokenResponse`(accessToken/refreshToken) DTO 추가
-- [ ] `AuthController`에 `POST /api/auth/signin`, `POST /api/auth/reissue`, `POST /api/auth/logout` 엔드포인트 추가 (Swagger 어노테이션 포함)
-- [ ] `JwtAuthenticationFilter` 추가 (`OncePerRequestFilter`) — Bearer 토큰 검증 후 `SecurityContextHolder`에 인증 정보 설정
-- [ ] `SecurityConfig` 갱신 — 공개 엔드포인트 목록 정리, 나머지 `authenticated()`, 필터 체인에 `JwtAuthenticationFilter` 등록
-- [ ] `AuthServiceTest` 추가 — 로그인 성공/비밀번호 불일치/존재하지 않는 이메일/재발급 성공·실패/로그아웃 후 재발급 거부 등
-- [ ] `JwtTokenProviderTest` 추가 — 토큰 생성/파싱/만료 검증
-- [ ] `BE/README.md`에 인증 방식(Bearer 토큰) 간단히 반영
+- [x] `build.gradle`에 `io.jsonwebtoken:jjwt-api`, `jjwt-impl`, `jjwt-jackson` 추가
+- [x] `application.yml`에 `jwt.secret`, `jwt.access-token-validity`, `jwt.refresh-token-validity` 추가 (env var 기반), 루트/BE `.env.example`에 `JWT_SECRET`/`JWT_ACCESS_TOKEN_EXPIRATION`/`JWT_REFRESH_TOKEN_EXPIRATION` 추가
+- [x] `ErrorCode`에 `INVALID_CREDENTIALS`(401), `INVALID_TOKEN`(401), `EXPIRED_TOKEN`(401) 추가
+- [x] `MemberRepository`에 `findByEmail` 추가
+- [x] `auth` 도메인에 `JwtTokenProvider` 추가 — Access/Refresh 토큰 생성, 파싱, 서명 검증, 만료 검증
+- [x] `AuthService`에 `signIn` 메서드 추가 — 이메일/비밀번호 검증(`PasswordEncoder.matches`) 후 토큰 발급 + Refresh Token Redis 저장
+- [x] `AuthService`에 `reissue`, `logout` 메서드 추가
+- [x] `SignInRequest`, `TokenResponse`(accessToken/refreshToken) DTO 추가
+- [x] `AuthController`에 `POST /api/auth/signin`, `POST /api/auth/reissue`, `POST /api/auth/logout` 엔드포인트 추가 (Swagger 어노테이션 포함)
+- [x] `JwtAuthenticationFilter` 추가 (`OncePerRequestFilter`) — Bearer 토큰 검증 후 `SecurityContextHolder`에 인증 정보 설정
+- [x] `SecurityConfig` 갱신 — 공개 엔드포인트 목록 정리, 나머지 `authenticated()`, 필터 체인에 `JwtAuthenticationFilter` 등록
+- [x] `AuthServiceTest` 추가 — 로그인 성공/비밀번호 불일치/존재하지 않는 이메일/재발급 성공·실패/로그아웃 후 재발급 거부 등
+- [x] `JwtTokenProviderTest` 추가 — 토큰 생성/파싱/만료 검증
+- [x] `BE/README.md`에 인증 방식(Bearer 토큰) 간단히 반영
 
-## 확인이 필요한 미결정 사항
+## 확인이 필요한 미결정 사항 (해소됨)
 
-- 위 "결정 필요 사항에 대한 가정" 4가지(토큰 구조/전달 방식/로그아웃 정책/라이브러리) — 승인 또는 수정 필요
-- Access/Refresh Token TTL 구체값 (Access 15분, Refresh 14일)
-- Refresh Token 회전(재발급마다 새 Refresh Token 발급) 여부 — 우선 미회전(같은 Refresh Token 재사용)으로 가정, 필요시 변경
+- 토큰 구조/전달 방식/로그아웃 정책/라이브러리 — 위 "가정" 그대로 구현 완료
+- Access/Refresh Token TTL: Access 15분, Refresh 14일로 확정
+- Refresh Token 회전: 재발급마다 새 Refresh Token을 발급해 Redis에 덮어쓰는 방식으로 구현(회전함)
