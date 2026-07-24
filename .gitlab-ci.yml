@@ -30,20 +30,24 @@ be-test:
   services:
     # docker-compose.yml과 동일 버전. application.yml이 DB_HOST/REDIS_HOST 등을
     # 환경변수로 읽으므로, @SpringBootTest가 실제 컨테이너에 붙어 동작함.
+    #
+    # ⚠️ alias 를 이미지 이름(postgres/redis)과 같게 두면 러너가 자동 생성하는
+    #    별칭과 충돌해 "alias is already in use" 로 skip 되고, 그 결과 호스트명이
+    #    해석되지 않아 DB 연결이 실패한다. 충돌하지 않는 이름을 쓴다.
     - name: postgres:18-alpine
-      alias: postgres
+      alias: db
     - name: redis:8.8-alpine
-      alias: redis
+      alias: cache
   variables:
     POSTGRES_DB: vintage_auction
     POSTGRES_USER: postgres
     POSTGRES_PASSWORD: postgres
-    DB_HOST: postgres
+    DB_HOST: db
     DB_PORT: "5432"
     DB_NAME: vintage_auction
     DB_USERNAME: postgres
     DB_PASSWORD: postgres
-    REDIS_HOST: redis
+    REDIS_HOST: cache
     REDIS_PORT: "6379"
   cache:
     key: "be-gradle-${CI_COMMIT_REF_SLUG}"
@@ -52,6 +56,11 @@ be-test:
   before_script:
     - cd BE
     - chmod +x gradlew
+    # 서비스 준비 확인. 여기서 끊으면 원인이 "DB 연결"임이 분명해진다.
+    # (없으면 Hibernate 가 dialect 결정 실패로 죽어 원인 파악이 어렵다)
+    - getent hosts "$DB_HOST" || { echo "DNS 해석 실패: $DB_HOST"; exit 1; }
+    - timeout 30 bash -c "until (echo > /dev/tcp/$DB_HOST/$DB_PORT) 2>/dev/null; do sleep 1; done" || { echo "TCP 연결 실패: $DB_HOST:$DB_PORT"; exit 1; }
+    - timeout 30 bash -c "until (echo > /dev/tcp/$REDIS_HOST/$REDIS_PORT) 2>/dev/null; do sleep 1; done" || { echo "TCP 연결 실패: $REDIS_HOST:$REDIS_PORT"; exit 1; }
   script:
     - ./gradlew build --no-daemon --build-cache -Dgradle.user.home=.gradle
 
