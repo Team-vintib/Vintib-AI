@@ -22,6 +22,23 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
 
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+jwt:
+  secret: ${JWT_SECRET:local-dev-only-secret-key-please-change-in-prod-0123456789}
+  access-token-validity: ${JWT_ACCESS_TOKEN_EXPIRATION:900000} # 15분(ms)
+  refresh-token-validity: ${JWT_REFRESH_TOKEN_EXPIRATION:1209600000} # 14일(ms)
+
 server:
   port: ${SERVER_PORT:8080}
 

@@ -117,4 +117,8 @@
 | 시착 결과 목록 조회 | GET | `/users/{id}/tryons` | MY |
 | 가상 시착 생성 | POST | `/users/{id}/tryons` | TRYON-003, TRYON-004 |
 | 시착 결과 상세 조회 | GET | `/users/{id}/tryons/{id}` | TRYON-005 |
+<<<<<<< Updated upstream
 | 시착 결과 삭제 | DELETE | `/users/{id}/tryons/{id}` | TRYON-005 |
+=======
+| 시착 결과 삭제 | DELETE | `/users/{id}/tryons/{id}` | TRYON-005 |
+>>>>>>> Stashed changes
