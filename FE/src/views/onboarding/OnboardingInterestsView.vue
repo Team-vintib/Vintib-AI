@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import BaseField from '@/components/base/BaseField.vue'
+import BaseInput from '@/components/base/BaseInput.vue'
 import OnboardingLayout from '@/layouts/OnboardingLayout.vue'
 
 interface InterestOption {
@@ -27,9 +29,20 @@ const categories: InterestOption[] = [
   { id: 'accessories', label: '액세서리' },
 ]
 
+const brandSearchQuery = ref('')
 const selectedBrandIds = ref<string[]>([])
 const selectedCategoryIds = ref<string[]>([])
 const router = useRouter()
+
+const filteredBrands = computed(() => {
+  const normalizedSearchQuery = brandSearchQuery.value.trim().toLocaleLowerCase()
+
+  if (!normalizedSearchQuery) {
+    return brands
+  }
+
+  return brands.filter((brand) => brand.label.toLocaleLowerCase().includes(normalizedSearchQuery))
+})
 
 const isBrandSelected = (brandId: string) => selectedBrandIds.value.includes(brandId)
 
@@ -81,9 +94,26 @@ const handlePrevious = async () => {
           여러 브랜드를 선택할 수 있습니다.
         </p>
 
-        <div class="brand-options">
+        <BaseField
+          id="brand-search"
+          class="brand-search"
+          label="브랜드 검색"
+          hint="브랜드명을 입력하면 아래 목록에서 검색할 수 있습니다."
+        >
+          <template #default="{ descriptionId, isInvalid }">
+            <BaseInput
+              id="brand-search"
+              v-model="brandSearchQuery"
+              placeholder="브랜드명을 입력해 주세요."
+              :described-by="descriptionId"
+              :invalid="isInvalid"
+            />
+          </template>
+        </BaseField>
+
+        <div v-if="filteredBrands.length > 0" class="brand-options">
           <button
-            v-for="brand in brands"
+            v-for="brand in filteredBrands"
             :key="brand.id"
             class="brand-option"
             :class="{ 'brand-option--selected': isBrandSelected(brand.id) }"
@@ -101,6 +131,8 @@ const handlePrevious = async () => {
             <span>{{ brand.label }}</span>
           </button>
         </div>
+
+        <p v-else class="brand-options-empty" role="status">검색 결과가 없습니다.</p>
       </fieldset>
 
       <fieldset class="interest-group" aria-describedby="category-selection-hint">
@@ -222,11 +254,31 @@ const handlePrevious = async () => {
   line-height: 20px;
 }
 
+.brand-search {
+  margin-top: var(--space-5);
+}
+
 .brand-options {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
   margin-top: var(--space-5);
+}
+
+.brand-options-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-control);
+  margin-top: var(--space-5);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
 }
 
 .brand-option {
