@@ -31,14 +31,13 @@ from __future__ import annotations
 import statistics
 import time
 import tracemalloc
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from functools import partial
 from itertools import combinations
-from typing import Callable, Iterable
 
 import torch
 import torch.nn.functional as F
-
 from loaders import (
     EmbeddingBundle,
     load_kanana_embedding,
@@ -332,9 +331,7 @@ def run_all_embeddings(
     for name, candidate in candidates.items():
         try:
             results.append(benchmark_embedding(candidate, groups, warmup=warmup))
-        except (
-            Exception
-        ) as exc:  # noqa: BLE001 — 스파이크 코드: 한 후보 실패해도 나머지는 계속 돈다
+        except Exception as exc:
             print(f"[{name}] 임베딩 벤치마크 실패: {exc}")
     return results
 

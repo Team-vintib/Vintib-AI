@@ -18,9 +18,8 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from PIL import Image, UnidentifiedImageError
-
 from dataset import CLASS_NAMES, DATASET_ROOT, Sample, collect_samples, dataset_specs
+from PIL import Image, UnidentifiedImageError
 
 
 def check_matching_and_parsing(dataset_root: Path) -> dict[str, dict[str, int]]:
