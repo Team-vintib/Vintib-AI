@@ -1,4 +1,6 @@
 :root {
+  color-scheme: light;
+
   /* Light UI */
   --color-page: #F7F6F2;
   --color-surface: #FFFFFF;
@@ -14,6 +16,10 @@
   --color-primary: #294335;
   --color-primary-hover: #1F352A;
   --color-primary-soft: #E7EEE9;
+
+  /* Feedback */
+  --color-error: #B42318;
+  --color-error-soft: #FEE4E2;
 
   /* Live & Auction */
   --color-live: #C43D46;
@@ -63,7 +69,9 @@
   --layout-content-max-width: 1320px;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;

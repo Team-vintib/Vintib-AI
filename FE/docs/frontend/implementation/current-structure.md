@@ -46,10 +46,21 @@ src/
       types/
     onboard/
       api/
+        onboarding.ts
+        postcode.ts
       components/
+        BaseButton.vue
+        BaseField.vue
+        BaseInput.vue
+        OnboardingLayout.vue
+        OnboardingStepIndicator.vue
       constants/
       pages/
+        OnboardingBasicInfoView.vue
+        OnboardingInterestsView.vue
+        OnboardingTryOnView.vue
       types/
+        kakao-postcode.d.ts
     biz/
       api/
       components/
@@ -232,8 +243,9 @@ docs/
 
 ## 구현 상태
 
-- 라우터는 `router/routes.ts`로 route 배열을 분리했으며, 등록된 화면 route는 아직 없습니다.
+- 라우터는 `router/routes.ts`로 route 배열을 분리했으며 ONBOARD-001~003 route가 등록되어 있습니다.
 - `App.vue`는 `RouterView`만 렌더링합니다.
-- 기능 ID prefix 기준 도메인 폴더와 공통 폴더는 생성되어 있습니다.
-- 각 폴더에는 구조 보존용 `.gitkeep`만 있으며 실제 화면, API, 타입 구현은 아직 없습니다.
-- 전역 스타일은 디자인 토큰, reset, 기본 font-family를 포함합니다.
+- 기능 ID prefix 기준 도메인 폴더와 공통 폴더가 생성되어 있습니다.
+- `domains/onboard`에는 기본 정보, 관심 정보와 AI 시착 정보 임시 화면 및 관련 API·컴포넌트가 구현되어 있습니다.
+- 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
+- 전역 스타일은 디자인 토큰, reset, 기본 font-family와 온보딩 오류 토큰을 포함합니다.

@@ -1,13 +1,21 @@
 export interface ApiResponse<T> {
-  data: T
+  data: T | null
+  error?: ApiErrorBody | null
   message?: string
   success: boolean
 }
 
+export interface ApiFieldError {
+  field: string
+  reason: string
+  value?: unknown
+}
+
 export interface ApiErrorBody {
   code: string
-  message: string
   details?: Record<string, unknown>
+  errors?: ApiFieldError[] | null
+  message: string
 }
 
 export interface PageMeta {

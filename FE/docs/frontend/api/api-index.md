@@ -14,13 +14,99 @@ Swagger 제공 전까지 사용하는 임시 후보입니다. 실제 구현 시 
 
 ## 온보딩/내 정보
 
-| 기능 | Method | 후보 endpoint |
-| --- | --- | --- |
-| 내 정보 조회 | GET | `/api/me` |
-| 온보딩 저장 | PATCH | `/api/me/onboarding` |
-| 내 정보 수정 | PATCH | `/api/me` |
-| 주소 조회/저장 | GET/POST | `/api/addresses` |
-| 사업자 인증 제출/조회 | POST/GET | `/api/business-verifications` |
+| 기능 | Method | endpoint | 상태 |
+| --- | --- | --- | --- |
+| 내 정보 조회 | GET | `/api/me` | 후보 |
+| 기본 정보 저장 | PATCH | `/api/me/onboarding` | S15P11A108-241 FE 선행 계약 |
+| 관심 정보 저장·건너뛰기 | PUT | `/api/me/interests` | S15P11A108-250 FE 선행 계약 |
+| 내 정보 수정 | PATCH | `/api/me` | 후보 |
+| 주소 조회/저장 | GET/POST | `/api/addresses` | 후보 |
+| 사업자 인증 제출/조회 | POST/GET | `/api/business-verifications` | 후보 |
+
+### 기본 정보 저장
+
+BE 구현 전 FE가 선행 정의한 임시 계약입니다. BE Swagger가 제공되면 실제 계약을 기준으로
+타입과 오류 처리를 갱신합니다.
+
+```http
+PATCH /api/me/onboarding
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+```json
+{
+  "nickname": "빈티지러버",
+  "gender": "FEMALE",
+  "phoneNumber": "010-1234-5678",
+  "postalCode": "06236",
+  "address": "서울 강남구 테헤란로 212",
+  "detailAddress": "3층"
+}
+```
+
+- `gender`: `MALE | FEMALE`
+- `postalCode`: 주소 검색을 사용하면 우편번호, 주소를 직접 입력하면 `null`
+- 나머지 필드는 필수
+
+성공 응답:
+
+```json
+{
+  "success": true,
+  "data": null,
+  "error": null
+}
+```
+
+검증 실패는 `400 / C001`과 `error.errors`를 사용한다. 필드명은 `nickname`,
+`gender`, `phoneNumber`, `postalCode`, `address`, `detailAddress` 중 하나로 전달한다.
+
+### 관심 정보 저장·건너뛰기
+
+BE 구현 전 FE가 선행 정의한 임시 계약입니다. 인증 토큰에서 현재 회원을 식별하며,
+선택 저장과 건너뛰기는 같은 멱등 PUT endpoint를 사용합니다.
+
+```http
+PUT /api/me/interests
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+선택 저장:
+
+```json
+{
+  "brandIds": ["brand-a", "brand-c"],
+  "categoryIds": ["outer", "top"]
+}
+```
+
+건너뛰기:
+
+```json
+{
+  "brandIds": [],
+  "categoryIds": []
+}
+```
+
+성공 응답:
+
+```json
+{
+  "success": true,
+  "data": null,
+  "error": null
+}
+```
+
+- `brandIds`, `categoryIds`는 중복 없는 문자열 배열입니다.
+- 빈 배열은 해당 관심 정보가 없는 상태로 저장하며 기존 선택값도 비웁니다.
+- 현재 문자열 ID는 FE 화면의 임시 식별자입니다. 브랜드·카테고리 마스터 조회 API와
+  서버 ID 타입이 확정되면 실제 ID로 교체해야 합니다.
+- HTTP 성공이어도 `success: false`이면 저장 실패로 처리합니다.
+- 검증 실패는 `error.message`를 화면 공통 오류로 표시합니다.
 
 ## 이후 화면 후보
 
