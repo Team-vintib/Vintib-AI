@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  테스트 실행 시에만 적용되는 로깅 설정 (테스트 클래스패스 전용, 운영/로컬 구동에는 영향 없음).
+
+  build.gradle 의 showStandardStreams = true 는 DB 접속 실패 원인을 보기 위해 필요하다.
+  Hibernate 가 원인 SQLException 을 삼키고 "Unable to determine Dialect" 로 덮어써서,
+  진짜 원인(PSQLException)은 테스트 JVM 로그로만 나오기 때문이다.
+
+  다만 그대로 두면 스프링 기동 INFO 로그가 전부 CI 로그에 쏟아진다.
+  root 를 WARN 으로 낮춰 프레임워크 소음만 걷어낸다. 실패 원인은 WARN 이상이라 그대로 남는다.
+-->
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 프레임워크 기동 로그(Spring/Hibernate/Hikari INFO)는 버린다. -->
+    <root level="WARN">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+    <!-- 우리 코드 로그는 남긴다. -->
+    <logger name="com.ssafy.backend" level="INFO"/>
+</configuration>
