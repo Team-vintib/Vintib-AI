@@ -8,6 +8,7 @@ interface Props {
   description: string
   previousDisabled?: boolean
   nextDisabled?: boolean
+  nextLabel?: string
 }
 
 const {
@@ -16,6 +17,7 @@ const {
   description,
   previousDisabled = false,
   nextDisabled = false,
+  nextLabel = '다음 단계',
 } = defineProps<Props>()
 
 const emit = defineEmits<{
@@ -75,7 +77,7 @@ const onboardingSteps = [
           :disabled="nextDisabled"
           @click="emit('next')"
         >
-          다음 단계
+          {{ nextLabel }}
         </BaseButton>
       </footer>
     </section>

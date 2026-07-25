@@ -7,8 +7,12 @@ const router = createRouter({
     {
       path: '/onboarding/basic-info',
       name: 'onboarding-basic-info',
-      component: () =>
-        import('@/views/onboarding/OnboardingBasicInfoView.vue'),
+      component: () => import('@/views/onboarding/OnboardingBasicInfoView.vue'),
+    },
+    {
+      path: '/onboarding/interests',
+      name: 'onboarding-interests',
+      component: () => import('@/views/onboarding/OnboardingInterestsPlaceholderView.vue'),
     },
   ],
 })

@@ -1,13 +1,19 @@
 <script setup lang="ts">
+import axios from 'axios'
 import { nextTick, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
+import { saveOnboardingBasicInfo } from '@/api/onboarding'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseField from '@/components/base/BaseField.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import OnboardingLayout from '@/layouts/OnboardingLayout.vue'
 import { openPostcodeSearch } from '@/services/postcodeService'
 
-type Gender = '' | 'MALE' | 'FEMALE'
+import type { OnboardingGender } from '@/api/onboarding'
+import type { ApiError, ApiResponse } from '@/api/types'
+
+type Gender = '' | OnboardingGender
 type FormField = 'nickname' | 'gender' | 'phoneNumber' | 'address' | 'detailAddress'
 type TextFormField = Exclude<FormField, 'gender'>
 
@@ -47,8 +53,10 @@ const touched = reactive<Record<FormField, boolean>>({
 
 const isAddressSearchLoading = ref(false)
 const addressSearchError = ref('')
-const isValidationCompleted = ref(false)
+const isSubmitting = ref(false)
+const submitError = ref('')
 const detailAddressInput = ref<InstanceType<typeof BaseInput> | null>(null)
+const router = useRouter()
 
 const genderOptions: { value: Exclude<Gender, ''>; label: string }[] = [
   { value: 'MALE', label: '남성' },
@@ -63,6 +71,15 @@ const fieldIds: Record<FormField, string> = {
   phoneNumber: 'phone-number',
   address: 'address',
   detailAddress: 'detail-address',
+}
+
+const apiFieldMap: Record<string, FormField> = {
+  nickname: 'nickname',
+  gender: 'gender',
+  phoneNumber: 'phoneNumber',
+  postalCode: 'address',
+  address: 'address',
+  detailAddress: 'detailAddress',
 }
 
 const nicknamePattern = /^[가-힣A-Za-z0-9]{2,10}$/
@@ -125,7 +142,7 @@ const handleFieldBlur = (field: FormField) => {
 
 const handleTextUpdate = (field: TextFormField, input: string) => {
   form[field] = field === 'phoneNumber' ? input.replace(/[^\d-]/g, '').slice(0, 13) : input
-  isValidationCompleted.value = false
+  submitError.value = ''
 
   if (touched[field]) {
     validateField(field)
@@ -134,7 +151,7 @@ const handleTextUpdate = (field: TextFormField, input: string) => {
 
 const handleGenderChange = () => {
   touched.gender = true
-  isValidationCompleted.value = false
+  submitError.value = ''
   validateField('gender')
 }
 
@@ -152,7 +169,7 @@ const handleAddressSearch = async () => {
       form.address = result.address
       touched.address = true
       validateField('address')
-      isValidationCompleted.value = false
+      submitError.value = ''
 
       await nextTick()
       detailAddressInput.value?.focus()
@@ -165,8 +182,52 @@ const handleAddressSearch = async () => {
   }
 }
 
+const focusField = async (field: FormField) => {
+  await nextTick()
+  document.getElementById(fieldIds[field])?.focus()
+}
+
+const applyApiError = async (apiError: ApiError | null) => {
+  if (!apiError) {
+    submitError.value = '기본 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+    return
+  }
+
+  const mappedFields: FormField[] = []
+  const unmappedReasons: string[] = []
+
+  apiError.errors?.forEach((fieldError) => {
+    const field = apiFieldMap[fieldError.field]
+
+    if (!field) {
+      unmappedReasons.push(fieldError.reason)
+      return
+    }
+
+    touched[field] = true
+    errors[field] = fieldError.reason
+    mappedFields.push(field)
+  })
+
+  if (unmappedReasons.length > 0) {
+    submitError.value = unmappedReasons.join(' ')
+  } else if (mappedFields.length === 0) {
+    submitError.value = apiError.message || '기본 정보를 저장하지 못했습니다.'
+  }
+
+  const firstInvalidField = fieldOrder.find((field) => mappedFields.includes(field))
+
+  if (firstInvalidField) {
+    await focusField(firstInvalidField)
+  }
+}
+
 const handleSubmit = async () => {
-  isValidationCompleted.value = false
+  if (isSubmitting.value) {
+    return
+  }
+
+  submitError.value = ''
 
   const isValid = fieldOrder
     .map((field) => {
@@ -181,7 +242,7 @@ const handleSubmit = async () => {
     await nextTick()
 
     if (firstInvalidField) {
-      document.getElementById(fieldIds[firstInvalidField])?.focus()
+      await focusField(firstInvalidField)
     }
 
     return
@@ -191,7 +252,43 @@ const handleSubmit = async () => {
   form.phoneNumber = form.phoneNumber.trim()
   form.address = form.address.trim()
   form.detailAddress = form.detailAddress.trim()
-  isValidationCompleted.value = true
+
+  if (!form.gender) {
+    return
+  }
+
+  isSubmitting.value = true
+
+  try {
+    const response = await saveOnboardingBasicInfo({
+      nickname: form.nickname,
+      gender: form.gender,
+      phoneNumber: form.phoneNumber,
+      postalCode: form.zonecode || null,
+      address: form.address,
+      detailAddress: form.detailAddress,
+    })
+
+    if (!response.success) {
+      await applyApiError(response.error)
+      return
+    }
+
+    await router.push({ name: 'onboarding-interests' })
+  } catch (error: unknown) {
+    if (axios.isAxiosError<ApiResponse<unknown>>(error)) {
+      if (!error.response) {
+        submitError.value =
+          '서버에 연결하지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.'
+      } else {
+        await applyApiError(error.response.data?.error ?? null)
+      }
+    } else {
+      submitError.value = '기본 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+    }
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 
@@ -201,6 +298,8 @@ const handleSubmit = async () => {
     title="기본 정보를 입력해 주세요"
     description="원활한 서비스 이용을 위해 기본 회원 정보를 등록해 주세요."
     :previous-disabled="true"
+    :next-disabled="isSubmitting"
+    :next-label="isSubmitting ? '저장 중' : '다음 단계'"
     @next="handleSubmit"
   >
     <form
@@ -371,8 +470,13 @@ const handleSubmit = async () => {
         <p>원활한 서비스 이용을 위해 정확한 정보를 입력해 주세요.</p>
       </div>
 
-      <p v-if="isValidationCompleted" class="basic-info-form__success" role="status">
-        입력값을 모두 확인했습니다.
+      <p
+        v-if="submitError"
+        class="basic-info-form__submit-error"
+        role="alert"
+        aria-live="assertive"
+      >
+        {{ submitError }}
       </p>
     </form>
   </OnboardingLayout>
@@ -539,12 +643,12 @@ const handleSubmit = async () => {
   color: var(--color-primary);
 }
 
-.basic-info-form__success {
+.basic-info-form__submit-error {
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-control);
   margin-top: var(--space-6);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
+  background: var(--color-error-soft);
+  color: var(--color-error);
   font-size: 14px;
   font-weight: 600;
 }

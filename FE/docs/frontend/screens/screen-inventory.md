@@ -11,8 +11,8 @@
 | AUTH-003 | 싸피어스 SSO 로그인 | 비회원 | `/auth/ssafy` | 1 | 미구현 |
 | AUTH-004-2 | 싸피 로그인 완료 안내 | 비회원 | `/auth/ssafy/success` | 1 | 미구현 |
 | AUTH-004 | 기존 계정 연결 | 비회원/회원 후보 | `/auth/link-account` | 1 | 미구현 |
-| ONBOARD-001 | 기본 정보 입력 | 회원 | `/onboarding/profile` | 2 | 미구현 |
-| ONBOARD-002 | 관심 브랜드/카테고리 설정 | 회원 | `/onboarding/interests` | 2 | 미구현 |
+| ONBOARD-001 | 기본 정보 입력 | 회원 | `/onboarding/basic-info` | 2 | FE 완료, BE API 대기 |
+| ONBOARD-002 | 관심 브랜드/카테고리 설정 | 회원 | `/onboarding/interests` | 2 | 임시 이동 화면 |
 | ONBOARD-003 | 전신 사진/신체 정보 등록 | 회원 | `/onboarding/try-on` | 2 | 미구현 |
 | ONBOARD-004 | 일반/사업자 회원 선택 | 회원 | `/onboarding/member-type` | 2 | 미구현 |
 | BIZ-001 | 사업자 정보 제출 | 사업자 회원 | `/business/verification` | 2 | 미구현 |
