@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import { RouterLink } from 'vue-router'
 
-import { ROUTE_NAMES } from '@/shared/constants/routes'
+import {
+  isEmail,
+  isRequired,
+  isSameValue,
+  isSignupPassword,
+  isVerificationCode,
+} from '@/shared/utils/validators'
 
 type SignupField = 'name' | 'email' | 'verificationCode' | 'password' | 'passwordConfirm'
 type AgreementField = 'serviceTerms' | 'privacyPolicy' | 'marketing'
@@ -43,7 +48,16 @@ const touched = reactive<Record<SignupField, boolean>>({
   passwordConfirm: false,
 })
 
+const errors = reactive<Record<SignupField, string>>({
+  name: '',
+  email: '',
+  verificationCode: '',
+  password: '',
+  passwordConfirm: '',
+})
+
 const isPasswordVisible = ref(false)
+const isAgreementTouched = ref(false)
 
 const agreementItems: {
   key: AgreementField
@@ -75,21 +89,106 @@ const isRequiredAgreementChecked = computed(
   () => agreements.serviceTerms && agreements.privacyPolicy,
 )
 
-const canRequestVerificationCode = computed(() => form.email.trim().length > 0)
-const canConfirmVerificationCode = computed(() => form.verificationCode.trim().length > 0)
+const agreementError = computed(() => {
+  if (!isAgreementTouched.value || isRequiredAgreementChecked.value) {
+    return ''
+  }
 
-const canSubmit = computed(
+  return '필수 약관에 모두 동의해 주세요.'
+})
+
+const canRequestVerificationCode = computed(() => isEmail(form.email))
+const canConfirmVerificationCode = computed(() => isVerificationCode(form.verificationCode))
+
+const isFormValid = computed(
   () =>
-    form.name.trim().length > 0 &&
-    form.email.trim().length > 0 &&
-    form.verificationCode.trim().length > 0 &&
-    form.password.length > 0 &&
-    form.passwordConfirm.length > 0 &&
+    isRequired(form.name) &&
+    form.name.trim().length <= 30 &&
+    isEmail(form.email) &&
+    isVerificationCode(form.verificationCode) &&
+    isSignupPassword(form.password) &&
+    isSameValue(form.passwordConfirm, form.password) &&
     isRequiredAgreementChecked.value,
 )
 
+const getFieldError = (field: SignupField) => {
+  if (field === 'name') {
+    if (!isRequired(form.name)) {
+      return '이름을 입력해 주세요.'
+    }
+
+    if (form.name.trim().length > 30) {
+      return '이름은 30자 이내로 입력해 주세요.'
+    }
+  }
+
+  if (field === 'email') {
+    if (!isRequired(form.email)) {
+      return '이메일을 입력해 주세요.'
+    }
+
+    if (!isEmail(form.email)) {
+      return '이메일 형식을 확인해 주세요.'
+    }
+  }
+
+  if (field === 'verificationCode') {
+    if (!isRequired(form.verificationCode)) {
+      return '인증코드를 입력해 주세요.'
+    }
+
+    if (!isVerificationCode(form.verificationCode)) {
+      return '인증코드는 숫자 6자리로 입력해 주세요.'
+    }
+  }
+
+  if (field === 'password') {
+    if (!form.password) {
+      return '비밀번호를 입력해 주세요.'
+    }
+
+    if (!isSignupPassword(form.password)) {
+      return '비밀번호는 영문과 숫자를 포함해 8~20자로 입력해 주세요.'
+    }
+  }
+
+  if (field === 'passwordConfirm') {
+    if (!form.passwordConfirm) {
+      return '비밀번호 확인을 입력해 주세요.'
+    }
+
+    if (!isSameValue(form.passwordConfirm, form.password)) {
+      return '비밀번호가 일치하지 않습니다.'
+    }
+  }
+
+  return ''
+}
+
+const validateField = (field: SignupField) => {
+  errors[field] = getFieldError(field)
+
+  return !errors[field]
+}
+
 const handleFieldBlur = (field: SignupField) => {
   touched[field] = true
+
+  if (field === 'name' || field === 'email') {
+    form[field] = form[field].trim()
+  }
+
+  validateField(field)
+}
+
+const handleFieldInput = (field: SignupField) => {
+  if (touched[field]) {
+    validateField(field)
+  }
+
+  if (field === 'password' && touched.passwordConfirm) {
+    validateField('passwordConfirm')
+  }
 }
 
 const togglePasswordVisibility = () => {
@@ -102,24 +201,40 @@ const handleAllAgreementChange = (event: Event) => {
   agreements.serviceTerms = isChecked
   agreements.privacyPolicy = isChecked
   agreements.marketing = isChecked
+  isAgreementTouched.value = true
 }
 
 const handleAgreementChange = (key: AgreementField, event: Event) => {
   agreements[key] = (event.target as HTMLInputElement).checked
+  isAgreementTouched.value = true
 }
 
 const handleVerificationCodeInput = (event: Event) => {
   form.verificationCode = (event.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6)
+  handleFieldInput('verificationCode')
 }
 
 const markAllTouched = () => {
   Object.keys(touched).forEach((field) => {
     touched[field as SignupField] = true
   })
+
+  isAgreementTouched.value = true
+}
+
+const validateForm = () => {
+  markAllTouched()
+
+  return (
+    (Object.keys(errors) as SignupField[]).map((field) => validateField(field)).every(Boolean) &&
+    isRequiredAgreementChecked.value
+  )
 }
 
 const handleSubmit = () => {
-  markAllTouched()
+  if (!validateForm()) {
+    return
+  }
 }
 </script>
 
@@ -136,12 +251,25 @@ const handleSubmit = () => {
         <input
           id="signup-name"
           v-model="form.name"
-          class="h-12 w-full rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+          class="h-12 w-full rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+          :class="
+            errors.name ? 'border-[var(--color-error)]' : 'border-[var(--color-border-strong)]'
+          "
           type="text"
           autocomplete="name"
           placeholder="성함을 입력해주세요."
+          :aria-invalid="errors.name ? 'true' : 'false'"
+          aria-describedby="signup-name-error"
+          @input="handleFieldInput('name')"
           @blur="handleFieldBlur('name')"
         />
+        <p
+          v-if="errors.name"
+          id="signup-name-error"
+          class="text-[13px] leading-5 text-[var(--color-error)]"
+        >
+          {{ errors.name }}
+        </p>
       </div>
 
       <div class="space-y-2">
@@ -155,10 +283,16 @@ const handleSubmit = () => {
           <input
             id="signup-email"
             v-model="form.email"
-            class="h-12 min-w-0 flex-1 rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+            class="h-12 min-w-0 flex-1 rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+            :class="
+              errors.email ? 'border-[var(--color-error)]' : 'border-[var(--color-border-strong)]'
+            "
             type="email"
             autocomplete="email"
             placeholder="이메일을 입력해주세요."
+            :aria-invalid="errors.email ? 'true' : 'false'"
+            aria-describedby="signup-email-error"
+            @input="handleFieldInput('email')"
             @blur="handleFieldBlur('email')"
           />
           <button
@@ -169,6 +303,13 @@ const handleSubmit = () => {
             인증코드 발송
           </button>
         </div>
+        <p
+          v-if="errors.email"
+          id="signup-email-error"
+          class="text-[13px] leading-5 text-[var(--color-error)]"
+        >
+          {{ errors.email }}
+        </p>
       </div>
 
       <div class="space-y-2">
@@ -181,12 +322,19 @@ const handleSubmit = () => {
         <div class="flex gap-2 max-sm:flex-col">
           <input
             id="signup-verification-code"
-            class="h-12 min-w-0 flex-1 rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+            class="h-12 min-w-0 flex-1 rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+            :class="
+              errors.verificationCode
+                ? 'border-[var(--color-error)]'
+                : 'border-[var(--color-border-strong)]'
+            "
             type="text"
             inputmode="numeric"
             autocomplete="one-time-code"
             placeholder="6자리 인증코드"
             :value="form.verificationCode"
+            :aria-invalid="errors.verificationCode ? 'true' : 'false'"
+            aria-describedby="signup-verification-code-error"
             @input="handleVerificationCodeInput"
             @blur="handleFieldBlur('verificationCode')"
           />
@@ -198,6 +346,13 @@ const handleSubmit = () => {
             확인
           </button>
         </div>
+        <p
+          v-if="errors.verificationCode"
+          id="signup-verification-code-error"
+          class="text-[13px] leading-5 text-[var(--color-error)]"
+        >
+          {{ errors.verificationCode }}
+        </p>
       </div>
 
       <div class="space-y-2">
@@ -211,10 +366,18 @@ const handleSubmit = () => {
           <input
             id="signup-password"
             v-model="form.password"
-            class="h-12 w-full rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 pr-20 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+            class="h-12 w-full rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 pr-20 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+            :class="
+              errors.password
+                ? 'border-[var(--color-error)]'
+                : 'border-[var(--color-border-strong)]'
+            "
             :type="isPasswordVisible ? 'text' : 'password'"
             autocomplete="new-password"
             placeholder="비밀번호를 입력해주세요."
+            :aria-invalid="errors.password ? 'true' : 'false'"
+            aria-describedby="signup-password-message"
+            @input="handleFieldInput('password')"
             @blur="handleFieldBlur('password')"
           />
           <button
@@ -226,8 +389,12 @@ const handleSubmit = () => {
             {{ isPasswordVisible ? '숨기기' : '보기' }}
           </button>
         </div>
-        <p class="text-[13px] leading-5 text-[var(--color-text-muted)]">
-          8~20자, 영문과 숫자를 포함해 입력해주세요.
+        <p
+          id="signup-password-message"
+          class="text-[13px] leading-5"
+          :class="errors.password ? 'text-[var(--color-error)]' : 'text-[var(--color-text-muted)]'"
+        >
+          {{ errors.password || '8~20자, 영문과 숫자를 포함해 입력해주세요.' }}
         </p>
       </div>
 
@@ -241,18 +408,35 @@ const handleSubmit = () => {
         <input
           id="signup-password-confirm"
           v-model="form.passwordConfirm"
-          class="h-12 w-full rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+          class="h-12 w-full rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+          :class="
+            errors.passwordConfirm
+              ? 'border-[var(--color-error)]'
+              : 'border-[var(--color-border-strong)]'
+          "
           :type="isPasswordVisible ? 'text' : 'password'"
           autocomplete="new-password"
           placeholder="비밀번호를 다시 입력해주세요."
+          :aria-invalid="errors.passwordConfirm ? 'true' : 'false'"
+          aria-describedby="signup-password-confirm-error"
+          @input="handleFieldInput('passwordConfirm')"
           @blur="handleFieldBlur('passwordConfirm')"
         />
+        <p
+          v-if="errors.passwordConfirm"
+          id="signup-password-confirm-error"
+          class="text-[13px] leading-5 text-[var(--color-error)]"
+        >
+          {{ errors.passwordConfirm }}
+        </p>
       </div>
     </section>
 
     <section
-      class="rounded-[var(--radius-control)] border border-[var(--color-border)] p-4"
+      class="rounded-[var(--radius-control)] border p-4"
+      :class="agreementError ? 'border-[var(--color-error)]' : 'border-[var(--color-border)]'"
       aria-labelledby="agreement-title"
+      aria-describedby="agreement-error"
     >
       <div class="mb-4 flex items-center justify-between gap-4">
         <h2 id="agreement-title" class="text-base font-semibold text-[var(--color-text-primary)]">
@@ -292,13 +476,25 @@ const handleSubmit = () => {
           </button>
         </div>
       </div>
+
+      <p
+        v-if="agreementError"
+        id="agreement-error"
+        class="mt-3 text-[13px] leading-5 text-[var(--color-error)]"
+      >
+        {{ agreementError }}
+      </p>
     </section>
 
     <section class="space-y-3" aria-label="회원가입 실행">
       <button
-        class="h-[var(--button-height-major)] w-full rounded-[var(--radius-control)] bg-[var(--color-primary)] px-5 text-[15px] font-semibold text-[var(--color-text-inverse)] transition hover:bg-[var(--color-primary-hover)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+        class="h-[var(--button-height-major)] w-full rounded-[var(--radius-control)] px-5 text-[15px] font-semibold transition focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+        :class="
+          isFormValid
+            ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)] hover:bg-[var(--color-primary-hover)]'
+            : 'bg-[var(--color-surface-secondary)] text-[var(--color-text-muted)]'
+        "
         type="submit"
-        :disabled="!canSubmit"
       >
         가입하기
       </button>
@@ -314,11 +510,6 @@ const handleSubmit = () => {
 
   <footer class="mt-6 text-center text-sm text-[var(--color-text-secondary)]">
     이미 계정이 있나요?
-    <RouterLink
-      class="font-semibold text-[var(--color-primary)]"
-      :to="{ name: ROUTE_NAMES.AUTH_LOGIN }"
-    >
-      로그인하기
-    </RouterLink>
+    <a class="font-semibold text-[var(--color-primary)]" href="/auth/login"> 로그인하기 </a>
   </footer>
 </template>
