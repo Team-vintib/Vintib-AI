@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 
+import EmailVerificationField from '@/domains/auth/components/EmailVerificationField.vue'
 import {
   isEmail,
   isRequired,
@@ -58,6 +59,12 @@ const errors = reactive<Record<SignupField, string>>({
 
 const isPasswordVisible = ref(false)
 const isAgreementTouched = ref(false)
+const isSendingVerificationCode = ref(false)
+const isVerifyingEmailCode = ref(false)
+const isEmailVerificationCodeSent = ref(false)
+const isEmailVerified = ref(false)
+const emailVerificationMessage = ref('')
+const verifiedEmail = ref('')
 
 const agreementItems: {
   key: AgreementField
@@ -105,6 +112,8 @@ const isFormValid = computed(
     isRequired(form.name) &&
     form.name.trim().length <= 30 &&
     isEmail(form.email) &&
+    isEmailVerified.value &&
+    verifiedEmail.value === form.email.trim() &&
     isVerificationCode(form.verificationCode) &&
     isSignupPassword(form.password) &&
     isSameValue(form.passwordConfirm, form.password) &&
@@ -186,6 +195,10 @@ const handleFieldInput = (field: SignupField) => {
     validateField(field)
   }
 
+  if (field === 'email') {
+    resetEmailVerification()
+  }
+
   if (field === 'password' && touched.passwordConfirm) {
     validateField('passwordConfirm')
   }
@@ -209,9 +222,61 @@ const handleAgreementChange = (key: AgreementField, event: Event) => {
   isAgreementTouched.value = true
 }
 
-const handleVerificationCodeInput = (event: Event) => {
-  form.verificationCode = (event.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6)
+const handleVerificationCodeUpdate = (verificationCode: string) => {
+  form.verificationCode = verificationCode
   handleFieldInput('verificationCode')
+}
+
+const resetEmailVerification = () => {
+  form.verificationCode = ''
+  isEmailVerificationCodeSent.value = false
+  isEmailVerified.value = false
+  emailVerificationMessage.value = ''
+  verifiedEmail.value = ''
+
+  if (touched.verificationCode) {
+    errors.verificationCode = ''
+  }
+}
+
+const handleSendVerificationCode = async () => {
+  touched.email = true
+
+  if (!validateField('email') || isSendingVerificationCode.value) {
+    return
+  }
+
+  isSendingVerificationCode.value = true
+  emailVerificationMessage.value = ''
+
+  await new Promise((resolve) => window.setTimeout(resolve, 300))
+
+  isEmailVerificationCodeSent.value = true
+  isSendingVerificationCode.value = false
+  emailVerificationMessage.value = '인증코드를 발송했습니다. 이메일을 확인해 주세요.'
+}
+
+const handleVerifyEmailCode = async () => {
+  touched.verificationCode = true
+
+  if (!isEmailVerificationCodeSent.value) {
+    errors.verificationCode = '먼저 인증코드를 발송해 주세요.'
+    return
+  }
+
+  if (!validateField('verificationCode') || isVerifyingEmailCode.value) {
+    return
+  }
+
+  isVerifyingEmailCode.value = true
+  emailVerificationMessage.value = ''
+
+  await new Promise((resolve) => window.setTimeout(resolve, 300))
+
+  isEmailVerified.value = true
+  verifiedEmail.value = form.email.trim()
+  isVerifyingEmailCode.value = false
+  emailVerificationMessage.value = '이메일 인증이 완료되었습니다.'
 }
 
 const markAllTouched = () => {
@@ -272,88 +337,24 @@ const handleSubmit = () => {
         </p>
       </div>
 
-      <div class="space-y-2">
-        <label
-          class="block text-sm font-semibold text-[var(--color-text-primary)]"
-          for="signup-email"
-        >
-          이메일
-        </label>
-        <div class="flex gap-2 max-sm:flex-col">
-          <input
-            id="signup-email"
-            v-model="form.email"
-            class="h-12 min-w-0 flex-1 rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
-            :class="
-              errors.email ? 'border-[var(--color-error)]' : 'border-[var(--color-border-strong)]'
-            "
-            type="email"
-            autocomplete="email"
-            placeholder="이메일을 입력해주세요."
-            :aria-invalid="errors.email ? 'true' : 'false'"
-            aria-describedby="signup-email-error"
-            @input="handleFieldInput('email')"
-            @blur="handleFieldBlur('email')"
-          />
-          <button
-            class="h-12 shrink-0 rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)] disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            :disabled="!canRequestVerificationCode"
-          >
-            인증코드 발송
-          </button>
-        </div>
-        <p
-          v-if="errors.email"
-          id="signup-email-error"
-          class="text-[13px] leading-5 text-[var(--color-error)]"
-        >
-          {{ errors.email }}
-        </p>
-      </div>
-
-      <div class="space-y-2">
-        <label
-          class="block text-sm font-semibold text-[var(--color-text-primary)]"
-          for="signup-verification-code"
-        >
-          인증코드
-        </label>
-        <div class="flex gap-2 max-sm:flex-col">
-          <input
-            id="signup-verification-code"
-            class="h-12 min-w-0 flex-1 rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
-            :class="
-              errors.verificationCode
-                ? 'border-[var(--color-error)]'
-                : 'border-[var(--color-border-strong)]'
-            "
-            type="text"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            placeholder="6자리 인증코드"
-            :value="form.verificationCode"
-            :aria-invalid="errors.verificationCode ? 'true' : 'false'"
-            aria-describedby="signup-verification-code-error"
-            @input="handleVerificationCodeInput"
-            @blur="handleFieldBlur('verificationCode')"
-          />
-          <button
-            class="h-12 shrink-0 rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)] disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            :disabled="!canConfirmVerificationCode"
-          >
-            확인
-          </button>
-        </div>
-        <p
-          v-if="errors.verificationCode"
-          id="signup-verification-code-error"
-          class="text-[13px] leading-5 text-[var(--color-error)]"
-        >
-          {{ errors.verificationCode }}
-        </p>
-      </div>
+      <EmailVerificationField
+        v-model:email="form.email"
+        :verification-code="form.verificationCode"
+        :email-error="errors.email"
+        :verification-code-error="errors.verificationCode"
+        :status-message="emailVerificationMessage"
+        :is-sending-code="isSendingVerificationCode"
+        :is-verifying-code="isVerifyingEmailCode"
+        :can-send-code="canRequestVerificationCode"
+        :can-verify-code="canConfirmVerificationCode"
+        :is-verified="isEmailVerified"
+        @update:email="handleFieldInput('email')"
+        @update:verification-code="handleVerificationCodeUpdate"
+        @email-blur="handleFieldBlur('email')"
+        @verification-code-blur="handleFieldBlur('verificationCode')"
+        @send-code="handleSendVerificationCode"
+        @verify-code="handleVerifyEmailCode"
+      />
 
       <div class="space-y-2">
         <label
