@@ -7,6 +7,9 @@ interface Props {
   title: string
   description: string
   previousDisabled?: boolean
+  showSkip?: boolean
+  skipDisabled?: boolean
+  skipLabel?: string
   nextDisabled?: boolean
   nextLabel?: string
 }
@@ -16,12 +19,16 @@ const {
   title,
   description,
   previousDisabled = false,
+  showSkip = false,
+  skipDisabled = false,
+  skipLabel = '건너뛰기',
   nextDisabled = false,
   nextLabel = '다음 단계',
 } = defineProps<Props>()
 
 const emit = defineEmits<{
   previous: []
+  skip: []
   next: []
 }>()
 
@@ -35,10 +42,7 @@ const onboardingSteps = [
 
 <template>
   <main class="onboarding-layout">
-    <section
-      class="onboarding-layout__container"
-      aria-labelledby="onboarding-title"
-    >
+    <section class="onboarding-layout__container" aria-labelledby="onboarding-title">
       <header class="onboarding-layout__header">
         <p class="onboarding-layout__eyebrow">회원 정보 등록</p>
 
@@ -51,10 +55,7 @@ const onboardingSteps = [
         </p>
       </header>
 
-      <OnboardingStepIndicator
-        :steps="onboardingSteps"
-        :current-step="currentStep"
-      />
+      <OnboardingStepIndicator :steps="onboardingSteps" :current-step="currentStep" />
 
       <div class="onboarding-layout__content">
         <slot />
@@ -71,14 +72,27 @@ const onboardingSteps = [
           이전 단계
         </BaseButton>
 
-        <BaseButton
-          class="onboarding-layout__action"
-          size="major"
-          :disabled="nextDisabled"
-          @click="emit('next')"
-        >
-          {{ nextLabel }}
-        </BaseButton>
+        <div class="onboarding-layout__action-group">
+          <BaseButton
+            v-if="showSkip"
+            class="onboarding-layout__action"
+            variant="secondary"
+            size="major"
+            :disabled="skipDisabled"
+            @click="emit('skip')"
+          >
+            {{ skipLabel }}
+          </BaseButton>
+
+          <BaseButton
+            class="onboarding-layout__action"
+            size="major"
+            :disabled="nextDisabled"
+            @click="emit('next')"
+          >
+            {{ nextLabel }}
+          </BaseButton>
+        </div>
       </footer>
     </section>
   </main>
@@ -133,12 +147,42 @@ const onboardingSteps = [
 
 .onboarding-layout__actions {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
   margin-top: var(--space-6);
 }
 
+.onboarding-layout__action-group {
+  display: flex;
+  gap: var(--space-4);
+}
+
 .onboarding-layout__action {
   min-width: 160px;
+}
+
+@media (max-width: 560px) {
+  .onboarding-layout {
+    padding: var(--space-10) var(--space-4);
+  }
+
+  .onboarding-layout__content {
+    padding: var(--space-5);
+  }
+
+  .onboarding-layout__actions,
+  .onboarding-layout__action-group {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .onboarding-layout__action-group {
+    width: 100%;
+  }
+
+  .onboarding-layout__action {
+    width: 100%;
+  }
 }
 </style>

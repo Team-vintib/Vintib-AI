@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import axios from 'axios'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { saveOnboardingInterests } from '@/api/onboarding'
 import BaseField from '@/components/base/BaseField.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import OnboardingLayout from '@/layouts/OnboardingLayout.vue'
+
+import type { ApiError, ApiResponse } from '@/api/types'
 
 interface InterestOption {
   id: string
@@ -32,6 +36,8 @@ const categories: InterestOption[] = [
 const brandSearchQuery = ref('')
 const selectedBrandIds = ref<string[]>([])
 const selectedCategoryIds = ref<string[]>([])
+const isSubmitting = ref(false)
+const submitError = ref('')
 const router = useRouter()
 
 const filteredBrands = computed(() => {
@@ -47,6 +53,8 @@ const filteredBrands = computed(() => {
 const isBrandSelected = (brandId: string) => selectedBrandIds.value.includes(brandId)
 
 const toggleBrand = (brandId: string) => {
+  submitError.value = ''
+
   if (isBrandSelected(brandId)) {
     selectedBrandIds.value = selectedBrandIds.value.filter(
       (selectedBrandId) => selectedBrandId !== brandId,
@@ -60,6 +68,51 @@ const toggleBrand = (brandId: string) => {
 const handlePrevious = async () => {
   await router.push({ name: 'onboarding-basic-info' })
 }
+
+const applyApiError = (apiError: ApiError | null) => {
+  submitError.value =
+    apiError?.message || '관심 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+}
+
+const handleSave = async (skip = false) => {
+  if (isSubmitting.value) {
+    return
+  }
+
+  isSubmitting.value = true
+  submitError.value = ''
+
+  try {
+    const response = await saveOnboardingInterests({
+      brandIds: skip ? [] : [...selectedBrandIds.value],
+      categoryIds: skip ? [] : [...selectedCategoryIds.value],
+    })
+
+    if (!response.success) {
+      applyApiError(response.error)
+      return
+    }
+
+    await router.push({ name: 'onboarding-try-on' })
+  } catch (error: unknown) {
+    if (axios.isAxiosError<ApiResponse<unknown>>(error)) {
+      if (!error.response) {
+        submitError.value =
+          '서버에 연결하지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.'
+      } else {
+        applyApiError(error.response.data?.error ?? null)
+      }
+    } else {
+      applyApiError(null)
+    }
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+const handleCategoryChange = () => {
+  submitError.value = ''
+}
 </script>
 
 <template>
@@ -67,8 +120,14 @@ const handlePrevious = async () => {
     :current-step="2"
     title="관심 정보를 설정해 주세요"
     description="관심 있는 브랜드와 카테고리를 선택해 주세요."
-    next-disabled
+    show-skip
+    :previous-disabled="isSubmitting"
+    :skip-disabled="isSubmitting"
+    :next-disabled="isSubmitting"
+    :next-label="isSubmitting ? '저장 중' : '다음 단계'"
     @previous="handlePrevious"
+    @skip="handleSave(true)"
+    @next="handleSave(false)"
   >
     <div class="interest-selection">
       <header class="interest-selection__header">
@@ -162,6 +221,7 @@ const handlePrevious = async () => {
               type="checkbox"
               name="interest-category"
               :value="category.id"
+              @change="handleCategoryChange"
             />
 
             <span class="category-option__label">{{ category.label }}</span>
@@ -177,6 +237,15 @@ const handlePrevious = async () => {
         <strong>나중에 변경할 수 있어요</strong>
         <p>관심 정보는 선택 사항이며, 가입 후 마이페이지에서 언제든 수정할 수 있습니다.</p>
       </div>
+
+      <p
+        v-if="submitError"
+        class="interest-selection__submit-error"
+        role="alert"
+        aria-live="assertive"
+      >
+        {{ submitError }}
+      </p>
     </div>
   </OnboardingLayout>
 </template>
@@ -417,6 +486,16 @@ const handlePrevious = async () => {
   display: block;
   margin-bottom: var(--space-1);
   color: var(--color-primary);
+}
+
+.interest-selection__submit-error {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  margin-top: var(--space-6);
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 @media (max-width: 820px) {

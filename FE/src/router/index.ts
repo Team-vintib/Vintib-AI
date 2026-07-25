@@ -14,6 +14,11 @@ const router = createRouter({
       name: 'onboarding-interests',
       component: () => import('@/views/onboarding/OnboardingInterestsView.vue'),
     },
+    {
+      path: '/onboarding/try-on',
+      name: 'onboarding-try-on',
+      component: () => import('@/views/onboarding/OnboardingTryOnView.vue'),
+    },
   ],
 })
 
