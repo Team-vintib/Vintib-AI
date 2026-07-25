@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 
+import { sendEmailVerificationCode, verifyEmailCode } from '@/domains/auth/api/authApi'
 import EmailVerificationField from '@/domains/auth/components/EmailVerificationField.vue'
+import { normalizeApiError } from '@/shared/api/http'
 import {
   isEmail,
   isRequired,
@@ -64,6 +66,7 @@ const isVerifyingEmailCode = ref(false)
 const isEmailVerificationCodeSent = ref(false)
 const isEmailVerified = ref(false)
 const emailVerificationMessage = ref('')
+const verificationToken = ref('')
 const verifiedEmail = ref('')
 
 const agreementItems: {
@@ -114,6 +117,7 @@ const isFormValid = computed(
     isEmail(form.email) &&
     isEmailVerified.value &&
     verifiedEmail.value === form.email.trim() &&
+    verificationToken.value.length > 0 &&
     isVerificationCode(form.verificationCode) &&
     isSignupPassword(form.password) &&
     isSameValue(form.passwordConfirm, form.password) &&
@@ -232,6 +236,7 @@ const resetEmailVerification = () => {
   isEmailVerificationCodeSent.value = false
   isEmailVerified.value = false
   emailVerificationMessage.value = ''
+  verificationToken.value = ''
   verifiedEmail.value = ''
 
   if (touched.verificationCode) {
@@ -242,18 +247,35 @@ const resetEmailVerification = () => {
 const handleSendVerificationCode = async () => {
   touched.email = true
 
-  if (!validateField('email') || isSendingVerificationCode.value) {
+  if (!validateField('email') || isSendingVerificationCode.value || isVerifyingEmailCode.value) {
     return
   }
 
   isSendingVerificationCode.value = true
   emailVerificationMessage.value = ''
+  errors.email = ''
+  errors.verificationCode = ''
 
-  await new Promise((resolve) => window.setTimeout(resolve, 300))
+  try {
+    const response = await sendEmailVerificationCode({ email: form.email.trim() })
 
-  isEmailVerificationCodeSent.value = true
-  isSendingVerificationCode.value = false
-  emailVerificationMessage.value = '인증코드를 발송했습니다. 이메일을 확인해 주세요.'
+    if (!response.success) {
+      applyEmailVerificationError(response.error?.code, response.error?.message)
+      return
+    }
+
+    isEmailVerificationCodeSent.value = true
+    isEmailVerified.value = false
+    verificationToken.value = ''
+    verifiedEmail.value = ''
+    emailVerificationMessage.value = '인증코드를 발송했습니다. 이메일을 확인해 주세요.'
+  } catch (error: unknown) {
+    const apiError = normalizeApiError(error)
+
+    applyEmailVerificationError(apiError.code, apiError.message)
+  } finally {
+    isSendingVerificationCode.value = false
+  }
 }
 
 const handleVerifyEmailCode = async () => {
@@ -264,19 +286,63 @@ const handleVerifyEmailCode = async () => {
     return
   }
 
-  if (!validateField('verificationCode') || isVerifyingEmailCode.value) {
+  if (
+    !validateField('verificationCode') ||
+    isVerifyingEmailCode.value ||
+    isSendingVerificationCode.value
+  ) {
     return
   }
 
   isVerifyingEmailCode.value = true
   emailVerificationMessage.value = ''
+  errors.verificationCode = ''
 
-  await new Promise((resolve) => window.setTimeout(resolve, 300))
+  try {
+    const response = await verifyEmailCode({
+      email: form.email.trim(),
+      code: form.verificationCode,
+    })
 
-  isEmailVerified.value = true
-  verifiedEmail.value = form.email.trim()
-  isVerifyingEmailCode.value = false
-  emailVerificationMessage.value = '이메일 인증이 완료되었습니다.'
+    if (!response.success || !response.data?.verificationToken) {
+      applyEmailVerificationError(response.error?.code, response.error?.message)
+      return
+    }
+
+    isEmailVerified.value = true
+    verificationToken.value = response.data.verificationToken
+    verifiedEmail.value = form.email.trim()
+    emailVerificationMessage.value = '이메일 인증이 완료되었습니다.'
+  } catch (error: unknown) {
+    const apiError = normalizeApiError(error)
+
+    applyEmailVerificationError(apiError.code, apiError.message)
+  } finally {
+    isVerifyingEmailCode.value = false
+  }
+}
+
+const applyEmailVerificationError = (code?: string, message?: string) => {
+  emailVerificationMessage.value = ''
+
+  if (code === 'U003') {
+    errors.email = message || '이미 가입된 이메일입니다.'
+    return
+  }
+
+  if (code === 'U008') {
+    errors.email = message || '인증코드 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.'
+    return
+  }
+
+  if (code === 'U005' || code === 'U007') {
+    errors.verificationCode =
+      message || '인증 코드가 일치하지 않거나 만료되었습니다. 인증코드를 다시 확인해 주세요.'
+    return
+  }
+
+  errors.verificationCode =
+    message || '이메일 인증을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
 }
 
 const markAllTouched = () => {

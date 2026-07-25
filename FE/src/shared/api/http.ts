@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios'
 
-import type { ApiErrorBody } from '@/shared/types/api.types'
+import type { ApiErrorBody, ApiResponse } from '@/shared/types/api.types'
 
 const DEFAULT_TIMEOUT_MS = 10_000
 
@@ -23,7 +23,7 @@ http.interceptors.request.use((config) => {
 })
 
 export function normalizeApiError(error: unknown): ApiErrorBody {
-  if (axios.isAxiosError<ApiErrorBody>(error)) {
+  if (axios.isAxiosError<ApiResponse<unknown> | ApiErrorBody>(error)) {
     return getAxiosErrorBody(error)
   }
 
@@ -33,8 +33,12 @@ export function normalizeApiError(error: unknown): ApiErrorBody {
   }
 }
 
-function getAxiosErrorBody(error: AxiosError<ApiErrorBody>): ApiErrorBody {
-  if (error.response?.data?.code && error.response.data.message) {
+function getAxiosErrorBody(error: AxiosError<ApiResponse<unknown> | ApiErrorBody>): ApiErrorBody {
+  if (isApiResponse(error.response?.data) && error.response.data.error) {
+    return error.response.data.error
+  }
+
+  if (isApiErrorBody(error.response?.data)) {
     return error.response.data
   }
 
@@ -49,4 +53,19 @@ function getAxiosErrorBody(error: AxiosError<ApiErrorBody>): ApiErrorBody {
     code: 'NETWORK_ERROR',
     message: '네트워크 연결을 확인해주세요.',
   }
+}
+
+function isApiResponse(data: unknown): data is ApiResponse<unknown> {
+  return Boolean(data && typeof data === 'object' && 'success' in data)
+}
+
+function isApiErrorBody(data: unknown): data is ApiErrorBody {
+  return Boolean(
+    data &&
+    typeof data === 'object' &&
+    'code' in data &&
+    'message' in data &&
+    typeof data.code === 'string' &&
+    typeof data.message === 'string',
+  )
 }
