@@ -100,6 +100,6 @@ Content-Type: application/json
 
 ## FE 관련 파일
 
-- `FE/src/api/onboarding.ts`
-- `FE/src/views/onboarding/OnboardingBasicInfoView.vue`
+- `FE/src/domains/onboard/api/onboarding.ts`
+- `FE/src/domains/onboard/pages/OnboardingBasicInfoView.vue`
 - `FE/docs/frontend/api/api-index.md`
