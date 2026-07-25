@@ -4,6 +4,11 @@ import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 
 export const routes: RouteRecordRaw[] = [
   {
+    path: ROUTE_PATHS.AUTH_SIGNUP,
+    name: ROUTE_NAMES.AUTH_SIGNUP,
+    component: () => import('@/domains/auth/pages/SignupPage.vue'),
+  },
+  {
     path: ROUTE_PATHS.ONBOARD_PROFILE,
     name: ROUTE_NAMES.ONBOARD_PROFILE,
     component: () => import('@/domains/onboard/pages/OnboardingBasicInfoView.vue'),
