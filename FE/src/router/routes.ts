@@ -16,9 +16,32 @@ export const routes: RouteRecordRaw[] = [
     meta: { guestOnly: true },
   },
   {
+    path: ROUTE_PATHS.AUTH_SIGNUP_EMAIL,
+    name: ROUTE_NAMES.AUTH_SIGNUP_EMAIL,
+    component: () => import('@/domains/auth/pages/SignupPage.vue'),
+    meta: { guestOnly: true },
+  },
+  {
     path: ROUTE_PATHS.AUTH_SSAFY,
     name: ROUTE_NAMES.AUTH_SSAFY,
+    redirect: (to) => ({
+      name:
+        to.query.from === 'login' ? ROUTE_NAMES.AUTH_SSAFY_LOGIN : ROUTE_NAMES.AUTH_SSAFY_SIGNUP,
+    }),
+    meta: { guestOnly: true },
+  },
+  {
+    path: ROUTE_PATHS.AUTH_SSAFY_LOGIN,
+    name: ROUTE_NAMES.AUTH_SSAFY_LOGIN,
     component: () => import('@/domains/auth/pages/SsafySsoPage.vue'),
+    props: { source: 'login' },
+    meta: { guestOnly: true },
+  },
+  {
+    path: ROUTE_PATHS.AUTH_SSAFY_SIGNUP,
+    name: ROUTE_NAMES.AUTH_SSAFY_SIGNUP,
+    component: () => import('@/domains/auth/pages/SsafySsoPage.vue'),
+    props: { source: 'signup' },
     meta: { guestOnly: true },
   },
   {

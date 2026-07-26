@@ -10,6 +10,10 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 const SSO_SOURCE_STORAGE_KEY = 'vintib_ssafy_sso_source'
 const SSO_SOURCE_LOGIN = 'login'
 
+const props = defineProps<{
+  source?: 'login' | 'signup'
+}>()
+
 const route = useRoute()
 
 const isStartingSso = ref(false)
@@ -48,6 +52,10 @@ const handleStartSso = () => {
 }
 
 function getSsoSource() {
+  if (props.source === SSO_SOURCE_LOGIN) {
+    return SSO_SOURCE_LOGIN
+  }
+
   return getQueryValue(route.query.from) === SSO_SOURCE_LOGIN ? SSO_SOURCE_LOGIN : 'signup'
 }
 
