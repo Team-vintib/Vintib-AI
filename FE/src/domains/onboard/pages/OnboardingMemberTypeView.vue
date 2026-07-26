@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import {
+  completeOnboarding,
+  type OnboardingMemberType,
+} from '@/domains/onboard/api/onboarding'
 import OnboardingLayout from '@/domains/onboard/components/OnboardingLayout.vue'
-import { ROUTE_NAMES } from '@/shared/constants/routes'
+import { normalizeApiError } from '@/shared/api/http'
+import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 
-type MemberType = 'GENERAL' | 'BUSINESS'
+import type { ApiErrorBody } from '@/shared/types/api.types'
 
 interface MemberTypeOption {
-  value: MemberType
+  value: OnboardingMemberType
   badge: string
   title: string
   description: string
@@ -33,10 +38,75 @@ const memberTypeOptions: MemberTypeOption[] = [
 ]
 
 const router = useRouter()
-const selectedMemberType = ref<MemberType | null>(null)
+const selectedMemberType = ref<OnboardingMemberType | null>(null)
+const isSubmitting = ref(false)
+const submitError = ref('')
+
+const selectionStatus = computed(() => {
+  if (isSubmitting.value) {
+    return '회원 유형을 저장하고 온보딩을 완료하는 중입니다.'
+  }
+
+  if (selectedMemberType.value === 'GENERAL') {
+    return '일반 회원을 선택했습니다.'
+  }
+
+  if (selectedMemberType.value === 'BUSINESS') {
+    return '사업자 회원을 선택했습니다.'
+  }
+
+  return '회원 유형을 선택하면 다음 단계로 진행할 수 있습니다.'
+})
 
 const handlePrevious = async () => {
+  if (isSubmitting.value) {
+    return
+  }
+
   await router.push({ name: ROUTE_NAMES.ONBOARD_TRYON })
+}
+
+const clearSubmitError = () => {
+  submitError.value = ''
+}
+
+const applyApiError = (apiError: ApiErrorBody | null) => {
+  submitError.value =
+    apiError?.message || '온보딩을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+}
+
+const handleComplete = async () => {
+  if (isSubmitting.value) {
+    return
+  }
+
+  const memberType = selectedMemberType.value
+
+  if (!memberType) {
+    submitError.value = '회원 유형을 선택해 주세요.'
+    return
+  }
+
+  isSubmitting.value = true
+  submitError.value = ''
+
+  try {
+    const response = await completeOnboarding({ memberType })
+
+    if (!response.success) {
+      applyApiError(response.error ?? null)
+      return
+    }
+
+    const destination =
+      memberType === 'GENERAL' ? ROUTE_PATHS.HOME : ROUTE_PATHS.BIZ_VERIFY
+
+    await router.push(destination)
+  } catch (error: unknown) {
+    applyApiError(normalizeApiError(error))
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 
@@ -45,8 +115,11 @@ const handlePrevious = async () => {
     :current-step="4"
     title="회원 유형을 선택해 주세요"
     description="이용 목적에 맞는 회원 유형을 선택해 주세요. 가입 후에도 기본 구매·판매 기능은 동일하게 이용할 수 있습니다."
-    :next-disabled="selectedMemberType === null"
+    :previous-disabled="isSubmitting"
+    :next-disabled="selectedMemberType === null || isSubmitting"
+    :next-label="isSubmitting ? '완료 중' : '온보딩 완료'"
     @previous="handlePrevious"
+    @next="handleComplete"
   >
     <section class="member-type-selection" aria-labelledby="member-type-title">
       <header class="member-type-selection__header">
@@ -73,6 +146,7 @@ const handlePrevious = async () => {
             class="member-type-option"
             :class="{
               'member-type-option--selected': selectedMemberType === option.value,
+              'member-type-option--disabled': isSubmitting,
             }"
           >
             <input
@@ -81,6 +155,8 @@ const handlePrevious = async () => {
               type="radio"
               name="member-type"
               :value="option.value"
+              :disabled="isSubmitting"
+              @change="clearSubmitError"
             />
 
             <span class="member-type-option__top">
@@ -108,11 +184,16 @@ const handlePrevious = async () => {
       </fieldset>
 
       <p id="member-type-status" class="member-type-selection__status" aria-live="polite">
-        {{
-          selectedMemberType
-            ? `${selectedMemberType === 'GENERAL' ? '일반 회원' : '사업자 회원'}을 선택했습니다.`
-            : '회원 유형을 선택하면 다음 단계로 진행할 수 있습니다.'
-        }}
+        {{ selectionStatus }}
+      </p>
+
+      <p
+        v-if="submitError"
+        class="member-type-selection__submit-error"
+        role="alert"
+        aria-live="assertive"
+      >
+        {{ submitError }}
       </p>
     </section>
   </OnboardingLayout>
@@ -212,6 +293,12 @@ const handlePrevious = async () => {
   color: var(--color-primary);
 }
 
+.member-type-option--disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+  transform: none;
+}
+
 .member-type-option__input {
   position: absolute;
   width: 1px;
@@ -304,6 +391,16 @@ const handlePrevious = async () => {
   color: var(--color-text-secondary);
   font-size: 14px;
   text-align: center;
+}
+
+.member-type-selection__submit-error {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  margin-top: var(--space-4);
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 @media (max-width: 820px) {

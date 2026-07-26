@@ -3,6 +3,7 @@ import { http } from '@/shared/api/http'
 import type { ApiResponse } from '@/shared/types/api.types'
 
 export type OnboardingGender = 'MALE' | 'FEMALE'
+export type OnboardingMemberType = 'GENERAL' | 'BUSINESS'
 
 export interface SaveBasicInfoRequest {
   nickname: string
@@ -25,6 +26,10 @@ export interface SaveOnboardingTryOnProfileRequest {
   chest?: string
   waist?: string
   hip?: string
+}
+
+export interface CompleteOnboardingRequest {
+  memberType: OnboardingMemberType
 }
 
 export const saveOnboardingBasicInfo = async (request: SaveBasicInfoRequest) => {
@@ -55,6 +60,12 @@ export const saveOnboardingTryOnProfile = async (
       'Content-Type': undefined,
     },
   })
+
+  return data
+}
+
+export const completeOnboarding = async (request: CompleteOnboardingRequest) => {
+  const { data } = await http.post<ApiResponse<null>>('/me/onboarding/complete', request)
 
   return data
 }

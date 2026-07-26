@@ -10,11 +10,11 @@
 | 디자인 토큰     | 완료   | `src/assets/main.scss`에 색상/간격/radius/버튼 높이/오류 변수 선언                             |
 | 라우터          | 부분   | `router/routes.ts`로 route 배열 분리, ONBOARD-001~004 등록                                     |
 | Pinia           | 부분   | 앱 등록 완료, store 없음                                                                       |
-| Axios           | 부분   | 공통 Axios 인스턴스와 ApiResponse 정규화, AUTH-001·ONBOARD-001~003 FE 선행 계약 연동           |
+| Axios           | 부분   | 공통 Axios 인스턴스와 ApiResponse 정규화, AUTH-001·ONBOARD-001~004 FE 선행 계약 연동           |
 | 스타일          | 부분   | Tailwind와 전역 SCSS 기반 완료, 온보딩 UI 컴포넌트 및 회원가입 화면 스타일 구현                |
 | 레이아웃        | 부분   | 공통 슬롯 레이아웃, 인증 레이아웃, 온보딩 단계 레이아웃 구현                                   |
 | 인증 화면       | 부분   | AUTH-001 이메일 회원가입 FE 완료, BE 메일 환경변수 이슈로 이메일 발송 E2E 재검증 필요          |
-| 온보딩 화면     | 부분   | ONBOARD-001~003 FE 구현 완료, ONBOARD-003 저장은 BE API 대기, ONBOARD-004 선택 UI·상태 구현       |
+| 온보딩 화면     | 부분   | ONBOARD-001~004 FE 구현 완료, ONBOARD-003·004 저장은 BE API 대기                                |
 | 공통 컴포넌트   | 부분   | 온보딩 도메인에 BaseButton, BaseInput, BaseField, 단계 표시 구현                               |
 | API 타입        | 부분   | 공통 응답/에러/pagination, 인증 요청/응답 타입, 온보딩 필드 오류 타입 구현                     |
 | Mock 데이터     | 미구현 | 인증 화면부터 가능                                                                             |

@@ -73,6 +73,7 @@ Content-Type: application/json
 | 기본 정보 저장          | PATCH    | `/api/me/onboarding`          | S15P11A108-241 FE 선행 계약 |
 | 관심 정보 저장·건너뛰기 | PUT      | `/api/me/interests`           | S15P11A108-250 FE 선행 계약 |
 | AI 시착 정보 저장       | PUT      | `/api/me/tryon`               | S15P11A108-254 FE 선행 계약 |
+| 회원 유형·온보딩 완료   | POST     | `/api/me/onboarding/complete` | S15P11A108-261 FE 선행 계약 |
 | 내 정보 수정            | PATCH    | `/api/me`                     | 후보                        |
 | 주소 조회/저장          | GET/POST | `/api/addresses`              | 후보                        |
 | 사업자 인증 제출/조회   | POST/GET | `/api/business-verifications` | 후보                        |
@@ -189,6 +190,31 @@ Content-Type: multipart/form-data
 - 브라우저가 multipart boundary를 생성하도록 FE는 `Content-Type` 값을 직접 고정하지 않습니다.
 - 검증 실패의 `error.errors[].field`는 위 multipart 필드명을 사용한다고 임시 정의합니다.
 - BE Swagger가 제공되면 endpoint, 필드명, 파일 제한, 단위와 숫자 범위를 갱신해야 합니다.
+
+### 회원 유형 저장·온보딩 완료
+
+BE 구현 전 FE가 선행 정의한 임시 계약입니다. 회원 유형 저장과 최종 온보딩 완료를 하나의
+요청으로 처리합니다.
+
+```http
+POST /api/me/onboarding/complete
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+```json
+{
+  "memberType": "GENERAL"
+}
+```
+
+- `memberType`: `GENERAL | BUSINESS`
+- 회원 유형 저장과 `onboardingCompleted = true` 변경은 하나의 트랜잭션으로 처리합니다.
+- HTTP 성공이어도 `success: false`이면 완료 실패로 처리합니다.
+- 성공한 `GENERAL` 회원은 HOME으로 이동합니다.
+- 성공한 `BUSINESS` 회원은 BIZ-001 사업자 인증 화면으로 이동합니다.
+- 실패 시 선택값을 유지하며 사용자가 다시 요청할 수 있습니다.
+- BE Swagger가 제공되면 endpoint, enum과 중복 완료 정책을 실제 계약에 맞춥니다.
 
 ## 이후 화면 후보
 
