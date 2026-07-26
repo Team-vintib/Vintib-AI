@@ -1,0 +1,21 @@
+# 브랜드 시드셋 예시.
+# 실제 사용: 이 파일을 같은 폴더의 brands.yaml 로 복사하고, data/images/<id>/ 아래에
+# 브랜드별 상품 이미지를 넣은 뒤 아래 명령으로 아티팩트를 생성한다.
+#
+#   python -m app.recommend.pipeline.build_artifact \
+#       --data app/recommend/data --entity brand --out app/recommend/artifacts
+#
+# 필드:
+#   id        (필수) 노드 식별자. data/images/<id>/ 폴더명과 일치시키면 편하다.
+#   name      (필수) 표시 이름.
+#   images    (선택) data/ 기준 glob 목록. 생략 시 images/<id>/* 를 사용.
+#   thumbnail (선택) data/ 기준 대표 이미지 경로. 생략 시 첫 이미지를 사용.
+- id: kapital
+  name: KAPITAL
+  # images:
+  #   - images/kapital/*.jpg
+  # thumbnail: images/kapital/0.jpg
+- id: needles
+  name: Needles
+- id: kaptain-sunshine
+  name: Kaptain Sunshine
