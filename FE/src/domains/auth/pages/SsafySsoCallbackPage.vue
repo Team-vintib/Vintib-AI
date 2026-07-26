@@ -3,13 +3,13 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { completeSsafySsoCallback } from '@/domains/auth/api/authApi'
+import { writeLinkAccountSession } from '@/domains/auth/utils/linkAccountSession'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type { AuthNextStep } from '@/domains/auth/types/auth.types'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 
-const LINK_ACCOUNT_STORAGE_KEY = 'vintib_ssafy_link_account'
 const SSO_SOURCE_STORAGE_KEY = 'vintib_ssafy_sso_source'
 const SSO_SOURCE_LOGIN = 'login'
 
@@ -84,7 +84,7 @@ const handleCallback = async () => {
     }
 
     window.sessionStorage.removeItem(SSO_SOURCE_STORAGE_KEY)
-    await moveToNextStep(response.data.nextStep, response.data.email)
+    await moveToNextStep(response.data.nextStep, response.data.email, response.data.linkToken)
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -102,14 +102,20 @@ const applyCallbackError = (title: string, message: string) => {
   errorMessage.value = message
 }
 
-const moveToNextStep = async (nextStep?: AuthNextStep, email?: string) => {
+const moveToNextStep = async (nextStep?: AuthNextStep, email?: string, linkToken?: string) => {
   if (nextStep === 'LINK_ACCOUNT') {
-    window.sessionStorage.setItem(
-      LINK_ACCOUNT_STORAGE_KEY,
-      JSON.stringify({
-        email: email || '',
-      }),
-    )
+    if (!linkToken) {
+      applyCallbackError(
+        '계정 연결 정보를 확인하지 못했습니다.',
+        '싸피어스 인증을 다시 진행해 주세요.',
+      )
+      return
+    }
+
+    writeLinkAccountSession({
+      email: email || '',
+      linkToken,
+    })
     await router.replace(ROUTE_PATHS.AUTH_LINK_ACCOUNT)
     return
   }

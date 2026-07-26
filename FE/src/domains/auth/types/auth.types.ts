@@ -47,6 +47,23 @@ export interface LoginResponse {
   nextStep?: AuthNextStep
 }
 
+export interface LinkAccountRequest {
+  linkToken: string
+  agree: boolean
+}
+
+export interface LinkAccountResponse {
+  accessToken?: string
+  refreshToken?: string
+  user?: AuthUser
+  nextStep?: AuthNextStep
+}
+
+export interface LinkAccountSessionPayload {
+  email?: string
+  linkToken: string
+}
+
 export interface SsafySsoCallbackRequest {
   authorizationCode: string
   redirectUri: string
@@ -57,6 +74,7 @@ export interface SsafySsoCallbackResponse {
   refreshToken?: string
   email?: string
   linked?: boolean
+  linkToken?: string
   nextStep?: AuthNextStep
   user?: AuthUser
 }
