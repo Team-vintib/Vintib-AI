@@ -177,6 +177,12 @@ BE/
 │   ├── member/                  # 회원 엔티티/레포지토리 (USER) — 서윤
 │   │   ├── entity/
 │   │   └── repository/
+│   ├── product/                 # 상품 등록/조회 (PROD) — 서윤
+│   │   ├── controller/
+│   │   ├── service/
+│   │   ├── entity/
+│   │   ├── repository/
+│   │   └── dto/
 │   ├── home/                    # 홈/팔로잉 콘텐츠 조회 (HOME) — 정윤
 │   │   ├── controller/
 │   │   ├── service/
