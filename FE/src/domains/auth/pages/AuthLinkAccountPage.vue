@@ -3,42 +3,27 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import logoImage from '@/assets/images/logo.png'
+import {
+  clearLinkAccountSession,
+  readLinkAccountSession,
+} from '@/domains/auth/utils/linkAccountSession'
+import type { LinkAccountSessionPayload } from '@/domains/auth/types/auth.types'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 
-const LINK_ACCOUNT_STORAGE_KEY = 'vintib_ssafy_link_account'
-
-interface LinkAccountInfo {
-  email?: string
-}
-
 const router = useRouter()
 
-const accountInfo = ref<LinkAccountInfo | null>(null)
+const accountInfo = ref<LinkAccountSessionPayload | null>(null)
 
 const displayEmail = computed(() => accountInfo.value?.email || '가입된 이메일 계정')
 
 onMounted(() => {
-  accountInfo.value = readAccountInfo()
+  accountInfo.value = readLinkAccountSession()
 })
 
 const handleRetrySso = async () => {
-  window.sessionStorage.removeItem(LINK_ACCOUNT_STORAGE_KEY)
+  clearLinkAccountSession()
   await router.push({ name: ROUTE_NAMES.AUTH_SSAFY_SIGNUP })
-}
-
-function readAccountInfo() {
-  const rawInfo = window.sessionStorage.getItem(LINK_ACCOUNT_STORAGE_KEY)
-
-  if (!rawInfo) {
-    return null
-  }
-
-  try {
-    return JSON.parse(rawInfo) as LinkAccountInfo
-  } catch {
-    return null
-  }
 }
 </script>
 

@@ -1,6 +1,8 @@
 import { http } from '@/shared/api/http'
 
 import type {
+  LinkAccountRequest,
+  LinkAccountResponse,
   LoginRequest,
   LoginResponse,
   SendEmailVerificationCodeRequest,
@@ -45,6 +47,15 @@ export const login = async (request: LoginRequest) => {
 export const completeSsafySsoCallback = async (request: SsafySsoCallbackRequest) => {
   const { data } = await http.post<ApiResponse<SsafySsoCallbackResponse>>(
     '/auth/ssafy/callback',
+    request,
+  )
+
+  return data
+}
+
+export const linkSsafyAccount = async (request: LinkAccountRequest) => {
+  const { data } = await http.post<ApiResponse<LinkAccountResponse>>(
+    '/auth/ssafy/link-account',
     request,
   )
 
