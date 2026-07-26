@@ -59,6 +59,7 @@ src/
         BaseButton.vue
         BaseField.vue
         BaseInput.vue
+        FullBodyPhotoUploader.vue
         OnboardingLayout.vue
         OnboardingStepIndicator.vue
       constants/
