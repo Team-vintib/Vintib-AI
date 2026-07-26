@@ -4,15 +4,58 @@ Swagger 제공 전까지는 임시 후보를 사용합니다. 실제 구현 시 
 
 ## 인증
 
-| 기능                 | Method | endpoint                      | 요청                                             | 응답                                         | 상태          |
-| -------------------- | ------ | ----------------------------- | ------------------------------------------------ | -------------------------------------------- | ------------- |
-| 이메일 인증코드 발송 | POST   | `/api/auth/email/send-code`   | `email`                                          | `null`                                       | AUTH-001 연동 |
-| 이메일 인증코드 확인 | POST   | `/api/auth/email/verify-code` | `email`, `code`                                  | `verificationToken`                          | AUTH-001 연동 |
-| 이메일 회원가입      | POST   | `/api/auth/signup`            | `name`, `email`, `password`, `verificationToken` | `id`, `email`, `name`, `onboardingCompleted` | AUTH-001 연동 |
-| 이메일 로그인        | POST   | `/api/auth/login`             | `email`, `password`, `rememberMe`                | `accessToken`, `refreshToken`, `user`        | 후보          |
-| 토큰 갱신            | POST   | `/api/auth/refresh`           | `refreshToken`                                   | `accessToken`                                | 후보          |
-| 로그아웃             | POST   | `/api/auth/logout`            | 없음 또는 `refreshToken`                         | 성공 여부                                    | 후보          |
-| 싸피어스 callback    | POST   | `/api/auth/ssafy/callback`    | `authorizationCode`, `redirectUri`               | `linked`, `nextStep`, `user`                 | 후보          |
+| 기능                 | Method | endpoint                      | 요청                                             | 응답                                              | 상태          |
+| -------------------- | ------ | ----------------------------- | ------------------------------------------------ | ------------------------------------------------- | ------------- |
+| 이메일 인증코드 발송 | POST   | `/api/auth/email/send-code`   | `email`                                          | `null`                                            | AUTH-001 연동 |
+| 이메일 인증코드 확인 | POST   | `/api/auth/email/verify-code` | `email`, `code`                                  | `verificationToken`                               | AUTH-001 연동 |
+| 이메일 회원가입      | POST   | `/api/auth/signup`            | `name`, `email`, `password`, `verificationToken` | `id`, `email`, `name`, `onboardingCompleted`      | AUTH-001 연동 |
+| 이메일 로그인        | POST   | `/api/auth/login`             | `email`, `password`, `rememberMe`                | `accessToken`, `refreshToken`, `user`, `nextStep` | AUTH-002 연동 |
+| 토큰 갱신            | POST   | `/api/auth/refresh`           | `refreshToken`                                   | `accessToken`                                     | 후보          |
+| 로그아웃             | POST   | `/api/auth/logout`            | 없음 또는 `refreshToken`                         | 성공 여부                                         | 후보          |
+| 싸피어스 callback    | POST   | `/api/auth/ssafy/callback`    | `authorizationCode`, `redirectUri`               | `linked`, `nextStep`, `user`                      | 후보          |
+
+### 이메일 로그인
+
+AUTH-002에서 FE가 연동한 후보 계약입니다. 공통 응답은 `ApiResponse<T>` envelope를 사용합니다.
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "user@example.com",
+  "password": "password123",
+  "rememberMe": true
+}
+```
+
+성공 응답 후보:
+
+```json
+{
+  "success": true,
+  "data": {
+    "accessToken": "access-token",
+    "refreshToken": "refresh-token",
+    "user": {
+      "id": 1,
+      "email": "user@example.com",
+      "name": "홍길동",
+      "onboardingCompleted": false
+    },
+    "nextStep": "ONBOARD_PROFILE"
+  },
+  "error": null
+}
+```
+
+- `accessToken`은 필수로 처리한다.
+- `refreshToken`, `user`, `nextStep`은 서버 구현 차이에 대비해 optional로 처리한다.
+- 로그인 성공 후 `redirect` query가 내부 경로이면 우선 이동한다.
+- `nextStep` 또는 `user.onboardingCompleted` 기준으로 홈 또는 온보딩 기본정보 화면으로 이동한다.
+- 로그인 실패 코드는 Swagger 확정 전까지 `C001`, 네트워크/타임아웃, 그 외 인증 실패로만 구분한다.
 
 ### 이메일 회원가입
 
