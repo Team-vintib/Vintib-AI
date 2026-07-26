@@ -16,7 +16,7 @@ CLIPSeg의 sigmoid 확률 스케일은 프롬프트·체크포인트·입력 해
 
 from typing import TypedDict
 
-from app.quality.schemas import DefectType
+from app.quality.schemas import ConditionGrade, DefectType, FindingStatus, Severity
 
 
 class SegmenterConfig(TypedDict):
@@ -139,6 +139,36 @@ DEFECT_TAXONOMY: dict[DefectType, DefectPolicy] = {
         "evidence": "미검증 프롬프트 — LAB-12 대상이 아니었다",
     },
 }
+
+
+# --- 점수·등급 (전부 미확정 임의값) ----------------------------------------
+# 003이 grounding threshold를 다룬 방식대로 상수로 노출하고 미확정임을 명시한다.
+
+SEVERITY_FACTORS: dict[Severity, float] = {
+    Severity.minor: 0.5,
+    Severity.moderate: 1.0,
+    Severity.major: 1.8,
+}
+
+# SUSPECTED는 확신이 낮으니 감점도 낮다 — 오탐이 가격을 깎는 걸 막는 완충이다.
+STATUS_FACTORS: dict[FindingStatus, float] = {
+    FindingStatus.detected: 1.0,
+    FindingStatus.suspected: 0.4,
+}
+
+# severity 구간 경계: (area_ratio × peak_confidence) 가 [0] 미만이면 MINOR,
+# [1] 미만이면 MODERATE, 그 이상이면 MAJOR.
+SEVERITY_BOUNDS: tuple[float, float] = (0.004, 0.02)
+
+# 등급 하한. 위에서부터 처음 만족하는 등급을 쓰고, 전부 미달이면 C다.
+GRADE_THRESHOLDS: tuple[tuple[float, ConditionGrade], ...] = (
+    (90.0, ConditionGrade.s),
+    (75.0, ConditionGrade.a),
+    (55.0, ConditionGrade.b),
+)
+
+# 경미하면서 확신도 낮은 항목까지 소명을 요구하면 판매자 입력 부담만 커진다 — 면제한다.
+EXEMPT_MINOR_SUSPECTED_FROM_STATEMENT = True
 
 
 def segmenter_config(key: str | None = None) -> SegmenterConfig:
