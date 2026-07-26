@@ -132,10 +132,10 @@
 
 ### 5단계: 검증 및 마무리
 
-- [ ] 라우트 guard 확인
-- [ ] `npm run type-check` 실행
-- [ ] `npm run build` 실행
-- [ ] 주요 수동 시나리오 확인
+- [x] 라우트 guard 확인
+- [x] `npm run type-check` 실행
+- [x] `npm run build` 실행
+- [x] BE API 없이 확인 가능한 주요 시나리오 코드 경로 확인
 
 ## 최종 검증
 
