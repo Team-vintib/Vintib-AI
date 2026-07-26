@@ -10,14 +10,13 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 const route = useRoute()
 
 const isStartingSso = ref(false)
-const requestError = ref('')
 
 const queryErrorMessage = computed(() => {
   const error = getQueryValue(route.query.error)
   const cancelled = getQueryValue(route.query.cancelled)
 
   if (cancelled === 'true' || error === 'access_denied') {
-    return '싸피어스 인증이 취소되었습니다. 다시 시도하거나 이메일 로그인으로 돌아가 주세요.'
+    return '싸피어스 인증이 취소되었습니다. 다시 시도하거나 이메일 회원가입으로 돌아가 주세요.'
   }
 
   if (error) {
@@ -27,7 +26,7 @@ const queryErrorMessage = computed(() => {
   return ''
 })
 
-const statusMessage = computed(() => requestError.value || queryErrorMessage.value)
+const statusMessage = computed(() => queryErrorMessage.value)
 const returnPath = computed(() =>
   getQueryValue(route.query.from) === 'login' ? ROUTE_PATHS.AUTH_LOGIN : ROUTE_PATHS.AUTH_SIGNUP,
 )
@@ -41,7 +40,6 @@ const handleStartSso = () => {
   }
 
   isStartingSso.value = true
-  requestError.value = ''
   window.location.assign(getSsafySsoStartUrl())
 }
 
