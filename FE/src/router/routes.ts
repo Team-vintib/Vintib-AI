@@ -19,6 +19,11 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/domains/auth/pages/SsafySsoCallbackPage.vue'),
   },
   {
+    path: ROUTE_PATHS.AUTH_LINK_ACCOUNT,
+    name: ROUTE_NAMES.AUTH_LINK_ACCOUNT,
+    component: () => import('@/domains/auth/pages/AuthLinkAccountPage.vue'),
+  },
+  {
     path: ROUTE_PATHS.ONBOARD_PROFILE,
     name: ROUTE_NAMES.ONBOARD_PROFILE,
     component: () => import('@/domains/onboard/pages/OnboardingBasicInfoView.vue'),

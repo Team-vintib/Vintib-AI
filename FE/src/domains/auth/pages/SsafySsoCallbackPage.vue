@@ -8,6 +8,8 @@ import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 
+const LINK_ACCOUNT_STORAGE_KEY = 'vintib_ssafy_link_account'
+
 const route = useRoute()
 const router = useRouter()
 
@@ -69,7 +71,7 @@ const handleCallback = async () => {
       window.localStorage.setItem('vintib_access_token', response.data.accessToken)
     }
 
-    await moveToNextStep(response.data.nextStep)
+    await moveToNextStep(response.data.nextStep, response.data.email)
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -87,8 +89,14 @@ const applyCallbackError = (title: string, message: string) => {
   errorMessage.value = message
 }
 
-const moveToNextStep = async (nextStep?: AuthNextStep) => {
+const moveToNextStep = async (nextStep?: AuthNextStep, email?: string) => {
   if (nextStep === 'LINK_ACCOUNT') {
+    window.sessionStorage.setItem(
+      LINK_ACCOUNT_STORAGE_KEY,
+      JSON.stringify({
+        email: email || '',
+      }),
+    )
     await router.replace(ROUTE_PATHS.AUTH_LINK_ACCOUNT)
     return
   }

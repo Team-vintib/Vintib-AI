@@ -34,6 +34,7 @@ export interface SsafySsoCallbackRequest {
 
 export interface SsafySsoCallbackResponse {
   accessToken?: string
+  email?: string
   linked?: boolean
   nextStep?: AuthNextStep
 }
