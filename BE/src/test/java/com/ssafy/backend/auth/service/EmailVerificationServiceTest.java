@@ -3,6 +3,7 @@ package com.ssafy.backend.auth.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -11,7 +12,10 @@ import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import jakarta.mail.Session;
+import jakarta.mail.internet.MimeMessage;
 import java.time.Duration;
+import java.util.Properties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,8 +24,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.mail.MailSendException;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
 @ExtendWith(MockitoExtension.class)
 class EmailVerificationServiceTest {
@@ -41,11 +46,18 @@ class EmailVerificationServiceTest {
     @Mock
     private JavaMailSender mailSender;
 
+    @Mock
+    private TemplateEngine templateEngine;
+
     private EmailVerificationService emailVerificationService;
 
     @BeforeEach
     void setUp() {
-        emailVerificationService = new EmailVerificationService(redisTemplate, mailSender);
+        emailVerificationService = new EmailVerificationService(redisTemplate, mailSender, templateEngine);
+    }
+
+    private static MimeMessage mimeMessage() {
+        return new MimeMessage(Session.getInstance(new Properties()));
     }
 
     @Test
@@ -59,7 +71,7 @@ class EmailVerificationServiceTest {
     }
 
     @Test
-    void 시간당_발송_횟수를_초과하면_메일을_보내지_않고_예외를_던진다() {
+    void 윈도우_내_발송_횟수를_초과하면_메일을_보내지_않고_예외를_던진다() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.get(SEND_COUNT_KEY)).thenReturn("5");
 
@@ -68,14 +80,16 @@ class EmailVerificationServiceTest {
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.TOO_MANY_VERIFICATION_REQUESTS);
 
-        verify(mailSender, never()).send(any(SimpleMailMessage.class));
+        verify(mailSender, never()).send(any(MimeMessage.class));
     }
 
     @Test
     void 메일_발송에_실패하면_Redis_상태를_남기지_않는다() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.get(SEND_COUNT_KEY)).thenReturn(null);
-        doThrow(new MailSendException("smtp error")).when(mailSender).send(any(SimpleMailMessage.class));
+        when(templateEngine.process(anyString(), any(Context.class))).thenReturn("<html></html>");
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage());
+        doThrow(new MailSendException("smtp error")).when(mailSender).send(any(MimeMessage.class));
 
         assertThatThrownBy(() -> emailVerificationService.sendVerificationCode(EMAIL))
                 .isInstanceOf(MailSendException.class);
