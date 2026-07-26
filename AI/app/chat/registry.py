@@ -40,7 +40,7 @@ POLICY_GROUNDING_THRESHOLD = 0.35
 
 EMBEDDER_BACKENDS: dict[str, EmbedderConfig] = {
     # 기본 — 문자 bigram 해싱 기반 결정적 임베딩. torch 불필요, CI에서 그대로 검증된다.
-    # 아래 두 값은 목업 세트 실측으로 잡았다(tests/test_thresholds.py가 이 분리를 고정한다):
+    # 아래 두 값은 목업 세트 실측으로 잡았다(tests/test_chat_faq.py가 이 분리를 고정한다):
     #   cluster 0.30 — 같은 질문 패러프레이즈 최저 0.308 vs 다른 질문 최고 0.224
     #   grounding 0.35 — 지식베이스에 있는 질문 0.52~0.85 vs 없는 질문 최고 0.334
     # 알려진 한계: 어휘가 거의 안 겹치는 표현("재고 남았나요?" ↔ "재고 아직 남아 있나요?" = 0.330)은
