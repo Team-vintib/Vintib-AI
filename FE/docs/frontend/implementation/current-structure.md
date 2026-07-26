@@ -47,11 +47,15 @@ src/
         EmailVerificationField.vue
         LoginForm.vue
         SignupForm.vue
+        SsafySsoStartCard.vue
       constants/
       pages/
         AuthLinkAccountPage.vue
         LoginPage.vue
+        SignupEntryPage.vue
         SignupPage.vue
+        SsafyLoginPage.vue
+        SsafySignupPage.vue
         SsafySsoCallbackPage.vue
         SsafySsoPage.vue
       stores/
@@ -266,7 +270,7 @@ docs/
 - `router/index.ts`에는 `requiresAuth`, `guestOnly` 메타 기반 인증 guard가 구현되어 있습니다.
 - `App.vue`는 `RouterView`만 렌더링합니다.
 - 기능 ID prefix 기준 도메인 폴더와 공통 폴더가 생성되어 있습니다.
-- `domains/auth`에는 이메일 회원가입 화면, 이메일 로그인 화면, 이메일 인증 UI, SSO callback 화면, 계정 연결 화면, 인증 API 호출 함수와 타입, 인증 store가 구현되어 있습니다.
+- `domains/auth`에는 회원가입 방식 선택 화면, 이메일 회원가입 화면, 이메일 로그인 화면, 이메일 인증 UI, SSAFY 로그인/가입 시작 화면, SSO callback 화면, 계정 연결 화면, 인증 API 호출 함수와 타입, 인증 store가 구현되어 있습니다.
 - `domains/onboard`에는 기본 정보, 관심 정보, AI 시착 정보 입력·저장 화면과 ONBOARD-004 이동 확인용 임시 화면 및 관련 API·컴포넌트가 구현되어 있습니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
