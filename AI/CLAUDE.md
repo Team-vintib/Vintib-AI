@@ -105,6 +105,22 @@ from my_module import Something  # noqa: E402 — importorskip 이후 import
 - 학습 산출물(모델 체크포인트, 재생성 가능한 데이터셋 등)은 `.gitignore`에 반영되어 있는지
   확인할 것 — PoC 결과물을 통째로 커밋하면 저장소가 급격히 커진다.
 
+## 참조 문서 (규율 아님 — 필요할 때 찾아 읽을 것)
+
+아래는 지켜야 할 규칙이 아니라 **참조 지식**이다. 해당 상황이 오면 읽고, 아니면 읽지 않아도 된다.
+색인은 `docs/README.md`.
+
+| 문서 | 읽어야 하는 상황 |
+| --- | --- |
+| `docs/testing-guide.md` | EC2 배포·테스트를 돕게 될 때. SSH 접속, compose 실행, API 확인 절차가 있다 |
+| `docs/infra-architecture.md` | 게이트웨이(`app/gateway/`)·워커·Redis 큐가 엮인 구조를 알아야 할 때. Job/Result 스키마 포함 |
+| `docs/tryon-advancement-strategy.md` | 가상 시착 개선 작업을 할 때 |
+| `docs/chat-advancement-strategy.md` | 라이브 댓글 관리(`app/chat/`) 개선 작업을 할 때. 실측 기반 한계점과 기법 우선순위가 있다 |
+
+구현 전 설계 계획은 여기가 아니라 루트 `.claude/plans/ai/`에 있다. 소스 파일 docstring의
+`설계: .claude/plans/ai/00N-*.md` 줄이 해당 모듈의 설계 근거를 가리킨다 — 모듈을 고치기 전에
+그 문서를 먼저 읽는다.
+
 ## 커밋/브랜치 규칙
 
 루트 `.claude/commit-convention.md` 참고. `[JIRA-KEY] type: subject` 형식, push는 항상
