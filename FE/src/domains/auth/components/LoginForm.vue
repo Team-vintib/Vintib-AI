@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
-import { ROUTE_NAMES } from '@/shared/constants/routes'
+import { login } from '@/domains/auth/api/authApi'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
+import type { LoginResponse } from '@/domains/auth/types/auth.types'
+import { normalizeApiError } from '@/shared/api/http'
+import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import { isEmail, isRequired } from '@/shared/utils/validators'
 
 type LoginField = 'email' | 'password'
@@ -30,7 +34,10 @@ const errors = reactive<Record<LoginField, string>>({
 })
 
 const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
 const isPasswordVisible = ref(false)
+const isSubmitting = ref(false)
 const submitError = ref('')
 
 const getFieldError = (field: LoginField) => {
@@ -95,16 +102,113 @@ const handleRememberMeChange = (event: Event) => {
   form.rememberMe = (event.target as HTMLInputElement).checked
 }
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
+  if (isSubmitting.value) {
+    return
+  }
+
   submitError.value = ''
 
   if (!validateForm()) {
     return
   }
+
+  isSubmitting.value = true
+
+  try {
+    const response = await login({
+      email: form.email.trim(),
+      password: form.password,
+      rememberMe: form.rememberMe,
+    })
+
+    if (!response.success) {
+      applyLoginError(response.error?.code, response.error?.message)
+      return
+    }
+
+    if (!response.data?.accessToken) {
+      submitError.value = '로그인 결과를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+      return
+    }
+
+    authStore.setSession(response.data, form.rememberMe)
+    await moveAfterLogin(response.data)
+  } catch (error: unknown) {
+    const apiError = normalizeApiError(error)
+
+    applyLoginError(apiError.code, apiError.message)
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 const handleSsafyLogin = async () => {
+  if (isSubmitting.value) {
+    return
+  }
+
   await router.push({ name: ROUTE_NAMES.AUTH_SSAFY, query: { from: 'login' } })
+}
+
+const applyLoginError = (code?: string, message?: string) => {
+  if (code === 'C001') {
+    submitError.value = message || '입력값을 다시 확인해 주세요.'
+    return
+  }
+
+  if (code === 'NETWORK_ERROR' || code === 'REQUEST_TIMEOUT') {
+    submitError.value = message || '네트워크 연결을 확인한 뒤 다시 시도해 주세요.'
+    return
+  }
+
+  submitError.value = message || '이메일 또는 비밀번호를 확인해 주세요.'
+}
+
+const moveAfterLogin = async (loginResult: LoginResponse) => {
+  const redirectPath = getInternalRedirectPath()
+
+  if (redirectPath) {
+    await router.replace(redirectPath)
+    return
+  }
+
+  if (loginResult.nextStep === 'HOME') {
+    await router.replace(ROUTE_PATHS.HOME)
+    return
+  }
+
+  if (
+    loginResult.nextStep === 'ONBOARD_PROFILE' ||
+    loginResult.user?.onboardingCompleted === false
+  ) {
+    await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
+    return
+  }
+
+  await router.replace(ROUTE_PATHS.HOME)
+}
+
+const getInternalRedirectPath = () => {
+  const redirect = getQueryValue(route.query.redirect)
+
+  if (!redirect || !redirect.startsWith('/') || redirect.startsWith('//')) {
+    return ''
+  }
+
+  if (redirect === ROUTE_PATHS.AUTH_LOGIN) {
+    return ''
+  }
+
+  return redirect
+}
+
+function getQueryValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return value[0] ? String(value[0]) : ''
+  }
+
+  return value ? String(value) : ''
 }
 </script>
 
@@ -125,6 +229,7 @@ const handleSsafyLogin = async () => {
           type="email"
           autocomplete="email"
           placeholder="이메일을 입력해주세요."
+          :disabled="isSubmitting"
           :aria-invalid="errors.email ? 'true' : 'false'"
           aria-describedby="login-email-error"
           @input="handleFieldInput('email')"
@@ -146,6 +251,7 @@ const handleSsafyLogin = async () => {
             :type="isPasswordVisible ? 'text' : 'password'"
             autocomplete="current-password"
             placeholder="비밀번호를 입력해주세요."
+            :disabled="isSubmitting"
             :aria-invalid="errors.password ? 'true' : 'false'"
             aria-describedby="login-password-error"
             @input="handleFieldInput('password')"
@@ -154,6 +260,7 @@ const handleSsafyLogin = async () => {
           <button
             class="login-form__password-toggle"
             type="button"
+            :disabled="isSubmitting"
             :aria-pressed="isPasswordVisible"
             @click="togglePasswordVisibility"
           >
@@ -172,6 +279,7 @@ const handleSsafyLogin = async () => {
           class="login-form__checkbox"
           type="checkbox"
           :checked="form.rememberMe"
+          :disabled="isSubmitting"
           @change="handleRememberMeChange"
         />
         로그인 상태 유지
@@ -180,9 +288,16 @@ const handleSsafyLogin = async () => {
     </div>
 
     <section class="login-form__actions" aria-label="로그인 실행">
-      <button class="login-form__submit" type="submit">로그인</button>
+      <button class="login-form__submit" type="submit" :disabled="isSubmitting">
+        {{ isSubmitting ? '로그인 중' : '로그인' }}
+      </button>
 
-      <button class="login-form__secondary" type="button" @click="handleSsafyLogin">
+      <button
+        class="login-form__secondary"
+        type="button"
+        :disabled="isSubmitting"
+        @click="handleSsafyLogin"
+      >
         싸피어스로 로그인
       </button>
     </section>
@@ -260,6 +375,11 @@ const handleSsafyLogin = async () => {
   border-color: var(--color-error);
 }
 
+.login-form__input:disabled {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-muted);
+}
+
 .login-form__input--password {
   padding-right: 80px;
 }
@@ -286,6 +406,11 @@ const handleSsafyLogin = async () => {
 
 .login-form__password-toggle:hover {
   background: var(--color-surface-secondary);
+}
+
+.login-form__password-toggle:disabled,
+.login-form__text-button:disabled {
+  color: var(--color-text-muted);
 }
 
 .login-form__field-error {
@@ -367,6 +492,11 @@ const handleSsafyLogin = async () => {
 
 .login-form__secondary:hover {
   background: var(--color-surface-secondary);
+}
+
+.login-form__secondary:disabled {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-muted);
 }
 
 .login-form__submit:focus-visible,
