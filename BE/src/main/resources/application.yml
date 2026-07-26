@@ -42,6 +42,15 @@ jwt:
 server:
   port: ${SERVER_PORT:8080}
 
+management:
+  health:
+    # 메일 서버(SMTP) 도달 여부는 "이 인스턴스가 트래픽을 처리할 수 있는가"의 기준이 아니다.
+    # 이 지표를 켜두면 MAIL_USERNAME/PASSWORD 미설정 시 mail 이 DOWN 이 되어 /actuator/health 가
+    # 503 을 반환하고, 그 결과 컨테이너 healthcheck 가 실패해 배포 자체가 막힌다(자격증명이 있어도
+    # Gmail 장애 시 같은 문제). 배포 게이트에서 제외한다. 메일 상태 확인이 필요하면 발송 경로에서 다룬다.
+    mail:
+      enabled: false
+
 # Spring 은 FastAPI 만 바라본다. 추론용 노트북 연결은 AI 팀 영역.
 ai:
   base-url: ${AI_BASE_URL:http://localhost:8000}
