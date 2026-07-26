@@ -43,6 +43,7 @@ AI/
 │   ├── shared/           #   도메인 공용 유틸(모델 레지스트리·임베딩 로더 등)
 │   ├── chat/             #   라이브 댓글 관리 도메인(자체완결): router/service/schemas + pipeline/
 │   └── recommend/        #   추천 도메인(자체완결): router.py / service.py / schemas.py / pipeline/
+├── docs/                 # 참조 문서(런북·아키텍처·고도화 전략) — docs/README.md가 색인
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml        # ruff/black 설정
@@ -51,6 +52,19 @@ AI/
 
 프로덕션 기능은 `app/<도메인>/` 단위로 추가한다(도메인 우선 구조). 자세한 규약은 `CLAUDE.md`
 "프로덕션 모듈 구조" 참고.
+
+## 문서
+
+참조 문서는 [`docs/`](./docs/README.md)에 모여 있다. 목적별 색인은 그 안의 `README.md`를 본다.
+
+| 문서 | 언제 보나 |
+| --- | --- |
+| [`docs/testing-guide.md`](./docs/testing-guide.md) | EC2에 올려 직접 테스트할 때 — 배포 절차·API 체크리스트·트러블슈팅 |
+| [`docs/infra-architecture.md`](./docs/infra-architecture.md) | 게이트웨이·워커·큐 구조를 파악할 때 |
+| [`docs/tryon-advancement-strategy.md`](./docs/tryon-advancement-strategy.md) | 가상 시착 개선 방향 (`S15P11A108-195`) |
+| [`docs/chat-advancement-strategy.md`](./docs/chat-advancement-strategy.md) | 라이브 댓글 관리 개선 방향 (`S15P11A108-197`) |
+
+구현 전 설계 계획은 문서가 아니라 루트 `.claude/plans/ai/`에 둔다(공통 규율).
 
 ## 추천 브랜드 그래프 아티팩트 빌드 (오프라인)
 
