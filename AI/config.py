@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     worker_api_key: str = ""
 
-    public_base_url: str = "https://i15a108.p.ssafy.io"   # 추가 필요
+    public_base_url: str = "https://i15a108.p.ssafy.io"  # 추가 필요
 
 
-settings = Settings()   # 추가 필요
+settings = Settings()  # 추가 필요

@@ -2,8 +2,9 @@ import json
 import os
 import uuid
 
+import aiofiles
 import redis
-from fastapi import FastAPI, HTTPException, Header, Query, UploadFile, File
+from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
 from fastapi.staticfiles import StaticFiles
 
 from config import settings
@@ -44,6 +45,7 @@ def health_check() -> dict[str, str]:
 
 # ---------- 백엔드(Spring Boot)가 호출하는 쪽 ----------
 
+
 @app.post("/ai/{feature}")
 def enqueue_job(feature: FeatureType, data: dict):
     job = new_job(feature, data)
@@ -66,8 +68,11 @@ def get_job_status(job_id: str):
 
 # ---------- 로컬 노트북 워커가 호출하는 쪽 ----------
 
+
 @app.get("/ai/workers/poll")
-def poll_job(feature: FeatureType = Query(...), x_api_key: str | None = Header(default=None)):
+def poll_job(
+    feature: FeatureType = Query(...), x_api_key: str | None = Header(default=None)
+):  # noqa: B008
     _check_worker_key(x_api_key)
 
     item = r.blpop([f"{QUEUE_PREFIX}{feature}"], timeout=POLL_TIMEOUT_SECONDS)
@@ -117,7 +122,7 @@ def submit_result(
 @app.post("/ai/workers/upload-image")
 async def upload_result_image(
     prefix: str = Query(...),
-    file: UploadFile = File(...),
+    file: UploadFile = File(...),  # noqa: B008
     x_api_key: str | None = Header(default=None),
 ):
     """
@@ -131,8 +136,8 @@ async def upload_result_image(
 
     filename = f"{uuid.uuid4().hex}.png"
     filepath = os.path.join(target_dir, filename)
-    with open(filepath, "wb") as f:
-        f.write(await file.read())
+    async with aiofiles.open(filepath, "wb") as f:
+        await f.write(await file.read())
 
     url = f"{settings.public_base_url}/results/{prefix}/{filename}"
     return {"url": url}
@@ -142,7 +147,7 @@ async def upload_result_image(
 async def upload_result_json(
     prefix: str = Query(...),
     name: str = Query(...),
-    data: dict = None,
+    data: dict | None = None,
     x_api_key: str | None = Header(default=None),
 ):
     """품질검수 리포트처럼 JSON 결과물을 저장할 때 쓰는 엔드포인트."""
@@ -152,8 +157,8 @@ async def upload_result_json(
     os.makedirs(target_dir, exist_ok=True)
 
     filepath = os.path.join(target_dir, f"{name}.json")
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
+    async with aiofiles.open(filepath, "w", encoding="utf-8") as f:
+        await f.write(json.dumps(data, ensure_ascii=False))
 
     url = f"{settings.public_base_url}/results/{prefix}/{name}.json"
     return {"url": url}
