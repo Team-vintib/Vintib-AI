@@ -16,6 +16,8 @@ CLIPSeg의 sigmoid 확률 스케일은 프롬프트·체크포인트·입력 해
 
 from typing import TypedDict
 
+from app.quality.schemas import DefectType
+
 
 class SegmenterConfig(TypedDict):
     """세그멘터 한 종류의 모델 ID + 그 모델 기준으로 잡은 임계치."""
@@ -78,6 +80,67 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
 ACTIVE_SEGMENTER = "mock"  # <- 여기 키만 바꾸면 스왑
 
 
+class DefectPolicy(TypedDict):
+    """하자 유형 하나의 취급 정책. **모델이 못 하는 걸 잘하는 척하지 않기 위한 장치**다."""
+
+    trusted: bool  # False면 확률이 높아도 DETECTED로 노출하지 않는다(항상 SUSPECTED)
+    needs_seller_review: bool  # 판매자 확인이 필수인지
+    statement_required: bool  # 판매자 소명 입력 대상인지(저장은 BE)
+    weight: float  # 감점 가중치 — 미확정(아래 주석 참고)
+    evidence: str  # 위 판단의 근거(LAB-12 실측 / 미검증)
+
+
+# LAB-12 검증 결론을 그대로 코드에 넣는다.
+#
+# ⚠️ `weight`는 **근거 없는 임의값**이다. 라벨링된 검증셋이 없어 정량 지표가 없는 상태이고,
+# 가격책정(에픽 밖)이 `condition_score`를 소비하게 되므로 값 확정은 검증셋 확보 이후의 별도
+# 작업이다. 지금은 "찢어짐이 오염보다 아프다" 정도의 순서만 담고 있다.
+DEFECT_TAXONOMY: dict[DefectType, DefectPolicy] = {
+    DefectType.stain: {
+        "trusted": True,
+        "needs_seller_review": False,
+        "statement_required": True,
+        "weight": 8.0,
+        "evidence": "LAB-12 실측 양호 — 오염을 의류 특성 반영해 잘 분리",
+    },
+    DefectType.dirt_mark: {
+        "trusted": True,
+        "needs_seller_review": False,
+        "statement_required": True,
+        "weight": 6.0,
+        "evidence": "LAB-12 실측 양호 — stain과 같은 프롬프트 계열",
+    },
+    DefectType.hole_tear: {
+        "trusted": False,
+        "needs_seller_review": True,
+        "statement_required": True,
+        "weight": 15.0,
+        "evidence": "LAB-12 실측 약함 — 찢어짐·훼손은 잘 판단하지 못함. 항상 SUSPECTED",
+    },
+    DefectType.discoloration: {
+        "trusted": False,
+        "needs_seller_review": True,
+        "statement_required": True,
+        "weight": 7.0,
+        "evidence": "미검증 프롬프트 — LAB-12 대상이 아니었다",
+    },
+    DefectType.pilling: {
+        "trusted": False,
+        "needs_seller_review": True,
+        "statement_required": False,
+        "weight": 4.0,
+        "evidence": "미검증 프롬프트 — 보풀은 경미해 소명 대상에서 제외",
+    },
+    DefectType.fray: {
+        "trusted": False,
+        "needs_seller_review": True,
+        "statement_required": True,
+        "weight": 5.0,
+        "evidence": "미검증 프롬프트 — LAB-12 대상이 아니었다",
+    },
+}
+
+
 def segmenter_config(key: str | None = None) -> SegmenterConfig:
     """활성 세그멘터의 설정(모델 ID + 임계치)을 돌려준다."""
     resolved = key or ACTIVE_SEGMENTER
@@ -85,3 +148,11 @@ def segmenter_config(key: str | None = None) -> SegmenterConfig:
         return SEGMENTER_BACKENDS[resolved]
     except KeyError as exc:
         raise ValueError(f"등록되지 않은 세그멘터 백엔드입니다: {resolved!r}") from exc
+
+
+def defect_policy(defect_type: DefectType) -> DefectPolicy:
+    """하자 유형의 취급 정책을 돌려준다."""
+    try:
+        return DEFECT_TAXONOMY[defect_type]
+    except KeyError as exc:  # pragma: no cover - enum이라 도달 불가, 방어용
+        raise ValueError(f"분류 체계에 없는 하자 유형입니다: {defect_type!r}") from exc
