@@ -37,6 +37,7 @@ def _check_worker_key(x_api_key: str | None):
 
 
 @app.get("/health")
+@app.get("/ai/health")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
