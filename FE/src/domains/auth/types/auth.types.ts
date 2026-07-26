@@ -25,7 +25,7 @@ export interface SignUpResponse {
   onboardingCompleted: boolean
 }
 
-export type AuthNextStep = 'HOME' | 'ONBOARD_PROFILE' | 'LINK_ACCOUNT' | 'SIGNUP_COMPLETE'
+export type AuthNextStep = 'HOME' | 'ONBOARD_PROFILE' | 'LINK_ACCOUNT'
 
 export interface SsafySsoCallbackRequest {
   authorizationCode: string

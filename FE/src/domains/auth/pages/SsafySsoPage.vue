@@ -10,7 +10,6 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 const route = useRoute()
 
 const isStartingSso = ref(false)
-const isHelpOpen = ref(false)
 const requestError = ref('')
 
 const queryErrorMessage = computed(() => {
@@ -29,8 +28,12 @@ const queryErrorMessage = computed(() => {
 })
 
 const statusMessage = computed(() => requestError.value || queryErrorMessage.value)
-
-const securityItems = ['SSL 보안 연결', '2단계 인증 지원']
+const returnPath = computed(() =>
+  getQueryValue(route.query.from) === 'login' ? ROUTE_PATHS.AUTH_LOGIN : ROUTE_PATHS.AUTH_SIGNUP,
+)
+const returnLabel = computed(() =>
+  getQueryValue(route.query.from) === 'login' ? '로그인으로 돌아가기' : '이메일 회원가입으로 돌아가기',
+)
 
 const handleStartSso = () => {
   if (isStartingSso.value) {
@@ -40,10 +43,6 @@ const handleStartSso = () => {
   isStartingSso.value = true
   requestError.value = ''
   window.location.assign(getSsafySsoStartUrl())
-}
-
-const toggleHelp = () => {
-  isHelpOpen.value = !isHelpOpen.value
 }
 
 function getQueryValue(value: unknown) {
@@ -65,19 +64,12 @@ function getQueryValue(value: unknown) {
         <img class="ssafy-header__logo" :src="logoImage" alt="VinTib" />
         <p class="ssafy-header__eyebrow">SSAFYERS SSO</p>
         <h1 id="ssafy-title" class="ssafy-header__title text-[var(--color-text-primary)]">
-          싸피어스 인증
+          싸피어스로 가입하기
         </h1>
         <p class="ssafy-header__description text-[var(--color-text-secondary)]">
-          SSAFYERS 통합 계정을 사용하여 VinTib 서비스에 안전하게 접근할 수 있습니다.
+          SSAFY 계정 인증 후 VinTib 회원가입을 계속합니다.
         </p>
       </header>
-
-      <section class="ssafy-security" aria-label="싸피어스 인증 보안 안내">
-        <div v-for="item in securityItems" :key="item" class="ssafy-security__item">
-          <span class="ssafy-security__mark" aria-hidden="true"></span>
-          <span>{{ item }}</span>
-        </div>
-      </section>
 
       <p v-if="statusMessage" class="ssafy-error" role="alert">
         {{ statusMessage }}
@@ -90,27 +82,13 @@ function getQueryValue(value: unknown) {
           :disabled="isStartingSso"
           @click="handleStartSso"
         >
-          {{ isStartingSso ? '인증 연결 중' : '싸피어스로 로그인' }}
+          {{ isStartingSso ? '인증 연결 중' : '싸피어스로 가입하기' }}
         </button>
 
-        <a class="ssafy-secondary-button" :href="ROUTE_PATHS.AUTH_LOGIN">
-          이메일 로그인으로 돌아가기
+        <a class="ssafy-secondary-button" :href="returnPath">
+          {{ returnLabel }}
         </a>
-
-        <button
-          class="ssafy-help-button"
-          type="button"
-          :aria-expanded="isHelpOpen"
-          aria-controls="ssafy-help"
-          @click="toggleHelp"
-        >
-          인증 도움말
-        </button>
       </section>
-
-      <p v-if="isHelpOpen" id="ssafy-help" class="ssafy-help-text">
-        싸피어스 계정 인증 창에서 인증을 완료하면 VinTib 회원가입 절차로 돌아옵니다.
-      </p>
     </article>
   </AuthLayout>
 </template>
@@ -155,35 +133,6 @@ function getQueryValue(value: unknown) {
   line-height: 24px;
 }
 
-.ssafy-security {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  margin-top: var(--space-8);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-primary-soft);
-}
-
-.ssafy-security__item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
-}
-
-.ssafy-security__mark {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-chip);
-  background: var(--color-primary);
-}
-
 .ssafy-error {
   margin-top: var(--space-5);
   padding: var(--space-3) var(--space-4);
@@ -203,8 +152,7 @@ function getQueryValue(value: unknown) {
 }
 
 .ssafy-primary-button,
-.ssafy-secondary-button,
-.ssafy-help-button {
+.ssafy-secondary-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -242,35 +190,14 @@ function getQueryValue(value: unknown) {
   background: var(--color-surface-secondary);
 }
 
-.ssafy-help-button {
-  height: var(--button-height-standard);
-  border: 0;
-  background: transparent;
-  color: var(--color-text-secondary);
-}
-
-.ssafy-help-button:hover {
-  color: var(--color-primary);
-}
-
-.ssafy-help-text {
-  margin-top: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: 13px;
-  line-height: 18px;
-  text-align: center;
-}
-
 .ssafy-primary-button:focus-visible,
-.ssafy-secondary-button:focus-visible,
-.ssafy-help-button:focus-visible {
+.ssafy-secondary-button:focus-visible {
   outline: 3px solid var(--color-primary);
   outline-offset: 3px;
 }
 
 .ssafy-primary-button:active:not(:disabled),
-.ssafy-secondary-button:active,
-.ssafy-help-button:active {
+.ssafy-secondary-button:active {
   transform: translateY(1px);
 }
 
@@ -287,10 +214,6 @@ function getQueryValue(value: unknown) {
   .ssafy-header__title {
     font-size: 28px;
     line-height: 38px;
-  }
-
-  .ssafy-security {
-    grid-template-columns: 1fr;
   }
 }
 </style>

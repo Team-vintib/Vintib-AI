@@ -7,8 +7,6 @@ import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 
-const SSO_RESULT_STORAGE_KEY = 'vintib_ssafy_sso_result'
-
 const route = useRoute()
 const router = useRouter()
 
@@ -70,17 +68,12 @@ const handleCallback = async () => {
       window.localStorage.setItem('vintib_access_token', response.data.accessToken)
     }
 
-    window.sessionStorage.setItem(
-      SSO_RESULT_STORAGE_KEY,
-      JSON.stringify({
-        email: response.data.user?.email || '',
-        linked: response.data.linked,
-        name: response.data.user?.name || '',
-        nextStep: response.data.nextStep || 'ONBOARD_PROFILE',
-      }),
-    )
+    if (response.data.nextStep === 'LINK_ACCOUNT') {
+      await router.replace(ROUTE_PATHS.AUTH_LINK_ACCOUNT)
+      return
+    }
 
-    await router.replace({ name: ROUTE_NAMES.AUTH_SSAFY_COMPLETE })
+    await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -128,8 +121,8 @@ function getQueryValue(value: unknown) {
         <RouterLink class="callback-primary-link" :to="{ name: ROUTE_NAMES.AUTH_SSAFY }">
           다시 인증하기
         </RouterLink>
-        <a class="callback-secondary-link" :href="ROUTE_PATHS.AUTH_LOGIN">
-          이메일 로그인으로 돌아가기
+        <a class="callback-secondary-link" :href="ROUTE_PATHS.AUTH_SIGNUP">
+          이메일 회원가입으로 돌아가기
         </a>
       </div>
 
