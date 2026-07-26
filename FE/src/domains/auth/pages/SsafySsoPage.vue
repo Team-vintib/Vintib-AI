@@ -7,6 +7,9 @@ import { getSsafySsoStartUrl } from '@/domains/auth/api/authApi'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 
+const SSO_SOURCE_STORAGE_KEY = 'vintib_ssafy_sso_source'
+const SSO_SOURCE_LOGIN = 'login'
+
 const route = useRoute()
 
 const isStartingSso = ref(false)
@@ -28,10 +31,10 @@ const queryErrorMessage = computed(() => {
 
 const statusMessage = computed(() => queryErrorMessage.value)
 const returnPath = computed(() =>
-  getQueryValue(route.query.from) === 'login' ? ROUTE_PATHS.AUTH_LOGIN : ROUTE_PATHS.AUTH_SIGNUP,
+  getSsoSource() === SSO_SOURCE_LOGIN ? ROUTE_PATHS.AUTH_LOGIN : ROUTE_PATHS.AUTH_SIGNUP,
 )
 const returnLabel = computed(() =>
-  getQueryValue(route.query.from) === 'login' ? '로그인으로 돌아가기' : '이메일 회원가입으로 돌아가기',
+  getSsoSource() === SSO_SOURCE_LOGIN ? '로그인으로 돌아가기' : '이메일 회원가입으로 돌아가기',
 )
 
 const handleStartSso = () => {
@@ -40,7 +43,12 @@ const handleStartSso = () => {
   }
 
   isStartingSso.value = true
+  window.sessionStorage.setItem(SSO_SOURCE_STORAGE_KEY, getSsoSource())
   window.location.assign(getSsafySsoStartUrl())
+}
+
+function getSsoSource() {
+  return getQueryValue(route.query.from) === SSO_SOURCE_LOGIN ? SSO_SOURCE_LOGIN : 'signup'
 }
 
 function getQueryValue(value: unknown) {

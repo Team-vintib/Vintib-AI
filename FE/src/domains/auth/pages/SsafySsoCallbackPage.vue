@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { completeSsafySsoCallback } from '@/domains/auth/api/authApi'
@@ -9,6 +9,8 @@ import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 
 const LINK_ACCOUNT_STORAGE_KEY = 'vintib_ssafy_link_account'
+const SSO_SOURCE_STORAGE_KEY = 'vintib_ssafy_sso_source'
+const SSO_SOURCE_LOGIN = 'login'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,12 +19,15 @@ const isProcessing = ref(true)
 const statusTitle = ref('싸피어스 인증 처리 중')
 const statusMessage = ref('인증 결과를 확인하고 있습니다.')
 const errorMessage = ref('')
+const ssoSource = ref<'login' | 'signup'>('signup')
 
 onMounted(() => {
   void handleCallback()
 })
 
 const handleCallback = async () => {
+  ssoSource.value = getSsoSource()
+
   const error = getQueryValue(route.query.error)
   const cancelled = getQueryValue(route.query.cancelled)
   const authorizationCode = getQueryValue(route.query.code)
@@ -67,10 +72,19 @@ const handleCallback = async () => {
       return
     }
 
+    if (response.data.nextStep !== 'LINK_ACCOUNT' && !response.data.accessToken) {
+      applyCallbackError(
+        '인증 결과를 확인하지 못했습니다.',
+        '회원가입을 계속할 수 없어 싸피어스 인증을 다시 진행해 주세요.',
+      )
+      return
+    }
+
     if (response.data.accessToken) {
       window.localStorage.setItem('vintib_access_token', response.data.accessToken)
     }
 
+    window.sessionStorage.removeItem(SSO_SOURCE_STORAGE_KEY)
     await moveToNextStep(response.data.nextStep, response.data.email)
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
@@ -109,6 +123,26 @@ const moveToNextStep = async (nextStep?: AuthNextStep, email?: string) => {
   await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
 }
 
+const retryRoute = computed(() => ({
+  name: ROUTE_NAMES.AUTH_SSAFY,
+  query: { from: ssoSource.value },
+}))
+
+const fallbackPath = computed(() =>
+  ssoSource.value === SSO_SOURCE_LOGIN ? ROUTE_PATHS.AUTH_LOGIN : ROUTE_PATHS.AUTH_SIGNUP,
+)
+
+const fallbackLabel = computed(() =>
+  ssoSource.value === SSO_SOURCE_LOGIN ? '로그인으로 돌아가기' : '이메일 회원가입으로 돌아가기',
+)
+
+function getSsoSource() {
+  const source =
+    getQueryValue(route.query.from) || window.sessionStorage.getItem(SSO_SOURCE_STORAGE_KEY)
+
+  return source === SSO_SOURCE_LOGIN ? SSO_SOURCE_LOGIN : 'signup'
+}
+
 function getQueryValue(value: unknown) {
   if (Array.isArray(value)) {
     return value[0] ? String(value[0]) : ''
@@ -136,11 +170,11 @@ function getQueryValue(value: unknown) {
       </p>
 
       <div v-if="errorMessage" class="callback-actions">
-        <RouterLink class="callback-primary-link" :to="{ name: ROUTE_NAMES.AUTH_SSAFY }">
+        <RouterLink class="callback-primary-link" :to="retryRoute">
           다시 인증하기
         </RouterLink>
-        <a class="callback-secondary-link" :href="ROUTE_PATHS.AUTH_SIGNUP">
-          이메일 회원가입으로 돌아가기
+        <a class="callback-secondary-link" :href="fallbackPath">
+          {{ fallbackLabel }}
         </a>
       </div>
 
