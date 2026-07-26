@@ -9,6 +9,21 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/domains/auth/pages/SignupPage.vue'),
   },
   {
+    path: ROUTE_PATHS.AUTH_SSAFY,
+    name: ROUTE_NAMES.AUTH_SSAFY,
+    component: () => import('@/domains/auth/pages/SsafySsoPage.vue'),
+  },
+  {
+    path: ROUTE_PATHS.AUTH_SSAFY_CALLBACK,
+    name: ROUTE_NAMES.AUTH_SSAFY_CALLBACK,
+    component: () => import('@/domains/auth/pages/SsafySsoCallbackPage.vue'),
+  },
+  {
+    path: ROUTE_PATHS.AUTH_SSAFY_COMPLETE,
+    name: ROUTE_NAMES.AUTH_SSAFY_COMPLETE,
+    component: () => import('@/domains/auth/pages/SsafySsoCompletePage.vue'),
+  },
+  {
     path: ROUTE_PATHS.ONBOARD_PROFILE,
     name: ROUTE_NAMES.ONBOARD_PROFILE,
     component: () => import('@/domains/onboard/pages/OnboardingBasicInfoView.vue'),
