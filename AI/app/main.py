@@ -12,12 +12,12 @@ app = FastAPI(title=settings.app_name)
 
 app.include_router(recommend_router, prefix="/recommend", tags=["recommend"])
 app.include_router(personalize_router, prefix="/recommend", tags=["recommend-personalize"])
-app.include_router(chas=["chat"])
+app.include_router(chat_router, prefix="/chat", tags=["chat"])
 app.include_router(gateway_router, prefix="/ai", tags=["ai-gateway"])
 
 app.mount("/results", StaticFiles(directory=RESULTS_DIR), name="results")
 
 
 @app.get("/health")
-def health_check() ->
+def health_check() -> dict[str, str]:
     return {"status": "ok"}
