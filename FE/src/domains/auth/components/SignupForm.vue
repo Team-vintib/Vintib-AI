@@ -115,20 +115,6 @@ const agreementError = computed(() => {
 const canRequestVerificationCode = computed(() => isEmail(form.email))
 const canConfirmVerificationCode = computed(() => isVerificationCode(form.verificationCode))
 
-const isFormValid = computed(
-  () =>
-    isRequired(form.name) &&
-    form.name.trim().length <= 30 &&
-    isEmail(form.email) &&
-    isEmailVerified.value &&
-    verifiedEmail.value === form.email.trim() &&
-    verificationToken.value.length > 0 &&
-    isVerificationCode(form.verificationCode) &&
-    isSignupPassword(form.password) &&
-    isSameValue(form.passwordConfirm, form.password) &&
-    isRequiredAgreementChecked.value,
-)
-
 const getFieldError = (field: SignupField) => {
   if (field === 'name') {
     if (!isRequired(form.name)) {
