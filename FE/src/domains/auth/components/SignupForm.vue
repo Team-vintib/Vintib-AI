@@ -643,7 +643,7 @@ const applySignUpError = (code?: string, message?: string) => {
       <button
         class="h-[var(--button-height-major)] w-full rounded-[var(--radius-control)] px-5 text-[15px] font-semibold transition focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
         :class="
-          isFormValid && !isSubmitting
+          !isSubmitting
             ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)] hover:bg-[var(--color-primary-hover)]'
             : 'bg-[var(--color-surface-secondary)] text-[var(--color-text-muted)]'
         "
@@ -667,3 +667,78 @@ const applySignUpError = (code?: string, message?: string) => {
     <a class="font-semibold text-[var(--color-primary)]" href="/auth/login"> 로그인하기 </a>
   </footer>
 </template>
+
+<style scoped lang="scss">
+form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.space-y-2,
+.space-y-3,
+.space-y-4,
+.space-y-6 {
+  display: flex;
+  flex-direction: column;
+}
+
+.space-y-2 {
+  gap: var(--space-2);
+}
+
+.space-y-3 {
+  gap: var(--space-3);
+}
+
+.space-y-4 {
+  gap: var(--space-4);
+}
+
+.space-y-6 {
+  gap: var(--space-6);
+}
+
+input:not([type='checkbox']) {
+  padding: 0 var(--space-4);
+}
+
+#signup-password {
+  padding-right: 80px;
+}
+
+section[aria-labelledby='agreement-title'] {
+  padding: var(--space-4);
+}
+
+.mb-4 {
+  margin-bottom: var(--space-4);
+}
+
+.mt-3 {
+  margin-top: var(--space-3);
+}
+
+.mt-6 {
+  margin-top: var(--space-6);
+}
+
+button {
+  padding-right: var(--space-4);
+  padding-left: var(--space-4);
+}
+
+button[type='submit'] {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+button[type='submit']:hover {
+  background: var(--color-primary-hover);
+}
+
+button[type='submit']:disabled {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-muted);
+}
+</style>

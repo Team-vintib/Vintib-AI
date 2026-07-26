@@ -136,3 +136,31 @@ const handleVerificationCodeInput = (event: Event) => {
     </div>
   </div>
 </template>
+
+<style scoped lang="scss">
+.space-y-4 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.space-y-2 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+input {
+  padding: 0 var(--space-4);
+}
+
+button {
+  padding: 0 var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .max-sm\:flex-col {
+    flex-direction: column;
+  }
+}
+</style>
