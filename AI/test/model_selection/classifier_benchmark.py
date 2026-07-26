@@ -23,11 +23,10 @@ from __future__ import annotations
 import statistics
 import time
 import tracemalloc
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 
 import torch
-
 from loaders import ClassifierBundle, load_sequence_classifier
 from model_registry import CLASSIFIER_MODELS
 
@@ -257,9 +256,7 @@ def run_all(
     for name, model_id in models.items():
         try:
             results.append(benchmark_model(name, model_id, samples, warmup=warmup))
-        except (
-            Exception
-        ) as exc:  # noqa: BLE001 — 스파이크 코드: 한 후보 실패해도 나머지는 계속 돈다
+        except Exception as exc:
             print(f"[{name}] 벤치마크 실패: {exc}")
     return results
 
