@@ -26,6 +26,12 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final StringRedisTemplate redisTemplate;
 
+    public void checkEmailDuplicate(String email) {
+        if (memberRepository.existsByEmail(normalizeEmail(email))) {
+            throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
+        }
+    }
+
     public void sendEmailVerificationCode(String email) {
         String normalizedEmail = normalizeEmail(email);
         if (memberRepository.existsByEmail(normalizedEmail)) {

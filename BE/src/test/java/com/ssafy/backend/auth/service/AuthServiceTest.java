@@ -84,6 +84,25 @@ class AuthServiceTest {
     }
 
     @Test
+    void 이미_가입된_이메일이면_중복확인에서_예외를_던진다() {
+        when(memberRepository.existsByEmail(EMAIL)).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.checkEmailDuplicate("User@Example.com"))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.DUPLICATE_EMAIL);
+    }
+
+    @Test
+    void 사용_가능한_이메일이면_중복확인을_통과한다() {
+        when(memberRepository.existsByEmail(EMAIL)).thenReturn(false);
+
+        authService.checkEmailDuplicate("User@Example.com");
+
+        verify(memberRepository).existsByEmail(EMAIL);
+    }
+
+    @Test
     void 로그인시_이메일_대소문자를_구분하지_않는다() {
         when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.of(member));
         when(member.getId()).thenReturn(MEMBER_ID);
