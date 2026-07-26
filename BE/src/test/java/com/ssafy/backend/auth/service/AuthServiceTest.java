@@ -7,6 +7,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.ssafy.backend.auth.dto.request.SignUpRequest;
+import com.ssafy.backend.auth.dto.response.SignUpResponse;
 import com.ssafy.backend.auth.dto.response.TokenResponse;
 import com.ssafy.backend.auth.jwt.JwtTokenProvider;
 import com.ssafy.backend.global.exception.CustomException;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -81,6 +84,43 @@ class AuthServiceTest {
     }
 
     @Test
+    void 이미_가입된_이메일이면_중복확인에서_예외를_던진다() {
+        when(memberRepository.existsByEmail(EMAIL)).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.checkEmailDuplicate("User@Example.com"))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.DUPLICATE_EMAIL);
+    }
+
+    @Test
+    void 사용_가능한_이메일이면_중복확인을_통과한다() {
+        when(memberRepository.existsByEmail(EMAIL)).thenReturn(false);
+
+        authService.checkEmailDuplicate("User@Example.com");
+
+        verify(memberRepository).existsByEmail(EMAIL);
+    }
+
+    @Test
+    void 로그인시_이메일_대소문자를_구분하지_않는다() {
+        when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.of(member));
+        when(member.getId()).thenReturn(MEMBER_ID);
+        when(member.getEmail()).thenReturn(EMAIL);
+        when(member.getPassword()).thenReturn("encoded-password");
+        when(passwordEncoder.matches(PASSWORD, "encoded-password")).thenReturn(true);
+        when(jwtTokenProvider.createAccessToken(MEMBER_ID, EMAIL)).thenReturn("access-token");
+        when(jwtTokenProvider.createRefreshToken(MEMBER_ID)).thenReturn("refresh-token");
+        when(jwtTokenProvider.getRefreshTokenValidity()).thenReturn(Duration.ofDays(14));
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        TokenResponse response = authService.signIn(" User@Example.com ", PASSWORD);
+
+        assertThat(response.accessToken()).isEqualTo("access-token");
+        verify(memberRepository).findByEmail(EMAIL);
+    }
+
+    @Test
     void 존재하지_않는_이메일이면_예외를_던진다() {
         when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
@@ -130,6 +170,34 @@ class AuthServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_TOKEN);
+    }
+
+    @Test
+    void 회원가입시_이메일을_소문자로_정규화하여_저장한다() {
+        SignUpRequest request = new SignUpRequest("User@Example.com", PASSWORD, "홍길동", "verification-token");
+        when(memberRepository.existsByEmail(EMAIL)).thenReturn(false);
+        when(passwordEncoder.encode(PASSWORD)).thenReturn("encoded-password");
+        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SignUpResponse response = authService.signUp(request);
+
+        assertThat(response.email()).isEqualTo(EMAIL);
+        verify(emailVerificationService).validateToken("verification-token", EMAIL);
+        verify(memberRepository).existsByEmail(EMAIL);
+    }
+
+    @Test
+    void 저장_시점에_유니크_제약_위반이_발생하면_중복_이메일_예외로_변환한다() {
+        SignUpRequest request = new SignUpRequest(EMAIL, PASSWORD, "홍길동", "verification-token");
+        when(memberRepository.existsByEmail(EMAIL)).thenReturn(false);
+        when(passwordEncoder.encode(PASSWORD)).thenReturn("encoded-password");
+        when(memberRepository.save(any(Member.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+        assertThatThrownBy(() -> authService.signUp(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.DUPLICATE_EMAIL);
     }
 
     @Test

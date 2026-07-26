@@ -31,6 +31,18 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @Operation(summary = "이메일 중복 확인", description = "인증코드 발송 없이 이미 가입된 이메일인지만 확인한다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "사용 가능한 이메일"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "이미 가입된 이메일")
+    })
+    @PostMapping("/email/check-duplicate")
+    public ResponseEntity<ApiResponse<Void>> checkEmailDuplicate(
+            @Valid @RequestBody EmailVerificationRequest request) {
+        authService.checkEmailDuplicate(request.email());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
     @Operation(summary = "이메일 인증코드 발송", description = "입력한 이메일로 6자리 인증코드를 발송한다. 이미 가입된 이메일이면 거절한다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "발송 성공"),
