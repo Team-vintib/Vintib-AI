@@ -70,6 +70,7 @@ const isEmailVerified = ref(false)
 const isSubmitting = ref(false)
 const emailVerificationMessage = ref('')
 const submitError = ref('')
+const duplicateEmail = ref('')
 const verificationToken = ref('')
 const verifiedEmail = ref('')
 const router = useRouter()
@@ -187,6 +188,10 @@ const handleFieldBlur = (field: SignupField) => {
 
 const handleFieldInput = (field: SignupField) => {
   submitError.value = ''
+
+  if (field === 'email') {
+    duplicateEmail.value = ''
+  }
 
   if (touched[field]) {
     validateField(field)
@@ -321,7 +326,7 @@ const applyEmailVerificationError = (code?: string, message?: string) => {
   emailVerificationMessage.value = ''
 
   if (code === 'U003') {
-    errors.email = message || '이미 가입된 이메일입니다.'
+    applyDuplicateEmailError(message)
     return
   }
 
@@ -416,10 +421,13 @@ const handleSsafySignUp = async () => {
   await router.push({ name: ROUTE_NAMES.AUTH_SSAFY_SIGNUP })
 }
 
+const handleMoveToLogin = async () => {
+  await router.push({ name: ROUTE_NAMES.AUTH_LOGIN })
+}
+
 const applySignUpError = (code?: string, message?: string) => {
   if (code === 'U003') {
-    errors.email = message || '이미 가입된 이메일입니다.'
-    resetEmailVerification()
+    applyDuplicateEmailError(message)
     return
   }
 
@@ -436,6 +444,13 @@ const applySignUpError = (code?: string, message?: string) => {
 
   submitError.value = message || '회원가입을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
 }
+
+const applyDuplicateEmailError = (message?: string) => {
+  duplicateEmail.value = form.email.trim()
+  errors.email = message || '이미 가입된 이메일입니다.'
+  submitError.value = '이미 가입된 이메일입니다. 기존 계정으로 로그인해 주세요.'
+  resetEmailVerification()
+}
 </script>
 
 <template>
@@ -447,6 +462,16 @@ const applySignUpError = (code?: string, message?: string) => {
     >
       {{ submitError }}
     </p>
+
+    <button
+      v-if="duplicateEmail"
+      class="h-11 w-full rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+      type="button"
+      :disabled="isSubmitting"
+      @click="handleMoveToLogin"
+    >
+      로그인하기
+    </button>
 
     <section class="space-y-4" aria-label="가입 정보">
       <div class="space-y-2">
