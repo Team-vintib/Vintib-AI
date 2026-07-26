@@ -1,7 +1,10 @@
 export const ROUTE_NAMES = {
   AUTH_SIGNUP: 'auth-signup',
+  AUTH_SIGNUP_EMAIL: 'auth-signup-email',
   AUTH_LOGIN: 'auth-login',
   AUTH_SSAFY: 'auth-ssafy',
+  AUTH_SSAFY_LOGIN: 'auth-ssafy-login',
+  AUTH_SSAFY_SIGNUP: 'auth-ssafy-signup',
   AUTH_SSAFY_CALLBACK: 'auth-ssafy-callback',
   AUTH_LINK_ACCOUNT: 'auth-link-account',
   ONBOARD_PROFILE: 'onboard-profile',
@@ -24,8 +27,11 @@ export const ROUTE_NAMES = {
 
 export const ROUTE_PATHS = {
   AUTH_SIGNUP: '/auth/signup',
+  AUTH_SIGNUP_EMAIL: '/auth/signup/email',
   AUTH_LOGIN: '/auth/login',
   AUTH_SSAFY: '/auth/ssafy',
+  AUTH_SSAFY_LOGIN: '/auth/ssafy/login',
+  AUTH_SSAFY_SIGNUP: '/auth/ssafy/signup',
   AUTH_SSAFY_CALLBACK: '/auth/ssafy/callback',
   AUTH_LINK_ACCOUNT: '/auth/link-account',
   ONBOARD_PROFILE: '/onboarding/basic-info',

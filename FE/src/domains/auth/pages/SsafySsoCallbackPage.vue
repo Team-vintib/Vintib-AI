@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { completeSsafySsoCallback } from '@/domains/auth/api/authApi'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type { AuthNextStep } from '@/domains/auth/types/auth.types'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
@@ -14,6 +15,7 @@ const SSO_SOURCE_LOGIN = 'login'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const isProcessing = ref(true)
 const statusTitle = ref('싸피어스 인증 처리 중')
@@ -65,10 +67,7 @@ const handleCallback = async () => {
     }
 
     if (!response.data) {
-      applyCallbackError(
-        '인증 결과를 확인하지 못했습니다.',
-        '싸피어스 인증을 다시 진행해 주세요.',
-      )
+      applyCallbackError('인증 결과를 확인하지 못했습니다.', '싸피어스 인증을 다시 진행해 주세요.')
       return
     }
 
@@ -81,7 +80,7 @@ const handleCallback = async () => {
     }
 
     if (response.data.accessToken) {
-      window.localStorage.setItem('vintib_access_token', response.data.accessToken)
+      authStore.setSession(response.data)
     }
 
     window.sessionStorage.removeItem(SSO_SOURCE_STORAGE_KEY)
@@ -124,8 +123,10 @@ const moveToNextStep = async (nextStep?: AuthNextStep, email?: string) => {
 }
 
 const retryRoute = computed(() => ({
-  name: ROUTE_NAMES.AUTH_SSAFY,
-  query: { from: ssoSource.value },
+  name:
+    ssoSource.value === SSO_SOURCE_LOGIN
+      ? ROUTE_NAMES.AUTH_SSAFY_LOGIN
+      : ROUTE_NAMES.AUTH_SSAFY_SIGNUP,
 }))
 
 const fallbackPath = computed(() =>
@@ -133,7 +134,7 @@ const fallbackPath = computed(() =>
 )
 
 const fallbackLabel = computed(() =>
-  ssoSource.value === SSO_SOURCE_LOGIN ? '로그인으로 돌아가기' : '이메일 회원가입으로 돌아가기',
+  ssoSource.value === SSO_SOURCE_LOGIN ? '로그인으로 돌아가기' : '회원가입 선택으로 돌아가기',
 )
 
 function getSsoSource() {
@@ -170,9 +171,7 @@ function getQueryValue(value: unknown) {
       </p>
 
       <div v-if="errorMessage" class="callback-actions">
-        <RouterLink class="callback-primary-link" :to="retryRoute">
-          다시 인증하기
-        </RouterLink>
+        <RouterLink class="callback-primary-link" :to="retryRoute"> 다시 인증하기 </RouterLink>
         <a class="callback-secondary-link" :href="fallbackPath">
           {{ fallbackLabel }}
         </a>
