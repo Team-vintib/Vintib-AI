@@ -104,9 +104,17 @@ const applyCallbackError = (title: string, message: string) => {
 
 const moveToNextStep = async (nextStep?: AuthNextStep, email?: string, linkToken?: string) => {
   if (nextStep === 'LINK_ACCOUNT') {
+    if (!linkToken) {
+      applyCallbackError(
+        '계정 연결 정보를 확인하지 못했습니다.',
+        '싸피어스 인증을 다시 진행해 주세요.',
+      )
+      return
+    }
+
     writeLinkAccountSession({
       email: email || '',
-      linkToken: linkToken || '',
+      linkToken,
     })
     await router.replace(ROUTE_PATHS.AUTH_LINK_ACCOUNT)
     return
