@@ -27,6 +27,26 @@ export interface SignUpResponse {
 
 export type AuthNextStep = 'HOME' | 'ONBOARD_PROFILE' | 'LINK_ACCOUNT'
 
+export interface AuthUser {
+  id: number
+  email: string
+  name?: string
+  onboardingCompleted?: boolean
+}
+
+export interface LoginRequest {
+  email: string
+  password: string
+  rememberMe: boolean
+}
+
+export interface LoginResponse {
+  accessToken?: string
+  refreshToken?: string
+  user?: AuthUser
+  nextStep?: AuthNextStep
+}
+
 export interface SsafySsoCallbackRequest {
   authorizationCode: string
   redirectUri: string
@@ -34,7 +54,9 @@ export interface SsafySsoCallbackRequest {
 
 export interface SsafySsoCallbackResponse {
   accessToken?: string
+  refreshToken?: string
   email?: string
   linked?: boolean
   nextStep?: AuthNextStep
+  user?: AuthUser
 }

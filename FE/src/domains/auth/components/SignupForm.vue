@@ -413,7 +413,7 @@ const handleSsafySignUp = async () => {
     return
   }
 
-  await router.push({ name: ROUTE_NAMES.AUTH_SSAFY, query: { from: 'signup' } })
+  await router.push({ name: ROUTE_NAMES.AUTH_SSAFY_SIGNUP })
 }
 
 const applySignUpError = (code?: string, message?: string) => {
@@ -660,7 +660,12 @@ const applySignUpError = (code?: string, message?: string) => {
 
   <footer class="mt-6 text-center text-sm text-[var(--color-text-secondary)]">
     이미 계정이 있나요?
-    <a class="font-semibold text-[var(--color-primary)]" href="/auth/login"> 로그인하기 </a>
+    <RouterLink
+      class="font-semibold text-[var(--color-primary)]"
+      :to="{ name: ROUTE_NAMES.AUTH_LOGIN }"
+    >
+      로그인하기
+    </RouterLink>
   </footer>
 </template>
 
