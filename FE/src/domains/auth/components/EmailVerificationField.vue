@@ -10,6 +10,7 @@ interface Props {
   canSendCode?: boolean
   canVerifyCode?: boolean
   isVerified?: boolean
+  disabled?: boolean
 }
 
 const {
@@ -21,6 +22,7 @@ const {
   canSendCode = false,
   canVerifyCode = false,
   isVerified = false,
+  disabled = false,
 } = defineProps<Props>()
 
 const emit = defineEmits<{
@@ -63,7 +65,7 @@ const handleVerificationCodeInput = (event: Event) => {
           autocomplete="email"
           placeholder="이메일을 입력해주세요."
           :value="email"
-          :readonly="isVerified"
+          :readonly="isVerified || disabled"
           :aria-invalid="emailError ? 'true' : 'false'"
           aria-describedby="signup-email-message"
           @input="handleEmailInput"
@@ -72,7 +74,7 @@ const handleVerificationCodeInput = (event: Event) => {
         <button
           class="h-12 shrink-0 rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)] disabled:cursor-not-allowed disabled:opacity-50"
           type="button"
-          :disabled="!canSendCode || isSendingCode || isVerifyingCode || isVerified"
+          :disabled="!canSendCode || isSendingCode || isVerifyingCode || isVerified || disabled"
           @click="emit('sendCode')"
         >
           {{ isSendingCode ? '발송 중' : '인증코드 발송' }}
@@ -109,7 +111,7 @@ const handleVerificationCodeInput = (event: Event) => {
           autocomplete="one-time-code"
           placeholder="6자리 인증코드"
           :value="verificationCode"
-          :readonly="isVerified"
+          :readonly="isVerified || disabled"
           :aria-invalid="verificationCodeError ? 'true' : 'false'"
           aria-describedby="signup-verification-code-error"
           @input="handleVerificationCodeInput"
@@ -118,7 +120,7 @@ const handleVerificationCodeInput = (event: Event) => {
         <button
           class="h-12 shrink-0 rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)] disabled:cursor-not-allowed disabled:opacity-50"
           type="button"
-          :disabled="!canVerifyCode || isSendingCode || isVerifyingCode || isVerified"
+          :disabled="!canVerifyCode || isSendingCode || isVerifyingCode || isVerified || disabled"
           @click="emit('verifyCode')"
         >
           {{ isVerifyingCode ? '확인 중' : '확인' }}

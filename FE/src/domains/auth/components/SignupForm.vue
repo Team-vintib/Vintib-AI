@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 
-import { sendEmailVerificationCode, verifyEmailCode } from '@/domains/auth/api/authApi'
+import { sendEmailVerificationCode, signUp, verifyEmailCode } from '@/domains/auth/api/authApi'
 import EmailVerificationField from '@/domains/auth/components/EmailVerificationField.vue'
 import { normalizeApiError } from '@/shared/api/http'
 import {
@@ -11,6 +11,8 @@ import {
   isSignupPassword,
   isVerificationCode,
 } from '@/shared/utils/validators'
+
+import type { SignUpResponse } from '@/domains/auth/types/auth.types'
 
 type SignupField = 'name' | 'email' | 'verificationCode' | 'password' | 'passwordConfirm'
 type AgreementField = 'serviceTerms' | 'privacyPolicy' | 'marketing'
@@ -65,9 +67,12 @@ const isSendingVerificationCode = ref(false)
 const isVerifyingEmailCode = ref(false)
 const isEmailVerificationCodeSent = ref(false)
 const isEmailVerified = ref(false)
+const isSubmitting = ref(false)
 const emailVerificationMessage = ref('')
+const submitError = ref('')
 const verificationToken = ref('')
 const verifiedEmail = ref('')
+const signUpResult = ref<SignUpResponse | null>(null)
 
 const agreementItems: {
   key: AgreementField
@@ -195,6 +200,8 @@ const handleFieldBlur = (field: SignupField) => {
 }
 
 const handleFieldInput = (field: SignupField) => {
+  submitError.value = ''
+
   if (touched[field]) {
     validateField(field)
   }
@@ -215,6 +222,7 @@ const togglePasswordVisibility = () => {
 const handleAllAgreementChange = (event: Event) => {
   const isChecked = (event.target as HTMLInputElement).checked
 
+  submitError.value = ''
   agreements.serviceTerms = isChecked
   agreements.privacyPolicy = isChecked
   agreements.marketing = isChecked
@@ -222,6 +230,7 @@ const handleAllAgreementChange = (event: Event) => {
 }
 
 const handleAgreementChange = (key: AgreementField, event: Event) => {
+  submitError.value = ''
   agreements[key] = (event.target as HTMLInputElement).checked
   isAgreementTouched.value = true
 }
@@ -356,21 +365,90 @@ const markAllTouched = () => {
 const validateForm = () => {
   markAllTouched()
 
-  return (
+  const isValid =
     (Object.keys(errors) as SignupField[]).map((field) => validateField(field)).every(Boolean) &&
     isRequiredAgreementChecked.value
-  )
+
+  if (
+    !isEmailVerified.value ||
+    verifiedEmail.value !== form.email.trim() ||
+    !verificationToken.value
+  ) {
+    errors.verificationCode = '이메일 인증을 완료해 주세요.'
+    return false
+  }
+
+  return isValid
 }
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
+  if (isSubmitting.value) {
+    return
+  }
+
+  submitError.value = ''
+
   if (!validateForm()) {
     return
   }
+
+  isSubmitting.value = true
+
+  try {
+    const response = await signUp({
+      name: form.name.trim(),
+      email: form.email.trim(),
+      password: form.password,
+      verificationToken: verificationToken.value,
+    })
+
+    if (!response.success) {
+      applySignUpError(response.error?.code, response.error?.message)
+      return
+    }
+
+    signUpResult.value = response.data ?? null
+  } catch (error: unknown) {
+    const apiError = normalizeApiError(error)
+
+    applySignUpError(apiError.code, apiError.message)
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+const applySignUpError = (code?: string, message?: string) => {
+  if (code === 'U003') {
+    errors.email = message || '이미 가입된 이메일입니다.'
+    resetEmailVerification()
+    return
+  }
+
+  if (code === 'U006') {
+    errors.verificationCode = message || '이메일 인증이 필요합니다.'
+    resetEmailVerification()
+    return
+  }
+
+  if (code === 'C001') {
+    submitError.value = message || '입력값을 다시 확인해 주세요.'
+    return
+  }
+
+  submitError.value = message || '회원가입을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
 }
 </script>
 
 <template>
   <form class="space-y-6" novalidate @submit.prevent="handleSubmit">
+    <p
+      v-if="submitError"
+      class="rounded-[var(--radius-control)] bg-[var(--color-error-soft)] px-4 py-3 text-sm font-medium text-[var(--color-error)]"
+      role="alert"
+    >
+      {{ submitError }}
+    </p>
+
     <section class="space-y-4" aria-label="가입 정보">
       <div class="space-y-2">
         <label
@@ -414,6 +492,7 @@ const handleSubmit = () => {
         :can-send-code="canRequestVerificationCode"
         :can-verify-code="canConfirmVerificationCode"
         :is-verified="isEmailVerified"
+        :disabled="isSubmitting"
         @update:email="handleFieldInput('email')"
         @update:verification-code="handleVerificationCodeUpdate"
         @email-blur="handleFieldBlur('email')"
@@ -557,13 +636,14 @@ const handleSubmit = () => {
       <button
         class="h-[var(--button-height-major)] w-full rounded-[var(--radius-control)] px-5 text-[15px] font-semibold transition focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
         :class="
-          isFormValid
+          isFormValid && !isSubmitting
             ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)] hover:bg-[var(--color-primary-hover)]'
             : 'bg-[var(--color-surface-secondary)] text-[var(--color-text-muted)]'
         "
         type="submit"
+        :disabled="isSubmitting"
       >
-        가입하기
+        {{ isSubmitting ? '가입 중' : '가입하기' }}
       </button>
 
       <button
