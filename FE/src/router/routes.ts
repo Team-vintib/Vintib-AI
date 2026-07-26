@@ -23,4 +23,9 @@ export const routes: RouteRecordRaw[] = [
     name: ROUTE_NAMES.ONBOARD_TRYON,
     component: () => import('@/domains/onboard/pages/OnboardingTryOnView.vue'),
   },
+  {
+    path: ROUTE_PATHS.ONBOARD_MEMBER_TYPE,
+    name: ROUTE_NAMES.ONBOARD_MEMBER_TYPE,
+    component: () => import('@/domains/onboard/pages/OnboardingMemberTypeView.vue'),
+  },
 ]

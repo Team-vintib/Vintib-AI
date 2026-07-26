@@ -13,8 +13,8 @@
 | AUTH-004    | 기존 계정 연결            | 비회원/회원 후보 | `/auth/link-account`      | 1             | 미구현                                                   |
 | ONBOARD-001 | 기본 정보 입력            | 회원             | `/onboarding/basic-info`  | 2             | FE 완료, BE API 대기                                     |
 | ONBOARD-002 | 관심 브랜드/카테고리 설정 | 회원             | `/onboarding/interests`   | 2             | FE 완료, BE API 대기                                     |
-| ONBOARD-003 | 전신 사진/신체 정보 등록  | 회원             | `/onboarding/try-on`      | 2             | 사진 선택·촬영·미리보기·삭제 완료, 입력·저장 대기        |
-| ONBOARD-004 | 일반/사업자 회원 선택     | 회원             | `/onboarding/member-type` | 2             | 미구현                                                   |
+| ONBOARD-003 | 전신 사진/신체 정보 등록  | 회원             | `/onboarding/try-on`      | 2             | FE 완료, 저장 BE API 대기                                |
+| ONBOARD-004 | 일반/사업자 회원 선택     | 회원             | `/onboarding/member-type` | 2             | 이동 확인용 임시 화면, 본 기능 미구현                    |
 | BIZ-001     | 사업자 정보 제출          | 사업자 회원      | `/business/verification`  | 2             | 미구현                                                   |
 
 ## 이후 화면 묶음
