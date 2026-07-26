@@ -12,7 +12,7 @@ export const routes: RouteRecordRaw[] = [
   {
     path: ROUTE_PATHS.AUTH_SIGNUP,
     name: ROUTE_NAMES.AUTH_SIGNUP,
-    component: () => import('@/domains/auth/pages/SignupPage.vue'),
+    component: () => import('@/domains/auth/pages/SignupEntryPage.vue'),
     meta: { guestOnly: true },
   },
   {
