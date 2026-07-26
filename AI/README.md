@@ -9,8 +9,10 @@
 - AI 가상 시착 (TRYON) — 등록 상품 이미지를 사용자 전신 사진에 합성
 - 상품 설명 초안 생성 (PROD-07) — 상품 이미지 분석 기반, 확인 불가한 정보는 추정하지 않음
 - 라이브 발언 기반 상품 정보 추출/정정 (LPROD-02~04)
+- 라이브 댓글 관리 (CHAT-001) — 욕설·도배 판정. AI는 판정만 하고 차단 집행은 BE가 한다
 - 반복 질문 자동 답변 (CHAT-02, CHAT-03) — 근거 있는 경우에만 응답
 - 라이브 자막용 STT 연동 (LIVE-06)
+- 개인화 상품 추천 / 브랜드 유사도 그래프 (REC)
 
 ## 기술 스택
 
@@ -39,6 +41,7 @@ AI/
 │   ├── main.py           #   FastAPI 앱 진입점 + 도메인 router 등록 (+ /health)
 │   ├── core/             #   앱 공통(설정 등, cross-cutting) — config.py
 │   ├── shared/           #   도메인 공용 유틸(모델 레지스트리·임베딩 로더 등)
+│   ├── chat/             #   라이브 댓글 관리 도메인(자체완결): router/service/schemas + pipeline/
 │   └── recommend/        #   추천 도메인(자체완결): router.py / service.py / schemas.py / pipeline/
 ├── requirements.txt
 ├── requirements-dev.txt
@@ -66,6 +69,24 @@ AI/
 4. `uvicorn app.main:app` 실행 후 `/recommend/graph?entity=brand` 확인.
 
 `--entity seller`로 같은 파이프라인을 상점 유사도에도 재사용할 수 있다(그룹 키만 상점 id로).
+
+## 라이브 댓글 관리 정확도 평가 (오프라인)
+
+댓글 판정 API(`/chat/moderate`)와 반복질문 근거 경로의 **정확도**를 측정한다(S15P11A108-196).
+무거운 의존성이 없어 `requirements-dev.txt`만으로 돌아간다.
+
+```bash
+python -m app.chat.pipeline.evaluate              # 전체 + artifacts/eval_report.md 기록
+python -m app.chat.pipeline.evaluate --sets A     # 호환셋(210건)만
+python -m app.chat.pipeline.evaluate --no-report  # 콘솔만
+```
+
+- Set A는 `test/model_selection/classifier_benchmark.ipynb`와 **같은 210건**이라 그 노트북에
+  기록된 모델 수치와 직접 대조할 수 있다. Set B는 오탐 발굴용 수제 세트, Set C는 반복질문셋.
+- 리포트(`app/chat/artifacts/`)는 생성물이라 gitignore 대상이다. 측정 결과와 오탐/미탐 정리는
+  `.claude/plans/ai/004-live-comment-moderation-evaluation.md`에 기록해 둔다.
+- 회귀는 `app/chat/tests/test_chat_evaluation.py`가 CI에서 잡는다(실측 하한 + 알려진 오탐/미탐
+  집합 고정).
 
 모델 선정(비교·평가) 단계의 실험 코드는 `test/`에 별도로 둔다.
 프로덕션 기능 모듈 구조에는 포함되지 않으며, 노트북 특성상 `ruff check .`에서 제외된다.
