@@ -63,6 +63,7 @@
 ### 8단계: 문서 및 검증 정리
 
 - AUTH-001 요구사항/API/구현 상태 문서 갱신
+- `npm run lint`
 - `npm run type-check`
 - `npm run build-only`
 
@@ -75,4 +76,15 @@
 - [x] 5단계 이메일 인증 API 연동
 - [x] 6단계 회원가입 API 연동
 - [x] 7단계 온보딩 이동 처리
-- [ ] 8단계 문서 및 검증 정리
+- [x] 8단계 문서 및 검증 정리
+
+## 최종 검증
+
+- `npm run lint`
+- `npm run type-check`
+- `npm run build-only`
+
+## 확인된 제약
+
+- 로컬 Docker 환경에서 이메일 인증코드 발송 시 BE 컨테이너에 `MAIL_*` 환경변수가 주입되지 않으면 500이 발생한다.
+- 해당 이슈는 FE 요청 경로/입력값 문제가 아니라 BE/Infra 환경 설정 이슈이며, 환경변수 주입 후 이메일 발송 E2E 재검증이 필요하다.

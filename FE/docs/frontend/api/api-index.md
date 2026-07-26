@@ -1,27 +1,80 @@
-# API 후보 목록
+# API 목록
 
-Swagger 제공 전까지 사용하는 임시 후보입니다. 실제 구현 시 Swagger 계약을 1순위로 갱신해야 합니다.
+Swagger 제공 전까지는 임시 후보를 사용합니다. 실제 구현 시 Swagger/BE 계약을 1순위로 갱신해야 합니다.
 
 ## 인증
 
-| 기능 | Method | 후보 endpoint | 요청 | 응답 |
-| --- | --- | --- | --- | --- |
-| 이메일 회원가입 | POST | `/api/auth/signup` | `name`, `email`, `password`, `agreements` | `user`, `nextStep` |
-| 이메일 로그인 | POST | `/api/auth/login` | `email`, `password`, `rememberMe` | `accessToken`, `refreshToken`, `user` |
-| 토큰 갱신 | POST | `/api/auth/refresh` | `refreshToken` | `accessToken` |
-| 로그아웃 | POST | `/api/auth/logout` | 없음 또는 `refreshToken` | 성공 여부 |
-| 싸피어스 callback | POST | `/api/auth/ssafy/callback` | `authorizationCode`, `redirectUri` | `linked`, `nextStep`, `user` |
+| 기능                 | Method | endpoint                      | 요청                                             | 응답                                         | 상태          |
+| -------------------- | ------ | ----------------------------- | ------------------------------------------------ | -------------------------------------------- | ------------- |
+| 이메일 인증코드 발송 | POST   | `/api/auth/email/send-code`   | `email`                                          | `null`                                       | AUTH-001 연동 |
+| 이메일 인증코드 확인 | POST   | `/api/auth/email/verify-code` | `email`, `code`                                  | `verificationToken`                          | AUTH-001 연동 |
+| 이메일 회원가입      | POST   | `/api/auth/signup`            | `name`, `email`, `password`, `verificationToken` | `id`, `email`, `name`, `onboardingCompleted` | AUTH-001 연동 |
+| 이메일 로그인        | POST   | `/api/auth/login`             | `email`, `password`, `rememberMe`                | `accessToken`, `refreshToken`, `user`        | 후보          |
+| 토큰 갱신            | POST   | `/api/auth/refresh`           | `refreshToken`                                   | `accessToken`                                | 후보          |
+| 로그아웃             | POST   | `/api/auth/logout`            | 없음 또는 `refreshToken`                         | 성공 여부                                    | 후보          |
+| 싸피어스 callback    | POST   | `/api/auth/ssafy/callback`    | `authorizationCode`, `redirectUri`               | `linked`, `nextStep`, `user`                 | 후보          |
+
+### 이메일 회원가입
+
+AUTH-001에서 실제 연동한 계약입니다. 공통 응답은 `ApiResponse<T>` envelope를 사용합니다.
+
+```http
+POST /api/auth/email/send-code
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+```http
+POST /api/auth/email/verify-code
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
+```
+
+성공 응답의 `data.verificationToken`을 회원가입 요청에 사용합니다.
+
+```http
+POST /api/auth/signup
+Content-Type: application/json
+```
+
+```json
+{
+  "name": "홍길동",
+  "email": "user@example.com",
+  "password": "password123",
+  "verificationToken": "verified-token"
+}
+```
+
+- `U003`: 중복 이메일
+- `U005`: 인증코드 불일치 또는 만료
+- `U006`: 이메일 인증 필요
+- `U007`: 인증 시도 횟수 초과
+- `U008`: 인증코드 요청 횟수 초과
+- `C001`: 입력값 검증 실패
+- 로컬 Docker 환경에서 이메일 발송 500이 발생하면 BE 컨테이너에 `MAIL_*` 환경변수가 주입되는지 확인해야 합니다.
 
 ## 온보딩/내 정보
 
-| 기능 | Method | endpoint | 상태 |
-| --- | --- | --- | --- |
-| 내 정보 조회 | GET | `/api/me` | 후보 |
-| 기본 정보 저장 | PATCH | `/api/me/onboarding` | S15P11A108-241 FE 선행 계약 |
-| 관심 정보 저장·건너뛰기 | PUT | `/api/me/interests` | S15P11A108-250 FE 선행 계약 |
-| 내 정보 수정 | PATCH | `/api/me` | 후보 |
-| 주소 조회/저장 | GET/POST | `/api/addresses` | 후보 |
-| 사업자 인증 제출/조회 | POST/GET | `/api/business-verifications` | 후보 |
+| 기능                    | Method   | endpoint                      | 상태                        |
+| ----------------------- | -------- | ----------------------------- | --------------------------- |
+| 내 정보 조회            | GET      | `/api/me`                     | 후보                        |
+| 기본 정보 저장          | PATCH    | `/api/me/onboarding`          | S15P11A108-241 FE 선행 계약 |
+| 관심 정보 저장·건너뛰기 | PUT      | `/api/me/interests`           | S15P11A108-250 FE 선행 계약 |
+| 내 정보 수정            | PATCH    | `/api/me`                     | 후보                        |
+| 주소 조회/저장          | GET/POST | `/api/addresses`              | 후보                        |
+| 사업자 인증 제출/조회   | POST/GET | `/api/business-verifications` | 후보                        |
 
 ### 기본 정보 저장
 
@@ -110,21 +163,27 @@ Content-Type: application/json
 
 ## 이후 화면 후보
 
-| 영역 | 후보 endpoint |
-| --- | --- |
-| 상품 | `/api/products`, `/api/products/{id}` |
-| 찜 | `/api/products/{id}/wish` |
-| 라이브 | `/api/lives`, `/api/lives/{id}` |
-| 경매 | `/api/auctions`, `/api/auctions/{id}` |
-| 주문 | `/api/orders`, `/api/orders/{id}` |
-| 배송 | `/api/shipments` |
-| 환불 | `/api/refunds` |
+| 영역   | 후보 endpoint                                                        |
+| ------ | -------------------------------------------------------------------- |
+| 상품   | `/api/products`, `/api/products/{id}`                                |
+| 찜     | `/api/products/{id}/wish`                                            |
+| 라이브 | `/api/lives`, `/api/lives/{id}`                                      |
+| 경매   | `/api/auctions`, `/api/auctions/{id}`                                |
+| 주문   | `/api/orders`, `/api/orders/{id}`                                    |
+| 배송   | `/api/shipments`                                                     |
+| 환불   | `/api/refunds`                                                       |
 | 포인트 | `/api/points`, `/api/points/transactions`, `/api/points/withdrawals` |
-| 알림 | `/api/notifications` |
-| 팔로우 | `/api/users/{id}/follow` |
+| 알림   | `/api/notifications`                                                 |
+| 팔로우 | `/api/users/{id}/follow`                                             |
 
 ## 공통 오류 코드
 
+- `C001`
+- `U003`
+- `U005`
+- `U006`
+- `U007`
+- `U008`
 - `AUTH_REQUIRED`
 - `PERMISSION_DENIED`
 - `VALIDATION_ERROR`
