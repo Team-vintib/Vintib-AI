@@ -112,15 +112,15 @@
 
 ### 3단계: 계정 연결 API 호출 및 결과 처리
 
-- [ ] 연결 버튼 submit handler 구현
-- [ ] 중복 제출 방지 구현
-- [ ] 동의 여부와 `linkToken` 검증 구현
-- [ ] `linkSsafyAccount` API 호출 구현
-- [ ] 성공 시 auth store 세션 저장
-- [ ] 성공 후 link account sessionStorage 제거
-- [ ] `nextStep` 기준 라우팅 구현
-- [ ] API 실패 오류 처리 구현
-- [ ] `npm run type-check` 실행
+- [x] 연결 버튼 submit handler 구현
+- [x] 중복 제출 방지 구현
+- [x] 동의 여부와 `linkToken` 검증 구현
+- [x] `linkSsafyAccount` API 호출 구현
+- [x] 성공 시 auth store 세션 저장
+- [x] 성공 후 link account sessionStorage 제거
+- [x] `nextStep` 기준 라우팅 구현
+- [x] API 실패 오류 처리 구현
+- [x] `npm run type-check` 실행
 
 ### 4단계: 이메일 회원가입 중복 이메일 로그인 유도
 

@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 
 import type {
   AuthUser,
+  LinkAccountResponse,
   LoginResponse,
   SsafySsoCallbackResponse,
 } from '@/domains/auth/types/auth.types'
@@ -12,7 +13,7 @@ import {
   writeStoredAuthSession,
 } from '@/shared/api/authTokenStorage'
 
-type AuthSession = LoginResponse | SsafySsoCallbackResponse
+type AuthSession = LoginResponse | SsafySsoCallbackResponse | LinkAccountResponse
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref('')

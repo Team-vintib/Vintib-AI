@@ -3,24 +3,30 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import logoImage from '@/assets/images/logo.png'
+import { linkSsafyAccount } from '@/domains/auth/api/authApi'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import {
   clearLinkAccountSession,
   readLinkAccountSession,
 } from '@/domains/auth/utils/linkAccountSession'
-import type { LinkAccountSessionPayload } from '@/domains/auth/types/auth.types'
-import { ROUTE_NAMES } from '@/shared/constants/routes'
+import type { AuthNextStep, LinkAccountSessionPayload } from '@/domains/auth/types/auth.types'
+import { normalizeApiError } from '@/shared/api/http'
+import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 const accountInfo = ref<LinkAccountSessionPayload | null>(null)
 const isAgreementChecked = ref(false)
+const isSubmitting = ref(false)
 const consentError = ref('')
 const pageError = ref('')
+const submitError = ref('')
 
 const displayEmail = computed(() => accountInfo.value?.email || '가입된 이메일 계정')
 const canContinue = computed(() =>
-  Boolean(accountInfo.value?.linkToken && isAgreementChecked.value),
+  Boolean(accountInfo.value?.linkToken && isAgreementChecked.value && !isSubmitting.value),
 )
 const hasValidAccountInfo = computed(() => Boolean(accountInfo.value?.linkToken))
 
@@ -54,12 +60,91 @@ const handleMoveToSignup = async () => {
 const handleAgreementChange = (event: Event) => {
   isAgreementChecked.value = (event.target as HTMLInputElement).checked
   consentError.value = ''
+  submitError.value = ''
 }
 
-const handleContinue = () => {
+const handleContinue = async () => {
+  if (isSubmitting.value) {
+    return
+  }
+
+  submitError.value = ''
+
   if (!isAgreementChecked.value) {
     consentError.value = '계정 연결에 동의해 주세요.'
+    return
   }
+
+  if (!accountInfo.value?.linkToken) {
+    clearLinkAccountSession()
+    pageError.value = '계정 연결 정보가 없거나 인증 시간이 만료되었습니다.'
+    return
+  }
+
+  isSubmitting.value = true
+
+  try {
+    const response = await linkSsafyAccount({
+      linkToken: accountInfo.value.linkToken,
+      agree: true,
+    })
+
+    if (!response.success) {
+      applyLinkAccountError(response.error?.code, response.error?.message)
+      return
+    }
+
+    if (!response.data?.accessToken) {
+      submitError.value = '계정 연결 결과를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+      return
+    }
+
+    authStore.setSession(response.data)
+    clearLinkAccountSession()
+    await moveAfterLink(response.data.nextStep, response.data.user?.onboardingCompleted)
+  } catch (error: unknown) {
+    const apiError = normalizeApiError(error)
+
+    applyLinkAccountError(apiError.code, apiError.message)
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+const applyLinkAccountError = (code?: string, message?: string) => {
+  if (code === 'U005' || code === 'U007' || code === 'AUTH_LINK_EXPIRED') {
+    submitError.value = message || '계정 연결 인증 시간이 만료되었습니다. 다시 인증해 주세요.'
+    clearLinkAccountSession()
+    accountInfo.value = null
+    pageError.value = submitError.value
+    return
+  }
+
+  if (code === 'C001') {
+    submitError.value = message || '계정 연결 정보를 다시 확인해 주세요.'
+    return
+  }
+
+  if (code === 'NETWORK_ERROR' || code === 'REQUEST_TIMEOUT') {
+    submitError.value = message || '네트워크 연결을 확인한 뒤 다시 시도해 주세요.'
+    return
+  }
+
+  submitError.value = message || '계정 연결을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+}
+
+const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: boolean) => {
+  if (nextStep === 'HOME') {
+    await router.replace(ROUTE_PATHS.HOME)
+    return
+  }
+
+  if (nextStep === 'ONBOARD_PROFILE' || onboardingCompleted === false) {
+    await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
+    return
+  }
+
+  await router.replace(ROUTE_PATHS.HOME)
 }
 </script>
 
@@ -100,6 +185,7 @@ const handleContinue = () => {
               class="link-consent__checkbox"
               type="checkbox"
               :checked="isAgreementChecked"
+              :disabled="isSubmitting"
               aria-describedby="link-account-agreement-message"
               @change="handleAgreementChange"
             />
@@ -115,6 +201,10 @@ const handleContinue = () => {
           </p>
         </section>
 
+        <p v-if="submitError" class="link-submit-error" role="alert">
+          {{ submitError }}
+        </p>
+
         <section class="link-actions" aria-label="계정 연결 실행">
           <button
             class="link-primary"
@@ -122,15 +212,30 @@ const handleContinue = () => {
             :disabled="!canContinue"
             @click="handleContinue"
           >
-            연결하고 계속하기
+            {{ isSubmitting ? '연결 중' : '연결하고 계속하기' }}
           </button>
-          <button class="link-secondary" type="button" @click="handleMoveToLogin">
+          <button
+            class="link-secondary"
+            type="button"
+            :disabled="isSubmitting"
+            @click="handleMoveToLogin"
+          >
             로그인으로 이동
           </button>
-          <button class="link-text-button" type="button" @click="handleRetrySso">
+          <button
+            class="link-text-button"
+            type="button"
+            :disabled="isSubmitting"
+            @click="handleRetrySso"
+          >
             다시 인증하기
           </button>
-          <button class="link-text-button" type="button" @click="handleMoveToSignup">
+          <button
+            class="link-text-button"
+            type="button"
+            :disabled="isSubmitting"
+            @click="handleMoveToSignup"
+          >
             회원가입 선택으로 돌아가기
           </button>
         </section>
@@ -267,6 +372,7 @@ const handleContinue = () => {
 }
 
 .link-consent__error,
+.link-submit-error,
 .link-error {
   margin-top: var(--space-3);
   padding: var(--space-3) var(--space-4);
@@ -324,6 +430,12 @@ const handleContinue = () => {
 
 .link-secondary:hover {
   background: var(--color-surface-secondary);
+}
+
+.link-secondary:disabled,
+.link-text-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .link-text-button {
