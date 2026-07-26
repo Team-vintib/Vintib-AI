@@ -29,6 +29,8 @@ public class SecurityConfig {
             "/api/auth/reissue",
             "/api/auth/email/**",
             "/api/health",
+            // 홈 콘텐츠 조회는 비회원도 가능(HOME-001). 정확 경로만 열어 /api/home/following(HOME-002)은 인증 필요로 남긴다.
+            "/api/home",
             "/actuator/**",
             "/swagger-ui/**",
             "/v3/api-docs/**"

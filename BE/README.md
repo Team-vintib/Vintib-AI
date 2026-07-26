@@ -177,6 +177,10 @@ BE/
 │   ├── member/                  # 회원 엔티티/레포지토리 (USER) — 서윤
 │   │   ├── entity/
 │   │   └── repository/
+│   ├── home/                    # 홈/팔로잉 콘텐츠 조회 (HOME) — 정윤
+│   │   ├── controller/
+│   │   ├── service/
+│   │   └── dto/response/        # 카드 DTO는 현재 Mock 응답용 (2주차 실데이터 연결)
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
 │       ├── client/              # AiClient — Spring → FastAPI
 │       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig
@@ -206,7 +210,7 @@ BE/
 - Access Token: 15분, Refresh Token: 14일(둘 다 서명 검증 + Refresh는 Redis 저장값과 대조)
 - 토큰 재발급: `POST /api/auth/reissue` (바디에 refreshToken)
 - 로그아웃: `POST /api/auth/logout` — Redis에 저장된 Refresh Token만 삭제(Access Token은 자연 만료까지 유효)
-- `/api/auth/signup`, `/api/auth/signin`, `/api/auth/reissue`, `/api/auth/email/**`, `/api/health`, `/actuator/**`, swagger 경로는 인증 없이 접근 가능. 그 외 모든 API는 인증 필요.
+- `/api/auth/signup`, `/api/auth/signin`, `/api/auth/reissue`, `/api/auth/email/**`, `/api/health`, `/api/home`, `/actuator/**`, swagger 경로는 인증 없이 접근 가능. 그 외 모든 API는 인증 필요. (`/api/home/following`은 정확 일치가 아니라 인증 필요)
 
 ## 공통 응답 규격
 
