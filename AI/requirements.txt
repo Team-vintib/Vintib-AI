@@ -6,3 +6,6 @@ redis==5.0.8
 python-multipart==0.0.12
 aiofiles==24.1.0
 numpy==1.26.4
+# 품질 검수 Attention Map 오버레이 생성 + 목업 베이스 이미지 합성(app/quality/).
+# matplotlib은 서빙 경로에 넣지 않는다 — 히트맵은 Pillow만으로 그린다.
+Pillow==11.3.0
