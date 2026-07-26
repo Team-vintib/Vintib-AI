@@ -59,10 +59,12 @@ SSAFY SSO 진입 화면은 query 분기 재사용 대신 별도 페이지로 분
 
 기존 `/auth/ssafy`는 직접 사용하지 않는 방향으로 전환한다.
 
-- 단기 호환:
+- 호환 정책:
   - `/auth/ssafy?from=login`은 `/auth/ssafy/login`으로 redirect한다.
   - `/auth/ssafy?from=signup` 또는 query 없음은 `/auth/ssafy/signup`으로 redirect한다.
 - 문서와 화면 링크는 새 라우트를 사용한다.
+- 기존 외부 링크와 과거 FE 내부 링크 대응을 위해 legacy route와 `SsafySsoPage.vue` redirect wrapper는 유지한다.
+- legacy route 제거는 외부 링크 사용 여부를 확인한 뒤 별도 작업으로 판단한다.
 
 ## 커밋 단위 구현 단계
 
@@ -198,7 +200,6 @@ SSAFY SSO 진입 화면은 query 분기 재사용 대신 별도 페이지로 분
 
 ## 미확정 사항
 
-- `/auth/ssafy` legacy route를 언제 제거할지
 - SSAFY 가입 완료 후 별도 성공 안내 화면을 둘지, callback 처리 화면에서 바로 이동할지
 - SSO 시작 API가 로그인/가입 intent를 서버에 별도로 전달해야 하는지 여부
 

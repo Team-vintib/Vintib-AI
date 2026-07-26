@@ -57,19 +57,16 @@ export const routes: RouteRecordRaw[] = [
     path: ROUTE_PATHS.ONBOARD_PROFILE,
     name: ROUTE_NAMES.ONBOARD_PROFILE,
     component: () => import('@/domains/onboard/pages/OnboardingBasicInfoView.vue'),
-    meta: { requiresAuth: true },
   },
   {
     path: ROUTE_PATHS.ONBOARD_INTERESTS,
     name: ROUTE_NAMES.ONBOARD_INTERESTS,
     component: () => import('@/domains/onboard/pages/OnboardingInterestsView.vue'),
-    meta: { requiresAuth: true },
   },
   {
     path: ROUTE_PATHS.ONBOARD_TRYON,
     name: ROUTE_NAMES.ONBOARD_TRYON,
     component: () => import('@/domains/onboard/pages/OnboardingTryOnView.vue'),
-    meta: { requiresAuth: true },
   },
   {
     path: ROUTE_PATHS.ONBOARD_MEMBER_TYPE,
