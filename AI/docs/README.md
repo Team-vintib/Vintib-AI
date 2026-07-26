@@ -11,6 +11,7 @@ AI 파트의 참조 문서 모음. 실행 방법·디렉터리 구조는 `../REA
 | 게이트웨이·워커·큐가 **어떻게 엮여 있는지** 알고 싶다 | [`infra-architecture.md`](./infra-architecture.md) — 전체 구조, 컴포넌트별 상세, 보안 설계, Job/Result 스키마 |
 | 가상 시착의 **다음 개선 방향**을 알고 싶다 | [`tryon-advancement-strategy.md`](./tryon-advancement-strategy.md) — 현재 한계, 적용 가능 기법, 로드맵 (`S15P11A108-195`) |
 | 라이브 댓글 관리의 **다음 개선 방향**을 알고 싶다 | [`chat-advancement-strategy.md`](./chat-advancement-strategy.md) — 실측 기반 한계점, 기법 우선순위, 스프린트 계획 (`S15P11A108-197`) |
+| 브랜드 유사도 그래프의 **다음 개선 방향**을 알고 싶다 | [`recommendation-advancement-strategy.md`](./recommendation-advancement-strategy.md) — 크롤링 텍스트 임베딩, 다면 유사도, FE 그래프 전달 설계 (`S15P11A108-199`) |
 
 > ⚠️ `infra-architecture.md`의 "7. 저장소 디렉토리 구조" 절은 `app/` 패키지 재구성 이전 상태로
 > 남아 있다. 현재 구조는 `../README.md`의 디렉터리 구조 절을 본다.

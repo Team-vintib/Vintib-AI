@@ -116,6 +116,7 @@ from my_module import Something  # noqa: E402 — importorskip 이후 import
 | `docs/infra-architecture.md` | 게이트웨이(`app/gateway/`)·워커·Redis 큐가 엮인 구조를 알아야 할 때. Job/Result 스키마 포함 |
 | `docs/tryon-advancement-strategy.md` | 가상 시착 개선 작업을 할 때 |
 | `docs/chat-advancement-strategy.md` | 라이브 댓글 관리(`app/chat/`) 개선 작업을 할 때. 실측 기반 한계점과 기법 우선순위가 있다 |
+| `docs/recommendation-advancement-strategy.md` | 브랜드 유사도 그래프(`app/recommend/`) 개선 작업을 할 때. 크롤링 텍스트 임베딩·다면 유사도·FE 전달 설계가 있다 |
 
 구현 전 설계 계획은 여기가 아니라 루트 `.claude/plans/ai/`에 있다. 소스 파일 docstring의
 `설계: .claude/plans/ai/00N-*.md` 줄이 해당 모듈의 설계 근거를 가리킨다 — 모듈을 고치기 전에
