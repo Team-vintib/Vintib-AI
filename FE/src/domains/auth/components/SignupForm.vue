@@ -653,7 +653,7 @@ const applySignUpError = (code?: string, message?: string) => {
         :disabled="isSubmitting"
         @click="handleSsafySignUp"
       >
-        싸피어스로 가입하기
+        싸피어스로 가입하기[
       </button>
     </section>
   </form>
