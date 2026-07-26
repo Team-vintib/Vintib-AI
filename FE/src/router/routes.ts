@@ -33,15 +33,13 @@ export const routes: RouteRecordRaw[] = [
   {
     path: ROUTE_PATHS.AUTH_SSAFY_LOGIN,
     name: ROUTE_NAMES.AUTH_SSAFY_LOGIN,
-    component: () => import('@/domains/auth/pages/SsafySsoPage.vue'),
-    props: { source: 'login' },
+    component: () => import('@/domains/auth/pages/SsafyLoginPage.vue'),
     meta: { guestOnly: true },
   },
   {
     path: ROUTE_PATHS.AUTH_SSAFY_SIGNUP,
     name: ROUTE_NAMES.AUTH_SSAFY_SIGNUP,
-    component: () => import('@/domains/auth/pages/SsafySsoPage.vue'),
-    props: { source: 'signup' },
+    component: () => import('@/domains/auth/pages/SsafySignupPage.vue'),
     meta: { guestOnly: true },
   },
   {
