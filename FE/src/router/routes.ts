@@ -25,7 +25,6 @@ export const routes: RouteRecordRaw[] = [
     path: ROUTE_PATHS.AUTH_SSAFY_CALLBACK,
     name: ROUTE_NAMES.AUTH_SSAFY_CALLBACK,
     component: () => import('@/domains/auth/pages/SsafySsoCallbackPage.vue'),
-    meta: { guestOnly: true },
   },
   {
     path: ROUTE_PATHS.AUTH_LINK_ACCOUNT,
