@@ -5,9 +5,12 @@ import BaseButton from '@/domains/onboard/components/BaseButton.vue'
 
 interface Props {
   modelValue: File | null
+  disabled?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  disabled: false,
+})
 
 const emit = defineEmits<{
   'update:modelValue': [file: File | null]
@@ -40,16 +43,28 @@ const resetFileInputs = () => {
 }
 
 const openFilePicker = () => {
+  if (props.disabled) {
+    return
+  }
+
   fileError.value = ''
   fileInputElement.value?.click()
 }
 
 const openCameraPicker = () => {
+  if (props.disabled) {
+    return
+  }
+
   fileError.value = ''
   captureInputElement.value?.click()
 }
 
 const handleFileChange = (event: Event) => {
+  if (props.disabled) {
+    return
+  }
+
   const inputElement = event.currentTarget as HTMLInputElement
   const selectedFile = inputElement.files?.[0]
 
@@ -69,6 +84,10 @@ const handleFileChange = (event: Event) => {
 }
 
 const handleDelete = () => {
+  if (props.disabled) {
+    return
+  }
+
   fileError.value = ''
   resetFileInputs()
   emit('update:modelValue', null)
@@ -98,6 +117,7 @@ onBeforeUnmount(() => {
       class="full-body-photo-uploader__input"
       type="file"
       accept="image/*"
+      :disabled="disabled"
       aria-label="전신 사진 파일 선택"
       @change="handleFileChange"
     />
@@ -108,6 +128,7 @@ onBeforeUnmount(() => {
       type="file"
       accept="image/*"
       capture="environment"
+      :disabled="disabled"
       aria-label="전신 사진 촬영"
       @change="handleFileChange"
     />
@@ -124,7 +145,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="photo-preview__actions">
-          <BaseButton variant="secondary" @click="openFilePicker">
+          <BaseButton variant="secondary" :disabled="disabled" @click="openFilePicker">
             <svg
               class="full-body-photo-uploader__button-icon"
               viewBox="0 0 24 24"
@@ -137,7 +158,12 @@ onBeforeUnmount(() => {
             사진 변경
           </BaseButton>
 
-          <BaseButton class="photo-preview__delete" variant="secondary" @click="handleDelete">
+          <BaseButton
+            class="photo-preview__delete"
+            variant="secondary"
+            :disabled="disabled"
+            @click="handleDelete"
+          >
             <svg
               class="full-body-photo-uploader__button-icon"
               viewBox="0 0 24 24"
@@ -166,7 +192,7 @@ onBeforeUnmount(() => {
       <p>이미지 파일을 선택하거나 카메라로 촬영해 주세요.</p>
 
       <div class="photo-upload-empty__actions" aria-label="전신 사진 등록 방법">
-        <BaseButton variant="secondary" @click="openFilePicker">
+        <BaseButton variant="secondary" :disabled="disabled" @click="openFilePicker">
           <svg class="full-body-photo-uploader__button-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path
               d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4.25A1.75 1.75 0 0 0 6.75 20h10.5A1.75 1.75 0 0 0 19 18.25V14"
@@ -175,7 +201,7 @@ onBeforeUnmount(() => {
           사진 등록
         </BaseButton>
 
-        <BaseButton variant="secondary" @click="openCameraPicker">
+        <BaseButton variant="secondary" :disabled="disabled" @click="openCameraPicker">
           <svg class="full-body-photo-uploader__button-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path
               d="M4 8.75A1.75 1.75 0 0 1 5.75 7h2l1.1-2h6.3l1.1 2h2A1.75 1.75 0 0 1 20 8.75v8.5A1.75 1.75 0 0 1 18.25 19H5.75A1.75 1.75 0 0 1 4 17.25v-8.5Z"

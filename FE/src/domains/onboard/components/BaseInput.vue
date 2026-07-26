@@ -7,10 +7,11 @@ interface Props {
   type?: 'text' | 'tel'
   placeholder?: string
   autocomplete?: string
-  inputmode?: 'text' | 'tel'
+  inputmode?: 'text' | 'tel' | 'numeric'
   maxlength?: number
   required?: boolean
   readonly?: boolean
+  disabled?: boolean
   invalid?: boolean
   describedBy?: string
 }
@@ -22,6 +23,7 @@ withDefaults(defineProps<Props>(), {
   inputmode: 'text',
   required: false,
   readonly: false,
+  disabled: false,
   invalid: false,
   describedBy: undefined,
 })
@@ -58,6 +60,7 @@ defineExpose({ focus })
     :maxlength="maxlength"
     :required="required"
     :readonly="readonly"
+    :disabled="disabled"
     :aria-invalid="invalid ? 'true' : 'false'"
     :aria-describedby="describedBy"
     @input="handleInput"
@@ -84,7 +87,7 @@ defineExpose({ focus })
   color: var(--color-text-muted);
 }
 
-.base-input:hover:not(:read-only) {
+.base-input:hover:not(:read-only, :disabled) {
   border-color: var(--color-text-muted);
 }
 
@@ -101,8 +104,14 @@ defineExpose({ focus })
   box-shadow: 0 0 0 3px var(--color-error-soft);
 }
 
-.base-input:read-only {
+.base-input:read-only,
+.base-input:disabled {
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
+}
+
+.base-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
 }
 </style>

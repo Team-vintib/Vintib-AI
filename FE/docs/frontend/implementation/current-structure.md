@@ -66,6 +66,7 @@ src/
       pages/
         OnboardingBasicInfoView.vue
         OnboardingInterestsView.vue
+        OnboardingMemberTypeView.vue
         OnboardingTryOnView.vue
       types/
         kakao-postcode.d.ts
@@ -252,11 +253,11 @@ docs/
 
 ## 구현 상태
 
-- 라우터는 `router/routes.ts`로 route 배열을 분리했으며 AUTH-001과 ONBOARD-001~003 route가 등록되어 있습니다.
+- 라우터는 `router/routes.ts`로 route 배열을 분리했으며 AUTH-001과 ONBOARD-001~004 route가 등록되어 있습니다.
 - `App.vue`는 `RouterView`만 렌더링합니다.
 - 기능 ID prefix 기준 도메인 폴더와 공통 폴더가 생성되어 있습니다.
 - `domains/auth`에는 이메일 회원가입 화면, 이메일 인증 UI, 회원가입 API 호출 함수와 타입이 구현되어 있습니다.
-- `domains/onboard`에는 기본 정보, 관심 정보와 AI 시착 정보 임시 화면 및 관련 API·컴포넌트가 구현되어 있습니다.
+- `domains/onboard`에는 기본 정보, 관심 정보, AI 시착 정보 입력·저장 화면과 ONBOARD-004 이동 확인용 임시 화면이 구현되어 있습니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/utils/validators.ts`에는 회원가입 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.
 - 전역 스타일은 디자인 토큰, reset, 기본 font-family와 온보딩 오류 토큰을 포함합니다.
