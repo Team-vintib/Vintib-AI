@@ -1,4 +1,4 @@
-"""카테고리 × 기본색 프롬프트 세트.
+"""카테고리 × 기본색 프롬프트 세트와 3×3 부위 라벨 맵.
 
 **프롬프트를 갈아끼우는 지점이다.** CLIPSeg는 텍스트 프롬프트로 세그멘테이션 대상을 지정하므로,
 모델을 그대로 두고 문구만 바꿔도 성능이 달라진다(설계 문서 §고도화 경로 2).
@@ -20,7 +20,47 @@ LAB-12가 실측한 프롬프트는 `"a stain on fabric"`, `"a dirty mark"`,
 from dataclasses import dataclass
 from functools import lru_cache
 
-from app.quality.schemas import BaseColor, DefectType, GarmentCategory
+from app.quality.schemas import BaseColor, DefectType, GarmentCategory, GarmentSection
+
+# 3×3 그리드. 섹션 번호는 행 우선(좌상단 1 → 우하단 9)이다.
+#
+# LAB-30이 요구한 "각 부위 넘버링(분류)"을 **평균 풀링으로** 달성한다 — 별도 컨볼루션 층을
+# 학습시키지 않기 위한 선택이다. 나중에 학습형 헤드로 바꿔도 이 라벨 맵과 출력 스키마는 그대로다.
+SECTION_GRID = 3
+SECTION_COUNT = SECTION_GRID * SECTION_GRID
+
+_TOP_SECTIONS: tuple[GarmentSection, ...] = (
+    GarmentSection.shoulder_left,
+    GarmentSection.collar,
+    GarmentSection.shoulder_right,
+    GarmentSection.sleeve_left,
+    GarmentSection.chest_center,
+    GarmentSection.sleeve_right,
+    GarmentSection.hem_left,
+    GarmentSection.hem_center,
+    GarmentSection.hem_right,
+)
+
+_BOTTOM_SECTIONS: tuple[GarmentSection, ...] = (
+    GarmentSection.waist_left,
+    GarmentSection.waist_center,
+    GarmentSection.waist_right,
+    GarmentSection.thigh_left,
+    GarmentSection.crotch,
+    GarmentSection.thigh_right,
+    GarmentSection.hem_left,
+    GarmentSection.shin_center,
+    GarmentSection.hem_right,
+)
+
+SECTION_LABELS: dict[GarmentCategory, tuple[GarmentSection, ...]] = {
+    GarmentCategory.top_knit: _TOP_SECTIONS,
+    GarmentCategory.top_shirt: _TOP_SECTIONS,
+    GarmentCategory.outer_jacket: _TOP_SECTIONS,
+    GarmentCategory.outer_coat: _TOP_SECTIONS,
+    GarmentCategory.bottom_pants: _BOTTOM_SECTIONS,
+    GarmentCategory.bottom_skirt: _BOTTOM_SECTIONS,
+}
 
 # 프롬프트에 들어갈 의류 명사.
 _GARMENT_NOUNS: dict[GarmentCategory, str] = {
@@ -101,3 +141,10 @@ def select_prompt_set(category: GarmentCategory, base_color: BaseColor) -> Promp
             for template, defect_type in _DEFECT_TEMPLATES
         ),
     )
+
+
+def section_label(category: GarmentCategory, section_no: int) -> GarmentSection:
+    """섹션 번호(1~9)를 카테고리별 부위 라벨로 바꾼다."""
+    if not 1 <= section_no <= SECTION_COUNT:
+        raise ValueError(f"섹션 번호는 1~{SECTION_COUNT} 범위여야 합니다: {section_no}")
+    return SECTION_LABELS[category][section_no - 1]
