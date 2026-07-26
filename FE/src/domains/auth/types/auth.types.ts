@@ -32,16 +32,8 @@ export interface SsafySsoCallbackRequest {
   redirectUri: string
 }
 
-export interface SsafySsoUser {
-  id?: number
-  email?: string
-  name?: string
-}
-
 export interface SsafySsoCallbackResponse {
   accessToken?: string
-  refreshToken?: string
   linked?: boolean
   nextStep?: AuthNextStep
-  user?: SsafySsoUser
 }

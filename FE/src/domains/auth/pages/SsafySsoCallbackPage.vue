@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { completeSsafySsoCallback } from '@/domains/auth/api/authApi'
+import type { AuthNextStep } from '@/domains/auth/types/auth.types'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
@@ -68,12 +69,7 @@ const handleCallback = async () => {
       window.localStorage.setItem('vintib_access_token', response.data.accessToken)
     }
 
-    if (response.data.nextStep === 'LINK_ACCOUNT') {
-      await router.replace(ROUTE_PATHS.AUTH_LINK_ACCOUNT)
-      return
-    }
-
-    await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
+    await moveToNextStep(response.data.nextStep)
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -89,6 +85,20 @@ const applyCallbackError = (title: string, message: string) => {
   statusTitle.value = title
   statusMessage.value = message
   errorMessage.value = message
+}
+
+const moveToNextStep = async (nextStep?: AuthNextStep) => {
+  if (nextStep === 'LINK_ACCOUNT') {
+    await router.replace(ROUTE_PATHS.AUTH_LINK_ACCOUNT)
+    return
+  }
+
+  if (nextStep === 'HOME') {
+    await router.replace(ROUTE_PATHS.HOME)
+    return
+  }
+
+  await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
 }
 
 function getQueryValue(value: unknown) {
