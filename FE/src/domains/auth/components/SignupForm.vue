@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { sendEmailVerificationCode, signUp, verifyEmailCode } from '@/domains/auth/api/authApi'
 import EmailVerificationField from '@/domains/auth/components/EmailVerificationField.vue'
 import { normalizeApiError } from '@/shared/api/http'
+import { ROUTE_NAMES } from '@/shared/constants/routes'
 import {
   isEmail,
   isRequired,
@@ -11,8 +13,6 @@ import {
   isSignupPassword,
   isVerificationCode,
 } from '@/shared/utils/validators'
-
-import type { SignUpResponse } from '@/domains/auth/types/auth.types'
 
 type SignupField = 'name' | 'email' | 'verificationCode' | 'password' | 'passwordConfirm'
 type AgreementField = 'serviceTerms' | 'privacyPolicy' | 'marketing'
@@ -72,7 +72,7 @@ const emailVerificationMessage = ref('')
 const submitError = ref('')
 const verificationToken = ref('')
 const verifiedEmail = ref('')
-const signUpResult = ref<SignUpResponse | null>(null)
+const router = useRouter()
 
 const agreementItems: {
   key: AgreementField
@@ -407,7 +407,12 @@ const handleSubmit = async () => {
       return
     }
 
-    signUpResult.value = response.data ?? null
+    if (!response.data) {
+      submitError.value = '회원가입 결과를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+      return
+    }
+
+    await router.push({ name: ROUTE_NAMES.ONBOARD_PROFILE })
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -593,6 +598,7 @@ const applySignUpError = (code?: string, message?: string) => {
             class="size-4 accent-[var(--color-primary)]"
             type="checkbox"
             :checked="isAllAgreed"
+            :disabled="isSubmitting"
             @change="handleAllAgreementChange"
           />
           전체 동의
@@ -610,6 +616,7 @@ const applySignUpError = (code?: string, message?: string) => {
               class="size-4 accent-[var(--color-primary)]"
               type="checkbox"
               :checked="agreements[agreement.key]"
+              :disabled="isSubmitting"
               @change="handleAgreementChange(agreement.key, $event)"
             />
             <span>{{ agreement.required ? '[필수]' : '[선택]' }} {{ agreement.label }}</span>
