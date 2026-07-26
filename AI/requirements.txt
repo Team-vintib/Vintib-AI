@@ -2,7 +2,7 @@ fastapi==0.139.0
 uvicorn[standard]==0.51.0
 pydantic==2.13.4
 pydantic-settings==2.14.2
-
-# 개인화 추천 서빙의 랭킹 연산(코사인 재정렬·집계)용 경량 의존성.
-# 무거운 임베딩 의존성(torch/transformers)은 requirements-pipeline.txt(CI 미설치)에 둔다.
-numpy==2.5.1
+redis==5.0.8
+python-multipart==0.0.12
+aiofiles==24.1.0
+numpy==1.26.4
