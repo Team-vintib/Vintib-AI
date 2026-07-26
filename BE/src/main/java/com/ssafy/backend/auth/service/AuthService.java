@@ -9,6 +9,7 @@ import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,35 +27,42 @@ public class AuthService {
     private final StringRedisTemplate redisTemplate;
 
     public void sendEmailVerificationCode(String email) {
-        if (memberRepository.existsByEmail(email)) {
+        String normalizedEmail = normalizeEmail(email);
+        if (memberRepository.existsByEmail(normalizedEmail)) {
             throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
         }
-        emailVerificationService.sendVerificationCode(email);
+        emailVerificationService.sendVerificationCode(normalizedEmail);
     }
 
     public String verifyEmailCode(String email, String code) {
-        return emailVerificationService.verifyCode(email, code);
+        return emailVerificationService.verifyCode(normalizeEmail(email), code);
     }
 
     @Transactional
     public SignUpResponse signUp(SignUpRequest request) {
-        emailVerificationService.validateToken(request.verificationToken(), request.email());
+        String email = normalizeEmail(request.email());
+        emailVerificationService.validateToken(request.verificationToken(), email);
 
-        if (memberRepository.existsByEmail(request.email())) {
+        if (memberRepository.existsByEmail(email)) {
             throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
         }
 
         Member member = Member.builder()
-                .email(request.email())
+                .email(email)
                 .password(passwordEncoder.encode(request.password()))
                 .name(request.name())
                 .build();
 
-        return SignUpResponse.from(memberRepository.save(member));
+        try {
+            return SignUpResponse.from(memberRepository.save(member));
+        } catch (DataIntegrityViolationException e) {
+            // existsByEmail 체크와 save 사이의 동시 가입 race를 유니크 제약으로 최종 방어한다.
+            throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
+        }
     }
 
     public TokenResponse signIn(String email, String password) {
-        Member member = memberRepository.findByEmail(email)
+        Member member = memberRepository.findByEmail(normalizeEmail(email))
                 .orElseThrow(() -> new CustomException(ErrorCode.INVALID_CREDENTIALS));
 
         if (!passwordEncoder.matches(password, member.getPassword())) {
@@ -91,6 +99,10 @@ public class AuthService {
                 refreshTokenKey(memberId), refreshToken, jwtTokenProvider.getRefreshTokenValidity());
 
         return new TokenResponse(accessToken, refreshToken);
+    }
+
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase();
     }
 
     private String refreshTokenKey(Long memberId) {
