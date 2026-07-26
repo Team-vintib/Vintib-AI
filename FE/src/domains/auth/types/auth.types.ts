@@ -24,3 +24,17 @@ export interface SignUpResponse {
   name: string
   onboardingCompleted: boolean
 }
+
+export type AuthNextStep = 'HOME' | 'ONBOARD_PROFILE' | 'LINK_ACCOUNT'
+
+export interface SsafySsoCallbackRequest {
+  authorizationCode: string
+  redirectUri: string
+}
+
+export interface SsafySsoCallbackResponse {
+  accessToken?: string
+  email?: string
+  linked?: boolean
+  nextStep?: AuthNextStep
+}

@@ -5,7 +5,8 @@
 |---|---|---|---|
 | 이메일 회원가입 | POST | `/auth/signup` | AUTH-001 |
 | 이메일 로그인 | POST | `/auth/login` | AUTH-002 |
-| 싸피어스 SSO 로그인 | POST | `/auth/sso/ssafy` | AUTH-003 |
+| 싸피어스 SSO 시작 | GET | `/auth/sso/ssafy` | AUTH-003 |
+| 싸피어스 SSO 콜백 처리 | POST | `/auth/ssafy/callback` | AUTH-003 |
 | 계정 연결 요청 | POST | `/users/{id}/links` | AUTH-004 |
 
 ## 회원 (Users)

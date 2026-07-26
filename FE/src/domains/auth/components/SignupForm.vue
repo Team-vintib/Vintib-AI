@@ -408,6 +408,14 @@ const handleSubmit = async () => {
   }
 }
 
+const handleSsafySignUp = async () => {
+  if (isSubmitting.value) {
+    return
+  }
+
+  await router.push({ name: ROUTE_NAMES.AUTH_SSAFY, query: { from: 'signup' } })
+}
+
 const applySignUpError = (code?: string, message?: string) => {
   if (code === 'U003') {
     errors.email = message || '이미 가입된 이메일입니다.'
@@ -642,6 +650,8 @@ const applySignUpError = (code?: string, message?: string) => {
       <button
         class="h-12 w-full rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
         type="button"
+        :disabled="isSubmitting"
+        @click="handleSsafySignUp"
       >
         싸피어스로 가입하기
       </button>
