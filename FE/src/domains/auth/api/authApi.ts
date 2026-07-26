@@ -1,6 +1,8 @@
 import { http } from '@/shared/api/http'
 
 import type {
+  LoginRequest,
+  LoginResponse,
   SendEmailVerificationCodeRequest,
   SignUpRequest,
   SignUpResponse,
@@ -30,6 +32,12 @@ export const verifyEmailCode = async (request: VerifyEmailCodeRequest) => {
 
 export const signUp = async (request: SignUpRequest) => {
   const { data } = await http.post<ApiResponse<SignUpResponse>>('/auth/signup', request)
+
+  return data
+}
+
+export const login = async (request: LoginRequest) => {
+  const { data } = await http.post<ApiResponse<LoginResponse>>('/auth/login', request)
 
   return data
 }

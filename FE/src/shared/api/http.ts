@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios'
 
+import { getStoredAccessToken } from '@/shared/api/authTokenStorage'
 import type { ApiErrorBody, ApiResponse } from '@/shared/types/api.types'
 
 const DEFAULT_TIMEOUT_MS = 10_000
@@ -13,7 +14,7 @@ export const http = axios.create({
 })
 
 http.interceptors.request.use((config) => {
-  const accessToken = window.localStorage.getItem('vintib_access_token')
+  const accessToken = getStoredAccessToken()
 
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`
