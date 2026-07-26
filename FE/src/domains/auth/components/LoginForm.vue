@@ -148,7 +148,7 @@ const handleSsafyLogin = async () => {
     return
   }
 
-  await router.push({ name: ROUTE_NAMES.AUTH_SSAFY, query: { from: 'login' } })
+  await router.push({ name: ROUTE_NAMES.AUTH_SSAFY_LOGIN })
 }
 
 const applyLoginError = (code?: string, message?: string) => {

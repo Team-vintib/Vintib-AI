@@ -24,7 +24,7 @@ onMounted(() => {
 
 const handleRetrySso = async () => {
   window.sessionStorage.removeItem(LINK_ACCOUNT_STORAGE_KEY)
-  await router.push({ name: ROUTE_NAMES.AUTH_SSAFY, query: { from: 'signup' } })
+  await router.push({ name: ROUTE_NAMES.AUTH_SSAFY_SIGNUP })
 }
 
 function readAccountInfo() {
@@ -51,9 +51,7 @@ function readAccountInfo() {
       <header class="link-header">
         <img class="link-header__logo" :src="logoImage" alt="VinTib" />
         <p class="link-header__eyebrow">SSAFYERS SSO</p>
-        <h1 id="link-title" class="link-header__title">
-          이미 가입된 계정입니다
-        </h1>
+        <h1 id="link-title" class="link-header__title">이미 가입된 계정입니다</h1>
         <p class="link-header__description">
           싸피어스 인증 이메일과 동일한 VinTib 계정이 확인되었습니다.
         </p>
@@ -65,12 +63,8 @@ function readAccountInfo() {
       </section>
 
       <section class="link-actions" aria-label="기존 계정 안내 실행">
-        <a class="link-primary" :href="ROUTE_PATHS.AUTH_LOGIN">
-          로그인으로 이동
-        </a>
-        <a class="link-secondary" :href="ROUTE_PATHS.AUTH_SIGNUP">
-          이메일 회원가입으로 돌아가기
-        </a>
+        <a class="link-primary" :href="ROUTE_PATHS.AUTH_LOGIN"> 로그인으로 이동 </a>
+        <a class="link-secondary" :href="ROUTE_PATHS.AUTH_SIGNUP"> 회원가입 선택으로 돌아가기 </a>
         <button class="link-text-button" type="button" @click="handleRetrySso">
           다시 인증하기
         </button>

@@ -123,8 +123,10 @@ const moveToNextStep = async (nextStep?: AuthNextStep, email?: string) => {
 }
 
 const retryRoute = computed(() => ({
-  name: ROUTE_NAMES.AUTH_SSAFY,
-  query: { from: ssoSource.value },
+  name:
+    ssoSource.value === SSO_SOURCE_LOGIN
+      ? ROUTE_NAMES.AUTH_SSAFY_LOGIN
+      : ROUTE_NAMES.AUTH_SSAFY_SIGNUP,
 }))
 
 const fallbackPath = computed(() =>
@@ -132,7 +134,7 @@ const fallbackPath = computed(() =>
 )
 
 const fallbackLabel = computed(() =>
-  ssoSource.value === SSO_SOURCE_LOGIN ? '로그인으로 돌아가기' : '이메일 회원가입으로 돌아가기',
+  ssoSource.value === SSO_SOURCE_LOGIN ? '로그인으로 돌아가기' : '회원가입 선택으로 돌아가기',
 )
 
 function getSsoSource() {
