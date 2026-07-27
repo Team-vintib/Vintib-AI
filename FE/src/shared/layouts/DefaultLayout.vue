@@ -1,10 +1,38 @@
-<script setup lang="ts">
-</script>
+<script setup lang="ts"></script>
 
 <template>
-  <div class="min-h-screen bg-[var(--color-page)] text-[var(--color-text-primary)]">
-    <main class="mx-auto w-full max-w-[var(--layout-content-max-width)] px-12 py-10 max-lg:px-8 max-md:px-5">
+  <div class="default-layout">
+    <main class="default-layout__content">
       <slot />
     </main>
   </div>
 </template>
+
+<style scoped lang="scss">
+.default-layout {
+  min-height: 100vh;
+  background: var(--color-page);
+  color: var(--color-text-primary);
+}
+
+.default-layout__content {
+  width: 100%;
+  max-width: var(--layout-content-max-width);
+  padding: var(--space-10) var(--space-12);
+  margin-inline: auto;
+}
+
+@media (max-width: 1024px) {
+  .default-layout__content {
+    padding-right: var(--space-8);
+    padding-left: var(--space-8);
+  }
+}
+
+@media (max-width: 768px) {
+  .default-layout__content {
+    padding-right: var(--space-5);
+    padding-left: var(--space-5);
+  }
+}
+</style>

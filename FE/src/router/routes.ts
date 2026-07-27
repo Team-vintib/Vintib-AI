@@ -83,4 +83,9 @@ export const routes: RouteRecordRaw[] = [
     name: ROUTE_NAMES.BIZ_VERIFY_PENDING,
     component: () => import('@/domains/biz/pages/BusinessVerificationPendingPage.vue'),
   },
+  {
+    path: ROUTE_PATHS.PRODUCT_LIST,
+    name: ROUTE_NAMES.PRODUCT_LIST,
+    component: () => import('@/domains/product/pages/ProductListView.vue'),
+  },
 ]

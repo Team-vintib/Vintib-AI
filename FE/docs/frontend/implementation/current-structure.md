@@ -37,6 +37,13 @@ src/
   assets/
     images/
       logo.png
+      products/
+        mock-denim-jacket.svg
+        mock-knit.svg
+        mock-leather-bag.svg
+        mock-sneakers.svg
+        mock-trench-coat.svg
+        mock-watch.svg
     main.scss
     tailwind.css
   domains/
@@ -126,9 +133,14 @@ src/
     product/
       api/
       components/
+        ProductCard.vue
+        ProductFilterPanel.vue
       constants/
+        productListMockData.ts
       pages/
+        ProductListView.vue
       types/
+        productList.types.ts
     live/
       api/
       components/
@@ -269,10 +281,14 @@ docs/
 - Tailwind import는 `src/assets/tailwind.css`에서 담당합니다.
 - 디자인 토큰과 전역 reset은 `src/assets/main.scss`에서 담당합니다.
 - 색상, 간격, radius, 버튼 높이 등 디자인 값은 CSS 변수로 관리합니다.
+- `DefaultLayout`은 전역 reset과 무관하게 중앙 1320px 콘텐츠 폭과 반응형 바깥 여백을
+  유지하도록 scoped SCSS를 사용합니다.
 
 ## 구현 상태
 
-- 라우터는 `router/routes.ts`로 route 배열을 분리했으며 AUTH-001~AUTH-004 후보와 ONBOARD-001~ONBOARD-004 route가 등록되어 있습니다.
+- 라우터는 `router/routes.ts`로 route 배열을 분리했으며 AUTH-001~AUTH-004 후보,
+  ONBOARD-001~ONBOARD-004, BIZ-001·BIZ-001-2와 공개 PROD-008 route가 등록되어
+  있습니다.
 - `router/index.ts`에는 `requiresAuth`, `guestOnly` 메타 기반 인증 guard가 구현되어 있습니다.
 - `App.vue`는 `RouterView`만 렌더링합니다.
 - 기능 ID prefix 기준 도메인 폴더와 공통 폴더가 생성되어 있습니다.
@@ -281,6 +297,9 @@ docs/
 - `domains/biz`에는 BIZ-001 사업자 정보 입력·검증 화면, 사업자등록증 이미지 선택
   컴포넌트, FE 더미 제출 상태 store와 BIZ-001-2 인증 대기 화면이 구현되어 있습니다.
   실제 인증 API와 HOME 화면은 후속 작업 대기 중입니다.
+- `domains/product`에는 PROD-008 상품 목록 껍데기 View, 필터와 카드 컴포넌트,
+  목록 타입과 화면 확인용 mock 데이터가 구현되어 있습니다. 실제 조회·필터·정렬·찜
+  API와 상세 이동은 후속 작업 대기 중입니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.

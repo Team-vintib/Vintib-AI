@@ -312,6 +312,17 @@ Content-Type: multipart/form-data
 | 알림   | `/api/notifications`                                                 |
 | 팔로우 | `/api/users/{id}/follow`                                             |
 
+### 상품 목록 조회
+
+PROD-008 껍데기 화면은 실제 API를 호출하지 않는다. 목록 연동 시
+`GET /api/products`를 후보로 사용하되 아래 항목은 Swagger와 BE 계약에서 확정한다.
+
+- pagination 방식과 응답 envelope
+- 검색어, 카테고리, 상태 등급과 판매 방식 query 이름
+- 최신순·가격 낮은순·가격 높은순 정렬 값
+- 상시 판매와 경매 상품의 가격 필드 구분
+- 찜 여부를 공개 목록 응답에 포함할지 여부
+
 ## 공통 오류 코드
 
 - `C001`
