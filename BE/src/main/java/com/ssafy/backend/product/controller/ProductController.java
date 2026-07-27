@@ -3,6 +3,7 @@ package com.ssafy.backend.product.controller;
 import com.ssafy.backend.global.response.ApiResponse;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
+import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.product.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -62,6 +64,22 @@ public class ProductController {
             @Valid @RequestBody ProductStatusUpdateRequest request) {
         Long sellerId = (Long) authentication.getPrincipal();
         ProductResponse response = productService.registerDirectSale(sellerId, id, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "상품 상세 조회",
+            description = "상품 상세 정보를 조회한다. 비회원도 조회 가능하다. "
+                    + "DRAFT/PRIVATE 상태 상품은 판매자 본인만 조회할 수 있으며, 그 외에는 존재하지 않는 것처럼 404를 반환한다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품이 없거나 비공개 상품을 본인 외 사용자가 조회함")
+    })
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<ProductDetailResponse>> getProductDetail(
+            Authentication authentication, @PathVariable Long id) {
+        Long viewerId = authentication != null ? (Long) authentication.getPrincipal() : null;
+        ProductDetailResponse response = productService.getProductDetail(viewerId, id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

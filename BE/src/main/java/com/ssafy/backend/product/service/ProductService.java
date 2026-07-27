@@ -6,6 +6,7 @@ import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
+import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.SaleStatus;
@@ -45,7 +46,7 @@ public class ProductService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
 
-        if (!product.getSeller().getId().equals(sellerId)) {
+        if (!product.isOwnedBy(sellerId)) {
             throw new CustomException(ErrorCode.NOT_PRODUCT_OWNER);
         }
         if (product.getSaleStatus() != SaleStatus.DRAFT) {
@@ -55,5 +56,16 @@ public class ProductService {
         product.registerDirectSale(request.price());
 
         return ProductResponse.from(product);
+    }
+
+    public ProductDetailResponse getProductDetail(Long viewerId, Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        if (product.isPrivate() && !product.isOwnedBy(viewerId)) {
+            throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
+        }
+
+        return ProductDetailResponse.from(product);
     }
 }
