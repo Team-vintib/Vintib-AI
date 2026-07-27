@@ -1,5 +1,5 @@
-// Mock 전용 홈 화면 view model입니다.
-// Swagger 또는 BE 응답 계약이 확정되면 API 응답 타입과 매핑 로직으로 교체합니다.
+// 홈 화면 view model입니다.
+// Swagger 또는 BE 응답 계약이 확정되면 API 응답 타입과 매핑 로직을 별도로 추가합니다.
 
 export type HomeLiveStatus = 'LIVE' | 'SCHEDULED'
 
@@ -65,7 +65,7 @@ export interface HomeContentCardItem {
   audience: HomeContentAudience
 }
 
-export interface HomeViewMockData {
+export interface HomeViewData {
   liveNow: HomeLiveCardItem[]
   scheduledLives: HomeLiveCardItem[]
   directSaleProducts: HomeProductCardItem[]

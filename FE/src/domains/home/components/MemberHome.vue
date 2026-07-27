@@ -6,11 +6,11 @@ import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
 import LiveCard from '@/domains/home/components/LiveCard.vue'
 import ProductCard from '@/domains/home/components/ProductCard.vue'
-import type { HomeLiveStatus, HomeViewMockData } from '@/domains/home/types/homeView.types'
+import type { HomeLiveStatus, HomeViewData } from '@/domains/home/types/homeView.types'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
 const props = defineProps<{
-  homeData: HomeViewMockData
+  homeData: HomeViewData
 }>()
 
 const memberContentCards = computed(() =>

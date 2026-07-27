@@ -1,9 +1,9 @@
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
-import type { HomeViewMockData } from '../types/homeView.types'
+import type { HomeViewData } from '../types/homeView.types'
 
 // Mock 전용 데이터입니다. API 응답 계약이 확정되면 제거하거나 API adapter 테스트 fixture로 이동합니다.
-export const homeMockData: HomeViewMockData = {
+export const homeMockData: HomeViewData = {
   liveNow: [
     {
       id: 101,
