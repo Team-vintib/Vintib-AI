@@ -10,6 +10,7 @@ import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
+import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.SaleStatus;
@@ -114,6 +115,46 @@ class ProductServiceTest {
 
         assertThatThrownBy(() ->
                 productService.registerDirectSale(SELLER_ID, 1L, new ProductStatusUpdateRequest(60000L)))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 공개_상태_상품은_비로그인_또는_타인도_조회할_수_있다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(seller.getNickname()).thenReturn("판매자");
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        product.registerDirectSale(50000L);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductDetailResponse loggedOutResponse = productService.getProductDetail(null, 1L);
+        ProductDetailResponse otherViewerResponse = productService.getProductDetail(2L, 1L);
+
+        assertThat(loggedOutResponse.saleStatus()).isEqualTo(SaleStatus.ON_SALE);
+        assertThat(loggedOutResponse.sellerNickname()).isEqualTo("판매자");
+        assertThat(otherViewerResponse.id()).isEqualTo(loggedOutResponse.id());
+    }
+
+    @Test
+    void DRAFT_또는_PRIVATE_상품은_본인만_조회할_수_있다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(seller.getNickname()).thenReturn("판매자");
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductDetailResponse ownerResponse = productService.getProductDetail(SELLER_ID, 1L);
+
+        assertThat(ownerResponse.saleStatus()).isEqualTo(SaleStatus.DRAFT);
+        assertThatThrownBy(() -> productService.getProductDetail(2L, 1L))
+                .isInstanceOf(CustomException.class);
+        assertThatThrownBy(() -> productService.getProductDetail(null, 1L))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 존재하지_않는_상품을_조회하면_예외를_던진다() {
+        when(productRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> productService.getProductDetail(SELLER_ID, 1L))
                 .isInstanceOf(CustomException.class);
     }
 }
