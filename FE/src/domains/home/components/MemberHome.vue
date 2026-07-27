@@ -216,13 +216,9 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 
 <style scoped lang="scss">
 .member-home {
-  --home-content-max-width: 1200px;
-
   display: grid;
   justify-items: stretch;
   gap: var(--space-12);
-  width: min(100%, var(--home-content-max-width));
-  margin-inline: auto;
   padding-bottom: var(--space-16);
 }
 

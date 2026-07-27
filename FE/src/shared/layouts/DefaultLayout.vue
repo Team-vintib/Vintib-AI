@@ -1,11 +1,23 @@
 <script setup lang="ts">
 import GlobalNavigation from '@/shared/components/GlobalNavigation.vue'
+
+withDefaults(
+  defineProps<{
+    contentMaxWidth?: string
+  }>(),
+  {
+    contentMaxWidth: 'var(--layout-content-max-width)',
+  },
+)
 </script>
 
 <template>
   <div class="default-layout">
     <GlobalNavigation />
-    <main class="default-layout__content">
+    <main
+      class="default-layout__content"
+      :style="{ '--default-layout-content-max-width': contentMaxWidth }"
+    >
       <slot />
     </main>
   </div>
@@ -20,7 +32,7 @@ import GlobalNavigation from '@/shared/components/GlobalNavigation.vue'
 
 .default-layout__content {
   width: 100%;
-  max-width: var(--layout-content-max-width);
+  max-width: var(--default-layout-content-max-width);
   padding: var(--space-10) var(--space-12);
   margin-inline: auto;
 }

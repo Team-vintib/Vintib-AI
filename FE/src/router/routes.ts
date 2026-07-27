@@ -89,11 +89,6 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/domains/biz/pages/BusinessVerificationPendingPage.vue'),
   },
   {
-<<<<<<< HEAD
-    path: ROUTE_PATHS.PRODUCT_LIST,
-    name: ROUTE_NAMES.PRODUCT_LIST,
-    component: () => import('@/domains/product/pages/ProductListView.vue'),
-=======
     path: ROUTE_PATHS.LIVE_LIST,
     name: ROUTE_NAMES.LIVE_LIST,
     component: () => import('@/shared/components/RoutePlaceholder.vue'),
@@ -102,7 +97,7 @@ export const routes: RouteRecordRaw[] = [
   {
     path: ROUTE_PATHS.PRODUCT_LIST,
     name: ROUTE_NAMES.PRODUCT_LIST,
-    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    component: () => import('@/domains/product/pages/ProductListView.vue'),
     meta: { title: '상품 목록' },
   },
   {
@@ -146,6 +141,5 @@ export const routes: RouteRecordRaw[] = [
     name: ROUTE_NAMES.POINT,
     component: () => import('@/shared/components/RoutePlaceholder.vue'),
     meta: { requiresAuth: true, title: '포인트' },
->>>>>>> be92e81 ([S15P11A108-277] feat: 네비게이션 라우팅과 로그인별 노출 처리)
   },
 ]

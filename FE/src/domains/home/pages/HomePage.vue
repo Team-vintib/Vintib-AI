@@ -14,7 +14,7 @@ const homeComponent = computed(() => (authStore.isAuthenticated ? MemberHome : G
 </script>
 
 <template>
-  <DefaultLayout>
+  <DefaultLayout content-max-width="1200px">
     <component :is="homeComponent" />
   </DefaultLayout>
 </template>

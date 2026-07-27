@@ -128,13 +128,9 @@ const getProductPath = (productId: number) => `/products/${productId}`
 
 <style scoped lang="scss">
 .guest-home {
-  --home-content-max-width: 1200px;
-
   display: grid;
   justify-items: stretch;
   gap: var(--space-12);
-  width: min(100%, var(--home-content-max-width));
-  margin-inline: auto;
   padding-bottom: var(--space-16);
 }
 
