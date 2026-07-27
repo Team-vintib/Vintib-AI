@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import { homeMockData } from '@/domains/home/constants/homeMockData'
+import type { HomeLiveStatus } from '@/domains/home/types/homeView.types'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
 const memberContentCards = computed(() =>
@@ -30,15 +31,22 @@ const formatSchedule = (value?: string) => {
   }
 
   return new Intl.DateTimeFormat('ko-KR', {
-    month: 'numeric',
+    month: 'long',
     day: 'numeric',
-    hour: '2-digit',
+    hour: 'numeric',
     minute: '2-digit',
+    hour12: true,
   }).format(new Date(value))
 }
 
 const getLivePath = (liveId: number) => `/lives/${liveId}`
 const getProductPath = (productId: number) => `/products/${productId}`
+const getSellerLivePath = (liveId?: number) =>
+  liveId ? getLivePath(liveId) : ROUTE_PATHS.LIVE_LIST
+const getSellerLiveActionQuery = (status?: HomeLiveStatus) =>
+  status === 'SCHEDULED' ? { action: 'notify' } : undefined
+const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
+  status === 'LIVE' ? '라이브 보기' : '방송 알림 받기'
 </script>
 
 <template>
@@ -123,7 +131,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
               class="seller-card__status"
               :class="{ 'seller-card__status--live': seller.liveStatus === 'LIVE' }"
             >
-              {{ seller.liveStatus === 'LIVE' ? 'LIVE' : '예약' }}
+              {{ seller.liveStatus === 'LIVE' ? 'LIVE' : formatSchedule(seller.liveAt) }}
             </span>
           </span>
           <span class="seller-card__body">
@@ -140,9 +148,15 @@ const getProductPath = (productId: number) => `/products/${productId}`
             </span>
             <strong class="seller-card__live-title">{{ seller.liveTitle }}</strong>
             <span class="seller-card__time">{{ formatSchedule(seller.liveAt) }}</span>
-            <RouterLink class="seller-card__action" :to="ROUTE_PATHS.LIVE_LIST"
-              >라이브 보기</RouterLink
+            <RouterLink
+              class="seller-card__action"
+              :to="{
+                path: getSellerLivePath(seller.liveId),
+                query: getSellerLiveActionQuery(seller.liveStatus),
+              }"
             >
+              {{ getSellerLiveActionLabel(seller.liveStatus) }}
+            </RouterLink>
           </span>
         </article>
       </div>
@@ -192,12 +206,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
         <article v-for="live in homeMockData.scheduledLives" :key="live.id" class="schedule-card">
           <span class="schedule-card__media">
             <img class="schedule-card__image" :src="live.thumbnailUrl" :alt="live.title" />
-            <RouterLink
-              class="schedule-card__action schedule-card__action--media"
-              :to="getLivePath(live.id)"
-            >
-              알림받기
-            </RouterLink>
+            <span class="schedule-card__time">{{ formatSchedule(live.scheduledAt) }}</span>
           </span>
           <span class="schedule-card__body">
             <strong class="schedule-card__title">{{ live.title }}</strong>
@@ -208,6 +217,9 @@ const getProductPath = (productId: number) => `/products/${productId}`
             <span class="schedule-card__meta"
               >예정 상품 {{ live.scheduledProductCount ?? 0 }}개</span
             >
+            <RouterLink class="schedule-card__action" :to="getLivePath(live.id)">
+              방송 알림 받기
+            </RouterLink>
           </span>
         </article>
       </div>
@@ -385,8 +397,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
 
 .home-search__button,
 .member-hero__primary,
-.member-hero__secondary,
-.seller-card__action {
+.member-hero__secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -403,8 +414,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
   color: var(--color-text-inverse);
 }
 
-.member-hero__primary,
-.seller-card__action {
+.member-hero__primary {
   background: var(--color-primary);
   color: var(--color-text-inverse);
 }
@@ -558,9 +568,10 @@ const getProductPath = (productId: number) => `/products/${productId}`
 .content-card {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
+  border: 1px solid #e6e1d8;
+  border-radius: 20px;
   background: var(--color-surface);
+  box-shadow: 0 8px 24px rgb(18 18 18 / 5%);
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -572,8 +583,8 @@ const getProductPath = (productId: number) => `/products/${productId}`
 .schedule-card:hover,
 .product-card:hover,
 .content-card:hover {
-  border-color: var(--color-border-strong);
-  box-shadow: 0 10px 24px rgba(23, 24, 21, 0.08);
+  border-color: #ded8ce;
+  box-shadow: 0 10px 26px rgb(18 18 18 / 7%);
   transform: translateY(-2px);
 }
 
@@ -630,20 +641,54 @@ const getProductPath = (productId: number) => `/products/${productId}`
   left: var(--space-3);
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-badge);
+  min-height: 28px;
+  max-width: calc(100% - var(--space-6));
+  padding: 0 10px;
+  overflow: hidden;
+  border-radius: var(--space-2);
   background: rgba(14, 17, 16, 0.72);
   color: var(--color-text-inverse);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .seller-card__status--live,
-.live-card__badge,
 .product-card__tag {
   background: var(--color-live);
+}
+
+.live-card__badge {
+  gap: 6px;
+  height: 28px;
+  background: #b83f42;
+}
+
+.live-card__badge::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+}
+
+.schedule-card__time {
+  position: absolute;
+  z-index: 1;
+  top: var(--space-3);
+  left: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: var(--space-2);
+  background: rgba(14, 17, 16, 0.66);
+  color: var(--color-text-inverse);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
 }
 
 .seller-card__body,
@@ -651,8 +696,8 @@ const getProductPath = (productId: number) => `/products/${productId}`
 .schedule-card__body,
 .product-card__body {
   display: grid;
-  gap: var(--space-1);
-  padding: var(--space-3);
+  gap: var(--space-2);
+  padding: var(--space-5);
 }
 
 .seller-card__profile {
@@ -662,8 +707,8 @@ const getProductPath = (productId: number) => `/products/${productId}`
 }
 
 .seller-card__avatar {
-  width: 46px;
-  height: 46px;
+  width: 42px;
+  height: 42px;
   border: 2px solid var(--color-surface);
   border-radius: 50%;
   object-fit: cover;
@@ -681,8 +726,19 @@ const getProductPath = (productId: number) => `/products/${productId}`
 .schedule-card__title,
 .product-card__title {
   color: var(--color-text-primary);
-  font-size: 17px;
-  font-weight: 800;
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 26px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.seller-card__name {
+  display: block;
+  font-size: 18px;
+  font-weight: 600;
   line-height: 24px;
 }
 
@@ -703,15 +759,11 @@ const getProductPath = (productId: number) => `/products/${productId}`
 .schedule-card__meta--time {
   color: var(--color-text-secondary);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 20px;
 }
 
-.seller-card__specialty,
-.seller-card__live-title,
-.live-card__title,
-.schedule-card__title,
-.product-card__title {
+.seller-card__specialty {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -724,11 +776,19 @@ const getProductPath = (productId: number) => `/products/${productId}`
 }
 
 .seller-card__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: fit-content;
-  min-height: 36px;
+  height: 40px;
   padding: 0 var(--space-4);
+  border-radius: 12px;
+  justify-self: end;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
   font-size: 14px;
-  line-height: 21px;
+  font-weight: 600;
+  line-height: 20px;
 }
 
 .schedule-card__action {
@@ -736,22 +796,16 @@ const getProductPath = (productId: number) => `/products/${productId}`
   align-items: center;
   justify-content: center;
   width: fit-content;
-  min-height: 36px;
+  height: 40px;
   padding: 0 var(--space-4);
-  border-radius: var(--radius-control);
+  justify-self: end;
+  margin-top: var(--space-2);
+  border-radius: 12px;
   background: var(--color-primary);
   color: var(--color-text-inverse);
   font-size: 14px;
-  font-weight: 800;
-  line-height: 21px;
-}
-
-.schedule-card__action--media {
-  position: absolute;
-  z-index: 1;
-  right: var(--space-2);
-  bottom: var(--space-2);
-  box-shadow: 0 6px 16px rgba(14, 17, 16, 0.22);
+  font-weight: 600;
+  line-height: 20px;
 }
 
 .product-card {
@@ -783,6 +837,11 @@ const getProductPath = (productId: number) => `/products/${productId}`
 
 .product-card__tag--direct {
   background: var(--color-direct-sale);
+}
+
+.product-card__action {
+  justify-self: end;
+  margin-top: var(--space-2);
 }
 
 .content-band {

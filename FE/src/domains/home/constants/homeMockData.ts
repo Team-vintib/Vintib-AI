@@ -153,6 +153,7 @@ export const homeMockData: HomeViewMockData = {
   followedSellers: [
     {
       id: 601,
+      liveId: 101,
       name: 'Archive Room',
       profileImageUrl:
         'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=400&q=80',
@@ -167,6 +168,7 @@ export const homeMockData: HomeViewMockData = {
     },
     {
       id: 602,
+      liveId: 202,
       name: '925 Collective',
       profileImageUrl:
         'https://images.unsplash.com/photo-1499952127939-9bbf5af6c51c?auto=format&fit=crop&w=400&q=80',
@@ -181,6 +183,7 @@ export const homeMockData: HomeViewMockData = {
     },
     {
       id: 603,
+      liveId: 201,
       name: 'Slow Knit Market',
       profileImageUrl:
         'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=400&q=80',

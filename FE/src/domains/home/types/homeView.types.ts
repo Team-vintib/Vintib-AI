@@ -37,6 +37,7 @@ export interface HomeProductCardItem {
 
 export interface HomeFollowedSellerItem {
   id: number
+  liveId?: number
   name: string
   profileImageUrl: string
   coverImageUrl: string
