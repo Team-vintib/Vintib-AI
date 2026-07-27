@@ -4,6 +4,11 @@ import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 
 export const routes: RouteRecordRaw[] = [
   {
+    path: ROUTE_PATHS.HOME,
+    name: ROUTE_NAMES.HOME,
+    component: () => import('@/domains/home/pages/HomePage.vue'),
+  },
+  {
     path: ROUTE_PATHS.AUTH_LOGIN,
     name: ROUTE_NAMES.AUTH_LOGIN,
     component: () => import('@/domains/auth/pages/LoginPage.vue'),
