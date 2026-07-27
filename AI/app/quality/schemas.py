@@ -119,6 +119,13 @@ class InspectionRequest(BaseModel):
     base_color: BaseColor = Field(
         default=BaseColor.light, description="기본색. 프롬프트 문구를 보정한다"
     )
+    include_attention_maps: bool = Field(
+        default=False,
+        description=(
+            "히트맵 오버레이 PNG 생성 여부. 기본 off — 상품 등록 흐름에서 쓰지 않을 수 있고, "
+            "켜면 이미지·하자유형마다 PNG를 만들어 응답이 느려진다"
+        ),
+    )
 
 
 # --- 응답 ------------------------------------------------------------------
@@ -184,3 +191,56 @@ class InspectionResponse(BaseModel):
         default_factory=list, description="판매자·FE에 보일 주의 문구(모델 한계 안내 등)"
     )
     latency_ms: float
+
+
+# --- 활성 설정 노출 (디버그·데모용) ---------------------------------------
+
+
+class BackendView(BaseModel):
+    """세그멘터 백엔드 하나의 설정. "모델을 갈아끼웠다"를 API로 확인하는 용도."""
+
+    backend: str
+    model_id: str | None
+    description: str
+    active: bool
+    mask_size: int
+    defect_threshold: float
+    confident_threshold: float
+    clean_margin: float
+    min_area_ratio: float
+
+
+class DefectPolicyView(BaseModel):
+    """하자 유형 하나의 취급 정책과 그 **근거**."""
+
+    defect_type: DefectType
+    label: str
+    trusted: bool = Field(description="False면 확률이 높아도 DETECTED로 노출하지 않는다")
+    needs_seller_review: bool
+    statement_required: bool
+    weight: float = Field(description="감점 가중치 — 미확정 임의값")
+    evidence: str = Field(description="LAB-12 실측 결과 또는 미검증 표시")
+
+
+class PromptSetView(BaseModel):
+    """카테고리 × 기본색 조합 하나의 프롬프트 세트."""
+
+    key: str
+    category: GarmentCategory
+    base_color: BaseColor
+    clean_prompt: str
+    defect_prompts: dict[str, DefectType] = Field(description="프롬프트 문구 → 하자 유형")
+    sections: list[GarmentSection] = Field(description="3×3 부위 라벨(섹션 1~9 순서)")
+
+
+class QualityConfigResponse(BaseModel):
+    """현재 활성 설정 전체. 값 확정 전 단계라 무엇이 임의값인지 함께 드러낸다."""
+
+    active_segmenter: str
+    backends: list[BackendView]
+    taxonomy: list[DefectPolicyView]
+    prompt_sets: list[PromptSetView]
+    mock_product_ids: list[int] = Field(
+        description="목업 백엔드에서 시나리오가 등록된 product_id. 그 외는 시드 기반 합성"
+    )
+    unverified_notice: str = Field(description="아직 실측으로 확정되지 않은 값에 대한 경고")
