@@ -10,10 +10,14 @@ withDefaults(
     title: string
     linkLabel?: string
     linkTo?: RouteLocationRaw
+    isEmpty?: boolean
+    emptyMessage?: string
   }>(),
   {
     linkLabel: '전체보기',
     linkTo: undefined,
+    isEmpty: false,
+    emptyMessage: '표시할 콘텐츠가 없습니다.',
   },
 )
 </script>
@@ -30,7 +34,12 @@ withDefaults(
       </RouterLink>
     </div>
 
-    <slot />
+    <div v-if="isEmpty" class="home-section__empty">
+      <slot name="empty">
+        {{ emptyMessage }}
+      </slot>
+    </div>
+    <slot v-else />
   </section>
 </template>
 
@@ -68,6 +77,21 @@ withDefaults(
   font-size: 14px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.home-section__empty {
+  display: grid;
+  min-height: 144px;
+  place-items: center;
+  padding: var(--space-8);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 22px;
+  text-align: center;
 }
 
 @media (max-width: 768px) {

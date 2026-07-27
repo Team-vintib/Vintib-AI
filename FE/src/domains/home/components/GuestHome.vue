@@ -47,6 +47,8 @@ const getProductPath = (productId: number) => `/products/${productId}`
       eyebrow="Live now"
       title="지금 진행 중인 라이브"
       :link-to="ROUTE_PATHS.LIVE_LIST"
+      :is-empty="homeMockData.liveNow.length === 0"
+      empty-message="지금 진행 중인 라이브가 없습니다."
     >
       <div class="live-grid">
         <LiveCard v-for="live in homeMockData.liveNow" :key="live.id" :live="live" />
@@ -58,6 +60,8 @@ const getProductPath = (productId: number) => `/products/${productId}`
       eyebrow="Upcoming"
       title="예약 라이브"
       :link-to="ROUTE_PATHS.LIVE_LIST"
+      :is-empty="homeMockData.scheduledLives.length === 0"
+      empty-message="예약된 라이브가 없습니다."
     >
       <div class="schedule-grid">
         <LiveCard
@@ -76,6 +80,8 @@ const getProductPath = (productId: number) => `/products/${productId}`
       eyebrow="Products"
       title="판매 상품"
       :link-to="ROUTE_PATHS.PRODUCT_LIST"
+      :is-empty="homeMockData.directSaleProducts.length === 0"
+      empty-message="판매 중인 상품이 없습니다."
     >
       <div class="product-grid">
         <ProductCard
@@ -92,6 +98,8 @@ const getProductPath = (productId: number) => `/products/${productId}`
       eyebrow="Auction"
       title="경매 예정 상품"
       :link-to="ROUTE_PATHS.PRODUCT_LIST"
+      :is-empty="homeMockData.upcomingAuctionProducts.length === 0"
+      empty-message="경매 예정 상품이 없습니다."
     >
       <div class="product-grid product-grid--auction">
         <ProductCard
