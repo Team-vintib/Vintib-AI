@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import GuestHome from '@/domains/home/components/GuestHome.vue'
 import MemberHome from '@/domains/home/components/MemberHome.vue'
+import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const authStore = useAuthStore()
 
@@ -13,5 +14,7 @@ const homeComponent = computed(() => (authStore.isAuthenticated ? MemberHome : G
 </script>
 
 <template>
-  <component :is="homeComponent" />
+  <DefaultLayout>
+    <component :is="homeComponent" />
+  </DefaultLayout>
 </template>

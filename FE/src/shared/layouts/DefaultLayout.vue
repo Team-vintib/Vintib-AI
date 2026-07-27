@@ -1,7 +1,10 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import GlobalNavigation from '@/shared/components/GlobalNavigation.vue'
+</script>
 
 <template>
   <div class="default-layout">
+    <GlobalNavigation />
     <main class="default-layout__content">
       <slot />
     </main>
