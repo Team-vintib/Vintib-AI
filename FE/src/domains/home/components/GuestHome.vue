@@ -4,20 +4,13 @@ import { RouterLink } from 'vue-router'
 
 import HomeSection from '@/domains/home/components/HomeSection.vue'
 import LiveCard from '@/domains/home/components/LiveCard.vue'
+import ProductCard from '@/domains/home/components/ProductCard.vue'
 import { homeMockData } from '@/domains/home/constants/homeMockData'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
 const guestContentCards = computed(() =>
   homeMockData.contentCards.filter((card) => card.audience === 'guest' || card.audience === 'all'),
 )
-
-const formatPrice = (value?: number) => {
-  if (value === undefined) {
-    return '가격 확인'
-  }
-
-  return `${value.toLocaleString('ko-KR')}원`
-}
 
 const getProductPath = (productId: number) => `/products/${productId}`
 </script>
@@ -113,23 +106,12 @@ const getProductPath = (productId: number) => `/products/${productId}`
       :link-to="ROUTE_PATHS.PRODUCT_LIST"
     >
       <div class="product-grid">
-        <RouterLink
+        <ProductCard
           v-for="product in homeMockData.directSaleProducts"
           :key="product.id"
-          class="product-card"
+          :product="product"
           :to="getProductPath(product.id)"
-        >
-          <span class="product-card__media">
-            <img class="product-card__image" :src="product.primaryImageUrl" :alt="product.title" />
-          </span>
-          <span class="product-card__body">
-            <span class="product-card__brand">{{ product.brandName }}</span>
-            <span class="product-card__seller">판매자 {{ product.sellerName }}</span>
-            <strong class="product-card__title">{{ product.title }}</strong>
-            <span class="product-card__price-text">{{ formatPrice(product.price) }}</span>
-            <span class="product-card__meta">{{ product.categoryName }}</span>
-          </span>
-        </RouterLink>
+        />
       </div>
     </HomeSection>
 
@@ -140,29 +122,16 @@ const getProductPath = (productId: number) => `/products/${productId}`
       :link-to="ROUTE_PATHS.PRODUCT_LIST"
     >
       <div class="product-grid product-grid--auction">
-        <article
+        <ProductCard
           v-for="product in homeMockData.upcomingAuctionProducts"
           :key="product.id"
-          class="product-card"
-        >
-          <span class="product-card__media">
-            <img class="product-card__image" :src="product.primaryImageUrl" :alt="product.title" />
-            <span class="product-card__tag product-card__tag--auction">경매 예정</span>
-          </span>
-          <span class="product-card__body">
-            <span class="product-card__brand">{{ product.brandName }}</span>
-            <span class="product-card__seller">판매자 {{ product.sellerName }}</span>
-            <strong class="product-card__title">{{ product.title }}</strong>
-            <span class="product-card__price-text">가격 {{ formatPrice(product.price) }}</span>
-            <span class="product-card__meta">{{ product.categoryName }}</span>
-            <span class="product-card__bid"
-              >경매 시작가 {{ formatPrice(product.startingBid) }}</span
-            >
-            <RouterLink class="product-card__action" :to="ROUTE_PATHS.AUTH_LOGIN">
-              경매 알림 받기
-            </RouterLink>
-          </span>
-        </article>
+          :product="product"
+          badge-label="경매 예정"
+          badge-variant="auction"
+          price-prefix="가격 "
+          :action-to="ROUTE_PATHS.AUTH_LOGIN"
+          action-label="경매 알림 받기"
+        />
       </div>
     </HomeSection>
 
@@ -403,7 +372,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   gap: var(--space-5);
 }
 
-.product-card,
 .content-card {
   position: relative;
   overflow: hidden;
@@ -417,25 +385,12 @@ const getProductPath = (productId: number) => `/products/${productId}`
     transform 160ms ease;
 }
 
-.product-card:hover,
 .content-card:hover {
   border-color: #ded8ce;
   box-shadow: 0 10px 26px rgb(18 18 18 / 7%);
   transform: translateY(-2px);
 }
 
-.product-card__media {
-  position: relative;
-  display: block;
-  overflow: hidden;
-  background: var(--color-surface-secondary);
-}
-
-.product-card__media {
-  aspect-ratio: 16 / 9;
-}
-
-.product-card__image,
 .content-card__image {
   width: 100%;
   height: 100%;
@@ -446,133 +401,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, rgba(14, 17, 16, 0.18), rgba(14, 17, 16, 0.82));
-}
-
-.product-card__tag,
-.product-card__time {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: var(--space-2);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 18px;
-}
-
-.product-card__time {
-  position: absolute;
-  z-index: 1;
-  background: rgba(14, 17, 16, 0.66);
-  color: var(--color-text-inverse);
-}
-
-.product-card__title {
-  color: var(--color-text-primary);
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 26px;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.product-card__meta,
-.product-card__seller {
-  color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 20px;
-}
-
-.product-card__action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  height: 40px;
-  padding: 0 var(--space-4);
-  border-radius: 12px;
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
-}
-
-.product-card {
-  display: grid;
-}
-
-.product-card__media::after {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(14, 17, 16, 0.04), rgba(14, 17, 16, 0.5));
-  content: '';
-}
-
-.product-card__tag,
-.product-card__time,
-.product-card__price {
-  position: absolute;
-  z-index: 1;
-}
-
-.product-card__tag {
-  top: var(--space-2);
-  left: var(--space-2);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.product-card__tag--auction {
-  background: var(--color-auction);
-}
-
-.product-card__time {
-  top: var(--space-2);
-  right: var(--space-2);
-}
-
-.product-card__price {
-  right: var(--space-2);
-  bottom: var(--space-2);
-  left: var(--space-2);
-  color: var(--color-text-inverse);
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 22px;
-}
-
-.product-card__body {
-  display: grid;
-  gap: var(--space-1);
-  padding: var(--space-5);
-}
-
-.product-card__brand {
-  color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 20px;
-}
-
-.product-card__price-text,
-.product-card__bid {
-  color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 21px;
-}
-
-.product-card__bid {
-  color: var(--color-auction);
-}
-
-.product-card__action {
-  justify-self: end;
-  margin-top: var(--space-2);
 }
 
 .content-band {
@@ -681,15 +509,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   .product-grid {
     grid-template-columns: 1fr 1fr;
     gap: var(--space-3);
-  }
-
-  .product-card__title {
-    font-size: 15px;
-    line-height: 22px;
-  }
-
-  .product-card__time {
-    display: none;
   }
 
   .content-card__body {

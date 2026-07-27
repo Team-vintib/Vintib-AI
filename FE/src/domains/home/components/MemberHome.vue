@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 
 import HomeSection from '@/domains/home/components/HomeSection.vue'
 import LiveCard from '@/domains/home/components/LiveCard.vue'
+import ProductCard from '@/domains/home/components/ProductCard.vue'
 import { homeMockData } from '@/domains/home/constants/homeMockData'
 import type { HomeLiveStatus } from '@/domains/home/types/homeView.types'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
@@ -11,14 +12,6 @@ import { ROUTE_PATHS } from '@/shared/constants/routes'
 const memberContentCards = computed(() =>
   homeMockData.contentCards.filter((card) => card.audience === 'member' || card.audience === 'all'),
 )
-
-const formatPrice = (value?: number) => {
-  if (value === undefined) {
-    return '가격 확인'
-  }
-
-  return `${value.toLocaleString('ko-KR')}원`
-}
 
 const formatCompactNumber = (value: number) => {
   return new Intl.NumberFormat('ko-KR', {
@@ -200,32 +193,14 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
       :link-to="ROUTE_PATHS.PRODUCT_LIST"
     >
       <div class="product-grid">
-        <RouterLink
+        <ProductCard
           v-for="product in homeMockData.recommendedProducts"
           :key="product.id"
-          class="product-card"
+          :product="product"
           :to="getProductPath(product.id)"
-        >
-          <span class="product-card__media">
-            <img class="product-card__image" :src="product.primaryImageUrl" :alt="product.title" />
-            <span
-              class="product-card__tag"
-              :class="{ 'product-card__tag--direct': product.saleType === 'DIRECT_SALE' }"
-            >
-              {{ product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매' }}
-            </span>
-          </span>
-          <span class="product-card__body">
-            <span class="product-card__brand">{{ product.brandName }}</span>
-            <span class="product-card__seller">판매자 {{ product.sellerName }}</span>
-            <strong class="product-card__title">{{ product.title }}</strong>
-            <span class="product-card__price">{{ formatPrice(product.price) }}</span>
-            <span v-if="product.startingBid" class="product-card__bid">
-              경매 시작가 {{ formatPrice(product.startingBid) }}
-            </span>
-            <span class="product-card__meta">{{ product.categoryName }}</span>
-          </span>
-        </RouterLink>
+          :badge-label="product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'"
+          :badge-variant="product.saleType === 'AUCTION' ? 'auction' : 'direct'"
+        />
       </div>
     </HomeSection>
 
@@ -236,27 +211,15 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
       :link-to="ROUTE_PATHS.PRODUCT_LIST"
     >
       <div class="product-grid">
-        <RouterLink
+        <ProductCard
           v-for="product in homeMockData.upcomingAuctionProducts"
           :key="product.id"
-          class="product-card"
+          :product="product"
           :to="getProductPath(product.id)"
-        >
-          <span class="product-card__media">
-            <img class="product-card__image" :src="product.primaryImageUrl" :alt="product.title" />
-            <span class="product-card__tag product-card__tag--auction">경매 예정</span>
-          </span>
-          <span class="product-card__body">
-            <span class="product-card__brand">{{ product.brandName }}</span>
-            <span class="product-card__seller">판매자 {{ product.sellerName }}</span>
-            <strong class="product-card__title">{{ product.title }}</strong>
-            <span class="product-card__price">가격 {{ formatPrice(product.price) }}</span>
-            <span class="product-card__meta">{{ product.categoryName }}</span>
-            <span class="product-card__bid"
-              >경매 시작가 {{ formatPrice(product.startingBid) }}</span
-            >
-          </span>
-        </RouterLink>
+          badge-label="경매 예정"
+          badge-variant="auction"
+          price-prefix="가격 "
+        />
       </div>
     </HomeSection>
 
@@ -495,7 +458,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 }
 
 .seller-card,
-.product-card,
 .content-card {
   position: relative;
   overflow: hidden;
@@ -510,20 +472,17 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 }
 
 .seller-card:hover,
-.product-card:hover,
 .content-card:hover {
   border-color: #ded8ce;
   box-shadow: 0 10px 26px rgb(18 18 18 / 7%);
   transform: translateY(-2px);
 }
 
-.seller-card,
-.product-card {
+.seller-card {
   display: grid;
 }
 
-.seller-card__cover,
-.product-card__media {
+.seller-card__cover {
   position: relative;
   display: block;
   overflow: hidden;
@@ -534,12 +493,7 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   aspect-ratio: 16 / 9;
 }
 
-.product-card__media {
-  aspect-ratio: 16 / 9;
-}
-
-.seller-card__cover::after,
-.product-card__media::after {
+.seller-card__cover::after {
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, rgba(14, 17, 16, 0.02), rgba(14, 17, 16, 0.42));
@@ -547,15 +501,13 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 }
 
 .seller-card__cover-image,
-.product-card__image,
 .content-card__image {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.seller-card__status,
-.product-card__tag {
+.seller-card__status {
   position: absolute;
   z-index: 1;
   top: var(--space-3);
@@ -576,13 +528,11 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   white-space: nowrap;
 }
 
-.seller-card__status--live,
-.product-card__tag {
+.seller-card__status--live {
   background: var(--color-live);
 }
 
-.seller-card__body,
-.product-card__body {
+.seller-card__body {
   display: grid;
   gap: var(--space-2);
   padding: var(--space-5);
@@ -609,8 +559,7 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 }
 
 .seller-card__name,
-.seller-card__live-title,
-.product-card__title {
+.seller-card__live-title {
   color: var(--color-text-primary);
   display: -webkit-box;
   overflow: hidden;
@@ -629,9 +578,7 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 }
 
 .seller-card__specialty,
-.seller-card__stats,
-.product-card__seller,
-.product-card__meta {
+.seller-card__stats {
   color: var(--color-text-muted);
   font-size: 13px;
   font-weight: 400;
@@ -671,38 +618,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
-}
-
-.product-card__brand {
-  color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 20px;
-}
-
-.product-card__price,
-.product-card__bid {
-  color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 21px;
-}
-
-.product-card__bid {
-  color: var(--color-auction);
-}
-
-.product-card__tag--auction {
-  background: var(--color-auction);
-}
-
-.product-card__tag--direct {
-  background: var(--color-direct-sale);
-}
-
-.product-card__action {
-  justify-self: end;
-  margin-top: var(--space-2);
 }
 
 .content-band {
@@ -819,11 +734,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   .product-grid {
     grid-template-columns: 1fr;
     gap: var(--space-3);
-  }
-
-  .product-card__title {
-    font-size: 15px;
-    line-height: 22px;
   }
 
   .content-card__body {
