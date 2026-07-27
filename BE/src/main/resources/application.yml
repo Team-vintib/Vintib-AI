@@ -21,6 +21,9 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+    web:
+      pageable:
+        max-page-size: 100
 
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}

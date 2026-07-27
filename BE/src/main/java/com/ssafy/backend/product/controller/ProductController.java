@@ -1,6 +1,7 @@
 package com.ssafy.backend.product.controller;
 
 import com.ssafy.backend.global.response.ApiResponse;
+import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
@@ -11,6 +12,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -64,6 +67,22 @@ public class ProductController {
             @Valid @RequestBody ProductStatusUpdateRequest request) {
         Long sellerId = (Long) authentication.getPrincipal();
         ProductResponse response = productService.registerDirectSale(sellerId, id, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "상품 목록 조회",
+            description = "상시 판매/경매 여부와 관계없이 공개된 상품 목록을 최신순으로 조회한다. "
+                    + "DRAFT/PRIVATE 상태 상품은 목록에서 제외한다. "
+                    + "정렬은 항상 최신순(createdAt DESC)으로 고정되며, sort 파라미터를 보내도 무시된다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요")
+    })
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getProductList(
+            @PageableDefault(size = 20) Pageable pageable) {
+        PageResponse<ProductResponse> response = productService.getProductList(pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
