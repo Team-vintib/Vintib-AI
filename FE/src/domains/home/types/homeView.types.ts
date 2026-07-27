@@ -11,6 +11,7 @@ export interface HomeLiveCardItem {
   hostName: string
   scheduledAt?: string
   startedAt?: string
+  scheduledProductCount?: number
   viewerCount?: number
   reservationCount?: number
   categoryName?: string

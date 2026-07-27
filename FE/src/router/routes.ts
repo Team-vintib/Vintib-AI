@@ -106,6 +106,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '상품 목록' },
   },
   {
+    path: ROUTE_PATHS.PRODUCT_DETAIL,
+    name: ROUTE_NAMES.PRODUCT_DETAIL,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { title: '상품 상세' },
+  },
+  {
     path: ROUTE_PATHS.PRODUCT_CREATE,
     name: ROUTE_NAMES.PRODUCT_CREATE,
     component: () => import('@/shared/components/RoutePlaceholder.vue'),
@@ -116,6 +122,12 @@ export const routes: RouteRecordRaw[] = [
     name: ROUTE_NAMES.LIVE_CREATE,
     component: () => import('@/shared/components/RoutePlaceholder.vue'),
     meta: { requiresAuth: true, title: '라이브 시작' },
+  },
+  {
+    path: ROUTE_PATHS.LIVE_WATCH,
+    name: ROUTE_NAMES.LIVE_WATCH,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { title: '라이브 시청' },
   },
   {
     path: ROUTE_PATHS.NOTIFICATIONS,

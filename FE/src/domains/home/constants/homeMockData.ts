@@ -27,6 +27,17 @@ export const homeMockData: HomeViewMockData = {
       viewerCount: 86,
       startedAt: '2026-07-27T19:30:00+09:00',
     },
+    {
+      id: 103,
+      status: 'LIVE',
+      title: '레더 아우터 컬렉션 경매',
+      hostName: 'Heritage Depot',
+      categoryName: '아우터',
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=80',
+      viewerCount: 64,
+      startedAt: '2026-07-27T20:10:00+09:00',
+    },
   ],
   scheduledLives: [
     {
@@ -38,6 +49,7 @@ export const homeMockData: HomeViewMockData = {
       thumbnailUrl:
         'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=900&q=80',
       reservationCount: 42,
+      scheduledProductCount: 8,
       scheduledAt: '2026-07-28T21:00:00+09:00',
     },
     {
@@ -49,7 +61,20 @@ export const homeMockData: HomeViewMockData = {
       thumbnailUrl:
         'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=900&q=80',
       reservationCount: 31,
+      scheduledProductCount: 6,
       scheduledAt: '2026-07-29T20:30:00+09:00',
+    },
+    {
+      id: 203,
+      status: 'SCHEDULED',
+      title: '데님 팬츠 아카이브 프리뷰',
+      hostName: 'Blue Label',
+      categoryName: '하의',
+      thumbnailUrl:
+        'https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=900&q=80',
+      reservationCount: 27,
+      scheduledProductCount: 10,
+      scheduledAt: '2026-07-30T19:00:00+09:00',
     },
   ],
   directSaleProducts: [
@@ -104,6 +129,7 @@ export const homeMockData: HomeViewMockData = {
       categoryName: '신발',
       primaryImageUrl:
         'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=900&q=80',
+      price: 240000,
       startingBid: 150000,
       auctionStartsAt: '2026-07-30T21:00:00+09:00',
       isWished: true,
@@ -118,6 +144,7 @@ export const homeMockData: HomeViewMockData = {
       categoryName: '시계',
       primaryImageUrl:
         'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80',
+      price: 680000,
       startingBid: 420000,
       auctionStartsAt: '2026-07-31T20:00:00+09:00',
       isWished: false,
