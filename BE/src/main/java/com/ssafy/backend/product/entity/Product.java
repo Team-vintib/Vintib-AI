@@ -96,4 +96,10 @@ public class Product extends BaseTimeEntity {
         this.sizeLabel = sizeLabel;
         this.saleStatus = SaleStatus.DRAFT;
     }
+
+    public void registerDirectSale(Long price) {
+        this.saleType = SaleType.DIRECT_SALE;
+        this.price = price;
+        this.saleStatus = SaleStatus.ON_SALE;
+    }
 }
