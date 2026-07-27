@@ -10,13 +10,28 @@
   `app/shared/`, 기능은 `app/<도메인>/` 단위.
 - `requirements.txt` — 프로덕션 런타임 의존성.
 - `requirements-dev.txt` — CI/개발 도구(`ruff`, `black`, `pytest`, `httpx`) + `requirements.txt`.
-- `test/` — PoC·스파이크 코드 전용. **프로덕션 코드가 아니다.** `test/requirements-test.txt`에
-  무거운 ML 의존성(torch, transformers, sentence-transformers, FlagEmbedding, datasets 등)이
-  모여 있는데, **CI에는 설치되지 않는다**(아래 CI 섹션 참고) — 로컬에서 별도로
-  `pip install -r test/requirements-test.txt`가 필요하다.
+- `test/` — **실제 테스트 코드.** `app/<도메인>/` 구조를 그대로 미러한다
+  (`app/chat/` → `test/chat/`, `app/recommend/personalize/` → `test/recommend/personalize/`).
+  프로덕션과 같은 lint 기준을 적용받는다.
+- `validation/` — **PoC·스파이크 코드 전용. 프로덕션 코드가 아니다.**
+  `validation/requirements-test.txt`에 무거운 ML 의존성(torch, transformers,
+  sentence-transformers, FlagEmbedding, datasets 등)이 모여 있는데, **CI에는 설치되지 않는다**
+  (아래 CI 섹션 참고) — 로컬에서 별도로 `pip install -r validation/requirements-test.txt`가 필요하다.
 - `pyproject.toml` — `ruff`/`black`(`line-length=100`, `target-version=py312`) 설정과
-  `pytest` 설정. `test/AI_tryon/{tryondiffusion,catvton}`, `test/**/*.ipynb`는 외부/서드파티
-  코드·노트북이라 lint/format 대상에서 제외되어 있다.
+  `pytest` 설정. `validation/AI_tryon/{tryondiffusion,catvton}`, `validation/**/*.ipynb`는
+  외부/서드파티 코드·노트북이라 lint/format 대상에서 제외되어 있다.
+  `per-file-ignores`(`E402`/`BLE001`/`F401` 완화)는 **`validation/**` 에만** 걸려 있다 —
+  `test/`에 같이 걸면 테스트 코드의 미사용 import가 그냥 통과한다.
+
+### 추론 코드는 `AI/`에 두지 않는다
+
+`AI/docs/infra-architecture.md` §3.2가 규정한다 — **AI 게이트웨이는 추론을 직접 수행하지 않는
+얇은 계층**이다. 모델·추론 코드는 리포지토리 루트 `worker/`에 두고 팀원 노트북에서 실행한다
+(배포 대상 아님). `AI/app/`은 API 호출·라우팅·계약만 맡는다.
+
+배포 이미지에 torch가 없다는 게 이 규칙의 실질적 근거다 — `AI/requirements.txt`에 없고
+Dockerfile은 그것만 설치하므로, `app/` 안에 실모델 경로를 만들어도 **컨테이너에서는 동작하지
+않는다**(ai 컨테이너 `mem_limit: 1g`이기도 하다).
 
 ## 프로덕션 모듈 구조 (도메인 우선)
 
@@ -26,7 +41,7 @@
 
 - `app/main.py` — FastAPI 앱 생성 + 각 도메인 router 등록(`app.include_router(...)`)과 `/health`.
 - `app/core/` — 앱 전역 공통(cross-cutting). 설정(`config.py`), 이후 DB/Redis 클라이언트 등. (BE `global/` 대응)
-- `app/shared/` — 여러 도메인이 공유하는 유틸(모델 레지스트리·임베딩 로더 등). `test/`에서 승격 시 여기로.
+- `app/shared/` — 여러 도메인이 공유하는 유틸(모델 레지스트리·임베딩 로더 등). `validation/`에서 승격 시 여기로.
 - `app/<도메인>/` — 자체완결 기능 패키지. 내부 파일 규약:
   - `router.py` — API 레이어. `APIRouter`·엔드포인트, 요청 검증·응답 변환만. 로직은 service에 위임. (BE controller)
   - `service.py` — 도메인 비즈니스 로직. (BE service)
@@ -34,9 +49,24 @@
   - `pipeline/` (선택) — 오프라인 배치(임베딩·전처리 등, AI 특유). 무거운 ML import는 함수 내부 지연 import.
   - `dependencies.py`/`models.py`/`artifacts/`(gitignore) 등은 필요 시 추가.
 - **서빙 경로(router/service)는 표준 라이브러리·경량 의존성만** 두고, 무거운 오프라인 의존성(torch·CLIP·umap 등)은 서비스 런타임(`requirements.txt`)에서 분리한다. 예: 추천 파이프라인 의존성은 `requirements-pipeline.txt`(CI 미설치)에 두고, 서빙은 사전계산 아티팩트만 읽는다.
-- 도메인 테스트는 `app/<도메인>/tests/`에 두고, 무거운 의존성이 필요한 테스트는 `pytest.importorskip`로 가드한다(순수 로직/서빙 테스트는 CI에서 그대로 실행). `pyproject.toml`의 `[tool.pytest.ini_options] pythonpath=["."]`로 `import app...`이 해석된다.
+- 도메인 테스트는 **`test/<도메인>/`** 에 둔다(`app/` 아래에 `tests/`를 만들지 않는다). 무거운
+  의존성이 필요한 테스트는 `pytest.importorskip`로 가드한다(순수 로직/서빙 테스트는 CI에서 그대로
+  실행). `pyproject.toml`의 `[tool.pytest.ini_options] pythonpath=["."]`로 `import app...`이 해석된다.
 - 새 도메인은 위 파일 규약대로 만들고 `app/main.py`에 router를 prefix/tags와 함께 등록한다.
-- `test/`(PoC·스파이크)와 `app/`(프로덕션)은 명확히 분리한다 — `test/` 코드를 프로덕션에서 import하지 않는다.
+- `validation/`(PoC·스파이크)과 `app/`(프로덕션)은 명확히 분리한다 — `validation/` 코드를
+  프로덕션에서 import하지 않는다. 반대 방향(`test/`·`validation/`이 `app/`을 import)은 정상이다.
+
+### 테스트 배치 규칙 2가지 (지키지 않으면 수집이 깨진다)
+
+- **`test/` 아래에 `__init__.py`를 만들지 않는다.** 파이썬 표준 라이브러리에 `test` 패키지가 있어서
+  `test/__init__.py` + `pythonpath=["."]` 조합은 stdlib `test`를 가린다.
+- 그래서 pytest가 파일 경로가 아닌 **basename으로 모듈을 식별**한다 → **테스트 파일 이름은 리포
+  전체에서 유일해야 한다.** `test_<도메인>_<대상>.py` 규칙을 따른다
+  (`test_chat_service.py`, `test_recommend_service.py`처럼). 도메인이 달라도 `test_service.py`가
+  둘이면 수집 단계에서 에러가 난다.
+- 테스트에서 목업 데이터를 읽을 때 `Path(__file__)` 상대경로를 쓰지 않는다 — 데이터는 프로덕션
+  패키지(`app/<도메인>/data/`)에 있고 테스트는 `test/` 아래라 경로가 어긋난다. 프로덕션 모듈의
+  경로 상수를 재사용한다(예: `test/chat/test_chat_service.py`가 `app.chat.faq._DATA_DIR`를 씀).
 
 ## CI 규칙 — 커밋 전 반드시 로컬에서 통과시킬 것
 
@@ -57,8 +87,8 @@ black --check .   # 실패하면 black . 로 자동 정렬 후 diff를 리뷰
 pytest -q
 ```
 
-- **`AI/test/`에 파일을 새로 추가/수정했다면 위 3개(ruff/black/pytest)를 빠짐없이 돌릴 것.**
-  특히 `black --check`는 새로 만든 파일을 깜빡하고 안 돌리기 쉽다 — 실제로
+- **`AI/test/`·`AI/validation/`에 파일을 새로 추가/수정했다면 위 3개(ruff/black/pytest)를
+  빠짐없이 돌릴 것.** 특히 `black --check`는 새로 만든 파일을 깜빡하고 안 돌리기 쉽다 — 실제로
   `test_recommendation_benchmark.py`/`test_dataset.py`를 black 없이 커밋했다가 CI의
   `black --check .` 단계에서 실패한 적이 있다. 새 파일을 추가하는 커밋에서는 항상 위
   4단계를 순서대로 실행한 뒤 커밋할 것.
@@ -68,10 +98,10 @@ pytest -q
 
 ## 테스트 작성 규칙 — 무거운 ML 의존성 가드 필수
 
-CI는 `AI/requirements-dev.txt`만 설치하고 `AI/test/requirements-test.txt`(torch 등)는 설치하지
-않는다. `AI/test/` 아래에서 이런 무거운 라이브러리를 import하는 모듈을 대상으로 pytest 테스트를
-작성할 때는, 테스트 파일 최상단에서 `pytest.importorskip(...)`으로 감싸 CI(라이브러리 없는
-환경)에서 에러 없이 스킵되게 해야 한다:
+CI는 `AI/requirements-dev.txt`만 설치하고 `AI/validation/requirements-test.txt`(torch 등)는
+설치하지 않는다. `AI/test/`·`AI/validation/` 어느 쪽이든 이런 무거운 라이브러리를 import하는
+모듈을 대상으로 pytest 테스트를 작성할 때는, 테스트 파일 최상단에서
+`pytest.importorskip(...)`으로 감싸 CI(라이브러리 없는 환경)에서 에러 없이 스킵되게 해야 한다:
 
 ```python
 import pytest
@@ -84,11 +114,11 @@ from my_module import Something  # noqa: E402 — importorskip 이후 import
 순수 로직(표준 라이브러리만 사용하는 데이터 분리/전처리 함수 등)을 테스트할 때는 이 가드가
 필요 없다 — CI에서 그대로 실행된다.
 
-- 가드 적용 예: `test/model_selection/test_recommendation_benchmark.py`(torch 필요)
-- 가드 불필요 예: `test/recommendation-embedding-finetune/test_dataset.py`(순수 로직만, 무거운
-  의존성은 함수 내부에서 지연 import)
+- 가드 적용 예: `validation/model_selection/test_recommendation_benchmark.py`(torch 필요)
+- 가드 불필요 예: `validation/recommendation-embedding-finetune/test_dataset.py`(순수 로직만,
+  무거운 의존성은 함수 내부에서 지연 import)
 
-## `AI/test/` 코드 관례 (PoC/스파이크)
+## `AI/validation/` 코드 관례 (PoC/스파이크)
 
 - 모델 후보·설정은 `model_selection/model_registry.py`처럼 중앙 레지스트리에
   `{"이름": "HF 모델ID 또는 로컬 경로"}` 딕셔너리 + `ACTIVE_*` 상수로 관리한다 — 키 하나만

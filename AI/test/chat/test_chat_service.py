@@ -5,7 +5,6 @@
 """
 
 import json
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,6 +13,7 @@ from app.chat import registry
 from app.chat.answers import InMemoryAnswerStore
 from app.chat.classifier import RuleBasedClassifier
 from app.chat.faq import (
+    _DATA_DIR,
     MockRetriever,
     PgvectorRetriever,
     QuestionClusterer,
@@ -25,7 +25,10 @@ from app.chat.service import ChatModerationService, get_chat_service
 from app.chat.spam import InMemoryStateStore, SpamDetector
 from app.main import app
 
-_MOCK_COMMENTS = Path(__file__).resolve().parent.parent / "data" / "mock_comments.json"
+# 테스트가 test/ 아래로 옮겨져 __file__ 기준 상대경로를 쓸 수 없다. 목업 데이터는 프로덕션
+# 패키지(app/chat/data/)에 그대로 있으므로 그쪽 상수를 재사용한다.
+# (`from app.main import app` 이 `app` 패키지 이름을 가려서 `app.chat.__file__` 은 못 쓴다.)
+_MOCK_COMMENTS = _DATA_DIR / "mock_comments.json"
 
 # 목업 시나리오에서 근거가 있어 답변이 생성되는 클러스터 / 생성되지 않는 클러스터.
 GROUNDED_QUESTION = "이거 M 사이즈 있나요?"
