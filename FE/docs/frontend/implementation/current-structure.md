@@ -1,6 +1,6 @@
 # 현재 프로젝트 구조
 
-확인일: 2026-07-26
+확인일: 2026-07-27
 
 ## 기술 스택
 
@@ -103,9 +103,18 @@ src/
     home/
       api/
       components/
+        GuestHome.vue
+        HomeSearchPanel.vue
+        HomeSection.vue
+        LiveCard.vue
+        MemberHome.vue
+        ProductCard.vue
       constants/
+        homeMockData.ts
       pages/
+        HomePage.vue
       types/
+        homeView.types.ts
     search/
       api/
       components/
@@ -210,6 +219,8 @@ src/
       authTokenStorage.ts
       http.ts
     components/
+      GlobalNavigation.vue
+      RoutePlaceholder.vue
     composables/
     constants/
       routes.ts
@@ -271,7 +282,7 @@ docs/
 | `shared/components/`  | 2개 이상 도메인에서 재사용되는 UI 컴포넌트                                                        |
 | `shared/composables/` | 2개 이상 도메인에서 재사용되는 Composition API 함수                                               |
 | `shared/constants/`   | 라우트명, 전역 옵션 등 공통 상수. 현재 `routes.ts` 제공                                           |
-| `shared/layouts/`     | 인증, 기본 서비스, 라이브 등 공통 레이아웃. 현재 `AuthLayout`, `DefaultLayout`, `LiveLayout` 제공 |
+| `shared/layouts/`     | 인증, 기본 서비스, 라이브 등 공통 레이아웃. 현재 `AuthLayout`, `DefaultLayout`, `LiveLayout` 제공. `DefaultLayout`은 화면별 `contentMaxWidth` 지정 가능 |
 | `shared/types/`       | 공통 API 응답, pagination 등 전역 타입. 현재 `api.types.ts` 제공                                  |
 | `shared/utils/`       | 포맷터, 검증기 등 순수 유틸 함수                                                                  |
 
@@ -281,14 +292,15 @@ docs/
 - Tailwind import는 `src/assets/tailwind.css`에서 담당합니다.
 - 디자인 토큰과 전역 reset은 `src/assets/main.scss`에서 담당합니다.
 - 색상, 간격, radius, 버튼 높이 등 디자인 값은 CSS 변수로 관리합니다.
-- `DefaultLayout`은 전역 reset과 무관하게 중앙 1320px 콘텐츠 폭과 반응형 바깥 여백을
-  유지하도록 scoped SCSS를 사용합니다.
+- `DefaultLayout`은 전역 reset과 무관하게 중앙 콘텐츠 폭과 반응형 바깥 여백을 유지하도록 scoped SCSS를 사용합니다.
+- 기본 콘텐츠 폭은 `--layout-content-max-width`이며, 화면에서 `contentMaxWidth` prop으로
+  폭을 조정할 수 있습니다. 홈 화면은 `1200px`을 사용합니다.
 
 ## 구현 상태
 
 - 라우터는 `router/routes.ts`로 route 배열을 분리했으며 AUTH-001~AUTH-004 후보,
-  ONBOARD-001~ONBOARD-004, BIZ-001·BIZ-001-2와 공개 PROD-008 route가 등록되어
-  있습니다.
+  ONBOARD-001~ONBOARD-004, BIZ-001·BIZ-001-2, HOME, LIVE placeholder, 공개 PROD-008
+  route가 등록되어 있습니다.
 - `router/index.ts`에는 `requiresAuth`, `guestOnly` 메타 기반 인증 guard가 구현되어 있습니다.
 - `App.vue`는 `RouterView`만 렌더링합니다.
 - 기능 ID prefix 기준 도메인 폴더와 공통 폴더가 생성되어 있습니다.
@@ -296,7 +308,11 @@ docs/
 - `domains/onboard`에는 기본 정보, 관심 정보, AI 시착 정보 입력·저장 화면과 ONBOARD-004 이동 확인용 임시 화면 및 관련 API·컴포넌트가 구현되어 있습니다.
 - `domains/biz`에는 BIZ-001 사업자 정보 입력·검증 화면, 사업자등록증 이미지 선택
   컴포넌트, FE 더미 제출 상태 store와 BIZ-001-2 인증 대기 화면이 구현되어 있습니다.
-  실제 인증 API와 HOME 화면은 후속 작업 대기 중입니다.
+  실제 인증 API는 후속 작업 대기 중입니다.
+- `domains/home`에는 HOME 공개 route, 로그인 여부에 따른 `GuestHome`/`MemberHome`
+  분기, 홈 검색 패널, 섹션 shell, 라이브 카드, 상품 카드, 화면 확인용 mock 데이터와
+  view model 타입이 구현되어 있습니다. 실제 홈 API와 empty/loading/error 상태는 후속
+  작업 대기 중입니다.
 - `domains/product`에는 PROD-008 상품 목록 껍데기 View, 필터와 카드 컴포넌트,
   목록 타입과 화면 확인용 mock 데이터가 구현되어 있습니다. 실제 조회·필터·정렬·찜
   API와 상세 이동은 후속 작업 대기 중입니다.
