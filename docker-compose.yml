@@ -106,6 +106,12 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      WORKER_API_KEY: ${WORKER_API_KEY}
+      PUBLIC_BASE_URL: https://i15a108.p.ssafy.io
+      RESULTS_DIR: /app/results
+    volumes:
+      - results-data:/app/results                                      
     networks:
       - vintib-net
     mem_limit: 1g
@@ -127,3 +133,4 @@ networks:
 volumes:
   postgres-data:
   redis-data:
+  results-data:
