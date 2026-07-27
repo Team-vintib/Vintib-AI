@@ -4,6 +4,17 @@ import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 
 export const routes: RouteRecordRaw[] = [
   {
+    path: ROUTE_PATHS.HOME,
+    name: ROUTE_NAMES.HOME,
+    component: () => import('@/domains/home/pages/HomePage.vue'),
+  },
+  {
+    path: ROUTE_PATHS.FOLLOWING_HOME,
+    name: ROUTE_NAMES.FOLLOWING_HOME,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { requiresAuth: true, title: '팔로잉 홈' },
+  },
+  {
     path: ROUTE_PATHS.AUTH_LOGIN,
     name: ROUTE_NAMES.AUTH_LOGIN,
     component: () => import('@/domains/auth/pages/LoginPage.vue'),
@@ -84,8 +95,57 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/domains/biz/pages/BusinessVerificationPendingPage.vue'),
   },
   {
+    path: ROUTE_PATHS.LIVE_LIST,
+    name: ROUTE_NAMES.LIVE_LIST,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { title: '라이브 목록' },
+  },
+  {
     path: ROUTE_PATHS.PRODUCT_LIST,
     name: ROUTE_NAMES.PRODUCT_LIST,
     component: () => import('@/domains/product/pages/ProductListView.vue'),
+    meta: { title: '상품 목록' },
+  },
+  {
+    path: ROUTE_PATHS.PRODUCT_DETAIL,
+    name: ROUTE_NAMES.PRODUCT_DETAIL,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { title: '상품 상세' },
+  },
+  {
+    path: ROUTE_PATHS.PRODUCT_CREATE,
+    name: ROUTE_NAMES.PRODUCT_CREATE,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { requiresAuth: true, title: '상품 등록' },
+  },
+  {
+    path: ROUTE_PATHS.LIVE_CREATE,
+    name: ROUTE_NAMES.LIVE_CREATE,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { requiresAuth: true, title: '라이브 시작' },
+  },
+  {
+    path: ROUTE_PATHS.LIVE_WATCH,
+    name: ROUTE_NAMES.LIVE_WATCH,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { title: '라이브 시청' },
+  },
+  {
+    path: ROUTE_PATHS.NOTIFICATIONS,
+    name: ROUTE_NAMES.NOTIFICATIONS,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { requiresAuth: true, title: '알림센터' },
+  },
+  {
+    path: ROUTE_PATHS.MY,
+    name: ROUTE_NAMES.MY,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { requiresAuth: true, title: '마이페이지' },
+  },
+  {
+    path: ROUTE_PATHS.POINT,
+    name: ROUTE_NAMES.POINT,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { requiresAuth: true, title: '포인트' },
   },
 ]

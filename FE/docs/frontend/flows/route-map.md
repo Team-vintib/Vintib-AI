@@ -54,6 +54,37 @@ flowchart TD
   Biz --> BizPending
 ```
 
+## 홈 흐름
+
+```mermaid
+flowchart TD
+  Home["HOME /"]
+  GuestHome["GuestHome"]
+  MemberHome["MemberHome"]
+  Search["SEARCH /search?keyword=..."]
+  LiveList["LIVE /lives"]
+  LiveWatch["LIVE /lives/:liveId"]
+  ProductList["PROD-008 /products"]
+  ProductDetail["PROD-006 /products/:productId"]
+  FollowingHome["HOME-002 /following"]
+  Login["AUTH-002 /auth/login"]
+
+  Home --> GuestHome
+  Home --> MemberHome
+  GuestHome --> Search
+  GuestHome --> LiveList
+  GuestHome --> LiveWatch
+  GuestHome --> ProductList
+  GuestHome --> ProductDetail
+  GuestHome --> Login
+  MemberHome --> Search
+  MemberHome --> LiveList
+  MemberHome --> LiveWatch
+  MemberHome --> ProductList
+  MemberHome --> ProductDetail
+  MemberHome --> FollowingHome
+```
+
 ## 상품 탐색 흐름
 
 ```mermaid
@@ -82,4 +113,15 @@ flowchart TD
 | `/onboarding/member-type` | ONBOARD-004 | false        | false     | 회원가입 응답의 인증 토큰 계약 확정 전 임시      |
 | `/business/verification`  | BIZ-001     | false        | false     | 사업자 회원 정보 제출, 인증 계약 확정 전 임시    |
 | `/business/verification/pending` | BIZ-001-2 | false   | false     | FE 메모리 제출 상태가 없으면 BIZ-001로 이동      |
+| `/`                       | HOME        | false        | false     | 로그인 상태에 따라 비로그인/회원 홈 렌더링       |
+| `/following`              | HOME-002    | true         | false     | 팔로잉 홈 placeholder, 회원 홈 CTA에서 진입       |
+| `/search`                 | SEARCH      | false        | false     | 홈 검색 패널에서 `keyword` query로 진입, 상세 UI 대기 |
+| `/lives`                  | LIVE        | false        | false     | 라이브 목록 placeholder                          |
 | `/products`               | PROD-008    | false        | false     | 공개 상품 목록 껍데기, 실제 조회 API 연동 대기   |
+| `/products/:productId`    | PROD-006    | false        | false     | 상품 상세 placeholder                            |
+| `/products/new`           | PROD 신규   | true         | false     | 상품 등록 placeholder                            |
+| `/lives/new`              | LIVE 신규   | true         | false     | 라이브 시작 placeholder                          |
+| `/lives/:liveId`          | LIVE 시청   | false        | false     | 라이브 시청 placeholder                          |
+| `/notifications`          | NOTI        | true         | false     | 알림센터 placeholder                             |
+| `/my`                     | MY          | true         | false     | 마이페이지 placeholder                           |
+| `/points`                 | POINT       | true         | false     | 포인트 placeholder                               |

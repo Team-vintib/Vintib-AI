@@ -16,14 +16,14 @@
 | ONBOARD-001 | 기본 정보 입력            | 회원             | `/onboarding/basic-info`  | 2             | FE 완료, BE API 대기                                     |
 | ONBOARD-002 | 관심 브랜드/카테고리 설정 | 회원             | `/onboarding/interests`   | 2             | FE 완료, BE API 대기                                     |
 | ONBOARD-003 | 전신 사진/신체 정보 등록  | 회원             | `/onboarding/try-on`      | 2             | FE 완료, 저장 BE API 대기                                |
-| ONBOARD-004 | 일반/사업자 회원 선택     | 회원             | `/onboarding/member-type` | 2             | FE 완료, 저장 BE API 및 목적지 화면 대기                 |
-| BIZ-001     | 사업자 정보 제출          | 사업자 회원      | `/business/verification`  | 2             | FE 입력 제약·더미 제출·BIZ-001-2 인증 대기 화면 완료, BE API 대기 |
+| ONBOARD-004 | 일반/사업자 회원 선택     | 회원             | `/onboarding/member-type` | 2             | FE 완료, 저장 BE API 대기. 일반은 HOME, 사업자는 BIZ-001로 이동 |
+| BIZ-001     | 사업자 정보 제출          | 사업자 회원      | `/business/verification`  | 2             | FE 입력 제약·더미 제출·BIZ-001-2 인증 대기 화면과 HOME 이동 완료, BE API 대기 |
 
 ## 이후 화면 묶음
 
 | 묶음                | 화면 ID                                                        | 상태   |
 | ------------------- | -------------------------------------------------------------- | ------ |
-| 홈/탐색             | HOME-001, HOME-002, SEARCH-001, SEARCH-002                     | 미구현 |
+| 홈/탐색             | HOME-001, HOME-002, SEARCH-001, SEARCH-002                     | HOME-001/002 홈 화면 구현, SEARCH는 `/search` route 후보만 연결 |
 | 상품                | PROD-001~008                                                   | PROD-008 껍데기 화면 구현, 나머지 미구현 |
 | 라이브              | LIVE-001~007                                                   | 미구현 |
 | 경매                | AUCT-001~014                                                   | 미구현 |
