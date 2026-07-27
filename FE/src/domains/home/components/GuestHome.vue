@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import HomeSection from '@/domains/home/components/HomeSection.vue'
 import { homeMockData } from '@/domains/home/constants/homeMockData'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
@@ -90,15 +91,12 @@ const getProductPath = (productId: number) => `/products/${productId}`
       </div>
     </section>
 
-    <section class="home-section" aria-labelledby="live-now-title">
-      <div class="home-section__header">
-        <div>
-          <p class="home-section__eyebrow">Live now</p>
-          <h2 id="live-now-title" class="home-section__title">지금 진행 중인 라이브</h2>
-        </div>
-        <RouterLink class="home-section__link" :to="ROUTE_PATHS.LIVE_LIST">전체보기</RouterLink>
-      </div>
-
+    <HomeSection
+      title-id="live-now-title"
+      eyebrow="Live now"
+      title="지금 진행 중인 라이브"
+      :link-to="ROUTE_PATHS.LIVE_LIST"
+    >
       <div class="live-grid">
         <article v-for="live in homeMockData.liveNow" :key="live.id" class="live-card">
           <span class="live-card__media">
@@ -114,17 +112,14 @@ const getProductPath = (productId: number) => `/products/${productId}`
           </span>
         </article>
       </div>
-    </section>
+    </HomeSection>
 
-    <section class="home-section" aria-labelledby="scheduled-live-title">
-      <div class="home-section__header">
-        <div>
-          <p class="home-section__eyebrow">Upcoming</p>
-          <h2 id="scheduled-live-title" class="home-section__title">예약 라이브</h2>
-        </div>
-        <RouterLink class="home-section__link" :to="ROUTE_PATHS.LIVE_LIST">전체보기</RouterLink>
-      </div>
-
+    <HomeSection
+      title-id="scheduled-live-title"
+      eyebrow="Upcoming"
+      title="예약 라이브"
+      :link-to="ROUTE_PATHS.LIVE_LIST"
+    >
       <div class="schedule-grid">
         <article v-for="live in homeMockData.scheduledLives" :key="live.id" class="schedule-card">
           <span class="schedule-card__media">
@@ -146,17 +141,14 @@ const getProductPath = (productId: number) => `/products/${productId}`
           </span>
         </article>
       </div>
-    </section>
+    </HomeSection>
 
-    <section class="home-section" aria-labelledby="product-title">
-      <div class="home-section__header">
-        <div>
-          <p class="home-section__eyebrow">Products</p>
-          <h2 id="product-title" class="home-section__title">판매 상품</h2>
-        </div>
-        <RouterLink class="home-section__link" :to="ROUTE_PATHS.PRODUCT_LIST">전체보기</RouterLink>
-      </div>
-
+    <HomeSection
+      title-id="product-title"
+      eyebrow="Products"
+      title="판매 상품"
+      :link-to="ROUTE_PATHS.PRODUCT_LIST"
+    >
       <div class="product-grid">
         <RouterLink
           v-for="product in homeMockData.directSaleProducts"
@@ -176,17 +168,14 @@ const getProductPath = (productId: number) => `/products/${productId}`
           </span>
         </RouterLink>
       </div>
-    </section>
+    </HomeSection>
 
-    <section class="home-section" aria-labelledby="auction-title">
-      <div class="home-section__header">
-        <div>
-          <p class="home-section__eyebrow">Auction</p>
-          <h2 id="auction-title" class="home-section__title">경매 예정 상품</h2>
-        </div>
-        <RouterLink class="home-section__link" :to="ROUTE_PATHS.PRODUCT_LIST">전체보기</RouterLink>
-      </div>
-
+    <HomeSection
+      title-id="auction-title"
+      eyebrow="Auction"
+      title="경매 예정 상품"
+      :link-to="ROUTE_PATHS.PRODUCT_LIST"
+    >
       <div class="product-grid product-grid--auction">
         <article
           v-for="product in homeMockData.upcomingAuctionProducts"
@@ -212,7 +201,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
           </span>
         </article>
       </div>
-    </section>
+    </HomeSection>
 
     <section class="content-band" aria-label="홈 콘텐츠">
       <RouterLink
@@ -247,7 +236,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
 
 .home-search-panel,
 .home-hero,
-.home-section,
 .content-band {
   width: 100%;
 }
@@ -404,8 +392,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
   padding: var(--space-10);
 }
 
-.home-hero__eyebrow,
-.home-section__eyebrow {
+.home-hero__eyebrow {
   color: var(--color-primary);
   font-size: 13px;
   font-weight: 800;
@@ -443,32 +430,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   border: 1px solid rgba(255, 255, 255, 0.42);
   background: rgba(255, 255, 255, 0.1);
   color: var(--color-text-inverse);
-}
-
-.home-section {
-  display: grid;
-  gap: var(--space-5);
-}
-
-.home-section__header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.home-section__title {
-  margin-top: var(--space-1);
-  color: var(--color-text-primary);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 34px;
-}
-
-.home-section__link {
-  color: var(--color-primary);
-  font-size: 14px;
-  font-weight: 800;
 }
 
 .live-grid,
@@ -802,15 +763,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   .home-hero__description {
     font-size: 15px;
     line-height: 24px;
-  }
-
-  .home-section__header {
-    align-items: flex-start;
-  }
-
-  .home-section__title {
-    font-size: 22px;
-    line-height: 31px;
   }
 
   .live-grid,
