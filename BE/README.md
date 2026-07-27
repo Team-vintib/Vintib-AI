@@ -187,6 +187,9 @@ BE/
 │   │   ├── controller/
 │   │   ├── service/
 │   │   └── dto/response/        # 카드 DTO는 현재 Mock 응답용 (2주차 실데이터 연결)
+│   ├── live/                    # 라이브 방 개설/조회/상태 전이 (LIVE) — 정윤
+│   │   ├── entity/              # Live, LiveStatus
+│   │   └── repository/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
 │       ├── client/              # AiClient — Spring → FastAPI
 │       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig
