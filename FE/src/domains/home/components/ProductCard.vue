@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import type { HomeProductCardItem } from '@/domains/home/types/homeView.types'
 import type { RouteLocationRaw } from 'vue-router'
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
     product: HomeProductCardItem
     to?: RouteLocationRaw
@@ -25,9 +24,6 @@ const props = withDefaults(
   },
 )
 
-const rootComponent = computed(() => (props.to ? RouterLink : 'article'))
-const rootProps = computed(() => (props.to ? { to: props.to } : {}))
-
 const formatPrice = (value?: number) => {
   if (value === undefined) {
     return '가격 확인'
@@ -38,7 +34,10 @@ const formatPrice = (value?: number) => {
 </script>
 
 <template>
-  <component :is="rootComponent" class="product-card" v-bind="rootProps">
+  <article class="product-card">
+    <RouterLink v-if="to" class="product-card__overlay-link" :to="to">
+      <span class="product-card__overlay-text">{{ product.title }} 상세 보기</span>
+    </RouterLink>
     <span class="product-card__media">
       <img class="product-card__image" :src="product.primaryImageUrl" :alt="product.title" />
       <span
@@ -65,7 +64,7 @@ const formatPrice = (value?: number) => {
         {{ actionLabel }}
       </RouterLink>
     </span>
-  </component>
+  </article>
 </template>
 
 <style scoped lang="scss">
@@ -87,6 +86,23 @@ const formatPrice = (value?: number) => {
   border-color: #ded8ce;
   box-shadow: 0 10px 26px rgb(18 18 18 / 7%);
   transform: translateY(-2px);
+}
+
+.product-card__overlay-link {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+}
+
+.product-card__overlay-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .product-card__media {
@@ -180,6 +196,8 @@ const formatPrice = (value?: number) => {
 }
 
 .product-card__action {
+  position: relative;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   justify-content: center;
