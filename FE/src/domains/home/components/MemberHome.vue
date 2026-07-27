@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import HomeSection from '@/domains/home/components/HomeSection.vue'
+import LiveCard from '@/domains/home/components/LiveCard.vue'
 import { homeMockData } from '@/domains/home/constants/homeMockData'
 import type { HomeLiveStatus } from '@/domains/home/types/homeView.types'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
@@ -165,24 +166,12 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
       :link-to="ROUTE_PATHS.LIVE_LIST"
     >
       <div class="live-grid">
-        <RouterLink
+        <LiveCard
           v-for="live in homeMockData.liveNow"
           :key="live.id"
-          class="live-card"
+          :live="live"
           :to="getLivePath(live.id)"
-        >
-          <span class="live-card__media">
-            <img class="live-card__image" :src="live.thumbnailUrl" :alt="live.title" />
-            <span class="live-card__badge">LIVE</span>
-          </span>
-          <span class="live-card__body">
-            <strong class="live-card__title">{{ live.title }}</strong>
-            <span class="live-card__meta">판매자 {{ live.hostName }}</span>
-            <span class="live-card__meta live-card__meta--time"
-              >시작 시간 {{ formatSchedule(live.startedAt) }}</span
-            >
-          </span>
-        </RouterLink>
+        />
       </div>
     </HomeSection>
 
@@ -193,25 +182,14 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
       :link-to="ROUTE_PATHS.LIVE_LIST"
     >
       <div class="schedule-grid">
-        <article v-for="live in homeMockData.scheduledLives" :key="live.id" class="schedule-card">
-          <span class="schedule-card__media">
-            <img class="schedule-card__image" :src="live.thumbnailUrl" :alt="live.title" />
-            <span class="schedule-card__time">{{ formatSchedule(live.scheduledAt) }}</span>
-          </span>
-          <span class="schedule-card__body">
-            <strong class="schedule-card__title">{{ live.title }}</strong>
-            <span class="schedule-card__meta">판매자 {{ live.hostName }}</span>
-            <span class="schedule-card__meta schedule-card__meta--time"
-              >예정 일자 {{ formatSchedule(live.scheduledAt) }}</span
-            >
-            <span class="schedule-card__meta"
-              >예정 상품 {{ live.scheduledProductCount ?? 0 }}개</span
-            >
-            <RouterLink class="schedule-card__action" :to="getLivePath(live.id)">
-              방송 알림 받기
-            </RouterLink>
-          </span>
-        </article>
+        <LiveCard
+          v-for="live in homeMockData.scheduledLives"
+          :key="live.id"
+          :live="live"
+          variant="scheduled"
+          :action-to="getLivePath(live.id)"
+          action-label="방송 알림 받기"
+        />
       </div>
     </HomeSection>
 
@@ -517,8 +495,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 }
 
 .seller-card,
-.live-card,
-.schedule-card,
 .product-card,
 .content-card {
   position: relative;
@@ -534,8 +510,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 }
 
 .seller-card:hover,
-.live-card:hover,
-.schedule-card:hover,
 .product-card:hover,
 .content-card:hover {
   border-color: #ded8ce;
@@ -544,14 +518,11 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 }
 
 .seller-card,
-.live-card,
-.schedule-card {
+.product-card {
   display: grid;
 }
 
 .seller-card__cover,
-.live-card__media,
-.schedule-card__media,
 .product-card__media {
   position: relative;
   display: block;
@@ -559,9 +530,7 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   background: var(--color-surface-secondary);
 }
 
-.seller-card__cover,
-.live-card__media,
-.schedule-card__media {
+.seller-card__cover {
   aspect-ratio: 16 / 9;
 }
 
@@ -578,8 +547,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 }
 
 .seller-card__cover-image,
-.live-card__image,
-.schedule-card__image,
 .product-card__image,
 .content-card__image {
   width: 100%;
@@ -588,7 +555,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 }
 
 .seller-card__status,
-.live-card__badge,
 .product-card__tag {
   position: absolute;
   z-index: 1;
@@ -615,40 +581,7 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   background: var(--color-live);
 }
 
-.live-card__badge {
-  gap: 6px;
-  height: 28px;
-  background: #b83f42;
-}
-
-.live-card__badge::before {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  content: '';
-}
-
-.schedule-card__time {
-  position: absolute;
-  z-index: 1;
-  top: var(--space-3);
-  left: var(--space-3);
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: var(--space-2);
-  background: rgba(14, 17, 16, 0.66);
-  color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 18px;
-}
-
 .seller-card__body,
-.live-card__body,
-.schedule-card__body,
 .product-card__body {
   display: grid;
   gap: var(--space-2);
@@ -677,8 +610,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 
 .seller-card__name,
 .seller-card__live-title,
-.live-card__title,
-.schedule-card__title,
 .product-card__title {
   color: var(--color-text-primary);
   display: -webkit-box;
@@ -699,8 +630,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 
 .seller-card__specialty,
 .seller-card__stats,
-.live-card__meta,
-.schedule-card__meta,
 .product-card__seller,
 .product-card__meta {
   color: var(--color-text-muted);
@@ -709,9 +638,7 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   line-height: 20px;
 }
 
-.seller-card__time,
-.live-card__meta--time,
-.schedule-card__meta--time {
+.seller-card__time {
   color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 500;
@@ -744,27 +671,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
-}
-
-.schedule-card__action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  height: 40px;
-  padding: 0 var(--space-4);
-  justify-self: end;
-  margin-top: var(--space-2);
-  border-radius: 12px;
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
-}
-
-.product-card {
-  display: grid;
 }
 
 .product-card__brand {
@@ -915,9 +821,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
     gap: var(--space-3);
   }
 
-  .seller-card__live-title,
-  .live-card__title,
-  .schedule-card__title,
   .product-card__title {
     font-size: 15px;
     line-height: 22px;

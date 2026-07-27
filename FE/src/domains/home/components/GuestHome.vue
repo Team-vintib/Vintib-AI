@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import HomeSection from '@/domains/home/components/HomeSection.vue'
+import LiveCard from '@/domains/home/components/LiveCard.vue'
 import { homeMockData } from '@/domains/home/constants/homeMockData'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
@@ -18,21 +19,6 @@ const formatPrice = (value?: number) => {
   return `${value.toLocaleString('ko-KR')}원`
 }
 
-const formatSchedule = (value?: string) => {
-  if (!value) {
-    return '일정 확인'
-  }
-
-  return new Intl.DateTimeFormat('ko-KR', {
-    month: 'long',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(new Date(value))
-}
-
-const getLivePath = (liveId: number) => `/lives/${liveId}`
 const getProductPath = (productId: number) => `/products/${productId}`
 </script>
 
@@ -98,19 +84,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
       :link-to="ROUTE_PATHS.LIVE_LIST"
     >
       <div class="live-grid">
-        <article v-for="live in homeMockData.liveNow" :key="live.id" class="live-card">
-          <span class="live-card__media">
-            <img class="live-card__image" :src="live.thumbnailUrl" :alt="live.title" />
-            <span class="live-card__badge">LIVE</span>
-          </span>
-          <span class="live-card__body">
-            <strong class="live-card__title">{{ live.title }}</strong>
-            <span class="live-card__meta">판매자 {{ live.hostName }}</span>
-            <span class="live-card__meta live-card__meta--time"
-              >시작 시간 {{ formatSchedule(live.startedAt) }}</span
-            >
-          </span>
-        </article>
+        <LiveCard v-for="live in homeMockData.liveNow" :key="live.id" :live="live" />
       </div>
     </HomeSection>
 
@@ -121,25 +95,14 @@ const getProductPath = (productId: number) => `/products/${productId}`
       :link-to="ROUTE_PATHS.LIVE_LIST"
     >
       <div class="schedule-grid">
-        <article v-for="live in homeMockData.scheduledLives" :key="live.id" class="schedule-card">
-          <span class="schedule-card__media">
-            <img class="schedule-card__image" :src="live.thumbnailUrl" :alt="live.title" />
-            <span class="schedule-card__time">{{ formatSchedule(live.scheduledAt) }}</span>
-          </span>
-          <span class="schedule-card__body">
-            <strong class="schedule-card__title">{{ live.title }}</strong>
-            <span class="schedule-card__meta">판매자 {{ live.hostName }}</span>
-            <span class="schedule-card__meta schedule-card__meta--time"
-              >예정 일자 {{ formatSchedule(live.scheduledAt) }}</span
-            >
-            <span class="schedule-card__meta"
-              >예정 상품 {{ live.scheduledProductCount ?? 0 }}개</span
-            >
-            <RouterLink class="schedule-card__action" :to="ROUTE_PATHS.AUTH_LOGIN">
-              방송 알림 받기
-            </RouterLink>
-          </span>
-        </article>
+        <LiveCard
+          v-for="live in homeMockData.scheduledLives"
+          :key="live.id"
+          :live="live"
+          variant="scheduled"
+          :action-to="ROUTE_PATHS.AUTH_LOGIN"
+          action-label="방송 알림 받기"
+        />
       </div>
     </HomeSection>
 
@@ -440,8 +403,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   gap: var(--space-5);
 }
 
-.live-card,
-.schedule-card,
 .product-card,
 .content-card {
   position: relative;
@@ -456,8 +417,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
     transform 160ms ease;
 }
 
-.live-card:hover,
-.schedule-card:hover,
 .product-card:hover,
 .content-card:hover {
   border-color: #ded8ce;
@@ -465,13 +424,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   transform: translateY(-2px);
 }
 
-.live-card,
-.schedule-card {
-  display: grid;
-}
-
-.live-card__media,
-.schedule-card__media,
 .product-card__media {
   position: relative;
   display: block;
@@ -479,17 +431,10 @@ const getProductPath = (productId: number) => `/products/${productId}`
   background: var(--color-surface-secondary);
 }
 
-.live-card__media,
-.schedule-card__media {
-  aspect-ratio: 16 / 9;
-}
-
 .product-card__media {
   aspect-ratio: 16 / 9;
 }
 
-.live-card__image,
-.schedule-card__image,
 .product-card__image,
 .content-card__image {
   width: 100%;
@@ -503,47 +448,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   background: linear-gradient(180deg, rgba(14, 17, 16, 0.18), rgba(14, 17, 16, 0.82));
 }
 
-.live-card__badge {
-  position: absolute;
-  z-index: 1;
-}
-
-.live-card__badge {
-  top: var(--space-3);
-  left: var(--space-3);
-}
-
-.live-card__body,
-.schedule-card__body {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-5);
-  background: var(--color-surface);
-}
-
-.live-card__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: var(--space-2);
-  background: #b83f42;
-  color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 18px;
-}
-
-.live-card__badge::before {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  content: '';
-}
-
-.schedule-card__time,
 .product-card__tag,
 .product-card__time {
   display: inline-flex;
@@ -556,7 +460,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   line-height: 18px;
 }
 
-.schedule-card__time,
 .product-card__time {
   position: absolute;
   z-index: 1;
@@ -564,14 +467,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   color: var(--color-text-inverse);
 }
 
-.live-card__category {
-  color: var(--color-live-text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.live-card__title,
-.schedule-card__title,
 .product-card__title {
   color: var(--color-text-primary);
   display: -webkit-box;
@@ -583,9 +478,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   -webkit-line-clamp: 2;
 }
 
-.live-card__host,
-.live-card__meta,
-.schedule-card__meta,
 .product-card__meta,
 .product-card__seller {
   color: var(--color-text-muted);
@@ -594,14 +486,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   line-height: 20px;
 }
 
-.live-card__meta--time,
-.schedule-card__meta--time {
-  color: var(--color-text-secondary);
-  font-weight: 500;
-}
-
-.live-card__action,
-.schedule-card__action,
 .product-card__action {
   display: inline-flex;
   align-items: center;
@@ -615,15 +499,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
-}
-
-.live-card__action {
-  background: var(--color-live);
-}
-
-.schedule-card__time {
-  top: var(--space-3);
-  left: var(--space-3);
 }
 
 .product-card {
@@ -695,7 +570,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   color: var(--color-auction);
 }
 
-.schedule-card__action,
 .product-card__action {
   justify-self: end;
   margin-top: var(--space-2);
@@ -809,8 +683,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
     gap: var(--space-3);
   }
 
-  .live-card__title,
-  .schedule-card__title,
   .product-card__title {
     font-size: 15px;
     line-height: 22px;
