@@ -45,6 +45,7 @@ BE/AI 코드는 직접 수정하지 않습니다. BE나 AI 쪽 변경이 필요�
 - `src/` 변경 전에는 관련 화면의 요구사항 문서를 먼저 확인합니다.
 - `src/` 변경 전에는 관련 프로토타입과 Figma Wireframe을 확인하고, 현재 구현된 유사 페이지의 디자인 구성을 함께 참고합니다.
 - `확인 필요`, `미확정`, `설계 제안`으로 표시된 항목은 확정값처럼 구현하지 않습니다.
+- API 요청/응답 필드는 FE에서 임의로 확정하지 않습니다. Swagger, `APIs.md`, DB/기능 문서로 확인되지 않은 필드는 `임시 view model`, `Mock 전용`, `BE 확인 필요`처럼 표시하고, BE 판단이 필요하면 루트 `.claude/requests/be/`에 요청 문서를 남깁니다.
 - 충돌 또는 미확정 사항은 `docs/frontend/decisions/open-questions.md`에 기록합니다.
 - 새 라이브러리는 팀 합의 없이 설치하지 않습니다.
 - Git commit, push, checkout, reset은 명시 요청 없이는 실행하지 않습니다.
