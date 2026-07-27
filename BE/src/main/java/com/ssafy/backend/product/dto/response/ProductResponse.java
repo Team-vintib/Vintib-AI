@@ -16,6 +16,7 @@ public record ProductResponse(
         String sizeLabel,
         SaleType saleType,
         SaleStatus saleStatus,
+        Long price,
         LocalDateTime createdAt) {
 
     public static ProductResponse from(Product product) {
@@ -30,6 +31,7 @@ public record ProductResponse(
                 product.getSizeLabel(),
                 product.getSaleType(),
                 product.getSaleStatus(),
+                product.getPrice(),
                 product.getCreatedAt());
     }
 }

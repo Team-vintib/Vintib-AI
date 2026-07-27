@@ -5,8 +5,10 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
+import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,5 +38,22 @@ public class ProductService {
                 .build();
 
         return ProductResponse.from(productRepository.save(product));
+    }
+
+    @Transactional
+    public ProductResponse registerDirectSale(Long sellerId, Long productId, ProductStatusUpdateRequest request) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        if (!product.getSeller().getId().equals(sellerId)) {
+            throw new CustomException(ErrorCode.NOT_PRODUCT_OWNER);
+        }
+        if (product.getSaleStatus() != SaleStatus.DRAFT) {
+            throw new CustomException(ErrorCode.INVALID_PRODUCT_STATE);
+        }
+
+        product.registerDirectSale(request.price());
+
+        return ProductResponse.from(product);
     }
 }

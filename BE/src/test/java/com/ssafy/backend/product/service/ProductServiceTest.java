@@ -9,9 +9,11 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
+import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.SaleStatus;
+import com.ssafy.backend.product.entity.SaleType;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +67,53 @@ class ProductServiceTest {
         ProductCreateRequest request = new ProductCreateRequest("빈티지 자켓", null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void DRAFT_상품에_가격을_설정하면_상시_판매_상태로_전환된다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductResponse response =
+                productService.registerDirectSale(SELLER_ID, 1L, new ProductStatusUpdateRequest(50000L));
+
+        assertThat(response.saleStatus()).isEqualTo(SaleStatus.ON_SALE);
+        assertThat(response.saleType()).isEqualTo(SaleType.DIRECT_SALE);
+        assertThat(response.price()).isEqualTo(50000L);
+    }
+
+    @Test
+    void 존재하지_않는_상품이면_예외를_던진다() {
+        when(productRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                productService.registerDirectSale(SELLER_ID, 1L, new ProductStatusUpdateRequest(50000L)))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 본인이_등록한_상품이_아니면_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        Long otherSellerId = 2L;
+        assertThatThrownBy(() ->
+                productService.registerDirectSale(otherSellerId, 1L, new ProductStatusUpdateRequest(50000L)))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void DRAFT_상태가_아니면_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        product.registerDirectSale(50000L);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() ->
+                productService.registerDirectSale(SELLER_ID, 1L, new ProductStatusUpdateRequest(60000L)))
                 .isInstanceOf(CustomException.class);
     }
 }
