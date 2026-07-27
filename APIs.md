@@ -3,8 +3,13 @@
 ## 인증 (Auth)
 | 이름 | Method | Endpoint | 관련 기능 ID |
 |---|---|---|---|
+| 이메일 중복 확인 | POST | `/auth/email/check-duplicate` | AUTH-001 |
+| 이메일 인증코드 발송 | POST | `/auth/email/send-code` | AUTH-001 |
+| 이메일 인증코드 확인 | POST | `/auth/email/verify-code` | AUTH-001 |
 | 이메일 회원가입 | POST | `/auth/signup` | AUTH-001 |
-| 이메일 로그인 | POST | `/auth/login` | AUTH-002 |
+| 이메일 로그인 | POST | `/auth/signin` | AUTH-002 |
+| 토큰 재발급 | POST | `/auth/reissue` | AUTH-002 |
+| 로그아웃 | POST | `/auth/logout` | AUTH-002 |
 | 싸피어스 SSO 로그인 | POST | `/auth/sso/ssafy` | AUTH-003 |
 | 계정 연결 요청 | POST | `/users/{id}/links` | AUTH-004 |
 
@@ -117,8 +122,4 @@
 | 시착 결과 목록 조회 | GET | `/users/{id}/tryons` | MY |
 | 가상 시착 생성 | POST | `/users/{id}/tryons` | TRYON-003, TRYON-004 |
 | 시착 결과 상세 조회 | GET | `/users/{id}/tryons/{id}` | TRYON-005 |
-<<<<<<< Updated upstream
 | 시착 결과 삭제 | DELETE | `/users/{id}/tryons/{id}` | TRYON-005 |
-=======
-| 시착 결과 삭제 | DELETE | `/users/{id}/tryons/{id}` | TRYON-005 |
->>>>>>> Stashed changes
