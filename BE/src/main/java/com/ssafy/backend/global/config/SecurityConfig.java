@@ -1,25 +1,48 @@
 package com.ssafy.backend.global.config;
 
+import com.ssafy.backend.auth.jwt.JwtAuthenticationEntryPoint;
+import com.ssafy.backend.auth.jwt.JwtAuthenticationFilter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * ⚠️ 임시 스텁. 현재는 모든 요청을 허용한다.
- *
- * spring-boot-starter-security 가 있는 상태에서 설정이 없으면 기본 HTTP Basic 이 걸려
- * 헬스체크·Swagger 를 포함한 모든 요청이 401 이 된다. 개발 환경을 띄우기 위한 최소 설정이다.
- *
- * 실제 인증/인가(JWT 필터, 엔드포인트별 권한)는 서윤의 AUTH-002(-220) 토큰 발급이 나온 뒤
- * 이 클래스에 얹는다. 그 전까지 여기에 도메인 권한 규칙을 추가하지 말 것.
+ * 인증이 필요 없는 엔드포인트만 permitAll, 나머지는 JwtAuthenticationFilter가 채운
+ * SecurityContext 인증 정보를 요구한다.
  */
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private static final String[] PUBLIC_ENDPOINTS = {
+            "/api/auth/signup",
+            "/api/auth/signin",
+            "/api/auth/reissue",
+            "/api/auth/email/**",
+            "/api/health",
+            // 홈 콘텐츠 조회는 비회원도 가능(HOME-001). 정확 경로만 열어 /api/home/following(HOME-002)은 인증 필요로 남긴다.
+            "/api/home",
+            "/actuator/**",
+            "/swagger-ui/**",
+            "/v3/api-docs/**"
+    };
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -28,7 +51,11 @@ public class SecurityConfig {
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        .anyRequest().authenticated())
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .cors(Customizer.withDefaults())
                 .build();
     }

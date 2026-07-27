@@ -7,10 +7,14 @@
 
 stages:
   - test
+  - deploy
 
 workflow:
   rules:
+    # MR 검증
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # develop-BE 병합 시 자동 배포 (-262)
+    - if: '$CI_COMMIT_BRANCH == "develop-BE"'
 
 variables:
   GIT_DEPTH: "1"
@@ -49,21 +53,19 @@ be-test:
   services:
     # docker-compose.yml과 동일 버전. application.yml이 DB_HOST/REDIS_HOST 등을
     # 환경변수로 읽으므로, @SpringBootTest가 실제 컨테이너에 붙어 동작함.
+    #
+    # ⚠️ alias 를 이미지 이름(postgres/redis)과 같게 두면 러너가 자동 생성하는
+    #    별칭과 충돌해 "alias is already in use" 로 skip 되고, 그 결과 호스트명이
+    #    해석되지 않아 DB 연결이 실패한다. 충돌하지 않는 이름을 쓴다.
     - name: postgres:18-alpine
-      alias: postgres
+      alias: db
     - name: redis:8.8-alpine
-      alias: redis
+      alias: cache
   variables:
-    POSTGRES_DB: vintage_auction
+    # postgres 서비스 컨테이너가 읽는 값. 여기서 DB·계정이 만들어진다.
+    POSTGRES_DB: vintib
     POSTGRES_USER: postgres
     POSTGRES_PASSWORD: postgres
-    DB_HOST: postgres
-    DB_PORT: "5432"
-    DB_NAME: vintage_auction
-    DB_USERNAME: postgres
-    DB_PASSWORD: postgres
-    REDIS_HOST: redis
-    REDIS_PORT: "6379"
   cache:
     key: "be-gradle-${CI_COMMIT_REF_SLUG}"
     paths:
@@ -71,6 +73,33 @@ be-test:
   before_script:
     - cd BE
     - chmod +x gradlew
+    # ⚠️ 앱이 읽는 DB_*/REDIS_*/SPRING_* 는 반드시 여기서 export 로 고정한다.
+    #    프로젝트 CI/CD Variables 는 job 의 variables: 보다 우선하므로(프로젝트 변수 > job 변수),
+    #    운영용으로 등록해 둔 DB_NAME/DB_PASSWORD 같은 이름이 있으면 job variables 로는 막을 수 없다.
+    #    before_script 의 export 는 그 뒤에 실행되므로 확실히 이긴다.
+    #    값은 위 POSTGRES_* 에서 파생시켜, 서비스가 실제로 만든 DB·계정과 절대 어긋나지 않게 한다.
+    - export DB_HOST=db DB_PORT=5432
+    - export DB_NAME="$POSTGRES_DB" DB_USERNAME="$POSTGRES_USER" DB_PASSWORD="$POSTGRES_PASSWORD"
+    - export REDIS_HOST=cache REDIS_PORT=6379
+    - export SPRING_PROFILES_ACTIVE=local
+    # 서비스 준비 확인. 여기서 끊으면 원인이 "DB 연결"임이 분명해진다.
+    # (없으면 Hibernate 가 dialect 결정 실패로 죽어 원인 파악이 어렵다)
+    # ⚠️ 콜론+공백이 든 명령은 반드시 따옴표로 감싼다. 안 그러면 YAML 이 맵으로 파싱해
+    #    GitLab 이 설정을 거부하고 잡이 실행조차 되지 않는다.
+    - 'getent hosts "$DB_HOST" || { echo "DNS 해석 실패 - $DB_HOST"; exit 1; }'
+    - 'timeout 30 bash -c "until (echo > /dev/tcp/$DB_HOST/$DB_PORT) 2>/dev/null; do sleep 1; done" || { echo "TCP 연결 실패 - $DB_HOST:$DB_PORT"; exit 1; }'
+    - 'timeout 30 bash -c "until (echo > /dev/tcp/$REDIS_HOST/$REDIS_PORT) 2>/dev/null; do sleep 1; done" || { echo "TCP 연결 실패 - $REDIS_HOST:$REDIS_PORT"; exit 1; }'
+    # TCP 가 열려도 인증이 틀리거나 DB 이름이 없으면 붙지 못한다.
+    # Hibernate 는 그 원인을 "Unable to determine Dialect" 로 덮어써 버리므로,
+    # 실제 로그인까지 여기서 미리 해 보고 psql 의 원문 오류로 원인을 특정한다.
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends postgresql-client || echo "psql 설치 실패 - DB 인증 사전 점검을 건너뛴다"
+    - |
+      if command -v psql >/dev/null 2>&1; then
+        if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME" -d "$DB_NAME" -c 'select 1' >/dev/null; then
+          echo "DB 인증/접속 실패 - ${DB_USERNAME}@${DB_HOST}:${DB_PORT}/${DB_NAME} (바로 위 psql 오류가 원인)"
+          exit 1
+        fi
+      fi
   script:
     - ./gradlew build --no-daemon --build-cache -Dgradle.user.home=.gradle
 
@@ -126,3 +155,35 @@ ai-test:
       elif [ "${code:-0}" -ne 0 ]; then
         exit "${code}";
       fi
+
+# ---------- 배포 (develop-BE 병합 시 EC2 자동 배포) ----------
+# 전용 러너(tag: deploy)에서만 실행된다. 그 러너에만 호스트 docker.sock 과
+# 배포 디렉터리가 마운트되어 있어, 일반 테스트 잡은 호스트 도커에 접근하지 못한다.
+#
+# 필요한 CI/CD Variables (Settings → CI/CD → Variables):
+#   PROD_DB_PASSWORD  운영 DB 비밀번호. Masked 권장.
+#                ⚠️ 프로젝트 변수는 job 변수보다 우선하므로, 운영값에 DB_PASSWORD/DB_NAME
+#                   같은 범용 이름을 쓰면 다른 잡까지 흘러든다. PROD_ 접두사를 유지할 것.
+#                   (be-test 는 before_script 의 export 로 자체 방어한다)
+#                ⚠️ EC2 PostgreSQL 볼륨을 처음 만들 때 쓴 값과 반드시 같아야 한다.
+#                ⚠️ "Protected" 로 두려면 develop-BE 도 protected 브랜치여야 한다.
+deploy:
+  stage: deploy
+  image: docker:cli
+  tags:
+    - deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop-BE"'
+  variables:
+    # 커밋 SHA 로 이미지를 태깅해 롤백 시 직전 태그를 되살릴 수 있게 한다.
+    IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+    DB_NAME: vintib
+    DB_USERNAME: postgres
+  before_script:
+    # docker:cli 에 compose 플러그인·rsync 가 없을 수 있어 명시적으로 설치한다.
+    - apk add --no-cache rsync docker-cli-compose
+  script:
+    - sh infra/ci/deploy.sh
+  environment:
+    name: production
+    url: https://i15a108.p.ssafy.io

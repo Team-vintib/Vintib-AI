@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     db_host: str = "localhost"
     db_port: int = 5432
-    db_name: str = "vintage_auction"
+    db_name: str = "vintib"
     db_username: str = "postgres"
     db_password: str = "postgres"
 
