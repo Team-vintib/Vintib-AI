@@ -89,8 +89,51 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/domains/biz/pages/BusinessVerificationPendingPage.vue'),
   },
   {
+<<<<<<< HEAD
     path: ROUTE_PATHS.PRODUCT_LIST,
     name: ROUTE_NAMES.PRODUCT_LIST,
     component: () => import('@/domains/product/pages/ProductListView.vue'),
+=======
+    path: ROUTE_PATHS.LIVE_LIST,
+    name: ROUTE_NAMES.LIVE_LIST,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { title: '라이브 목록' },
+  },
+  {
+    path: ROUTE_PATHS.PRODUCT_LIST,
+    name: ROUTE_NAMES.PRODUCT_LIST,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { title: '상품 목록' },
+  },
+  {
+    path: ROUTE_PATHS.PRODUCT_CREATE,
+    name: ROUTE_NAMES.PRODUCT_CREATE,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { requiresAuth: true, title: '상품 등록' },
+  },
+  {
+    path: ROUTE_PATHS.LIVE_CREATE,
+    name: ROUTE_NAMES.LIVE_CREATE,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { requiresAuth: true, title: '라이브 시작' },
+  },
+  {
+    path: ROUTE_PATHS.NOTIFICATIONS,
+    name: ROUTE_NAMES.NOTIFICATIONS,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { requiresAuth: true, title: '알림센터' },
+  },
+  {
+    path: ROUTE_PATHS.MY,
+    name: ROUTE_NAMES.MY,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { requiresAuth: true, title: '마이페이지' },
+  },
+  {
+    path: ROUTE_PATHS.POINT,
+    name: ROUTE_NAMES.POINT,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { requiresAuth: true, title: '포인트' },
+>>>>>>> be92e81 ([S15P11A108-277] feat: 네비게이션 라우팅과 로그인별 노출 처리)
   },
 ]

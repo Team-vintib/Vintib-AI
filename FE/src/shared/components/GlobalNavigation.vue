@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import logoImage from '@/assets/images/logo.png'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
+import { ROUTE_NAMES, ROUTE_PATHS, type RoutePath } from '@/shared/constants/routes'
 
 const authStore = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 
 authStore.hydrateSession()
@@ -15,12 +16,42 @@ const isAuthenticated = computed(() => authStore.isAuthenticated)
 const displayName = computed(() => authStore.user?.name || '회원')
 const profileInitial = computed(() => displayName.value.slice(0, 1).toUpperCase())
 
-const goToPublicPath = async (path: string) => {
-  await router.push(path)
+const primaryMenuItems = [
+  { label: '라이브', path: ROUTE_PATHS.LIVE_LIST, authRequired: false },
+  { label: '상품', path: ROUTE_PATHS.PRODUCT_LIST, authRequired: false },
+  { label: '상품 등록', path: ROUTE_PATHS.PRODUCT_CREATE, authRequired: true },
+  { label: '라이브 시작', path: ROUTE_PATHS.LIVE_CREATE, authRequired: true },
+] satisfies Array<{
+  label: string
+  path: RoutePath
+  authRequired: boolean
+}>
+
+const userActionItems = [
+  { label: '찜', icon: '♡', path: ROUTE_PATHS.MY, query: { section: 'wishlist' }, badge: '' },
+  { label: '장바구니', icon: '▢', path: ROUTE_PATHS.MY, query: { section: 'cart' }, badge: '2' },
+  { label: '알림', icon: '◦', path: ROUTE_PATHS.NOTIFICATIONS, query: undefined, badge: '3' },
+] satisfies Array<{
+  label: string
+  icon: string
+  path: RoutePath
+  query?: Record<string, string>
+  badge: string
+}>
+
+const isActivePath = (path: RoutePath) => {
+  if (path === ROUTE_PATHS.HOME) {
+    return route.path === ROUTE_PATHS.HOME
+  }
+
+  return route.path === path || route.path.startsWith(`${path}/`)
 }
 
-const goToProtectedPath = async (path: string) => {
-  if (!isAuthenticated.value) {
+const goToPath = async (
+  path: RoutePath,
+  options: { authRequired?: boolean; query?: Record<string, string> } = {},
+) => {
+  if (options.authRequired && !isAuthenticated.value) {
     await router.push({
       name: ROUTE_NAMES.AUTH_LOGIN,
       query: { redirect: path },
@@ -28,7 +59,7 @@ const goToProtectedPath = async (path: string) => {
     return
   }
 
-  await router.push(path)
+  await router.push({ path, query: options.query })
 }
 </script>
 
@@ -40,30 +71,27 @@ const goToProtectedPath = async (path: string) => {
       </RouterLink>
 
       <nav class="global-nav__menu" aria-label="주요 메뉴">
-        <button class="global-nav__menu-item" type="button" @click="goToPublicPath('/lives')">
-          라이브
-        </button>
-        <button class="global-nav__menu-item" type="button" @click="goToPublicPath(ROUTE_PATHS.PRODUCT_LIST)">
-          상품
-        </button>
-
-        <span class="global-nav__divider" aria-hidden="true"></span>
-
-        <button class="global-nav__menu-item" type="button" @click="goToProtectedPath(ROUTE_PATHS.PRODUCT_CREATE)">
-          상품 등록
-        </button>
-        <button class="global-nav__menu-item" type="button" @click="goToProtectedPath(ROUTE_PATHS.LIVE_CREATE)">
-          라이브 시작
-        </button>
+        <template v-for="(item, index) in primaryMenuItems" :key="item.path">
+          <span v-if="index === 2" class="global-nav__divider" aria-hidden="true"></span>
+          <button
+            class="global-nav__menu-item"
+            :class="{ 'global-nav__menu-item--active': isActivePath(item.path) }"
+            type="button"
+            @click="goToPath(item.path, { authRequired: item.authRequired })"
+          >
+            {{ item.label }}
+          </button>
+        </template>
 
         <span v-if="isAuthenticated" class="global-nav__divider" aria-hidden="true"></span>
 
         <button
           v-if="isAuthenticated"
           class="global-nav__points"
+          :class="{ 'global-nav__points--active': isActivePath(ROUTE_PATHS.POINT) }"
           type="button"
           aria-label="사용 가능 포인트 125,000P"
-          @click="goToProtectedPath(ROUTE_PATHS.POINT)"
+          @click="goToPath(ROUTE_PATHS.POINT, { authRequired: true })"
         >
           <span class="global-nav__icon" aria-hidden="true">₩</span>
           125,000P
@@ -71,28 +99,25 @@ const goToProtectedPath = async (path: string) => {
       </nav>
 
       <div v-if="isAuthenticated" class="global-nav__actions" aria-label="사용자 메뉴">
-        <button class="global-nav__action" type="button" @click="goToProtectedPath('/my/wishlist')">
-          <span class="global-nav__icon" aria-hidden="true">♡</span>
-          찜
-        </button>
-
-        <button class="global-nav__action global-nav__action--badge" type="button" @click="goToProtectedPath('/orders')">
-          <span class="global-nav__icon" aria-hidden="true">▢</span>
-          장바구니
-          <span class="global-nav__badge">2</span>
+        <button
+          v-for="item in userActionItems"
+          :key="item.label"
+          class="global-nav__action global-nav__action--badge"
+          :class="{ 'global-nav__action--active': isActivePath(item.path) }"
+          type="button"
+          @click="goToPath(item.path, { authRequired: true, query: item.query })"
+        >
+          <span class="global-nav__icon" aria-hidden="true">{{ item.icon }}</span>
+          {{ item.label }}
+          <span v-if="item.badge" class="global-nav__badge">{{ item.badge }}</span>
         </button>
 
         <button
-          class="global-nav__action global-nav__action--badge"
+          class="global-nav__profile"
+          :class="{ 'global-nav__profile--active': isActivePath(ROUTE_PATHS.MY) }"
           type="button"
-          @click="goToProtectedPath(ROUTE_PATHS.NOTIFICATIONS)"
+          @click="goToPath(ROUTE_PATHS.MY, { authRequired: true })"
         >
-          <span class="global-nav__icon" aria-hidden="true">◦</span>
-          알림
-          <span class="global-nav__badge">3</span>
-        </button>
-
-        <button class="global-nav__profile" type="button" @click="goToProtectedPath(ROUTE_PATHS.MY)">
           <span class="global-nav__avatar" aria-hidden="true">{{ profileInitial }}</span>
           <span class="global-nav__profile-name">{{ displayName }}</span>
           <span class="global-nav__chevron" aria-hidden="true">⌄</span>
@@ -173,12 +198,15 @@ const goToProtectedPath = async (path: string) => {
   line-height: 20px;
   white-space: nowrap;
   transition:
+    border-color 160ms ease,
     color 160ms ease,
     opacity 160ms ease;
 }
 
-.global-nav__menu-item:hover {
-  color: var(--color-text-primary);
+.global-nav__menu-item:hover,
+.global-nav__menu-item--active {
+  border-bottom-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .global-nav__points {
@@ -186,7 +214,8 @@ const goToProtectedPath = async (path: string) => {
   font-variant-numeric: tabular-nums;
 }
 
-.global-nav__points:hover {
+.global-nav__points:hover,
+.global-nav__points--active {
   opacity: 0.8;
 }
 
@@ -235,7 +264,9 @@ const goToProtectedPath = async (path: string) => {
 }
 
 .global-nav__action:hover,
+.global-nav__action--active,
 .global-nav__profile:hover,
+.global-nav__profile--active,
 .global-nav__guest-link:hover {
   background: var(--color-surface-secondary);
   color: var(--color-text-primary);
