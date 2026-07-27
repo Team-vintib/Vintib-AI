@@ -3,9 +3,12 @@ package com.ssafy.backend.product.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.global.exception.CustomException;
+import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
@@ -16,12 +19,17 @@ import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.entity.SaleType;
 import com.ssafy.backend.product.repository.ProductRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class ProductServiceTest {
@@ -116,6 +124,52 @@ class ProductServiceTest {
         assertThatThrownBy(() ->
                 productService.registerDirectSale(SELLER_ID, 1L, new ProductStatusUpdateRequest(60000L)))
                 .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 상품_목록_조회시_DRAFT와_PRIVATE_상태는_제외하고_조회한다() {
+        Product onSale = Product.builder().seller(seller).title("상시 판매 상품").build();
+        onSale.registerDirectSale(10000L);
+        Pageable pageable = PageRequest.of(0, 20);
+        when(productRepository.findBySaleStatusNotIn(any(), any()))
+                .thenReturn(new PageImpl<>(List.of(onSale), pageable, 1));
+
+        PageResponse<ProductResponse> response = productService.getProductList(pageable);
+
+        verify(productRepository)
+                .findBySaleStatusNotIn(
+                        eq(List.of(SaleStatus.DRAFT, SaleStatus.PRIVATE)), any(Pageable.class));
+        assertThat(response.content()).hasSize(1);
+        assertThat(response.content().get(0).saleStatus()).isEqualTo(SaleStatus.ON_SALE);
+    }
+
+    @Test
+    void 상품_목록_조회시_페이지네이션_정보를_반환한다() {
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        Pageable pageable = PageRequest.of(0, 2);
+        when(productRepository.findBySaleStatusNotIn(any(), any()))
+                .thenReturn(new PageImpl<>(List.of(product, product), pageable, 5));
+
+        PageResponse<ProductResponse> response = productService.getProductList(pageable);
+
+        assertThat(response.page()).isEqualTo(0);
+        assertThat(response.size()).isEqualTo(2);
+        assertThat(response.totalElements()).isEqualTo(5);
+        assertThat(response.totalPages()).isEqualTo(3);
+        assertThat(response.hasNext()).isTrue();
+    }
+
+    @Test
+    void 상품_목록이_비어있으면_빈_배열을_반환한다() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(productRepository.findBySaleStatusNotIn(any(), any()))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        PageResponse<ProductResponse> response = productService.getProductList(pageable);
+
+        assertThat(response.content()).isEmpty();
+        assertThat(response.totalElements()).isZero();
+        assertThat(response.hasNext()).isFalse();
     }
 
     @Test
