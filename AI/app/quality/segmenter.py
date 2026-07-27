@@ -364,7 +364,7 @@ class RemoteWorkerSegmenter(DefectSegmenter):
     동기 REST가 한계에 닿으면(EC2에 GPU가 없어 CLIPSeg 추론이 느려지면) 여기로 넘어간다.
     **그때도 API 계약과 downstream은 그대로다** — 바뀌는 건 `ACTIVE_SEGMENTER` 한 줄뿐이다.
 
-    TODO(-299): `app/gateway/router.py`의 큐 규약을 그대로 쓴다.
+    TODO(-211): `app/gateway/router.py`의 큐 규약을 그대로 쓴다.
       1. `enqueue_job("quality_check", {image_url, prompts})` 로 job 등록
       2. `result:{job_id}` 를 폴링해 워커가 올린 마스크를 회수
       3. 마스크는 배열 그대로 넘기기엔 크므로 워커가 `/ai/workers/upload-json` 으로 올린
@@ -378,7 +378,7 @@ class RemoteWorkerSegmenter(DefectSegmenter):
         # NotImplementedError가 아니라 SegmenterNotReady를 던진다 — 라우터가 이걸 503으로
         # 매핑하고, "워커 미연결"은 500(버그)이 아니라 가용성 문제이기 때문이다.
         raise SegmenterNotReady(
-            "원격 워커 세그멘터는 아직 구현되지 않았습니다 (S15P11A108-299). "
+            "원격 워커 세그멘터는 아직 구현되지 않았습니다 (S15P11A108-211). "
             "registry.ACTIVE_SEGMENTER 를 'mock' 또는 'clipseg_rd64_refined' 로 두십시오."
         )
 

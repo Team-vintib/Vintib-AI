@@ -87,24 +87,24 @@ class InMemoryInspectionStore(InspectionStore):
 class RedisInspectionStore(InspectionStore):
     """Redis 공유 저장소 자리(빈 스텁).
 
-    TODO(-299): `app/core/config.py`의 redis_* 설정으로 붙어서
+    TODO(-211): `app/core/config.py`의 redis_* 설정으로 붙어서
     `quality:inspection:{id}` 키에 `model_dump_json()`을 넣고 `ex=INSPECTION_TTL_SECONDS`로
     만료를 Redis에 맡긴다(게이트웨이 `RESULT_PREFIX`와 같은 방식).
     """
 
     def save(self, inspection: InspectionResponse) -> None:
         raise NotImplementedError(
-            "RedisInspectionStore는 아직 구현되지 않았습니다 (S15P11A108-299)"
+            "RedisInspectionStore는 아직 구현되지 않았습니다 (S15P11A108-211)"
         )
 
     def get(self, inspection_id: str) -> InspectionResponse:
         raise NotImplementedError(
-            "RedisInspectionStore는 아직 구현되지 않았습니다 (S15P11A108-299)"
+            "RedisInspectionStore는 아직 구현되지 않았습니다 (S15P11A108-211)"
         )
 
     def clear(self) -> None:
         raise NotImplementedError(
-            "RedisInspectionStore는 아직 구현되지 않았습니다 (S15P11A108-299)"
+            "RedisInspectionStore는 아직 구현되지 않았습니다 (S15P11A108-211)"
         )
 
 
