@@ -38,7 +38,7 @@ export const ROUTE_PATHS = {
   ONBOARD_INTERESTS: '/onboarding/interests',
   ONBOARD_TRYON: '/onboarding/try-on',
   ONBOARD_MEMBER_TYPE: '/onboarding/member-type',
-  BIZ_VERIFY: '/biz/verify',
+  BIZ_VERIFY: '/business/verification',
   HOME: '/',
   FOLLOWING_HOME: '/following',
   SEARCH: '/search',
