@@ -6,12 +6,17 @@ import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
 import LiveCard from '@/domains/home/components/LiveCard.vue'
 import ProductCard from '@/domains/home/components/ProductCard.vue'
-import { homeMockData } from '@/domains/home/constants/homeMockData'
-import type { HomeLiveStatus } from '@/domains/home/types/homeView.types'
+import type { HomeLiveStatus, HomeViewMockData } from '@/domains/home/types/homeView.types'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
+const props = defineProps<{
+  homeData: HomeViewMockData
+}>()
+
 const memberContentCards = computed(() =>
-  homeMockData.contentCards.filter((card) => card.audience === 'member' || card.audience === 'all'),
+  props.homeData.contentCards.filter(
+    (card) => card.audience === 'member' || card.audience === 'all',
+  ),
 )
 
 const formatCompactNumber = (value: number) => {
@@ -79,12 +84,12 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
       eyebrow="Following"
       title="내가 팔로우한 판매자"
       :link-to="ROUTE_PATHS.FOLLOWING_HOME"
-      :is-empty="homeMockData.followedSellers.length === 0"
+      :is-empty="homeData.followedSellers.length === 0"
       empty-message="팔로우한 판매자가 없습니다."
     >
       <div class="seller-grid">
         <article
-          v-for="seller in homeMockData.followedSellers"
+          v-for="seller in homeData.followedSellers"
           :key="seller.id"
           class="seller-card"
         >
@@ -131,12 +136,12 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
       eyebrow="Live now"
       title="지금 진행 중인 라이브"
       :link-to="ROUTE_PATHS.LIVE_LIST"
-      :is-empty="homeMockData.liveNow.length === 0"
+      :is-empty="homeData.liveNow.length === 0"
       empty-message="지금 진행 중인 라이브가 없습니다."
     >
       <div class="live-grid">
         <LiveCard
-          v-for="live in homeMockData.liveNow"
+          v-for="live in homeData.liveNow"
           :key="live.id"
           :live="live"
           :to="getLivePath(live.id)"
@@ -149,12 +154,12 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
       eyebrow="Upcoming"
       title="예약 라이브"
       :link-to="ROUTE_PATHS.LIVE_LIST"
-      :is-empty="homeMockData.scheduledLives.length === 0"
+      :is-empty="homeData.scheduledLives.length === 0"
       empty-message="예약된 라이브가 없습니다."
     >
       <div class="schedule-grid">
         <LiveCard
-          v-for="live in homeMockData.scheduledLives"
+          v-for="live in homeData.scheduledLives"
           :key="live.id"
           :live="live"
           variant="scheduled"
@@ -169,12 +174,12 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
       eyebrow="Taste pick"
       title="내 취향의 빈티지 상품"
       :link-to="ROUTE_PATHS.PRODUCT_LIST"
-      :is-empty="homeMockData.recommendedProducts.length === 0"
+      :is-empty="homeData.recommendedProducts.length === 0"
       empty-message="추천할 상품이 없습니다."
     >
       <div class="product-grid">
         <ProductCard
-          v-for="product in homeMockData.recommendedProducts"
+          v-for="product in homeData.recommendedProducts"
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
@@ -189,12 +194,12 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
       eyebrow="Auction"
       title="경매 예정 상품"
       :link-to="ROUTE_PATHS.PRODUCT_LIST"
-      :is-empty="homeMockData.upcomingAuctionProducts.length === 0"
+      :is-empty="homeData.upcomingAuctionProducts.length === 0"
       empty-message="경매 예정 상품이 없습니다."
     >
       <div class="product-grid">
         <ProductCard
-          v-for="product in homeMockData.upcomingAuctionProducts"
+          v-for="product in homeData.upcomingAuctionProducts"
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"

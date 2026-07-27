@@ -6,11 +6,17 @@ import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
 import LiveCard from '@/domains/home/components/LiveCard.vue'
 import ProductCard from '@/domains/home/components/ProductCard.vue'
-import { homeMockData } from '@/domains/home/constants/homeMockData'
+import type { HomeViewMockData } from '@/domains/home/types/homeView.types'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
+const props = defineProps<{
+  homeData: HomeViewMockData
+}>()
+
 const guestContentCards = computed(() =>
-  homeMockData.contentCards.filter((card) => card.audience === 'guest' || card.audience === 'all'),
+  props.homeData.contentCards.filter(
+    (card) => card.audience === 'guest' || card.audience === 'all',
+  ),
 )
 
 const getProductPath = (productId: number) => `/products/${productId}`
@@ -47,11 +53,11 @@ const getProductPath = (productId: number) => `/products/${productId}`
       eyebrow="Live now"
       title="지금 진행 중인 라이브"
       :link-to="ROUTE_PATHS.LIVE_LIST"
-      :is-empty="homeMockData.liveNow.length === 0"
+      :is-empty="homeData.liveNow.length === 0"
       empty-message="지금 진행 중인 라이브가 없습니다."
     >
       <div class="live-grid">
-        <LiveCard v-for="live in homeMockData.liveNow" :key="live.id" :live="live" />
+        <LiveCard v-for="live in homeData.liveNow" :key="live.id" :live="live" />
       </div>
     </HomeSection>
 
@@ -60,12 +66,12 @@ const getProductPath = (productId: number) => `/products/${productId}`
       eyebrow="Upcoming"
       title="예약 라이브"
       :link-to="ROUTE_PATHS.LIVE_LIST"
-      :is-empty="homeMockData.scheduledLives.length === 0"
+      :is-empty="homeData.scheduledLives.length === 0"
       empty-message="예약된 라이브가 없습니다."
     >
       <div class="schedule-grid">
         <LiveCard
-          v-for="live in homeMockData.scheduledLives"
+          v-for="live in homeData.scheduledLives"
           :key="live.id"
           :live="live"
           variant="scheduled"
@@ -80,12 +86,12 @@ const getProductPath = (productId: number) => `/products/${productId}`
       eyebrow="Products"
       title="판매 상품"
       :link-to="ROUTE_PATHS.PRODUCT_LIST"
-      :is-empty="homeMockData.directSaleProducts.length === 0"
+      :is-empty="homeData.directSaleProducts.length === 0"
       empty-message="판매 중인 상품이 없습니다."
     >
       <div class="product-grid">
         <ProductCard
-          v-for="product in homeMockData.directSaleProducts"
+          v-for="product in homeData.directSaleProducts"
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
@@ -98,12 +104,12 @@ const getProductPath = (productId: number) => `/products/${productId}`
       eyebrow="Auction"
       title="경매 예정 상품"
       :link-to="ROUTE_PATHS.PRODUCT_LIST"
-      :is-empty="homeMockData.upcomingAuctionProducts.length === 0"
+      :is-empty="homeData.upcomingAuctionProducts.length === 0"
       empty-message="경매 예정 상품이 없습니다."
     >
       <div class="product-grid product-grid--auction">
         <ProductCard
-          v-for="product in homeMockData.upcomingAuctionProducts"
+          v-for="product in homeData.upcomingAuctionProducts"
           :key="product.id"
           :product="product"
           badge-label="경매 예정"
