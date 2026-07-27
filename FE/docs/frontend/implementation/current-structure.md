@@ -102,6 +102,7 @@ src/
       types/
     home/
       api/
+        homeViewApi.ts
       components/
         GuestHome.vue
         HomeSearchPanel.vue
@@ -311,8 +312,9 @@ docs/
   실제 인증 API는 후속 작업 대기 중입니다.
 - `domains/home`에는 HOME 공개 route, 로그인 여부에 따른 `GuestHome`/`MemberHome`
   분기, 홈 검색 패널, 섹션 shell, 라이브 카드, 상품 카드, 화면 확인용 mock 데이터와
-  view model 타입이 구현되어 있습니다. 실제 홈 API와 empty/loading/error 상태는 후속
-  작업 대기 중입니다.
+  `HomeViewData` view model 타입이 구현되어 있습니다. `homeViewApi.ts`는 현재 mock
+  데이터를 반환하는 adapter 자리이며, `HomePage`는 loading/error/retry 상태를 처리합니다.
+  실제 HOME API 계약이 확정되면 adapter 내부를 HTTP 호출과 응답 매핑으로 교체합니다.
 - `domains/product`에는 PROD-008 상품 목록 껍데기 View, 필터와 카드 컴포넌트,
   목록 타입과 화면 확인용 mock 데이터가 구현되어 있습니다. 실제 조회·필터·정렬·찜
   API와 상세 이동은 후속 작업 대기 중입니다.
