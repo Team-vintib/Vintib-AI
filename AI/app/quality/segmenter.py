@@ -17,8 +17,13 @@ overlay 전 경로가 목업에서도 그대로 실행된다. 실모델로 갈�
 from __future__ import annotations
 
 import hashlib
+import io
+import logging
+import urllib.error
+import urllib.request
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
@@ -42,6 +47,17 @@ _PLACEHOLDER_COLORS: dict[BaseColor, tuple[int, int, int]] = {
 _PLACEHOLDER_TEXTURE = 8
 _PLACEHOLDER_STRIPE_PERIOD = 24  # PATTERNED 플레이스홀더의 줄무늬 주기(px)
 _PLACEHOLDER_STRIPE_DEPTH = 26
+
+# 실백엔드가 상품 이미지를 받아올 때의 제한. BE가 준 URL을 서버가 대신 가져오는 경로라
+# 무한정 기다리거나 거대한 파일을 통째로 읽지 않게 막는다.
+_FETCH_TIMEOUT_SECONDS = 10.0
+_FETCH_MAX_BYTES = 20 * 1024 * 1024
+
+# CLIPSeg 입력 해상도. 디코더 출력(352×352)과 별개로 인코더가 224×224를 받는다 —
+# 미세 오염이 뭉개지는 원인이며, 타일 추론이 고도화 경로 6에 올라와 있는 이유다.
+_CLIPSEG_INPUT_SIZE = 224
+
+logger = logging.getLogger(__name__)
 
 
 class SegmenterNotReady(Exception):
@@ -217,6 +233,128 @@ class MockSegmenter(DefectSegmenter):
         return Image.fromarray(np.clip(canvas, 0, 255).astype(np.uint8), mode="RGB")
 
 
+# --- 실 이미지 로딩 --------------------------------------------------------
+
+
+def load_source_image(url: str) -> Image.Image:
+    """검수 대상 이미지를 RGB로 읽는다. 실패는 전부 `ImageFetchFailed`로 모은다.
+
+    HTTP(S) URL과 로컬 경로를 모두 받는다 — 후자는 발표자료용 배치 렌더 스크립트가 이미지
+    폴더를 그대로 흘려보낼 수 있게 하려는 것이다.
+    """
+    try:
+        if url.startswith(("http://", "https://")):
+            request = urllib.request.Request(url, headers={"User-Agent": "vintib-ai-quality/0.1"})
+            with urllib.request.urlopen(  # noqa: S310 - BE가 준 상품 이미지 URL을 대신 가져온다
+                request, timeout=_FETCH_TIMEOUT_SECONDS
+            ) as response:
+                payload = response.read(_FETCH_MAX_BYTES + 1)
+            if len(payload) > _FETCH_MAX_BYTES:
+                raise ImageFetchFailed(f"이미지가 너무 큽니다(>{_FETCH_MAX_BYTES}B): {url}")
+            return Image.open(io.BytesIO(payload)).convert("RGB")
+        return Image.open(Path(url)).convert("RGB")
+    except ImageFetchFailed:
+        raise
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        raise ImageFetchFailed(f"이미지를 읽을 수 없습니다: {url} ({exc})") from exc
+
+
+# --- CLIPSeg 백엔드 --------------------------------------------------------
+
+
+class ClipSegSegmenter(DefectSegmenter):
+    """LAB-12가 채택한 CLIPSeg 백엔드.
+
+    `torch`/`transformers`는 **함수 내부에서 지연 import**한다(`requirements-pipeline` 계열,
+    CI 미설치). 미설치 환경에서도 앱은 정상 기동하고 **첫 호출에서 503**이 나는 게 의도된
+    동작이다 — 목업이 기본값이라 서비스 자체는 항상 뜬다.
+
+    알려진 한계(LAB-12 실측): ⑴ 찢어짐·훼손 판단이 약하다 ⑵ 미세 오염은 탐지되나 뚜렷하지
+    않다. ⑴은 `registry.DEFECT_TAXONOMY`가 SUSPECTED 강등으로 흡수하고, ⑵는 입력 해상도
+    224×224가 유력한 원인이라 타일 추론(고도화 경로 6)이 후보다.
+    """
+
+    def __init__(self, model_id: str, mask_size: int) -> None:
+        self._model_id = model_id
+        self._mask_size = mask_size
+        self._model = None
+        self._processor = None
+        self._device = "cpu"
+
+    def _ensure_loaded(self) -> None:
+        """모델을 지연 로드한다(프로세스당 1회). 라이브러리가 없으면 `SegmenterNotReady`."""
+        if self._model is not None:
+            return
+        try:
+            import torch
+            from transformers import CLIPSegForImageSegmentation, CLIPSegProcessor
+        except ImportError as exc:
+            raise SegmenterNotReady(
+                "CLIPSeg 백엔드에는 torch/transformers가 필요합니다 "
+                "(pip install -r requirements-pipeline.txt)"
+            ) from exc
+
+        try:
+            self._device = "cuda" if torch.cuda.is_available() else "cpu"
+            self._processor = CLIPSegProcessor.from_pretrained(self._model_id)
+            self._model = (
+                CLIPSegForImageSegmentation.from_pretrained(self._model_id).to(self._device).eval()
+            )
+        except Exception as exc:  # 체크포인트 다운로드 실패·손상 등
+            raise SegmenterNotReady(f"CLIPSeg 모델을 불러오지 못했습니다: {exc}") from exc
+        logger.info("CLIPSeg 로드 완료 (model=%s, device=%s)", self._model_id, self._device)
+
+    def segment(self, target: InspectionTarget, image_index: int) -> SegmentationResult:
+        self._ensure_loaded()
+        import torch
+
+        image = load_source_image(target.image_urls[image_index])
+        prompts = list(target.prompt_set.all_prompts)
+
+        # 통합 processor(...) 호출 대신 tokenizer/image_processor를 분리 호출한다 —
+        # 한 번에 넘기면 텍스트/이미지 kwarg가 서로 섞여 에러가 난다.
+        # (test/clipseg-condition-check/verify_clipseg.py에서 이미 밟은 문제라 여기로 승격했다.
+        #  test/ 코드를 프로덕션에서 import하지 않는 규약에 따라 복사한다.)
+        text_inputs = self._processor.tokenizer(prompts, return_tensors="pt", padding=True)
+        image_inputs = self._processor.image_processor(
+            [image] * len(prompts),
+            size={"height": _CLIPSEG_INPUT_SIZE, "width": _CLIPSEG_INPUT_SIZE},
+            return_tensors="pt",
+        )
+        inputs = {**text_inputs, "pixel_values": image_inputs["pixel_values"]}
+        inputs = {key: value.to(self._device) for key, value in inputs.items()}
+
+        with torch.no_grad():
+            outputs = self._model(**inputs)
+
+        logits = outputs.logits
+        if logits.ndim == 2:
+            # 프롬프트가 1개면 배치 축이 사라진다 — 항상 (N, H, W)로 맞춘다.
+            logits = logits.unsqueeze(0)
+        probs = torch.sigmoid(logits).float().cpu().numpy()
+
+        masks = {
+            prompt: self._to_mask_size(probs[i])
+            for i, (prompt, _) in enumerate(target.prompt_set.defect_prompts)
+        }
+        return SegmentationResult(
+            image_index=image_index,
+            masks=masks,
+            clean_mask=self._to_mask_size(probs[-1]),  # all_prompts의 마지막이 clean 대조항
+            base_image=image,
+            size=(self._mask_size, self._mask_size),
+        )
+
+    def _to_mask_size(self, mask: np.ndarray) -> np.ndarray:
+        """디코더 출력이 설정된 마스크 크기와 다르면 맞춘다(체크포인트별로 달라질 수 있다)."""
+        if mask.shape == (self._mask_size, self._mask_size):
+            return np.clip(mask.astype(np.float32), 0.0, 1.0)
+        resized = Image.fromarray((np.clip(mask, 0.0, 1.0) * 255).astype(np.uint8)).resize(
+            (self._mask_size, self._mask_size), Image.BILINEAR
+        )
+        return (np.asarray(resized, dtype=np.float32) / 255.0).astype(np.float32)
+
+
 # --- 조립 ------------------------------------------------------------------
 
 
@@ -226,4 +364,6 @@ def build_segmenter(key: str | None = None) -> DefectSegmenter:
     config = registry.segmenter_config(resolved)
     if resolved == "mock":
         return MockSegmenter(mask_size=config["mask_size"])
+    if resolved == "clipseg_rd64_refined":
+        return ClipSegSegmenter(model_id=config["model_id"], mask_size=config["mask_size"])
     raise SegmenterNotReady(f"아직 구현되지 않은 세그멘터 백엔드입니다: {resolved!r}")
