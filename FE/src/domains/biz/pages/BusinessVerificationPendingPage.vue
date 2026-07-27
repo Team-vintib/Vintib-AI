@@ -76,6 +76,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   releaseCertificatePreviewUrl()
 })
+
+const goHome = async () => {
+  await router.push({ name: ROUTE_NAMES.HOME })
+}
 </script>
 
 <template>
@@ -150,13 +154,13 @@ onBeforeUnmount(() => {
       <button
         type="button"
         class="verification-pending__home-button"
-        disabled
         aria-describedby="verification-home-description"
+        @click="goHome"
       >
         메인으로 이동
       </button>
       <p id="verification-home-description" class="verification-pending__home-description">
-        HOME 화면이 구현되면 이동 기능을 연결합니다.
+        홈 화면으로 이동해 라이브와 상품을 둘러볼 수 있습니다.
       </p>
     </section>
   </main>

@@ -9,6 +9,12 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/domains/home/pages/HomePage.vue'),
   },
   {
+    path: ROUTE_PATHS.FOLLOWING_HOME,
+    name: ROUTE_NAMES.FOLLOWING_HOME,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { requiresAuth: true, title: '팔로잉 홈' },
+  },
+  {
     path: ROUTE_PATHS.AUTH_LOGIN,
     name: ROUTE_NAMES.AUTH_LOGIN,
     component: () => import('@/domains/auth/pages/LoginPage.vue'),
