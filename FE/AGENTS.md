@@ -1,6 +1,7 @@
 # VinTib FE Codex 작업 규칙
 
 이 저장소는 VinTib 프론트엔드 프로젝트입니다. Codex는 아래 기준을 우선 적용합니다.
+루트 `AGENTS.md`의 공통 규율(새 기능 계획 선승인, 파트 간 요청 문서, push 금지 등)은 이 폴더 작업에도 그대로 적용됩니다.
 
 ## 작업 범위
 
@@ -10,6 +11,16 @@
 - 디자인 토큰과 시각 규칙은 `docs/notion/프론트엔드 디자인 구현 규칙.md`를 사용합니다.
 - Vue 코드 작성 방식은 `docs/notion/프론트엔드 개발 공통 규칙.md`를 사용합니다.
 - FE 작업은 `FE/` 내부만 수정합니다. `BE/`, `AI/`, `infra/` 등 다른 파트는 읽기만 하며 직접 수정하지 않습니다.
+
+## 새 기능 계획
+
+신규 화면/기능 등 새 기능은 바로 구현하지 않습니다. 먼저 계획을 세워 `.codex/plans/fe/`(루트 기준)에 md로 기록하고, 사용자 승인 후 그 계획대로 구현합니다. 파일 규칙(경로, `<이니셜><번호>-slug.md` 형식, 계획 내용 구성)은 루트 `.claude/plans/README.md`를 그대로 따르되 저장 위치만 `.codex/plans/fe/`를 씁니다. 버그 수정 등 설계 판단이 필요 없는 변경에는 적용하지 않습니다.
+
+기존 `001-onboarding-...` 형식의 계획 파일은 이 규칙 이전에 작성된 것으로 소급 변경하지 않습니다. 새로 작성하는 계획 파일부터 `<이니셜><번호>-slug.md` 형식을 적용합니다.
+
+## 다른 파트 요청
+
+BE/AI 코드는 직접 수정하지 않습니다. BE나 AI 쪽 변경이 필요하면 `.codex/requests/be/` 또는 `.codex/requests/ai/`(루트 기준)에 md로 요청 문서를 남깁니다. 형식은 루트 `.claude/requests/README.md`를 그대로 따르되 저장 위치만 `.codex/requests/<대상 파트>/`를 씁니다.
 
 ## 자료 우선순위
 
@@ -109,7 +120,7 @@ domains/<domain>/
 
 - 구조 변경 시 `docs/frontend/implementation/current-structure.md`를 함께 갱신합니다.
 - 구현 상태가 바뀌면 `docs/frontend/implementation/status.md`를 함께 갱신합니다.
-- 신규 화면/기능 구현 전에는 `.claude/plans/fe/`에 계획을 먼저 기록하고 사용자 승인 후 진행합니다.
+- 신규 화면/기능 구현 전 계획 기록 규칙은 위 "새 기능 계획" 섹션을 따릅니다.
 - 화면 요구사항이 바뀌면 해당 `docs/frontend/screens/<SCREEN-ID>/requirements.md` 또는 원천 문서를 함께 확인합니다.
 
 ## 구현 순서
