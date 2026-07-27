@@ -1,15 +1,135 @@
-* {
+:root {
+  color-scheme: light;
+
+  /* Light UI */
+  --color-page: #F7F6F2;
+  --color-surface: #FFFFFF;
+  --color-surface-secondary: #F0F0EB;
+  --color-text-primary: #171815;
+  --color-text-secondary: #686A64;
+  --color-text-muted: #92948E;
+  --color-text-inverse: #FFFFFF;
+  --color-border: #E1E0DA;
+  --color-border-strong: #C9C8C1;
+
+  /* Brand */
+  --color-primary: #294335;
+  --color-primary-hover: #1F352A;
+  --color-primary-soft: #E7EEE9;
+
+  /* Feedback */
+  --color-error: #B42318;
+  --color-error-soft: #FEE4E2;
+
+  /* Live & Auction */
+  --color-live: #C43D46;
+  --color-auction: #A92F38;
+  --color-auction-soft: #F7E8EA;
+  --color-timer: #CF7A36;
+
+  /* AI */
+  --color-ai: #6F5BD3;
+  --color-ai-soft: #F0EDFC;
+
+  /* Dark Live UI */
+  --color-live-background: #0E1110;
+  --color-live-surface: #171B19;
+  --color-live-surface-raised: #202522;
+  --color-live-border: #343A36;
+  --color-live-text-primary: #F7F7F4;
+  --color-live-text-secondary: #A9ADA7;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radius */
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-media: 16px;
+  --radius-modal: 16px;
+  --radius-badge: 4px;
+  --radius-chip: 999px;
+
+  /* Controls */
+  --button-height-small: 36px;
+  --button-height-standard: 48px;
+  --button-height-major: 52px;
+  --button-height-bid: 60px;
+
+  /* Layout */
+  --layout-content-max-width: 1320px;
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+html {
+  min-height: 100%;
+  background: var(--color-page);
+}
+
 body {
   min-height: 100vh;
+  background: var(--color-page);
+  color: var(--color-text-primary);
   font-family:
+    'Pretendard',
+    'Noto Sans KR',
+    Inter,
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
-    'Pretendard',
     sans-serif;
+  font-size: 15px;
+  line-height: 24px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+#app {
+  min-height: 100vh;
 }
