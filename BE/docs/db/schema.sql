@@ -112,7 +112,9 @@ CREATE TABLE product (
     description     TEXT,
     condition_grade VARCHAR(20),                     -- 중고 상태 등급 (체계 미확정)
     size_label      VARCHAR(50),
-    sale_type       VARCHAR(20)  NOT NULL,           -- 상시 판매 / 경매
+    sale_type       VARCHAR(20),                     -- 상시 판매 / 경매. 기본 정보 저장 시점에는 NULL,
+                                                       -- 판매 채널을 정하는 API(판매 가격 설정/경매 조건 설정)
+                                                       -- 호출 시 확정된다
     sale_status     VARCHAR(30)  NOT NULL DEFAULT 'DRAFT',
     price           BIGINT,                          -- 상시 판매가. 경매 예정 상품은 NULL
     view_count      INTEGER      NOT NULL DEFAULT 0,

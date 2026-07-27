@@ -2,14 +2,19 @@ package com.ssafy.backend.auth.service;
 
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.MailPreparationException;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
 @Service
 @RequiredArgsConstructor
@@ -17,13 +22,14 @@ public class EmailVerificationService {
 
     private static final Duration CODE_TTL = Duration.ofMinutes(5);
     private static final Duration RESEND_COOLDOWN = Duration.ofSeconds(60);
-    private static final Duration SEND_COUNT_WINDOW = Duration.ofHours(1);
-    private static final int MAX_SEND_COUNT_PER_HOUR = 5;
+    private static final Duration SEND_COUNT_WINDOW = Duration.ofMinutes(5);
+    private static final int MAX_SEND_COUNT_PER_WINDOW = 5;
     private static final int MAX_VERIFY_ATTEMPTS = 5;
     private static final Duration TOKEN_TTL = Duration.ofMinutes(30);
 
     private final StringRedisTemplate redisTemplate;
     private final JavaMailSender mailSender;
+    private final TemplateEngine templateEngine;
 
     public void sendVerificationCode(String email) {
         String cooldownKey = cooldownKey(email);
@@ -34,7 +40,7 @@ public class EmailVerificationService {
         String sendCountKey = sendCountKey(email);
         String sendCountValue = redisTemplate.opsForValue().get(sendCountKey);
         long sendCount = sendCountValue == null ? 0 : Long.parseLong(sendCountValue);
-        if (sendCount >= MAX_SEND_COUNT_PER_HOUR) {
+        if (sendCount >= MAX_SEND_COUNT_PER_WINDOW) {
             throw new CustomException(ErrorCode.TOO_MANY_VERIFICATION_REQUESTS);
         }
 
@@ -88,10 +94,19 @@ public class EmailVerificationService {
     }
 
     private void sendMail(String email, String code) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(email);
-        message.setSubject("[빈티지 경매] 이메일 인증 코드");
-        message.setText("인증 코드: " + code + "\n5분 이내에 입력해주세요.");
+        Context context = new Context();
+        context.setVariable("authCode", code);
+        String html = templateEngine.process("mail/verification-code", context);
+
+        MimeMessage message = mailSender.createMimeMessage();
+        try {
+            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+            helper.setTo(email);
+            helper.setSubject("[Vintib] 이메일 인증 코드");
+            helper.setText(html, true);
+        } catch (MessagingException e) {
+            throw new MailPreparationException("이메일 메시지 생성에 실패했습니다.", e);
+        }
         mailSender.send(message);
     }
 

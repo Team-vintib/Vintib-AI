@@ -3,11 +3,16 @@
 ## 인증 (Auth)
 | 이름 | Method | Endpoint | 관련 기능 ID |
 |---|---|---|---|
+| 이메일 중복 확인 | POST | `/auth/email/check-duplicate` | AUTH-001 |
+| 이메일 인증코드 발송 | POST | `/auth/email/send-code` | AUTH-001 |
+| 이메일 인증코드 확인 | POST | `/auth/email/verify-code` | AUTH-001 |
 | 이메일 회원가입 | POST | `/auth/signup` | AUTH-001 |
-| 이메일 로그인 | POST | `/auth/login` | AUTH-002 |
-| 싸피어스 SSO 시작 | GET | `/auth/sso/ssafy` | AUTH-003 |
-| 싸피어스 SSO 콜백 처리 | POST | `/auth/ssafy/callback` | AUTH-003 |
-| 계정 연결 요청 | POST | `/users/{id}/links` | AUTH-004 |
+| 이메일 로그인 | POST | `/auth/signin` | AUTH-002 |
+| 토큰 재발급 | POST | `/auth/reissue` | AUTH-002 |
+| 로그아웃 | POST | `/auth/logout` | AUTH-002 |
+| 싸피어스 SSO 시작 (미정) | GET | `/auth/sso/ssafy` | AUTH-003 |
+| 싸피어스 SSO 콜백 처리 (미정) | POST | `/auth/ssafy/callback` | AUTH-003 |
+| 계정 연결 요청 (미정) | POST | `/users/{id}/links` | AUTH-004 |
 
 ## 회원 (Users)
 | 이름 | Method | Endpoint | 관련 기능 ID |
