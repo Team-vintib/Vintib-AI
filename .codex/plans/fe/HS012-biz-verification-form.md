@@ -5,7 +5,7 @@
 ONBOARD-004에서 사업자 회원을 선택한 사용자가 사업자 정보를 입력하고 제출할 수 있는
 BIZ-001 화면을 구현한다. 화면 구현과 입력 제약을 Jira 작업 단위로 분리하며, 이번
 범위에서는 실제 인증 API를 호출하지 않고 더미 제출 성공 후 BIZ-001-2 인증 대기
-화면을 거쳐 로그인 상태를 유지한 채 HOME으로 이동한다.
+화면까지 구현한다. HOME 이동은 버튼 UI만 제공하고 실제 연결은 후속 작업으로 남긴다.
 
 ## 확인한 기준
 
@@ -24,8 +24,12 @@ BIZ-001 화면을 구현한다. 화면 구현과 입력 제약을 Jira 작업 �
 - API 문서에는 `POST /api/business-verifications`가 후보로만 있으며 BE 구현과
   Swagger 계약은 아직 없다.
 - 사업자번호 세부 검증 정책과 이미지 형식·용량은 아직 확정되지 않았다.
-- BIZ-001 더미 제출 성공 시 BIZ-001-2 인증 대기 화면으로 이동하고, 사용자가
-  `메인으로 이동`을 선택하면 `ROUTE_PATHS.HOME`으로 이동한다.
+- BIZ-001 더미 제출 성공 시 BIZ-001-2 인증 대기 화면으로 이동한다.
+- BIZ-001-2의 `메인으로 이동` 버튼 UI는 제공하지만 HOME 화면 구현 전까지 비활성화하며,
+  실제 이동은 후속 작업에서 연결한다.
+- 현재 이메일 회원가입 응답에는 access token이 없어 기존 온보딩 route와 동일하게 BIZ
+  route에도 인증 가드를 적용하지 않는다. 인증 계약 확정 후 함께 적용한다.
+- 현재 저장소에는 HOME(`/`) 상수만 있고 HOME 페이지와 route가 없다.
 
 ## 작업 1: S15P11A108-397 사업자 인증 입력 화면
 
@@ -52,7 +56,7 @@ BIZ-001 화면을 구현한다. 화면 구현과 입력 제약을 Jira 작업 �
 - 실제 API를 호출하지 않는 더미 제출 상태를 거쳐 BIZ-001-2로 이동한다.
 - BIZ-001-2에는 인증 대기 상태, 제출 정보와 사업자등록증 확인 UI,
   `메인으로 이동` 버튼을 제공한다.
-- `메인으로 이동`을 누르면 로그인 상태를 유지한 채 HOME(`/`)으로 이동한다.
+- `메인으로 이동` 버튼 UI를 비활성 상태로 제공하고 HOME 이동은 후속 작업으로 남긴다.
 - FE API 후보와 미확정 사항 문서를 갱신하고, BE가 검토할 요청 문서를 작성한다.
 
 ## BE 확인용 API 계약 제안
@@ -79,6 +83,7 @@ BIZ-001 화면을 구현한다. 화면 구현과 입력 제약을 Jira 작업 �
 ### 작업 2
 
 - 필요 시 새 파일: `FE/src/domains/biz/constants/businessVerification.ts`
+- 새 파일: `FE/src/domains/biz/stores/businessVerificationStore.ts`
 - 수정: `FE/src/domains/biz/pages/BusinessVerificationPage.vue`
 - 새 파일: `FE/src/domains/biz/pages/BusinessVerificationPendingPage.vue`
 - 수정: `FE/src/domains/biz/components/BusinessCertificateUploader.vue`
@@ -88,6 +93,7 @@ BIZ-001 화면을 구현한다. 화면 구현과 입력 제약을 Jira 작업 �
 - 수정: `FE/docs/frontend/decisions/open-questions.md`
 - 수정: `FE/docs/frontend/flows/route-map.md`
 - 수정: `FE/docs/frontend/screens/BIZ-001/requirements.md`
+- 수정: `FE/docs/frontend/implementation/current-structure.md`
 - 수정: `FE/docs/frontend/implementation/status.md`
 - 새 파일: `.codex/requests/be/005-business-verification-api.md`
 
@@ -104,20 +110,21 @@ BIZ-001 화면을 구현한다. 화면 구현과 입력 제약을 Jira 작업 �
 - [x] BIZ-001 요구사항·구조·상태 문서 갱신
 - [x] 자동 검증
 - [x] 사용자 수동 검증
-- [ ] 사용자 확인 후 작업 단위 add/commit/push
+- [x] 사용자 확인 후 작업 단위 add/commit/push
 
 ### S15P11A108-400
 
-- [ ] 사업자번호 숫자 10자리와 상호명·대표자명 필수 검증
-- [ ] 이미지 한 개·이미지 MIME·필수 검증
-- [ ] 제출 활성화 조건과 중복 제출 방지
-- [ ] 더미 제출 상태와 BIZ-001-2 이동 구현
-- [ ] BIZ-001-2 인증 대기·제출 정보 확인 화면 구현
-- [ ] BIZ-001-2 메인 이동 버튼과 HOME 이동 구현
-- [ ] 일반 오류 표시
-- [ ] FE API·미확정 사항 문서 갱신
-- [ ] BE API·검증 정책 요청 문서 작성
-- [ ] 자동 검증과 사용자 수동 검증
+- [x] 사업자번호 숫자 10자리와 상호명·대표자명 필수 검증
+- [x] 이미지 한 개·이미지 MIME·필수 검증
+- [x] 제출 활성화 조건과 중복 제출 방지
+- [x] 더미 제출 상태와 BIZ-001-2 이동 구현
+- [x] BIZ-001-2 인증 대기·제출 정보 확인 화면 구현
+- [x] BIZ-001-2 메인 이동 버튼 UI 구현과 HOME 이동 보류
+- [x] 일반 오류 표시
+- [x] FE API·미확정 사항 문서 갱신
+- [x] BE API·검증 정책 요청 문서 작성
+- [x] 자동 검증
+- [x] 사용자 수동 검증
 - [ ] 사용자 확인 후 작업 단위 add/commit/push
 
 ## 검증 시나리오
@@ -131,7 +138,7 @@ BIZ-001 화면을 구현한다. 화면 구현과 입력 제약을 Jira 작업 �
 7. 요청 중에는 입력 변경과 중복 제출을 막는다.
 8. 더미 제출 성공 후 BIZ-001-2 인증 대기 화면으로 이동한다.
 9. BIZ-001-2는 제출 정보와 사업자등록증 확인 UI를 표시한다.
-10. 메인 이동 버튼을 누르면 로그인 상태를 유지한 채 HOME(`/`)으로 이동한다.
+10. 메인 이동 버튼은 HOME 연결 전까지 비활성 상태로 표시된다.
 11. ONBOARD-001~004와 기존 인증 route에 회귀가 없다.
 12. ESLint, type-check와 build가 통과한다.
 

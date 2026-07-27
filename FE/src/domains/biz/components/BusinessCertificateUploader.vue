@@ -3,12 +3,15 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 interface Props {
   modelValue: File | null
+  disabled?: boolean
+  errorMessage?: string
 }
 
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
   'update:modelValue': [file: File | null]
+  'validation-error': [message: string]
 }>()
 
 const fileInputElement = ref<HTMLInputElement | null>(null)
@@ -26,6 +29,10 @@ const releasePreviewUrl = () => {
 }
 
 const openFilePicker = () => {
+  if (props.disabled) {
+    return
+  }
+
   fileInputElement.value?.click()
 }
 
@@ -35,12 +42,21 @@ const handleFileChange = (event: Event) => {
 
   inputElement.value = ''
 
-  if (selectedFile) {
-    emit('update:modelValue', selectedFile)
+  if (!selectedFile) {
+    return
   }
+
+  if (!selectedFile.type.startsWith('image/')) {
+    emit('validation-error', '이미지 형식의 파일만 등록할 수 있습니다.')
+    return
+  }
+
+  emit('validation-error', '')
+  emit('update:modelValue', selectedFile)
 }
 
 const handleDelete = () => {
+  emit('validation-error', '')
   emit('update:modelValue', null)
 }
 
@@ -69,10 +85,17 @@ onBeforeUnmount(() => {
       type="file"
       accept="image/*"
       aria-label="사업자등록증 이미지 선택"
+      :disabled="disabled"
+      :aria-invalid="errorMessage ? 'true' : 'false'"
+      aria-describedby="certificate-upload-description certificate-upload-error"
       @change="handleFileChange"
     />
 
-    <div v-if="modelValue && previewUrl" class="certificate-preview">
+    <div
+      v-if="modelValue && previewUrl"
+      class="certificate-preview"
+      :class="{ 'certificate-preview--invalid': errorMessage }"
+    >
       <img
         class="certificate-preview__image"
         :src="previewUrl"
@@ -86,12 +109,18 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="certificate-preview__actions">
-          <button type="button" class="certificate-uploader__button" @click="openFilePicker">
+          <button
+            type="button"
+            class="certificate-uploader__button"
+            :disabled="disabled"
+            @click="openFilePicker"
+          >
             이미지 변경
           </button>
           <button
             type="button"
             class="certificate-uploader__button certificate-uploader__button--danger"
+            :disabled="disabled"
             @click="handleDelete"
           >
             삭제
@@ -104,7 +133,10 @@ onBeforeUnmount(() => {
       v-else
       type="button"
       class="certificate-upload-empty"
-      aria-describedby="certificate-upload-description"
+      :class="{ 'certificate-upload-empty--invalid': errorMessage }"
+      :disabled="disabled"
+      :aria-invalid="errorMessage ? 'true' : 'false'"
+      aria-describedby="certificate-upload-description certificate-upload-error"
       @click="openFilePicker"
     >
       <span class="certificate-upload-empty__icon" aria-hidden="true">
@@ -116,6 +148,15 @@ onBeforeUnmount(() => {
       <strong>이미지 등록</strong>
       <span id="certificate-upload-description">사업자등록증 이미지를 선택해 주세요.</span>
     </button>
+
+    <p
+      v-if="errorMessage"
+      id="certificate-upload-error"
+      class="certificate-uploader__error"
+      role="alert"
+    >
+      {{ errorMessage }}
+    </p>
   </div>
 </template>
 
@@ -155,6 +196,16 @@ onBeforeUnmount(() => {
 .certificate-upload-empty:hover {
   border-color: var(--color-primary);
   background: var(--color-primary-soft);
+}
+
+.certificate-upload-empty--invalid,
+.certificate-preview--invalid {
+  border-color: var(--color-error);
+}
+
+.certificate-upload-empty:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
 }
 
 .certificate-upload-empty:focus-visible,
@@ -265,9 +316,21 @@ onBeforeUnmount(() => {
   border-color: var(--color-primary);
 }
 
+.certificate-uploader__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+}
+
 .certificate-uploader__button--danger {
   border-color: var(--color-error);
   color: var(--color-error);
+}
+
+.certificate-uploader__error {
+  margin-top: var(--space-2);
+  color: var(--color-error);
+  font-size: 13px;
+  line-height: 18px;
 }
 
 @media (max-width: 640px) {

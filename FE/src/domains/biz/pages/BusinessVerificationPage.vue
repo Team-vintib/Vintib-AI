@@ -1,12 +1,109 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import BusinessCertificateUploader from '@/domains/biz/components/BusinessCertificateUploader.vue'
+import {
+  BUSINESS_REGISTRATION_NUMBER_LENGTH,
+  BUSINESS_SUBMISSION_DELAY_MS,
+} from '@/domains/biz/constants/businessVerification'
+import { useBusinessVerificationStore } from '@/domains/biz/stores/businessVerificationStore'
+import { ROUTE_NAMES } from '@/shared/constants/routes'
+
+const router = useRouter()
+const businessVerificationStore = useBusinessVerificationStore()
 
 const businessRegistrationNumber = ref('')
 const businessName = ref('')
 const representativeName = ref('')
 const certificateFile = ref<File | null>(null)
+const certificateSelectionError = ref('')
+const isSubmitting = ref(false)
+const submitError = ref('')
+
+const touched = reactive({
+  businessRegistrationNumber: false,
+  businessName: false,
+  representativeName: false,
+  certificateFile: false,
+})
+
+const isBusinessRegistrationNumberValid = computed(
+  () =>
+    businessRegistrationNumber.value.length === BUSINESS_REGISTRATION_NUMBER_LENGTH &&
+    /^\d+$/.test(businessRegistrationNumber.value),
+)
+const isBusinessNameValid = computed(() => businessName.value.trim().length > 0)
+const isRepresentativeNameValid = computed(() => representativeName.value.trim().length > 0)
+const isCertificateValid = computed(
+  () =>
+    certificateFile.value !== null &&
+    certificateFile.value.type.startsWith('image/') &&
+    certificateSelectionError.value === '',
+)
+const isFormValid = computed(
+  () =>
+    isBusinessRegistrationNumberValid.value &&
+    isBusinessNameValid.value &&
+    isRepresentativeNameValid.value &&
+    isCertificateValid.value,
+)
+
+const businessRegistrationNumberError = computed(() => {
+  if (!touched.businessRegistrationNumber) {
+    return ''
+  }
+
+  if (!businessRegistrationNumber.value) {
+    return '사업자등록번호를 입력해 주세요.'
+  }
+
+  if (!isBusinessRegistrationNumberValid.value) {
+    return '사업자등록번호는 숫자 10자리로 입력해 주세요.'
+  }
+
+  return ''
+})
+
+const businessNameError = computed(() => {
+  if (!touched.businessName || isBusinessNameValid.value) {
+    return ''
+  }
+
+  return '상호명을 입력해 주세요.'
+})
+
+const representativeNameError = computed(() => {
+  if (!touched.representativeName || isRepresentativeNameValid.value) {
+    return ''
+  }
+
+  return '대표자명을 입력해 주세요.'
+})
+
+const certificateError = computed(() => {
+  if (certificateSelectionError.value) {
+    return certificateSelectionError.value
+  }
+
+  if (touched.certificateFile && !isCertificateValid.value) {
+    return '사업자등록증 이미지를 등록해 주세요.'
+  }
+
+  return ''
+})
+
+const submitDescription = computed(() => {
+  if (isSubmitting.value) {
+    return '사업자 정보를 제출하고 있습니다. 잠시만 기다려 주세요.'
+  }
+
+  if (isFormValid.value) {
+    return '제출하면 사업자 인증 확인 대기 화면으로 이동합니다.'
+  }
+
+  return '모든 필수 정보가 유효해야 제출할 수 있습니다.'
+})
 
 const onboardingSteps = [
   { id: 1, label: '기본 정보', state: 'completed' },
@@ -14,6 +111,70 @@ const onboardingSteps = [
   { id: 3, label: '신체 정보', state: 'completed' },
   { id: 4, label: '회원 유형', state: 'current' },
 ] as const
+
+const handleBusinessRegistrationNumberInput = (event: Event) => {
+  const inputElement = event.currentTarget as HTMLInputElement
+  const normalizedValue = inputElement.value
+    .replace(/\D/g, '')
+    .slice(0, BUSINESS_REGISTRATION_NUMBER_LENGTH)
+
+  businessRegistrationNumber.value = normalizedValue
+  inputElement.value = normalizedValue
+  submitError.value = ''
+}
+
+const handleCertificateValidationError = (message: string) => {
+  touched.certificateFile = true
+  certificateSelectionError.value = message
+  submitError.value = ''
+}
+
+const handleCertificateUpdate = (file: File | null) => {
+  certificateFile.value = file
+  touched.certificateFile = true
+  certificateSelectionError.value = ''
+  submitError.value = ''
+}
+
+const waitForDummySubmission = () =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, BUSINESS_SUBMISSION_DELAY_MS)
+  })
+
+const handleSubmit = async () => {
+  if (isSubmitting.value) {
+    return
+  }
+
+  touched.businessRegistrationNumber = true
+  touched.businessName = true
+  touched.representativeName = true
+  touched.certificateFile = true
+  submitError.value = ''
+
+  if (!isFormValid.value || !certificateFile.value) {
+    return
+  }
+
+  isSubmitting.value = true
+
+  try {
+    await waitForDummySubmission()
+
+    businessVerificationStore.setSubmission({
+      businessRegistrationNumber: businessRegistrationNumber.value,
+      businessName: businessName.value.trim(),
+      representativeName: representativeName.value.trim(),
+      certificateFile: certificateFile.value,
+    })
+
+    await router.push({ name: ROUTE_NAMES.BIZ_VERIFY_PENDING })
+  } catch {
+    submitError.value = '제출 상태를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  } finally {
+    isSubmitting.value = false
+  }
+}
 </script>
 
 <template>
@@ -52,7 +213,7 @@ const onboardingSteps = [
         <p>사업자 회원 이용을 위해 정보를 제출해 주세요.</p>
       </header>
 
-      <form class="business-form" @submit.prevent>
+      <form class="business-form" novalidate @submit.prevent="handleSubmit">
         <section class="business-form__section" aria-labelledby="business-details-title">
           <div class="business-form__section-header">
             <div>
@@ -64,34 +225,86 @@ const onboardingSteps = [
 
           <div class="business-form__fields">
             <label class="business-field business-field--full">
-              <span class="business-field__label">사업자등록번호</span>
+              <span class="business-field__label">
+                사업자등록번호
+                <span aria-hidden="true">*</span>
+              </span>
               <input
-                v-model="businessRegistrationNumber"
+                :value="businessRegistrationNumber"
                 type="text"
                 inputmode="numeric"
                 autocomplete="off"
+                maxlength="10"
                 placeholder="사업자등록번호를 입력해 주세요"
+                :disabled="isSubmitting"
+                :aria-invalid="businessRegistrationNumberError ? 'true' : 'false'"
+                aria-describedby="business-registration-number-help business-registration-number-error"
+                @input="handleBusinessRegistrationNumberInput"
+                @blur="touched.businessRegistrationNumber = true"
               />
+              <span id="business-registration-number-help" class="business-field__help">
+                하이픈 없이 숫자 10자리를 입력해 주세요.
+              </span>
+              <span
+                v-if="businessRegistrationNumberError"
+                id="business-registration-number-error"
+                class="business-field__error"
+                role="alert"
+              >
+                {{ businessRegistrationNumberError }}
+              </span>
             </label>
 
             <label class="business-field">
-              <span class="business-field__label">상호명</span>
+              <span class="business-field__label">
+                상호명
+                <span aria-hidden="true">*</span>
+              </span>
               <input
                 v-model="businessName"
                 type="text"
                 autocomplete="organization"
                 placeholder="상호명을 입력해 주세요"
+                :disabled="isSubmitting"
+                :aria-invalid="businessNameError ? 'true' : 'false'"
+                aria-describedby="business-name-error"
+                @input="submitError = ''"
+                @blur="touched.businessName = true"
               />
+              <span
+                v-if="businessNameError"
+                id="business-name-error"
+                class="business-field__error"
+                role="alert"
+              >
+                {{ businessNameError }}
+              </span>
             </label>
 
             <label class="business-field">
-              <span class="business-field__label">대표자명</span>
+              <span class="business-field__label">
+                대표자명
+                <span aria-hidden="true">*</span>
+              </span>
               <input
                 v-model="representativeName"
                 type="text"
                 autocomplete="name"
                 placeholder="대표자명을 입력해 주세요"
+                :disabled="isSubmitting"
+                :aria-invalid="representativeNameError ? 'true' : 'false'"
+                aria-describedby="representative-name-error"
+                @input="submitError = ''"
+                @blur="touched.representativeName = true"
               />
+              <span
+                v-if="representativeNameError"
+                id="representative-name-error"
+                class="business-field__error"
+                role="alert"
+              >
+                {{ representativeNameError }}
+              </span>
             </label>
           </div>
         </section>
@@ -105,7 +318,13 @@ const onboardingSteps = [
             <span>필수 등록</span>
           </div>
 
-          <BusinessCertificateUploader v-model="certificateFile" />
+          <BusinessCertificateUploader
+            :model-value="certificateFile"
+            :disabled="isSubmitting"
+            :error-message="certificateError"
+            @update:model-value="handleCertificateUpdate"
+            @validation-error="handleCertificateValidationError"
+          />
         </section>
 
         <aside class="business-privacy-notice" aria-label="개인정보 이용 안내">
@@ -116,16 +335,20 @@ const onboardingSteps = [
           </p>
         </aside>
 
+        <p v-if="submitError" class="business-form__submit-error" role="alert">
+          {{ submitError }}
+        </p>
+
         <button
           type="submit"
           class="business-form__submit"
-          disabled
+          :disabled="!isFormValid || isSubmitting"
           aria-describedby="business-submit-description"
         >
-          사업자 정보 제출
+          {{ isSubmitting ? '제출 중' : '사업자 정보 제출' }}
         </button>
         <p id="business-submit-description" class="business-form__submit-description">
-          제출 조건과 화면 이동은 다음 입력 제약 작업에서 연결합니다.
+          {{ submitDescription }}
         </p>
       </form>
     </section>
@@ -322,6 +545,10 @@ const onboardingSteps = [
   line-height: 20px;
 }
 
+.business-field__label > span {
+  color: var(--color-error);
+}
+
 .business-field input {
   width: 100%;
   height: var(--button-height-standard);
@@ -345,6 +572,31 @@ const onboardingSteps = [
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-soft);
   outline: none;
+}
+
+.business-field input[aria-invalid='true'] {
+  border-color: var(--color-error);
+}
+
+.business-field input:disabled {
+  background: var(--color-surface-secondary);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.business-field__help,
+.business-field__error {
+  margin-top: var(--space-2);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.business-field__help {
+  color: var(--color-text-muted);
+}
+
+.business-field__error {
+  color: var(--color-error);
 }
 
 .business-privacy-notice {
@@ -389,6 +641,21 @@ const onboardingSteps = [
   font: inherit;
   font-size: 15px;
   font-weight: 600;
+}
+
+.business-form__submit-error {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  margin-top: var(--space-6);
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.business-form__submit-error + .business-form__submit {
+  margin-top: var(--space-4);
 }
 
 .business-form__submit:disabled {
