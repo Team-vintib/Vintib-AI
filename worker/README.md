@@ -20,7 +20,7 @@ S15P11A108-27(인프라 세팅) / S15P11A108-210(CatVTON 모델 연결) 관련 �
 |---|---|
 | `base_worker.py` | 모든 워커가 상속하는 공통 골격. poll → 추론 → 결과 제출 → 실패 시 재시도를 처리한다. **이 파일은 기능이 늘어나도 수정할 필요가 거의 없다.** |
 | `storage_utils.py` | 결과 이미지/JSON을 게이트웨이의 업로드 엔드포인트로 전송하는 유틸. S3 권한이 없어 EC2 로컬 디스크 저장 방식을 쓰기 때문에, 워커가 직접 디스크에 쓰지 않고 HTTP로 전송한다. **⚠️ 아직 리포에 커밋되지 않았다** — `tryon_worker_example.py`가 import하므로 이 파일 없이는 워커가 기동하지 않는다. |
-| `tryon_worker_example.py` | 시착(CatVTON) 워커. 현재 `AI/validation/AI_tryon/catvton`의 검증 코드(`verify_fit_tryon.py`)를 기반으로 실제 모델이 연결되어 있다. |
+| `tryon_worker_example.py` | 시착(CatVTON) 워커. 현재 `worker/models/catvton`의 검증 코드(`verify_fit_tryon.py`)를 기반으로 실제 모델이 연결되어 있다. |
 | `quality_check_worker_example.py` | 품질검수 워커 예시. **모델 연결은 아직 TODO 상태.** 판정 로직(프롬프트·임계치·하자 항목화·점수·오버레이)은 `AI/app/quality/`에 이미 구현돼 있고, 비동기 전환 시 이쪽으로 옮겨온다. |
 | `requirements.txt` | 워커 공통 의존성. 현재 `requests`만 들어 있다. CatVTON 등 모델 자체의 의존성(torch, diffusers 등)은 각자 기존에 구성해둔 conda 환경을 그대로 쓴다 — 이 파일에 포함하지 않는다. |
 | `.env.example` | 워커 실행에 필요한 환경변수 예시. **⚠️ 아직 리포에 커밋되지 않았다** (gitignore 대상은 아니다). 필요한 값은 아래 "실행 방법" 참고. |
@@ -37,7 +37,7 @@ export WORKER_API_KEY=<EC2 .env의 WORKER_API_KEY와 동일한 값>
 CatVTON 워커는 추가로 아래 환경변수도 쓸 수 있다 (생략 시 기본값 사용):
 
 ```bash
-export CATVTON_CODE_PATH=/path/to/AI/validation/AI_tryon/catvton   # 기본값: worker/ 기준 ../AI/validation/AI_tryon/catvton
+export CATVTON_CODE_PATH=/path/to/worker/models/catvton   # 기본값: worker/ 기준 models/catvton
 ```
 
 ### 2. 실행
@@ -64,7 +64,7 @@ python tryon_worker_example.py
 
 ## CatVTON 워커 동작 방식
 
-기존 `AI/validation/AI_tryon/catvton/verify_fit_tryon.py`(검증 스크립트)를 워커 구조에 맞게 옮긴 것이다. 로직 자체는 동일하고, 아래 세 가지만 다르다.
+기존 `worker/models/catvton/verify_fit_tryon.py`(검증 스크립트)를 워커 구조에 맞게 옮긴 것이다. 로직 자체는 동일하고, 아래 세 가지만 다르다.
 
 | 항목 | 검증 스크립트 | 워커 |
 |---|---|---|
