@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
     command: ["postgres", "-c", "shared_buffers=1GB"]
     environment:
-      POSTGRES_DB: ${DB_NAME:-vintage_auction}
+      POSTGRES_DB: ${DB_NAME:-vintib}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     volumes:
@@ -28,7 +28,7 @@ services:
       - vintib-net
     mem_limit: 2g
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-vintage_auction}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-vintib}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -67,12 +67,16 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-vintage_auction}
+      DB_NAME: ${DB_NAME:-vintib}
       DB_USERNAME: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       AI_BASE_URL: http://ai:8000
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
@@ -97,7 +101,7 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-vintage_auction}
+      DB_NAME: ${DB_NAME:-vintib}
       DB_USERNAME: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       REDIS_HOST: redis

@@ -13,9 +13,14 @@
 
 ## 파일 규칙
 
-- 경로: `.claude/plans/<파트>/<번호>-<slug>.md` (파트: `be` / `fe` / `ai`, 번호는 파트별로 `001`부터 3자리로 증가)
-  - 예: `.claude/plans/be/001-auction-bid-api.md`
-- 같은 기능번호(AUTH-004, ONBOARD-001 등)를 가진 작업은 여러 단계나 여러 커밋으로 나뉘어도 같은 계획 파일 안에 정리한다.
+- 경로: `.claude/plans/<파트>/<이니셜><번호>-<slug>.md` (파트: `be` / `fe` / `ai`)
+  - 이니셜: 작성자를 구분하는 영문 대문자 2자. 같은 파트 팀원끼리 겹치지 않게 각자 정해서 고정으로 사용한다 (예: 이름 로마자 표기 이니셜).
+  - 번호: 같은 이니셜 안에서만 `001`부터 3자리로 증가한다. 즉 각자 자기 번호만 신경 쓰면 되고, 다른 팀원의 다음 번호를 확인할 필요가 없다.
+  - 예: `.claude/plans/be/SY001-auction-bid-api.md`, `.claude/plans/be/JY001-payment-webhook.md`, `.claude/plans/be/SY002-live-chat.md`
+  - slug: 핵심 키워드 1~3단어로 짧고 함축적으로 작성한다 (전체 파일명이 한눈에 들어오는 길이).
+    - "implementation", "structure", "management" 같은 군더더기 단어, 조사성 표현은 뺀다.
+    - 기능 전체를 풀어 쓰지 말고 핵심 도메인 단어만 남긴다. 예: `product-price-set-direct-sale` → `product-price-sale`, `auth-signup-implementation` → `auth-signup`
+- 같은 기능번호(AUTH-004, ONBOARD-001 등)를 가진 작업은 여러 단계나 여러 커밋으로 나뉘어도 같은 계획 파일(같은 이니셜+번호) 안에 정리한다.
 - 계획 내용은 간결하게 작성한다. 상세 코드는 넣지 않는다.
   - **배경/목표**: 왜 필요한지, 무엇을 만드는지 1~2문장
   - **작업 내용**: 어떻게 구현할지 구두로 간단히 설명 (상세 코드 X)
