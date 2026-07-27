@@ -83,7 +83,9 @@ const getProductPath = (productId: number) => `/products/${productId}`
           <span class="live-card__body">
             <strong class="live-card__title">{{ live.title }}</strong>
             <span class="live-card__meta">판매자 {{ live.hostName }}</span>
-            <span class="live-card__meta">시작 시간 {{ formatSchedule(live.startedAt) }}</span>
+            <span class="live-card__meta live-card__meta--time"
+              >시작 시간 {{ formatSchedule(live.startedAt) }}</span
+            >
           </span>
         </article>
       </div>
@@ -112,7 +114,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
           <span class="schedule-card__body">
             <strong class="schedule-card__title">{{ live.title }}</strong>
             <span class="schedule-card__meta">판매자 {{ live.hostName }}</span>
-            <span class="schedule-card__meta"
+            <span class="schedule-card__meta schedule-card__meta--time"
               >예정 일자 {{ formatSchedule(live.scheduledAt) }}</span
             >
             <span class="schedule-card__meta"
@@ -427,7 +429,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
 }
 
 .product-card__media {
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 16 / 9;
 }
 
 .live-card__image,
@@ -517,8 +519,14 @@ const getProductPath = (productId: number) => `/products/${productId}`
 .product-card__seller {
   color: var(--color-text-muted);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 20px;
+}
+
+.live-card__meta--time,
+.schedule-card__meta--time {
+  color: var(--color-text-secondary);
+  font-weight: 700;
 }
 
 .live-card__action,
@@ -600,7 +608,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
 .product-card__brand {
   color: var(--color-primary);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 20px;
 }
 

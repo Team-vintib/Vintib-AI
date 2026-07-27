@@ -147,7 +147,9 @@ const getProductPath = (productId: number) => `/products/${productId}`
           <span class="live-card__body">
             <strong class="live-card__title">{{ live.title }}</strong>
             <span class="live-card__meta">판매자 {{ live.hostName }}</span>
-            <span class="live-card__meta">시작 시간 {{ formatSchedule(live.startedAt) }}</span>
+            <span class="live-card__meta live-card__meta--time"
+              >시작 시간 {{ formatSchedule(live.startedAt) }}</span
+            >
           </span>
         </RouterLink>
       </div>
@@ -176,7 +178,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
           <span class="schedule-card__body">
             <strong class="schedule-card__title">{{ live.title }}</strong>
             <span class="schedule-card__meta">판매자 {{ live.hostName }}</span>
-            <span class="schedule-card__meta"
+            <span class="schedule-card__meta schedule-card__meta--time"
               >예정 일자 {{ formatSchedule(live.scheduledAt) }}</span
             >
             <span class="schedule-card__meta"
@@ -205,12 +207,14 @@ const getProductPath = (productId: number) => `/products/${productId}`
         >
           <span class="product-card__media">
             <img class="product-card__image" :src="product.primaryImageUrl" :alt="product.title" />
-            <span class="product-card__tag">{{
-              product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'
-            }}</span>
+            <span
+              class="product-card__tag"
+              :class="{ 'product-card__tag--direct': product.saleType === 'DIRECT_SALE' }"
+            >
+              {{ product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매' }}
+            </span>
           </span>
           <span class="product-card__body">
-            <span class="product-card__reason">{{ product.recommendationReason }}</span>
             <span class="product-card__brand">{{ product.brandName }}</span>
             <span class="product-card__seller">판매자 {{ product.sellerName }}</span>
             <strong class="product-card__title">{{ product.title }}</strong>
@@ -499,7 +503,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
 }
 
 .product-card__media {
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 16 / 9;
 }
 
 .seller-card__cover::after,
@@ -550,7 +554,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
 .schedule-card__body,
 .product-card__body {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-1);
   padding: var(--space-3);
 }
 
@@ -587,14 +591,22 @@ const getProductPath = (productId: number) => `/products/${productId}`
 
 .seller-card__specialty,
 .seller-card__stats,
-.seller-card__time,
 .live-card__meta,
 .schedule-card__meta,
 .product-card__seller,
 .product-card__meta {
   color: var(--color-text-muted);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.seller-card__time,
+.live-card__meta--time,
+.schedule-card__meta--time {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
   line-height: 20px;
 }
 
@@ -649,25 +661,10 @@ const getProductPath = (productId: number) => `/products/${productId}`
   display: grid;
 }
 
-.product-card__reason {
-  width: fit-content;
-  max-width: 100%;
-  padding: var(--space-1) var(--space-2);
-  overflow: hidden;
-  border-radius: var(--radius-badge);
-  background: var(--color-surface-secondary);
-  color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .product-card__brand {
   color: var(--color-primary);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 20px;
 }
 
@@ -685,6 +682,10 @@ const getProductPath = (productId: number) => `/products/${productId}`
 
 .product-card__tag--auction {
   background: var(--color-auction);
+}
+
+.product-card__tag--direct {
+  background: var(--color-direct-sale);
 }
 
 .content-band {
