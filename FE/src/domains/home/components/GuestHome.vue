@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
 import LiveCard from '@/domains/home/components/LiveCard.vue'
 import ProductCard from '@/domains/home/components/ProductCard.vue'
@@ -17,36 +18,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
 
 <template>
   <div class="guest-home">
-    <section class="home-search-panel" aria-label="홈 검색">
-      <form class="home-search" role="search" @submit.prevent>
-        <span class="home-search__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="m20 20-4.2-4.2m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </span>
-        <input
-          class="home-search__input"
-          type="search"
-          placeholder="예: 리바이스 데님 자켓, Archive Room"
-        />
-        <RouterLink class="home-search__button" :to="ROUTE_PATHS.SEARCH">검색하기</RouterLink>
-      </form>
-      <div class="home-search-tags" aria-label="인기 검색어">
-        <span class="home-search-tags__label">인기 검색어</span>
-        <RouterLink class="home-search-tags__item" :to="ROUTE_PATHS.SEARCH">리바이스</RouterLink>
-        <RouterLink class="home-search-tags__item" :to="ROUTE_PATHS.SEARCH">가죽 자켓</RouterLink>
-        <RouterLink class="home-search-tags__item" :to="ROUTE_PATHS.SEARCH">라이브 경매</RouterLink>
-        <RouterLink class="home-search-tags__item" :to="ROUTE_PATHS.SEARCH"
-          >Archive Room</RouterLink
-        >
-      </div>
-    </section>
+    <HomeSearchPanel />
 
     <section class="home-hero" aria-labelledby="guest-home-title">
       <img
@@ -166,72 +138,11 @@ const getProductPath = (productId: number) => `/products/${productId}`
   padding-bottom: var(--space-16);
 }
 
-.home-search-panel,
 .home-hero,
 .content-band {
   width: 100%;
 }
 
-.home-search-panel {
-  display: grid;
-  place-items: center;
-  gap: var(--space-3);
-  padding-top: var(--space-5);
-}
-
-.home-search {
-  display: flex;
-  align-items: center;
-  width: min(100%, 860px);
-  height: 58px;
-  padding: 5px 5px 5px var(--space-5);
-  border: 1px solid var(--color-search-border);
-  border-radius: 16px;
-  background: var(--color-surface);
-  box-shadow: none;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
-}
-
-.home-search:focus-within {
-  border-color: var(--color-search-button);
-  box-shadow: 0 0 0 4px rgba(47, 75, 58, 0.08);
-}
-
-.home-search__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  flex: 0 0 auto;
-  color: var(--color-search-icon);
-}
-
-.home-search__icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.home-search__input {
-  height: 48px;
-  min-width: 0;
-  border: 0;
-  flex: 1;
-  padding: 0 var(--space-4);
-  background: transparent;
-  color: var(--color-text-primary);
-  font-size: 15px;
-  line-height: 48px;
-  outline: none;
-}
-
-.home-search__input::placeholder {
-  color: var(--color-text-muted);
-}
-
-.home-search__button,
 .home-hero__primary,
 .home-hero__secondary {
   display: inline-flex;
@@ -245,51 +156,9 @@ const getProductPath = (productId: number) => `/products/${productId}`
   white-space: nowrap;
 }
 
-.home-search__button {
-  background: var(--color-search-button);
-  color: var(--color-text-inverse);
-}
-
 .home-hero__primary {
   background: var(--color-primary);
   color: var(--color-text-inverse);
-}
-
-.home-search__button:hover {
-  background: var(--color-search-button-hover);
-}
-
-.home-search-tags {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  width: min(100%, 860px);
-}
-
-.home-search-tags__label {
-  color: var(--color-text-muted);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.home-search-tags__item {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-chip);
-  background: rgba(255, 255, 255, 0.62);
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.home-search-tags__item:hover {
-  border-color: var(--color-border-strong);
-  color: var(--color-text-primary);
 }
 
 .home-hero {
@@ -475,31 +344,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
 }
 
 @media (max-width: 520px) {
-  .home-search {
-    display: grid;
-    gap: var(--space-2);
-    padding: var(--space-2);
-    height: auto;
-  }
-
-  .home-search__icon {
-    display: none;
-  }
-
-  .home-search__input {
-    height: 42px;
-    line-height: 42px;
-  }
-
-  .home-search__button {
-    width: 100%;
-    height: 42px;
-  }
-
-  .home-search-tags {
-    justify-content: flex-start;
-  }
-
   .home-hero__content {
     padding: var(--space-5);
   }
