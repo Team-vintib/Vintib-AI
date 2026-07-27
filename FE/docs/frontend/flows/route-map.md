@@ -43,6 +43,7 @@ flowchart TD
   TryOn["ONBOARD-003 /onboarding/try-on"]
   MemberType["ONBOARD-004 /onboarding/member-type"]
   Biz["BIZ-001 /business/verification"]
+  BizPending["BIZ-001-2 /business/verification/pending"]
   Home["HOME /"]
 
   Profile --> Interests
@@ -50,7 +51,7 @@ flowchart TD
   TryOn --> MemberType
   MemberType --> Home
   MemberType --> Biz
-  Biz --> Home
+  Biz --> BizPending
 ```
 
 ## 라우트 메타 초안
@@ -68,5 +69,6 @@ flowchart TD
 | `/onboarding/basic-info`  | ONBOARD-001 | false        | false     | 가입 후 필수/보완 흐름                           |
 | `/onboarding/interests`   | ONBOARD-002 | false        | false     | 건너뛰기 가능                                    |
 | `/onboarding/try-on`      | ONBOARD-003 | false        | false     | 건너뛰기 가능                                    |
-| `/onboarding/member-type` | ONBOARD-004 | true         | false     | 일반/사업자 선택                                 |
-| `/business/verification`  | BIZ-001     | true         | false     | 사업자 회원 정보 제출                            |
+| `/onboarding/member-type` | ONBOARD-004 | false        | false     | 회원가입 응답의 인증 토큰 계약 확정 전 임시      |
+| `/business/verification`  | BIZ-001     | false        | false     | 사업자 회원 정보 제출, 인증 계약 확정 전 임시    |
+| `/business/verification/pending` | BIZ-001-2 | false   | false     | FE 메모리 제출 상태가 없으면 BIZ-001로 이동      |

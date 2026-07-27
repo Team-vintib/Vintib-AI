@@ -119,7 +119,7 @@ Content-Type: application/json
 | 회원 유형·온보딩 완료   | POST     | `/api/me/onboarding/complete` | S15P11A108-261 FE 선행 계약 |
 | 내 정보 수정            | PATCH    | `/api/me`                     | 후보                        |
 | 주소 조회/저장          | GET/POST | `/api/addresses`              | 후보                        |
-| 사업자 인증 제출/조회   | POST/GET | `/api/business-verifications` | 후보                        |
+| 사업자 인증 제출/조회   | POST/GET | `/api/business-verifications` | S15P11A108-400 FE 계약 제안 |
 
 ### 기본 정보 저장
 
@@ -258,6 +258,44 @@ Content-Type: application/json
 - 성공한 `BUSINESS` 회원은 BIZ-001 사업자 인증 화면으로 이동합니다.
 - 실패 시 선택값을 유지하며 사용자가 다시 요청할 수 있습니다.
 - BE Swagger가 제공되면 endpoint, enum과 중복 완료 정책을 실제 계약에 맞춥니다.
+
+### 사업자 인증 제출
+
+S15P11A108-400에서는 실제 API를 호출하지 않고 FE 더미 제출 상태만 구현했습니다.
+아래 내용은 BE 검토를 위한 후보 계약이며 Swagger 확정 후 타입과 API 함수를 구현합니다.
+
+```http
+POST /api/business-verifications
+Authorization: Bearer {accessToken}
+Content-Type: multipart/form-data
+```
+
+| multipart 필드 | 타입 | 필수 | FE 임시 규칙 |
+| --- | --- | --- | --- |
+| `businessRegistrationNumber` | string | 예 | 하이픈 없는 숫자 10자리 |
+| `businessName` | string | 예 | 공백 제외 값 필요 |
+| `representativeName` | string | 예 | 공백 제외 값 필요 |
+| `certificate` | image file | 예 | 한 개, `image/*` MIME 1차 확인 |
+
+성공 응답 후보:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "status": "PENDING",
+    "submittedAt": "2026-07-27T17:00:00+09:00"
+  },
+  "error": null
+}
+```
+
+- 브라우저가 multipart boundary를 생성하도록 FE는 `Content-Type` 값을 직접 고정하지
+  않습니다.
+- 사업자등록번호 체크섬, 이미지 확장자·MIME·용량·해상도와 중복 제출 정책은 미확정입니다.
+- 실제 API 연동 전까지 제출 정보는 Pinia 메모리 상태로만 BIZ-001-2에 전달합니다.
+- BIZ-001-2 상태 조회 endpoint와 승인·반려 상태 값도 BE 확인이 필요합니다.
 
 ## 이후 화면 후보
 
