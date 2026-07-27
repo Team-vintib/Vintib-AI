@@ -54,6 +54,16 @@ flowchart TD
   Biz --> BizPending
 ```
 
+## 상품 탐색 흐름
+
+```mermaid
+flowchart TD
+  ProductList["PROD-008 /products"]
+  ProductDetail["PROD-006 /products/:productId"]
+
+  ProductList -. "상세 화면 구현 후 연결" .-> ProductDetail
+```
+
 ## 라우트 메타 초안
 
 | 라우트                    | 화면        | requiresAuth | guestOnly | 비고                                             |
@@ -72,3 +82,4 @@ flowchart TD
 | `/onboarding/member-type` | ONBOARD-004 | false        | false     | 회원가입 응답의 인증 토큰 계약 확정 전 임시      |
 | `/business/verification`  | BIZ-001     | false        | false     | 사업자 회원 정보 제출, 인증 계약 확정 전 임시    |
 | `/business/verification/pending` | BIZ-001-2 | false   | false     | FE 메모리 제출 상태가 없으면 BIZ-001로 이동      |
+| `/products`               | PROD-008    | false        | false     | 공개 상품 목록 껍데기, 실제 조회 API 연동 대기   |
