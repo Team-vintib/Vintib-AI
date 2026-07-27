@@ -35,6 +35,23 @@ export interface HomeProductCardItem {
   isWished?: boolean
 }
 
+export interface HomeFollowedSellerItem {
+  id: number
+  name: string
+  profileImageUrl: string
+  coverImageUrl: string
+  specialty: string
+  followerCount: number
+  newProductCount: number
+  liveStatus?: HomeLiveStatus
+  liveTitle?: string
+  liveAt?: string
+}
+
+export interface HomeRecommendedProductItem extends HomeProductCardItem {
+  recommendationReason: string
+}
+
 export type HomeContentAudience = 'guest' | 'member' | 'all'
 
 export interface HomeContentCardItem {
@@ -52,5 +69,7 @@ export interface HomeViewMockData {
   scheduledLives: HomeLiveCardItem[]
   directSaleProducts: HomeProductCardItem[]
   upcomingAuctionProducts: HomeProductCardItem[]
+  followedSellers: HomeFollowedSellerItem[]
+  recommendedProducts: HomeRecommendedProductItem[]
   contentCards: HomeContentCardItem[]
 }

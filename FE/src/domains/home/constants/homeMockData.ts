@@ -150,6 +150,96 @@ export const homeMockData: HomeViewMockData = {
       isWished: false,
     },
   ],
+  followedSellers: [
+    {
+      id: 601,
+      name: 'Archive Room',
+      profileImageUrl:
+        'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=400&q=80',
+      coverImageUrl:
+        'https://images.unsplash.com/photo-1516762689617-e1cffcef479d?auto=format&fit=crop&w=900&q=80',
+      specialty: '90s denim and outer',
+      followerCount: 1240,
+      newProductCount: 12,
+      liveStatus: 'LIVE',
+      liveTitle: '90s 데님 재킷 라이브 셀렉션',
+      liveAt: '2026-07-27T20:00:00+09:00',
+    },
+    {
+      id: 602,
+      name: '925 Collective',
+      profileImageUrl:
+        'https://images.unsplash.com/photo-1499952127939-9bbf5af6c51c?auto=format&fit=crop&w=400&q=80',
+      coverImageUrl:
+        'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=900&q=80',
+      specialty: 'silver jewelry',
+      followerCount: 860,
+      newProductCount: 6,
+      liveStatus: 'SCHEDULED',
+      liveTitle: '실버 주얼리 소장품 오픈',
+      liveAt: '2026-07-29T20:30:00+09:00',
+    },
+    {
+      id: 603,
+      name: 'Slow Knit Market',
+      profileImageUrl:
+        'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=400&q=80',
+      coverImageUrl:
+        'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=900&q=80',
+      specialty: 'knit and calm casual',
+      followerCount: 540,
+      newProductCount: 8,
+      liveStatus: 'SCHEDULED',
+      liveTitle: '주말 니트웨어 프리뷰',
+      liveAt: '2026-07-28T21:00:00+09:00',
+    },
+  ],
+  recommendedProducts: [
+    {
+      id: 701,
+      saleType: 'DIRECT_SALE',
+      saleStatus: 'ON_SALE',
+      title: 'Levi’s 501 washed denim',
+      sellerName: 'Blue Label',
+      brandName: 'Levi’s',
+      categoryName: '하의',
+      primaryImageUrl:
+        'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=900&q=80',
+      price: 86000,
+      isWished: true,
+      recommendationReason: '최근 데님 상품을 자주 봤어요',
+    },
+    {
+      id: 702,
+      saleType: 'AUCTION',
+      saleStatus: 'AUCTION_SCHEDULED',
+      title: 'Prada nylon shoulder bag',
+      sellerName: 'Second Vault',
+      brandName: 'Prada',
+      categoryName: '가방',
+      primaryImageUrl:
+        'https://images.unsplash.com/photo-1590874103328-eac38a683ce7?auto=format&fit=crop&w=900&q=80',
+      price: 390000,
+      startingBid: 250000,
+      auctionStartsAt: '2026-07-30T20:00:00+09:00',
+      isWished: false,
+      recommendationReason: '팔로우 셀러의 경매 예정 상품',
+    },
+    {
+      id: 703,
+      saleType: 'DIRECT_SALE',
+      saleStatus: 'ON_SALE',
+      title: 'Vintage leather bomber',
+      sellerName: 'Heritage Depot',
+      brandName: 'Schott',
+      categoryName: '아우터',
+      primaryImageUrl:
+        'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=80',
+      price: 210000,
+      isWished: false,
+      recommendationReason: '아우터 관심 카테고리와 맞아요',
+    },
+  ],
   contentCards: [
     {
       id: 501,

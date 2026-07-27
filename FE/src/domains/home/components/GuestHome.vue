@@ -57,7 +57,9 @@ const getProductPath = (productId: number) => `/products/${productId}`
         </h1>
         <p class="home-hero__description">지금 진행 중인 라이브와 상시 판매 상품을 둘러보세요.</p>
         <div class="home-hero__actions">
-          <RouterLink class="home-hero__primary" :to="ROUTE_PATHS.LIVE_LIST">라이브 둘러보기</RouterLink>
+          <RouterLink class="home-hero__primary" :to="ROUTE_PATHS.LIVE_LIST"
+            >라이브 둘러보기</RouterLink
+          >
           <RouterLink class="home-hero__secondary" :to="ROUTE_PATHS.AUTH_LOGIN">로그인</RouterLink>
         </div>
       </div>
@@ -73,11 +75,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
       </div>
 
       <div class="live-grid">
-        <article
-          v-for="live in homeMockData.liveNow"
-          :key="live.id"
-          class="live-card"
-        >
+        <article v-for="live in homeMockData.liveNow" :key="live.id" class="live-card">
           <span class="live-card__media">
             <img class="live-card__image" :src="live.thumbnailUrl" :alt="live.title" />
             <span class="live-card__badge">LIVE</span>
@@ -101,22 +99,25 @@ const getProductPath = (productId: number) => `/products/${productId}`
       </div>
 
       <div class="schedule-grid">
-        <article
-          v-for="live in homeMockData.scheduledLives"
-          :key="live.id"
-          class="schedule-card"
-        >
+        <article v-for="live in homeMockData.scheduledLives" :key="live.id" class="schedule-card">
           <span class="schedule-card__media">
             <img class="schedule-card__image" :src="live.thumbnailUrl" :alt="live.title" />
-            <RouterLink class="schedule-card__action schedule-card__action--media" :to="ROUTE_PATHS.AUTH_LOGIN">
+            <RouterLink
+              class="schedule-card__action schedule-card__action--media"
+              :to="ROUTE_PATHS.AUTH_LOGIN"
+            >
               알림받기
             </RouterLink>
           </span>
           <span class="schedule-card__body">
             <strong class="schedule-card__title">{{ live.title }}</strong>
             <span class="schedule-card__meta">판매자 {{ live.hostName }}</span>
-            <span class="schedule-card__meta">예정 일자 {{ formatSchedule(live.scheduledAt) }}</span>
-            <span class="schedule-card__meta">예정 상품 {{ live.scheduledProductCount ?? 0 }}개</span>
+            <span class="schedule-card__meta"
+              >예정 일자 {{ formatSchedule(live.scheduledAt) }}</span
+            >
+            <span class="schedule-card__meta"
+              >예정 상품 {{ live.scheduledProductCount ?? 0 }}개</span
+            >
           </span>
         </article>
       </div>
@@ -169,7 +170,10 @@ const getProductPath = (productId: number) => `/products/${productId}`
         >
           <span class="product-card__media">
             <img class="product-card__image" :src="product.primaryImageUrl" :alt="product.title" />
-            <RouterLink class="product-card__action product-card__action--media" :to="ROUTE_PATHS.AUTH_LOGIN">
+            <RouterLink
+              class="product-card__action product-card__action--media"
+              :to="ROUTE_PATHS.AUTH_LOGIN"
+            >
               알림받기
             </RouterLink>
           </span>
@@ -179,7 +183,9 @@ const getProductPath = (productId: number) => `/products/${productId}`
             <strong class="product-card__title">{{ product.title }}</strong>
             <span class="product-card__price-text">가격 {{ formatPrice(product.price) }}</span>
             <span class="product-card__meta">{{ product.categoryName }}</span>
-            <span class="product-card__bid">경매 시작가 {{ formatPrice(product.startingBid) }}</span>
+            <span class="product-card__bid"
+              >경매 시작가 {{ formatPrice(product.startingBid) }}</span
+            >
           </span>
         </article>
       </div>
@@ -625,14 +631,20 @@ const getProductPath = (productId: number) => `/products/${productId}`
 }
 
 .content-card {
-  min-height: 220px;
+  height: 150px;
+  min-height: 0;
+}
+
+.content-card__image {
+  position: absolute;
+  inset: 0;
 }
 
 .content-card__body {
   position: absolute;
   z-index: 1;
   right: var(--space-8);
-  bottom: var(--space-8);
+  bottom: var(--space-5);
   left: var(--space-8);
   display: grid;
   max-width: 520px;
@@ -732,9 +744,13 @@ const getProductPath = (productId: number) => `/products/${productId}`
   }
 
   .content-card__body {
-    right: var(--space-5);
-    bottom: var(--space-5);
-    left: var(--space-5);
+    right: var(--space-4);
+    bottom: var(--space-4);
+    left: var(--space-4);
+  }
+
+  .content-card {
+    height: 132px;
   }
 }
 </style>
