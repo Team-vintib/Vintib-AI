@@ -30,6 +30,16 @@ def download_image(url: str, timeout: float = 30.0) -> Image.Image:
     return Image.open(io.BytesIO(resp.content))
 
 
+def download_bytes(url: str, timeout: float = 60.0) -> bytes:
+    """오디오/영상처럼 PIL로 열 수 없는 원본을 그대로 내려받는다(STT 워커용).
+
+    타임아웃을 이미지보다 길게 잡은 이유: 방송 녹화 청크는 이미지보다 용량이 크다.
+    """
+    resp = requests.get(url, timeout=timeout)
+    resp.raise_for_status()
+    return resp.content
+
+
 def upload_image(image: Image.Image, prefix: str, timeout: float = 30.0) -> str:
     """결과 이미지를 PNG로 인코딩해 게이트웨이에 올리고 공개 URL을 받는다."""
     buffer = io.BytesIO()
