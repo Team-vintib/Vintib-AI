@@ -750,11 +750,34 @@ const getProductActivityLabel = (product: SearchProductResult) => {
         </aside>
 
         <div class="search-page__results">
-          <SearchResultTabs
-            :tabs="resultTabs"
-            :active-tab-id="activeTabId"
-            @select="selectTab"
-          />
+          <div class="search-page__result-header">
+            <SearchResultTabs
+              :tabs="resultTabs"
+              :active-tab-id="activeTabId"
+              @select="selectTab"
+            />
+
+            <div
+              v-if="activeTabId === 'all' || activeTabId === 'product'"
+              class="search-page__sort-toolbar"
+            >
+              <span>{{ filteredProducts.length }}개</span>
+              <label class="sr-only" for="search-product-sort">검색 상품 정렬</label>
+              <select
+                id="search-product-sort"
+                :value="querySortOption"
+                @change="handleSortChange"
+              >
+                <option
+                  v-for="sortOption in SEARCH_SORT_OPTIONS"
+                  :key="sortOption.id"
+                  :value="sortOption.id"
+                >
+                  {{ sortOption.label }}
+                </option>
+              </select>
+            </div>
+          </div>
 
           <p class="sr-only" aria-live="polite">{{ liveMessage }}</p>
 
@@ -794,23 +817,7 @@ const getProductActivityLabel = (product: SearchProductResult) => {
               >
                 <div class="search-page__section-header">
                   <h2 id="search-products-title">상품</h2>
-                  <div class="search-page__section-toolbar">
-                    <span>{{ filteredProducts.length }}개</span>
-                    <label class="sr-only" for="search-product-sort">검색 상품 정렬</label>
-                    <select
-                      id="search-product-sort"
-                      :value="querySortOption"
-                      @change="handleSortChange"
-                    >
-                      <option
-                        v-for="sortOption in SEARCH_SORT_OPTIONS"
-                        :key="sortOption.id"
-                        :value="sortOption.id"
-                      >
-                        {{ sortOption.label }}
-                      </option>
-                    </select>
-                  </div>
+                  <span>{{ filteredProducts.length }}개</span>
                 </div>
 
                 <div class="search-page__product-grid">
@@ -1211,6 +1218,42 @@ const getProductActivityLabel = (product: SearchProductResult) => {
   min-width: 0;
 }
 
+.search-page__result-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-6);
+  min-height: 48px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.search-page__sort-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding-bottom: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.search-page__sort-toolbar select {
+  min-width: 136px;
+  height: var(--button-height-small);
+  padding: 0 var(--space-8) 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  outline: 0;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-regular);
+}
+
+.search-page__sort-toolbar select:focus-visible {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
 .search-page__selected-filters {
   display: flex;
   flex-wrap: wrap;
@@ -1276,36 +1319,6 @@ const getProductActivityLabel = (product: SearchProductResult) => {
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
   line-height: 20px;
-}
-
-.search-page__section-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.search-page__section-toolbar select {
-  min-width: 132px;
-  height: var(--button-height-small);
-  padding: 0 var(--space-9) 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  outline: 0;
-  background:
-    linear-gradient(45deg, transparent 50%, var(--color-text-secondary) 50%) right 14px center /
-      6px 6px no-repeat,
-    linear-gradient(135deg, var(--color-text-secondary) 50%, transparent 50%) right 10px center /
-      6px 6px no-repeat,
-    var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: var(--font-size-button-small);
-  font-weight: var(--font-weight-semibold);
-  appearance: none;
-}
-
-.search-page__section-toolbar select:focus-visible {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 
 .search-page__product-grid,
@@ -1539,6 +1552,16 @@ const getProductActivityLabel = (product: SearchProductResult) => {
   .search-page__title {
     font-size: 26px;
     line-height: 36px;
+  }
+
+  .search-page__result-header {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .search-page__sort-toolbar {
+    justify-content: flex-end;
+    padding-bottom: var(--space-3);
   }
 
   .search-page__product-grid,
