@@ -1,6 +1,7 @@
 package com.ssafy.backend.live.controller;
 
 import com.ssafy.backend.global.response.ApiResponse;
+import com.ssafy.backend.live.dto.request.LiveInstantRequest;
 import com.ssafy.backend.live.dto.request.LiveScheduleRequest;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.service.LiveService;
@@ -39,6 +40,22 @@ public class LiveController {
             Authentication authentication, @Valid @RequestBody LiveScheduleRequest request) {
         Long hostId = (Long) authentication.getPrincipal();
         LiveResponse response = liveService.scheduleLive(hostId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "즉시 라이브 개설",
+            description = "예약 없이 곧바로 방송을 시작한다. 생성 직후 상태는 LIVE이며, 시작 시각은 서버 시각으로 기록된다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "개설 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패(방송명 누락 등)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요")
+    })
+    @PostMapping
+    public ResponseEntity<ApiResponse<LiveResponse>> openLiveNow(
+            Authentication authentication, @Valid @RequestBody LiveInstantRequest request) {
+        Long hostId = (Long) authentication.getPrincipal();
+        LiveResponse response = liveService.openLiveNow(hostId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 }
