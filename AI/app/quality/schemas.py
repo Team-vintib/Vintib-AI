@@ -128,25 +128,7 @@ class InspectionRequest(BaseModel):
     )
 
 
-# --- 접수 응답 --------------------------------------------------------------
-
-
-class InspectionEnqueued(BaseModel):
-    """`POST /quality/inspections`의 응답. **결과가 아니라 접수증이다.**
-
-    실제 결과는 `GET /ai/jobs/{job_id}`로 폴링한다 — 시착과 같은 형식이라 BE가 폴링 로직을
-    하나만 유지하면 된다. `result` 필드에 아래 `InspectionResult` 형태가 담긴다.
-    """
-
-    job_id: str = Field(description="게이트웨이가 채번한 job id. 이 값으로 결과를 폴링한다")
-    product_id: int = Field(description="요청에서 받은 값을 그대로 에코")
-
-
-# --- job result 계약 --------------------------------------------------------
-# 아래 모델들은 **AI가 직접 생성하지 않는다.** 워커(worker/models/clipseg/)가 만들어
-# `JobResult.result`에 dict로 싣는 값의 형태를 문서화·고정하는 용도다. 워커 쪽 사본은
-# `worker/models/clipseg/contracts.py`이며, 둘이 어긋나지 않는지는
-# `AI/test/quality/test_quality_contract.py`가 검사한다.
+# --- 응답 ------------------------------------------------------------------
 
 
 class ModelInfo(BaseModel):
@@ -193,8 +175,8 @@ class AttentionMap(BaseModel):
     url: str
 
 
-class InspectionResult(BaseModel):
-    """검수 1건의 결과. `GET /ai/jobs/{job_id}` 응답의 `result` 필드에 담긴다."""
+class InspectionResponse(BaseModel):
+    """검수 1건의 결과. `GET /quality/inspections/{id}` 재조회 시에도 같은 형태다."""
 
     inspection_id: str
     product_id: int
@@ -208,10 +190,57 @@ class InspectionResult(BaseModel):
     notes: list[str] = Field(
         default_factory=list, description="판매자·FE에 보일 주의 문구(모델 한계 안내 등)"
     )
-    latency_ms: float = Field(description="워커의 추론+후처리 소요 시간(큐 대기 제외)")
+    latency_ms: float
 
 
-# 활성 설정 노출용 스키마(`GET /quality/prompt-sets`)는 제거했다 — 프롬프트·임계치·하자 분류
-# 체계가 전부 워커(`worker/models/clipseg/registry.py`)로 옮겨가서 게이트웨이가 그 값을 알지
-# 못한다. 설정을 확인하려면 워커 쪽 파일을 보거나, 필요해지면 워커가 job result에 실어 보내는
-# 방식으로 되살린다(`ModelInfo`가 이미 백엔드·프롬프트 세트를 담고 있다).
+# --- 활성 설정 노출 (디버그·데모용) ---------------------------------------
+
+
+class BackendView(BaseModel):
+    """세그멘터 백엔드 하나의 설정. "모델을 갈아끼웠다"를 API로 확인하는 용도."""
+
+    backend: str
+    model_id: str | None
+    description: str
+    active: bool
+    mask_size: int
+    defect_threshold: float
+    confident_threshold: float
+    clean_margin: float
+    min_area_ratio: float
+
+
+class DefectPolicyView(BaseModel):
+    """하자 유형 하나의 취급 정책과 그 **근거**."""
+
+    defect_type: DefectType
+    label: str
+    trusted: bool = Field(description="False면 확률이 높아도 DETECTED로 노출하지 않는다")
+    needs_seller_review: bool
+    statement_required: bool
+    weight: float = Field(description="감점 가중치 — 미확정 임의값")
+    evidence: str = Field(description="LAB-12 실측 결과 또는 미검증 표시")
+
+
+class PromptSetView(BaseModel):
+    """카테고리 × 기본색 조합 하나의 프롬프트 세트."""
+
+    key: str
+    category: GarmentCategory
+    base_color: BaseColor
+    clean_prompt: str
+    defect_prompts: dict[str, DefectType] = Field(description="프롬프트 문구 → 하자 유형")
+    sections: list[GarmentSection] = Field(description="3×3 부위 라벨(섹션 1~9 순서)")
+
+
+class QualityConfigResponse(BaseModel):
+    """현재 활성 설정 전체. 값 확정 전 단계라 무엇이 임의값인지 함께 드러낸다."""
+
+    active_segmenter: str
+    backends: list[BackendView]
+    taxonomy: list[DefectPolicyView]
+    prompt_sets: list[PromptSetView]
+    mock_product_ids: list[int] = Field(
+        description="목업 백엔드에서 시나리오가 등록된 product_id. 그 외는 시드 기반 합성"
+    )
+    unverified_notice: str = Field(description="아직 실측으로 확정되지 않은 값에 대한 경고")

@@ -35,7 +35,7 @@ from pathlib import Path
 
 import numpy as np
 
-from contracts import (
+from app.quality.schemas import (
     BaseColor,
     ConditionGrade,
     DefectType,

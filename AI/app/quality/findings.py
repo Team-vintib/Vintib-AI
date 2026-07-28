@@ -34,11 +34,11 @@ from dataclasses import dataclass
 
 import numpy as np
 
-import registry
-from prompts import SECTION_COUNT, SECTION_GRID, PromptSet, section_label
-from registry import SegmenterConfig
-from contracts import DefectType, Finding, FindingStatus, SectionScore, Severity
-from segmenter import SegmentationResult
+from app.quality import registry
+from app.quality.prompts import SECTION_COUNT, SECTION_GRID, PromptSet, section_label
+from app.quality.registry import SegmenterConfig
+from app.quality.schemas import DefectType, Finding, FindingStatus, SectionScore, Severity
+from app.quality.segmenter import SegmentationResult
 
 # 서로 다른 프롬프트가 같은 하자를 잡았다고 볼 기준.
 #

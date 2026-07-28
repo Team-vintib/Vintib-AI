@@ -20,7 +20,7 @@ LAB-12가 실측한 프롬프트는 `"a stain on fabric"`, `"a dirty mark"`,
 from dataclasses import dataclass
 from functools import lru_cache
 
-from contracts import BaseColor, DefectType, GarmentCategory, GarmentSection
+from app.quality.schemas import BaseColor, DefectType, GarmentCategory, GarmentSection
 
 # 3×3 그리드. 섹션 번호는 행 우선(좌상단 1 → 우하단 9)이다.
 #
