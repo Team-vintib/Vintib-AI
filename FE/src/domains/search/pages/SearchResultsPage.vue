@@ -30,6 +30,10 @@ const authStore = useAuthStore()
 const validTabIds: SearchResultTabId[] = ['all', 'product', 'live', 'member']
 const validSortOptionIds: SearchSortOptionId[] = ['LATEST', 'PRICE_ASC', 'PRICE_DESC']
 const validMockStatuses = ['loading', 'error', 'empty'] as const
+const SEARCH_RESULT_PREVIEW_LIMIT = 3
+const SEARCH_PRODUCT_PAGE_SIZE = 3
+const SEARCH_LIVE_PAGE_SIZE = 2
+const SEARCH_MEMBER_PAGE_SIZE = 2
 const SEARCH_SORT_OPTIONS: { id: SearchSortOptionId; label: string }[] = [
   { id: 'LATEST', label: '최신순' },
   { id: 'PRICE_ASC', label: '가격 낮은순' },
@@ -60,6 +64,15 @@ const queryConditionIds = computed(() => getQueryArray(route.query.conditions))
 const querySaleTypeIds = computed(() => getQueryArray(route.query.saleTypes))
 const queryMinPrice = computed(() => getQueryNumber(route.query.minPrice))
 const queryMaxPrice = computed(() => getQueryNumber(route.query.maxPrice))
+const queryPage = computed(() => {
+  const page = getQueryNumber(route.query.page)
+
+  if (page === undefined || page < 1) {
+    return 1
+  }
+
+  return Math.floor(page)
+})
 const querySortOption = computed<SearchSortOptionId>(() => {
   const querySort = getQueryString(route.query.sort)
 
@@ -295,6 +308,59 @@ const visibleMembers = computed(() => {
 const totalResultCount = computed(
   () => filteredProducts.value.length + visibleLives.value.length + visibleMembers.value.length,
 )
+const previewProducts = computed(() => sortedProducts.value.slice(0, SEARCH_RESULT_PREVIEW_LIMIT))
+const previewLives = computed(() => visibleLives.value.slice(0, SEARCH_RESULT_PREVIEW_LIMIT))
+const previewMembers = computed(() => visibleMembers.value.slice(0, SEARCH_RESULT_PREVIEW_LIMIT))
+
+const getPageCount = (totalCount: number, pageSize: number) =>
+  Math.max(1, Math.ceil(totalCount / pageSize))
+
+const activePageSize = computed(() => {
+  if (activeTabId.value === 'live') {
+    return SEARCH_LIVE_PAGE_SIZE
+  }
+
+  if (activeTabId.value === 'member') {
+    return SEARCH_MEMBER_PAGE_SIZE
+  }
+
+  return SEARCH_PRODUCT_PAGE_SIZE
+})
+
+const activePaginationTotalCount = computed(() => {
+  if (activeTabId.value === 'live') {
+    return visibleLives.value.length
+  }
+
+  if (activeTabId.value === 'member') {
+    return visibleMembers.value.length
+  }
+
+  if (activeTabId.value === 'product') {
+    return sortedProducts.value.length
+  }
+
+  return 0
+})
+
+const activePageCount = computed(() =>
+  getPageCount(activePaginationTotalCount.value, activePageSize.value),
+)
+const currentPage = computed(() => Math.min(queryPage.value, activePageCount.value))
+const hasPagination = computed(
+  () => activeTabId.value !== 'all' && activePaginationTotalCount.value > activePageSize.value,
+)
+const visiblePageNumbers = computed(() =>
+  Array.from({ length: activePageCount.value }, (_, index) => index + 1),
+)
+const getPageSlice = <T,>(items: T[], pageSize: number) => {
+  const startIndex = (currentPage.value - 1) * pageSize
+
+  return items.slice(startIndex, startIndex + pageSize)
+}
+const pagedProducts = computed(() => getPageSlice(sortedProducts.value, SEARCH_PRODUCT_PAGE_SIZE))
+const pagedLives = computed(() => getPageSlice(visibleLives.value, SEARCH_LIVE_PAGE_SIZE))
+const pagedMembers = computed(() => getPageSlice(visibleMembers.value, SEARCH_MEMBER_PAGE_SIZE))
 
 const activeTabResultCount = computed(() => {
   if (activeTabId.value === 'product') {
@@ -407,13 +473,14 @@ const pushSearchQuery = async (query: Record<string, string | undefined>) => {
 const submitSearch = async () => {
   const keyword = searchKeyword.value.trim()
 
-  await pushSearchQuery(keyword ? { keyword } : {})
+  await pushSearchQuery(keyword ? { keyword, page: undefined } : {})
 }
 
 const selectTab = async (tabId: SearchResultTabId) => {
   await pushSearchQuery({
     ...route.query,
     type: tabId === 'all' ? undefined : tabId,
+    page: undefined,
   } as Record<string, string | undefined>)
 
   liveMessage.value = `${resultTabs.value.find((tab) => tab.id === tabId)?.label ?? '전체'} 결과 탭을 선택했습니다.`
@@ -425,9 +492,33 @@ const handleSortChange = async (event: Event) => {
   await pushSearchQuery({
     ...route.query,
     sort: sortOption === 'LATEST' ? undefined : sortOption,
+    page: undefined,
   } as Record<string, string | undefined>)
 
   liveMessage.value = `${getFilterOptionLabel(SEARCH_SORT_OPTIONS, sortOption, '최신순')}으로 정렬했습니다.`
+}
+
+const viewAllResults = async (tabId: Exclude<SearchResultTabId, 'all'>) => {
+  await pushSearchQuery({
+    ...route.query,
+    type: tabId,
+    page: undefined,
+  } as Record<string, string | undefined>)
+
+  liveMessage.value = `${resultTabs.value.find((tab) => tab.id === tabId)?.label ?? ''} 전체 결과로 이동했습니다.`
+}
+
+const moveToPage = async (page: number) => {
+  if (page < 1 || page > activePageCount.value || page === currentPage.value) {
+    return
+  }
+
+  await pushSearchQuery({
+    ...route.query,
+    page: page === 1 ? undefined : page.toString(),
+  } as Record<string, string | undefined>)
+
+  liveMessage.value = `${page}페이지 결과를 표시합니다.`
 }
 
 const toggleFilterValue = (selectedIds: string[], targetId: string, isSelected: boolean) => {
@@ -476,6 +567,7 @@ const applyProductFilters = async () => {
     minPrice: minPrice || undefined,
     maxPrice: maxPrice || undefined,
     status: undefined,
+    page: undefined,
   } as Record<string, string | undefined>)
 
   liveMessage.value = '가격 필터를 적용했습니다.'
@@ -496,6 +588,7 @@ const resetProductFilters = async () => {
     minPrice: undefined,
     maxPrice: undefined,
     status: undefined,
+    page: undefined,
   } as Record<string, string | undefined>)
 
   liveMessage.value = '필터를 초기화했습니다.'
@@ -529,6 +622,7 @@ const removeFilterChip = async (chip: SearchFilterChip) => {
     minPrice: chip.kind === 'price' ? undefined : route.query.minPrice?.toString(),
     maxPrice: chip.kind === 'price' ? undefined : route.query.maxPrice?.toString(),
     status: undefined,
+    page: undefined,
   } as Record<string, string | undefined>)
 
   liveMessage.value = `${chip.label} 필터를 해제했습니다.`
@@ -817,12 +911,21 @@ const getProductActivityLabel = (product: SearchProductResult) => {
               >
                 <div class="search-page__section-header">
                   <h2 id="search-products-title">상품</h2>
-                  <span>{{ filteredProducts.length }}개</span>
+                  <div class="search-page__section-summary">
+                    <span>{{ filteredProducts.length }}개</span>
+                    <button
+                      v-if="activeTabId === 'all' && filteredProducts.length > SEARCH_RESULT_PREVIEW_LIMIT"
+                      type="button"
+                      @click="viewAllResults('product')"
+                    >
+                      전체보기
+                    </button>
+                  </div>
                 </div>
 
                 <div class="search-page__product-grid">
                   <article
-                    v-for="product in sortedProducts"
+                    v-for="product in activeTabId === 'all' ? previewProducts : pagedProducts"
                     :key="product.id"
                     class="search-product-card"
                   >
@@ -898,12 +1001,21 @@ const getProductActivityLabel = (product: SearchProductResult) => {
               >
                 <div class="search-page__section-header">
                   <h2 id="search-lives-title">라이브</h2>
-                  <span>{{ visibleLives.length }}개</span>
+                  <div class="search-page__section-summary">
+                    <span>{{ visibleLives.length }}개</span>
+                    <button
+                      v-if="activeTabId === 'all' && visibleLives.length > SEARCH_RESULT_PREVIEW_LIMIT"
+                      type="button"
+                      @click="viewAllResults('live')"
+                    >
+                      전체보기
+                    </button>
+                  </div>
                 </div>
 
                 <div class="search-page__card-grid">
                   <SearchLiveResultCard
-                    v-for="live in visibleLives"
+                    v-for="live in activeTabId === 'all' ? previewLives : pagedLives"
                     :key="live.id"
                     :live="live"
                   />
@@ -917,12 +1029,21 @@ const getProductActivityLabel = (product: SearchProductResult) => {
               >
                 <div class="search-page__section-header">
                   <h2 id="search-members-title">회원</h2>
-                  <span>{{ visibleMembers.length }}명</span>
+                  <div class="search-page__section-summary">
+                    <span>{{ visibleMembers.length }}명</span>
+                    <button
+                      v-if="activeTabId === 'all' && visibleMembers.length > SEARCH_RESULT_PREVIEW_LIMIT"
+                      type="button"
+                      @click="viewAllResults('member')"
+                    >
+                      전체보기
+                    </button>
+                  </div>
                 </div>
 
                 <div class="search-page__member-list">
                   <SearchMemberResultCard
-                    v-for="member in visibleMembers"
+                    v-for="member in activeTabId === 'all' ? previewMembers : pagedMembers"
                     :key="member.id"
                     :member="member"
                     :is-following="followedMemberIds.has(member.id)"
@@ -930,6 +1051,43 @@ const getProductActivityLabel = (product: SearchProductResult) => {
                   />
                 </div>
               </section>
+
+              <nav
+                v-if="hasPagination"
+                class="search-page__pagination"
+                aria-label="검색 결과 페이지"
+              >
+                <button
+                  type="button"
+                  aria-label="이전 페이지"
+                  :disabled="currentPage === 1"
+                  @click="moveToPage(currentPage - 1)"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="m15 18-6-6 6-6" />
+                  </svg>
+                </button>
+                <button
+                  v-for="page in visiblePageNumbers"
+                  :key="page"
+                  type="button"
+                  :class="{ 'search-page__page--active': currentPage === page }"
+                  :aria-current="currentPage === page ? 'page' : undefined"
+                  @click="moveToPage(page)"
+                >
+                  {{ page }}
+                </button>
+                <button
+                  type="button"
+                  aria-label="다음 페이지"
+                  :disabled="currentPage === activePageCount"
+                  @click="moveToPage(currentPage + 1)"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </button>
+              </nav>
             </template>
           </div>
 
@@ -1321,6 +1479,29 @@ const getProductActivityLabel = (product: SearchProductResult) => {
   line-height: 20px;
 }
 
+.search-page__section-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.search-page__section-summary button {
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.search-page__section-summary button:hover,
+.search-page__section-summary button:focus-visible {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
 .search-page__product-grid,
 .search-page__card-grid {
   display: grid;
@@ -1331,6 +1512,54 @@ const getProductActivityLabel = (product: SearchProductResult) => {
 .search-page__member-list {
   display: grid;
   gap: var(--space-4);
+}
+
+.search-page__pagination {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-12);
+}
+
+.search-page__pagination button {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.search-page__pagination button:hover:not(:disabled),
+.search-page__pagination button:focus-visible,
+.search-page__page--active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.search-page__pagination button:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 2px;
+}
+
+.search-page__pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.search-page__pagination svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .search-product-card {

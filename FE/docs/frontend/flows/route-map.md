@@ -115,7 +115,7 @@ flowchart TD
 | `/business/verification/pending` | BIZ-001-2 | false   | false     | FE 메모리 제출 상태가 없으면 BIZ-001로 이동      |
 | `/`                       | HOME        | false        | false     | 로그인 상태에 따라 비로그인/회원 홈 렌더링       |
 | `/following`              | HOME-002    | true         | false     | 팔로잉 홈 placeholder, 회원 홈 CTA에서 진입       |
-| `/search`                 | SEARCH      | false        | false     | 홈 검색 패널에서 `keyword` query로 진입, 결과 탭·필터·상태 화면 구현, 실제 검색 API 대기 |
+| `/search`                 | SEARCH      | false        | false     | 홈 검색 패널에서 `keyword` query로 진입, 결과 탭·필터·정렬·전체보기·페이지네이션·상태 화면 구현, 실제 검색 API 대기 |
 | `/lives`                  | LIVE        | false        | false     | 라이브 목록 placeholder                          |
 | `/products`               | PROD-008    | false        | false     | 공개 상품 목록 껍데기, 실제 조회 API 연동 대기   |
 | `/products/:productId`    | PROD-006    | false        | false     | 상품 상세 408·410·412 UI, 실제 API 대기           |
@@ -131,7 +131,7 @@ flowchart TD
 ```mermaid
 flowchart TD
   HomeSearch["홈 검색 패널"]
-  SearchPage["SEARCH /search?keyword=...&type=..."]
+  SearchPage["SEARCH /search?keyword=...&type=...&page=..."]
   ProductTab["상품 결과 탭"]
   LiveTab["라이브 결과 탭"]
   MemberTab["회원 결과 탭"]
@@ -143,6 +143,9 @@ flowchart TD
   SearchPage --> ProductTab
   SearchPage --> LiveTab
   SearchPage --> MemberTab
+  SearchPage -->|"전체보기"| ProductTab
+  SearchPage -->|"전체보기"| LiveTab
+  SearchPage -->|"전체보기"| MemberTab
   ProductTab --> ProductDetail
   LiveTab --> LiveWatch
   ProductTab -->|비로그인 찜| Login
@@ -151,4 +154,4 @@ flowchart TD
 
 | 라우트 | 화면 | requiresAuth | guestOnly | 비고 |
 | --- | --- | --- | --- | --- |
-| `/search` | SEARCH-001/002 | false | false | `keyword`, `type`, `categories`, `conditions`, `saleTypes`, `minPrice`, `maxPrice` query 기반 검색 결과 탭/필터/상태 화면. 실제 검색 API 대기 |
+| `/search` | SEARCH-001/002 | false | false | `keyword`, `type`, `page`, `categories`, `conditions`, `saleTypes`, `minPrice`, `maxPrice`, `sort` query 기반 검색 결과 탭/전체보기/페이지네이션/필터/상태 화면. 실제 검색 API 대기 |
