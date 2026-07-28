@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.global.exception.CustomException;
+import com.ssafy.backend.live.dto.request.LiveInstantRequest;
 import com.ssafy.backend.live.dto.request.LiveScheduleRequest;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
@@ -59,6 +60,21 @@ class LiveServiceTest {
         assertThat(response.startedAt()).isNull();
         assertThat(response.hostId()).isEqualTo(HOST_ID);
         assertThat(response.title()).isEqualTo(TITLE);
+    }
+
+    @Test
+    void 즉시_개설하면_LIVE_상태로_시작_시각이_박힌다() {
+        LocalDateTime 개설_직전 = LocalDateTime.now();
+        when(memberRepository.findById(HOST_ID)).thenReturn(Optional.of(host));
+        when(host.getId()).thenReturn(HOST_ID);
+        when(liveRepository.save(any(Live.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        LiveResponse response = liveService.openLiveNow(HOST_ID, new LiveInstantRequest(TITLE, THUMBNAIL_URL));
+
+        assertThat(response.status()).isEqualTo(LiveStatus.LIVE);
+        assertThat(response.scheduledAt()).isNull();
+        // 시작 시각은 클라이언트 값이 아니라 서버 시각이어야 한다.
+        assertThat(response.startedAt()).isBetween(개설_직전, LocalDateTime.now());
     }
 
     @Test

@@ -118,4 +118,46 @@ class LiveControllerTest {
                         .content(body))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void 즉시_개설하면_201과_LIVE_상태를_반환한다() throws Exception {
+        String body = """
+                {"title":"지금 바로 여는 빈티지 라이브","thumbnailUrl":null}
+                """;
+
+        mockMvc.perform(post("/api/lives")
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("LIVE"))
+                .andExpect(jsonPath("$.data.startedAt").exists())
+                .andExpect(jsonPath("$.data.scheduledAt").doesNotExist());
+    }
+
+    @Test
+    void 즉시_개설도_방송명이_비어_있으면_400을_반환한다() throws Exception {
+        String body = """
+                {"title":"   ","thumbnailUrl":null}
+                """;
+
+        mockMvc.perform(post("/api/lives")
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 즉시_개설도_미인증이면_401을_반환한다() throws Exception {
+        String body = """
+                {"title":"지금 바로 여는 빈티지 라이브","thumbnailUrl":null}
+                """;
+
+        mockMvc.perform(post("/api/lives")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isUnauthorized());
+    }
 }
