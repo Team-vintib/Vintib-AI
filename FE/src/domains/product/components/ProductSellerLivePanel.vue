@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import type { ProductLinkedLive } from '@/domains/product/types/productDetail.types'
 
-defineProps<{
+const props = defineProps<{
   linkedLive: ProductLinkedLive | null
+  isReminderSet: boolean
+}>()
+
+const emit = defineEmits<{
+  toggleReminder: []
+  viewLive: [liveId: number]
 }>()
 
 const formatLiveDate = (date: string) =>
@@ -29,8 +35,22 @@ const formatLiveDate = (date: string) =>
         <p>{{ formatLiveDate(linkedLive.startsAt) }}</p>
       </div>
       <div class="seller-live__actions">
-        <button class="seller-live__secondary" type="button">알림 받기</button>
-        <button class="seller-live__link" type="button">라이브 상세 보기</button>
+        <button
+          class="seller-live__secondary"
+          :class="{ 'seller-live__secondary--active': props.isReminderSet }"
+          type="button"
+          :aria-pressed="props.isReminderSet"
+          @click="emit('toggleReminder')"
+        >
+          {{ props.isReminderSet ? '알림 신청됨' : '알림 받기' }}
+        </button>
+        <button
+          class="seller-live__link"
+          type="button"
+          @click="emit('viewLive', linkedLive.id)"
+        >
+          {{ linkedLive.status === 'LIVE' ? '라이브 입장' : '라이브 상세 보기' }}
+        </button>
       </div>
     </article>
   </section>
@@ -132,6 +152,12 @@ const formatLiveDate = (date: string) =>
 
 .seller-live__secondary:hover,
 .seller-live__link:hover {
+  color: var(--color-primary);
+}
+
+.seller-live__secondary--active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
   color: var(--color-primary);
 }
 

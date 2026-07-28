@@ -1,9 +1,32 @@
 <script setup lang="ts">
-import type { AiQualityAnalysis } from '@/domains/product/types/productDetail.types'
+import { computed } from 'vue'
 
-defineProps<{
+import type {
+  AiQualityAnalysis,
+  ProductDetailImage,
+} from '@/domains/product/types/productDetail.types'
+
+const props = defineProps<{
   analysis: AiQualityAnalysis
+  selectedImage: ProductDetailImage | undefined
 }>()
+
+const selectedImageIndex = computed(() => {
+  const imageOrder = ['front', 'front-detail', 'hem-detail', 'cuff-detail']
+  const selectedIndex = imageOrder.indexOf(props.selectedImage?.id ?? 'front')
+  return selectedIndex >= 0 ? selectedIndex : 0
+})
+
+const comparisonImageStyle = computed(() => {
+  const detailStyles = [
+    { transform: 'scale(1)', transformOrigin: '50% 50%' },
+    { transform: 'scale(1.35)', transformOrigin: '50% 26%' },
+    { transform: 'scale(1.45)', transformOrigin: '45% 78%' },
+    { transform: 'scale(1.45)', transformOrigin: '90% 78%' },
+  ]
+
+  return detailStyles[selectedImageIndex.value] ?? detailStyles[0]
+})
 </script>
 
 <template>
@@ -17,21 +40,29 @@ defineProps<{
       원본 상품 이미지와 AI가 표시한 검수 이미지를 비교해 보세요.
     </p>
 
-    <div class="ai-analysis__comparison">
+    <div class="ai-analysis__comparison" aria-live="polite">
       <figure>
-        <figcaption>원본 이미지</figcaption>
+        <figcaption>{{ selectedImage?.label ?? '대표' }} 원본 이미지</figcaption>
         <div class="ai-analysis__image-frame">
-          <img :src="analysis.originalImageUrl" :alt="analysis.originalImageAlt" />
+          <img
+            :src="analysis.originalImageUrl"
+            :alt="`${selectedImage?.label ?? '대표'} ${analysis.originalImageAlt}`"
+            :style="comparisonImageStyle"
+          />
         </div>
       </figure>
 
       <figure>
         <figcaption>
-          <span>AI 검수 이미지</span>
+          <span>{{ selectedImage?.label ?? '대표' }} AI 검수 이미지</span>
           <span class="ai-analysis__reference-label">탐지 위치 표시</span>
         </figcaption>
         <div class="ai-analysis__image-frame">
-          <img :src="analysis.analyzedImageUrl" :alt="analysis.analyzedImageAlt" />
+          <img
+            :src="analysis.analyzedImageUrl"
+            :alt="`${selectedImage?.label ?? '대표'} ${analysis.analyzedImageAlt}`"
+            :style="comparisonImageStyle"
+          />
         </div>
       </figure>
     </div>
@@ -148,6 +179,7 @@ defineProps<{
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 180ms ease;
 }
 
 .ai-analysis__description {

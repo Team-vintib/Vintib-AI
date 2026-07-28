@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import type { ProductListItem } from '@/domains/product/types/productList.types'
+import { ROUTE_NAMES } from '@/shared/constants/routes'
 
 interface Props {
   product: ProductListItem
@@ -24,9 +25,14 @@ const saleTypeLabel = computed(() =>
 <template>
   <article class="product-card">
     <div class="product-card__media">
-      <img class="product-card__image" :src="product.imageUrl" :alt="product.imageAlt" />
-
-      <span class="product-card__grade">{{ product.conditionGrade }}급</span>
+      <RouterLink
+        class="product-card__detail-link product-card__media-link"
+        :to="{ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId: product.id } }"
+        :aria-label="`${product.name} 상세 보기`"
+      >
+        <img class="product-card__image" :src="product.imageUrl" :alt="product.imageAlt" />
+        <span class="product-card__grade">{{ product.conditionGrade }}급</span>
+      </RouterLink>
 
       <button
         class="product-card__like-button"
@@ -44,7 +50,10 @@ const saleTypeLabel = computed(() =>
       </button>
     </div>
 
-    <div class="product-card__body">
+    <RouterLink
+      class="product-card__detail-link product-card__body"
+      :to="{ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId: product.id } }"
+    >
       <p class="product-card__brand">{{ product.brand }}</p>
       <h2 class="product-card__name">{{ product.name }}</h2>
 
@@ -60,7 +69,7 @@ const saleTypeLabel = computed(() =>
           {{ saleTypeLabel }}
         </span>
       </div>
-    </div>
+    </RouterLink>
   </article>
 </template>
 
@@ -85,6 +94,17 @@ const saleTypeLabel = computed(() =>
   overflow: hidden;
   aspect-ratio: 4 / 5;
   background: var(--color-surface-secondary);
+}
+
+.product-card__detail-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.product-card__media-link {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .product-card__image {
@@ -145,7 +165,13 @@ const saleTypeLabel = computed(() =>
 }
 
 .product-card__body {
+  display: block;
   padding: var(--space-4);
+}
+
+.product-card__detail-link:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: -3px;
 }
 
 .product-card__brand {

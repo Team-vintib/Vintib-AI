@@ -9,14 +9,43 @@ import type {
 const props = defineProps<{
   product: ProductDetailViewData
   seller: ProductSellerSummary
+  isLiked: boolean
+  isInCart: boolean
 }>()
 
-const formattedPrice = computed(() => `${props.product.price.toLocaleString('ko-KR')}P`)
+const emit = defineEmits<{
+  toggleLike: []
+  toggleCart: []
+  openTryOn: []
+  purchase: []
+  viewSeller: []
+}>()
+
+const formattedPrice = computed(() => {
+  const price = `${props.product.price.toLocaleString('ko-KR')}P`
+  return props.product.saleType === 'AUCTION' ? `시작가 ${price}` : price
+})
+
+const saleTypeLabel = computed(() =>
+  props.product.saleType === 'AUCTION' ? '경매 판매' : '상시 판매',
+)
+
+const purchaseLabel = computed(() => {
+  if (props.product.saleStatus === 'SOLD') return '판매 완료'
+  if (props.product.saleStatus === 'AUCTION_SCHEDULED') return '경매 알림 받기'
+  if (props.product.saleStatus === 'AUCTION_IN_PROGRESS') return '입찰하기'
+  if (props.product.saleStatus === 'AUCTION_FAILED') return '경매 종료'
+  return '구매하기'
+})
+
+const isPurchaseDisabled = computed(() =>
+  ['DRAFT', 'SOLD', 'PRIVATE', 'AUCTION_FAILED'].includes(props.product.saleStatus),
+)
 </script>
 
 <template>
   <section class="purchase-summary" aria-labelledby="product-title">
-    <p class="purchase-summary__breadcrumb">라이브 · {{ product.category }}</p>
+    <p class="purchase-summary__breadcrumb">{{ saleTypeLabel }} · {{ product.category }}</p>
     <h1 id="product-title" class="purchase-summary__title">{{ product.title }}</h1>
     <p class="purchase-summary__price">{{ formattedPrice }}</p>
 
@@ -31,7 +60,7 @@ const formattedPrice = computed(() => `${props.product.price.toLocaleString('ko-
           {{ seller.productCount }}개
         </p>
       </div>
-      <button type="button">판매자 프로필 보기</button>
+      <button type="button" @click="emit('viewSeller')">판매자 프로필 보기</button>
     </article>
 
     <dl class="purchase-summary__quick-info">
@@ -52,9 +81,11 @@ const formattedPrice = computed(() => `${props.product.price.toLocaleString('ko-
     <div class="purchase-summary__actions">
       <button
         class="purchase-summary__secondary"
+        :class="{ 'purchase-summary__secondary--liked': isLiked }"
         type="button"
-        :aria-label="product.isLiked ? '상품 찜 해제' : '상품 찜하기'"
-        :aria-pressed="product.isLiked"
+        :aria-label="isLiked ? '상품 찜 해제' : '상품 찜하기'"
+        :aria-pressed="isLiked"
+        @click="emit('toggleLike')"
       >
         <svg aria-hidden="true" viewBox="0 0 24 24">
           <path
@@ -63,7 +94,13 @@ const formattedPrice = computed(() => `${props.product.price.toLocaleString('ko-
         </svg>
         찜
       </button>
-      <button class="purchase-summary__secondary" type="button">
+      <button
+        class="purchase-summary__secondary"
+        :class="{ 'purchase-summary__secondary--active': isInCart }"
+        type="button"
+        :aria-pressed="isInCart"
+        @click="emit('toggleCart')"
+      >
         <svg aria-hidden="true" viewBox="0 0 24 24">
           <path
             d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.5h7.7a2 2 0 0 0 1.9-1.4L21 7H6m4 12h.01M17 19h.01"
@@ -71,7 +108,11 @@ const formattedPrice = computed(() => `${props.product.price.toLocaleString('ko-
         </svg>
         장바구니
       </button>
-      <button class="purchase-summary__secondary" type="button">
+      <button
+        class="purchase-summary__secondary purchase-summary__secondary--ai"
+        type="button"
+        @click="emit('openTryOn')"
+      >
         <svg aria-hidden="true" viewBox="0 0 24 24">
           <path
             d="m12 3 1.3 4.2L17.5 9l-4.2 1.8L12 15l-1.3-4.2L6.5 9l4.2-1.8L12 3Zm6 12 .7 2.3L21 18l-2.3.7L18 21l-.7-2.3L15 18l2.3-.7L18 15Z"
@@ -81,7 +122,14 @@ const formattedPrice = computed(() => `${props.product.price.toLocaleString('ko-
       </button>
     </div>
 
-    <button class="purchase-summary__purchase" type="button">구매하기</button>
+    <button
+      class="purchase-summary__purchase"
+      type="button"
+      :disabled="isPurchaseDisabled"
+      @click="emit('purchase')"
+    >
+      {{ purchaseLabel }}
+    </button>
   </section>
 </template>
 
@@ -259,8 +307,42 @@ const formattedPrice = computed(() => `${props.product.price.toLocaleString('ko-
   background: var(--color-primary-soft);
 }
 
+.purchase-summary__secondary--active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.purchase-summary__secondary--liked {
+  border-color: var(--color-auction);
+  background: var(--color-auction-soft);
+  color: var(--color-auction);
+}
+
+.purchase-summary__secondary--liked svg {
+  fill: currentColor;
+}
+
+.purchase-summary__secondary--ai,
+.purchase-summary__secondary--ai:hover {
+  border-color: var(--color-ai);
+  background: var(--color-ai-soft);
+  color: var(--color-ai);
+}
+
+.purchase-summary__secondary--ai:focus-visible {
+  outline-color: var(--color-ai-soft);
+}
+
 .purchase-summary__purchase:hover {
   background: var(--color-primary-hover);
+}
+
+.purchase-summary__purchase:disabled {
+  cursor: not-allowed;
+  border-color: var(--color-border);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-muted);
 }
 
 .purchase-summary button:focus-visible {

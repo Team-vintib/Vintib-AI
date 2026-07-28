@@ -1,26 +1,58 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 import type { ProductDetailImage } from '@/domains/product/types/productDetail.types'
 
 const props = defineProps<{
   images: ProductDetailImage[]
+  selectedImageId: string
 }>()
 
-const representativeImage = computed(() => props.images[0])
+const emit = defineEmits<{
+  selectImage: [imageId: string]
+}>()
+
+const zoomDialog = ref<HTMLDialogElement | null>(null)
+
+const selectedImageIndex = computed(() => {
+  const selectedIndex = props.images.findIndex((image) => image.id === props.selectedImageId)
+  return selectedIndex >= 0 ? selectedIndex : 0
+})
+
+const representativeImage = computed(() => props.images[selectedImageIndex.value])
+
+const representativeImageStyle = computed(() => {
+  const detailStyles = [
+    { transform: 'scale(1)', transformOrigin: '50% 50%' },
+    { transform: 'scale(1.35)', transformOrigin: '50% 26%' },
+    { transform: 'scale(1.45)', transformOrigin: '45% 78%' },
+    { transform: 'scale(1.45)', transformOrigin: '90% 78%' },
+  ]
+
+  return detailStyles[selectedImageIndex.value] ?? detailStyles[0]
+})
+
+const openZoom = () => {
+  zoomDialog.value?.showModal()
+}
+
+const closeZoom = () => {
+  zoomDialog.value?.close()
+}
 </script>
 
 <template>
   <section class="product-gallery" aria-label="상품 이미지">
     <div v-if="images.length" class="product-gallery__thumbnails" aria-label="상품 이미지 목록">
       <button
-        v-for="(image, index) in images"
+        v-for="image in images"
         :key="image.id"
         class="product-gallery__thumbnail"
-        :class="{ 'product-gallery__thumbnail--selected': index === 0 }"
+        :class="{ 'product-gallery__thumbnail--selected': image.id === representativeImage?.id }"
         type="button"
         :aria-label="`${image.label} 이미지 보기`"
-        :aria-pressed="index === 0"
+        :aria-pressed="image.id === representativeImage?.id"
+        @click="emit('selectImage', image.id)"
       >
         <img :src="image.url" alt="" />
       </button>
@@ -32,6 +64,7 @@ const representativeImage = computed(() => props.images[0])
         class="product-gallery__main-image"
         :src="representativeImage.url"
         :alt="representativeImage.alt"
+        :style="representativeImageStyle"
       />
       <div v-else class="product-gallery__empty">등록된 상품 이미지가 없습니다.</div>
 
@@ -40,12 +73,30 @@ const representativeImage = computed(() => props.images[0])
         class="product-gallery__zoom"
         type="button"
         aria-label="상품 이미지 확대"
+        @click="openZoom"
       >
         <svg aria-hidden="true" viewBox="0 0 24 24">
           <path d="m15 15 5 5m-2-9a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
         </svg>
       </button>
     </div>
+
+    <dialog
+      ref="zoomDialog"
+      class="product-gallery__dialog"
+      aria-label="상품 이미지 확대 보기"
+      @click.self="closeZoom"
+    >
+      <button type="button" aria-label="확대 이미지 닫기" @click="closeZoom">×</button>
+      <div class="product-gallery__dialog-image">
+        <img
+          v-if="representativeImage"
+          :src="representativeImage.url"
+          :alt="`${representativeImage.alt} 확대 이미지`"
+          :style="representativeImageStyle"
+        />
+      </div>
+    </dialog>
   </section>
 </template>
 
@@ -73,6 +124,7 @@ const representativeImage = computed(() => props.images[0])
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 180ms ease;
 }
 
 .product-gallery__empty {
@@ -163,6 +215,49 @@ const representativeImage = computed(() => props.images[0])
 .product-gallery__zoom:focus-visible {
   outline: 3px solid var(--color-primary-soft);
   outline-offset: 2px;
+}
+
+.product-gallery__dialog {
+  width: min(760px, calc(100vw - 48px));
+  max-width: none;
+  padding: var(--space-6);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.product-gallery__dialog::backdrop {
+  background: rgba(24, 24, 22, 0.72);
+}
+
+.product-gallery__dialog > button {
+  position: absolute;
+  z-index: 1;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: grid;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 26px;
+  line-height: 1;
+  place-items: center;
+}
+
+.product-gallery__dialog-image {
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
+  border-radius: var(--radius-media);
+  background: var(--color-surface-secondary);
+}
+
+.product-gallery__dialog-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 @media (max-width: 520px) {
