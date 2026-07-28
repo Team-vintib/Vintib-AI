@@ -139,6 +139,15 @@ const hasProductFilter = computed(
     queryConditionIds.value.length > 0 ||
     querySaleTypeIds.value.length > 0,
 )
+const normalizedKeyword = computed(() => queryKeyword.value.toLocaleLowerCase('ko-KR'))
+
+const matchesKeyword = (values: string[]) => {
+  if (!normalizedKeyword.value) {
+    return true
+  }
+
+  return values.some((value) => value.toLocaleLowerCase('ko-KR').includes(normalizedKeyword.value))
+}
 
 const filteredProducts = computed(() => {
   if (mockStatus.value === 'empty') {
@@ -150,6 +159,19 @@ const filteredProducts = computed(() => {
   }
 
   return SEARCH_MOCK_RESULTS.products.filter((product) => {
+    if (
+      !matchesKeyword([
+        product.brand,
+        product.name,
+        product.sellerName,
+        product.categoryName,
+        product.conditionGrade,
+        product.saleType,
+      ])
+    ) {
+      return false
+    }
+
     if (
       queryCategoryIds.value.length > 0 &&
       !queryCategoryIds.value.includes(product.categoryName)
@@ -180,10 +202,24 @@ const filteredProducts = computed(() => {
   })
 })
 
-const visibleLives = computed(() => (mockStatus.value === 'empty' ? [] : SEARCH_MOCK_RESULTS.lives))
-const visibleMembers = computed(() =>
-  mockStatus.value === 'empty' ? [] : SEARCH_MOCK_RESULTS.members,
-)
+const visibleLives = computed(() => {
+  if (mockStatus.value === 'empty') {
+    return []
+  }
+
+  return SEARCH_MOCK_RESULTS.lives.filter((live) =>
+    matchesKeyword([live.title, live.hostName, live.status]),
+  )
+})
+const visibleMembers = computed(() => {
+  if (mockStatus.value === 'empty') {
+    return []
+  }
+
+  return SEARCH_MOCK_RESULTS.members.filter((member) =>
+    matchesKeyword([member.nickname, member.description]),
+  )
+})
 const totalResultCount = computed(
   () => filteredProducts.value.length + visibleLives.value.length + visibleMembers.value.length,
 )
