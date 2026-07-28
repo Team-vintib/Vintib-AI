@@ -28,6 +28,10 @@ public enum ErrorCode {
     LIVE_NOT_FOUND(HttpStatus.NOT_FOUND, "L001", "진행 중이거나 예약된 라이브가 없습니다."),
     MESSAGE_BLOCKED(HttpStatus.FORBIDDEN, "L002", "숨김 또는 차단 처리된 메시지입니다."),
     STT_PROCESSING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "L003", "STT 변환 처리에 실패했습니다."),
+    NOT_LIVE_HOST(HttpStatus.FORBIDDEN, "L004", "본인이 개설한 라이브만 처리할 수 있습니다."),
+    PRODUCT_ALREADY_LINKED(HttpStatus.CONFLICT, "L005", "이미 라이브에 연결된 상품입니다."),
+    LIVE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "L006", "라이브에 연결되지 않은 상품입니다."),
+    INVALID_LIVE_STATE(HttpStatus.BAD_REQUEST, "L007", "현재 방송 상태에서는 해당 처리를 할 수 없습니다."),
 
     // [경매/입찰]
     AUCTION_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "A001", "현재 진행 중인 경매가 아닙니다."),

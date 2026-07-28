@@ -92,4 +92,13 @@ public class Live extends BaseTimeEntity {
             Member host, String title, String thumbnailUrl, LocalDateTime startedAt) {
         return new Live(host, title, thumbnailUrl, LiveStatus.LIVE, null, startedAt);
     }
+
+    public boolean isHostedBy(Long memberId) {
+        return memberId != null && host.getId().equals(memberId);
+    }
+
+    /** 상품 편성을 바꿀 수 있는 상태인지. 종료·취소된 방송은 더 이상 손대지 않는다. */
+    public boolean isOpenForEditing() {
+        return status == LiveStatus.SCHEDULED || status == LiveStatus.LIVE;
+    }
 }
