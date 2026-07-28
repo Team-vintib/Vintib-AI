@@ -1,0 +1,116 @@
+import denimJacketImage from '@/assets/images/products/mock-denim-jacket.svg'
+import knitImage from '@/assets/images/products/mock-knit.svg'
+import leatherBagImage from '@/assets/images/products/mock-leather-bag.svg'
+import sneakersImage from '@/assets/images/products/mock-sneakers.svg'
+import trenchCoatImage from '@/assets/images/products/mock-trench-coat.svg'
+import watchImage from '@/assets/images/products/mock-watch.svg'
+
+import type { SearchResultsViewModel } from '@/domains/search/types/search.types'
+
+export const SEARCH_MOCK_RESULTS: SearchResultsViewModel = {
+  products: [
+    {
+      id: 1,
+      brand: "Levi's",
+      name: "Levi's 빈티지 데님 재킷",
+      sellerName: '오래입는상점',
+      price: 45000,
+      conditionGrade: 'S',
+      saleType: 'DIRECT',
+      categoryName: '아우터',
+      imageUrl: denimJacketImage,
+      imageAlt: "Levi's 빈티지 데님 재킷",
+      isLiked: false,
+    },
+    {
+      id: 2,
+      brand: 'Ralph Lauren',
+      name: 'Polo Ralph Lauren 케이블 니트',
+      sellerName: '폴로아카이브',
+      price: 38000,
+      conditionGrade: 'A',
+      saleType: 'DIRECT',
+      categoryName: '상의',
+      imageUrl: knitImage,
+      imageAlt: '아이보리 케이블 니트',
+      isLiked: true,
+    },
+    {
+      id: 3,
+      brand: 'Burberry',
+      name: 'Burberry 빈티지 트렌치코트',
+      sellerName: '런던빈티지',
+      price: 450000,
+      conditionGrade: 'A',
+      saleType: 'AUCTION',
+      categoryName: '아우터',
+      imageUrl: trenchCoatImage,
+      imageAlt: '베이지 빈티지 트렌치코트',
+      isLiked: false,
+    },
+    {
+      id: 4,
+      brand: 'Omega',
+      name: 'Omega Seamaster 빈티지 워치',
+      sellerName: '타임셀렉트',
+      price: 320000,
+      conditionGrade: 'B',
+      saleType: 'AUCTION',
+      categoryName: '시계',
+      imageUrl: watchImage,
+      imageAlt: '가죽 스트랩 빈티지 손목시계',
+      isLiked: false,
+    },
+  ],
+  lives: [
+    {
+      id: 101,
+      title: '데님 아우터 라이브 경매',
+      hostName: '오래입는상점',
+      status: 'LIVE',
+      startedAt: '2026-07-28T20:00:00+09:00',
+      productCount: 12,
+      thumbnailUrl: denimJacketImage,
+    },
+    {
+      id: 102,
+      title: '명품 가방 셀렉션 프리뷰',
+      hostName: '런던빈티지',
+      status: 'SCHEDULED',
+      scheduledAt: '2026-07-29T21:00:00+09:00',
+      productCount: 8,
+      thumbnailUrl: leatherBagImage,
+    },
+    {
+      id: 103,
+      title: '스니커즈 주말 특가 라이브',
+      hostName: '슈즈마켓',
+      status: 'SCHEDULED',
+      scheduledAt: '2026-07-31T19:30:00+09:00',
+      productCount: 15,
+      thumbnailUrl: sneakersImage,
+    },
+  ],
+  members: [
+    {
+      id: 201,
+      nickname: '오래입는상점',
+      profileImageUrl: denimJacketImage,
+      description: '데님과 워크웨어를 중심으로 엄선한 빈티지 상품을 소개합니다.',
+      followerCount: 1280,
+      productCount: 42,
+      liveCount: 6,
+      isFollowing: false,
+    },
+    {
+      id: 202,
+      nickname: '런던빈티지',
+      profileImageUrl: trenchCoatImage,
+      description: '버버리, 바버 등 영국 클래식 아우터를 다룹니다.',
+      followerCount: 943,
+      productCount: 31,
+      liveCount: 4,
+      isFollowing: true,
+    },
+  ],
+}
