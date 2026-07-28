@@ -13,6 +13,10 @@
 - `test/` — **실제 테스트 코드.** `app/<도메인>/` 구조를 그대로 미러한다
   (`app/chat/` → `test/chat/`, `app/recommend/personalize/` → `test/recommend/personalize/`).
   프로덕션과 같은 lint 기준을 적용받는다.
+  - **예외: `test/worker/`** — 리포 루트 `worker/`(추론 워커) 코드를 대상으로 한다. `worker/`는
+    전용 CI 잡이 없어(`ai-test`는 `AI/**/*`만 감시) 그냥 두면 lint·test가 전혀 안 돈다. 그래서
+    **torch 없이 돌 수 있는 순수 로직만이라도** 여기서 커버한다. import 경로는
+    `test/conftest.py`가 `sys.path`에 넣어 준다(워커 실행 환경과 같은 방식).
 - `validation/` — **PoC·스파이크 코드 전용. 프로덕션 코드가 아니다.**
   `validation/requirements-test.txt`에 무거운 ML 의존성(torch, transformers,
   sentence-transformers, FlagEmbedding, datasets 등)이 모여 있는데, **CI에는 설치되지 않는다**

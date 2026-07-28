@@ -16,7 +16,7 @@ CLIPSeg의 sigmoid 확률 스케일은 프롬프트·체크포인트·입력 해
 
 from typing import TypedDict
 
-from app.quality.schemas import ConditionGrade, DefectType, FindingStatus, Severity
+from contracts import ConditionGrade, DefectType, FindingStatus, Severity
 
 
 class SegmenterConfig(TypedDict):
@@ -65,19 +65,9 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         "clean_margin": 0.0,
         "min_area_ratio": 0.0015,
     },
-    # 게이트웨이 큐(POST /ai/quality_check) 경유 — 동기 REST가 한계에 닿을 때 쓸 비동기 전환용
-    # 스텁. 실제로는 로컬 GPU 워커가 위 CLIPSeg를 돌리므로 임계치를 그대로 물려받는다.
-    "remote_worker": {
-        "model_id": None,
-        "description": "게이트웨이 Redis 큐 경유 원격 GPU 워커(미구현 스텁)",
-        "mask_size": 352,
-        "defect_threshold": 0.45,
-        "confident_threshold": 0.60,
-        "clean_margin": 0.0,
-        "min_area_ratio": 0.0015,
-    },
 }
-ACTIVE_SEGMENTER = "mock"  # <- 여기 키만 바꾸면 스왑
+# 기본값. 워커는 `QUALITY_BACKEND` 환경변수로 이 값을 덮어쓴다.
+ACTIVE_SEGMENTER = "mock"
 
 
 class DefectPolicy(TypedDict):

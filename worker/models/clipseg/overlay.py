@@ -13,8 +13,11 @@
 오히려 안 보인다. `defect_threshold` 미만은 완전 투명이라 원본이 그대로 보이고, 임계치를 넘는
 영역만 색이 올라온다 — 화면에 보이는 것과 findings가 일치한다.
 
-저장 경로는 게이트웨이가 이미 쓰고 있는 `RESULTS_DIR`을 그대로 재사용한다(새 저장·서빙 경로를
-만들지 않는다). `app/main.py`가 `/results`로 마운트해 둔 StaticFiles가 그대로 서빙한다.
+**워커는 결과 이미지를 자기 디스크에 쓰지 않는다.** 노트북 디스크는 외부에서 접근할 수 없어서,
+게이트웨이의 업로드 엔드포인트로 보내고 공개 URL을 받아야 한다(인프라 문서 §3.5). 그래서
+`build_attention_maps()`가 **업로더 함수를 주입받는다** — `worker/storage_utils.upload_image`를
+그대로 넘기면 되고, 테스트에서는 가짜 함수를 넘겨 디스크·네트워크 없이 검증할 수 있다.
+(게이트웨이 안에서 돌던 시절에는 `RESULTS_DIR`에 직접 썼는데, 그 코드는 여기 없다.)
 
 설계: .claude/plans/ai/005-quality-inspection-prototype.md
 """
@@ -22,25 +25,24 @@
 from __future__ import annotations
 
 import logging
-import os
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import numpy as np
+from contracts import AttentionMap, DefectType, Finding
+from findings import normalize_mask
 from PIL import Image
-
-from app.core.config import settings
-from app.gateway.router import RESULTS_DIR
-from app.quality.findings import normalize_mask
-from app.quality.prompts import PromptSet
-from app.quality.registry import SegmenterConfig
-from app.quality.schemas import AttentionMap, DefectType, Finding
-from app.quality.segmenter import SegmentationResult
+from prompts import PromptSet
+from registry import SegmenterConfig
+from segmenter import SegmentationResult
 
 # 히트맵이 원본을 덮는 최대 불투명도. 1.0이면 원본이 완전히 가려져 무엇 위의 하자인지 알 수 없다.
 HEATMAP_MAX_ALPHA = 0.62
 
-# 오버레이 PNG가 쌓이는 하위 디렉터리(`RESULTS_DIR/quality/{inspection_id}/`).
-OVERLAY_SUBDIR = "quality"
+# 업로드 시 게이트웨이에 넘기는 prefix — `/results/{prefix}/...` 로 서빙된다.
+OVERLAY_PREFIX = "quality-attention"
+
+# 업로더 시그니처: (이미지, prefix) -> 공개 URL. `storage_utils.upload_image`가 이 형태다.
+ImageUploader = Callable[[Image.Image, str], str]
 
 logger = logging.getLogger(__name__)
 
@@ -93,35 +95,12 @@ def render_overlay(
     return Image.fromarray(blended.astype(np.uint8), mode="RGB")
 
 
-def overlay_path(inspection_id: str, filename: str, results_dir: str = RESULTS_DIR) -> str:
-    return os.path.join(results_dir, OVERLAY_SUBDIR, inspection_id, filename)
-
-
-def overlay_url(inspection_id: str, filename: str) -> str:
-    """StaticFiles가 서빙하는 공개 URL. `app/main.py`의 `/results` 마운트와 짝이다."""
-    return f"{settings.public_base_url}/results/{OVERLAY_SUBDIR}/{inspection_id}/{filename}"
-
-
-def save_overlay(
-    image: Image.Image,
-    inspection_id: str,
-    filename: str,
-    results_dir: str = RESULTS_DIR,
-) -> str:
-    """PNG로 저장하고 공개 URL을 돌려준다."""
-    path = overlay_path(inspection_id, filename, results_dir)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    image.save(path, format="PNG")
-    return overlay_url(inspection_id, filename)
-
-
 def build_attention_maps(
-    inspection_id: str,
     results: Sequence[SegmentationResult],
     findings: Sequence[Finding],
     prompt_set: PromptSet,
     config: SegmenterConfig,
-    results_dir: str = RESULTS_DIR,
+    upload: ImageUploader,
 ) -> list[AttentionMap]:
     """findings가 실제로 나온 (이미지, 하자유형) 조합만 오버레이로 만든다.
 
@@ -130,6 +109,10 @@ def build_attention_maps(
 
     마스크는 findings와 **같은 정규화**를 거친 것을 쓴다 — 원본 마스크를 그리면 프린트처럼
     대조 정규화로 상쇄된 영역이 화면에서는 시뻘겋게 보이는 모순이 생긴다.
+
+    `upload`는 `(이미지, prefix) -> 공개 URL` 함수다(`storage_utils.upload_image`).
+    업로드 실패는 여기서 삼키지 않고 그대로 올린다 — 호출자(워커)가 검수 결과 전체를 살릴지
+    판단한다.
     """
     by_image = {result.image_index: result for result in results}
     prompt_by_type = {defect_type: prompt for prompt, defect_type in prompt_set.defect_prompts}
@@ -149,12 +132,11 @@ def build_attention_maps(
 
         normalized = normalize_mask(result.masks[prompt], result.clean_mask, config["clean_margin"])
         image = render_overlay(result.base_image, normalized, floor=config["defect_threshold"])
-        filename = f"{image_index}_{defect_type.value.lower()}.png"
         maps.append(
             AttentionMap(
                 image_index=image_index,
                 defect_type=defect_type,
-                url=save_overlay(image, inspection_id, filename, results_dir),
+                url=upload(image, OVERLAY_PREFIX),
             )
         )
     return maps
