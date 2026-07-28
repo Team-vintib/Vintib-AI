@@ -109,7 +109,7 @@ export const routes: RouteRecordRaw[] = [
   {
     path: ROUTE_PATHS.PRODUCT_DETAIL,
     name: ROUTE_NAMES.PRODUCT_DETAIL,
-    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    component: () => import('@/domains/product/pages/ProductDetailView.vue'),
     meta: { title: '상품 상세' },
   },
   {
