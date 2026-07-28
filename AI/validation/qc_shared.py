@@ -88,10 +88,13 @@ DEFECT_PROMPTS: dict[str, str] = PROMPT_SETS[ACTIVE_PROMPT_SET]
 #    억제하면 안 되고, **양성 쪽 confidence 가 하자보다 높을 때만** 억제한다 — 확신이 더 강한
 #    쪽을 믿는다는 원칙이다.
 STRUCTURAL_BENIGN_PROMPTS: dict[str, str] = {
-    "ARMHOLE": "an armhole opening",
-    "NECKLINE": "a neckline opening",
-    "HEM": "a garment hem edge",
-    "CUFF": "a sleeve cuff opening",
+    # 짧은 명사구로 통일한다 — SAM3 는 논문상 짧은 명사구로 학습돼 있어 수식어를 붙일수록
+    # 반응이 약해진다("a scratch" -> "a scratch on fabric" 실측에서 이미 확인). HEM/CUFF 를
+    # 처음엔 3단어로 넣었다가 억제가 안 됐는데, 이 길이 차이가 원인일 가능성이 있다.
+    "ARMHOLE": "an armhole",
+    "NECKLINE": "a neckline",
+    "HEM": "a hem",
+    "CUFF": "a cuff",
 }
 
 TEXTURE_BENIGN_PROMPTS: dict[str, str] = {
