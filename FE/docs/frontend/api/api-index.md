@@ -356,3 +356,31 @@ PROD-008 껍데기 화면은 실제 API를 호출하지 않는다. 목록 연동
 - `POINT_INSUFFICIENT`
 - `REALTIME_CONNECTION_FAILED`
 - `INTERNAL_ERROR`
+
+## 2026-07-28 통합 검색 API 후보
+
+SEARCH-001/002 검색 결과 화면은 현재 mock data를 클라이언트에서 필터링합니다. 실제 API 연동 시
+아래 항목은 BE Swagger/계약 확정 후 adapter로 교체해야 합니다.
+
+### 통합 검색 조회
+
+- 후보 endpoint: `GET /api/search` 또는 도메인별 검색 endpoint 조합
+- 현재 FE query: `keyword`, `type`, `page`, `categories`, `conditions`, `saleTypes`, `minPrice`, `maxPrice`, `sort`
+- `type` 후보값: `all`, `product`, `live`, `member`
+- `page`: `product`, `live`, `member` 탭 페이지 번호. `all` 탭과 첫 페이지에서는 생략합니다.
+- `categories`: 상품 카테고리 복수 선택
+- `conditions`: 상품 상태 등급 복수 선택
+- `saleTypes`: `DIRECT`, `AUCTION`
+- `minPrice`, `maxPrice`: 숫자형 가격 범위
+- `sort`: `LATEST`, `PRICE_ASC`, `PRICE_DESC`
+- `status`: FE mock 상태 확인 전용 query이며 실제 API query가 아닙니다.
+
+확정 필요 항목:
+
+- 통합 검색 단일 endpoint 사용 여부와 path
+- 상품/라이브/회원 결과를 한 응답에 포함할지, 탭별 endpoint로 나눌지
+- 탭별 count와 pagination 응답 구조
+- `all` 탭 preview 개수와 전체보기 진입 시 page 초기화 정책
+- 상품 카드의 찜 여부와 판매 유형/가격 필드 구조
+- 라이브 카드의 실시간 상태, 시청자 수, 썸네일 필드 구조
+- 회원 카드의 팔로우 여부, 통계 필드, 프로필 상세 route

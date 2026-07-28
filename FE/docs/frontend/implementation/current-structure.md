@@ -121,9 +121,17 @@ src/
     search/
       api/
       components/
+        SearchLiveResultCard.vue
+        SearchMemberResultCard.vue
+        SearchResultTabs.vue
+        SearchStatePanel.vue
       constants/
+        searchFilterOptions.ts
+        searchMockData.ts
       pages/
+        SearchResultsPage.vue
       types/
+        search.types.ts
     recommendation/
       api/
       components/
@@ -342,3 +350,12 @@ docs/
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.
 - 전역 스타일은 디자인 토큰, reset, 기본 font-family와 온보딩 오류 토큰을 포함합니다.
+
+### 2026-07-28 검색 화면 반영
+
+- `domains/search`는 SEARCH-001/002 공개 route, 검색 결과 탭, 상품/라이브/회원 mock 결과 카드,
+  카테고리·상태·가격·판매 유형 필터, loading/error/empty/filter-empty/price-error 상태 화면을 구현했습니다.
+- 검색어·탭·필터는 `/search` query 기반으로 동작하며, 실제 통합 검색 API 계약 확정 전까지
+  `searchMockData.ts`에서 클라이언트 필터링합니다.
+- `src/assets/main.scss`에는 상품 목록과 검색 화면이 공유하는 필터 패널 폭, 본문/캡션/버튼 글자 크기,
+  font-weight, line-height 토큰을 추가했습니다.

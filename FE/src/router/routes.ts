@@ -9,6 +9,12 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/domains/home/pages/HomePage.vue'),
   },
   {
+    path: ROUTE_PATHS.SEARCH,
+    name: ROUTE_NAMES.SEARCH,
+    component: () => import('@/domains/search/pages/SearchResultsPage.vue'),
+    meta: { title: '검색' },
+  },
+  {
     path: ROUTE_PATHS.FOLLOWING_HOME,
     name: ROUTE_NAMES.FOLLOWING_HOME,
     component: () => import('@/shared/components/RoutePlaceholder.vue'),

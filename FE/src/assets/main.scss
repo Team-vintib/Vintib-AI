@@ -72,6 +72,20 @@
   --button-height-major: 52px;
   --button-height-bid: 60px;
 
+  /* Typography */
+  --font-size-body: 15px;
+  --font-size-caption: 13px;
+  --font-size-button-small: 14px;
+  --line-height-body: 24px;
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+
+  /* Filter */
+  --filter-panel-width: 224px;
+  --filter-option-min-height: 24px;
+
   /* Layout */
   --layout-content-max-width: 1320px;
 }
@@ -101,8 +115,8 @@ body {
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
-  font-size: 15px;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
