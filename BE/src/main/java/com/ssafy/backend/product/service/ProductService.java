@@ -22,6 +22,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
+    private final ProductImageService productImageService;
 
     @Transactional
     public ProductResponse createProduct(Long sellerId, ProductCreateRequest request) {
@@ -66,6 +67,6 @@ public class ProductService {
             throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
         }
 
-        return ProductDetailResponse.from(product);
+        return ProductDetailResponse.from(product, productImageService.getImages(productId));
     }
 }

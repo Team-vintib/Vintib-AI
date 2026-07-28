@@ -2,9 +2,14 @@ package com.ssafy.backend.product.controller;
 
 import com.ssafy.backend.global.response.ApiResponse;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
+import com.ssafy.backend.product.dto.request.ProductImageRegisterRequest;
+import com.ssafy.backend.product.dto.request.ProductImageUploadUrlRequest;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
+import com.ssafy.backend.product.dto.response.ProductImageResponse;
+import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
+import com.ssafy.backend.product.service.ProductImageService;
 import com.ssafy.backend.product.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -14,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductImageService productImageService;
 
     @Operation(
             summary = "상품 기본 정보 저장",
@@ -81,5 +88,63 @@ public class ProductController {
         Long viewerId = authentication != null ? (Long) authentication.getPrincipal() : null;
         ProductDetailResponse response = productService.getProductDetail(viewerId, id);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "상품 이미지 업로드 URL 발급",
+            description = "S3에 이미지를 직접 업로드할 수 있는 presigned URL을 발급한다(5분 만료). "
+                    + "이미지 1개당 1회 호출하며, 업로드 후 등록 API를 호출해야 상품에 실제로 반영된다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "발급 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "지원하지 않는 이미지 형식"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @PostMapping("/{id}/images/upload-url")
+    public ResponseEntity<ApiResponse<ProductImageUploadUrlResponse>> createImageUploadUrl(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody ProductImageUploadUrlRequest request) {
+        Long sellerId = (Long) authentication.getPrincipal();
+        ProductImageUploadUrlResponse response = productImageService.createUploadUrl(sellerId, id, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "상품 이미지 등록",
+            description = "presigned URL로 S3 업로드를 마친 이미지를 상품에 등록한다. "
+                    + "업로드된 객체가 실제로 존재하는지, 용량 제한(10MB)을 넘지 않는지 서버가 다시 검증한다. "
+                    + "상품당 이미지는 최대 10장까지 등록할 수 있다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "등록 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "업로드 미확인 또는 이미지 개수 초과"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @PostMapping("/{id}/images")
+    public ResponseEntity<ApiResponse<ProductImageResponse>> registerImage(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody ProductImageRegisterRequest request) {
+        Long sellerId = (Long) authentication.getPrincipal();
+        ProductImageResponse response = productImageService.registerImage(sellerId, id, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "상품 이미지 삭제", description = "등록된 상품 이미지를 S3와 DB에서 함께 삭제한다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "삭제 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 또는 이미지 없음")
+    })
+    @DeleteMapping("/{id}/images/{imageId}")
+    public ResponseEntity<Void> deleteImage(
+            Authentication authentication, @PathVariable Long id, @PathVariable Long imageId) {
+        Long sellerId = (Long) authentication.getPrincipal();
+        productImageService.deleteImage(sellerId, id, imageId);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -42,11 +42,17 @@ public enum ErrorCode {
     // [AI 가상 시착]
     TRYON_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "T001", "가상 시착 프로필이 등록되지 않았습니다."),
     TRYON_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "T002", "가상 시착 이미지 생성 중 오류가 발생했습니다."),
+    TRYON_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "T003", "존재하지 않는 시착 결과입니다."),
+    TRYON_RESULT_NOT_OWNER(HttpStatus.FORBIDDEN, "T004", "본인의 시착 결과만 처리할 수 있습니다."),
 
     // [상품]
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "존재하지 않는 상품입니다."),
     NOT_PRODUCT_OWNER(HttpStatus.FORBIDDEN, "P002", "본인이 등록한 상품만 처리할 수 있습니다."),
-    INVALID_PRODUCT_STATE(HttpStatus.BAD_REQUEST, "P003", "현재 상태에서는 해당 처리를 할 수 없습니다.");
+    INVALID_PRODUCT_STATE(HttpStatus.BAD_REQUEST, "P003", "현재 상태에서는 해당 처리를 할 수 없습니다."),
+    PRODUCT_IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "P004", "존재하지 않는 상품 이미지입니다."),
+    PRODUCT_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "P005", "상품 이미지는 최대 10장까지 등록할 수 있습니다."),
+    INVALID_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "P006", "지원하지 않는 이미지 형식입니다."),
+    PRODUCT_IMAGE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "P007", "업로드가 확인되지 않았습니다. 먼저 파일을 업로드해주세요.");
 
     private final HttpStatus status;
     private final String code;

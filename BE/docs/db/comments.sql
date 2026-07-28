@@ -160,7 +160,13 @@ COMMENT ON COLUMN business_info.verified_at  IS '인증 승인·거절 처리 �
 
 COMMENT ON COLUMN product.title       IS '상품명. 통합 검색 대상이며 pg_trgm GIN 인덱스가 걸려 있다 (SEARCH-001).';
 COMMENT ON COLUMN product.description IS '상품 상세 설명.';
-COMMENT ON COLUMN product_image.image_url IS '이미지 URL. S3 미제공이라 EC2 로컬 볼륨 기준 (저장 방식 미확정).';
+COMMENT ON COLUMN product_image.image_key IS 'S3 오브젝트 key(전체 URL 아님). public 버킷에 저장하며 응답 시점에 고정 URL로 조립한다.';
+
+COMMENT ON TABLE tryon_result IS 'AI 가상 시착 합성 결과물. 생성(POST) 자체는 AI 계약 확정 전이라 저장/조회/삭제만 다룬다.';
+COMMENT ON COLUMN tryon_result.member_id  IS '결과물 소유자. 본인만 조회 가능 (presigned GET URL).';
+COMMENT ON COLUMN tryon_result.product_id IS '합성에 사용된 상품.';
+COMMENT ON COLUMN tryon_result.image_key  IS 'S3 오브젝트 key(전체 URL 아님). private 버킷에 저장하며 조회 시 presigned GET URL을 매번 새로 발급한다.';
+COMMENT ON COLUMN tryon_result.deleted_at IS '사용자가 수동 삭제한 시각. 자동 만료 정책은 없다.';
 
 COMMENT ON COLUMN live.title         IS '방송명. 통합 검색 대상 (SEARCH-001).';
 COMMENT ON COLUMN live.thumbnail_url IS '방송 썸네일 URL. 홈 목록에 노출된다.';

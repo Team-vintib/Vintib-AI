@@ -1,6 +1,6 @@
 # ERD 및 상태 설계 (S15P11A108-296)
 
-> 대상 DB: PostgreSQL 18 · 테이블 23개
+> 대상 DB: PostgreSQL 18 · 테이블 24개
 > DDL: [`schema.sql`](./schema.sql) — 실제 PostgreSQL 18에 적용 검증 완료
 > 데이터 사전: [`data-dictionary.md`](./data-dictionary.md) — 이 스키마에서 자동 생성
 >
@@ -16,7 +16,7 @@
 
 | 담당 | 테이블 |
 | --- | --- |
-| **서윤** | `member*`, `business_info`, `brand`, `category`, `product*`, `wish`, `follow`, `point_*`, `orders`, `order_shipment`, `notification` |
+| **서윤** | `member*`, `business_info`, `brand`, `category`, `product*`, `tryon_result`, `wish`, `follow`, `point_*`, `orders`, `order_shipment`, `notification` |
 | **정윤** | `live`, `live_product`, `auction`, `bid`, `chat_message` |
 
 ---
@@ -40,6 +40,9 @@ erDiagram
     brand ||--o{ product : brands
     product ||--o{ product_image : has
     product ||--o{ wish : wished
+
+    member ||--o{ tryon_result : owns
+    product ||--o{ tryon_result : "used in"
 
     member ||--o{ live : hosts
     live ||--o{ live_product : lists

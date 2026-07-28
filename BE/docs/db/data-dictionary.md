@@ -519,9 +519,28 @@
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `product_id` | `bigint` | NOT NULL |  | FK→product | 대상 상품. |
-| `image_url` | `varchar(500)` | NOT NULL |  |  | 이미지 URL. S3 미제공이라 EC2 로컬 볼륨 기준 (저장 방식 미확정). |
+| `image_key` | `varchar(500)` | NOT NULL |  |  | S3 오브젝트 key(전체 URL 아님). public 버킷에 저장하며 응답 시점에 고정 URL로 조립한다. |
 | `sort_order` | `smallint` | NOT NULL | `0` |  | 노출 순서. |
 | `is_primary` | `boolean` | NOT NULL | `false` |  | 대표 이미지 여부. 목록·썸네일에 쓴다. |
+
+---
+
+### `tryon_result`
+
+AI 가상 시착 합성 결과물. 생성(POST) 자체는 AI 계약 확정 전이라 저장/조회/삭제만 다룬다.
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `member_id` | `bigint` | NOT NULL |  | FK→member | 결과물 소유자. 본인만 조회 가능 (presigned GET URL). |
+| `product_id` | `bigint` | NOT NULL |  | FK→product | 합성에 사용된 상품. |
+| `image_key` | `varchar(500)` | NOT NULL |  |  | S3 오브젝트 key(전체 URL 아님). private 버킷에 저장하며 조회 시 presigned GET URL을 매번 새로 발급한다. |
+| `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
+| `deleted_at` | `timestamptz` |  |  |  | 사용자가 수동 삭제한 시각. 자동 만료 정책은 없다. |
+
+**인덱스**
+
+- `ix_tryon_result_member` — `CREATE INDEX ix_tryon_result_member ON public.tryon_result USING btree (member_id, created_at DESC) WHERE (deleted_at IS NULL)`
 
 ---
 
