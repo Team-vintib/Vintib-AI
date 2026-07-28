@@ -70,12 +70,19 @@ DEFECT_PROMPTS: dict[str, str] = PROMPT_SETS[ACTIVE_PROMPT_SET]
 #
 # CLIPSeg 백엔드의 `clean fabric` 대조 정규화(`registry.clean_margin`)와 같은 발상이다.
 # 다만 SAM3 는 인스턴스 단위 출력이라 확률 감산 대신 **영역 겹침**으로 처리한다.
+#
+# ARMHOLE/NECKLINE — "a hole in fabric" 프롬프트 자체가 손상된 구멍과 암홀·넥라인 같은
+# 구조적 개구부를 구분하지 못한다(둘 다 "구멍"이라는 단어로는 같은 개념). 크롭 여부와
+# 무관하게 원본 이미지에서도 재현되는 문제라(git aa9a977, 크롭 도입 전에도 동일 프롬프트),
+# 프롬프트를 바꾸는 대신 이 개념 자체를 양성 후보로 등록해 겹침 억제로 처리한다.
 BENIGN_PROMPTS: dict[str, str] = {
     "WRINKLE": "a wrinkle on fabric",
     "FOLD": "a fold in fabric",
     "SHADOW": "a shadow",
     "SEAM": "a seam",
     "PRINT": "a printed pattern on fabric",
+    "ARMHOLE": "an armhole opening",
+    "NECKLINE": "a neckline opening",
 }
 
 # 의류 영역 게이트 — 배경(바닥·소품) 탐지를 구조적으로 걷어낸다.
@@ -153,6 +160,8 @@ KOREAN_LABELS: dict[str, str] = {
     "SHADOW": "그림자",
     "SEAM": "솔기",
     "PRINT": "프린트",
+    "ARMHOLE": "암홀",
+    "NECKLINE": "넥라인",
 }
 
 
