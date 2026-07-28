@@ -10,13 +10,13 @@ from PIL import Image
 from base_worker import BaseWorker
 from storage_utils import download_image, upload_image
 
-# 기존 검증 코드(AI/validation/AI_tryon/catvton)를 import 할 수 있도록 경로 추가.
+# 기존 검증 코드(worker/models/catvton)를 import 할 수 있도록 경로 추가.
 # 다른 환경에서 위치가 다르면 CATVTON_CODE_PATH 환경변수로 덮어쓸 수 있다.
-# (구 경로는 AI/test/ 였다 — PoC·스파이크 코드가 validation/ 으로 이동하면서 바뀌었고,
-#  AI/test/ 는 이제 실제 테스트 코드 자리다.)
+# (구 경로는 AI/test/ → AI/validation/ 이었다 — 추론 코드는 AI/에 두지 않는다는 원칙에 따라
+#  worker/models/ 로 옮겼다.)
 CATVTON_CODE_PATH = os.getenv(
     "CATVTON_CODE_PATH",
-    os.path.join(os.path.dirname(__file__), "..", "AI", "validation", "AI_tryon", "catvton"),
+    os.path.join(os.path.dirname(__file__), "models", "catvton"),
 )
 sys.path.insert(0, CATVTON_CODE_PATH)
 

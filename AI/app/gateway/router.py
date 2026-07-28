@@ -1,6 +1,8 @@
 import json
 import os
 import uuid
+from datetime import UTC, datetime
+from typing import get_args
 
 import aiofiles
 import redis
@@ -25,6 +27,12 @@ RESULT_TTL_SECONDS = 3600
 POLL_TIMEOUT_SECONDS = 5
 MAX_RETRY = 3
 
+# 워커 생존 신호. 워커가 팀원 노트북이라 항상 떠 있지 않은데, 이게 없으면 BE·FE가
+# "처리 중"과 "아무도 안 듣고 있음"을 구별할 수 없다 — job은 둘 다 queued로 보인다.
+# poll 할 때마다 갱신하고, poll 주기(최대 5초)의 여유를 둔 값으로 만료시킨다.
+WORKER_SEEN_PREFIX = "worker:last_seen:"
+WORKER_SEEN_TTL_SECONDS = POLL_TIMEOUT_SECONDS * 6
+
 # S3 권한이 없어서 EC2 로컬 디스크에 저장 → Caddy가 /results/* 로 서빙
 RESULTS_DIR = os.getenv("RESULTS_DIR", "/app/results")
 os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -33,6 +41,10 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 def _check_worker_key(x_api_key: str | None):
     if not settings.worker_api_key or x_api_key != settings.worker_api_key:
         raise HTTPException(status_code=401, detail="invalid worker api key")
+
+
+def _now_iso() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 @router.get("/health")
@@ -63,6 +75,32 @@ def get_job_status(job_id: str):
     return json.loads(raw)
 
 
+@router.get("/workers/status")
+def get_worker_status():
+    """기능별 워커 가용성. **워커가 팀원 노트북이라 항상 떠 있지 않다.**
+
+    워커가 없으면 job은 `queued`로 남아 있다가 TTL(1시간)에 조용히 만료된다. BE·FE가 그걸
+    "처리 중"과 구별하려면 이 정보가 필요하다 — 상품 등록 화면에서 "지금 검수 가능/불가"를
+    미리 알리거나, 폴링을 언제 포기할지 판단하는 데 쓴다.
+
+    `online`은 최근 poll 기록이 살아 있다는 뜻일 뿐, 그 워커가 지금 한가하다는 보장은 아니다.
+    `queued`는 대기 중인 job 수다.
+
+    **다른 `/workers/*`와 달리 API 키를 요구하지 않는다.** 저 셋은 워커가 *호출하는* 쪽이라
+    인증이 필요하지만, 이건 워커에 *대한* 정보를 BE·FE에 알려주는 용도다. 노출되는 건 기능
+    목록·온라인 여부·대기 job 수뿐이고, 이걸 못 보면 FE가 "지금 검수 가능한지"를 표시할 수 없다.
+    """
+    features: dict[str, dict] = {}
+    for feature in get_args(FeatureType):
+        last_seen = r.get(f"{WORKER_SEEN_PREFIX}{feature}")
+        features[feature] = {
+            "online": last_seen is not None,
+            "last_seen": last_seen,
+            "queued": r.llen(f"{QUEUE_PREFIX}{feature}"),
+        }
+    return {"features": features, "checked_at": _now_iso()}
+
+
 # ---------- 로컬 노트북 워커가 호출하는 쪽 ----------
 
 
@@ -71,6 +109,10 @@ def poll_job(
     feature: FeatureType = Query(...), x_api_key: str | None = Header(default=None)
 ):  # noqa: B008
     _check_worker_key(x_api_key)
+
+    # 생존 신호를 BLPOP **전에** 찍는다. 뒤에 찍으면 job이 없어 5초를 블로킹하는 동안
+    # 키가 만료돼, 한가한 워커가 죽은 것처럼 보인다.
+    r.set(f"{WORKER_SEEN_PREFIX}{feature}", _now_iso(), ex=WORKER_SEEN_TTL_SECONDS)
 
     item = r.blpop([f"{QUEUE_PREFIX}{feature}"], timeout=POLL_TIMEOUT_SECONDS)
     if item is None:
