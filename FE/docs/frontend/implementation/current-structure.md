@@ -38,12 +38,12 @@ src/
     images/
       logo.png
       products/
-        mock-denim-jacket.svg
-        mock-knit.svg
-        mock-leather-bag.svg
-        mock-sneakers.svg
-        mock-trench-coat.svg
-        mock-watch.svg
+        product-denim-jacket.webp
+        product-knit.webp
+        product-leather-bag.webp
+        product-sneakers.webp
+        product-trench-coat.webp
+        product-watch.webp
     main.scss
     tailwind.css
   domains/
@@ -331,7 +331,9 @@ docs/
   loading/error/retry 상태를 처리합니다.
   실제 HOME API 계약이 확정되면 adapter 내부를 HTTP 호출과 응답 매핑으로 교체합니다.
 - `domains/product`에는 PROD-008 상품 목록 View와 S15P11A108-408·410·412 상품 상세 UI가
-  구현되어 있습니다. 상품 목록 카드는 상품 ID가 포함된 상세 route로 이동합니다. 상세 화면은
+  구현되어 있습니다. 상품 목록은 실사형 로컬 WebP를 사용하고 최소·최대 가격 범위를 검증해
+  mock 상품을 필터링하며 결과 없음 상태를 제공합니다. 상품 목록 카드는 상품 ID가 포함된 상세
+  route로 이동합니다. 상세 화면은
   썸네일과 대표 이미지·AI 원본/검수 이미지 쌍을 함께 변경하며 찜·장바구니·라이브 알림 상태,
   기존 라이브 route 이동과 미구현 CTA 안내를 제공합니다. 상세 조회의 로딩·오류·상품 없음·
   판매 완료와 AI 분석 전·중·완료·결과 없음·실패 상태를 구분하며 mock adapter에서 데이터를
