@@ -1,0 +1,105 @@
+package com.ssafy.backend.live.service;
+
+import com.ssafy.backend.global.exception.CustomException;
+import com.ssafy.backend.global.exception.ErrorCode;
+import com.ssafy.backend.live.dto.request.LiveProductLinkRequest;
+import com.ssafy.backend.live.dto.response.LiveProductResponse;
+import com.ssafy.backend.live.entity.Live;
+import com.ssafy.backend.live.entity.LiveProduct;
+import com.ssafy.backend.live.port.ProductQueryPort;
+import com.ssafy.backend.live.port.ProductQueryPort.ProductSummary;
+import com.ssafy.backend.live.repository.LiveProductRepository;
+import com.ssafy.backend.live.repository.LiveRepository;
+import java.time.LocalDateTime;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * 라이브 상품 편성(LIVE-003).
+ *
+ * <p>{@link LiveService}와 분리한 이유는 관심사가 다르기 때문이다 — 이쪽은 방 자체가 아니라
+ * 방에 걸리는 상품 목록을 다룬다. 상품 조회는 {@link ProductQueryPort}만 거친다.
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class LiveProductService {
+
+    private final LiveRepository liveRepository;
+    private final LiveProductRepository liveProductRepository;
+    private final ProductQueryPort productQueryPort;
+
+    /**
+     * 라이브에 상품을 연결한다. 방송 전·중 모두 가능하다.
+     *
+     * <p>호스트 본인의 상품만 걸 수 있다 — 남의 상품을 자기 방송에 올리는 것을 막는다.
+     */
+    @Transactional
+    public LiveProductResponse linkProduct(Long hostId, Long liveId, LiveProductLinkRequest request) {
+        Live live = findEditableLive(hostId, liveId);
+        ProductSummary product = findProduct(request.productId());
+
+        if (!product.sellerId().equals(hostId)) {
+            throw new CustomException(ErrorCode.NOT_PRODUCT_OWNER);
+        }
+        if (liveProductRepository.existsByLiveIdAndProductIdAndRemovedAtIsNull(liveId, product.id())) {
+            throw new CustomException(ErrorCode.PRODUCT_ALREADY_LINKED);
+        }
+
+        LiveProduct linked = liveProductRepository.save(
+                LiveProduct.link(live, product.id(), request.sortOrderOrDefault(), LocalDateTime.now()));
+
+        return LiveProductResponse.of(linked, product.title());
+    }
+
+    /**
+     * 연결을 해제한다. 물리 삭제가 아니라 제외 시각을 남긴다 — 다시보기 타임라인(LIVE-008)의 근거가 된다.
+     */
+    @Transactional
+    public void unlinkProduct(Long hostId, Long liveId, Long productId) {
+        findEditableLive(hostId, liveId);
+
+        LiveProduct linked = liveProductRepository
+                .findByLiveIdAndProductIdAndRemovedAtIsNull(liveId, productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.LIVE_PRODUCT_NOT_FOUND));
+
+        linked.unlink(LocalDateTime.now());
+    }
+
+    /** 현재 연결 중인 상품 목록. 제외된 건은 빠진다. */
+    public List<LiveProductResponse> getLinkedProducts(Long liveId) {
+        if (!liveRepository.existsById(liveId)) {
+            throw new CustomException(ErrorCode.LIVE_NOT_FOUND);
+        }
+
+        return liveProductRepository.findByLiveIdAndRemovedAtIsNullOrderBySortOrderAsc(liveId).stream()
+                .map(liveProduct -> LiveProductResponse.of(liveProduct, productTitleOf(liveProduct.getProductId())))
+                .toList();
+    }
+
+    private Live findEditableLive(Long hostId, Long liveId) {
+        Live live = liveRepository.findById(liveId)
+                .orElseThrow(() -> new CustomException(ErrorCode.LIVE_NOT_FOUND));
+
+        if (!live.isHostedBy(hostId)) {
+            throw new CustomException(ErrorCode.NOT_LIVE_HOST);
+        }
+        if (!live.isOpenForEditing()) {
+            throw new CustomException(ErrorCode.INVALID_LIVE_STATE);
+        }
+
+        return live;
+    }
+
+    private ProductSummary findProduct(Long productId) {
+        return productQueryPort.findById(productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+    }
+
+    // 연결 당시 존재하던 상품이 이후 삭제될 수 있다. 목록 조회가 통째로 실패하지 않도록 제목만 비운다.
+    private String productTitleOf(Long productId) {
+        return productQueryPort.findById(productId).map(ProductSummary::title).orElse(null);
+    }
+}

@@ -188,8 +188,12 @@ BE/
 │   │   ├── service/
 │   │   └── dto/response/        # 카드 DTO는 현재 Mock 응답용 (2주차 실데이터 연결)
 │   ├── live/                    # 라이브 방 개설/조회/상태 전이 (LIVE) — 정윤
-│   │   ├── entity/              # Live, LiveStatus
-│   │   └── repository/
+│   │   ├── controller/          # LiveController, LiveProductController
+│   │   ├── service/             # LiveService, LiveProductService
+│   │   ├── entity/              # Live, LiveStatus, LiveProduct
+│   │   ├── repository/
+│   │   ├── port/                # ProductQueryPort — 상품 도메인 참조를 한 곳으로 격리
+│   │   └── dto/
 │   ├── auction/                 # 경매 조건 설정/진행 (AUCT) — 정윤
 │   │   ├── entity/              # Auction, AuctionStatus
 │   │   └── repository/
