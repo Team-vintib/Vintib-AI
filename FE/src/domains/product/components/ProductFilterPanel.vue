@@ -171,7 +171,7 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
   position: sticky;
   top: var(--space-6);
   align-self: start;
-  width: 224px;
+  width: var(--filter-panel-width);
   padding: var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
@@ -191,14 +191,14 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 .product-filter__legend {
   margin-bottom: var(--space-4);
   color: var(--color-text-primary);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
 }
 
 .product-filter__option {
   display: flex;
   align-items: center;
-  min-height: 24px;
+  min-height: var(--filter-option-min-height);
   gap: var(--space-3);
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -295,8 +295,8 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 .product-filter__button {
   min-height: var(--button-height-small);
   border-radius: var(--radius-control);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
   transition:
     border-color 160ms ease,
     background-color 160ms ease,

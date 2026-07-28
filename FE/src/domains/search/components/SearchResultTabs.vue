@@ -49,7 +49,7 @@ const emit = defineEmits<{
   border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--color-text-secondary);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .search-result-tabs__item:hover,
@@ -65,9 +65,9 @@ const emit = defineEmits<{
 
 .search-result-tabs__count {
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .search-result-tabs__item--active .search-result-tabs__count {

@@ -140,15 +140,15 @@ const displayTime = computed(() => {
   overflow: hidden;
   color: var(--color-text-primary);
   font-size: 17px;
-  font-weight: 700;
-  line-height: 24px;
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
 .search-live-card__meta {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   line-height: 20px;
 }
 </style>

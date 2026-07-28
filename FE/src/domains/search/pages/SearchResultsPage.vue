@@ -7,6 +7,11 @@ import SearchLiveResultCard from '@/domains/search/components/SearchLiveResultCa
 import SearchMemberResultCard from '@/domains/search/components/SearchMemberResultCard.vue'
 import SearchResultTabs from '@/domains/search/components/SearchResultTabs.vue'
 import SearchStatePanel from '@/domains/search/components/SearchStatePanel.vue'
+import {
+  SEARCH_CATEGORY_FILTER_OPTIONS,
+  SEARCH_CONDITION_FILTER_OPTIONS,
+  SEARCH_SALE_TYPE_FILTER_OPTIONS,
+} from '@/domains/search/constants/searchFilterOptions'
 import { SEARCH_MOCK_RESULTS } from '@/domains/search/constants/searchMockData'
 import type {
   SearchProductResult,
@@ -23,25 +28,6 @@ const authStore = useAuthStore()
 
 const validTabIds: SearchResultTabId[] = ['all', 'product', 'live', 'member']
 const validMockStatuses = ['loading', 'error', 'empty'] as const
-const categoryFilterOptions = [
-  { id: '아우터', label: '아우터' },
-  { id: '상의', label: '상의' },
-  { id: '하의', label: '하의' },
-  { id: '원피스', label: '원피스' },
-  { id: '신발', label: '신발' },
-  { id: '액세서리', label: '액세서리' },
-  { id: '시계', label: '시계' },
-] as const
-const conditionFilterOptions = [
-  { id: 'S', label: 'S급' },
-  { id: 'A', label: 'A급' },
-  { id: 'B', label: 'B급' },
-  { id: 'C', label: 'C급' },
-] as const
-const saleTypeFilterOptions = [
-  { id: 'DIRECT', label: '즉시 구매' },
-  { id: 'AUCTION', label: '경매' },
-] as const
 
 const getQueryString = (value: unknown) => (typeof value === 'string' ? value : '')
 const getQueryArray = (value: unknown) =>
@@ -534,7 +520,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
               <legend>카테고리</legend>
 
               <label
-                v-for="option in categoryFilterOptions"
+                v-for="option in SEARCH_CATEGORY_FILTER_OPTIONS"
                 :key="option.id"
                 class="search-page__checkbox-option"
               >
@@ -551,7 +537,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
               <legend>상태</legend>
 
               <label
-                v-for="option in conditionFilterOptions"
+                v-for="option in SEARCH_CONDITION_FILTER_OPTIONS"
                 :key="option.id"
                 class="search-page__checkbox-option"
               >
@@ -596,7 +582,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
               <legend>판매 유형</legend>
 
               <label
-                v-for="option in saleTypeFilterOptions"
+                v-for="option in SEARCH_SALE_TYPE_FILTER_OPTIONS"
                 :key="option.id"
                 class="search-page__checkbox-option"
               >
@@ -826,7 +812,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .search-page__search button:hover {
@@ -848,8 +834,8 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 
 .search-page__eyebrow {
   color: var(--color-primary);
-  font-size: 14px;
-  font-weight: 800;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-extrabold);
   line-height: 20px;
 }
 
@@ -863,7 +849,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 
 .search-page__layout {
   display: grid;
-  grid-template-columns: 224px minmax(0, 1fr);
+  grid-template-columns: var(--filter-panel-width) minmax(0, 1fr);
   align-items: start;
   gap: var(--space-8);
   margin-top: var(--space-8);
@@ -871,7 +857,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 
 .search-page__filters {
   align-self: start;
-  width: 224px;
+  width: var(--filter-panel-width);
   padding: var(--space-5);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
@@ -880,8 +866,8 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 
 .search-page__filter-title {
   font-size: 17px;
-  font-weight: 800;
-  line-height: 24px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-body);
 }
 
 .search-page__product-filter {
@@ -901,21 +887,21 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 .search-page__product-filter legend {
   margin-bottom: var(--space-4);
   color: var(--color-text-primary);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
 }
 
 .search-page__product-filter label {
   color: var(--color-text-secondary);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-body);
 }
 
 .search-page__checkbox-option {
   display: flex;
   align-items: center;
-  min-height: 22px;
+  min-height: var(--filter-option-min-height);
   gap: var(--space-3);
 }
 
@@ -960,8 +946,8 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 .search-page__filter-actions button {
   height: var(--button-height-small);
   border-radius: var(--radius-control);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
 }
 
 .search-page__filter-actions button:first-child {
@@ -1010,7 +996,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 .search-page__section-header span,
 .search-page__panel-label {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   line-height: 20px;
 }
 
@@ -1123,7 +1109,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 .search-product-card__seller {
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1131,15 +1117,15 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 
 .search-product-card__brand {
   color: var(--color-primary);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .search-product-card__name {
   overflow: hidden;
   color: var(--color-text-primary);
   font-size: 17px;
-  font-weight: 700;
-  line-height: 24px;
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1155,7 +1141,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 .search-product-card__meta strong {
   font-size: 16px;
   font-variant-numeric: tabular-nums;
-  line-height: 24px;
+  line-height: var(--line-height-body);
 }
 
 .search-product-card__badge {
@@ -1165,7 +1151,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
   background: var(--color-primary-soft);
   color: var(--color-primary);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   line-height: 16px;
 }
 

@@ -110,7 +110,7 @@ const emit = defineEmits<{
 .search-state__body p {
   max-width: 420px;
   color: var(--color-text-secondary);
-  line-height: 24px;
+  line-height: var(--line-height-body);
 }
 
 .search-state__action {
@@ -121,7 +121,7 @@ const emit = defineEmits<{
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .search-state__action:hover {

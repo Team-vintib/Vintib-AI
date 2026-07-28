@@ -50,6 +50,11 @@ export interface SearchResultTab {
   count: number
 }
 
+export interface SearchFilterOption {
+  id: string
+  label: string
+}
+
 export interface SearchStateContent {
   title: string
   description: string

@@ -81,7 +81,7 @@ const emit = defineEmits<{
 .search-member-card__stats,
 .search-member-card__description {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   line-height: 20px;
 }
 
@@ -101,8 +101,8 @@ const emit = defineEmits<{
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .search-member-card__follow--active {
