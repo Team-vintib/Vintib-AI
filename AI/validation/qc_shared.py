@@ -35,6 +35,10 @@ IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
 # 다만 SAM3 는 논문상 **짧은 명사구**(예: "yellow school bus")로 학습돼 있어 문장을 길게
 # 늘이면 오히려 나빠질 수 있다. 어느 표현이 실제로 나은지는 실측 대상이므로 세트로 만들어
 # 두고 ACTIVE_PROMPT_SET 만 바꿔 비교한다.
+# DIRT_MARK("a dirty mark")는 세 세트 모두 **똑같은 문구**를 쓴다 — LAB-12 가 검증한 게 이
+# 표현 하나뿐이라 "on fabric"/"on clothing" 을 붙인 변형은 검증된 적이 없다. CLIPSeg 노트북을
+# SAM3 와 같은 프롬프트로 맞추면서(공정 비교 목적) 이 개념이 빠졌었는데, LAB-12·프로덕션
+# (`worker/models/clipseg/prompts.py`)이 검증한 오염 계열 핵심 프롬프트라 다시 넣는다.
 PROMPT_SETS: dict[str, dict[str, str]] = {
     # 대조군 — 기존 프롬프트. 배경 오탐이 가장 많다.
     "bare": {
@@ -42,6 +46,7 @@ PROMPT_SETS: dict[str, dict[str, str]] = {
         "SCRATCH": "a scratch",
         "TEAR": "a tear",
         "HOLE": "a hole",
+        "DIRT_MARK": "a dirty mark",
     },
     # 원단 한정. LAB-12 CLIPSeg 프롬프트와 같은 골격이다.
     "fabric": {
@@ -49,6 +54,7 @@ PROMPT_SETS: dict[str, dict[str, str]] = {
         "SCRATCH": "a scratch on fabric",
         "TEAR": "a tear in fabric",
         "HOLE": "a hole in fabric",
+        "DIRT_MARK": "a dirty mark",
     },
     # 의류 명시. 명사구를 짧게 유지하려고 "clothing" 한 단어만 덧붙였다.
     "garment": {
@@ -56,6 +62,7 @@ PROMPT_SETS: dict[str, dict[str, str]] = {
         "SCRATCH": "a scratch on clothing",
         "TEAR": "a tear in clothing",
         "HOLE": "a hole in clothing",
+        "DIRT_MARK": "a dirty mark",
     },
 }
 ACTIVE_PROMPT_SET = "fabric"  # <- 여기만 바꾸면 두 노트북이 함께 스왑된다
@@ -163,6 +170,7 @@ KOREAN_LABELS: dict[str, str] = {
     "SCRATCH": "스크래치",
     "TEAR": "찢어짐",
     "HOLE": "구멍",
+    "DIRT_MARK": "얼룩",  # worker/models/clipseg/scoring.py 의 DEFECT_LABELS 와 같은 한글
     # 양성(억제용) 태그도 함께 둔다 — 디버깅 시각화(§6 히트맵 등)에서 재사용한다.
     "WRINKLE": "주름",
     "FOLD": "접힘",
