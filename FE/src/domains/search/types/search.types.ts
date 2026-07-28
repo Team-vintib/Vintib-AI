@@ -1,5 +1,7 @@
 export type SearchResultTabId = 'all' | 'product' | 'live' | 'member'
 
+export type SearchSortOptionId = 'LATEST' | 'PRICE_ASC' | 'PRICE_DESC'
+
 export type SearchStateKind = 'initial' | 'loading' | 'empty' | 'filter-empty' | 'error' | 'price-error'
 
 export interface SearchProductResult {
@@ -8,6 +10,7 @@ export interface SearchProductResult {
   name: string
   sellerName: string
   price: number
+  createdAt: string
   conditionGrade: 'S' | 'A' | 'B' | 'C'
   saleType: 'DIRECT' | 'AUCTION'
   categoryName: string

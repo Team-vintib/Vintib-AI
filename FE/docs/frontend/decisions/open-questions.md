@@ -50,7 +50,7 @@
 | 항목 | 현재 상태 | 임시 처리 |
 | --- | --- | --- |
 | SEARCH-001/002 통합 검색 API | endpoint, 탭별/통합 응답, pagination, count 구조 미확정 | `/search` 화면에서 mock data 클라이언트 필터링 |
-| 검색 query 계약 | `keyword`, 탭, 카테고리, 상태, 가격, 판매 유형 query 이름과 값 미확정 | FE query는 `keyword`, `type`, `categories`, `conditions`, `saleTypes`, `minPrice`, `maxPrice` 사용 |
+| 검색 query 계약 | `keyword`, 탭, 카테고리, 상태, 가격, 판매 유형, 정렬 query 이름과 값 미확정 | FE query는 `keyword`, `type`, `categories`, `conditions`, `saleTypes`, `minPrice`, `maxPrice`, `sort` 사용 |
 | 회원 검색 상세 route | 회원 카드 클릭 시 이동할 프로필 route 미확정 | 카드 표시와 팔로우 mock action만 구현 |
 | 검색 결과 찜/팔로우 API | 공개 목록에서 찜/팔로우 여부 노출, 비로그인 클릭 정책, mutation endpoint 미확정 | 비로그인은 login redirect, 로그인은 화면 내 mock toggle |
 | 상품 상세 mock 데이터 | 검색 결과의 상품 ID로 상세 route는 이동하지만 상세 mock adapter가 단일 Levi's 데이터를 반환 | 실제 상품 상세 API 또는 ID별 mock data 필요 |

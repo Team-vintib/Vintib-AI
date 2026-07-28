@@ -365,12 +365,13 @@ SEARCH-001/002 검색 결과 화면은 현재 mock data를 클라이언트에서
 ### 통합 검색 조회
 
 - 후보 endpoint: `GET /api/search` 또는 도메인별 검색 endpoint 조합
-- 현재 FE query: `keyword`, `type`, `categories`, `conditions`, `saleTypes`, `minPrice`, `maxPrice`
+- 현재 FE query: `keyword`, `type`, `categories`, `conditions`, `saleTypes`, `minPrice`, `maxPrice`, `sort`
 - `type` 후보값: `all`, `product`, `live`, `member`
 - `categories`: 상품 카테고리 복수 선택
 - `conditions`: 상품 상태 등급 복수 선택
 - `saleTypes`: `DIRECT`, `AUCTION`
 - `minPrice`, `maxPrice`: 숫자형 가격 범위
+- `sort`: `LATEST`, `PRICE_ASC`, `PRICE_DESC`
 - `status`: FE mock 상태 확인 전용 query이며 실제 API query가 아닙니다.
 
 확정 필요 항목:

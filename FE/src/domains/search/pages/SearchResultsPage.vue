@@ -16,6 +16,7 @@ import { SEARCH_MOCK_RESULTS } from '@/domains/search/constants/searchMockData'
 import type {
   SearchProductResult,
   SearchResultTabId,
+  SearchSortOptionId,
   SearchStateContent,
   SearchStateKind,
 } from '@/domains/search/types/search.types'
@@ -27,7 +28,13 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const validTabIds: SearchResultTabId[] = ['all', 'product', 'live', 'member']
+const validSortOptionIds: SearchSortOptionId[] = ['LATEST', 'PRICE_ASC', 'PRICE_DESC']
 const validMockStatuses = ['loading', 'error', 'empty'] as const
+const SEARCH_SORT_OPTIONS: { id: SearchSortOptionId; label: string }[] = [
+  { id: 'LATEST', label: '최신순' },
+  { id: 'PRICE_ASC', label: '가격 낮은순' },
+  { id: 'PRICE_DESC', label: '가격 높은순' },
+]
 
 const getQueryString = (value: unknown) => (typeof value === 'string' ? value : '')
 const getQueryArray = (value: unknown) =>
@@ -53,6 +60,13 @@ const queryConditionIds = computed(() => getQueryArray(route.query.conditions))
 const querySaleTypeIds = computed(() => getQueryArray(route.query.saleTypes))
 const queryMinPrice = computed(() => getQueryNumber(route.query.minPrice))
 const queryMaxPrice = computed(() => getQueryNumber(route.query.maxPrice))
+const querySortOption = computed<SearchSortOptionId>(() => {
+  const querySort = getQueryString(route.query.sort)
+
+  return validSortOptionIds.includes(querySort as SearchSortOptionId)
+    ? (querySort as SearchSortOptionId)
+    : 'LATEST'
+})
 const mockStatus = computed(() => {
   const queryStatus = getQueryString(route.query.status)
 
@@ -243,6 +257,23 @@ const filteredProducts = computed(() => {
   })
 })
 
+const sortedProducts = computed(() => {
+  const products = [...filteredProducts.value]
+
+  if (querySortOption.value === 'PRICE_ASC') {
+    return products.sort((firstProduct, secondProduct) => firstProduct.price - secondProduct.price)
+  }
+
+  if (querySortOption.value === 'PRICE_DESC') {
+    return products.sort((firstProduct, secondProduct) => secondProduct.price - firstProduct.price)
+  }
+
+  return products.sort(
+    (firstProduct, secondProduct) =>
+      new Date(secondProduct.createdAt).getTime() - new Date(firstProduct.createdAt).getTime(),
+  )
+})
+
 const visibleLives = computed(() => {
   if (mockStatus.value === 'empty') {
     return []
@@ -386,6 +417,17 @@ const selectTab = async (tabId: SearchResultTabId) => {
   } as Record<string, string | undefined>)
 
   liveMessage.value = `${resultTabs.value.find((tab) => tab.id === tabId)?.label ?? '전체'} 결과 탭을 선택했습니다.`
+}
+
+const handleSortChange = async (event: Event) => {
+  const sortOption = (event.target as HTMLSelectElement).value as SearchSortOptionId
+
+  await pushSearchQuery({
+    ...route.query,
+    sort: sortOption === 'LATEST' ? undefined : sortOption,
+  } as Record<string, string | undefined>)
+
+  liveMessage.value = `${getFilterOptionLabel(SEARCH_SORT_OPTIONS, sortOption, '최신순')}으로 정렬했습니다.`
 }
 
 const toggleFilterValue = (selectedIds: string[], targetId: string, isSelected: boolean) => {
@@ -752,12 +794,28 @@ const getProductActivityLabel = (product: SearchProductResult) => {
               >
                 <div class="search-page__section-header">
                   <h2 id="search-products-title">상품</h2>
-                  <span>{{ filteredProducts.length }}개</span>
+                  <div class="search-page__section-toolbar">
+                    <span>{{ filteredProducts.length }}개</span>
+                    <label class="sr-only" for="search-product-sort">검색 상품 정렬</label>
+                    <select
+                      id="search-product-sort"
+                      :value="querySortOption"
+                      @change="handleSortChange"
+                    >
+                      <option
+                        v-for="sortOption in SEARCH_SORT_OPTIONS"
+                        :key="sortOption.id"
+                        :value="sortOption.id"
+                      >
+                        {{ sortOption.label }}
+                      </option>
+                    </select>
+                  </div>
                 </div>
 
                 <div class="search-page__product-grid">
                   <article
-                    v-for="product in filteredProducts"
+                    v-for="product in sortedProducts"
                     :key="product.id"
                     class="search-product-card"
                   >
@@ -1218,6 +1276,36 @@ const getProductActivityLabel = (product: SearchProductResult) => {
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
   line-height: 20px;
+}
+
+.search-page__section-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.search-page__section-toolbar select {
+  min-width: 132px;
+  height: var(--button-height-small);
+  padding: 0 var(--space-9) 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  outline: 0;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--color-text-secondary) 50%) right 14px center /
+      6px 6px no-repeat,
+    linear-gradient(135deg, var(--color-text-secondary) 50%, transparent 50%) right 10px center /
+      6px 6px no-repeat,
+    var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
+  appearance: none;
+}
+
+.search-page__section-toolbar select:focus-visible {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 
 .search-page__product-grid,
