@@ -79,10 +79,13 @@ BENIGN_PROMPTS: dict[str, str] = {
 }
 
 # 의류 영역 게이트 — 배경(바닥·소품) 탐지를 구조적으로 걷어낸다.
-# 프롬프트만으로는 배경 오탐이 0 이 되지 않아서, 의류 마스크를 따로 뽑아 교집합으로 거른다.
+# 프롬프트만으로는 배경 오탐이 0 이 되지 않아서, 의류를 먼저 찾아 **그 영역으로 크롭한 뒤**
+# 하자 프롬프트를 돌린다("의류만 세그먼트한 상태에서 탐지" — crop-then-detect).
+# 크롭한 뒤에도 의류 실루엣 밖에 걸치는 인스턴스는 마스크 겹침으로 한 번 더 거른다.
 # 005 계획 §고도화 경로 3(의류 영역 마스크로 배경 제외)에 해당한다.
 GARMENT_PROMPT = "clothing"
-GARMENT_OVERLAP_MIN = 0.6  # 하자 마스크의 이 비율 이상이 의류 안에 있어야 채택
+GARMENT_OVERLAP_MIN = 0.6  # 크롭 후에도, 하자 마스크의 이 비율 이상이 의류 안에 있어야 채택
+GARMENT_CROP_PAD_RATIO = 0.06  # 의류 bbox 를 이만큼 여유 있게 잡고 크롭(경계 하자 잘림 방지)
 RESTRICT_TO_GARMENT = True
 
 BENIGN_CONTAINMENT = 0.6  # 하자 마스크가 양성 마스크에 이만큼 잠기면 억제 후보
@@ -101,13 +104,34 @@ VERDICT_THRESHOLDS = (0.4, 0.7)
 # 픽셀 sigmoid 확률은 서로 비교할 수 있는 값이 아니다.
 BACKEND_THRESHOLDS = {
     # post_process_instance_segmentation 의 threshold (HF 기본값)
-    "sam3": {"score": 0.30},
+    # garment_score: 의류 존재 여부만 확인하는 임계치라 하자 탐지(0.30)보다 훨씬 관대하게 잡는다.
+    # ⚠️ 처음엔 여기도 0.30 을 그대로 썼다가, "clothing" 개념이 그 기준을 못 넘기면 의류를
+    # 아예 못 찾아 크롭·필터가 통째로 no-op 되는 문제가 실측에서 나왔다(라이브 검수 이슈).
+    # 존재 확인용 임계치와 정밀 판정용 임계치를 분리한 이유가 이것이다.
+    "sam3": {"score": 0.30, "garment_score": 0.05},
     # worker/models/clipseg/registry.py 의 clipseg_rd64_refined defect_threshold
-    "clipseg": {"prob": 0.45},
+    "clipseg": {"prob": 0.45, "garment_prob": 0.05},
 }
 
 # 겹침 판정은 **기하학적 비율**이라 스케일과 무관하다 — 그래서 백엔드가 달라도 공유한다.
 MIN_AREA_RATIO = 0.0015  # 이보다 작은 blob 은 노이즈로 버린다 (registry.py 와 같은 값)
+
+
+# --------------------------------------------------------------------------
+# 한글 라벨 — bbox 태그·JSON 출력에 쓴다
+# --------------------------------------------------------------------------
+KOREAN_LABELS: dict[str, str] = {
+    "STAIN": "오염",
+    "SCRATCH": "스크래치",
+    "TEAR": "찢어짐",
+    "HOLE": "구멍",
+    # 양성(억제용) 태그도 함께 둔다 — 디버깅 시각화(§6 히트맵 등)에서 재사용한다.
+    "WRINKLE": "주름",
+    "FOLD": "접힘",
+    "SHADOW": "그림자",
+    "SEAM": "솔기",
+    "PRINT": "프린트",
+}
 
 
 # --------------------------------------------------------------------------
@@ -133,6 +157,24 @@ def use_korean_font():
     return None
 
 
+def korean_font_path(size: int = 18):
+    """PIL `ImageFont` 로 쓸 한글 TTF 경로. `cv2.putText` 는 Hershey 폰트뿐이라 한글을 못
+    그린다(빈 네모나 깨진 기호로 나온다) — 그래서 bbox 라벨은 cv2가 아니라 PIL 로 그린다.
+
+    개발 환경(Windows)의 맑은 고딕을 우선 찾고, 없으면 None(호출부가 fallback 처리)."""
+    from PIL import ImageFont
+
+    for candidate in (
+        r"C:\Windows\Fonts\malgun.ttf",
+        r"C:\Windows\Fonts\malgunbd.ttf",
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+        "/System/Library/Fonts/Supplemental/AppleGothic.ttf",
+    ):
+        if Path(candidate).is_file():
+            return ImageFont.truetype(candidate, size)
+    return None
+
+
 def list_images(image_dir=SHARED_IMAGE_DIR):
     """공용 이미지 폴더의 이미지 목록(하위 폴더 포함, 정렬)."""
     image_dir = Path(image_dir)
@@ -148,6 +190,68 @@ def containment(a: np.ndarray, b: np.ndarray) -> float:
     if area == 0:
         return 0.0
     return float(np.logical_and(a_bool, b.astype(bool)).sum() / area)
+
+
+# --------------------------------------------------------------------------
+# 크롭 기반 의류 게이트 — "의류만 세그먼트한 상태에서 탐지"
+# --------------------------------------------------------------------------
+# 이전 버전은 하자 탐지와 같은 임계치(0.30)로 "clothing" 을 찾아 마스크 겹침만으로 걸렀는데,
+# 그 임계치를 못 넘으면 의류를 아예 못 찾아 필터가 통째로 no-op 됐다(원인은
+# BACKEND_THRESHOLDS 의 garment_score/garment_prob 주석 참고). 지금은 관대한 전용 임계치로
+# 의류 영역을 먼저 찾고, **그 bbox 로 이미지 자체를 잘라 그 안에서만** 하자 프롬프트를
+# 돌린다 — 배경(바닥·소품)이 애초에 모델 입력에 들어가지 않는다.
+
+
+def pick_largest(instances):
+    """마스크 면적이 가장 큰 인스턴스 1개. 여러 조각으로 나뉘어 잡혀도 '진짜 의류'를 고르기 위함."""
+    if not instances:
+        return None
+    return max(instances, key=lambda d: int(d["mask"].sum()))
+
+
+def pad_bbox_clamped(bbox, pad_ratio, image_size):
+    """bbox 를 pad_ratio 만큼 넓히고 이미지 경계 안으로 clamp. image_size = (width, height)."""
+    img_w, img_h = image_size
+    x1, y1, x2, y2 = bbox
+    pad_x = int((x2 - x1) * pad_ratio) + 1
+    pad_y = int((y2 - y1) * pad_ratio) + 1
+    return [
+        max(0, int(x1) - pad_x),
+        max(0, int(y1) - pad_y),
+        min(img_w, int(x2) + pad_x),
+        min(img_h, int(y2) + pad_y),
+    ]
+
+
+def remap_instances_to_full(instances, crop_box, full_size):
+    """크롭 좌표계의 인스턴스를 원본 이미지 좌표계로 되돌린다(bbox 오프셋 + mask 캔버스 배치).
+
+    full_size = (width, height). 다운스트림(오버레이·§8 crop 등)이 전부 '원본 이미지 좌표'를
+    전제하므로, 크롭 안에서 탐지한 뒤에는 반드시 이 함수로 되돌려야 한다.
+    """
+    x1, y1, x2, y2 = crop_box
+    full_w, full_h = full_size
+    out = []
+    for inst in instances:
+        bx1, by1, bx2, by2 = inst["bbox"]
+        new_inst = dict(inst)
+        new_inst["bbox"] = [bx1 + x1, by1 + y1, bx2 + x1, by2 + y1]
+        full_mask = np.zeros((full_h, full_w), dtype=np.uint8)
+        crop_h, crop_w = inst["mask"].shape
+        full_mask[y1 : y1 + crop_h, x1 : x1 + crop_w] = inst["mask"]
+        new_inst["mask"] = full_mask
+        out.append(new_inst)
+    return out
+
+
+def remap_mask_to_full(mask, crop_box, full_size):
+    """크롭 좌표계의 마스크 1장을 원본 크기 캔버스로 되돌린다."""
+    x1, y1, _, _ = crop_box
+    full_w, full_h = full_size
+    full_mask = np.zeros((full_h, full_w), dtype=np.uint8)
+    crop_h, crop_w = mask.shape
+    full_mask[y1 : y1 + crop_h, x1 : x1 + crop_w] = mask
+    return full_mask
 
 
 def filter_by_garment(instances, garment_mask, min_overlap=GARMENT_OVERLAP_MIN):
@@ -202,6 +306,48 @@ def renumber(instances):
     return ordered
 
 
+# --------------------------------------------------------------------------
+# 시각화 — 두 노트북이 **같은 함수**로 그려야 그림도 눈으로 비교가 된다
+# --------------------------------------------------------------------------
+def draw_numbered_boxes(pil_image, instances, box_color=(255, 0, 0), thickness=4):
+    """confidence 내림차순 1,2,3… 번호 + 한글 유형 라벨 + 빨간 박스. RGB ndarray 반환.
+
+    `cv2.putText` 는 Hershey 폰트만 지원해 한글을 그리지 못한다(빈 네모/깨진 기호로 나온다).
+    그래서 박스는 OpenCV로, **라벨 텍스트는 PIL** 로 그린다. box_color 는 PIL 기준 RGB.
+    """
+    from PIL import Image as PILImage
+    from PIL import ImageDraw
+
+    import cv2
+
+    canvas = np.array(pil_image).copy()
+    ordered = sorted(instances, key=lambda d: d["confidence"], reverse=True)
+
+    for inst in ordered:
+        x1, y1, x2, y2 = (int(v) for v in inst["bbox"])
+        cv2.rectangle(canvas, (x1, y1), (x2, y2), box_color, thickness)
+
+    pil_canvas = PILImage.fromarray(canvas)
+    draw = ImageDraw.Draw(pil_canvas)
+    font_size = max(14, int(0.022 * max(pil_canvas.size)))
+    font = korean_font_path(font_size)
+
+    if font is None:
+        print("[주의] 한글 TTF 폰트를 못 찾았습니다 — 라벨이 기본 폰트로 그려져 한글이 깨집니다.")
+
+    for no, inst in enumerate(ordered, start=1):
+        x1, y1, _, _ = (int(v) for v in inst["bbox"])
+        label_ko = KOREAN_LABELS.get(inst["type"], inst["type"])
+        text = f"{no}. {label_ko} {inst['confidence']:.2f}"
+        box = draw.textbbox((0, 0), text, font=font)  # font=None 이면 PIL 기본 비트맵 폰트
+        tw, th = box[2] - box[0], box[3] - box[1]
+        ty = max(y1 - th - 6, 0)
+        draw.rectangle([x1, ty, x1 + tw + 8, ty + th + 6], fill=box_color)
+        draw.text((x1 + 4, ty + 2), text, fill=(255, 255, 255), font=font)
+
+    return np.array(pil_canvas)
+
+
 def decide_verdict(instances, thresholds=VERDICT_THRESHOLDS):
     """인스턴스별 confidence 최댓값으로 PASS / REVIEW / FAIL 판정. (verdict, peak) 반환."""
     review_at, fail_at = thresholds
@@ -214,6 +360,15 @@ def decide_verdict(instances, thresholds=VERDICT_THRESHOLDS):
 
 
 def to_serializable(instances):
-    """mask(ndarray)를 뺀 JSON 직렬화 가능한 형태로 변환."""
+    """mask(ndarray)를 뺀 JSON 직렬화 가능한 형태로 변환.
+
+    `type` 은 코드(STAIN 등)로 그대로 두고 `label` 에 한글 표시명을 별도로 담는다 —
+    FE 전달 스키마(안)이 `defect_type` + `label` 두 필드로 나눈 것과 같은 이유다.
+    """
     fields = ("no", "type", "prompt", "bbox", "confidence", "garment_overlap")
-    return [{k: d[k] for k in fields if k in d} for d in instances]
+    out = []
+    for d in instances:
+        row = {k: d[k] for k in fields if k in d}
+        row["label"] = KOREAN_LABELS.get(d["type"], d["type"])
+        out.append(row)
+    return out
