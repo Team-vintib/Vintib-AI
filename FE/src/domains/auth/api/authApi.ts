@@ -46,7 +46,7 @@ export const signUp = async (request: SignUpRequest) => {
 }
 
 export const login = async (request: LoginRequest) => {
-  const { data } = await http.post<ApiResponse<LoginResponse>>('/auth/login', request)
+  const { data } = await http.post<ApiResponse<LoginResponse>>('/auth/signin', request)
 
   return data
 }
