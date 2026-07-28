@@ -25,6 +25,15 @@ const rootComponent = computed(() => (props.to ? RouterLink : 'article'))
 const isScheduled = computed(() => props.variant === 'scheduled')
 const rootClass = computed(() => (isScheduled.value ? 'schedule-card' : 'live-card'))
 const rootProps = computed(() => (props.to ? { to: props.to } : {}))
+const fallbackImageUrl =
+  'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=80'
+
+const handleImageError = (event: Event) => {
+  if (event.target instanceof HTMLImageElement) {
+    event.target.onerror = null
+    event.target.src = fallbackImageUrl
+  }
+}
 
 const formatSchedule = (value?: string) => {
   if (!value) {
@@ -48,6 +57,7 @@ const formatSchedule = (value?: string) => {
         :class="isScheduled ? 'schedule-card__image' : 'live-card__image'"
         :src="live.thumbnailUrl"
         :alt="live.title"
+        @error="handleImageError"
       />
       <span v-if="isScheduled" class="schedule-card__time">
         {{ formatSchedule(live.scheduledAt) }}

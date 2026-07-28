@@ -24,6 +24,16 @@ withDefaults(
   },
 )
 
+const fallbackImageUrl =
+  'https://images.unsplash.com/photo-1516762689617-e1cffcef479d?auto=format&fit=crop&w=900&q=80'
+
+const handleImageError = (event: Event) => {
+  if (event.target instanceof HTMLImageElement) {
+    event.target.onerror = null
+    event.target.src = fallbackImageUrl
+  }
+}
+
 const formatPrice = (value?: number) => {
   if (value === undefined) {
     return '가격 확인'
@@ -39,7 +49,12 @@ const formatPrice = (value?: number) => {
       <span class="product-card__overlay-text">{{ product.title }} 상세 보기</span>
     </RouterLink>
     <span class="product-card__media">
-      <img class="product-card__image" :src="product.primaryImageUrl" :alt="product.title" />
+      <img
+        class="product-card__image"
+        :src="product.primaryImageUrl"
+        :alt="product.title"
+        @error="handleImageError"
+      />
       <span
         v-if="badgeLabel"
         class="product-card__tag"

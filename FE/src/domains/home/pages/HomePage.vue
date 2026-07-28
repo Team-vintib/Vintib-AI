@@ -22,7 +22,7 @@ const loadHomeData = async () => {
   errorMessage.value = ''
 
   try {
-    homeData.value = await getHomeViewData()
+    homeData.value = await getHomeViewData({ isAuthenticated: authStore.isAuthenticated })
   } catch {
     errorMessage.value = '홈 데이터를 불러오지 못했습니다.'
   } finally {
