@@ -8,6 +8,7 @@ import aiofiles
 import redis
 from fastapi import APIRouter, File, Header, HTTPException, Query, UploadFile
 
+from app.chat import rag_store
 from app.core.config import settings
 from app.gateway.schemas import FeatureType, Job, JobResult, new_job
 
@@ -45,6 +46,25 @@ def _check_worker_key(x_api_key: str | None):
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _ingest_stt_result(result: dict) -> None:
+    """STT 워커 결과(텍스트+임베딩)를 pgvector에 저장한다. 계산은 워커가 이미 끝냈으므로
+    여기선 통과만 시킨다(`AI/docs/chat-rag-storage.md`).
+
+    저장 실패가 job 제출 자체를 실패로 만들면 안 된다 — 워커 입장에선 전사는 이미 끝난
+    일이라, 저장소 장애 때문에 재시도 루프를 돌게 하지 않는다(다른 도메인의 그라운딩
+    실패 처리와 같은 원칙, `app/chat/service.py` 참고).
+    """
+    try:
+        rag_store.save_document(
+            live_id=int(result["live_id"]),
+            source_type="stt",
+            content=result["text"],
+            embedding=result.get("embedding"),
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[gateway] STT 결과 저장 실패(live_id={result.get('live_id')}): {exc}")
 
 
 @router.get("/health")
@@ -143,6 +163,8 @@ def submit_result(
     if status == "success":
         payload = JobResult(job_id=job.job_id, status="success", result=result, worker_id=worker_id)
         r.set(f"{RESULT_PREFIX}{job.job_id}", payload.model_dump_json(), ex=RESULT_TTL_SECONDS)
+        if job.type == "stt" and result is not None:
+            _ingest_stt_result(result)
         return {"ok": True}
 
     job.retry_count += 1

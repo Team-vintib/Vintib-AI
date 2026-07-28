@@ -9,6 +9,7 @@ AI 파트의 참조 문서 모음. 실행 방법·디렉터리 구조는 `../REA
 | --- | --- |
 | EC2에 올려서 **직접 테스트**하고 싶다 | [`testing-guide.md`](./testing-guide.md) — SSH 접속, 배포 절차, API 확인 체크리스트, 트러블슈팅 |
 | 게이트웨이·워커·큐가 **어떻게 엮여 있는지** 알고 싶다 | [`infra-architecture.md`](./infra-architecture.md) — 전체 구조, 컴포넌트별 상세, 보안 설계, Job/Result 스키마 |
+| 워커 입출력이 **왜 전부 URL인지**(바이트를 직접 안 주고받는 이유) 알고 싶다 | [`worker-url-transport.md`](./worker-url-transport.md) — 워커 인바운드 제약, Redis 바이너리 금지 원칙 |
 | 가상 시착의 **다음 개선 방향**을 알고 싶다 | [`tryon-advancement-strategy.md`](./tryon-advancement-strategy.md) — 현재 한계, 적용 가능 기법, 로드맵 (`S15P11A108-195`) |
 | 라이브 댓글 관리의 **다음 개선 방향**을 알고 싶다 | [`chat-advancement-strategy.md`](./chat-advancement-strategy.md) — 실측 기반 한계점, 기법 우선순위, 스프린트 계획 (`S15P11A108-197`) |
 | 브랜드 유사도 그래프의 **다음 개선 방향**을 알고 싶다 | [`recommendation-advancement-strategy.md`](./recommendation-advancement-strategy.md) — 크롤링 텍스트 임베딩, 다면 유사도, FE 그래프 전달 설계 (`S15P11A108-199`) |

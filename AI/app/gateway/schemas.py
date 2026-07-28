@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-FeatureType = Literal["tryon", "quality_check", "chat_rag", "recommend_offline"]
+FeatureType = Literal["tryon", "quality_check", "chat_rag", "recommend_offline", "stt"]
 JobStatus = Literal["queued", "processing", "success", "failed"]
 
 
