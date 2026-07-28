@@ -20,25 +20,87 @@ const selectedSaleType = ref<ProductSaleTypeTab['id']>('ALL')
 const selectedSortOption = ref<ProductSortOption>('LATEST')
 const selectedPage = ref(1)
 const searchKeyword = ref('')
+const minimumPrice = ref('')
+const maximumPrice = ref('')
+const appliedMinimumPrice = ref<number | null>(null)
+const appliedMaximumPrice = ref<number | null>(null)
+const priceError = ref('')
 const likedProductIds = ref(
   new Set(PRODUCT_LIST_MOCK_DATA.filter((product) => product.isLiked).map((product) => product.id)),
 )
 const filterStatusMessage = ref('')
 
 const selectedFilterCount = computed(
-  () => selectedCategoryIds.value.length + selectedConditionIds.value.length,
+  () =>
+    selectedCategoryIds.value.length +
+    selectedConditionIds.value.length +
+    Number(Boolean(minimumPrice.value)) +
+    Number(Boolean(maximumPrice.value)),
 )
+
+const filteredProducts = computed(() =>
+  PRODUCT_LIST_MOCK_DATA.filter((product) => {
+    if (appliedMinimumPrice.value !== null && product.price < appliedMinimumPrice.value) {
+      return false
+    }
+
+    if (appliedMaximumPrice.value !== null && product.price > appliedMaximumPrice.value) {
+      return false
+    }
+
+    return true
+  }),
+)
+
+const parseOptionalPrice = (value: string) => {
+  if (!value) {
+    return null
+  }
+
+  const parsedPrice = Number(value)
+  return Number.isFinite(parsedPrice) ? parsedPrice : null
+}
 
 const handleFilterReset = () => {
   selectedCategoryIds.value = []
   selectedConditionIds.value = []
+  minimumPrice.value = ''
+  maximumPrice.value = ''
+  appliedMinimumPrice.value = null
+  appliedMaximumPrice.value = null
+  priceError.value = ''
+  selectedPage.value = 1
   filterStatusMessage.value = '선택한 필터를 초기화했습니다.'
 }
 
 const handleFilterApply = () => {
+  const nextMinimumPrice = parseOptionalPrice(minimumPrice.value)
+  const nextMaximumPrice = parseOptionalPrice(maximumPrice.value)
+
+  if (
+    (nextMinimumPrice !== null && nextMinimumPrice < 0) ||
+    (nextMaximumPrice !== null && nextMaximumPrice < 0)
+  ) {
+    priceError.value = '가격은 0 이상으로 입력해 주세요.'
+    return
+  }
+
+  if (
+    nextMinimumPrice !== null &&
+    nextMaximumPrice !== null &&
+    nextMinimumPrice > nextMaximumPrice
+  ) {
+    priceError.value = '최소 가격은 최대 가격보다 클 수 없습니다.'
+    return
+  }
+
+  priceError.value = ''
+  appliedMinimumPrice.value = nextMinimumPrice
+  appliedMaximumPrice.value = nextMaximumPrice
+  selectedPage.value = 1
   filterStatusMessage.value =
     selectedFilterCount.value > 0
-      ? `선택한 필터 ${selectedFilterCount.value}개를 확인했습니다.`
+      ? `선택한 필터를 적용해 상품 ${filteredProducts.value.length}개를 찾았습니다.`
       : '전체 상품 조건을 선택했습니다.'
 }
 
@@ -85,6 +147,9 @@ const handleToggleLike = (productId: number) => {
         <ProductFilterPanel
           v-model:selected-category-ids="selectedCategoryIds"
           v-model:selected-condition-ids="selectedConditionIds"
+          v-model:minimum-price="minimumPrice"
+          v-model:maximum-price="maximumPrice"
+          :price-error="priceError"
           @reset="handleFilterReset"
           @apply="handleFilterApply"
         />
@@ -107,7 +172,7 @@ const handleToggleLike = (productId: number) => {
             </div>
 
             <div class="product-list-page__toolbar">
-              <p>총 247개</p>
+              <p>총 {{ filteredProducts.length }}개</p>
               <label class="sr-only" for="product-sort">상품 정렬</label>
               <select id="product-sort" v-model="selectedSortOption">
                 <option
@@ -123,9 +188,13 @@ const handleToggleLike = (productId: number) => {
 
           <p class="sr-only" aria-live="polite">{{ filterStatusMessage }}</p>
 
-          <div class="product-list-page__grid" aria-label="상품 목록">
+          <div
+            v-if="filteredProducts.length"
+            class="product-list-page__grid"
+            aria-label="상품 목록"
+          >
             <ProductCard
-              v-for="product in PRODUCT_LIST_MOCK_DATA"
+              v-for="product in filteredProducts"
               :key="product.id"
               :product="product"
               :is-liked="likedProductIds.has(product.id)"
@@ -133,7 +202,21 @@ const handleToggleLike = (productId: number) => {
             />
           </div>
 
-          <nav class="product-list-page__pagination" aria-label="상품 목록 페이지">
+          <div v-else class="product-list-page__empty" role="status">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.8-3.8" />
+            </svg>
+            <strong>조건에 맞는 상품이 없습니다.</strong>
+            <p>가격 범위를 다시 설정하거나 필터를 초기화해 주세요.</p>
+            <button type="button" @click="handleFilterReset">필터 초기화</button>
+          </div>
+
+          <nav
+            v-if="filteredProducts.length"
+            class="product-list-page__pagination"
+            aria-label="상품 목록 페이지"
+          >
             <button type="button" aria-label="이전 페이지" disabled>
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="m15 18-6-6 6-6" />
@@ -321,6 +404,61 @@ const handleToggleLike = (productId: number) => {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-6);
+}
+
+.product-list-page__empty {
+  display: grid;
+  justify-items: center;
+  min-height: 360px;
+  place-content: center;
+  padding: var(--space-8);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.product-list-page__empty svg {
+  width: 36px;
+  height: 36px;
+  margin-bottom: var(--space-4);
+  color: var(--color-text-muted);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.6;
+}
+
+.product-list-page__empty strong {
+  color: var(--color-text-primary);
+  font-size: 18px;
+}
+
+.product-list-page__empty p {
+  margin-top: var(--space-2);
+  font-size: 14px;
+}
+
+.product-list-page__empty button {
+  min-height: var(--button-height-small);
+  margin-top: var(--space-5);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-weight: 600;
+}
+
+.product-list-page__empty button:hover {
+  border-color: var(--color-primary-hover);
+  background: var(--color-primary-hover);
+}
+
+.product-list-page__empty button:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 2px;
 }
 
 .product-list-page__pagination {

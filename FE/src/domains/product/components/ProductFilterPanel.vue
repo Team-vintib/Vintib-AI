@@ -7,6 +7,9 @@ import {
 interface Props {
   selectedCategoryIds: string[]
   selectedConditionIds: string[]
+  minimumPrice: string
+  maximumPrice: string
+  priceError: string
 }
 
 const props = defineProps<Props>()
@@ -14,6 +17,8 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   'update:selectedCategoryIds': [categoryIds: string[]]
   'update:selectedConditionIds': [conditionIds: string[]]
+  'update:minimumPrice': [price: string]
+  'update:maximumPrice': [price: string]
   reset: []
   apply: []
 }>()
@@ -42,6 +47,17 @@ const handleConditionChange = (event: Event, conditionId: string) => {
     'update:selectedConditionIds',
     toggleSelection(props.selectedConditionIds, conditionId, isSelected),
   )
+}
+
+const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
+  const value = (event.target as HTMLInputElement).value
+
+  if (target === 'minimum') {
+    emit('update:minimumPrice', value)
+    return
+  }
+
+  emit('update:maximumPrice', value)
 }
 </script>
 
@@ -81,6 +97,54 @@ const handleConditionChange = (event: Event, conditionId: string) => {
         />
         <span>{{ option.label }}</span>
       </label>
+    </fieldset>
+
+    <fieldset class="product-filter__group">
+      <legend class="product-filter__legend">가격</legend>
+
+      <div class="product-filter__price-fields">
+        <label class="product-filter__price-field">
+          <span>최소 가격</span>
+          <span class="product-filter__price-control">
+            <input
+              :value="minimumPrice"
+              type="number"
+              min="0"
+              step="1000"
+              inputmode="numeric"
+              placeholder="0"
+              :aria-invalid="Boolean(priceError)"
+              :aria-describedby="priceError ? 'product-price-error' : undefined"
+              @input="handlePriceInput($event, 'minimum')"
+            />
+            <span aria-hidden="true">P</span>
+          </span>
+        </label>
+
+        <span class="product-filter__price-separator" aria-hidden="true">–</span>
+
+        <label class="product-filter__price-field">
+          <span>최대 가격</span>
+          <span class="product-filter__price-control">
+            <input
+              :value="maximumPrice"
+              type="number"
+              min="0"
+              step="1000"
+              inputmode="numeric"
+              placeholder="제한 없음"
+              :aria-invalid="Boolean(priceError)"
+              :aria-describedby="priceError ? 'product-price-error' : undefined"
+              @input="handlePriceInput($event, 'maximum')"
+            />
+            <span aria-hidden="true">P</span>
+          </span>
+        </label>
+      </div>
+
+      <p v-if="priceError" id="product-price-error" class="product-filter__error" role="alert">
+        {{ priceError }}
+      </p>
     </fieldset>
 
     <div class="product-filter__actions">
@@ -151,6 +215,76 @@ const handleConditionChange = (event: Event, conditionId: string) => {
   outline-offset: 3px;
 }
 
+.product-filter__price-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+.product-filter__price-field {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.product-filter__price-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  height: var(--button-height-small);
+  padding-right: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.product-filter__price-control:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.product-filter__price-control input {
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0 0 0 var(--space-3);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 13px;
+}
+
+.product-filter__price-control input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.product-filter__price-control input::-webkit-inner-spin-button,
+.product-filter__price-control input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.product-filter__price-control input[type='number'] {
+  appearance: textfield;
+}
+
+.product-filter__price-separator {
+  display: none;
+}
+
+.product-filter__error {
+  margin-top: var(--space-3);
+  color: var(--color-error);
+  font-size: 12px;
+  line-height: 18px;
+}
+
 .product-filter__actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -212,6 +346,24 @@ const handleConditionChange = (event: Event, conditionId: string) => {
 
   .product-filter__legend {
     grid-column: 1 / -1;
+  }
+
+  .product-filter__price-fields,
+  .product-filter__error {
+    grid-column: 1 / -1;
+    max-width: 440px;
+  }
+
+  .product-filter__price-fields {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: end;
+    gap: var(--space-2);
+  }
+
+  .product-filter__price-separator {
+    display: block;
+    padding-bottom: 11px;
+    color: var(--color-text-muted);
   }
 
   .product-filter__actions {
