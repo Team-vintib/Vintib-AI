@@ -12,6 +12,8 @@ AI 파트의 참조 문서 모음. 실행 방법·디렉터리 구조는 `../REA
 | 가상 시착의 **다음 개선 방향**을 알고 싶다 | [`tryon-advancement-strategy.md`](./tryon-advancement-strategy.md) — 현재 한계, 적용 가능 기법, 로드맵 (`S15P11A108-195`) |
 | 라이브 댓글 관리의 **다음 개선 방향**을 알고 싶다 | [`chat-advancement-strategy.md`](./chat-advancement-strategy.md) — 실측 기반 한계점, 기법 우선순위, 스프린트 계획 (`S15P11A108-197`) |
 | 브랜드 유사도 그래프의 **다음 개선 방향**을 알고 싶다 | [`recommendation-advancement-strategy.md`](./recommendation-advancement-strategy.md) — 크롤링 텍스트 임베딩, 다면 유사도, FE 그래프 전달 설계 (`S15P11A108-199`) |
+| BE가 **AI 게이트웨이 API를 호출**해야 한다(`AiClient.java` 등) | [`api-reference.md`](./api-reference.md) — 엔드포인트 목록, 기능별 job payload/result 필드, `APIs.md`(FE↔BE)와의 관계 (`S15P11A108-371`) |
+| 결과/입력 이미지 URL의 **접근 제어**를 검토해야 한다 | [`results-access-control.md`](./results-access-control.md) — 서명된 URL / JWT 인증 / 보관기간 정책 비교, 미결정 상태 (`S15P11A108-371`) |
 
 > ⚠️ `infra-architecture.md`의 "7. 저장소 디렉토리 구조" 절은 `app/` 패키지 재구성 이전 상태로
 > 남아 있다. 현재 구조는 `../README.md`의 디렉터리 구조 절을 본다.
