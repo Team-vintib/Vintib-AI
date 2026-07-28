@@ -12,6 +12,10 @@ services:
     ports:
       - "${DB_PORT:-5432}:5432"
 
+  postgres-vector:
+    ports:
+      - "${VECTOR_DB_PORT:-5433}:5432"
+
   redis:
     ports:
       - "${REDIS_PORT:-6379}:6379"
