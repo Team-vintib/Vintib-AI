@@ -71,19 +71,38 @@ DEFECT_PROMPTS: dict[str, str] = PROMPT_SETS[ACTIVE_PROMPT_SET]
 # CLIPSeg 백엔드의 `clean fabric` 대조 정규화(`registry.clean_margin`)와 같은 발상이다.
 # 다만 SAM3 는 인스턴스 단위 출력이라 확률 감산 대신 **영역 겹침**으로 처리한다.
 #
-# ARMHOLE/NECKLINE — "a hole in fabric" 프롬프트 자체가 손상된 구멍과 암홀·넥라인 같은
-# 구조적 개구부를 구분하지 못한다(둘 다 "구멍"이라는 단어로는 같은 개념). 크롭 여부와
-# 무관하게 원본 이미지에서도 재현되는 문제라(git aa9a977, 크롭 도입 전에도 동일 프롬프트),
-# 프롬프트를 바꾸는 대신 이 개념 자체를 양성 후보로 등록해 겹침 억제로 처리한다.
-BENIGN_PROMPTS: dict[str, str] = {
+# 양성 후보를 **두 종류로 나눈다** — 억제 조건이 다르다.
+#
+# 1) 구조적 개구부(STRUCTURAL) — 암홀·넥라인·밑단·소매끝. "a hole in fabric" 프롬프트 자체가
+#    손상된 구멍과 의류가 원래 갖고 있는 개구부를 구분하지 못한다(둘 다 "구멍"이라는 단어로는
+#    같은 개념). 실측(검정 티셔츠 1장)에서 넥라인 1건 + 밑단 1건 + 소매끝 2건, 총 4건이 전부
+#    HOLE 오탐이었다 — 처음엔 암홀·넥라인만 등록했는데 밑단·소매끝은 못 걸러 범위를 넓혔다.
+#    크롭 여부와 무관하게 원본 이미지에서도 재현되는 문제다(git aa9a977, 크롭 도입 전에도
+#    동일 프롬프트로 재현됨).
+#    **이 항목들은 겹치면 confidence 비교 없이 곧바로 억제한다** — 실제 손상이 정확히 같은
+#    모양·위치로 넥라인/소매끝 자체가 될 수는 없으니, 겹침 자체가 "이건 그 구조물이다"의
+#    충분한 증거다. 아래(TEXTURE_BENIGN_PROMPTS)와 이 부분이 다른 이유다.
+#
+# 2) 질감형(TEXTURE) — 주름·접힘·그림자·솔기·프린트. 이 위에는 **실제 하자가 진짜로 생길 수
+#    있다**(솔기 근처에 실밥이 뜯기거나, 주름 접힌 자리에 오염이 앉거나). 그래서 겹침만으로
+#    억제하면 안 되고, **양성 쪽 confidence 가 하자보다 높을 때만** 억제한다 — 확신이 더 강한
+#    쪽을 믿는다는 원칙이다.
+STRUCTURAL_BENIGN_PROMPTS: dict[str, str] = {
+    "ARMHOLE": "an armhole opening",
+    "NECKLINE": "a neckline opening",
+    "HEM": "a garment hem edge",
+    "CUFF": "a sleeve cuff opening",
+}
+
+TEXTURE_BENIGN_PROMPTS: dict[str, str] = {
     "WRINKLE": "a wrinkle on fabric",
     "FOLD": "a fold in fabric",
     "SHADOW": "a shadow",
     "SEAM": "a seam",
     "PRINT": "a printed pattern on fabric",
-    "ARMHOLE": "an armhole opening",
-    "NECKLINE": "a neckline opening",
 }
+
+BENIGN_PROMPTS: dict[str, str] = {**STRUCTURAL_BENIGN_PROMPTS, **TEXTURE_BENIGN_PROMPTS}
 
 # 의류 영역 게이트 — 배경(바닥·소품) 탐지를 구조적으로 걷어낸다.
 # 005 계획 §고도화 경로 3(의류 영역 마스크로 배경 제외)에 해당한다.
@@ -162,6 +181,8 @@ KOREAN_LABELS: dict[str, str] = {
     "PRINT": "프린트",
     "ARMHOLE": "암홀",
     "NECKLINE": "넥라인",
+    "HEM": "밑단",
+    "CUFF": "소매 끝단",
 }
 
 
@@ -302,21 +323,29 @@ def filter_by_garment(instances, garment_mask, min_overlap=GARMENT_OVERLAP_MIN):
     return kept, dropped
 
 
-def suppress_benign(defects, benigns, min_containment=BENIGN_CONTAINMENT):
-    """주름·접힘·그림자 등 정상 영역에 잠긴 하자 인스턴스를 억제한다.
+def suppress_benign(
+    defects,
+    benigns,
+    min_containment=BENIGN_CONTAINMENT,
+    unconditional_types=frozenset(STRUCTURAL_BENIGN_PROMPTS),
+):
+    """정상 영역에 잠긴 하자 인스턴스를 억제한다. 억제 조건이 양성 종류에 따라 다르다.
 
-    억제 조건은 두 가지를 모두 만족할 때다:
-      1. 하자 마스크가 양성 마스크에 `min_containment` 이상 잠겨 있고,
-      2. **양성 쪽 confidence 가 하자 쪽보다 높다.**
-
-    2번이 없으면 주름 위에 실제로 생긴 오염까지 지워진다. 같은 모델의 같은 sigmoid 스케일이라
-    두 점수를 비교하는 것 자체는 성립한다.
+    - **구조적 개구부**(`unconditional_types` — 기본은 STRUCTURAL_BENIGN_PROMPTS: 암홀·넥라인·
+      밑단·소매끝) — 겹치기만 하면(`min_containment` 이상) confidence 비교 없이 곧바로
+      억제한다. 실제 손상이 정확히 그 구조물 자체와 같은 모양·위치일 수는 없으니, 겹침 자체가
+      "이건 그 구조물이다"의 충분한 증거다.
+    - **질감형**(그 외 — 주름·접힘·그림자·솔기·프린트) — 겹침 + **양성 쪽 confidence 가 하자
+      쪽보다 높을 때만** 억제한다. 이 위에는 실제 하자가 진짜로 생길 수 있어서(솔기 근처 실밥
+      뜯김, 주름 자리 오염), 확신이 더 강한 쪽을 믿는다는 원칙이다. 이 조건이 없으면 주름 위에
+      실제로 생긴 오염까지 지워진다.
     """
     kept, dropped = [], []
     for inst in defects:
         hit = None
         for benign in benigns:
-            if benign["confidence"] < inst["confidence"]:
+            structural = benign["type"] in unconditional_types
+            if not structural and benign["confidence"] < inst["confidence"]:
                 continue
             if containment(inst["mask"], benign["mask"]) >= min_containment:
                 hit = benign
