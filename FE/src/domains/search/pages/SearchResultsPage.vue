@@ -701,16 +701,6 @@ const toggleFollow = async (memberId: number) => {
 const formatPrice = (value: number) => `${value.toLocaleString('ko-KR')}P`
 const getSaleTypeLabel = (product: SearchProductResult) =>
   product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'
-const getProductActivityLabel = (product: SearchProductResult) => {
-
-
-  if (product.saleType === 'AUCTION') {
-    const bidCount = product.bidCount ?? 0
-    const timeLeftLabel = product.timeLeftLabel ?? '마감 임박'
-
-  }
-
-}
 </script>
 
 <template>
@@ -978,9 +968,6 @@ const getProductActivityLabel = (product: SearchProductResult) => {
                           {{ getSaleTypeLabel(product) }}
                         </span>
                       </div>
-                      <p class="search-product-card__activity-text">
-                        {{ getProductActivityLabel(product) }}
-                      </p>
                     </div>
                   </article>
                 </div>
@@ -1699,12 +1686,6 @@ const getProductActivityLabel = (product: SearchProductResult) => {
 .search-product-card__badge--auction {
   background: var(--color-auction-soft);
   color: var(--color-auction);
-}
-
-.search-product-card__activity-text {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
-  line-height: 20px;
 }
 
 @media (max-width: 1180px) {
