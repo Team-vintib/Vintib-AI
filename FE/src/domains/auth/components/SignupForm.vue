@@ -11,6 +11,7 @@ import {
 import EmailVerificationField from '@/domains/auth/components/EmailVerificationField.vue'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
+import type { ApiErrorBody } from '@/shared/types/api.types'
 import {
   isEmail,
   isRequired,
@@ -21,6 +22,7 @@ import {
 
 type SignupField = 'name' | 'email' | 'verificationCode' | 'password' | 'passwordConfirm'
 type AgreementField = 'serviceTerms' | 'privacyPolicy' | 'marketing'
+type ServerSignupField = Extract<SignupField, 'name' | 'email' | 'password'>
 
 interface SignupFormState {
   name: string
@@ -130,6 +132,12 @@ const canRequestVerificationCode = computed(
   () => isEmail(form.email) && isCurrentEmailDuplicateChecked.value,
 )
 const canConfirmVerificationCode = computed(() => isVerificationCode(form.verificationCode))
+const serverFieldMap: Partial<Record<string, ServerSignupField | 'verificationCode'>> = {
+  name: 'name',
+  email: 'email',
+  password: 'password',
+  verificationToken: 'verificationCode',
+}
 
 const getFieldError = (field: SignupField) => {
   if (field === 'name') {
@@ -318,8 +326,12 @@ const handleSendVerificationCode = async () => {
 
   isSendingVerificationCode.value = true
   emailVerificationMessage.value = ''
+  form.verificationCode = ''
   errors.email = ''
   errors.verificationCode = ''
+  verificationToken.value = ''
+  verifiedEmail.value = ''
+  isEmailVerified.value = false
 
   try {
     const response = await sendEmailVerificationCode({ email: normalizedEmail.value })
@@ -475,7 +487,7 @@ const handleSubmit = async () => {
     })
 
     if (!response.success) {
-      applySignUpError(response.error?.code, response.error?.message)
+      applySignUpError(response.error)
       return
     }
 
@@ -488,7 +500,7 @@ const handleSubmit = async () => {
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
-    applySignUpError(apiError.code, apiError.message)
+    applySignUpError(apiError)
   } finally {
     isSubmitting.value = false
   }
@@ -506,7 +518,10 @@ const handleMoveToLogin = async () => {
   await router.push({ name: ROUTE_NAMES.AUTH_LOGIN })
 }
 
-const applySignUpError = (code?: string, message?: string) => {
+const applySignUpError = (apiError?: ApiErrorBody | null) => {
+  const code = apiError?.code
+  const message = apiError?.message
+
   if (code === 'U003') {
     applyDuplicateEmailError(message)
     return
@@ -519,11 +534,37 @@ const applySignUpError = (code?: string, message?: string) => {
   }
 
   if (code === 'C001') {
-    submitError.value = message || '입력값을 다시 확인해 주세요.'
+    applySignUpFieldErrors(apiError)
     return
   }
 
   submitError.value = message || '회원가입을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+}
+
+const applySignUpFieldErrors = (apiError?: ApiErrorBody | null) => {
+  const mappedFields: SignupField[] = []
+  const unmappedReasons: string[] = []
+
+  apiError?.errors?.forEach((fieldError) => {
+    const field = serverFieldMap[fieldError.field]
+
+    if (!field) {
+      unmappedReasons.push(fieldError.reason)
+      return
+    }
+
+    touched[field] = true
+    errors[field] = fieldError.reason
+    mappedFields.push(field)
+  })
+
+  if (mappedFields.length === 0) {
+    submitError.value =
+      unmappedReasons[0] || apiError?.message || '입력값을 다시 확인해 주세요.'
+    return
+  }
+
+  submitError.value = unmappedReasons[0] || apiError?.message || ''
 }
 
 const applyDuplicateEmailError = (message?: string) => {

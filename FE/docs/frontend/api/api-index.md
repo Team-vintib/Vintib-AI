@@ -6,6 +6,7 @@ Swagger 제공 전까지는 임시 후보를 사용합니다. 실제 구현 시 
 
 | 기능                 | Method | endpoint                      | 요청                                             | 응답                                              | 상태          |
 | -------------------- | ------ | ----------------------------- | ------------------------------------------------ | ------------------------------------------------- | ------------- |
+| 이메일 중복 확인     | POST   | `/api/auth/email/check-duplicate` | `email`                                       | `null`                                            | AUTH-001 연동 |
 | 이메일 인증코드 발송 | POST   | `/api/auth/email/send-code`   | `email`                                          | `null`                                            | AUTH-001 연동 |
 | 이메일 인증코드 확인 | POST   | `/api/auth/email/verify-code` | `email`, `code`                                  | `verificationToken`                               | AUTH-001 연동 |
 | 이메일 회원가입      | POST   | `/api/auth/signup`            | `name`, `email`, `password`, `verificationToken` | `id`, `email`, `name`, `onboardingCompleted`      | AUTH-001 연동 |
@@ -62,6 +63,19 @@ Content-Type: application/json
 AUTH-001에서 실제 연동한 계약입니다. 공통 응답은 `ApiResponse<T>` envelope를 사용합니다.
 
 ```http
+POST /api/auth/email/check-duplicate
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+성공하면 같은 이메일로 인증코드 발송 버튼과 인증코드 입력창을 활성화합니다.
+
+```http
 POST /api/auth/email/send-code
 Content-Type: application/json
 ```
@@ -106,6 +120,7 @@ Content-Type: application/json
 - `U007`: 인증 시도 횟수 초과
 - `U008`: 인증코드 요청 횟수 초과
 - `C001`: 입력값 검증 실패
+- 이메일 입력값이 바뀌면 중복 확인, 인증코드 발송, 인증 완료, `verificationToken` 상태를 모두 초기화합니다.
 - 로컬 Docker 환경에서 이메일 발송 500이 발생하면 BE 컨테이너에 `MAIL_*` 환경변수가 주입되는지 확인해야 합니다.
 
 ## 온보딩/내 정보

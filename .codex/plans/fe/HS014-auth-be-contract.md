@@ -49,6 +49,51 @@
 - [x] 중복 이메일이면 기존처럼 로그인 이동 CTA와 이메일 오류를 표시한다.
 - [x] `npm run type-check`, `npm run build`로 검증한다.
 
+## AUTH-001 회원가입 BE 연동 실행 계획
+
+이번 단계는 로그인 연동을 제외하고 이메일 회원가입만 실제 BE 계약에 맞춰 마무리한다.
+
+- [x] 회원가입 API 함수 경로를 최종 점검한다.
+  - `checkEmailDuplicate`: `POST /auth/email/check-duplicate`
+  - `sendEmailVerificationCode`: `POST /auth/email/send-code`
+  - `verifyEmailCode`: `POST /auth/email/verify-code`
+  - `signUp`: `POST /auth/signup`
+- [x] 요청 payload를 BE DTO와 맞춘다.
+  - 중복 확인/인증코드 발송: `{ email }`
+  - 인증코드 확인: `{ email, code }`
+  - 회원가입: `{ email, password, name, verificationToken }`
+- [x] 응답 envelope 처리를 점검한다.
+  - 모든 응답은 `ApiResponse<T>` 기준으로 처리한다.
+  - `checkEmailDuplicate`, `sendEmailVerificationCode` 성공 `data`는 `null`로 처리한다.
+  - `verifyEmailCode` 성공 시 `data.verificationToken`을 저장한다.
+  - `signUp` 성공 시 `data.onboardingCompleted`가 `false`이면 온보딩 기본정보 화면으로 이동한다.
+- [x] 회원가입 화면 상태 흐름을 실제 API 실패 케이스 기준으로 점검한다.
+  - 중복 확인 성공 전에는 인증코드 발송/입력/확인 불가
+  - 이메일 변경 시 중복 확인/인증코드/인증 토큰 초기화
+  - 인증코드 재발송 시 기존 코드 입력값과 인증 토큰 초기화
+  - 인증 완료 후 이메일 입력 잠금
+- [x] BE 오류 코드별 메시지를 회원가입 화면에 매핑한다.
+  - `U003`: 이메일 필드 오류 + 로그인하기 CTA
+  - `U005`: 인증코드 오류
+  - `U006`: 인증 토큰 만료/불일치로 인증 상태 초기화
+  - `U007`: 인증 시도 횟수 초과, 재발송 안내
+  - `U008`: 이메일 필드 또는 상태 메시지에 재요청 제한 안내
+  - `C001`: 서버 검증 실패, field errors가 있으면 해당 필드에 표시
+- [x] API 문서를 실제 회원가입 흐름에 맞춰 갱신한다.
+  - `FE/docs/frontend/api/api-index.md` 인증 표에 이메일 중복 확인 행 추가
+  - 이메일 회원가입 섹션에 중복 확인 단계를 추가
+  - `FE/docs/frontend/screens/AUTH-001/requirements.md`에 현재 UX 흐름 반영
+- [ ] 로컬 수동 검증 시나리오를 확인한다.
+  - BE 미기동 상태에서 네트워크 오류 표시
+  - 중복 이메일이면 로그인 CTA 표시
+  - 사용 가능한 이메일이면 인증코드 발송 버튼 활성화
+  - 인증코드 발송 성공 후 코드 입력/확인 가능
+  - 인증 성공 후 가입하기 가능
+  - 가입 성공 후 `/onboarding/basic-info` 이동
+- [x] 최종 검증을 실행한다.
+  - `npm run type-check`
+  - `npm run build`
+
 ## 구현 목록
 
 - [ ] `FE/src/domains/auth/api/authApi.ts`의 로그인 endpoint를 `/auth/signin`으로 변경한다.
