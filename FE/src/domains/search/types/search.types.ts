@@ -1,5 +1,7 @@
 export type SearchResultTabId = 'all' | 'product' | 'live' | 'member'
 
+export type SearchStateKind = 'initial' | 'loading' | 'empty' | 'filter-empty' | 'error' | 'price-error'
+
 export interface SearchProductResult {
   id: number
   brand: string
@@ -46,4 +48,10 @@ export interface SearchResultTab {
   id: SearchResultTabId
   label: string
   count: number
+}
+
+export interface SearchStateContent {
+  title: string
+  description: string
+  actionLabel?: string
 }
