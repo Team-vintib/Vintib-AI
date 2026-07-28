@@ -170,11 +170,20 @@ console.log(health.backend); // "UP"
 
 **JWT 인증이 붙어 있습니다.** 위 표에서 "인증 **필요**"인 API는 토큰 없이 호출하면 `401`이 납니다.
 
-1. `POST /api/auth/signin`으로 로그인하면 액세스 토큰과 리프레시 토큰이 나옵니다.
-2. 이후 요청 헤더에 `Authorization: Bearer <액세스 토큰>`을 붙입니다.
-3. 액세스 토큰이 만료되면(15분) `POST /api/auth/reissue`로 재발급받습니다.
+가입·인증 과정에서 토큰처럼 생긴 값이 두 번 나오는데, **용도가 서로 다릅니다.** 헷갈리기 쉬운 부분이라 정리합니다.
 
-> ⚠️ **Swagger 화면에는 아직 `Authorize` 버튼이 없습니다.** 인증 스키마를 문서에 등록하지 않아서, Swagger의 `Try it out`으로는 인증이 필요한 API를 호출할 수 없습니다. 지금은 `curl`이나 Postman에서 헤더를 직접 붙여 테스트해 주세요. 버튼이 필요하시면 백엔드에 말씀해 주시면 추가하겠습니다.
+| 값 | 어디서 나오나 | 용도 |
+| --- | --- | --- |
+| `verificationToken` | `POST /api/auth/email/verify-code` (인증코드 확인) | **회원가입 전용, 1회성.** `POST /api/auth/signup` 요청에 실어 보내는 용도일 뿐, API 인증에는 못 씁니다. |
+| `accessToken` / `refreshToken` | `POST /api/auth/signin` (로그인) | **실제 API 인증용.** 이 값을 `Authorization` 헤더에 넣어야 인증 필요한 API를 호출할 수 있습니다. |
+
+즉 회원가입(`signup`)이 끝났다고 바로 토큰이 생기는 게 아니라, **가입 후 로그인(`signin`)을 한 번 더 호출해야** `accessToken`을 받습니다.
+
+1. `POST /api/auth/signin`으로 로그인하면 `accessToken`/`refreshToken`이 나옵니다.
+2. 이후 요청 헤더에 `Authorization: Bearer <accessToken>`을 붙입니다.
+3. `accessToken`이 만료되면(15분) `POST /api/auth/reissue`로 재발급받습니다.
+
+**Swagger 화면에 `Authorize` 버튼이 생겼습니다.** 우측 상단 자물쇠 아이콘을 클릭 → `signin` 응답의 `accessToken` 값을 **`Bearer ` 접두어 없이** 그대로 붙여넣고 Authorize → Close 하면, 이후 `Try it out`으로 호출하는 모든 요청에 `Authorization` 헤더가 자동으로 실립니다. 더 이상 `curl`/Postman에서 헤더를 직접 붙일 필요 없습니다.
 
 명시된 것 외의 모든 경로는 기본적으로 **인증이 필요합니다.** 새 API가 추가되면 공개 여부를 따로 안내드립니다.
 

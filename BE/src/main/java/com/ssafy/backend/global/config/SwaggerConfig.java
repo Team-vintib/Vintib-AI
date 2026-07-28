@@ -1,7 +1,10 @@
 package com.ssafy.backend.global.config;
 
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -12,12 +15,25 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SwaggerConfig {
 
+    private static final String BEARER_SCHEME_NAME = "bearerAuth";
+
     @Bean
     public OpenAPI vintibOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
                         .title("VinTib API")
                         .description("빈티지·세컨핸드 의류 라이브 경매 플랫폼 백엔드 API")
-                        .version("v0.1"));
+                        .version("v0.1"))
+                // swagger-ui 우측 상단 "Authorize" 버튼. 로그인/재발급 응답의 accessToken을
+                // "Bearer " 접두어 없이 그대로 붙여넣으면 이후 모든 요청에 Authorization 헤더가 실린다.
+                .addSecurityItem(new SecurityRequirement().addList(BEARER_SCHEME_NAME))
+                .components(new Components()
+                        .addSecuritySchemes(
+                                BEARER_SCHEME_NAME,
+                                new SecurityScheme()
+                                        .name(BEARER_SCHEME_NAME)
+                                        .type(SecurityScheme.Type.HTTP)
+                                        .scheme("bearer")
+                                        .bearerFormat("JWT")));
     }
 }
