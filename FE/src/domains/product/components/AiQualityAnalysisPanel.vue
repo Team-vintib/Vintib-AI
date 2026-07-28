@@ -27,61 +27,139 @@ const comparisonImageStyle = computed(() => {
 
   return detailStyles[selectedImageIndex.value] ?? detailStyles[0]
 })
+
+const statusMeta = computed(() => {
+  const statusMap = {
+    NOT_REQUESTED: {
+      label: '분석 전',
+      intro: '상품 이미지의 AI 품질 분석 준비 상태입니다.',
+      title: '아직 AI 분석 결과가 없습니다',
+      description: '상품 이미지 분석이 시작되면 이 영역에서 진행 상태와 결과를 확인할 수 있습니다.',
+    },
+    ANALYZING: {
+      label: '분석 중',
+      intro: 'AI가 등록 이미지에서 눈에 보이는 하자 후보를 검토하고 있습니다.',
+      title: '상품 이미지를 분석하고 있습니다',
+      description: '이미지에서 눈에 보이는 하자 후보와 위치를 확인하고 있습니다.',
+    },
+    COMPLETED: {
+      label: '분석 완료',
+      intro: '원본 상품 이미지와 AI가 표시한 검수 이미지를 비교해 보세요.',
+      title: '',
+      description: '',
+    },
+    NO_FINDINGS: {
+      label: '분석 결과 없음',
+      intro: 'AI 품질 분석 결과와 참고 안내를 확인해 주세요.',
+      title: '눈에 띄는 하자 후보를 찾지 못했습니다',
+      description:
+        '등록 이미지에서 분석 가능한 범위의 하자 후보가 확인되지 않았습니다. 실제 상품 상태는 상세 설명과 판매자 고지를 함께 확인해 주세요.',
+    },
+    FAILED: {
+      label: '분석 실패',
+      intro: '분석이 완료되지 않아 AI 검수 이미지를 표시할 수 없습니다.',
+      title: 'AI 분석을 완료하지 못했습니다',
+      description:
+        '이미지 상태가 분석에 적합하지 않거나 일시적인 시스템 오류가 발생했습니다. 상품 상세 설명과 판매자 고지를 확인해 주세요.',
+    },
+  } as const
+
+  return statusMap[props.analysis.status]
+})
+
+const statusClass = computed(() => props.analysis.status.toLowerCase().replace('_', '-'))
 </script>
 
 <template>
   <section class="ai-analysis" aria-labelledby="ai-analysis-title">
     <div class="ai-analysis__tab-heading">
       <h2 id="ai-analysis-title">AI 분석</h2>
-      <span>분석 완료</span>
+      <span :class="`ai-analysis__status--${statusClass}`">{{ statusMeta.label }}</span>
     </div>
 
-    <p class="ai-analysis__intro">
-      원본 상품 이미지와 AI가 표시한 검수 이미지를 비교해 보세요.
-    </p>
+    <p class="ai-analysis__intro">{{ statusMeta.intro }}</p>
 
-    <div class="ai-analysis__comparison" aria-live="polite">
-      <figure>
-        <figcaption>{{ selectedImage?.label ?? '대표' }} 원본 이미지</figcaption>
-        <div class="ai-analysis__image-frame">
-          <img
-            :src="analysis.originalImageUrl"
-            :alt="`${selectedImage?.label ?? '대표'} ${analysis.originalImageAlt}`"
-            :style="comparisonImageStyle"
-          />
-        </div>
-      </figure>
-
-      <figure>
-        <figcaption>
-          <span>{{ selectedImage?.label ?? '대표' }} AI 검수 이미지</span>
-          <span class="ai-analysis__reference-label">탐지 위치 표시</span>
-        </figcaption>
-        <div class="ai-analysis__image-frame">
-          <img
-            :src="analysis.analyzedImageUrl"
-            :alt="`${selectedImage?.label ?? '대표'} ${analysis.analyzedImageAlt}`"
-            :style="comparisonImageStyle"
-          />
-        </div>
-      </figure>
-    </div>
-
-    <div class="ai-analysis__description">
-      <h3>AI 분석 설명</h3>
-      <p>{{ analysis.summary }}</p>
-
-      <ul>
-        <li v-for="(finding, index) in analysis.findings" :key="finding.id">
-          <span>{{ index + 1 }}</span>
-          <div>
-            <strong>{{ finding.type }} · {{ finding.location }}</strong>
-            <p>{{ finding.description }}</p>
+    <template v-if="analysis.status === 'COMPLETED'">
+      <div class="ai-analysis__comparison" aria-live="polite">
+        <figure>
+          <figcaption>{{ selectedImage?.label ?? '대표' }} 원본 이미지</figcaption>
+          <div class="ai-analysis__image-frame">
+            <img
+              :src="analysis.originalImageUrl"
+              :alt="`${selectedImage?.label ?? '대표'} ${analysis.originalImageAlt}`"
+              :style="comparisonImageStyle"
+            />
           </div>
-        </li>
-      </ul>
+        </figure>
 
-      <p class="ai-analysis__disclaimer">
+        <figure>
+          <figcaption>
+            <span>{{ selectedImage?.label ?? '대표' }} AI 검수 이미지</span>
+            <span class="ai-analysis__reference-label">탐지 위치 표시</span>
+          </figcaption>
+          <div class="ai-analysis__image-frame">
+            <img
+              :src="analysis.analyzedImageUrl"
+              :alt="`${selectedImage?.label ?? '대표'} ${analysis.analyzedImageAlt}`"
+              :style="comparisonImageStyle"
+            />
+          </div>
+        </figure>
+      </div>
+
+      <div class="ai-analysis__description">
+        <h3>AI 분석 설명</h3>
+        <p>{{ analysis.summary }}</p>
+
+        <ul>
+          <li v-for="(finding, index) in analysis.findings" :key="finding.id">
+            <span>{{ index + 1 }}</span>
+            <div>
+              <strong>{{ finding.type }} · {{ finding.location }}</strong>
+              <p>{{ finding.description }}</p>
+            </div>
+          </li>
+        </ul>
+
+        <p class="ai-analysis__disclaimer">
+          <span aria-hidden="true">i</span>
+          {{ analysis.disclaimer }}
+        </p>
+      </div>
+    </template>
+
+    <div
+      v-else
+      class="ai-analysis__state"
+      :class="`ai-analysis__state--${statusClass}`"
+      :aria-live="analysis.status === 'ANALYZING' ? 'polite' : undefined"
+      :role="analysis.status === 'FAILED' ? 'alert' : 'status'"
+    >
+      <div class="ai-analysis__state-icon" aria-hidden="true">
+        <span v-if="analysis.status === 'ANALYZING'" class="ai-analysis__spinner" />
+        <svg v-else-if="analysis.status === 'NO_FINDINGS'" viewBox="0 0 24 24">
+          <path d="m7 12 3 3 7-7" />
+          <circle cx="12" cy="12" r="9" />
+        </svg>
+        <svg v-else-if="analysis.status === 'FAILED'" viewBox="0 0 24 24">
+          <path d="M12 8v5m0 3.5v.5M10.3 4.6 3.2 17a2 2 0 0 0 1.7 3h14.2a2 2 0 0 0 1.7-3L13.7 4.6a2 2 0 0 0-3.4 0Z" />
+        </svg>
+        <svg v-else viewBox="0 0 24 24">
+          <path d="m12 3 1.3 4.2L17.5 9l-4.2 1.8L12 15l-1.3-4.2L6.5 9l4.2-1.8L12 3Z" />
+        </svg>
+      </div>
+
+      <h3>{{ statusMeta.title }}</h3>
+      <p>{{ statusMeta.description }}</p>
+
+      <p v-if="analysis.status === 'ANALYZING'" class="ai-analysis__state-note">
+        분석이 완료되면 원본 이미지와 검수 이미지를 함께 표시합니다.
+      </p>
+
+      <p
+        v-if="analysis.status === 'NO_FINDINGS' || analysis.status === 'FAILED'"
+        class="ai-analysis__state-disclaimer"
+      >
         <span aria-hidden="true">i</span>
         {{ analysis.disclaimer }}
       </p>
@@ -129,12 +207,140 @@ const comparisonImageStyle = computed(() => {
   line-height: 16px;
 }
 
+.ai-analysis__tab-heading .ai-analysis__status--not-requested {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+}
+
+.ai-analysis__tab-heading .ai-analysis__status--analyzing {
+  background: var(--color-ai-soft);
+  color: var(--color-ai);
+}
+
+.ai-analysis__tab-heading .ai-analysis__status--no-findings {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.ai-analysis__tab-heading .ai-analysis__status--failed {
+  background: var(--color-error-soft);
+  color: var(--color-error);
+}
+
 .ai-analysis__intro {
   padding: var(--space-5) var(--space-6) 0;
   color: var(--color-text-secondary);
   font-size: 15px;
   font-weight: 400;
   line-height: 24px;
+}
+
+.ai-analysis__state {
+  display: grid;
+  min-height: 340px;
+  align-content: center;
+  justify-items: center;
+  margin: var(--space-6);
+  padding: var(--space-10);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-secondary);
+  text-align: center;
+}
+
+.ai-analysis__state-icon {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  place-items: center;
+}
+
+.ai-analysis__state--analyzing .ai-analysis__state-icon {
+  background: var(--color-ai-soft);
+  color: var(--color-ai);
+}
+
+.ai-analysis__state--no-findings .ai-analysis__state-icon {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.ai-analysis__state--failed .ai-analysis__state-icon {
+  background: var(--color-error-soft);
+  color: var(--color-error);
+}
+
+.ai-analysis__state-icon svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.ai-analysis__spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-ai-soft);
+  border-top-color: var(--color-ai);
+  border-radius: 50%;
+  animation: ai-analysis-spin 900ms linear infinite;
+}
+
+.ai-analysis__state h3 {
+  margin-top: var(--space-5);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.ai-analysis__state > p {
+  max-width: 620px;
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.ai-analysis__state .ai-analysis__state-note {
+  margin-top: var(--space-4);
+  color: var(--color-ai);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.ai-analysis__state .ai-analysis__state-disclaimer {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  text-align: left;
+}
+
+.ai-analysis__state-disclaimer > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--color-text-muted);
+  border-radius: 50%;
+  font-family: serif;
+  font-weight: 700;
+  place-items: center;
+}
+
+@keyframes ai-analysis-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .ai-analysis__comparison {
@@ -273,6 +479,12 @@ const comparisonImageStyle = computed(() => {
   .ai-analysis__comparison,
   .ai-analysis__description ul {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-analysis__spinner {
+    animation: none;
   }
 }
 </style>

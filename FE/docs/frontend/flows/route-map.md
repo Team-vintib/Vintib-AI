@@ -92,7 +92,7 @@ flowchart TD
   ProductList["PROD-008 /products"]
   ProductDetail["PROD-006 /products/:productId"]
 
-  ProductList -. "상세 화면 구현 후 연결" .-> ProductDetail
+  ProductList -->|"상품 카드 선택"| ProductDetail
 ```
 
 ## 라우트 메타 초안
@@ -118,7 +118,7 @@ flowchart TD
 | `/search`                 | SEARCH      | false        | false     | 홈 검색 패널에서 `keyword` query로 진입, 상세 UI 대기 |
 | `/lives`                  | LIVE        | false        | false     | 라이브 목록 placeholder                          |
 | `/products`               | PROD-008    | false        | false     | 공개 상품 목록 껍데기, 실제 조회 API 연동 대기   |
-| `/products/:productId`    | PROD-006    | false        | false     | 상품 상세 placeholder                            |
+| `/products/:productId`    | PROD-006    | false        | false     | 상품 상세 408·410·412 UI, 실제 API 대기           |
 | `/products/new`           | PROD 신규   | true         | false     | 상품 등록 placeholder                            |
 | `/lives/new`              | LIVE 신규   | true         | false     | 라이브 시작 placeholder                          |
 | `/lives/:liveId`          | LIVE 시청   | false        | false     | 라이브 시청 placeholder                          |

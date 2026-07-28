@@ -70,6 +70,24 @@ AI 품질 분석 결과를 확인하고 상시 판매 구매 또는 관련 기�
 
 - 상세 로딩·오류·상품 없음·판매 완료
 - AI 분석 전·중·완료·결과 없음·실패
+- 구현 완료: 상세 골격 로딩, 조회 오류·재시도, 상품 없음·목록 이동, 판매 완료 구매 제한,
+  AI 분석 5개 상태와 상태별 비보증 안내
+
+## Mock 상태 확인
+
+실제 API 계약이 완성되기 전까지 아래 query로 한 개의 상세 route 안에서 상태를 확인한다.
+
+- `?mock=loading`
+- `?mock=error`
+- `?mock=not-found`
+- `?mock=sold`
+- `?mock=ai-not-requested`
+- `?mock=ai-analyzing`
+- `?mock=ai-no-findings`
+- `?mock=ai-failed`
+
+실제 API 연결 후에는 query가 아니라 요청 진행 여부, HTTP 오류와 응답의
+`saleStatus`·`aiQualityAnalysis.status`에 따라 같은 화면 상태를 표시한다.
 
 ## 현재 API 연결 범위
 

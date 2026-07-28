@@ -41,6 +41,10 @@ const purchaseLabel = computed(() => {
 const isPurchaseDisabled = computed(() =>
   ['DRAFT', 'SOLD', 'PRIVATE', 'AUCTION_FAILED'].includes(props.product.saleStatus),
 )
+
+const isCartDisabled = computed(() =>
+  ['DRAFT', 'SOLD', 'PRIVATE'].includes(props.product.saleStatus),
+)
 </script>
 
 <template>
@@ -99,6 +103,7 @@ const isPurchaseDisabled = computed(() =>
         :class="{ 'purchase-summary__secondary--active': isInCart }"
         type="button"
         :aria-pressed="isInCart"
+        :disabled="isCartDisabled"
         @click="emit('toggleCart')"
       >
         <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -339,6 +344,13 @@ const isPurchaseDisabled = computed(() =>
 }
 
 .purchase-summary__purchase:disabled {
+  cursor: not-allowed;
+  border-color: var(--color-border);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-muted);
+}
+
+.purchase-summary__secondary:disabled {
   cursor: not-allowed;
   border-color: var(--color-border);
   background: var(--color-surface-secondary);

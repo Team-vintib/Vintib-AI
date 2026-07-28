@@ -16,6 +16,17 @@ export type AiQualityAnalysisStatus =
   | 'NO_FINDINGS'
   | 'FAILED'
 
+export type ProductDetailMockScenario =
+  | 'default'
+  | 'loading'
+  | 'error'
+  | 'not-found'
+  | 'sold'
+  | 'ai-not-requested'
+  | 'ai-analyzing'
+  | 'ai-no-findings'
+  | 'ai-failed'
+
 export interface ProductDetailImage {
   id: string
   url: string
