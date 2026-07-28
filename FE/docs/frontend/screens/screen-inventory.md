@@ -39,3 +39,9 @@
 - URL은 사용자가 이해하기 쉬운 영문 명사 중심으로 제안합니다.
 - 인증이 필요한 화면은 라우트 가드에서 `requiresAuth` 메타를 사용합니다.
 - 미확정 이동은 구현하지 않고 `docs/frontend/decisions/open-questions.md`에 기록합니다.
+
+## 2026-07-28 화면 목록 보강
+
+| 묶음 | 화면 ID | 상태 |
+| --- | --- | --- |
+| 홈/탐색 | SEARCH-001, SEARCH-002 | `/search` route, 검색 결과 탭, 상품/라이브/회원 mock 결과, 카테고리·상태·가격·판매 유형 필터, 초기/loading/error/empty/filter-empty/price-error 상태 화면 구현. 실제 통합 검색 API 대기 |

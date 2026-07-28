@@ -1,0 +1,52 @@
+# 검색 결과 화면 API 계약 보완 요청
+
+- **요청한 파트**: FE
+- **대상 파트**: BE
+- **관련 티켓**: `S15P11A108-401`, `S15P11A108-404`
+- **관련 화면**: `SEARCH-001`, `SEARCH-002`, `/search`
+
+## 배경/이유
+
+FE 검색 결과 화면은 상품, 라이브, 회원 결과를 탭으로 구분하고 카테고리·상태·가격·판매 유형 필터를 제공하도록 구현되어 있습니다.
+현재는 실제 검색 API 계약이 없어 `domains/search`의 mock data를 클라이언트에서 필터링하고 있습니다.
+
+## 요청 내용
+
+- 통합 검색 조회 API 계약 확정을 요청합니다.
+  - 단일 endpoint 예시: `GET /api/search`
+  - 또는 상품/라이브/회원 탭별 endpoint 분리 여부 확정 필요
+- FE가 현재 사용하는 query 후보는 아래와 같습니다.
+  - `keyword`: 검색어
+  - `type`: `all | product | live | member`
+  - `categories`: 상품 카테고리 복수 선택
+  - `conditions`: 상품 상태 등급 복수 선택
+  - `saleTypes`: `DIRECT | AUCTION`
+  - `minPrice`, `maxPrice`: 가격 범위
+- 실제 API에서 확정이 필요한 항목은 아래와 같습니다.
+  - 탭별 결과 count 제공 방식
+  - pagination 요청/응답 구조
+  - `all` 탭에서 상품/라이브/회원 결과를 몇 개까지 내려줄지
+  - 상품 결과 DTO의 가격, 판매 유형, 상태 등급, 썸네일, 찜 여부 필드
+  - 라이브 결과 DTO의 상태, 시작 일시, 시청자 수, 썸네일, 연결 상품 수 필드
+  - 회원 결과 DTO의 닉네임, 프로필 이미지, 팔로워 수, 판매 상품 수, 팔로우 여부 필드
+- 검색 결과에서 필요한 사용자 액션 API 정책 확인을 요청합니다.
+  - 상품 찜 등록/해제 endpoint와 비로그인 클릭 시 처리 정책
+  - 회원 팔로우 등록/해제 endpoint와 비로그인 클릭 시 처리 정책
+  - 회원 검색 결과 카드 클릭 시 이동할 회원 프로필 route 또는 조회 endpoint
+
+## FE 임시 처리
+
+- `/search` route는 공개 접근으로 연결되어 있습니다.
+- `keyword`, `type`, 필터 query를 URL에 반영하고 mock data에서 결과를 필터링합니다.
+- `status=loading|error|empty` query는 FE 상태 화면 확인용 mock query이며 실제 API query가 아닙니다.
+- 비로그인 상태에서 찜/팔로우를 누르면 `/auth/login?redirect=...`로 이동합니다.
+- 로그인 상태의 찜/팔로우는 화면 안에서만 mock toggle 처리합니다.
+
+## 관련 자료
+
+- FE 계획: `.codex/plans/fe/SY002-search-result-tabs-states.md`
+- FE 화면: `FE/src/domains/search/pages/SearchResultsPage.vue`
+- FE 타입: `FE/src/domains/search/types/search.types.ts`
+- FE mock data: `FE/src/domains/search/constants/searchMockData.ts`
+- FE API 후보 문서: `FE/docs/frontend/api/api-index.md`
+- FE 미확정 문서: `FE/docs/frontend/decisions/open-questions.md`

@@ -125,3 +125,30 @@ flowchart TD
 | `/notifications`          | NOTI        | true         | false     | 알림센터 placeholder                             |
 | `/my`                     | MY          | true         | false     | 마이페이지 placeholder                           |
 | `/points`                 | POINT       | true         | false     | 포인트 placeholder                               |
+
+## 2026-07-28 검색 흐름 보강
+
+```mermaid
+flowchart TD
+  HomeSearch["홈 검색 패널"]
+  SearchPage["SEARCH /search?keyword=...&type=..."]
+  ProductTab["상품 결과 탭"]
+  LiveTab["라이브 결과 탭"]
+  MemberTab["회원 결과 탭"]
+  ProductDetail["/products/:productId"]
+  LiveWatch["/lives/:liveId"]
+  Login["/auth/login?redirect=..."]
+
+  HomeSearch --> SearchPage
+  SearchPage --> ProductTab
+  SearchPage --> LiveTab
+  SearchPage --> MemberTab
+  ProductTab --> ProductDetail
+  LiveTab --> LiveWatch
+  ProductTab -->|비로그인 찜| Login
+  MemberTab -->|비로그인 팔로우| Login
+```
+
+| 라우트 | 화면 | requiresAuth | guestOnly | 비고 |
+| --- | --- | --- | --- | --- |
+| `/search` | SEARCH-001/002 | false | false | `keyword`, `type`, `categories`, `conditions`, `saleTypes`, `minPrice`, `maxPrice` query 기반 검색 결과 탭/필터/상태 화면. 실제 검색 API 대기 |
