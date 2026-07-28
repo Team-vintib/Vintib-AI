@@ -197,13 +197,20 @@ BE/
 │   ├── auction/                 # 경매 조건 설정/진행 (AUCT) — 정윤
 │   │   ├── entity/              # Auction, AuctionStatus
 │   │   └── repository/
+│   ├── tryon/                    # AI 가상 시착 결과 저장/조회/삭제 (TRYON) — 서윤
+│   │   ├── controller/
+│   │   ├── service/
+│   │   ├── entity/               # TryOnResult
+│   │   ├── repository/
+│   │   └── dto/response/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
 │       ├── client/              # AiClient — Spring → FastAPI
-│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig
+│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config
 │       ├── entity/              # BaseTimeEntity 등 공통 베이스 엔티티
 │       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
 │       ├── health/              # HealthController
-│       └── response/            # ApiResponse, ErrorResponse
+│       ├── response/            # ApiResponse, ErrorResponse
+│       └── storage/             # S3StorageService, LocalS3BucketInitializer(local 전용)
 ├── src/main/resources/application.yml
 └── src/test/java/com/ssafy/backend/
 ```
@@ -213,7 +220,7 @@ BE/
 담당 분배:
 
 ```
-{auth,member,product,point,order}/   ← 서윤
+{auth,member,product,tryon,point,order}/   ← 서윤
 {live,auction,chat,home,search}/     ← 정윤
 ```
 

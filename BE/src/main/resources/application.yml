@@ -44,6 +44,12 @@ jwt:
 
 server:
   port: ${SERVER_PORT:8080}
+  # Caddy가 TLS를 종단하고 backend에는 평문 HTTP로 넘긴다. 이 설정이 없으면
+  # Spring이 요청을 그냥 http로 인식해 springdoc이 서버 URL을 http://로 잡고,
+  # 그 결과 https로 열린 Swagger UI에서 "Execute"가 스킴이 다른(=교차 출처) 요청이
+  # 되어 CORS/mixed-content로 막힌다. Caddy가 보내는 X-Forwarded-* 를 신뢰해
+  # 실제 스킴(https)을 인식하도록 한다.
+  forward-headers-strategy: framework
 
 management:
   health:
@@ -59,3 +65,21 @@ ai:
   base-url: ${AI_BASE_URL:http://localhost:8000}
   connect-timeout: 2s
   read-timeout: 5s
+
+cors:
+  # FE 로컬 개발 서버(vite, 기본 포트 5173) 기준. 배포 환경은 CORS_ALLOWED_ORIGINS 로 덮어쓴다.
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+aws:
+  region: ${AWS_REGION:us-east-1}
+  access-key: ${AWS_ACCESS_KEY_ID:}
+  secret-key: ${AWS_SECRET_ACCESS_KEY:}
+  s3:
+    # local(MinIO)만 채운다. prod는 비워서 AWS 기본 리졸버(virtual-hosted style)를 그대로 쓴다.
+    endpoint: ${AWS_S3_ENDPOINT:}
+    # 브라우저가 여는 presigned URL/공개 URL용. 비우면 endpoint를 그대로 쓴다 — docker-compose로
+    # 백엔드까지 컨테이너로 띄울 때만 endpoint(minio:9000, 컨테이너 네트워크)와
+    # public-endpoint(localhost:9000, 호스트 발행 포트)가 달라진다.
+    public-endpoint: ${AWS_S3_PUBLIC_ENDPOINT:}
+    public-bucket: ${AWS_S3_PUBLIC_BUCKET:vintib-public}
+    private-bucket: ${AWS_S3_PRIVATE_BUCKET:vintib-private}

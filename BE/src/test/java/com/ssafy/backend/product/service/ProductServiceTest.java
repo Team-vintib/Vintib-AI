@@ -43,13 +43,16 @@ class ProductServiceTest {
     private MemberRepository memberRepository;
 
     @Mock
+    private ProductImageService productImageService;
+
+    @Mock
     private Member seller;
 
     private ProductService productService;
 
     @BeforeEach
     void setUp() {
-        productService = new ProductService(productRepository, memberRepository);
+        productService = new ProductService(productRepository, memberRepository, productImageService);
     }
 
     @Test

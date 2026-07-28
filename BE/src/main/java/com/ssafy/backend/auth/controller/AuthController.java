@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "인증/회원", description = "회원가입 및 이메일 인증 API")
+@Tag(name = "인증", description = "회원가입 및 이메일 인증 API")
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -68,7 +68,7 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(new EmailVerificationTokenResponse(token)));
     }
 
-    @Operation(summary = "회원가입", description = "이메일 인증 토큰을 검증한 뒤 이메일/비밀번호/이름으로 회원가입을 완료한다.")
+    @Operation(summary = "이메일 회원가입", description = "이메일 인증 토큰을 검증한 뒤 이메일/비밀번호/이름으로 회원가입을 완료한다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "가입 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "이메일 인증이 필요함(토큰 없음/불일치/만료)"),

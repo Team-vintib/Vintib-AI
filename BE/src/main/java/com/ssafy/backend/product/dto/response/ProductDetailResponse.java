@@ -4,6 +4,7 @@ import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.entity.SaleType;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record ProductDetailResponse(
         Long id,
@@ -18,10 +19,11 @@ public record ProductDetailResponse(
         SaleType saleType,
         SaleStatus saleStatus,
         Long price,
+        List<ProductImageResponse> images,
         LocalDateTime createdAt,
         LocalDateTime updatedAt) {
 
-    public static ProductDetailResponse from(Product product) {
+    public static ProductDetailResponse from(Product product, List<ProductImageResponse> images) {
         return new ProductDetailResponse(
                 product.getId(),
                 product.getSeller().getId(),
@@ -35,6 +37,7 @@ public record ProductDetailResponse(
                 product.getSaleType(),
                 product.getSaleStatus(),
                 product.getPrice(),
+                images,
                 product.getCreatedAt(),
                 product.getUpdatedAt());
     }
