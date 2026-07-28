@@ -243,10 +243,6 @@ const resultSummary = computed(() => {
   return `'${queryKeyword.value}' 검색 결과 ${totalResultCount.value.toLocaleString('ko-KR')}건`
 })
 
-const panelTitle = computed(
-  () => resultTabs.value.find((tab) => tab.id === activeTabId.value)?.label ?? '전체',
-)
-
 const hasKeyword = computed(() => queryKeyword.value.length > 0)
 const searchState = computed<SearchStateKind | null>(() => {
   if (!hasKeyword.value) {
@@ -308,7 +304,6 @@ const stateContent = computed<SearchStateContent>(() => {
     return {
       title: '검색 결과가 없습니다.',
       description: '검색어를 다시 입력하거나 다른 유형의 결과를 확인해 보세요.',
-      actionLabel: '검색어 수정',
     }
   }
 
@@ -741,7 +736,6 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
             </template>
           </div>
 
-          <p class="search-page__panel-label">현재 탭: {{ panelTitle }}</p>
         </div>
       </div>
     </section>
@@ -993,8 +987,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
   line-height: 30px;
 }
 
-.search-page__section-header span,
-.search-page__panel-label {
+.search-page__section-header span {
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
   line-height: 20px;
@@ -1010,10 +1003,6 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 .search-page__member-list {
   display: grid;
   gap: var(--space-4);
-}
-
-.search-page__panel-label {
-  margin-top: var(--space-6);
 }
 
 .search-product-card {
@@ -1175,6 +1164,21 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
   .search-page__filters {
     width: 100%;
   }
+
+  .search-page__product-filter {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-8);
+    row-gap: var(--space-5);
+  }
+
+  .search-page__product-filter fieldset + fieldset {
+    margin-top: 0;
+  }
+
+  .search-page__filter-actions {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1197,6 +1201,12 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
   .search-page__search button {
     grid-column: 1 / -1;
     width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .search-page__product-filter {
+    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -85,9 +85,9 @@
 - [x] 필터 결과 없음 상태 화면 구현
 - [x] 오류 상태 화면과 재시도 CTA 구현
 - [x] 최소/최대 가격 범위 오류 상태 구현
-- [ ] mock view model과 실제 API 대기 항목 문서화
-- [ ] 1440px, 1024px, 720px 이하 반응형 레이아웃 확인
-- [ ] `npm run type-check`, `npm run build` 검증
+- [x] mock view model과 실제 API 대기 항목 문서화
+- [x] 1440px, 1024px, 720px 이하 반응형 레이아웃 확인
+- [x] `npm run type-check`, `npm run build` 검증
 
 ## 검증 시나리오
 
