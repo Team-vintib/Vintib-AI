@@ -42,9 +42,3 @@ Pillow>=10.0
 jupyterlab>=4.2
 ipykernel>=6.29
 nbformat>=5.10
-
-# pricing-model-check/ — GMS(SSAFY 프록시) 경유 LLM 호출. Anthropic은 공식 SDK에 base_url만
-# 갈아끼우고, Gemini는 SDK 없이 httpx로 직접 친다(규격이 달라 SDK를 섞을 이유가 없다).
-# httpx는 requirements-dev.txt 에도 있지만 여기 스파이크는 그것과 독립적으로 설치될 수 있다.
-anthropic>=0.116
-httpx>=0.28

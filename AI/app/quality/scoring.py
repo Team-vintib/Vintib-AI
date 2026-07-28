@@ -18,8 +18,8 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Sequence
 
-import registry
-from contracts import ConditionGrade, DefectType, Finding, FindingStatus
+from app.quality import registry
+from app.quality.schemas import ConditionGrade, DefectType, Finding, FindingStatus
 
 MAX_SCORE = 100.0
 
