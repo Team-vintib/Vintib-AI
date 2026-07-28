@@ -3,6 +3,7 @@ package com.ssafy.backend.product.controller;
 import com.ssafy.backend.global.response.ApiResponse;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductImageRegisterRequest;
+import com.ssafy.backend.product.dto.request.ProductImageUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUploadUrlRequest;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
@@ -131,6 +132,28 @@ public class ProductController {
         Long sellerId = (Long) authentication.getPrincipal();
         ProductImageResponse response = productImageService.registerImage(sellerId, id, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "상품 이미지 수정",
+            description = "등록된 상품 이미지의 표시 순서(sortOrder)·대표 여부(isPrimary)를 수정한다. "
+                    + "요청에 포함된 필드만 반영하는 부분 수정이다. isPrimary를 true로 바꾸면 같은 상품의 "
+                    + "다른 이미지는 자동으로 대표에서 해제된다(상품당 대표 이미지는 항상 최대 1장).")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 또는 이미지 없음")
+    })
+    @PatchMapping("/{id}/images/{imageId}")
+    public ResponseEntity<ApiResponse<ProductImageResponse>> updateImage(
+            Authentication authentication,
+            @PathVariable Long id,
+            @PathVariable Long imageId,
+            @Valid @RequestBody ProductImageUpdateRequest request) {
+        Long sellerId = (Long) authentication.getPrincipal();
+        ProductImageResponse response = productImageService.updateImage(sellerId, id, imageId, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(summary = "상품 이미지 삭제", description = "등록된 상품 이미지를 S3와 DB에서 함께 삭제한다.")

@@ -65,6 +65,7 @@
 | 상품 판매 방식 변경 | PATCH | `/products/{id}/status` | PROD-002~005, PROD-014 |
 | 상품 이미지 업로드 URL 발급 | POST | `/products/{id}/images/upload-url` | PROD-001 |
 | 상품 이미지 등록 | POST | `/products/{id}/images` | PROD-001 |
+| 상품 이미지 수정 (순서/대표 여부) | PATCH | `/products/{id}/images/{imageId}` | PROD-001 |
 | 상품 이미지 삭제 | DELETE | `/products/{id}/images/{imageId}` | PROD-001 |
 
 ## 라이브 / 채팅 (Lives)

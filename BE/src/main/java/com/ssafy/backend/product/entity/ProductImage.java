@@ -48,4 +48,16 @@ public class ProductImage {
     public boolean belongsTo(Long productId) {
         return productId != null && product.getId().equals(productId);
     }
+
+    public void changeSortOrder(Short sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
+    public void markAsPrimary() {
+        this.primary = true;
+    }
+
+    public void unmarkAsPrimary() {
+        this.primary = false;
+    }
 }

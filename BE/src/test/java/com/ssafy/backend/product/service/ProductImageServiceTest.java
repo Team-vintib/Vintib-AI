@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.global.config.S3Config.AwsProperties;
@@ -12,10 +13,12 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.storage.S3StorageService;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.product.dto.request.ProductImageRegisterRequest;
+import com.ssafy.backend.product.dto.request.ProductImageUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUploadUrlRequest;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
 import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.entity.ProductImage;
 import com.ssafy.backend.product.repository.ProductImageRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.Optional;
@@ -45,6 +48,9 @@ class ProductImageServiceTest {
 
     @Mock
     private Member seller;
+
+    @Mock
+    private Product imageProduct;
 
     private AwsProperties awsProperties;
     private ProductImageService productImageService;
@@ -146,6 +152,66 @@ class ProductImageServiceTest {
         when(productImageRepository.findById(any())).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> productImageService.deleteImage(SELLER_ID, PRODUCT_ID, 99L))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 이미지_수정시_정렬순서만_바꾼다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(imageProduct.getId()).thenReturn(PRODUCT_ID);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        ProductImage image = ProductImage.builder()
+                .product(imageProduct)
+                .imageKey("product-images/1/a.jpg")
+                .sortOrder((short) 0)
+                .primary(false)
+                .build();
+        when(productImageRepository.findById(5L)).thenReturn(Optional.of(image));
+        when(s3StorageService.publicUrl(eq(PUBLIC_BUCKET), anyString())).thenReturn("https://s3.example/a.jpg");
+
+        ProductImageResponse response = productImageService.updateImage(
+                SELLER_ID, PRODUCT_ID, 5L, new ProductImageUpdateRequest((short) 3, null));
+
+        assertThat(response.sortOrder()).isEqualTo((short) 3);
+        assertThat(response.isPrimary()).isFalse();
+    }
+
+    @Test
+    void 대표_이미지로_지정하면_같은_상품의_다른_대표를_해제한다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(imageProduct.getId()).thenReturn(PRODUCT_ID);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        ProductImage image = ProductImage.builder()
+                .product(imageProduct)
+                .imageKey("product-images/1/a.jpg")
+                .sortOrder((short) 0)
+                .primary(false)
+                .build();
+        when(productImageRepository.findById(5L)).thenReturn(Optional.of(image));
+        when(s3StorageService.publicUrl(eq(PUBLIC_BUCKET), anyString())).thenReturn("https://s3.example/a.jpg");
+
+        ProductImageResponse response = productImageService.updateImage(
+                SELLER_ID, PRODUCT_ID, 5L, new ProductImageUpdateRequest(null, true));
+
+        verify(productImageRepository).clearPrimaryExcept(PRODUCT_ID, 5L);
+        assertThat(response.isPrimary()).isTrue();
+    }
+
+    @Test
+    void 다른_상품의_이미지를_수정하려_하면_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(imageProduct.getId()).thenReturn(999L);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        ProductImage image = ProductImage.builder()
+                .product(imageProduct)
+                .imageKey("product-images/999/a.jpg")
+                .sortOrder((short) 0)
+                .primary(false)
+                .build();
+        when(productImageRepository.findById(5L)).thenReturn(Optional.of(image));
+
+        assertThatThrownBy(() -> productImageService.updateImage(
+                SELLER_ID, PRODUCT_ID, 5L, new ProductImageUpdateRequest((short) 1, null)))
                 .isInstanceOf(CustomException.class);
     }
 }

@@ -31,6 +31,7 @@
 - `ProductController`에 서브 리소스 엔드포인트 추가(모두 인증 필요, `product.isOwnedBy(sellerId)`로 소유자 검증 후 `NOT_PRODUCT_OWNER` 재사용):
   - `POST /api/products/{id}/images/upload-url` — `{fileName, contentType}` → presigned PUT URL + key 발급 (파일 1개당 1회 호출, FE가 최대 10회 반복)
   - `POST /api/products/{id}/images` — `{key, sortOrder, isPrimary}` → S3 `HeadObject` 검증 후 `ProductImage` row 생성, 총 개수 10장 제한
+  - `PATCH /api/products/{id}/images/{imageId}` — `{sortOrder?, isPrimary?}` 부분 수정(추가 구현, 사용자 요청). `isPrimary: true` 시 `ProductImageRepository.clearPrimaryExcept(productId, imageId)`로 같은 상품의 다른 이미지를 먼저 대표 해제 — 대표 이미지는 상품당 항상 최대 1장. 같은 규칙을 `registerImage`(`clearPrimary`)에도 적용해 등록 시점부터 일관되게 함.
   - `DELETE /api/products/{id}/images/{imageId}` — DB row + S3 객체 삭제
 - `ProductDetailResponse`에 `images: List<ProductImageResponse>`(`id`, `url`, `sortOrder`, `isPrimary`) 필드 추가 — 별도 목록 조회 엔드포인트 없이 상세 조회에 포함(기존 `GET /api/products/{id}`는 이미 공개 엔드포인트라 별도 permitAll 설정 불필요).
 - 신규 `ErrorCode`(P 구역 이어서 추가): `P004 PRODUCT_IMAGE_NOT_FOUND`, `P005 PRODUCT_IMAGE_LIMIT_EXCEEDED`, `P006 INVALID_IMAGE_TYPE`, `P007 PRODUCT_IMAGE_UPLOAD_NOT_CONFIRMED`(HeadObject 실패).
@@ -66,7 +67,7 @@
 - [x] `infra/ci/deploy.sh`, `.gitlab-ci.yml`: AWS 자격증명/버킷명 prod 반영 (GitLab CI/CD Variables 등록은 아직 사용자 몫 — 아래 "남은 수동 작업" 참고)
 - [x] `ProductImage` 엔티티 / `ProductImageRepository`
 - [x] 신규 `ProductImageService`: upload-url 발급, 등록(HeadObject 검증 + 개수 제한), 삭제
-- [x] `ProductController`: `POST /{id}/images/upload-url`, `POST /{id}/images`, `DELETE /{id}/images/{imageId}` (Swagger 포함)
+- [x] `ProductController`: `POST /{id}/images/upload-url`, `POST /{id}/images`, `PATCH /{id}/images/{imageId}`, `DELETE /{id}/images/{imageId}` (Swagger 포함)
 - [x] `ProductDetailResponse`에 `images` 필드 추가
 - [x] `ErrorCode`: P004~P007 추가
 - [x] `TryOnResult` 엔티티 / `TryOnResultRepository`
@@ -87,8 +88,9 @@
 1. `POST /api/products/{id}/images/upload-url` — body `{ fileName, contentType }` → 응답 `{ key, uploadUrl, expiresInSeconds }` (presigned PUT, 5분 만료). 이미지 1장당 1회 호출.
 2. FE가 응답받은 `uploadUrl`에 파일 바이너리를 **직접 PUT**(S3/MinIO로, 백엔드 경유 없음). `Content-Type` 헤더를 1단계에서 보낸 값과 동일하게 맞춰야 한다.
 3. `POST /api/products/{id}/images` — body `{ key, sortOrder, isPrimary }` → 서버가 `HeadObject`로 실제 업로드 여부·용량(10MB 이하)을 검증한 뒤 `ProductImage` row 생성. 검증 실패 시 `P006`(형식) / `P007`(업로드 미확인), 상품당 10장 초과 시 `P005`.
-4. `DELETE /api/products/{id}/images/{imageId}` — DB row + S3 객체를 함께 삭제.
-5. `GET /api/products/{id}`(기존 상세 조회) 응답에 `images: [{ id, url, sortOrder, isPrimary }]`가 포함된다. `url`은 public 버킷 고정 URL(만료 없음, presigned 아님).
+4. `PATCH /api/products/{id}/images/{imageId}` — body `{ sortOrder?, isPrimary? }`(부분 수정, 사진 재업로드 없음). `isPrimary: true`면 같은 상품의 다른 이미지를 서버가 자동으로 대표 해제.
+5. `DELETE /api/products/{id}/images/{imageId}` — DB row + S3 객체를 함께 삭제.
+6. `GET /api/products/{id}`(기존 상세 조회) 응답에 `images: [{ id, url, sortOrder, isPrimary }]`가 포함된다. `url`은 public 버킷 고정 URL(만료 없음, presigned 아님).
 
 **시착 결과 조회 (본인 전용)**
 

@@ -5,6 +5,7 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.storage.S3StorageService;
 import com.ssafy.backend.product.dto.request.ProductImageRegisterRequest;
+import com.ssafy.backend.product.dto.request.ProductImageUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUploadUrlRequest;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
@@ -67,6 +68,11 @@ public class ProductImageService {
         String bucket = awsProperties.s3().publicBucket();
         verifyUploaded(bucket, request.key());
 
+        // 대표 이미지는 상품당 1장만 유지 — 새 이미지를 대표로 등록하기 전에 기존 대표를 먼저 내린다.
+        if (request.isPrimary()) {
+            productImageRepository.clearPrimary(productId);
+        }
+
         ProductImage image = ProductImage.builder()
                 .product(product)
                 .imageKey(request.key())
@@ -79,14 +85,31 @@ public class ProductImageService {
     }
 
     @Transactional
+    public ProductImageResponse updateImage(
+            Long sellerId, Long productId, Long imageId, ProductImageUpdateRequest request) {
+        getOwnedProduct(sellerId, productId);
+        ProductImage image = getOwnedImage(productId, imageId);
+
+        if (request.sortOrder() != null) {
+            image.changeSortOrder(request.sortOrder());
+        }
+        if (request.isPrimary() != null) {
+            if (request.isPrimary()) {
+                productImageRepository.clearPrimaryExcept(productId, imageId);
+                image.markAsPrimary();
+            } else {
+                image.unmarkAsPrimary();
+            }
+        }
+
+        String bucket = awsProperties.s3().publicBucket();
+        return ProductImageResponse.of(image, s3StorageService.publicUrl(bucket, image.getImageKey()));
+    }
+
+    @Transactional
     public void deleteImage(Long sellerId, Long productId, Long imageId) {
         getOwnedProduct(sellerId, productId);
-
-        ProductImage image = productImageRepository.findById(imageId)
-                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_IMAGE_NOT_FOUND));
-        if (!image.belongsTo(productId)) {
-            throw new CustomException(ErrorCode.PRODUCT_IMAGE_NOT_FOUND);
-        }
+        ProductImage image = getOwnedImage(productId, imageId);
 
         s3StorageService.delete(awsProperties.s3().publicBucket(), image.getImageKey());
         productImageRepository.delete(image);
@@ -106,6 +129,15 @@ public class ProductImageService {
             throw new CustomException(ErrorCode.NOT_PRODUCT_OWNER);
         }
         return product;
+    }
+
+    private ProductImage getOwnedImage(Long productId, Long imageId) {
+        ProductImage image = productImageRepository.findById(imageId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_IMAGE_NOT_FOUND));
+        if (!image.belongsTo(productId)) {
+            throw new CustomException(ErrorCode.PRODUCT_IMAGE_NOT_FOUND);
+        }
+        return image;
     }
 
     // presigned PUT 자체는 최대 용량을 강제하지 못하므로, 등록 확인 시점에 실제 업로드된

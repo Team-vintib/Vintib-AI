@@ -19,13 +19,17 @@
    - 요청: `{ "key": string, "sortOrder": number, "isPrimary": boolean }` (`key`는 1번에서 받은 값을 그대로 사용)
    - 성공(201) 응답: `{ "id": number, "url": string, "sortOrder": number, "isPrimary": boolean }` — `url`이 실제 화면에 보여줄 고정 이미지 URL이다.
 
-이미지 여러 장은 파일마다 1~3단계를 반복한다(병렬 호출 가능). 이미지 삭제는 `DELETE /api/products/{productId}/images/{imageId}`.
+이미지 여러 장은 파일마다 1~3단계를 반복한다(병렬 호출 가능).
+
+이미지 순서/대표 여부만 바꿀 때(사진 재업로드 없이)는 `PATCH /api/products/{productId}/images/{imageId}` — 요청 `{ "sortOrder"?: number, "isPrimary"?: boolean }` (둘 다 선택, 보낸 필드만 반영되는 부분 수정). `isPrimary: true`를 보내면 같은 상품의 다른 이미지는 서버가 자동으로 대표에서 해제한다 — FE가 직접 다른 이미지를 false로 내리는 별도 호출을 할 필요는 없다.
+
+이미지 삭제는 `DELETE /api/products/{productId}/images/{imageId}`.
 
 상품 상세 조회(`GET /api/products/{id}`) 응답에 이제 `images: [{ id, url, sortOrder, isPrimary }, ...]` 필드가 추가되어 있다.
 
-모든 엔드포인트는 인증 필요(판매자 본인만). 실패 시 공통 `ApiResponse` envelope의 `error.code`로 구분: `P006`(지원하지 않는 이미지 형식), `P007`(2단계 업로드를 하지 않고 3단계를 호출함), `P005`(이미지 10장 초과).
+모든 엔드포인트는 인증 필요(판매자 본인만). 실패 시 공통 `ApiResponse` envelope의 `error.code`로 구분: `P006`(지원하지 않는 이미지 형식), `P007`(2단계 업로드를 하지 않고 3단계를 호출함), `P005`(이미지 10장 초과), `P004`(이미지 없음/다른 상품 소유).
 
 ## 관련 자료
 
-- Swagger: `/swagger-ui/index.html` — "상품" 태그 하위 3개 엔드포인트
+- Swagger: `/swagger-ui/index.html` — "상품" 태그 하위 이미지 관련 4개 엔드포인트(업로드 URL 발급/등록/수정/삭제)
 - `BE/src/main/java/com/ssafy/backend/product/controller/ProductController.java`
