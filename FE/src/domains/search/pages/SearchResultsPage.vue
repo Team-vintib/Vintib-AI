@@ -702,18 +702,14 @@ const formatPrice = (value: number) => `${value.toLocaleString('ko-KR')}P`
 const getSaleTypeLabel = (product: SearchProductResult) =>
   product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'
 const getProductActivityLabel = (product: SearchProductResult) => {
-  if (product.isLive && product.viewerCount !== undefined) {
-    return `LIVE 현재 ${product.viewerCount.toLocaleString('ko-KR')}명 시청 중`
-  }
+
 
   if (product.saleType === 'AUCTION') {
     const bidCount = product.bidCount ?? 0
     const timeLeftLabel = product.timeLeftLabel ?? '마감 임박'
 
-    return `현재 입찰 ${bidCount.toLocaleString('ko-KR')}회 · ${timeLeftLabel}`
   }
 
-  return '상시 판매 상품'
 }
 </script>
 
@@ -939,10 +935,6 @@ const getProductActivityLabel = (product: SearchProductResult) => {
                         :alt="product.imageAlt"
                       />
                       <span class="search-product-card__grade">{{ product.conditionGrade }}급</span>
-                      <span v-if="product.isLive" class="search-product-card__live-badge">LIVE</span>
-                      <span class="search-product-card__activity">
-                        {{ getProductActivityLabel(product) }}
-                      </span>
                     </RouterLink>
 
                     <button
@@ -1611,40 +1603,6 @@ const getProductActivityLabel = (product: SearchProductResult) => {
   font-size: 12px;
   font-weight: 800;
   line-height: 18px;
-}
-
-.search-product-card__live-badge {
-  position: absolute;
-  right: var(--space-3);
-  bottom: var(--space-3);
-  padding: 3px var(--space-2);
-  border-radius: var(--radius-badge);
-  background: var(--color-live);
-  color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: var(--font-weight-extrabold);
-  line-height: 16px;
-}
-
-.search-product-card__activity {
-  position: absolute;
-  right: var(--space-3);
-  bottom: var(--space-3);
-  left: var(--space-3);
-  overflow: hidden;
-  padding: 6px var(--space-2);
-  border-radius: var(--radius-badge);
-  background: rgba(34, 45, 39, 0.86);
-  color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: var(--font-weight-bold);
-  line-height: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.search-product-card__live-badge + .search-product-card__activity {
-  right: 68px;
 }
 
 .search-product-card__like {
