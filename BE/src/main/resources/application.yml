@@ -41,6 +41,12 @@ jwt:
 
 server:
   port: ${SERVER_PORT:8080}
+  # Caddy가 TLS를 종단하고 backend에는 평문 HTTP로 넘긴다. 이 설정이 없으면
+  # Spring이 요청을 그냥 http로 인식해 springdoc이 서버 URL을 http://로 잡고,
+  # 그 결과 https로 열린 Swagger UI에서 "Execute"가 스킴이 다른(=교차 출처) 요청이
+  # 되어 CORS/mixed-content로 막힌다. Caddy가 보내는 X-Forwarded-* 를 신뢰해
+  # 실제 스킴(https)을 인식하도록 한다.
+  forward-headers-strategy: framework
 
 management:
   health:
