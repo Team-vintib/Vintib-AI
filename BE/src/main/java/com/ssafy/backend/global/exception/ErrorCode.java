@@ -37,6 +37,7 @@ public enum ErrorCode {
     AUCTION_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "A001", "현재 진행 중인 경매가 아닙니다."),
     BID_LOWER_THAN_CURRENT(HttpStatus.BAD_REQUEST, "A002", "입찰 금액이 현재 최고가보다 낮습니다."),
     AUCTION_ALREADY_CLOSED(HttpStatus.BAD_REQUEST, "A003", "이미 종료된 경매입니다."),
+    AUCTION_ALREADY_CONFIGURED(HttpStatus.CONFLICT, "A004", "해당 상품에 이미 설정된 경매가 있습니다."),
 
     // [지갑/주문]
     INSUFFICIENT_POINTS(HttpStatus.BAD_REQUEST, "W001", "포인트 잔액이 부족합니다."),
