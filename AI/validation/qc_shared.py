@@ -111,34 +111,21 @@ BENIGN_PROMPTS: dict[str, str] = {**STRUCTURAL_BENIGN_PROMPTS, **TEXTURE_BENIGN_
 # 005 계획 §고도화 경로 3(의류 영역 마스크로 배경 제외)에 해당한다.
 GARMENT_PROMPT = "clothing"
 GARMENT_OVERLAP_MIN = 0.6  # 하자 마스크의 이 비율 이상이 의류 안에 있어야 채택
-GARMENT_CROP_PAD_RATIO = 0.06  # CROP_BEFORE_DETECT=True 일 때, bbox 에 둘 여유(경계 하자 잘림 방지)
 RESTRICT_TO_GARMENT = True
 
-# ⚠️ 크롭 여부 토글 — 실측(실제 상품 사진 8장, sam3-condition-check) 결과 회귀가 나와 False 로 되돌렸다.
+# ⚠️ 크롭(crop-then-detect) 여부 토글과 그 여유 비율(`GARMENT_CROP_PAD_RATIO`)은 **여기 없다.**
+# 각 노트북(`sam3_qc_test.ipynb`/`clipseg_qc_test.ipynb`)의 설정 상수 셀에 `CROP_BEFORE_DETECT`
+# 지역 변수로 따로 있다 — 두 노트북을 독립적으로 실험하려고 분리해 둔 건데, 이 토글을 여기
+# 공유 모듈에 두면 한쪽만 켜고 다른 쪽은 끈 채로 비교할 수가 없어서다.
 #
-# "의류 bbox 로 이미지를 실제로 잘라낸 뒤 그 위에서만 탐지"(crop-then-detect, CROP_BEFORE_DETECT=True)
-# 는 배경 오탐은 확실히 줄이지만, **실측 8장 중 6장(파일 인덱스 0,1,2,4,5,7)에서 기존에 잡히던
-# 오염/찢어짐을 더 못 잡거나(denim/fix 는 아예 0건), 저신뢰 1건으로 쪼그라들거나(logo_test/
-# scratch), 반대로 전부 STAIN 으로만 쏠리는(small_pro, 6건 전부 STAIN) 회귀가 나왔다.**
-# 뚜렷한 하자(levis_patch, 16건 고신뢰 TEAR+STAIN)만 크롭 여부와 무관하게 살아남았다 —
-# 크롭이 "작거나 애매한" 하자에 더 크게 해를 끼친다는 뜻이다.
-#
-# 원인으로 갈리는 두 가설이 있고 실측 패턴이 둘 다 어느 정도 설명한다:
-#   1) 물리적 잘림 — 의류 개념 마스크가 실제 의류 전체를 못 덮으면(소매 끝·밑단 등) 크롭이
-#      그 부분을 통째로 잘라낸다. denim/fix 의 완전 미검출과 부합한다.
-#   2) 맥락 붕괴 — 크롭해서 확대하면 SAM3 가 보던 "장면"이 좁아져, 하자 유형을 구분하던
-#      주변 맥락(원단 결·전체 실루엣)이 사라지고 개념 매칭이 한쪽(STAIN)으로 쏠릴 수 있다.
-#      small_pro 가 전부 STAIN 으로 뭉친 것과 부합한다.
-#
-# 그래서 기본값은 **크롭하지 않는다**(False) — 탐지는 항상 원본 전체 이미지에서 하고, 의류
-# 마스크는 여전히 구해서 **결과만 사후 필터링**한다(이전 버전 방식 + 이번에 고친 낮은
-# 존재확인 임계치 GARMENT_SCORE_THRESHOLD/GARMENT_PROB_THRESHOLD 조합). 이게 두 극단의
-# 중간값이다: 잘림·맥락 붕괴 위험은 없애면서, 배경/주름 억제는 그대로 유지한다.
-#
-# 크롭 버전과 다시 비교하고 싶으면 True 로 바꾸거나, 이미 아카이브된
-# `sam3-condition-check/sam3_qc_test_seg_ver.ipynb` (크롭 버전 스냅샷)를 그대로 실행한다.
-CROP_BEFORE_DETECT = False
-
+# 왜 기본값이 False(크롭 안 함)인지는 실측 근거가 있다 — 의류 bbox 로 이미지를 실제로 잘라낸
+# 뒤 그 안에서만 탐지하면 배경 오탐은 줄지만, 실측 상품 사진 8장 중 6장에서 기존에 잡히던
+# 오염/찢어짐을 더 못 잡거나(완전 미검출도 있었음) 전부 STAIN 으로만 쏠리는 회귀가 나왔다.
+# 뚜렷한 하자만 크롭 여부와 무관하게 살아남았다 — 크롭이 작거나 애매한 하자에 더 해롭다.
+# 가설: ① 의류 마스크가 소매 끝·밑단을 못 덮으면 그 부분이 통째로 잘려나간다 ② 확대되면서
+# 유형을 구분하던 주변 맥락이 좁아져 개념 매칭이 한쪽으로 쏠린다. 상세 데이터·크롭 버전
+# 스냅샷은 각 노트북의 `CROP_BEFORE_DETECT` 지역 변수 옆 주석과
+# `sam3-condition-check/sam3_qc_test_seg_ver.ipynb` 참고.
 BENIGN_CONTAINMENT = 0.6  # 하자 마스크가 양성 마스크에 이만큼 잠기면 억제 후보
 SUPPRESS_BENIGN = True
 
