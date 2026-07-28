@@ -127,6 +127,59 @@ const hasProductFilter = computed(
     queryConditionIds.value.length > 0 ||
     querySaleTypeIds.value.length > 0,
 )
+type SearchFilterChipKind = 'category' | 'condition' | 'saleType' | 'price'
+
+interface SearchFilterChip {
+  id: string
+  label: string
+  kind: SearchFilterChipKind
+  value?: string
+}
+
+const getFilterOptionLabel = (
+  options: { id: string; label: string }[],
+  optionId: string,
+  fallback = optionId,
+) => options.find((option) => option.id === optionId)?.label ?? fallback
+
+const selectedFilterChips = computed<SearchFilterChip[]>(() => {
+  const categoryChips = queryCategoryIds.value.map((categoryId) => ({
+    id: `category-${categoryId}`,
+    kind: 'category' as const,
+    value: categoryId,
+    label: getFilterOptionLabel(SEARCH_CATEGORY_FILTER_OPTIONS, categoryId),
+  }))
+  const conditionChips = queryConditionIds.value.map((conditionId) => ({
+    id: `condition-${conditionId}`,
+    kind: 'condition' as const,
+    value: conditionId,
+    label: getFilterOptionLabel(SEARCH_CONDITION_FILTER_OPTIONS, conditionId),
+  }))
+  const saleTypeChips = querySaleTypeIds.value.map((saleTypeId) => ({
+    id: `sale-type-${saleTypeId}`,
+    kind: 'saleType' as const,
+    value: saleTypeId,
+    label: getFilterOptionLabel(SEARCH_SALE_TYPE_FILTER_OPTIONS, saleTypeId),
+  }))
+
+  if (!hasPriceFilter.value) {
+    return [...categoryChips, ...conditionChips, ...saleTypeChips]
+  }
+
+  const minPrice = queryMinPrice.value?.toLocaleString('ko-KR') ?? '0'
+  const maxPrice = queryMaxPrice.value?.toLocaleString('ko-KR') ?? '제한 없음'
+
+  return [
+    ...categoryChips,
+    ...conditionChips,
+    ...saleTypeChips,
+    {
+      id: 'price-range',
+      kind: 'price',
+      label: `₩ ${minPrice} - ₩ ${maxPrice}`,
+    },
+  ]
+})
 const normalizedKeyword = computed(() => queryKeyword.value.toLocaleLowerCase('ko-KR'))
 
 const matchesKeyword = (values: string[]) => {
@@ -406,6 +459,39 @@ const resetProductFilters = async () => {
   liveMessage.value = '필터를 초기화했습니다.'
 }
 
+const removeFilterChip = async (chip: SearchFilterChip) => {
+  if (chip.kind === 'category') {
+    selectedCategoryIds.value = selectedCategoryIds.value.filter((id) => id !== chip.value)
+  }
+
+  if (chip.kind === 'condition') {
+    selectedConditionIds.value = selectedConditionIds.value.filter((id) => id !== chip.value)
+  }
+
+  if (chip.kind === 'saleType') {
+    selectedSaleTypeIds.value = selectedSaleTypeIds.value.filter((id) => id !== chip.value)
+  }
+
+  if (chip.kind === 'price') {
+    minPriceInput.value = ''
+    maxPriceInput.value = ''
+  }
+
+  await pushSearchQuery({
+    ...route.query,
+    categories: selectedCategoryIds.value.length ? selectedCategoryIds.value.join(',') : undefined,
+    conditions: selectedConditionIds.value.length
+      ? selectedConditionIds.value.join(',')
+      : undefined,
+    saleTypes: selectedSaleTypeIds.value.length ? selectedSaleTypeIds.value.join(',') : undefined,
+    minPrice: chip.kind === 'price' ? undefined : route.query.minPrice?.toString(),
+    maxPrice: chip.kind === 'price' ? undefined : route.query.maxPrice?.toString(),
+    status: undefined,
+  } as Record<string, string | undefined>)
+
+  liveMessage.value = `${chip.label} 필터를 해제했습니다.`
+}
+
 const retrySearch = async () => {
   await pushSearchQuery({
     ...route.query,
@@ -479,6 +565,20 @@ const toggleFollow = async (memberId: number) => {
 const formatPrice = (value: number) => `${value.toLocaleString('ko-KR')}P`
 const getSaleTypeLabel = (product: SearchProductResult) =>
   product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'
+const getProductActivityLabel = (product: SearchProductResult) => {
+  if (product.isLive && product.viewerCount !== undefined) {
+    return `LIVE 현재 ${product.viewerCount.toLocaleString('ko-KR')}명 시청 중`
+  }
+
+  if (product.saleType === 'AUCTION') {
+    const bidCount = product.bidCount ?? 0
+    const timeLeftLabel = product.timeLeftLabel ?? '마감 임박'
+
+    return `현재 입찰 ${bidCount.toLocaleString('ko-KR')}회 · ${timeLeftLabel}`
+  }
+
+  return '상시 판매 상품'
+}
 </script>
 
 <template>
@@ -508,90 +608,100 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 
       <div class="search-page__layout">
         <aside class="search-page__filters" aria-label="검색 필터">
-          <h2 class="search-page__filter-title">필터</h2>
+          <div class="search-page__filter-header">
+            <h2 class="search-page__filter-title">필터</h2>
+            <button type="button" @click="resetProductFilters">초기화</button>
+          </div>
 
           <form class="search-page__product-filter" @submit.prevent="applyProductFilters">
-            <fieldset>
-              <legend>카테고리</legend>
+            <details class="search-page__filter-group" open>
+              <summary>카테고리</summary>
 
-              <label
-                v-for="option in SEARCH_CATEGORY_FILTER_OPTIONS"
-                :key="option.id"
-                class="search-page__checkbox-option"
-              >
+              <div class="search-page__filter-group-body">
+                <label
+                  v-for="option in SEARCH_CATEGORY_FILTER_OPTIONS"
+                  :key="option.id"
+                  class="search-page__checkbox-option"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="selectedCategoryIds.includes(option.id)"
+                    @change="handleCategoryChange($event, option.id)"
+                  />
+                  <span>{{ option.label }}</span>
+                </label>
+              </div>
+            </details>
+
+            <details class="search-page__filter-group" open>
+              <summary>상품 상태</summary>
+
+              <div class="search-page__filter-group-body">
+                <label
+                  v-for="option in SEARCH_CONDITION_FILTER_OPTIONS"
+                  :key="option.id"
+                  class="search-page__checkbox-option"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="selectedConditionIds.includes(option.id)"
+                    @change="handleConditionChange($event, option.id)"
+                  />
+                  <span>{{ option.label }}</span>
+                </label>
+              </div>
+            </details>
+
+            <details class="search-page__filter-group" open>
+              <summary>가격 범위</summary>
+
+              <div class="search-page__filter-group-body">
+                <label for="search-min-price">최소 가격</label>
                 <input
-                  type="checkbox"
-                  :checked="selectedCategoryIds.includes(option.id)"
-                  @change="handleCategoryChange($event, option.id)"
+                  id="search-min-price"
+                  v-model="minPriceInput"
+                  inputmode="numeric"
+                  type="number"
+                  min="0"
+                  placeholder="₩ 0"
                 />
-                <span>{{ option.label }}</span>
-              </label>
-            </fieldset>
 
-            <fieldset>
-              <legend>상태</legend>
-
-              <label
-                v-for="option in SEARCH_CONDITION_FILTER_OPTIONS"
-                :key="option.id"
-                class="search-page__checkbox-option"
-              >
+                <label for="search-max-price">최대 가격</label>
                 <input
-                  type="checkbox"
-                  :checked="selectedConditionIds.includes(option.id)"
-                  @change="handleConditionChange($event, option.id)"
+                  id="search-max-price"
+                  v-model="maxPriceInput"
+                  inputmode="numeric"
+                  type="number"
+                  min="0"
+                  placeholder="₩ 300000"
                 />
-                <span>{{ option.label }}</span>
-              </label>
-            </fieldset>
 
-            <fieldset>
-              <legend>가격대</legend>
+                <p v-if="isPriceRangeInvalid" class="search-page__field-error" role="alert">
+                  최소 가격은 최대 가격보다 클 수 없습니다.
+                </p>
+              </div>
+            </details>
 
-              <label for="search-min-price">최소 가격</label>
-              <input
-                id="search-min-price"
-                v-model="minPriceInput"
-                inputmode="numeric"
-                type="number"
-                min="0"
-                placeholder="예: 10000"
-              />
+            <details class="search-page__filter-group" open>
+              <summary>판매 유형</summary>
 
-              <label for="search-max-price">최대 가격</label>
-              <input
-                id="search-max-price"
-                v-model="maxPriceInput"
-                inputmode="numeric"
-                type="number"
-                min="0"
-                placeholder="예: 100000"
-              />
-
-              <p v-if="isPriceRangeInvalid" class="search-page__field-error" role="alert">
-                최소 가격은 최대 가격보다 클 수 없습니다.
-              </p>
-            </fieldset>
-
-            <fieldset>
-              <legend>판매 유형</legend>
-
-              <label
-                v-for="option in SEARCH_SALE_TYPE_FILTER_OPTIONS"
-                :key="option.id"
-                class="search-page__checkbox-option"
-              >
-                <input
-                  type="checkbox"
-                  :checked="selectedSaleTypeIds.includes(option.id)"
-                  @change="handleSaleTypeChange($event, option.id)"
-                />
-                <span>{{ option.label }}</span>
-              </label>
-            </fieldset>
+              <div class="search-page__filter-group-body">
+                <label
+                  v-for="option in SEARCH_SALE_TYPE_FILTER_OPTIONS"
+                  :key="option.id"
+                  class="search-page__checkbox-option"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="selectedSaleTypeIds.includes(option.id)"
+                    @change="handleSaleTypeChange($event, option.id)"
+                  />
+                  <span>{{ option.label }}</span>
+                </label>
+              </div>
+            </details>
 
             <div class="search-page__filter-actions">
-              <button type="button" @click="resetProductFilters">초기화</button>
               <button type="submit">적용</button>
             </div>
           </form>
@@ -605,6 +715,21 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
           />
 
           <p class="sr-only" aria-live="polite">{{ liveMessage }}</p>
+
+          <div v-if="selectedFilterChips.length" class="search-page__selected-filters">
+            <span>선택된 필터</span>
+            <button
+              v-for="chip in selectedFilterChips"
+              :key="chip.id"
+              type="button"
+              @click="removeFilterChip(chip)"
+            >
+              {{ chip.label }} <span aria-hidden="true">×</span>
+            </button>
+            <button type="button" class="search-page__clear-filters" @click="resetProductFilters">
+              전체 해제
+            </button>
+          </div>
 
           <div
             :id="`search-panel-${activeTabId}`"
@@ -646,6 +771,10 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
                         :alt="product.imageAlt"
                       />
                       <span class="search-product-card__grade">{{ product.conditionGrade }}급</span>
+                      <span v-if="product.isLive" class="search-product-card__live-badge">LIVE</span>
+                      <span class="search-product-card__activity">
+                        {{ getProductActivityLabel(product) }}
+                      </span>
                     </RouterLink>
 
                     <button
@@ -689,6 +818,9 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
                           {{ getSaleTypeLabel(product) }}
                         </span>
                       </div>
+                      <p class="search-product-card__activity-text">
+                        {{ getProductActivityLabel(product) }}
+                      </p>
                     </div>
                   </article>
                 </div>
@@ -852,37 +984,76 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 .search-page__filters {
   align-self: start;
   width: var(--filter-panel-width);
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+}
+
+.search-page__filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+
+.search-page__filter-header button {
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.search-page__filter-header button:hover {
+  color: var(--color-primary);
 }
 
 .search-page__filter-title {
-  font-size: 17px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-extrabold);
   line-height: var(--line-height-body);
 }
 
 .search-page__product-filter {
-  margin-top: var(--space-5);
-}
-
-.search-page__product-filter fieldset {
   display: grid;
-  gap: var(--space-2);
-  border: 0;
 }
 
-.search-page__product-filter fieldset + fieldset {
-  margin-top: var(--space-5);
+.search-page__filter-group {
+  border-top: 1px solid var(--color-border);
 }
 
-.search-page__product-filter legend {
-  margin-bottom: var(--space-4);
+.search-page__filter-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
   color: var(--color-text-primary);
+  cursor: pointer;
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
+  list-style: none;
+}
+
+.search-page__filter-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.search-page__filter-group summary::after {
+  color: var(--color-text-muted);
+  content: '⌃';
+  font-size: var(--font-size-caption);
+}
+
+.search-page__filter-group:not([open]) summary::after {
+  content: '⌄';
+}
+
+.search-page__filter-group-body {
+  display: grid;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
 }
 
 .search-page__product-filter label {
@@ -897,12 +1068,37 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
   align-items: center;
   min-height: var(--filter-option-min-height);
   gap: var(--space-3);
+  cursor: pointer;
 }
 
 .search-page__checkbox-option input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--color-primary);
+  display: grid;
+  place-content: center;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+  appearance: none;
+  background: var(--color-surface);
+}
+
+.search-page__checkbox-option input::before {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--color-primary);
+  content: '';
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+
+.search-page__checkbox-option input:checked {
+  border-color: var(--color-primary);
+}
+
+.search-page__checkbox-option input:checked::before {
+  transform: scale(1);
 }
 
 .search-page__product-filter input[type='number'] {
@@ -932,8 +1128,6 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 
 .search-page__filter-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
   margin-top: var(--space-4);
 }
 
@@ -944,13 +1138,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
   font-weight: var(--font-weight-semibold);
 }
 
-.search-page__filter-actions button:first-child {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-}
-
-.search-page__filter-actions button:last-child {
+.search-page__filter-actions button {
   border: 1px solid var(--color-primary);
   background: var(--color-primary);
   color: var(--color-text-inverse);
@@ -963,6 +1151,45 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 
 .search-page__results {
   min-width: 0;
+}
+
+.search-page__selected-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: 22px;
+}
+
+.search-page__selected-filters > span {
+  margin-right: var(--space-1);
+  font-weight: var(--font-weight-semibold);
+}
+
+.search-page__selected-filters button {
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.search-page__selected-filters button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.search-page__selected-filters .search-page__clear-filters {
+  margin-left: auto;
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-semibold);
 }
 
 .search-page__tabpanel {
@@ -997,7 +1224,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 .search-page__card-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-5);
+  gap: var(--space-6);
 }
 
 .search-page__member-list {
@@ -1007,18 +1234,13 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 
 .search-product-card {
   position: relative;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  transition:
-    border-color 160ms ease,
-    transform 160ms ease;
+  display: grid;
+  gap: var(--space-3);
+  transition: transform 180ms ease;
 }
 
 .search-product-card:hover {
-  border-color: var(--color-border-strong);
-  transform: translateY(-2px);
+  transform: translateY(-4px);
 }
 
 .search-product-card__media {
@@ -1026,6 +1248,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
   display: block;
   overflow: hidden;
   aspect-ratio: 4 / 5;
+  border-radius: 14px;
   background: var(--color-surface-secondary);
 }
 
@@ -1040,6 +1263,11 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 220ms ease;
+}
+
+.search-product-card:hover .search-product-card__image {
+  transform: scale(1.02);
 }
 
 .search-product-card__grade {
@@ -1053,6 +1281,40 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
   font-size: 12px;
   font-weight: 800;
   line-height: 18px;
+}
+
+.search-product-card__live-badge {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-badge);
+  background: var(--color-live);
+  color: var(--color-text-inverse);
+  font-size: 12px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 16px;
+}
+
+.search-product-card__activity {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  left: var(--space-3);
+  overflow: hidden;
+  padding: 6px var(--space-2);
+  border-radius: var(--radius-badge);
+  background: rgba(34, 45, 39, 0.86);
+  color: var(--color-text-inverse);
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-product-card__live-badge + .search-product-card__activity {
+  right: 68px;
 }
 
 .search-product-card__like {
@@ -1091,7 +1353,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 .search-product-card__body {
   display: grid;
   gap: var(--space-1);
-  padding: var(--space-4);
+  padding: 0 var(--space-1);
 }
 
 .search-product-card__brand,
@@ -1110,13 +1372,14 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 }
 
 .search-product-card__name {
+  display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-primary);
   font-size: 17px;
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-body);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .search-product-card__meta {
@@ -1128,8 +1391,9 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 }
 
 .search-product-card__meta strong {
-  font-size: 16px;
+  font-size: 19px;
   font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-extrabold);
   line-height: var(--line-height-body);
 }
 
@@ -1147,6 +1411,12 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 .search-product-card__badge--auction {
   background: var(--color-auction-soft);
   color: var(--color-auction);
+}
+
+.search-product-card__activity-text {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: 20px;
 }
 
 @media (max-width: 1180px) {
@@ -1170,10 +1440,6 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
     grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: var(--space-8);
     row-gap: var(--space-5);
-  }
-
-  .search-page__product-filter fieldset + fieldset {
-    margin-top: 0;
   }
 
   .search-page__filter-actions {

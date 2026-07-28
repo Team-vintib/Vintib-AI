@@ -21,6 +21,8 @@ export const SEARCH_MOCK_RESULTS: SearchResultsViewModel = {
       imageUrl: denimJacketImage,
       imageAlt: "Levi's 빈티지 데님 재킷",
       isLiked: false,
+      isLive: true,
+      viewerCount: 8,
     },
     {
       id: 2,
@@ -34,6 +36,7 @@ export const SEARCH_MOCK_RESULTS: SearchResultsViewModel = {
       imageUrl: knitImage,
       imageAlt: '아이보리 케이블 니트',
       isLiked: true,
+      isLive: false,
     },
     {
       id: 3,
@@ -47,6 +50,8 @@ export const SEARCH_MOCK_RESULTS: SearchResultsViewModel = {
       imageUrl: trenchCoatImage,
       imageAlt: '베이지 빈티지 트렌치코트',
       isLiked: false,
+      bidCount: 12,
+      timeLeftLabel: '02:14 남음',
     },
     {
       id: 4,
@@ -60,6 +65,8 @@ export const SEARCH_MOCK_RESULTS: SearchResultsViewModel = {
       imageUrl: watchImage,
       imageAlt: '가죽 스트랩 빈티지 손목시계',
       isLiked: false,
+      bidCount: 7,
+      timeLeftLabel: '1일 4시간 남음',
     },
   ],
   lives: [

@@ -34,7 +34,9 @@ const emit = defineEmits<{
 <style scoped lang="scss">
 .search-result-tabs {
   display: flex;
-  min-height: 52px;
+  min-height: 48px;
+  gap: var(--space-4);
+  padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -42,28 +44,45 @@ const emit = defineEmits<{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 112px;
+  min-width: 92px;
+  height: 40px;
   gap: var(--space-2);
   padding: 0 var(--space-4);
-  border: 0;
-  border-bottom: 2px solid transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
   background: transparent;
   color: var(--color-text-secondary);
   font-weight: var(--font-weight-bold);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
-.search-result-tabs__item:hover,
+.search-result-tabs__item:hover {
+  color: var(--color-primary);
+}
+
 .search-result-tabs__item--active {
-  border-bottom-color: var(--color-primary);
+  border-color: var(--color-primary-soft);
+  background: var(--color-primary-soft);
   color: var(--color-primary);
 }
 
 .search-result-tabs__item:focus-visible {
   outline: 3px solid var(--color-primary-soft);
-  outline-offset: -3px;
+  outline-offset: 2px;
 }
 
 .search-result-tabs__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  background: var(--color-surface-secondary);
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
@@ -71,6 +90,7 @@ const emit = defineEmits<{
 }
 
 .search-result-tabs__item--active .search-result-tabs__count {
+  background: var(--color-surface);
   color: var(--color-primary);
 }
 
@@ -81,7 +101,7 @@ const emit = defineEmits<{
 
   .search-result-tabs__item {
     flex: 1 0 auto;
-    min-width: 88px;
+    min-width: 84px;
     padding: 0 var(--space-3);
   }
 }

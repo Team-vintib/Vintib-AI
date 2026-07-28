@@ -14,6 +14,10 @@ export interface SearchProductResult {
   imageUrl: string
   imageAlt: string
   isLiked: boolean
+  bidCount?: number
+  timeLeftLabel?: string
+  isLive?: boolean
+  viewerCount?: number
 }
 
 export interface SearchLiveResult {
