@@ -6,6 +6,11 @@ redis==5.0.8
 python-multipart==0.0.12
 aiofiles==24.1.0
 numpy==1.26.4
+# AI 전용 RAG 저장소(postgres-vector, S15P11A108-375) 접속용. 임베딩 계산(torch)은 이 컨테이너가
+# 아니라 워커/ONNX 쪽 몫이라 여긴 DB 드라이버만 있으면 된다.
+sqlalchemy==2.0.44
+psycopg[binary]==3.2.4
+pgvector==0.5.0
 # 품질 검수 Attention Map 오버레이 생성 + 목업 베이스 이미지 합성(app/quality/).
 # matplotlib은 서빙 경로에 넣지 않는다 — 히트맵은 Pillow만으로 그린다.
 Pillow==11.3.0

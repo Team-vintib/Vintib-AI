@@ -13,6 +13,14 @@ class Settings(BaseSettings):
     db_username: str = "postgres"
     db_password: str = "postgres"
 
+    # AI 전용 RAG 저장소(postgres-vector, S15P11A108-375). 위 db_*(BE 공유 DB)와는 별개 인스턴스 —
+    # 혼동 방지를 위해 이름을 분리했다. 아직 어느 코드도 db_*를 안 쓰는 것과 달리 이건 rag_store.py가 쓴다.
+    vector_db_host: str = "localhost"
+    vector_db_port: int = 5433
+    vector_db_name: str = "vintib_rag"
+    vector_db_username: str = "postgres"
+    vector_db_password: str = "postgres"
+
     redis_host: str = "localhost"
     redis_port: int = 6379
     redis_password: str = ""
