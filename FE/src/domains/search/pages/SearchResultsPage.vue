@@ -802,16 +802,16 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 
 .search-page__layout {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 224px minmax(0, 1fr);
   align-items: start;
   gap: var(--space-8);
   margin-top: var(--space-8);
 }
 
 .search-page__filters {
-  position: sticky;
-  top: var(--space-6);
-  padding: var(--space-6);
+  align-self: start;
+  width: 224px;
+  padding: var(--space-5);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
@@ -824,36 +824,37 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
 }
 
 .search-page__product-filter {
-  margin-top: var(--space-6);
+  margin-top: var(--space-5);
 }
 
 .search-page__product-filter fieldset {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
   border: 0;
 }
 
 .search-page__product-filter fieldset + fieldset {
-  margin-top: var(--space-6);
+  margin-top: var(--space-5);
 }
 
 .search-page__product-filter legend {
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-4);
   color: var(--color-text-primary);
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .search-page__product-filter label {
   color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 20px;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 24px;
 }
 
 .search-page__checkbox-option {
   display: flex;
   align-items: center;
-  min-height: 24px;
+  min-height: 22px;
   gap: var(--space-3);
 }
 
@@ -892,13 +893,14 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-2);
-  margin-top: var(--space-5);
+  margin-top: var(--space-4);
 }
 
 .search-page__filter-actions button {
   height: var(--button-height-small);
   border-radius: var(--radius-control);
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .search-page__filter-actions button:first-child {
@@ -1124,7 +1126,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
   }
 
   .search-page__filters {
-    position: static;
+    width: 100%;
   }
 }
 
