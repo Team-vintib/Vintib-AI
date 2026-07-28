@@ -21,7 +21,8 @@ S15P11A108-27(인프라 세팅) / S15P11A108-210(CatVTON 모델 연결) 관련 �
 | `base_worker.py` | 모든 워커가 상속하는 공통 골격. poll → 추론 → 결과 제출 → 실패 시 재시도를 처리한다. **이 파일은 기능이 늘어나도 수정할 필요가 거의 없다.** |
 | `storage_utils.py` | 결과 이미지를 게이트웨이의 업로드 엔드포인트로 전송하는 유틸(`download_image`/`upload_image`). S3 권한이 없어 EC2 로컬 디스크 저장 방식을 쓰기 때문에, 워커가 직접 디스크에 쓰지 않고 HTTP로 전송한다. `tryon_worker_example.py`가 import하므로 이 파일 없이는 워커가 기동하지 않는다. |
 | `tryon_worker_example.py` | 시착(CatVTON) 워커. 현재 `worker/models/catvton`의 검증 코드(`verify_fit_tryon.py`)를 기반으로 실제 모델이 연결되어 있다. |
-| `quality_check_worker_example.py` | 품질검수 워커 예시. **모델 연결은 아직 TODO 상태.** 판정 로직(프롬프트·임계치·하자 항목화·점수·오버레이)은 `AI/app/quality/`에 이미 구현돼 있고, 비동기 전환 시 이쪽으로 옮겨온다. |
+| `quality_check_worker_example.py` | 품질검수(CLIPSeg) 워커. 판정 로직은 `models/clipseg/`에 있고 이 파일은 오케스트레이션만 한다. **`QUALITY_BACKEND=mock`이면 GPU 없이도 전 경로가 돈다.** |
+| `models/clipseg/` | 품질검수 판정 로직 — 세그멘테이션(목업/CLIPSeg) · 하자 항목화 · 점수 · 히트맵. 순수 로직은 `AI/test/worker/clipseg/`가 CI에서 검증한다. |
 | `requirements.txt` | 워커 공통 의존성. `requests`, `Pillow`(storage_utils.py가 `PIL.Image`를 다룬다). CatVTON 등 모델 자체의 의존성(torch, diffusers 등)은 각자 기존에 구성해둔 conda 환경을 그대로 쓴다 — 이 파일에 포함하지 않는다. |
 | `.env.example` | 워커 실행에 필요한 환경변수 예시. 필요한 값은 아래 "실행 방법" 참고. |
 
@@ -39,6 +40,18 @@ CatVTON 워커는 추가로 아래 환경변수도 쓸 수 있다 (생략 시 �
 ```bash
 export CATVTON_CODE_PATH=/path/to/worker/models/catvton   # 기본값: worker/ 기준 models/catvton
 ```
+
+품질검수 워커는 아래를 쓴다:
+
+```bash
+export QUALITY_BACKEND=mock                    # 기본값. GPU 불필요 — 목업 시나리오로 전 경로 검증
+export QUALITY_BACKEND=clipseg_rd64_refined    # 실제 CLIPSeg. torch/transformers 필요
+export CLIPSEG_CODE_PATH=/path/to/worker/models/clipseg   # 기본값: worker/ 기준 models/clipseg
+```
+
+`mock` 백엔드는 `models/clipseg/data/mock_inspections.json`의 시나리오(오염 명확 / 미세 오염 /
+찢어짐 / 깨끗함 / 프린트)로 확률 마스크를 **결정적으로 합성**한다. GPU가 없는 팀원도 워커를 띄워
+게이트웨이 큐 왕복부터 리포트 JSON까지 그대로 확인할 수 있다.
 
 ### 2. 실행
 
@@ -118,6 +131,6 @@ curl https://i15a108.p.ssafy.io/ai/jobs/{job_id}
 
 ## 남은 작업
 
-- `quality_check_worker_example.py`에 실제 ViT 모델 연결 (현재 TODO)
+- 품질검수 워커를 실제 GPU 노트북에서 `QUALITY_BACKEND=clipseg_rd64_refined`로 돌려보기 (지금까지는 `mock`으로만 검증했다)
 - 워커 여러 대(팀원별)를 동시에 띄웠을 때 동작 검증
 - CatVTON 모델 로딩 시간이 길 경우, 워커 기동 시점에 미리 로딩해두는 방식(lazy 대신 eager)으로 바꿀지 검토
