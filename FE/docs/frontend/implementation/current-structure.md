@@ -144,14 +144,23 @@ src/
       types/
     product/
       api/
+        productDetailApi.ts
       components/
+        AiQualityAnalysisPanel.vue
         ProductCard.vue
+        ProductDetailInformation.vue
         ProductFilterPanel.vue
+        ProductImageGallery.vue
+        ProductPurchaseSummary.vue
+        ProductSellerLivePanel.vue
       constants/
+        productDetailMockData.ts
         productListMockData.ts
       pages/
+        ProductDetailView.vue
         ProductListView.vue
       types/
+        productDetail.types.ts
         productList.types.ts
     live/
       api/
@@ -319,9 +328,11 @@ docs/
   `homeViewApi.ts`는 현재 mock 데이터를 반환하는 adapter 자리이며, `HomePage`는
   loading/error/retry 상태를 처리합니다.
   실제 HOME API 계약이 확정되면 adapter 내부를 HTTP 호출과 응답 매핑으로 교체합니다.
-- `domains/product`에는 PROD-008 상품 목록 껍데기 View, 필터와 카드 컴포넌트,
-  목록 타입과 화면 확인용 mock 데이터가 구현되어 있습니다. 실제 조회·필터·정렬·찜
-  API와 상세 이동은 후속 작업 대기 중입니다.
+- `domains/product`에는 PROD-008 상품 목록 껍데기 View와 S15P11A108-408 상품 상세
+  정적 UI가 구현되어 있습니다. 상세 화면은 이미지·구매 요약·판매자·연결 라이브·상세 정보와
+  원본/검수 이미지 비교형 AI 감정 영역을 포함하며 mock adapter에서 데이터를 받습니다.
+  상세 상호작용은 S15P11A108-410, 로딩·오류·판매 완료와 AI 분석 상태는
+  S15P11A108-412에서 구현합니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.
