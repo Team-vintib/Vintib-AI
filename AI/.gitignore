@@ -30,3 +30,8 @@ app/recommend/data/brands.yaml
 app/recommend/personalize/artifacts/
 # 라이브 댓글 관리 정확도 평가 리포트(pipeline/evaluate 산출물). 평가셋은 코드(eval_dataset.py)라 커밋한다.
 app/chat/artifacts/
+
+# SAM3 QC 스파이크의 입력 이미지·시각화 산출물. 둘 다 재생성 가능하다
+# (sample_images/ 는 노트북이 공개 URL 에서 받아 채우고, outputs/ 는 히트맵 PNG).
+validation/sam3-condition-check/sample_images/
+validation/sam3-condition-check/outputs/
