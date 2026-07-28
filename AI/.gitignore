@@ -35,3 +35,5 @@ app/chat/artifacts/
 # (sample_images/ 는 노트북이 공개 URL 에서 받아 채우고, outputs/ 는 히트맵 PNG).
 validation/sam3-condition-check/sample_images/
 validation/sam3-condition-check/outputs/
+validation/clipseg-condition-check/outputs/
+
