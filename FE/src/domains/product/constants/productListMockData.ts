@@ -1,9 +1,9 @@
-import denimJacketImage from '@/assets/images/products/mock-denim-jacket.svg'
-import knitImage from '@/assets/images/products/mock-knit.svg'
-import leatherBagImage from '@/assets/images/products/mock-leather-bag.svg'
-import sneakersImage from '@/assets/images/products/mock-sneakers.svg'
-import trenchCoatImage from '@/assets/images/products/mock-trench-coat.svg'
-import watchImage from '@/assets/images/products/mock-watch.svg'
+import denimJacketImage from '@/assets/images/products/product-denim-jacket.webp'
+import knitImage from '@/assets/images/products/product-knit.webp'
+import leatherBagImage from '@/assets/images/products/product-leather-bag.webp'
+import sneakersImage from '@/assets/images/products/product-sneakers.webp'
+import trenchCoatImage from '@/assets/images/products/product-trench-coat.webp'
+import watchImage from '@/assets/images/products/product-watch.webp'
 
 import type {
   ProductFilterOption,
