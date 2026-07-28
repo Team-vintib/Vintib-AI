@@ -4,10 +4,14 @@
 #    그쪽은 Kanana 체크포인트 때문에 transformers<5 로 핀이 박혀 있는데,
 #    SAM3 는 transformers v5.0.0 부터 포함됐다(4.57.x 에는 Sam3Model 자체가 없음).
 #
-# 별도 venv 권장:
+# 별도 conda 환경 권장 (worker/requirements.txt 주석의 "모델 자체 의존성은 각자 conda 환경" 방침):
+#   conda create -n qual python=3.12 -y
+#   conda activate qual
 #   cd AI/validation/sam3-condition-check
-#   python -m venv .venv-sam3
-#   .venv-sam3/Scripts/pip install -r requirements-sam3.txt
+#   pip install -r requirements-sam3.txt
+#
+# ⚠️ torch 는 반드시 pip 로만 넣는다. conda 의 pytorch 패키지를 같이 깔면 아래 cu130 휠과
+#    섞여서 깨진다.
 #
 # 노트북 1번 셀의 `%pip install -q -r requirements-sam3.txt` 가 이 파일을 읽는다.
 #
