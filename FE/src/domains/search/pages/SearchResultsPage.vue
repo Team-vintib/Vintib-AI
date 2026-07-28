@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import SearchLiveResultCard from '@/domains/search/components/SearchLiveResultCard.vue'
 import SearchMemberResultCard from '@/domains/search/components/SearchMemberResultCard.vue'
 import SearchResultTabs from '@/domains/search/components/SearchResultTabs.vue'
@@ -18,6 +19,7 @@ import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const validTabIds: SearchResultTabId[] = ['all', 'product', 'live', 'member']
 const validMockStatuses = ['loading', 'error', 'empty'] as const
@@ -446,7 +448,26 @@ const handleStateAction = async () => {
   }
 }
 
-const toggleLike = (productId: number) => {
+const requireAuthenticatedAction = async () => {
+  authStore.hydrateSession()
+
+  if (authStore.isAuthenticated) {
+    return true
+  }
+
+  await router.push({
+    name: ROUTE_NAMES.AUTH_LOGIN,
+    query: { redirect: route.fullPath },
+  })
+
+  return false
+}
+
+const toggleLike = async (productId: number) => {
+  if (!(await requireAuthenticatedAction())) {
+    return
+  }
+
   const nextLikedProductIds = new Set(likedProductIds.value)
 
   if (nextLikedProductIds.has(productId)) {
@@ -458,7 +479,11 @@ const toggleLike = (productId: number) => {
   likedProductIds.value = nextLikedProductIds
 }
 
-const toggleFollow = (memberId: number) => {
+const toggleFollow = async (memberId: number) => {
+  if (!(await requireAuthenticatedAction())) {
+    return
+  }
+
   const nextFollowedMemberIds = new Set(followedMemberIds.value)
 
   if (nextFollowedMemberIds.has(memberId)) {
