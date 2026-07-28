@@ -152,6 +152,7 @@ COMMENT ON COLUMN member.phone             IS '연락처. 배송·정산 확인�
 COMMENT ON COLUMN member.profile_image_url IS '프로필 이미지 URL.';
 
 COMMENT ON COLUMN brand.name    IS '브랜드명. 중복 불가.';
+COMMENT ON COLUMN brand.name_en IS '브랜드 영문명. 없는 브랜드는 NULL.';
 COMMENT ON COLUMN category.name IS '카테고리명.';
 
 COMMENT ON COLUMN business_info.submitted_at IS '인증 서류 제출 시각.';

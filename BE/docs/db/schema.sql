@@ -74,8 +74,9 @@ CREATE TABLE business_info (
 -- =============================================================================
 
 CREATE TABLE brand (
-    id   BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE
+    id      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name    VARCHAR(100) NOT NULL UNIQUE,
+    name_en VARCHAR(100)                     -- 영문명. 없는 브랜드 대비 nullable
 );
 
 CREATE TABLE category (
