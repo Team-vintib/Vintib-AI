@@ -40,11 +40,11 @@
 
 - 신규 테이블 `tryon_result`(`schema.sql`/`comments.sql` 추가): `id`, `member_id`(FK), `product_id`(FK), `image_key`, `created_at`, `deleted_at`. 다중 아이템 합성("빈티지 코디") 등은 이번 범위 제외, 상품 1개 기준 단일 합성 결과만 다룬다.
 - `TryOnResult` 엔티티 / `TryOnResultRepository`.
-- 신규 `TryOnController`(`/api/me/tryons` — 경로에 `{id}` 없이 인증된 본인 기준. `APIs.md` 초안은 `/users/{id}/tryons`였지만, 시착 결과는 본인만 볼 수 있는 리소스라 path id와 principal 비교하는 IDOR 여지를 원천적으로 없애기 위해 `/api/me/tryons`로 결정 — 승인되면 `APIs.md`에도 반영):
-  - `GET /api/me/tryons` — 목록, 각 항목에 presigned GET URL 포함
-  - `GET /api/me/tryons/{id}` — 상세, presigned GET URL
-  - `DELETE /api/me/tryons/{id}` — DB row + S3 객체 삭제
-  - (생성 `POST /api/me/tryons`는 제외 — 아래 "AI 요청 문서" 참고)
+- 신규 `TryOnController`(`APIs.md`의 `/users/{id}/tryons` 스펙을 그대로 따름 — 처음엔 IDOR 우려로 `/api/me/tryons`(본인 기준, path id 없음)로 구현했다가, 사용자 지시로 공유 계약 문서인 `APIs.md`에 맞춰 되돌림. IDOR은 경로 대신 컨트롤러에서 `path userId == 인증된 principal` 체크로 막는다 — 불일치 시 `T004`):
+  - `GET /api/users/{userId}/tryons` — 목록, 각 항목에 presigned GET URL 포함
+  - `GET /api/users/{userId}/tryons/{id}` — 상세, presigned GET URL
+  - `DELETE /api/users/{userId}/tryons/{id}` — DB row + S3 객체 삭제
+  - (생성 `POST /api/users/{userId}/tryons`는 제외 — 아래 "AI 요청 문서" 참고)
 - 신규 `ErrorCode`(T 구역 이어서 추가): `T003 TRYON_RESULT_NOT_FOUND`, `T004 TRYON_RESULT_NOT_OWNER`.
 - 서비스: `TryOnResultService.saveResult(memberId, productId, imageBytes)`처럼 "이미 생성된 이미지를 저장하는" 메서드까지만 구현. 실제 AI 호출/합성 트리거는 후속 계획.
 
@@ -55,35 +55,58 @@
 
 ## 구현 목록
 
-- [ ] `build.gradle`: `software.amazon.awssdk:s3` 추가
-- [ ] `docs/db/schema.sql`, `comments.sql`: `product_image.image_url` → `image_key` 컬럼명 변경 + 코멘트 갱신, `tryon_result` 테이블 신규 추가 + 코멘트
-- [ ] `regen.sh`/`export-erd.sh` 재실행 (data-dictionary.md, ERD 갱신)
-- [ ] `global/config/S3Config` (`S3Client`, `S3Presigner` 빈, local endpoint override)
-- [ ] `global/config`(또는 유사 위치)에 `S3StorageService` (presigned PUT/GET, HeadObject 검증, delete, public URL 조립)
-- [ ] `docker-compose.override.yml`: `minio` 서비스 추가
-- [ ] `LocalS3BucketInitializer` (`@Profile("local")` `ApplicationRunner`): 버킷 생성 + public 버킷 익명 읽기 정책
-- [ ] `application.yml`/`application-local.yml`/`application-prod.yml`: `aws.*` 설정 추가
-- [ ] `infra/ci/deploy.sh`, GitLab CI/CD Variables: AWS 자격증명/버킷명 prod 반영
-- [ ] `ProductImage` 엔티티 / `ProductImageRepository`
-- [ ] `ProductService`(또는 신규 `ProductImageService`): upload-url 발급, 등록(HeadObject 검증 + 개수 제한), 삭제
-- [ ] `ProductController`: `POST /{id}/images/upload-url`, `POST /{id}/images`, `DELETE /{id}/images/{imageId}` (Swagger 포함)
-- [ ] `ProductDetailResponse`에 `images` 필드 추가
-- [ ] `ErrorCode`: P004~P007 추가
-- [ ] `TryOnResult` 엔티티 / `TryOnResultRepository`
-- [ ] `TryOnResultService`: 목록/상세(presigned GET 발급)/삭제/`saveResult(...)`
-- [ ] `TryOnController`(`/api/me/tryons`): GET 목록, GET 상세, DELETE (Swagger 포함)
-- [ ] `ErrorCode`: T003~T004 추가
-- [ ] `.claude/requests/fe/001-product-image-presigned-upload.md` 작성
-- [ ] `.claude/requests/ai/001-tryon-result-contract.md` 작성
-- [ ] `ProductImageServiceTest`, `TryOnResultServiceTest` (Mockito, `S3StorageService` 목 처리 — 기존 서비스 테스트 컨벤션과 동일)
-- [ ] `.claude/skills/verify`(BE) 기준 빌드/테스트 통과 확인
+- [x] `build.gradle`: `software.amazon.awssdk:s3` 추가
+- [x] `docs/db/schema.sql`, `comments.sql`: `product_image.image_url` → `image_key` 컬럼명 변경 + 코멘트 갱신, `tryon_result` 테이블 신규 추가 + 코멘트
+- [x] `regen.sh`/`export-erd.sh` 재실행 (data-dictionary.md, ERD 갱신)
+- [x] `global/config/S3Config` (`S3Client`, `S3Presigner` 빈, local endpoint override) — `aws.s3.endpoint`(백엔드 내부용)와 `aws.s3.public-endpoint`(presigned URL용) 분리 (아래 "구현 중 발견/수정한 버그" 참고)
+- [x] `global/storage/S3StorageService` (presigned PUT/GET, HeadObject 검증, delete, public URL 조립)
+- [x] `docker-compose.override.yml`: `minio` 서비스 추가
+- [x] `global/storage/LocalS3BucketInitializer` (`@Profile("local")` `ApplicationRunner`): 버킷 생성 + public 버킷 익명 읽기 정책
+- [x] `application.yml`/`application-local.yml`: `aws.*` 설정 추가
+- [x] `infra/ci/deploy.sh`, `.gitlab-ci.yml`: AWS 자격증명/버킷명 prod 반영 (GitLab CI/CD Variables 등록은 아직 사용자 몫 — 아래 "남은 수동 작업" 참고)
+- [x] `ProductImage` 엔티티 / `ProductImageRepository`
+- [x] 신규 `ProductImageService`: upload-url 발급, 등록(HeadObject 검증 + 개수 제한), 삭제
+- [x] `ProductController`: `POST /{id}/images/upload-url`, `POST /{id}/images`, `DELETE /{id}/images/{imageId}` (Swagger 포함)
+- [x] `ProductDetailResponse`에 `images` 필드 추가
+- [x] `ErrorCode`: P004~P007 추가
+- [x] `TryOnResult` 엔티티 / `TryOnResultRepository`
+- [x] `TryOnResultService`: 목록/상세(presigned GET 발급)/삭제/`saveResult(...)`
+- [x] `TryOnController`(`/api/users/{userId}/tryons`, `APIs.md` 스펙 그대로): GET 목록, GET 상세, DELETE (Swagger 포함)
+- [x] `ErrorCode`: T003~T004 추가
+- [x] `.claude/requests/fe/001-product-image-presigned-upload.md` 작성
+- [x] `.claude/requests/ai/001-tryon-result-contract.md` 작성
+- [x] `ProductImageServiceTest`, `TryOnResultServiceTest` (Mockito, `S3StorageService` 목 처리)
+- [x] `.claude/skills/verify`(BE) 기준 빌드/테스트 통과 확인 — 61개 테스트 전체 통과
 - [ ] (인프라, 코드 범위 아님) prod S3 버킷 생성 + public 버킷 정책 콘솔에서 수동 설정
+- [ ] GitLab CI/CD Variables에 `AWS_REGION`/`AWS_S3_PUBLIC_BUCKET`/`AWS_S3_PRIVATE_BUCKET`/`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` 등록 (사용자 몫)
+
+## 이미지 저장 플로우 (실제 구현된 요청/응답 형태)
+
+**상품 이미지 업로드 (판매자, 최대 10장)**
+
+1. `POST /api/products/{id}/images/upload-url` — body `{ fileName, contentType }` → 응답 `{ key, uploadUrl, expiresInSeconds }` (presigned PUT, 5분 만료). 이미지 1장당 1회 호출.
+2. FE가 응답받은 `uploadUrl`에 파일 바이너리를 **직접 PUT**(S3/MinIO로, 백엔드 경유 없음). `Content-Type` 헤더를 1단계에서 보낸 값과 동일하게 맞춰야 한다.
+3. `POST /api/products/{id}/images` — body `{ key, sortOrder, isPrimary }` → 서버가 `HeadObject`로 실제 업로드 여부·용량(10MB 이하)을 검증한 뒤 `ProductImage` row 생성. 검증 실패 시 `P006`(형식) / `P007`(업로드 미확인), 상품당 10장 초과 시 `P005`.
+4. `DELETE /api/products/{id}/images/{imageId}` — DB row + S3 객체를 함께 삭제.
+5. `GET /api/products/{id}`(기존 상세 조회) 응답에 `images: [{ id, url, sortOrder, isPrimary }]`가 포함된다. `url`은 public 버킷 고정 URL(만료 없음, presigned 아님).
+
+**시착 결과 조회 (본인 전용)**
+
+- 생성 경로 없음(AI 계약 미정, 위 "시착 결과 이미지" 절 참고). `TryOnResultService.saveResult(memberId, productId, imageBytes)`가 이미지 바이트를 받아 private 버킷에 저장 + row 생성하는 지점까지만 구현되어 있고, 이걸 호출하는 컨트롤러/AI 연동은 후속 계획(SY009)에서 붙인다.
+- `GET /api/users/{userId}/tryons` — 응답 `[{ id, productId, imageUrl, createdAt }]`, `imageUrl`은 조회 시점에 발급한 presigned GET URL(10분 만료). `userId`가 인증된 본인이 아니면 `T004`.
+- `GET /api/users/{userId}/tryons/{id}` — 단건, 동일 형태. 본인 것이 아니면 `T004`, 없으면 `T003`.
+- `DELETE /api/users/{userId}/tryons/{id}` — soft delete(`deleted_at`) + S3 객체 실제 삭제.
+
+## 구현 중 발견/수정한 버그
+
+- **(실제 버그) presigned/공개 URL이 도커 내부 호스트명으로 서명되던 문제**: 백엔드 컨테이너가 MinIO를 부르는 내부 주소(`minio:9000`)와, 브라우저·FE가 열어야 하는 주소(`localhost:9000`)가 다른데 endpoint를 하나로 같이 쓰고 있어 presigned URL이 브라우저에서 열리지 않았다. `aws.s3.endpoint`(백엔드 전용)와 `aws.s3.public-endpoint`(presigned/공개 URL 전용, 비어 있으면 `endpoint`로 폴백)로 분리해 해결. `S3Config`/`S3StorageService` 참고.
+- (사소한 버그) `ProductImageService.createUploadUrl`이 key를 만들 때 파라미터로 받은 `productId` 대신 `product.getId()`를 써서 `registerImage`와 일관성이 어긋나 있던 것을 수정.
+- 실제 컨테이너(Postgres/Redis/MinIO)로 상품 생성 → 업로드 URL 발급 → PUT → 등록 → 상세조회 노출 → 삭제(S3 객체 실제 삭제 확인) → 형식/미확인 오류 → 시착 목록/상세(presigned GET, 서명 없는 요청은 403, 타인 접근 403) → 삭제까지 수동 E2E로 확인.
 
 ## 확인이 필요한 미결정 사항
 
-- `/api/me/tryons` 경로가 `APIs.md`의 `/users/{id}/tryons` 초안과 다르다 — 승인되면 `APIs.md` 갱신 필요.
 - 시착 결과 보관 기간/삭제 정책(예: N일 후 자동 삭제)은 정해진 바 없어 이번 범위에서는 사용자가 수동 삭제하는 것만 지원한다.
-- AI 쪽 시착 생성 계약(요청 문서로 제안만) 및 실제 `POST /api/me/tryons` 생성 API는 AI 응답 후 별도 계획(SY009 예정)으로 진행.
+- AI 쪽 시착 생성 계약(요청 문서로 제안만) 및 실제 `POST /api/users/{userId}/tryons` 생성 API는 AI 응답 후 별도 계획(SY009 예정)으로 진행.
 
 ## 검증
 
