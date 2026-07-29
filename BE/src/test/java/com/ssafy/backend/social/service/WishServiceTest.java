@@ -1,4 +1,4 @@
-package com.ssafy.backend.wish.service;
+package com.ssafy.backend.social.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -15,11 +15,11 @@ import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.repository.ProductRepository;
-import com.ssafy.backend.wish.dto.response.WishItemResponse;
-import com.ssafy.backend.wish.dto.response.WishResponse;
-import com.ssafy.backend.wish.entity.Wish;
-import com.ssafy.backend.wish.entity.WishId;
-import com.ssafy.backend.wish.repository.WishRepository;
+import com.ssafy.backend.social.dto.response.WishItemResponse;
+import com.ssafy.backend.social.dto.response.WishResponse;
+import com.ssafy.backend.social.entity.Wish;
+import com.ssafy.backend.social.entity.WishId;
+import com.ssafy.backend.social.repository.WishRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;

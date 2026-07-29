@@ -1,4 +1,9 @@
 package com.ssafy.backend.product.dto.response;
 
-public record ProductImageUploadUrlResponse(String key, String uploadUrl, long expiresInSeconds) {
+import io.swagger.v3.oas.annotations.media.Schema;
+
+public record ProductImageUploadUrlResponse(
+        @Schema(example = "product-images/1/abc123.jpg") String key,
+        @Schema(example = "https://s3.example.com/product-images/1/abc123.jpg?X-Amz-...") String uploadUrl,
+        @Schema(example = "300") long expiresInSeconds) {
 }

@@ -203,7 +203,7 @@ BE/
 │   │   ├── entity/               # TryOnResult
 │   │   ├── repository/
 │   │   └── dto/response/
-│   ├── wish/                     # 상품 찜/해제 (WISH) — 서윤
+│   ├── social/                   # 상품 찜/해제 (WISH, APIs.md "팔로우 / 찜" 섹션 기준) — 서윤
 │   │   ├── controller/
 │   │   ├── service/
 │   │   ├── entity/               # Wish, WishId(복합키)
@@ -226,7 +226,7 @@ BE/
 담당 분배:
 
 ```
-{auth,member,product,tryon,wish,point,order}/   ← 서윤
+{auth,member,product,tryon,social,point,order}/   ← 서윤
 {live,auction,chat,home,search}/     ← 정윤
 ```
 

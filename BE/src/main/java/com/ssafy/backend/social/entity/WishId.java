@@ -1,4 +1,4 @@
-package com.ssafy.backend.wish.entity;
+package com.ssafy.backend.social.entity;
 
 import jakarta.persistence.Embeddable;
 import java.io.Serializable;

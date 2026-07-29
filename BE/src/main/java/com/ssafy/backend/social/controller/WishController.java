@@ -1,15 +1,16 @@
-package com.ssafy.backend.wish.controller;
+package com.ssafy.backend.social.controller;
 
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.ApiResponse;
 import com.ssafy.backend.global.response.PageResponse;
-import com.ssafy.backend.wish.dto.request.WishCreateRequest;
-import com.ssafy.backend.wish.dto.response.WishItemResponse;
-import com.ssafy.backend.wish.dto.response.WishResponse;
-import com.ssafy.backend.wish.service.WishService;
+import com.ssafy.backend.social.dto.request.WishCreateRequest;
+import com.ssafy.backend.social.dto.response.WishItemResponse;
+import com.ssafy.backend.social.dto.response.WishResponse;
+import com.ssafy.backend.social.service.WishService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +29,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 // 경로는 APIs.md의 `/users/{id}/wishes`, `/users/{userId}/wishes/{id}` 스펙을 그대로 따른다.
 // {id}는 별도 찜 PK가 없어(복합키) 상품 ID를 그대로 받는다 — TryOnController와 동일한 표기 관례.
-@Tag(name = "찜", description = "상품 찜/해제 API")
+// 태그는 APIs.md "팔로우 / 찜 (Socials)" 섹션 기준 — 이후 FollowController가 생기면 같은 태그명을 써서 Swagger에서 묶인다.
+@Tag(name = "팔로우 / 찜(Socials)", description = "팔로우, 상품 찜/해제 API")
 @RestController
 @RequestMapping("/api/users/{userId}/wishes")
 @RequiredArgsConstructor
@@ -45,6 +47,7 @@ public class WishController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품이 없거나 비공개 상품임"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "이미 찜한 상품임")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping
     public ResponseEntity<ApiResponse<WishResponse>> wish(
             Authentication authentication, @PathVariable Long userId, @Valid @RequestBody WishCreateRequest request) {
@@ -60,6 +63,7 @@ public class WishController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자의 찜을 해제하려 함"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "찜하지 않은 상품임")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> unwish(Authentication authentication, @PathVariable Long userId, @PathVariable Long id) {
         requireSelf(authentication, userId);
@@ -76,6 +80,7 @@ public class WishController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자의 찜 목록을 조회하려 함")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<WishItemResponse>>> getWishList(
             Authentication authentication, @PathVariable Long userId, @PageableDefault(size = 20) Pageable pageable) {

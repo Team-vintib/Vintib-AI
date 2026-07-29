@@ -1,4 +1,4 @@
-package com.ssafy.backend.wish.service;
+package com.ssafy.backend.social.service;
 
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
@@ -7,11 +7,11 @@ import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.ProductRepository;
-import com.ssafy.backend.wish.dto.response.WishItemResponse;
-import com.ssafy.backend.wish.dto.response.WishResponse;
-import com.ssafy.backend.wish.entity.Wish;
-import com.ssafy.backend.wish.entity.WishId;
-import com.ssafy.backend.wish.repository.WishRepository;
+import com.ssafy.backend.social.dto.response.WishItemResponse;
+import com.ssafy.backend.social.dto.response.WishResponse;
+import com.ssafy.backend.social.entity.Wish;
+import com.ssafy.backend.social.entity.WishId;
+import com.ssafy.backend.social.repository.WishRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;

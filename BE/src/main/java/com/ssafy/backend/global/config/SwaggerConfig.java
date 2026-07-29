@@ -15,6 +15,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SwaggerConfig {
 
+    // OpenAPI 스펙상 components 하위 키(securitySchemes 포함)는 ^[a-zA-Z0-9._-]+$ 만 허용되므로
+    // 한글은 쓸 수 없다 — 사람이 보는 이름은 SecurityScheme.description()에 한글로 넣는다.
     private static final String BEARER_SCHEME_NAME = "bearerAuth";
 
     @Bean
@@ -31,9 +33,9 @@ public class SwaggerConfig {
                         .addSecuritySchemes(
                                 BEARER_SCHEME_NAME,
                                 new SecurityScheme()
-                                        .name(BEARER_SCHEME_NAME)
                                         .type(SecurityScheme.Type.HTTP)
                                         .scheme("bearer")
-                                        .bearerFormat("JWT")));
+                                        .bearerFormat("JWT")
+                                        .description("JWT 인증 — 로그인/재발급 응답의 accessToken을 붙여넣는다.")));
     }
 }

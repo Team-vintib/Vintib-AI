@@ -7,6 +7,7 @@ import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.service.LiveService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "라이브", description = "라이브 방송 개설/조회 API")
+@Tag(name = "라이브(Lives)", description = "라이브 방송 개설/조회 API")
 @RestController
 @RequestMapping("/api/lives")
 @RequiredArgsConstructor
@@ -35,6 +36,7 @@ public class LiveController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패(방송명 누락, 예정 시각이 과거 등)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/schedule")
     public ResponseEntity<ApiResponse<LiveResponse>> scheduleLive(
             Authentication authentication, @Valid @RequestBody LiveScheduleRequest request) {
@@ -51,6 +53,7 @@ public class LiveController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패(방송명 누락 등)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping
     public ResponseEntity<ApiResponse<LiveResponse>> openLiveNow(
             Authentication authentication, @Valid @RequestBody LiveInstantRequest request) {

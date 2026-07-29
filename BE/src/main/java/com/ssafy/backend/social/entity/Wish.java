@@ -1,4 +1,4 @@
-package com.ssafy.backend.wish.entity;
+package com.ssafy.backend.social.entity;
 
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.product.entity.Product;

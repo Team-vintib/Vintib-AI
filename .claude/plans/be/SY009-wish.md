@@ -57,3 +57,14 @@
 - [x] `WishController` — `GET /api/users/{userId}/wishes`(`Pageable` 파라미터, Swagger 포함)
 - [x] `WishServiceTest` 케이스 추가(목록 반환 / 판매완료·비공개 상품도 노출 / 빈 목록) — 3건 추가로 총 9건
 - [x] `.claude/skills/BE:verify` 기준 빌드/테스트 통과 확인 (`BUILD SUCCESSFUL`, 신규 테스트 9건 모두 통과)
+
+### Swagger 태그 정리 (추가분)
+
+- `APIs.md`가 "팔로우 / 찜 (Socials)"로 묶어놨는데 컨트롤러 `@Tag`가 `"찜"`(패키지명도 `wish`)로 따로였던 걸 발견해 수정을 요청받음. 태그를 `"팔로우 / 찜 (Socials)"`로 바꾸고(사용자가 이후 `"팔로우 / 찜 (Socials)"`로 직접 다듬음), 패키지명도 태그와 맞춰 `wish` → `social`로 리네임(엔티티/테이블명 `wish`는 유지 — DB 테이블/도메인 코드는 그대로, Java 패키지 이름만 Swagger 그룹핑 기준으로 바꿈).
+- 같은 맥락에서 `product` 패키지 안에 있던 `BrandController`/`CategoryController`가 각각 `"브랜드"`/`"카테고리"` 별도 태그를 쓰고 있던 것도 `"상품(Products)"` 태그로 합침(단, 이건 `APIs.md`에 브랜드/카테고리 엔드포인트 자체가 없어서 스펙 근거는 아니고 Swagger UX상 자체 판단 — 사용자 확인 후 진행).
+
+- [x] `wish` 패키지 → `social`로 리네임(`git mv`, 패키지 선언·import 일괄 치환, 컨트롤러/서비스/레포지토리/엔티티/DTO/테스트 전체)
+- [x] `WishController` `@Tag`를 `"팔로우 / 찜 (Socials)"`로 변경
+- [x] `BrandController`/`CategoryController` `@Tag`를 `"상품(Products)"`로 통일(`ProductController`와 동일 문자열로 맞춰 springdoc 태그 설명 충돌 방지)
+- [x] `BE/README.md` 디렉터리 구조·담당 분배 표기를 `wish/` → `social/`로 갱신
+- [x] `.claude/skills/BE:verify` 기준 빌드/테스트 통과 확인 (`BUILD SUCCESSFUL`)

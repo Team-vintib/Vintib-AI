@@ -1,7 +1,7 @@
-package com.ssafy.backend.wish.repository;
+package com.ssafy.backend.social.repository;
 
-import com.ssafy.backend.wish.entity.Wish;
-import com.ssafy.backend.wish.entity.WishId;
+import com.ssafy.backend.social.entity.Wish;
+import com.ssafy.backend.social.entity.WishId;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;

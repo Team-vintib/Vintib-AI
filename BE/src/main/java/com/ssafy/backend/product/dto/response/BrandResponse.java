@@ -1,8 +1,13 @@
 package com.ssafy.backend.product.dto.response;
 
 import com.ssafy.backend.product.entity.Brand;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-public record BrandResponse(Long id, String name, String nameEn) {
+public record BrandResponse(
+
+        @Schema(example = "1") Long id,
+        @Schema(example = "리바이스") String name,
+        @Schema(example = "Levi's") String nameEn) {
 
     public static BrandResponse from(Brand brand) {
         return new BrandResponse(brand.getId(), brand.getName(), brand.getNameEn());
