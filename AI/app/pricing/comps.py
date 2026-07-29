@@ -205,7 +205,7 @@ def build_comps_source(key: str | None = None) -> CompsSource:
 def _comps_prompt(query: str) -> str:
     return (
         f"'{query}' 의 **중고** 거래 시세를 웹에서 검색해라. "
-        "번개장터·당근마켓·중고나라 등 중고 거래 매물을 우선한다.\n"
+        "후르츠패밀리·번개장터·중고나라 등 중고 거래 매물을 우선한다.\n"
         "찾은 매물을 JSON 배열로만 답해라. 설명 문장은 쓰지 마라.\n"
         '형식: [{"title": "상품명", "price": 숫자(원, 쉼표 없이), "url": "링크", '
         '"listed_at": "YYYY-MM-DD 또는 빈 문자열", "is_used": true/false}]\n'
