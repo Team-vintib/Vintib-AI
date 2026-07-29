@@ -5,6 +5,7 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.live.dto.request.LiveInstantRequest;
 import com.ssafy.backend.live.dto.request.LiveScheduleRequest;
 import com.ssafy.backend.live.dto.request.LiveStatusUpdateRequest;
+import com.ssafy.backend.live.dto.response.LiveDetailResponse;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveStatus;
@@ -24,6 +25,7 @@ public class LiveService {
 
     private final LiveRepository liveRepository;
     private final MemberRepository memberRepository;
+    private final LiveProductService liveProductService;
     // 종료 시 정리할 리소스가 늘어나면 구현체만 추가한다 — 종료 로직은 다시 열지 않는다.
     private final List<LiveCleanupHook> cleanupHooks;
 
@@ -52,6 +54,19 @@ public class LiveService {
         Live live = Live.openNow(host, request.title(), request.thumbnailUrl(), LocalDateTime.now());
 
         return LiveResponse.from(liveRepository.save(live));
+    }
+
+    /**
+     * 라이브 시청 정보 조회(LIVE-005). <b>비회원도 조회할 수 있다.</b>
+     *
+     * <p>편성 상품을 함께 담아 시청 화면 진입 시 왕복을 늘리지 않는다. 상품 조회는
+     * {@link LiveProductService}에 위임해 연결 조회 규칙(제외된 건 제외)을 한 곳에만 둔다.
+     */
+    public LiveDetailResponse getLiveDetail(Long liveId) {
+        Live live = liveRepository.findById(liveId)
+                .orElseThrow(() -> new CustomException(ErrorCode.LIVE_NOT_FOUND));
+
+        return LiveDetailResponse.of(live, liveProductService.getLinkedProducts(liveId));
     }
 
     /**

@@ -79,6 +79,8 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         // 상품 상세 조회(PROD-006)는 비회원도 가능. POST /api/products(등록)는 인증 필요로 남긴다.
                         .requestMatchers(HttpMethod.GET, "/api/products/{id}").permitAll()
+                        // 라이브 시청 조회(LIVE-005)는 비회원도 가능. 개설·상태 전이는 인증 필요로 남긴다.
+                        .requestMatchers(HttpMethod.GET, "/api/lives/{liveId}").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

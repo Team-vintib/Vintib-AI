@@ -46,13 +46,16 @@ class LiveServiceTest {
     private Member host;
 
     @Mock
+    private LiveProductService liveProductService;
+
+    @Mock
     private LiveCleanupHook cleanupHook;
 
     private LiveService liveService;
 
     @BeforeEach
     void setUp() {
-        liveService = new LiveService(liveRepository, memberRepository, List.of());
+        liveService = new LiveService(liveRepository, memberRepository, liveProductService, List.of());
     }
 
     @Test
@@ -90,7 +93,7 @@ class LiveServiceTest {
     @Test
     void 진행_중인_방송을_종료하면_ENDED로_바뀌고_정리_훅이_불린다() {
         LiveService 훅이_달린_서비스 =
-                new LiveService(liveRepository, memberRepository, List.of(cleanupHook));
+                new LiveService(liveRepository, memberRepository, liveProductService, List.of(cleanupHook));
         when(host.getId()).thenReturn(HOST_ID);
         Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
@@ -105,7 +108,7 @@ class LiveServiceTest {
     @Test
     void 예정_방송을_시작하면_LIVE로_바뀌고_정리_훅은_불리지_않는다() {
         LiveService 훅이_달린_서비스 =
-                new LiveService(liveRepository, memberRepository, List.of(cleanupHook));
+                new LiveService(liveRepository, memberRepository, liveProductService, List.of(cleanupHook));
         when(host.getId()).thenReturn(HOST_ID);
         Live live = Live.schedule(host, TITLE, THUMBNAIL_URL, LocalDateTime.now().plusDays(1));
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
