@@ -65,7 +65,7 @@ export const getHomeViewData = async ({
 }
 
 const getHomeContent = async () => {
-  const { data } = await http.get<ApiResponse<HomeContentResponse>>('/home')
+  const { data } = await http.get<ApiResponse<HomeContentResponse>>('/home', { skipAuth: true })
 
   return unwrapApiData(data)
 }
