@@ -175,9 +175,13 @@ src/
     live/
       api/
       components/
+        LiveListCard.vue
       constants/
+        liveListMockData.ts
       pages/
+        LiveListView.vue
       types/
+        liveList.types.ts
     chat/
       api/
       components/
@@ -322,7 +326,7 @@ docs/
 
 - 라우터는 `router/routes.ts`로 route 배열을 분리했으며 AUTH-001~AUTH-004 후보,
   ONBOARD-001~ONBOARD-004, BIZ-001·BIZ-001-2, HOME, FOLLOWING_HOME placeholder,
-  LIVE placeholder, 공개 PROD-008
+  LIVE 공개 목록, 공개 PROD-008
   route가 등록되어 있습니다.
 - `router/index.ts`에는 `requiresAuth`, `guestOnly` 메타 기반 인증 guard가 구현되어 있습니다.
 - `App.vue`는 `RouterView`만 렌더링합니다.
@@ -346,6 +350,9 @@ docs/
   기존 라이브 route 이동과 미구현 CTA 안내를 제공합니다. 상세 조회의 로딩·오류·상품 없음·
   판매 완료와 AI 분석 전·중·완료·결과 없음·실패 상태를 구분하며 mock adapter에서 데이터를
   받습니다. 실제 API 계약이 확정되면 adapter 내부를 교체합니다.
+- `domains/live`에는 S15P11A108-413 공개 라이브 목록 View, 진행 중·예정·종료 상태 카드,
+  로컬 이미지 기반 mock 데이터와 라이브 시청 route 연결이 구현되어 있습니다.
+  필터·목록 상태와 실제 API 연결은 S15P11A108-415·418에서 이어서 구현합니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.
