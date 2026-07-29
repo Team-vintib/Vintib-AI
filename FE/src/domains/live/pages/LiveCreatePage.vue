@@ -57,12 +57,36 @@ const scheduleSummary = computed(() => {
 
   return [form.scheduledDate, form.scheduledTime].filter(Boolean).join(' ')
 })
+const filteredProducts = computed(() => {
+  const keyword = form.productKeyword.trim().toLowerCase()
+
+  if (!keyword) {
+    return LIVE_CREATE_MOCK_PRODUCTS
+  }
+
+  return LIVE_CREATE_MOCK_PRODUCTS.filter((product) =>
+    [product.name, product.brand, product.category, product.condition].some((value) =>
+      value.toLowerCase().includes(keyword),
+    ),
+  )
+})
 const selectedProducts = computed(() =>
   LIVE_CREATE_MOCK_PRODUCTS.filter((product) => form.selectedProductIds.includes(product.id)),
 )
 
 const selectMode = (mode: LiveCreateMode) => {
   form.mode = mode
+}
+
+const isProductSelected = (productId: number) => form.selectedProductIds.includes(productId)
+
+const toggleProductSelection = (productId: number) => {
+  if (isProductSelected(productId)) {
+    form.selectedProductIds = form.selectedProductIds.filter((selectedId) => selectedId !== productId)
+    return
+  }
+
+  form.selectedProductIds = [...form.selectedProductIds, productId]
 }
 
 const moveToPreviousStep = () => {
@@ -170,6 +194,56 @@ const moveToNextStep = () => {
             </label>
           </form>
 
+          <section
+            v-else-if="currentStep.id === 'products'"
+            class="live-create__product-panel"
+            aria-label="판매 상품 선택"
+          >
+            <label class="live-create__field" for="live-create-product-search">
+              <span>상품 검색</span>
+              <input
+                id="live-create-product-search"
+                v-model="form.productKeyword"
+                class="live-create__product-search-input"
+                type="search"
+                placeholder="상품명, 브랜드, 카테고리를 검색해 주세요"
+              />
+            </label>
+
+            <div v-if="filteredProducts.length" class="live-create__product-list">
+              <article
+                v-for="product in filteredProducts"
+                :key="product.id"
+                class="live-create__product"
+                :class="{ 'live-create__product--selected': isProductSelected(product.id) }"
+              >
+                <img :src="product.thumbnailUrl" :alt="product.name" />
+                <div class="live-create__product-info">
+                  <strong>{{ product.name }}</strong>
+                  <dl class="live-create__product-meta">
+                    <div>
+                      <dt>브랜드</dt>
+                      <dd>{{ product.brand }}</dd>
+                    </div>
+                    <div>
+                      <dt>카테고리</dt>
+                      <dd>{{ product.category }}</dd>
+                    </div>
+                  </dl>
+                  <em>{{ product.price.toLocaleString() }}원</em>
+                </div>
+                <button type="button" @click="toggleProductSelection(product.id)">
+                  {{ isProductSelected(product.id) ? '선택 해제' : '선택' }}
+                </button>
+              </article>
+            </div>
+
+            <div v-else class="live-create__empty" role="status">
+              <strong>검색 결과가 없습니다.</strong>
+              <p>다른 상품명이나 브랜드로 다시 검색해 주세요.</p>
+            </div>
+          </section>
+
           <div v-else class="live-create__placeholder" role="status">
             <strong>{{ currentStep.label }}</strong>
             <p>이 단계의 세부 UI는 다음 작업에서 이어서 구현합니다.</p>
@@ -208,7 +282,16 @@ const moveToNextStep = () => {
                 <img :src="product.thumbnailUrl" :alt="product.name" />
                 <div>
                   <strong>{{ product.name }}</strong>
-                  <span>{{ product.brand }} · {{ product.condition }}</span>
+                  <dl class="live-create__summary-product-meta">
+                    <div>
+                      <dt>브랜드</dt>
+                      <dd>{{ product.brand }}</dd>
+                    </div>
+                    <div>
+                      <dt>카테고리</dt>
+                      <dd>{{ product.category }}</dd>
+                    </div>
+                  </dl>
                 </div>
               </article>
             </div>
@@ -438,6 +521,10 @@ const moveToNextStep = () => {
   padding: 0 var(--space-4);
 }
 
+.live-create__field .live-create__product-search-input {
+  height: var(--button-height-small);
+}
+
 .live-create__field textarea {
   min-height: 96px;
   padding: var(--space-3) var(--space-4);
@@ -454,6 +541,135 @@ const moveToNextStep = () => {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-soft);
   outline: none;
+}
+
+.live-create__product-panel {
+  display: grid;
+  gap: var(--space-5);
+  margin-top: var(--space-8);
+}
+
+.live-create__product-list {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.live-create__product {
+  display: grid;
+  overflow: hidden;
+  gap: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.live-create__product--selected {
+  border-color: var(--color-live);
+  box-shadow: 0 0 0 3px var(--color-auction-soft);
+}
+
+.live-create__product img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.live-create__product-info {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+  padding: 0 var(--space-4);
+}
+
+.live-create__product-info strong,
+.live-create__product-info em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-create__product-info strong {
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-style: normal;
+  font-weight: var(--font-weight-bold);
+}
+
+.live-create__product-info em {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: var(--font-weight-bold);
+}
+
+.live-create__product-meta,
+.live-create__summary-product-meta {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.live-create__product-meta div,
+.live-create__summary-product-meta div {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.live-create__product-meta dt,
+.live-create__summary-product-meta dt {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 16px;
+}
+
+.live-create__product-meta dd,
+.live-create__summary-product-meta dd {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-create__product button {
+  width: calc(100% - var(--space-8));
+  height: var(--button-height-small);
+  margin: 0 var(--space-4) var(--space-4);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: var(--font-weight-bold);
+}
+
+.live-create__product--selected button {
+  border-color: var(--color-live);
+  background: var(--color-auction-soft);
+  color: var(--color-live);
+}
+
+.live-create__empty {
+  display: grid;
+  gap: var(--space-2);
+  min-height: 160px;
+  place-content: center;
+  padding: var(--space-6);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.live-create__empty strong {
+  color: var(--color-text-primary);
 }
 
 .live-create__placeholder {
@@ -570,22 +786,26 @@ const moveToNextStep = () => {
   gap: var(--space-1);
 }
 
-.live-create__products strong,
-.live-create__products span {
+.live-create__products strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.live-create__products span {
-  color: var(--color-text-secondary);
-  font-size: 13px;
 }
 
 @media (max-width: 960px) {
   .live-create__steps ol,
   .live-create__body,
   .live-create__method-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .live-create__product-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .live-create__product-list {
     grid-template-columns: 1fr;
   }
 }
