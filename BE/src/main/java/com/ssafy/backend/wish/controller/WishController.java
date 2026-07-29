@@ -1,0 +1,72 @@
+package com.ssafy.backend.wish.controller;
+
+import com.ssafy.backend.global.exception.CustomException;
+import com.ssafy.backend.global.exception.ErrorCode;
+import com.ssafy.backend.global.response.ApiResponse;
+import com.ssafy.backend.wish.dto.request.WishCreateRequest;
+import com.ssafy.backend.wish.dto.response.WishResponse;
+import com.ssafy.backend.wish.service.WishService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+// 경로는 APIs.md의 `/users/{id}/wishes`, `/users/{userId}/wishes/{id}` 스펙을 그대로 따른다.
+// {id}는 별도 찜 PK가 없어(복합키) 상품 ID를 그대로 받는다 — TryOnController와 동일한 표기 관례.
+@Tag(name = "찜", description = "상품 찜/해제 API")
+@RestController
+@RequestMapping("/api/users/{userId}/wishes")
+@RequiredArgsConstructor
+public class WishController {
+
+    private final WishService wishService;
+
+    @Operation(summary = "상품 찜", description = "관심 상품을 찜한다. DRAFT/PRIVATE 상태 상품은 찜할 수 없다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "찜 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자의 찜을 등록하려 함"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품이 없거나 비공개 상품임"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "이미 찜한 상품임")
+    })
+    @PostMapping
+    public ResponseEntity<ApiResponse<WishResponse>> wish(
+            Authentication authentication, @PathVariable Long userId, @Valid @RequestBody WishCreateRequest request) {
+        requireSelf(authentication, userId);
+        WishResponse response = wishService.wish(userId, request.productId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "상품 찜 해제", description = "찜 목록에서 상품을 제거한다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "해제 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자의 찜을 해제하려 함"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "찜하지 않은 상품임")
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> unwish(Authentication authentication, @PathVariable Long userId, @PathVariable Long id) {
+        requireSelf(authentication, userId);
+        wishService.unwish(userId, id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // path의 userId가 인증된 본인이 아니면 존재 자체를 드러내지 않고 403으로 막는다(IDOR 방지).
+    private void requireSelf(Authentication authentication, Long userId) {
+        Long memberId = (Long) authentication.getPrincipal();
+        if (!memberId.equals(userId)) {
+            throw new CustomException(ErrorCode.WISH_FORBIDDEN);
+        }
+    }
+}
