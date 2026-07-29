@@ -108,6 +108,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `name` | `varchar(100)` | NOT NULL |  | UQ | 브랜드명. 중복 불가. |
+| `name_en` | `varchar(100)` |  |  |  | 브랜드 영문명. 없는 브랜드는 NULL. |
 
 **인덱스**
 
@@ -485,7 +486,7 @@
 | `description` | `text` |  |  |  | 상품 상세 설명. |
 | `condition_grade` | `varchar(20)` |  |  |  | 중고 상태 등급. ⚠️ 등급 체계 미확정이라 자유 문자열. |
 | `size_label` | `varchar(50)` |  |  |  | 사이즈 표기(S/M/L, 95/100 등). 브랜드마다 달라 문자열로 둔다. |
-| `sale_type` | `varchar(20)` | NOT NULL |  |  | DIRECT_SALE(상시 판매) \| AUCTION(경매) |
+| `sale_type` | `varchar(20)` |  |  |  | DIRECT_SALE(상시 판매) \| AUCTION(경매) |
 | `sale_status` | `varchar(30)` | NOT NULL | `'DRAFT'` |  | DRAFT \| ON_SALE \| AUCTION_SCHEDULED \| AUCTION_IN_PROGRESS \| AUCTION_FAILED \| SOLD \| PRIVATE |
 | `price` | `bigint` |  |  |  | 상시 판매가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002). |
 | `view_count` | `integer` | NOT NULL | `0` |  | 누적 조회수(집계값). ⚠️ 회원별 조회 이력은 남지 않는다 — REC-001 착수 시 재검토 필요. |
@@ -518,9 +519,28 @@
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `product_id` | `bigint` | NOT NULL |  | FK→product | 대상 상품. |
-| `image_url` | `varchar(500)` | NOT NULL |  |  | 이미지 URL. S3 미제공이라 EC2 로컬 볼륨 기준 (저장 방식 미확정). |
+| `image_key` | `varchar(500)` | NOT NULL |  |  | S3 오브젝트 key(전체 URL 아님). public 버킷에 저장하며 응답 시점에 고정 URL로 조립한다. |
 | `sort_order` | `smallint` | NOT NULL | `0` |  | 노출 순서. |
 | `is_primary` | `boolean` | NOT NULL | `false` |  | 대표 이미지 여부. 목록·썸네일에 쓴다. |
+
+---
+
+### `tryon_result`
+
+AI 가상 시착 합성 결과물. 생성(POST) 자체는 AI 계약 확정 전이라 저장/조회/삭제만 다룬다.
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `member_id` | `bigint` | NOT NULL |  | FK→member | 결과물 소유자. 본인만 조회 가능 (presigned GET URL). |
+| `product_id` | `bigint` | NOT NULL |  | FK→product | 합성에 사용된 상품. |
+| `image_key` | `varchar(500)` | NOT NULL |  |  | S3 오브젝트 key(전체 URL 아님). private 버킷에 저장하며 조회 시 presigned GET URL을 매번 새로 발급한다. |
+| `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
+| `deleted_at` | `timestamptz` |  |  |  | 사용자가 수동 삭제한 시각. 자동 만료 정책은 없다. |
+
+**인덱스**
+
+- `ix_tryon_result_member` — `CREATE INDEX ix_tryon_result_member ON public.tryon_result USING btree (member_id, created_at DESC) WHERE (deleted_at IS NULL)`
 
 ---
 

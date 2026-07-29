@@ -18,9 +18,26 @@ i15a108.p.ssafy.io {
 		reverse_proxy ai:8000
 	}
 
-	handle /results/* {         
-		reverse_proxy ai:8000     
-	}                            
+	handle /results/* {
+		reverse_proxy ai:8000
+	}
+
+	# 오브젝트 스토리지(MinIO). 팀에 AWS 계정이 없어 운영도 자체 호스팅한다 — 계획 JY006.
+	#
+	# 백엔드가 endpoint override 를 쓰면 SDK 가 path-style 을 강제하므로 URL 이
+	# https://i15a108.p.ssafy.io/{bucket}/{key} 형태가 된다. 그래서 버킷명을 그대로
+	# 최상위 경로로 받는다 (현재 API 는 전부 /api/* 라 충돌하지 않는다).
+	#
+	# ⚠️ handle_path 를 쓰면 안 된다. 경로 접두사를 잘라내면 SigV4 서명 대상이 달라져
+	#    presigned URL 검증이 전부 실패한다. handle 로 경로를 그대로 넘긴다.
+	# ⚠️ 서명에는 Host 도 포함된다. Caddy 는 reverse_proxy 시 원본 Host 를 보존하므로
+	#    MinIO 가 백엔드의 presigner 와 동일한 값으로 검증한다 — 여기서 Host 를 바꾸지 말 것.
+	handle /vintib-public/* {
+		reverse_proxy minio:9000
+	}
+	handle /vintib-private/* {
+		reverse_proxy minio:9000
+	}
 
 	# 헬스체크·REST·(추후)WebSocket 전부 백엔드로
 	handle {

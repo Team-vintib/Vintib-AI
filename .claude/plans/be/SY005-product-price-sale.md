@@ -21,6 +21,7 @@
   - `INVALID_PRODUCT_STATE`(400, `P003`) — `DRAFT` 상태가 아닌데 상시 판매 등록을 시도함
 - Swagger 어노테이션(`@Operation`/`@ApiResponses`) 추가.
 - `ProductServiceTest`에 케이스 추가: 정상 전환(가격 설정 + `ON_SALE`) / 상품 없음(404) / 본인 상품 아님(403) / `DRAFT`가 아닌 상품에 시도(400).
+- **요청 DTO를 `price` 단일 필드로 좁게감. 아직 요구되지 않은 미래 케이스를 지금 설계하지 않는다는 원칙에 따름.
 
 ## 구현 목록
 
@@ -32,7 +33,3 @@
 - [x] `ProductController` — `PATCH /api/products/{id}/status` (Swagger 포함)
 - [x] `ProductServiceTest` 케이스 4건 추가
 - [x] `.claude/skills/verify` 기준 빌드/테스트 통과 확인
-
-## 확인이 필요한 미결정 사항
-
-- **요청 DTO를 `price` 단일 필드로 좁게 갈지, 아니면 향후 PROD-003~005/014를 염두에 두고 지금부터 `action`/`targetStatus` 같은 필드를 넣어둘지.** 이번 계획은 전자(좁게 감)로 가정했다 — 아직 요구되지 않은 미래 케이스를 지금 설계하지 않는다는 원칙에 따름. 다른 방식을 원하면 알려달라.

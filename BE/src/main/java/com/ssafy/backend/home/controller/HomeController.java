@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "홈", description = "홈 화면 콘텐츠 조회 API")
+@Tag(name = "홈(Home)", description = "홈 화면 콘텐츠 조회 API")
 @RestController
 @RequestMapping("/api/home")
 @RequiredArgsConstructor

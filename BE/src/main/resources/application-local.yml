@@ -25,3 +25,12 @@ management:
   endpoint:
     health:
       show-details: always
+
+aws:
+  # docker-compose 로 백엔드까지 컨테이너로 띄우면 backend 서비스 env(AWS_*)가 이 기본값을 덮어써
+  # endpoint 가 http://minio:9000 이 된다. IDE 등에서 백엔드만 호스트에서 직접 띄울 때는
+  # docker-compose.override.yml 이 연 호스트 포트(localhost:9000)를 그대로 쓴다.
+  access-key: ${AWS_ACCESS_KEY_ID:minioadmin}
+  secret-key: ${AWS_SECRET_ACCESS_KEY:minioadmin}
+  s3:
+    endpoint: ${AWS_S3_ENDPOINT:http://localhost:9000}
