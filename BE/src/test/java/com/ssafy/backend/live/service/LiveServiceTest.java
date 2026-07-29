@@ -15,6 +15,7 @@ import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,7 @@ class LiveServiceTest {
 
     @BeforeEach
     void setUp() {
-        liveService = new LiveService(liveRepository, memberRepository);
+        liveService = new LiveService(liveRepository, memberRepository, List.of());
     }
 
     @Test

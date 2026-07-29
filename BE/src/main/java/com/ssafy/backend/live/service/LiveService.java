@@ -7,10 +7,12 @@ import com.ssafy.backend.live.dto.request.LiveScheduleRequest;
 import com.ssafy.backend.live.dto.request.LiveStatusUpdateRequest;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
+import com.ssafy.backend.live.entity.LiveStatus;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,8 @@ public class LiveService {
 
     private final LiveRepository liveRepository;
     private final MemberRepository memberRepository;
+    // 종료 시 정리할 리소스가 늘어나면 구현체만 추가한다 — 종료 로직은 다시 열지 않는다.
+    private final List<LiveCleanupHook> cleanupHooks;
 
     /**
      * 예약 라이브 개설(LIVE-001). 방송 예정 시각이 미래인지는 요청 DTO({@code @Future})가 검증한다.
@@ -68,6 +72,10 @@ public class LiveService {
         }
 
         live.transitionTo(request.status(), LocalDateTime.now());
+
+        if (request.status() == LiveStatus.ENDED) {
+            cleanupHooks.forEach(hook -> hook.onLiveEnded(live));
+        }
 
         return LiveResponse.from(live);
     }
