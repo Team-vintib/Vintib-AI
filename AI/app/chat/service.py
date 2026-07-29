@@ -66,7 +66,7 @@ class ChatModerationService:
         *,
         abuse_threshold: float = registry.ABUSE_THRESHOLD,
         min_cluster_size: int = registry.MIN_CLUSTER_SIZE,
-        candidate_limit: int = registry.RETRIEVE_TOP_K,
+        candidate_limit: int = registry.CHAT_RAG_CANDIDATE_LIMIT,
     ) -> None:
         self._spam = spam_detector
         self._classifier = classifier
