@@ -14,6 +14,11 @@ venv/
 .DS_Store
 Thumbs.db
 
+# 모델 가중치 다운로드 위치. SAM 3D Objects 체크포인트(facebook/sam-3d-objects)를 여기로
+# 받으면 12GB 를 넘는다 — ss_generator.ckpt 단독으로 6.7GB, slat_generator.ckpt 4.9GB.
+# `git add .` 한 번으로 리포가 폭발하므로 반드시 제외한다.
+/checkpoints/
+
 .idea/
 .vscode/*
 !.vscode/extensions.json

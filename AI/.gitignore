@@ -38,4 +38,6 @@ validation/sam3-condition-check/outputs/
 validation/clipseg-condition-check/outputs/
 # SAM 3D 스파이크 산출물(.ply splat + 턴테이블 GIF). splat 은 장당 수십 MB 라 커밋 금지.
 validation/sam3d-condition-check/outputs/
+# 의류 파인튜닝 스캐폴드의 산출물 — 더미 데이터·캐시·체크포인트·렌더·리포트 전부 재생성 가능하다.
+validation/sam3d-garment-finetune-check/artifacts/
 
