@@ -10,6 +10,7 @@ target-version = "py312"
 # 외부/서드파티 코드라 lint 대상이 아니다(PoC로 통째로 가져온 것).
 extend-exclude = [
 "validation/AI_tryon/tryondiffusion",
+"validation/AI_tryon/CatVTON",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -23,8 +24,13 @@ target-version = ["py312"]
 extend-exclude = '''
 (
   validation/AI_tryon/tryondiffusion
+  | validation/AI_tryon/CatVTON
 )
 '''
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+# validation/AI_tryon/CatVTON 안 서드파티 코드(detectron2/densepose)에 test_*.py 이름의 비-테스트
+# 모듈이 있어 pytest가 그대로 수집하려다 torch 미설치로 깨진다(CI엔 validation/requirements-test.txt
+# 설치 안 함) — ruff/black처럼 pytest도 이 폴더를 수집 대상에서 제외한다.
+addopts = "--ignore=validation/AI_tryon/CatVTON"

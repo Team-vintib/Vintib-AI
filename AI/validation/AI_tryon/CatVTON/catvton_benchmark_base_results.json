@@ -1,0 +1,44 @@
+{
+  "model": "CatVTON (base pipeline, fit_type=regular -> equivalent to original)",
+  "note": "model/cloth_masker.py has been extended for fit-aware masking, but fit_type='regular' bypasses the extension and reproduces original CatVTON behavior.",
+  "model_load_time_sec": 13.79,
+  "mask_generation_time_sec": 2.88,
+  "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+  "benchmarks": [
+    {
+      "steps": 10,
+      "resolution": "768x1024",
+      "inference_time_sec": 35.23,
+      "peak_vram_gb": 4.89,
+      "output_file": "bench_catvton_base_steps10_768x1024.png"
+    },
+    {
+      "steps": 20,
+      "resolution": "768x1024",
+      "inference_time_sec": 55.34,
+      "peak_vram_gb": 4.89,
+      "output_file": "bench_catvton_base_steps20_768x1024.png"
+    },
+    {
+      "steps": 30,
+      "resolution": "768x1024",
+      "inference_time_sec": 76.28,
+      "peak_vram_gb": 4.89,
+      "output_file": "bench_catvton_base_steps30_768x1024.png"
+    },
+    {
+      "steps": 50,
+      "resolution": "768x1024",
+      "inference_time_sec": 118.79,
+      "peak_vram_gb": 4.89,
+      "output_file": "bench_catvton_base_steps50_768x1024.png"
+    },
+    {
+      "steps": 30,
+      "resolution": "512x512",
+      "inference_time_sec": 77.14,
+      "peak_vram_gb": 4.89,
+      "output_file": "bench_catvton_base_steps30_512x512.png"
+    }
+  ]
+}
