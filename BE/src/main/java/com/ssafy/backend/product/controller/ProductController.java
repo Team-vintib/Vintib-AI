@@ -7,6 +7,7 @@ import com.ssafy.backend.product.dto.request.ProductImageRegisterRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUploadUrlRequest;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
+import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
@@ -112,6 +113,45 @@ public class ProductController {
         Long viewerId = authentication != null ? (Long) authentication.getPrincipal() : null;
         ProductDetailResponse response = productService.getProductDetail(viewerId, id);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "상품 정보 수정",
+            description = "제목/설명/카테고리/브랜드/상태등급/사이즈를 부분 수정한다. 요청에 포함된 필드만 반영한다. "
+                    + "DRAFT/ON_SALE/PRIVATE 상태의 상품만 수정할 수 있다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패 또는 수정 불가 상태"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @PatchMapping("/{id}")
+    public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody ProductUpdateRequest request) {
+        Long sellerId = (Long) authentication.getPrincipal();
+        ProductResponse response = productService.updateProduct(sellerId, id, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "상품 삭제",
+            description = "상품을 소프트 삭제한다(deleted_at 기록, DB row는 유지). "
+                    + "DRAFT/ON_SALE/PRIVATE 상태의 상품만 삭제할 수 있으며, 삭제 후에는 상세 조회 등에서 존재하지 않는 상품으로 취급된다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "삭제 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "삭제 불가 상태"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteProduct(Authentication authentication, @PathVariable Long id) {
+        Long sellerId = (Long) authentication.getPrincipal();
+        productService.deleteProduct(sellerId, id);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(
