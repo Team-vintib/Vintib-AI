@@ -1,25 +1,37 @@
-eck# HOME 홈 화면 API 응답 계약 확인 요청
+# S15P11A108-283 홈 화면 API 응답 계약 확인 요청
 
-- 요청자 파트: FE
-- 대상 파트: BE
+## 요청 배경
 
-## 배경/이유
+FE의 홈 화면 기본 레이아웃, 비로그인/로그인 홈 섹션, 라이브·상품 카드 UI가 구현되어
+현재 `HomeViewData` view model과 mock adapter로 동작한다.
 
-FE 홈 화면은 현재 `HomeViewData` view model과 mock adapter(`FE/src/domains/home/api/homeViewApi.ts`)로 동작합니다. 실제 서비스 데이터로 전환하려면 BE 응답 계약과 API 제공 방식이 확정되어야 하므로, 아래 필드와 엔드포인트 구성 가능 여부 확인을 요청합니다.
+실제 서비스 데이터로 전환하려면 HOME 전용 API 제공 방식과 응답 필드 계약이 확정되어야
+하므로 아래 FE 선행 구조에 맞춘 BE 계약 확인을 요청한다.
 
-## 관련 기능/Jira
+## 요청 API
 
-- `S15P11A108-283` 홈 페이지 기본 레이아웃 구현
-- `S15P11A108-287` 홈 화면 Mock 데이터 렌더링 및 반응형 구현
-- `S15P11A108-284` 진행 중·예약 라이브 카드 및 목록 UI 구현
-- `S15P11A108-285` 상시 판매·경매 예정 상품 카드 및 목록 UI 구현
-- `S15P11A108-286` 홈 콘텐츠 UI 구현
-- `S15P11A108-396` 로그인 홈 섹션 레이아웃 구현
-- `S15P11A108-398` 비로그인 홈 진입 화면 구현
+HOME 전용 집계 API가 필요하다면 아래 형태를 우선 후보로 요청한다.
+
+```http
+GET /api/home
+Authorization: Bearer {accessToken} 선택
+```
+
+로그인 회원의 팔로잉 기반 홈 콘텐츠를 별도 조회해야 한다면 아래 형태를 우선 후보로 요청한다.
+
+```http
+GET /api/home/following
+Authorization: Bearer {accessToken}
+```
+
+- 비회원 홈은 인증 없이 접근 가능해야 한다.
+- 로그인 홈은 인증 여부에 따라 회원별 상태와 팔로잉 콘텐츠를 포함할 수 있어야 한다.
+- 단일 API로 비회원/로그인 홈을 모두 처리할지, 공통 홈과 팔로잉 홈을 분리할지 확정이 필요하다.
 
 ## 현재 FE view model
 
-FE는 현재 아래 구조로 화면을 렌더링합니다. API 계약 확정 전 임시 구조이며, BE 응답이 정리되면 adapter에서 매핑할 예정입니다.
+FE는 현재 아래 구조로 화면을 렌더링한다. API 계약 확정 후 adapter에서 BE 응답을
+`HomeViewData`로 매핑할 예정이다.
 
 ```ts
 interface HomeViewData {
@@ -37,64 +49,111 @@ interface HomeViewData {
 
 ### 라이브 카드
 
-- `id`
-- `status`: `LIVE` 또는 `SCHEDULED`
-- `title`
-- `thumbnailUrl`
-- `hostName`
-- `scheduledAt`: 예약 라이브에서 사용
-- `startedAt`: 진행 중 라이브에서 사용
-- `scheduledProductCount`: 예약 라이브 예정 상품 수
-- `viewerCount`: 진행 중 라이브 시청자 수를 제공할 수 있으면 사용 가능
-- `reservationCount`: 예약 라이브 알림/예약 수를 제공할 수 있으면 사용 가능
-- `categoryName`: 카테고리 노출이 가능하면 사용 가능
+| 필드 | 타입 | 필수 | 규칙 |
+| --- | --- | --- | --- |
+| `id` | number/string | 필수 | 라이브 상세 이동과 카드 key에 사용 |
+| `status` | enum | 필수 | `LIVE`, `SCHEDULED` |
+| `title` | string | 필수 | 라이브 제목 |
+| `thumbnailUrl` | string | 필수 | 접근 가능한 대표 이미지 URL |
+| `hostName` | string | 필수 | 판매자/호스트 표시명 |
+| `scheduledAt` | string/null | 예약 라이브 필수 | ISO 8601 일시 |
+| `startedAt` | string/null | 진행 중 라이브 요청 | ISO 8601 일시 |
+| `scheduledProductCount` | number/null | 선택 | 예약 라이브 예정 상품 수 |
+| `viewerCount` | number/null | 선택 | 진행 중 라이브 시청자 수 |
+| `reservationCount` | number/null | 선택 | 예약/알림 수 |
+| `categoryName` | string/null | 선택 | 카테고리 노출 가능 시 사용 |
 
 ### 상품 카드
 
-- `id`
-- `title`
-- `saleType`: `DIRECT_SALE` 또는 `AUCTION`
-- `saleStatus`: `ON_SALE` 또는 `AUCTION_SCHEDULED`
-- `primaryImageUrl`
-- `sellerName`
-- `price`
-- `startingBid`: 경매 상품에서 사용
-- `auctionStartsAt`: 경매 예정 시각 제공 가능하면 사용 가능
-- `brandName`: 브랜드 제공 가능하면 사용
-- `categoryName`: 카테고리 제공 가능하면 사용
-- `isWished`: 로그인 회원의 찜 상태 제공 가능하면 사용
+| 필드 | 타입 | 필수 | 규칙 |
+| --- | --- | --- | --- |
+| `id` | number/string | 필수 | 상품 상세 이동과 카드 key에 사용 |
+| `title` | string | 필수 | 상품명 |
+| `saleType` | enum | 필수 | `DIRECT_SALE`, `AUCTION` |
+| `saleStatus` | enum | 필수 | `ON_SALE`, `AUCTION_SCHEDULED` |
+| `primaryImageUrl` | string | 필수 | 접근 가능한 대표 이미지 URL |
+| `sellerName` | string | 필수 | 판매자 표시명 |
+| `price` | number/null | 상시 판매 필수 | 판매가 |
+| `startingBid` | number/null | 경매 상품 요청 | 경매 시작가 |
+| `auctionStartsAt` | string/null | 선택 | 경매 예정 시각 |
+| `brandName` | string/null | 선택 | 브랜드명 |
+| `categoryName` | string/null | 선택 | 카테고리명 |
+| `isWished` | boolean/null | 로그인 시 선택 | 회원별 찜 상태 |
 
 ### 로그인 홈 전용 팔로잉 판매자 카드
 
-- `id`
-- `liveId`
-- `name`
-- `profileImageUrl`
-- `coverImageUrl`
-- `specialty`
-- `followerCount`
-- `newProductCount`
-- `liveStatus`: `LIVE` 또는 `SCHEDULED`
-- `liveTitle`
-- `liveAt`
+| 필드 | 타입 | 필수 | 규칙 |
+| --- | --- | --- | --- |
+| `id` | number/string | 필수 | 판매자 카드 key |
+| `liveId` | number/string/null | 선택 | 진행/예약 라이브 이동 |
+| `name` | string | 필수 | 판매자 표시명 |
+| `profileImageUrl` | string | 필수 | 접근 가능한 프로필 이미지 URL |
+| `coverImageUrl` | string | 필수 | 접근 가능한 커버 이미지 URL |
+| `specialty` | string/null | 선택 | 판매자 전문 분야 또는 소개 |
+| `followerCount` | number/null | 선택 | 팔로워 수 |
+| `newProductCount` | number/null | 선택 | 신규/판매 상품 수 |
+| `liveStatus` | enum/null | 선택 | `LIVE`, `SCHEDULED` |
+| `liveTitle` | string/null | 선택 | 라이브 제목 |
+| `liveAt` | string/null | 선택 | 라이브 시작 또는 예약 일시 |
 
 ### 추천 상품
 
-상품 카드 필드에 더해 아래 값을 제공할 수 있으면 사용합니다.
+상품 카드 필드에 더해 아래 값을 제공할 수 있으면 사용한다.
 
-- `recommendationReason`
+| 필드 | 타입 | 필수 | 규칙 |
+| --- | --- | --- | --- |
+| `recommendationReason` | string/null | 선택 | 추천 이유. 현재 카드에는 직접 표시하지 않음 |
 
-## 요청 내용
+## 응답 규격
 
-1. HOME 전용 집계 API가 필요한지, 기존 라이브/상품/팔로잉 API 조합으로 처리하는 것이 적절한지 판단 부탁드립니다.
-2. 위 후보 필드 중 BE에서 제공 가능한 필드와 제공하지 않을 필드를 구분해 주세요.
-3. `viewerCount`, `reservationCount`, `isWished`, `followerCount`처럼 집계/회원별 상태가 필요한 값이 HOME 응답에서 바로 제공 가능한지 확인 부탁드립니다.
-4. 비로그인 홈과 로그인 홈을 같은 응답으로 처리할지, 인증 여부에 따라 다른 응답을 제공할지 확인 부탁드립니다.
-5. 각 섹션의 기본 노출 개수와 정렬 기준을 정해 주세요. FE 현재 mock은 섹션당 2~3개 카드 기준입니다.
-6. 응답이 빈 배열일 수 있는 섹션을 알려 주세요. FE는 각 섹션 empty 상태를 이미 처리할 수 있습니다.
+성공:
 
-## FE 반영 예정
+```http
+200 OK
+```
 
-- BE 계약 확정 전까지는 `homeViewApi.ts`에서 mock 데이터를 반환합니다.
-- BE 계약 확정 후 `homeViewApi.ts` 내부를 HTTP 호출과 `HomeViewData` 매핑 로직으로 교체합니다.
-- 화면 컴포넌트(`GuestHome`, `MemberHome`)는 API 응답에 직접 묶지 않고 `HomeViewData`만 받도록 유지합니다.
+```json
+{
+  "success": true,
+  "data": {
+    "liveNow": [],
+    "scheduledLives": [],
+    "directSaleProducts": [],
+    "upcomingAuctionProducts": [],
+    "followedSellers": [],
+    "recommendedProducts": [],
+    "contentCards": []
+  },
+  "error": null
+}
+```
+
+- 각 섹션은 빈 배열을 허용한다.
+- 섹션별 기본 노출 개수와 정렬 기준을 BE에서 확정해 공유해야 한다.
+- `viewerCount`, `reservationCount`, `isWished`, `followerCount`처럼 집계/회원별 상태가 필요한 값은 제공 가능 여부 확인이 필요하다.
+
+## FE 처리
+
+- BE 계약 확정 전까지 `homeViewApi.ts`에서 mock 데이터를 반환한다.
+- BE 계약 확정 후 `homeViewApi.ts`를 HTTP 호출과 `HomeViewData` 매핑 로직으로 교체한다.
+- 화면 컴포넌트(`GuestHome`, `MemberHome`)는 API 응답 DTO에 직접 묶지 않고 `HomeViewData`만 받도록 유지한다.
+- 비회원과 로그인 회원의 응답 차이는 adapter에서 흡수한다.
+- 빈 배열 섹션은 FE에서 섹션 숨김 또는 empty 상태로 처리할 수 있다.
+
+## BE 확인 필요
+
+1. HOME 전용 집계 API가 필요한지, 기존 라이브/상품/팔로잉 API 조합으로 처리하는 것이 적절한지 확정해야 한다.
+2. 비회원 홈과 로그인 홈을 같은 응답으로 처리할지, 인증 여부에 따라 다른 응답을 제공할지 확정해야 한다.
+3. 후보 필드 중 BE에서 제공 가능한 필드와 제공하지 않을 필드를 구분해야 한다.
+4. 집계값과 회원별 상태값을 HOME 응답에서 바로 제공할 수 있는지 확인해야 한다.
+5. 각 섹션의 기본 노출 개수와 정렬 기준을 확정해야 한다.
+6. 구현 후 Swagger에 HOME 응답 DTO, 인증 정책, 빈 배열 가능 섹션을 문서화해야 한다.
+
+## FE 관련 파일
+
+- `FE/src/domains/home/api/homeViewApi.ts`
+- `FE/src/domains/home/types/homeView.types.ts`
+- `FE/src/domains/home/components/GuestHome.vue`
+- `FE/src/domains/home/components/MemberHome.vue`
+- `FE/src/domains/home/components/LiveCard.vue`
+- `FE/src/domains/home/components/ProductCard.vue`
