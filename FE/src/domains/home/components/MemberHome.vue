@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import CategoryProductTabs from '@/domains/home/components/CategoryProductTabs.vue'
-import HomeContentCard from '@/domains/home/components/HomeContentCard.vue'
 import HomeHero from '@/domains/home/components/HomeHero.vue'
 import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
@@ -20,12 +18,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   toggleWish: [productId: number]
 }>()
-
-const memberContentCards = computed(() =>
-  props.homeData.contentCards.filter(
-    (card) => card.audience === 'member' || card.audience === 'all',
-  ),
-)
 
 const formatCompactNumber = (value: number) => {
   return new Intl.NumberFormat('ko-KR', {
@@ -219,13 +211,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
       </div>
     </HomeSection>
 
-    <section class="content-band" aria-label="회원 홈 콘텐츠">
-      <HomeContentCard
-        v-for="content in memberContentCards"
-        :key="content.id"
-        :content="content"
-      />
-    </section>
   </div>
 </template>
 
@@ -235,10 +220,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   justify-items: stretch;
   gap: var(--space-12);
   padding-bottom: var(--space-16);
-}
-
-.content-band {
-  width: 100%;
 }
 
 .member-hero__primary,
@@ -425,10 +406,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
-}
-
-.content-band {
-  display: grid;
 }
 
 @media (max-width: 768px) {

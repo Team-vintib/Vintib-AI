@@ -1,5 +1,3 @@
-import { ROUTE_PATHS } from '@/shared/constants/routes'
-
 import type { HomeViewData } from '../types/homeView.types'
 
 // Mock 전용 데이터입니다. API 응답 계약이 확정되면 제거하거나 API adapter 테스트 fixture로 이동합니다.
@@ -523,28 +521,6 @@ export const homeMockData: HomeViewData = {
           isWished: false,
         },
       ],
-    },
-  ],
-  contentCards: [
-    {
-      id: 501,
-      title: '라이브로 만나는 빈티지 셀렉션',
-      description: '실시간으로 상태를 확인하고 판매자와 대화하며 구매해 보세요.',
-      imageUrl:
-        'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1200&q=80',
-      ctaLabel: '라이브 둘러보기',
-      targetPath: ROUTE_PATHS.LIVE_LIST,
-      audience: 'guest',
-    },
-    {
-      id: 502,
-      title: '팔로우한 셀러의 새 라이브',
-      description: '관심 있는 셀러의 라이브와 상품을 홈에서 바로 확인하세요.',
-      imageUrl:
-        'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80',
-      ctaLabel: '팔로잉 보기',
-      targetPath: ROUTE_PATHS.FOLLOWING_HOME,
-      audience: 'member',
     },
   ],
 }

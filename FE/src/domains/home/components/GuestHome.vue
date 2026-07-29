@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import CategoryProductTabs from '@/domains/home/components/CategoryProductTabs.vue'
-import HomeContentCard from '@/domains/home/components/HomeContentCard.vue'
 import HomeHero from '@/domains/home/components/HomeHero.vue'
 import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
@@ -20,12 +18,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   toggleWish: [productId: number]
 }>()
-
-const guestContentCards = computed(() =>
-  props.homeData.contentCards.filter(
-    (card) => card.audience === 'guest' || card.audience === 'all',
-  ),
-)
 
 const getLivePath = (liveId: number) => `/lives/${liveId}`
 const getProductPath = (productId: number) => `/products/${productId}`
@@ -140,13 +132,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
       </div>
     </HomeSection>
 
-    <section class="content-band" aria-label="홈 콘텐츠">
-      <HomeContentCard
-        v-for="content in guestContentCards"
-        :key="content.id"
-        :content="content"
-      />
-    </section>
   </div>
 </template>
 
@@ -156,10 +141,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   justify-items: stretch;
   gap: var(--space-12);
   padding-bottom: var(--space-16);
-}
-
-.content-band {
-  width: 100%;
 }
 
 .home-hero__primary,
@@ -192,10 +173,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-5);
-}
-
-.content-band {
-  display: grid;
 }
 
 @media (max-width: 768px) {

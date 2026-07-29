@@ -29,7 +29,6 @@ FE 홈 화면은 `GET /api/home`과 `GET /api/home/following`을 연결해 Guest
 | 라이브 `startedAt` | `일정 확인` fallback | BE 홈 라이브 응답에 진행 중 라이브 시작 시간 없음 |
 | `followedSellers` | FE mock 유지 | BE `/home/following` 응답에 팔로잉 판매자 카드 없음 |
 | `categoryProductSections` | FE mock 유지 | BE `/home` 응답에 카테고리별 상품 묶음 없음 |
-| `contentCards` | FE 상수 유지 | BE `/home` 응답에 홈 배너/콘텐츠 카드 없음 |
 | 이미지 URL | 카드 `onerror` fallback | BE mock 이미지가 `cdn.example.com`이라 실제 접근 불가 |
 
 ## 요청 1. `GET /api/home` 응답 구조
@@ -43,7 +42,6 @@ interface HomeContentResponse {
   onSaleProducts: HomeProductCardResponse[]
   upcomingAuctionProducts: HomeProductCardResponse[]
   categoryProductSections?: HomeCategoryProductSectionResponse[]
-  contentCards?: HomeContentCardResponse[]
 }
 ```
 
@@ -56,7 +54,6 @@ interface HomeContentResponse {
 | `onSaleProducts` | `HomeProductCardResponse[]` | 예 | GuestHome의 `판매 상품` 섹션 | BE 응답 사용 중 |
 | `upcomingAuctionProducts` | `HomeProductCardResponse[]` | 예 | GuestHome/MemberHome의 `경매 예정 상품` 섹션 | BE 응답 사용 중 |
 | `categoryProductSections` | `HomeCategoryProductSectionResponse[]` | 요청 | GuestHome/MemberHome의 `카테고리별 상품` 탭 섹션 | FE mock 유지 |
-| `contentCards` | `HomeContentCardResponse[]` | 선택 | 홈 하단 배너/콘텐츠 카드 | FE 상수 유지. BE 관리 계획 있으면 제공 요청 |
 
 ## 요청 2. 라이브 카드 응답
 
@@ -71,6 +68,7 @@ interface HomeLiveCardResponse {
   broadcastStatus: 'LIVE' | 'SCHEDULED'
   scheduledAt: string | null
   startedAt: string | null
+  viewerCount: number | null
   productCount: number | null
 }
 ```
@@ -86,6 +84,7 @@ interface HomeLiveCardResponse {
 | `broadcastStatus` | `'LIVE' \| 'SCHEDULED'` | 예 | 진행 중/예약 라이브 구분 | LIVE badge, 예약 카드 variant | BE 응답 사용 중 |
 | `scheduledAt` | `string \| null` | 예약 라이브 필수 | 예약 라이브 일시 표시 | 예약 라이브 카드 상단 시간, 본문 예정 일자 | BE 응답 사용 중 |
 | `startedAt` | `string \| null` | 진행 중 라이브 요청 | 진행 중 라이브 시작 시간 표시 | 진행 중 라이브 본문 `시작 시간` | 현재 없음. 없으면 `일정 확인`으로 보임 |
+| `viewerCount` | `number \| null` | 선택 | 현재 시청자 수 표시 후보 | 현재 화면에는 직접 노출하지 않음 | BE 응답 타입에는 있으나 현재 카드 렌더링 필수는 아님 |
 | `productCount` | `number \| null` | 선택 | 연결/예정 상품 수 표시 | 예약 카드 `예정 상품 n개` | BE 응답 사용 중 |
 
 ### FE에서 원하는 표시 정책
@@ -135,7 +134,7 @@ interface HomeProductCardResponse {
 | `sellerName` | `string` | 요청 | 판매자명 표시 | `판매자 {sellerName}` | 현재 없음. FE 기본값 사용 |
 | `isWished` | `boolean \| null` | 로그인 시 요청 | 회원별 찜 상태 표시 | 찜 버튼/상태 표시 예정 | 현재 없음. FE `false` 기본값 |
 | `startingBid` | `number \| null` | 경매 상품 요청 | 경매 시작가 표시 | 경매 상품 가격/보조 가격 | 현재 없음. `시작가 미정` 표시 |
-| `auctionStartsAt` | `string \| null` | 경매 상품 요청 | 경매 시작 예정 시각 표시 | 경매 예정 상품 보조 정보 | 현재 없음 |
+| `auctionStartsAt` | `string \| null` | 선택 | 경매 시작 예정 시각 표시 후보 | 현재 상품 카드에는 직접 노출하지 않음 | 추후 경매 시작 시각 노출 시 사용 |
 
 ### FE 매핑 규칙
 
@@ -152,7 +151,7 @@ interface HomeProductCardResponse {
 | `auctionScheduled` | `saleStatus` 보정 | `true`면 `AUCTION_SCHEDULED` |
 | `sellerName` | `sellerName` | 없으면 `판매자 정보 확인 중` |
 | `startingBid` | `startingBid` | 경매 시작가 표시 |
-| `auctionStartsAt` | `auctionStartsAt` | 경매 예정 시각 표시 |
+| `auctionStartsAt` | `auctionStartsAt` | 경매 예정 시각 표시 후보. 현재 화면 필수는 아님 |
 
 ## 요청 4. `GET /api/home/following` 응답 구조
 
@@ -184,6 +183,8 @@ interface FollowingContentResponse {
 interface HomeFollowedSellerResponse {
   sellerId: number
   sellerName: string
+  profileImageUrl: string
+  coverImageUrl: string
   followerCount: number
   productCount: number
   liveId: number | null
@@ -199,6 +200,8 @@ interface HomeFollowedSellerResponse {
 | --- | --- | --- | --- | --- | --- |
 | `sellerId` | `number` | 예 | 판매자 카드 key, 추후 판매자 상세 이동 | 팔로잉 판매자 카드 | FE mock `id` 사용 |
 | `sellerName` | `string` | 예 | 판매자명 표시 | 팔로잉 판매자 카드 이름 | FE mock `name` 사용 |
+| `profileImageUrl` | `string` | 예 | 판매자 프로필 이미지 표시 | 카드 본문 원형 아바타 | FE mock 사용 |
+| `coverImageUrl` | `string` | 예 | 판매자 대표/커버 이미지 표시 | 카드 상단 16:9 이미지 | FE mock 사용 |
 | `followerCount` | `number` | 요청 | 팔로워 수 표시 | `팔로워 n` | FE mock 사용 |
 | `productCount` | `number` | 요청 | 판매 상품 수 표시 | `판매 상품 n개` | FE mock `newProductCount` 사용 |
 | `liveId` | `number \| null` | 선택 | 라이브 CTA 이동 | 버튼 경로 `/lives/{liveId}` | FE mock 사용 |
@@ -209,6 +212,7 @@ interface HomeFollowedSellerResponse {
 ## 요청 6. 추천 상품과 팔로잉 상품 구분
 
 현재 FE는 `/home/following.products`를 MemberHome의 `recommendedProducts`로 임시 표시합니다. 실제 서비스에서는 아래 개념을 구분할지 결정이 필요합니다.
+AI 작업과 연계하여 recommend 기능을 보강할 경우, 양 섹션을 모두 구현할 예정입니다.
 
 ### 선택지 A. 팔로잉 상품만 제공
 
@@ -242,7 +246,7 @@ interface HomeRecommendedProductResponse extends HomeProductCardResponse {
 | --- | --- | --- | --- |
 | `recommendationReason` | `string \| null` | 선택 | 추천 이유 표시. 예: `최근 데님 상품을 자주 봤어요` |
 
-현재 FE에는 `recommendationReason` 타입이 있지만 카드에는 직접 표시하지 않습니다. 추후 추천 이유를 노출할 경우 바로 사용할 수 있습니다.
+현재 FE에는 `recommendationReason` 타입이 있지만 카드에는 직접 표시하지 않습니다. 현재 홈 화면 필수 응답은 아니며, 추후 추천 이유를 노출할 경우 사용할 수 있습니다.
 
 ## 요청 7. 카테고리별 상품 섹션 응답
 
@@ -304,7 +308,7 @@ interface HomeCategoryProductItemResponse {
 | `categoryName` | `string` | 예 | 상품이 속한 카테고리 표시 및 검증 | 현재 탭 카테고리와 같은 값 기대 |
 | `isWished` | `boolean \| null` | 회원 응답에서 요청 | 찜 여부 표시 | 찜 버튼 상태. 비회원이면 `null` 또는 `false` 가능 |
 | `startingBid` | `number \| null` | 경매 예정 상품은 예 | 경매 시작가 표시 | `시작가 ₩가격` 형태로 표시 |
-| `auctionStartsAt` | `string \| null` | 경매 예정 상품은 예 | 경매 시작 예정 시간 표시 | 경매 예정 상품 보조 정보 |
+| `auctionStartsAt` | `string \| null` | 선택 | 경매 시작 예정 시간 표시 후보 | 현재 상품 카드에는 직접 노출하지 않음 |
 
 ### 카테고리별 기대 응답 예시
 
@@ -349,35 +353,11 @@ interface HomeCategoryProductItemResponse {
 - 현재 FE 화면 기준 카테고리 탭은 `아우터 / 상의 / 하의 / 원피스 / 신발 / 액세서리` 6개를 기대합니다.
 - 각 카테고리의 `products`는 우선 3개 이상 내려오면 현재 카드 그리드에서 자연스럽게 표시됩니다.
 
-## 요청 8. 콘텐츠 카드/배너 처리 방식 확인
+## 요청 8. 하단 콘텐츠 카드/배너 제거 반영
 
-GuestHome/MemberHome 하단 콘텐츠 카드는 현재 FE 상수로 유지 중입니다. BE에서 운영 배너나 홈 콘텐츠를 관리할 계획이 있다면 아래 응답을 제공해 주세요. 관리 계획이 없다면 FE 상수로 유지하겠습니다.
+GuestHome/MemberHome 하단 사진형 콘텐츠 카드 섹션은 FE 화면에서 제거했습니다. 따라서 `GET /api/home` 응답에 `contentCards` 또는 `HomeContentCardResponse`를 추가로 제공할 필요가 없습니다.
 
-### DTO 후보
-
-```ts
-interface HomeContentCardResponse {
-  id: number
-  title: string
-  description: string
-  imageUrl: string
-  ctaLabel: string
-  targetPath: string
-  audience: 'guest' | 'member' | 'all'
-}
-```
-
-### 필드 상세
-
-| 필드명 | 타입 | 필수 | 목적 |
-| --- | --- | --- | --- |
-| `id` | `number` | 예 | 콘텐츠 카드 key |
-| `title` | `string` | 예 | 카드 제목 |
-| `description` | `string` | 예 | 카드 설명 |
-| `imageUrl` | `string` | 예 | 카드 배경/이미지 |
-| `ctaLabel` | `string` | 예 | CTA 버튼 텍스트 |
-| `targetPath` | `string` | 예 | 클릭 이동 경로 |
-| `audience` | `'guest' \| 'member' \| 'all'` | 예 | 비회원/회원 노출 분기 |
+추후 운영 배너 기능을 새로 도입하는 경우에는 홈 화면 요구사항을 다시 정의한 뒤 별도 요청 문서로 진행하겠습니다.
 
 ## 관련 FE 파일
 
@@ -398,6 +378,5 @@ interface HomeContentCardResponse {
 | 1 | `HomeService` mock 제거 및 상품/라이브 DB 조회 연결 | 홈이 실제 데이터로 보여야 함 |
 | 2 | 상품 `sellerName`, `startingBid`, `categoryName` 보강 | 현재 화면에 기본값/미정 표시가 노출됨 |
 | 3 | 라이브 `startedAt` 보강 | 진행 중 라이브 시간이 `일정 확인`으로 보임 |
-| 4 | `followedSellers` 응답 추가 | MemberHome의 팔로잉 판매자 섹션이 mock에 의존 중 |
+| 4 | `followedSellers` 응답 추가. `profileImageUrl`, `coverImageUrl` 포함 필요 | MemberHome의 팔로잉 판매자 섹션이 mock에 의존 중 |
 | 5 | `categoryProductSections` 응답 추가 | 카테고리별 상품 탭이 mock에 의존 중 |
-| 6 | `contentCards` BE 관리 여부 결정 | 운영 배너 관리 방식 확정 필요 |

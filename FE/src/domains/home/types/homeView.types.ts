@@ -60,18 +60,6 @@ export interface HomeCategoryProductSection {
   products: HomeProductCardItem[]
 }
 
-export type HomeContentAudience = 'guest' | 'member' | 'all'
-
-export interface HomeContentCardItem {
-  id: number
-  title: string
-  description: string
-  imageUrl: string
-  ctaLabel: string
-  targetPath: string
-  audience: HomeContentAudience
-}
-
 export interface HomeViewData {
   liveNow: HomeLiveCardItem[]
   scheduledLives: HomeLiveCardItem[]
@@ -80,5 +68,4 @@ export interface HomeViewData {
   followedSellers: HomeFollowedSellerItem[]
   recommendedProducts: HomeRecommendedProductItem[]
   categoryProductSections: HomeCategoryProductSection[]
-  contentCards: HomeContentCardItem[]
 }
