@@ -10,6 +10,7 @@ target-version = "py312"
 # 외부/서드파티 코드라 lint 대상이 아니다(PoC로 통째로 가져온 것).
 extend-exclude = [
 "validation/AI_tryon/tryondiffusion",
+"validation/AI_tryon/CatVTON",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -23,6 +24,7 @@ target-version = ["py312"]
 extend-exclude = '''
 (
   validation/AI_tryon/tryondiffusion
+  | validation/AI_tryon/CatVTON
 )
 '''
 
