@@ -1,6 +1,6 @@
 # 현재 프로젝트 구조
 
-확인일: 2026-07-26
+확인일: 2026-07-27
 
 ## 기술 스택
 
@@ -37,6 +37,13 @@ src/
   assets/
     images/
       logo.png
+      products/
+        product-denim-jacket.webp
+        product-knit.webp
+        product-leather-bag.webp
+        product-sneakers.webp
+        product-trench-coat.webp
+        product-watch.webp
     main.scss
     tailwind.css
   domains/
@@ -84,21 +91,47 @@ src/
     biz/
       api/
       components/
+        BusinessCertificateUploader.vue
       constants/
+        businessVerification.ts
       pages/
+        BusinessVerificationPage.vue
+        BusinessVerificationPendingPage.vue
+      stores/
+        businessVerificationStore.ts
       types/
     home/
       api/
+        homeViewApi.ts
       components/
+        GuestHome.vue
+        HomeContentCard.vue
+        HomeHero.vue
+        HomeSearchPanel.vue
+        HomeSection.vue
+        LiveCard.vue
+        MemberHome.vue
+        ProductCard.vue
       constants/
+        homeMockData.ts
       pages/
+        HomePage.vue
       types/
+        homeView.types.ts
     search/
       api/
       components/
+        SearchLiveResultCard.vue
+        SearchMemberResultCard.vue
+        SearchResultTabs.vue
+        SearchStatePanel.vue
       constants/
+        searchFilterOptions.ts
+        searchMockData.ts
       pages/
+        SearchResultsPage.vue
       types/
+        search.types.ts
     recommendation/
       api/
       components/
@@ -119,16 +152,40 @@ src/
       types/
     product/
       api/
+        productDetailApi.ts
       components/
+        AiQualityAnalysisPanel.vue
+        ProductCard.vue
+        ProductDetailInformation.vue
+        ProductDetailSkeleton.vue
+        ProductDetailStatePanel.vue
+        ProductFilterPanel.vue
+        ProductImageGallery.vue
+        ProductPurchaseSummary.vue
+        ProductSellerLivePanel.vue
       constants/
+        productDetailMockData.ts
+        productListMockData.ts
       pages/
+        ProductDetailView.vue
+        ProductListView.vue
       types/
+        productDetail.types.ts
+        productList.types.ts
     live/
       api/
+        liveListApi.ts
       components/
+        LiveListCard.vue
+        LiveListFilter.vue
+        LiveListState.vue
       constants/
+        liveListFilterOptions.ts
+        liveListMockData.ts
       pages/
+        LiveListView.vue
       types/
+        liveList.types.ts
     chat/
       api/
       components/
@@ -192,6 +249,8 @@ src/
       authTokenStorage.ts
       http.ts
     components/
+      GlobalNavigation.vue
+      RoutePlaceholder.vue
     composables/
     constants/
       routes.ts
@@ -253,7 +312,7 @@ docs/
 | `shared/components/`  | 2개 이상 도메인에서 재사용되는 UI 컴포넌트                                                        |
 | `shared/composables/` | 2개 이상 도메인에서 재사용되는 Composition API 함수                                               |
 | `shared/constants/`   | 라우트명, 전역 옵션 등 공통 상수. 현재 `routes.ts` 제공                                           |
-| `shared/layouts/`     | 인증, 기본 서비스, 라이브 등 공통 레이아웃. 현재 `AuthLayout`, `DefaultLayout`, `LiveLayout` 제공 |
+| `shared/layouts/`     | 인증, 기본 서비스, 라이브 등 공통 레이아웃. 현재 `AuthLayout`, `DefaultLayout`, `LiveLayout` 제공. `DefaultLayout`은 화면별 `contentMaxWidth` 지정 가능 |
 | `shared/types/`       | 공통 API 응답, pagination 등 전역 타입. 현재 `api.types.ts` 제공                                  |
 | `shared/utils/`       | 포맷터, 검증기 등 순수 유틸 함수                                                                  |
 
@@ -263,16 +322,55 @@ docs/
 - Tailwind import는 `src/assets/tailwind.css`에서 담당합니다.
 - 디자인 토큰과 전역 reset은 `src/assets/main.scss`에서 담당합니다.
 - 색상, 간격, radius, 버튼 높이 등 디자인 값은 CSS 변수로 관리합니다.
+- `DefaultLayout`은 전역 reset과 무관하게 중앙 콘텐츠 폭과 반응형 바깥 여백을 유지하도록 scoped SCSS를 사용합니다.
+- 기본 콘텐츠 폭은 `--layout-content-max-width`이며, 화면에서 `contentMaxWidth` prop으로
+  폭을 조정할 수 있습니다. 홈 화면은 `1200px`을 사용합니다.
 
 ## 구현 상태
 
-- 라우터는 `router/routes.ts`로 route 배열을 분리했으며 AUTH-001~AUTH-004 후보와 ONBOARD-001~ONBOARD-004 route가 등록되어 있습니다.
+- 라우터는 `router/routes.ts`로 route 배열을 분리했으며 AUTH-001~AUTH-004 후보,
+  ONBOARD-001~ONBOARD-004, BIZ-001·BIZ-001-2, HOME, FOLLOWING_HOME placeholder,
+  LIVE 공개 목록, 공개 PROD-008
+  route가 등록되어 있습니다.
 - `router/index.ts`에는 `requiresAuth`, `guestOnly` 메타 기반 인증 guard가 구현되어 있습니다.
 - `App.vue`는 `RouterView`만 렌더링합니다.
 - 기능 ID prefix 기준 도메인 폴더와 공통 폴더가 생성되어 있습니다.
 - `domains/auth`에는 회원가입 방식 선택 화면, 이메일 회원가입 화면, 이메일 로그인 화면, 이메일 인증 UI, SSAFY 로그인/가입 시작 화면, SSO callback 화면, 계정 연결 화면, 인증 API 호출 함수와 타입, 인증 store가 구현되어 있습니다.
 - `domains/onboard`에는 기본 정보, 관심 정보, AI 시착 정보 입력·저장 화면과 ONBOARD-004 이동 확인용 임시 화면 및 관련 API·컴포넌트가 구현되어 있습니다.
+- `domains/biz`에는 BIZ-001 사업자 정보 입력·검증 화면, 사업자등록증 이미지 선택
+  컴포넌트, FE 더미 제출 상태 store와 BIZ-001-2 인증 대기 화면이 구현되어 있습니다.
+  BIZ-001-2의 메인 이동은 HOME route로 연결되어 있으며, 실제 인증 API는 후속 작업 대기 중입니다.
+- `domains/home`에는 HOME 공개 route, 로그인 여부에 따른 `GuestHome`/`MemberHome`
+  분기, 홈 검색 패널, 섹션 shell, 공통 홈 hero/content 카드, 라이브 카드, 상품 카드,
+  화면 확인용 mock 데이터와 `HomeViewData` view model 타입이 구현되어 있습니다.
+  `homeViewApi.ts`는 현재 mock 데이터를 반환하는 adapter 자리이며, `HomePage`는
+  loading/error/retry 상태를 처리합니다.
+  실제 HOME API 계약이 확정되면 adapter 내부를 HTTP 호출과 응답 매핑으로 교체합니다.
+- `domains/product`에는 PROD-008 상품 목록 View와 S15P11A108-408·410·412 상품 상세 UI가
+  구현되어 있습니다. 상품 목록은 실사형 로컬 WebP를 사용하고 최소·최대 가격 범위를 검증해
+  mock 상품을 필터링하며 결과 없음 상태를 제공합니다. 상품 목록 카드는 상품 ID가 포함된 상세
+  route로 이동합니다. 상세 화면은
+  썸네일과 대표 이미지·AI 원본/검수 이미지 쌍을 함께 변경하며 찜·장바구니·라이브 알림 상태,
+  기존 라이브 route 이동과 미구현 CTA 안내를 제공합니다. 상세 조회의 로딩·오류·상품 없음·
+  판매 완료와 AI 분석 전·중·완료·결과 없음·실패 상태를 구분하며 mock adapter에서 데이터를
+  받습니다. 실제 API 계약이 확정되면 adapter 내부를 교체합니다.
+- `domains/live`에는 S15P11A108-413·415·418 공개 라이브 목록 View, 진행 중·예정 상태 카드,
+  로컬 이미지 기반 mock 데이터와 라이브 시청 route 연결, 카테고리·방송 상태 필터,
+  최신 방송·시청자·제목 정렬과 초기화가 구현되어 있습니다. 공개 목록에서는 종료 방송과
+  상품 판매 방식 조건을 제외합니다. 목록 DTO·adapter와 API 호출 함수, loading skeleton,
+  전체 빈 목록·필터 결과 없음·오류·재시도 상태를 제공합니다.
+  BE에 `GET /api/lives` 목록 계약이 없어 기본값은 mock adapter이며
+  `VITE_LIVE_LIST_API_ENABLED=true` 설정 후 실제 API adapter로 전환합니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.
 - 전역 스타일은 디자인 토큰, reset, 기본 font-family와 온보딩 오류 토큰을 포함합니다.
+
+### 2026-07-28 검색 화면 반영
+
+- `domains/search`는 SEARCH-001/002 공개 route, 검색 결과 탭, 상품/라이브/회원 mock 결과 카드,
+  카테고리·상태·가격·판매 유형 필터, loading/error/empty/filter-empty/price-error 상태 화면을 구현했습니다.
+- 검색어·탭·필터는 `/search` query 기반으로 동작하며, 실제 통합 검색 API 계약 확정 전까지
+  `searchMockData.ts`에서 클라이언트 필터링합니다.
+- `src/assets/main.scss`에는 상품 목록과 검색 화면이 공유하는 필터 패널 폭, 본문/캡션/버튼 글자 크기,
+  font-weight, line-height 토큰을 추가했습니다.

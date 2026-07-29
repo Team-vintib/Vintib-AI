@@ -1,0 +1,114 @@
+import fallbackThumbnail from '@/assets/images/products/product-denim-jacket.webp'
+import { liveListMockData } from '@/domains/live/constants/liveListMockData'
+import { http } from '@/shared/api/http'
+
+import type {
+  LiveBroadcastStatus,
+  LiveCategory,
+  LiveListDto,
+  LiveListItem,
+  LiveListMockScenario,
+  LiveListQuery,
+  LiveListViewData,
+} from '@/domains/live/types/liveList.types'
+import type { ApiResponse, PageResponse } from '@/shared/types/api.types'
+
+const MOCK_DELAY_MS = 450
+const LIVE_LIST_API_ENABLED = import.meta.env.VITE_LIVE_LIST_API_ENABLED === 'true'
+const PUBLIC_LIVE_STATUSES: LiveBroadcastStatus[] = ['LIVE', 'SCHEDULED']
+const LIVE_CATEGORIES: LiveCategory[] = ['아우터', '상의', '하의', '가방', '신발', '액세서리']
+
+export class LiveListContractError extends Error {
+  constructor(message = '라이브 목록 응답 형식을 확인할 수 없습니다.') {
+    super(message)
+    this.name = 'LiveListContractError'
+  }
+}
+
+const wait = (delay: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, delay)
+  })
+
+const isLiveCategory = (categoryName: string): categoryName is LiveCategory =>
+  LIVE_CATEGORIES.includes(categoryName as LiveCategory)
+
+const isPublicLiveStatus = (
+  status: LiveListDto['broadcastStatus'],
+): status is Exclude<LiveBroadcastStatus, 'ENDED'> =>
+  PUBLIC_LIVE_STATUSES.includes(status as LiveBroadcastStatus)
+
+const mapLiveListDto = (dto: LiveListDto): LiveListItem | null => {
+  if (!isPublicLiveStatus(dto.broadcastStatus)) {
+    return null
+  }
+
+  if (!isLiveCategory(dto.categoryName)) {
+    throw new LiveListContractError(`지원하지 않는 라이브 카테고리입니다: ${dto.categoryName}`)
+  }
+
+  const broadcastAt = dto.broadcastStatus === 'LIVE' ? dto.startedAt : dto.scheduledAt
+
+  if (!broadcastAt) {
+    throw new LiveListContractError('방송 상태에 맞는 시작 시각이 없습니다.')
+  }
+
+  return {
+    id: dto.liveId,
+    title: dto.title,
+    sellerName: dto.hostNickname,
+    thumbnailUrl: dto.thumbnailUrl || fallbackThumbnail,
+    status: dto.broadcastStatus,
+    viewerCount: dto.viewerCount,
+    category: dto.categoryName,
+    broadcastAt,
+  }
+}
+
+const requestLiveList = async (query: LiveListQuery): Promise<LiveListViewData> => {
+  const response = await http.get<ApiResponse<PageResponse<LiveListDto>>>('/lives', {
+    params: query,
+  })
+  const responseBody = response.data
+
+  if (!responseBody.success || !responseBody.data) {
+    throw new LiveListContractError(responseBody.error?.message)
+  }
+
+  return {
+    items: responseBody.data.items
+      .map(mapLiveListDto)
+      .filter((item): item is LiveListItem => item !== null),
+    totalElements: responseBody.data.meta.totalElements,
+    totalPages: responseBody.data.meta.totalPages,
+  }
+}
+
+const getMockLiveList = async (scenario: LiveListMockScenario): Promise<LiveListViewData> => {
+  await wait(MOCK_DELAY_MS)
+
+  if (scenario === 'error') {
+    throw new Error('LIVE_LIST_MOCK_ERROR')
+  }
+
+  const items = scenario === 'empty' ? [] : liveListMockData
+
+  return {
+    items,
+    totalElements: items.length,
+    totalPages: items.length > 0 ? 1 : 0,
+  }
+}
+
+export const getLiveListViewData = (
+  query: LiveListQuery,
+  scenario: LiveListMockScenario = 'default',
+): Promise<LiveListViewData> => {
+  if (LIVE_LIST_API_ENABLED) {
+    return requestLiveList(query)
+  }
+
+  return getMockLiveList(scenario)
+}
+
+export const isLiveListApiEnabled = () => LIVE_LIST_API_ENABLED

@@ -2,6 +2,10 @@ export interface SendEmailVerificationCodeRequest {
   email: string
 }
 
+export interface CheckEmailDuplicateRequest {
+  email: string
+}
+
 export interface VerifyEmailCodeRequest {
   email: string
   code: string
