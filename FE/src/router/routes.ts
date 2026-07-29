@@ -127,7 +127,7 @@ export const routes: RouteRecordRaw[] = [
   {
     path: ROUTE_PATHS.LIVE_CREATE,
     name: ROUTE_NAMES.LIVE_CREATE,
-    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    component: () => import('@/domains/live/pages/LiveCreatePage.vue'),
     meta: { requiresAuth: true, title: '라이브 시작' },
   },
   {
