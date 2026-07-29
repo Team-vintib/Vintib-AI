@@ -48,15 +48,19 @@ E2E는 못 한다** — 로컬 임의 오디오 파일로 워커 단독 동작�
       차원(1024)/결정성 확인
 - [x] 검증: 로컬 `postgres-vector` 컨테이너에 `router._ingest_stt_result()` 직접 호출 —
       저장 성공 케이스 + 저장 실패(잘못된 payload)해도 예외 안 던지는 케이스 둘 다 확인
-- [ ] 검증(보류): 실제 Whisper 모델(`STT_BACKEND=faster_whisper`)과 실제 방송 오디오 E2E —
-      OpenVidu 설치 이후로 지연
+- [x] 검증: 실제 `STT_BACKEND=faster_whisper`로 로컬 임의 오디오 파일(방송 음성은 아직 없어
+      대체) E2E — 로컬 HTTP 서버로 파일 URL 서빙 → `POST /ai/stt` → 실제 워커가 poll·전사·
+      KURE-v1 임베딩 → 결과 제출 → `rag_store`에 저장까지 전부 실제 인프라(Redis·
+      postgres-vector·게이트웨이)로 확인 완료. 실행 중 발견한 이슈 2건은 `worker/README.md`에
+      기록(`faster-whisper` 패키지 누락, CUDA 12 cuBLAS/cuDNN 필요 — torch가 cu130이라 발생).
 
 ## 미결정 사항
 
 - Whisper 백엔드/모델 크기(`small` vs `base` 등) — 실측 없이 우선 `small`로 시작, 정확도·속도
   보고 조정.
-- 실제 오디오 E2E는 OpenVidu 설치 후로 지연 — 그때 `.claude/requests/be/002-*.md`에서 논의한
-  청크 단위 녹화 방식이 정해지면 이 문서에 반영.
+- **실제 방송 오디오로 하는 E2E는 여전히 OpenVidu 설치 후로 지연** — 이번에 확인한 건 "워커가
+  실제 모델로 정상 동작하는지"이지, "OpenVidu가 만든 오디오 형식/전달 방식과 맞는지"는 아니다.
+  그때 `.claude/requests/be/002-*.md`에서 논의한 청크 단위 녹화 방식이 정해지면 이 문서에 반영.
 
 ## 관련 자료
 

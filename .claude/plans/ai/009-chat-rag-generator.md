@@ -134,9 +134,32 @@
   `_stub_singleton` 참고). 다중 게이트웨이 프로세스 환경에서도 이 싱글턴 가정이 깨진다 —
   `InMemoryAnswerStore`/`_pending`과 같은 한계선상(`S15P11A108-188`).
 
+## 실제 모델 검증 (커밋 이후, `rag-worker` conda env)
+
+로컬에 Redis+`postgres-vector`+게이트웨이(uvicorn)+`chat_rag` 워커(`CHAT_RAG_BACKEND=
+lfm2_langchain`)를 전부 띄워 실제 HTTP job 큐 왕복까지 확인했다 — `POST /chat/moderate` 2회
+(반복질문) → 실제 Redis에 job 적재 확인 → 진짜 워커가 poll해서 KURE-v1+LFM2.5-230M으로 처리 →
+`GET /chat/answers/{ticket}`로 최종 답변 조회, 전부 성공.
+
+이 과정에서 버그 2개를 발견해 고쳤다(둘 다 이 문서와 같은 커밋 이력에 반영):
+
+1. **프롬프트 에코 버그**: `transformers.pipeline("text-generation")`이 기본적으로 입력
+   프롬프트를 포함한 전체 텍스트를 반환하는데 `return_full_text=False`가 빠져 있어서, 생성된
+   "답변"에 프롬프트 지시문이 그대로 섞여 나왔다. 옵션 추가로 해결.
+2. **그라운딩 임계치 과소평가**: `GROUNDING_THRESHOLD=0.35`(bigram 기준 정책 제안치)가
+   KURE-v1엔 너무 낮았다 — 무관한 질문("오늘 날씨가 어떤가요?")도 코사인 0.4232가 나와 임계치를
+   넘어버렸다. bigram과 KURE-v1은 무관한 문장 간 "기본 유사도" 자체가 다르다(의미 임베딩은
+   완전 무관해도 어느 정도 유사도를 가지는 경향). 실측 데이터로 정식 스윕하기 전까지 오탐을
+   줄이는 쪽으로 `0.70`으로 올려 뒀다 — 여전히 잠정치다.
+
+수정 후 재검증: 관련 질문(`grounding_score=0.858`) → 정상 그라운딩 + 깨끗한 답변("정확히는
+프리사이즈입니다."), 무관 질문 → `grounded: false`로 정상 무응답. E2E도 동일 결과("가능합니다.")로
+재확인.
+
 ## 미결정 사항
 
 - 답변 캐시(같은 `live_id` 안 유사 질문 재사용, ONNX 임베더) — 별도 후속 작업.
+- `GROUNDING_THRESHOLD=0.70`은 실측 스윕 전 잠정치 — 진짜 방송 데이터가 쌓이면 재조정 필요.
 - 클러스터링/그라운딩 임계치는 여전히 mock_bigram 기준 — 실측 재스윕은 각 임베더가 실제
   검증된 뒤로 계속 미룬다.
 - `worker/chat_rag_worker_example.py`의 `GROUNDING_THRESHOLD`(0.35, 정책 제안치)는 KURE-v1

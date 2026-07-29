@@ -62,6 +62,20 @@ export STT_BACKEND=mock             # 기본값. GPU 불필요 — 결정적 더
 export STT_BACKEND=faster_whisper   # 실제 Whisper(small) + KURE-v1. torch/faster-whisper/sentence-transformers 필요
 ```
 
+**`faster_whisper` 백엔드를 GPU로 돌리면 겪을 수 있는 문제(실측, `S15P11A108-443`)**:
+
+- `pip install faster-whisper`가 별도로 필요하다 — `worker/requirements.txt`엔 없다(무거운 모델
+  의존성은 conda 환경에서 개별 설치하는 원칙).
+- `RuntimeError: Library cublas64_12.dll is not found or cannot be loaded`가 날 수 있다.
+  `faster-whisper`(CTranslate2)는 **CUDA 12용** cuBLAS/cuDNN을 찾는데, torch가 CUDA 13(cu130)
+  빌드면 시스템에 그 라이브러리가 없어서 발생한다. 해결:
+  ```bash
+  pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
+  # 설치된 DLL 경로를 PATH에 추가하고 실행 (Windows, Git Bash 기준)
+  export PATH="$CONDA_PREFIX/Lib/site-packages/nvidia/cublas/bin:$CONDA_PREFIX/Lib/site-packages/nvidia/cudnn/bin:$PATH"
+  python stt_worker_example.py
+  ```
+
 chat_rag 워커는 아래를 쓴다:
 
 ```bash
