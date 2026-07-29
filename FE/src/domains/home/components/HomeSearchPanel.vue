@@ -45,7 +45,17 @@ const submitSearch = async () => {
         type="search"
         placeholder="예: 리바이스 데님 자켓, Archive Room"
       />
-      <button class="home-search__button" type="submit">검색하기</button>
+      <button class="home-search__button" type="submit" aria-label="검색">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+          <path
+            d="m20 20-4.2-4.2m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
     </form>
     <div class="home-search-tags" aria-label="인기 검색어">
       <span class="home-search-tags__label">인기 검색어</span>
@@ -66,18 +76,18 @@ const submitSearch = async () => {
   display: grid;
   width: 100%;
   place-items: center;
-  gap: var(--space-3);
-  padding-top: var(--space-5);
+  gap: var(--space-2);
+  padding-top: var(--space-3);
 }
 
 .home-search {
   display: flex;
   align-items: center;
   width: min(100%, 860px);
-  height: 58px;
-  padding: 5px 5px 5px var(--space-5);
+  height: 46px;
+  padding: 3px 3px 3px var(--space-4);
   border: 1px solid var(--color-search-border);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--color-surface);
   box-shadow: none;
   transition:
@@ -106,15 +116,15 @@ const submitSearch = async () => {
 }
 
 .home-search__input {
-  height: 48px;
+  height: 38px;
   min-width: 0;
   border: 0;
   flex: 1;
-  padding: 0 var(--space-4);
+  padding: 0 var(--space-3);
   background: transparent;
   color: var(--color-text-primary);
   font-size: 15px;
-  line-height: 48px;
+  line-height: 38px;
   outline: none;
 }
 
@@ -126,15 +136,22 @@ const submitSearch = async () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 48px;
-  padding: 0 var(--space-4);
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  padding: 0;
   border: 0;
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--color-search-button);
   color: var(--color-text-inverse);
   font-weight: 700;
   line-height: 20px;
   white-space: nowrap;
+}
+
+.home-search__button svg {
+  width: 18px;
+  height: 18px;
 }
 
 .home-search__button:hover {
@@ -176,10 +193,10 @@ const submitSearch = async () => {
 
 @media (max-width: 520px) {
   .home-search {
-    display: grid;
-    gap: var(--space-2);
+    display: flex;
+    gap: var(--space-1);
     padding: var(--space-2);
-    height: auto;
+    height: 52px;
   }
 
   .home-search__icon {
@@ -187,13 +204,14 @@ const submitSearch = async () => {
   }
 
   .home-search__input {
-    height: 42px;
-    line-height: 42px;
+    height: 36px;
+    line-height: 36px;
   }
 
   .home-search__button {
-    width: 100%;
-    height: 42px;
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
   }
 
   .home-search-tags {

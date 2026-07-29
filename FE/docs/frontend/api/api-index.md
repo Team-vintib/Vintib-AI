@@ -312,6 +312,49 @@ Content-Type: multipart/form-data
 - 실제 API 연동 전까지 제출 정보는 Pinia 메모리 상태로만 BIZ-001-2에 전달합니다.
 - BIZ-001-2 상태 조회 endpoint와 승인·반려 상태 값도 BE 확인이 필요합니다.
 
+## 홈
+
+HOME-001/002는 BE의 현재 홈 전용 API를 FE adapter에서 `HomeViewData`로 변환해 사용합니다.
+공통 응답은 `ApiResponse<T>` envelope를 사용합니다.
+
+| 기능 | Method | endpoint | 상태 |
+| --- | --- | --- | --- |
+| 홈 콘텐츠 조회 | GET | `/api/home` | HOME-001 부분 연동 |
+| 팔로잉 콘텐츠 조회 | GET | `/api/home/following` | HOME-002 부분 연동, 인증 필요 |
+
+### 홈 콘텐츠 조회
+
+```http
+GET /api/home
+```
+
+성공 응답의 `data`는 아래 섹션 배열을 포함합니다.
+
+- `liveNow`
+- `scheduledLives`
+- `onSaleProducts`
+- `upcomingAuctionProducts`
+
+FE 매핑 기준:
+
+- 라이브 `liveId`, `title`, `hostNickname`, `thumbnailUrl`, `broadcastStatus`, `scheduledAt`, `viewerCount`, `productCount`를 홈 라이브 카드 모델로 변환합니다.
+- 상품 `productId`, `name`, `brand`, `thumbnailUrl`, `sellType`, `sellStatus`, `price`, `auctionScheduled`를 홈 상품 카드 모델로 변환합니다.
+- `sellType === 'NORMAL'`은 `DIRECT_SALE`, `sellType === 'AUCTION_SCHEDULED'` 또는 `auctionScheduled === true`는 `AUCTION`으로 표시합니다.
+
+### 팔로잉 콘텐츠 조회
+
+```http
+GET /api/home/following
+Authorization: Bearer {accessToken}
+```
+
+성공 응답의 `data`는 `empty`, `lives`, `products`를 포함합니다.
+
+- `lives`는 기존 홈 라이브 섹션에 중복 제거 후 보강합니다.
+- `products`는 회원 홈의 `recommendedProducts`에 `팔로우한 판매자의 상품` 표시 문구와 함께 제한 매핑합니다.
+- BE가 제공하지 않는 `followedSellers`, `contentCards`, `sellerName`, `categoryName`, `startedAt`, `reservationCount`, `isWished` 등은 FE 보조값 또는 선택 필드로 처리합니다.
+- BE mock 이미지 URL이 접근 불가할 수 있어 홈 라이브/상품 카드에서 이미지 로드 실패 fallback을 적용합니다.
+
 ## 이후 화면 후보
 
 | 영역   | 후보 endpoint                                                        |

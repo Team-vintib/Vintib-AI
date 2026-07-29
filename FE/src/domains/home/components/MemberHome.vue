@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
-import HomeContentCard from '@/domains/home/components/HomeContentCard.vue'
+import CategoryProductTabs from '@/domains/home/components/CategoryProductTabs.vue'
 import HomeHero from '@/domains/home/components/HomeHero.vue'
 import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
@@ -11,15 +10,14 @@ import ProductCard from '@/domains/home/components/ProductCard.vue'
 import type { HomeLiveStatus, HomeViewData } from '@/domains/home/types/homeView.types'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
-const props = defineProps<{
+defineProps<{
   homeData: HomeViewData
+  wishedProductIds: Set<number>
 }>()
 
-const memberContentCards = computed(() =>
-  props.homeData.contentCards.filter(
-    (card) => card.audience === 'member' || card.audience === 'all',
-  ),
-)
+const emit = defineEmits<{
+  toggleWish: [productId: number]
+}>()
 
 const formatCompactNumber = (value: number) => {
   return new Intl.NumberFormat('ko-KR', {
@@ -102,12 +100,11 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
               <img class="seller-card__avatar" :src="seller.profileImageUrl" :alt="seller.name" />
               <span class="seller-card__identity">
                 <strong class="seller-card__name">{{ seller.name }}</strong>
-                <span class="seller-card__specialty">{{ seller.specialty }}</span>
               </span>
             </span>
             <span class="seller-card__stats">
               <span>팔로워 {{ formatCompactNumber(seller.followerCount) }}</span>
-              <span>새 상품 {{ seller.newProductCount }}개</span>
+              <span>판매 상품 {{ seller.newProductCount }}개</span>
             </span>
             <strong class="seller-card__live-title">{{ seller.liveTitle }}</strong>
             <span class="seller-card__time">{{ formatSchedule(seller.liveAt) }}</span>
@@ -179,9 +176,17 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
           :to="getProductPath(product.id)"
           :badge-label="product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'"
           :badge-variant="product.saleType === 'AUCTION' ? 'auction' : 'direct'"
+          :is-wished="wishedProductIds.has(product.id)"
+          @toggle-wish="emit('toggleWish', $event)"
         />
       </div>
     </HomeSection>
+
+    <CategoryProductTabs
+      :sections="homeData.categoryProductSections"
+      :wished-product-ids="wishedProductIds"
+      @toggle-wish="emit('toggleWish', $event)"
+    />
 
     <HomeSection
       title-id="auction-title"
@@ -200,17 +205,12 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
           badge-label="경매 예정"
           badge-variant="auction"
           price-prefix="가격 "
+          :is-wished="wishedProductIds.has(product.id)"
+          @toggle-wish="emit('toggleWish', $event)"
         />
       </div>
     </HomeSection>
 
-    <section class="content-band" aria-label="회원 홈 콘텐츠">
-      <HomeContentCard
-        v-for="content in memberContentCards"
-        :key="content.id"
-        :content="content"
-      />
-    </section>
   </div>
 </template>
 
@@ -220,10 +220,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   justify-items: stretch;
   gap: var(--space-12);
   padding-bottom: var(--space-16);
-}
-
-.content-band {
-  width: 100%;
 }
 
 .member-hero__primary,
@@ -376,7 +372,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   line-height: 24px;
 }
 
-.seller-card__specialty,
 .seller-card__stats {
   color: var(--color-text-muted);
   font-size: 13px;
@@ -389,12 +384,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   font-size: 13px;
   font-weight: 500;
   line-height: 20px;
-}
-
-.seller-card__specialty {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .seller-card__stats {
@@ -417,10 +406,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
-}
-
-.content-band {
-  display: grid;
 }
 
 @media (max-width: 768px) {

@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
-import HomeContentCard from '@/domains/home/components/HomeContentCard.vue'
+import CategoryProductTabs from '@/domains/home/components/CategoryProductTabs.vue'
 import HomeHero from '@/domains/home/components/HomeHero.vue'
 import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
@@ -11,15 +10,14 @@ import ProductCard from '@/domains/home/components/ProductCard.vue'
 import type { HomeViewData } from '@/domains/home/types/homeView.types'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
-const props = defineProps<{
+defineProps<{
   homeData: HomeViewData
+  wishedProductIds: Set<number>
 }>()
 
-const guestContentCards = computed(() =>
-  props.homeData.contentCards.filter(
-    (card) => card.audience === 'guest' || card.audience === 'all',
-  ),
-)
+const emit = defineEmits<{
+  toggleWish: [productId: number]
+}>()
 
 const getLivePath = (liveId: number) => `/lives/${liveId}`
 const getProductPath = (productId: number) => `/products/${productId}`
@@ -97,9 +95,17 @@ const getProductPath = (productId: number) => `/products/${productId}`
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
+          :is-wished="wishedProductIds.has(product.id)"
+          @toggle-wish="emit('toggleWish', $event)"
         />
       </div>
     </HomeSection>
+
+    <CategoryProductTabs
+      :sections="homeData.categoryProductSections"
+      :wished-product-ids="wishedProductIds"
+      @toggle-wish="emit('toggleWish', $event)"
+    />
 
     <HomeSection
       title-id="auction-title"
@@ -120,17 +126,12 @@ const getProductPath = (productId: number) => `/products/${productId}`
           price-prefix="가격 "
           :action-to="ROUTE_PATHS.AUTH_LOGIN"
           action-label="경매 알림 받기"
+          :is-wished="wishedProductIds.has(product.id)"
+          @toggle-wish="emit('toggleWish', $event)"
         />
       </div>
     </HomeSection>
 
-    <section class="content-band" aria-label="홈 콘텐츠">
-      <HomeContentCard
-        v-for="content in guestContentCards"
-        :key="content.id"
-        :content="content"
-      />
-    </section>
   </div>
 </template>
 
@@ -140,10 +141,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   justify-items: stretch;
   gap: var(--space-12);
   padding-bottom: var(--space-16);
-}
-
-.content-band {
-  width: 100%;
 }
 
 .home-hero__primary,
@@ -176,10 +173,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-5);
-}
-
-.content-band {
-  display: grid;
 }
 
 @media (max-width: 768px) {

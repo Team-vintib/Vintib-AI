@@ -5,6 +5,16 @@ import type { ApiErrorBody, ApiResponse } from '@/shared/types/api.types'
 
 const DEFAULT_TIMEOUT_MS = 10_000
 
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    skipAuth?: boolean
+  }
+
+  export interface InternalAxiosRequestConfig {
+    skipAuth?: boolean
+  }
+}
+
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
   timeout: DEFAULT_TIMEOUT_MS,
@@ -14,6 +24,10 @@ export const http = axios.create({
 })
 
 http.interceptors.request.use((config) => {
+  if (config.skipAuth) {
+    return config
+  }
+
   const accessToken = getStoredAccessToken()
 
   if (accessToken) {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppFooter from '@/shared/components/AppFooter.vue'
 import GlobalNavigation from '@/shared/components/GlobalNavigation.vue'
 
 withDefaults(
@@ -20,20 +21,24 @@ withDefaults(
     >
       <slot />
     </main>
+    <AppFooter />
   </div>
 </template>
 
 <style scoped lang="scss">
 .default-layout {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   background: var(--color-page);
   color: var(--color-text-primary);
 }
 
 .default-layout__content {
+  flex: 1 0 auto;
   width: 100%;
   max-width: var(--default-layout-content-max-width);
-  padding: var(--space-10) var(--space-12);
+  padding: var(--space-6) var(--space-12);
   margin-inline: auto;
 }
 
