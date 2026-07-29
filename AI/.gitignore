@@ -36,4 +36,6 @@ app/chat/artifacts/
 validation/sam3-condition-check/sample_images/
 validation/sam3-condition-check/outputs/
 validation/clipseg-condition-check/outputs/
+# SAM 3D 스파이크 산출물(.ply splat + 턴테이블 GIF). splat 은 장당 수십 MB 라 커밋 금지.
+validation/sam3d-condition-check/outputs/
 
