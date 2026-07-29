@@ -112,7 +112,11 @@ const moveToNextStep = () => {
           <h2 :id="`${currentStep.id}-title`">{{ currentStep.label }}</h2>
           <p>{{ currentStep.description }}</p>
 
-          <div class="live-create__method-grid" aria-label="라이브 유형 선택">
+          <div
+            v-if="currentStep.id === 'method'"
+            class="live-create__method-grid"
+            aria-label="라이브 유형 선택"
+          >
             <button
               v-for="method in LIVE_CREATE_METHOD_OPTIONS"
               :key="method.id"
@@ -127,6 +131,49 @@ const moveToNextStep = () => {
             </button>
           </div>
 
+          <form
+            v-else-if="currentStep.id === 'info'"
+            class="live-create__info-form"
+            aria-label="방송 정보 입력"
+          >
+            <label class="live-create__field" for="live-create-title-input">
+              <span>방송 제목</span>
+              <input
+                id="live-create-title-input"
+                v-model="form.title"
+                type="text"
+                maxlength="60"
+                placeholder="예: 빈티지 레더 특집 경매"
+              />
+            </label>
+
+            <label class="live-create__field" for="live-create-description-input">
+              <span>한 줄 소개</span>
+              <textarea
+                id="live-create-description-input"
+                v-model="form.description"
+                maxlength="120"
+                rows="3"
+                placeholder="시청자에게 보여질 소개 문구를 입력해 주세요"
+              />
+            </label>
+
+            <label class="live-create__field" for="live-create-brand-input">
+              <span>대표 브랜드</span>
+              <input
+                id="live-create-brand-input"
+                v-model="form.mainBrand"
+                type="text"
+                maxlength="40"
+                placeholder="예: Burberry, Levi's"
+              />
+            </label>
+          </form>
+
+          <div v-else class="live-create__placeholder" role="status">
+            <strong>{{ currentStep.label }}</strong>
+            <p>이 단계의 세부 UI는 다음 작업에서 이어서 구현합니다.</p>
+          </div>
         </section>
 
         <aside class="live-create__side" aria-label="방송 정보와 단계 이동">
@@ -353,6 +400,75 @@ const moveToNextStep = () => {
 .live-create__method--selected {
   border-color: var(--color-live);
   box-shadow: 0 0 0 3px var(--color-auction-soft);
+}
+
+.live-create__info-form {
+  display: grid;
+  gap: var(--space-5);
+  margin-top: var(--space-8);
+}
+
+.live-create__field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.live-create__field span {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  line-height: 20px;
+}
+
+.live-create__field input,
+.live-create__field textarea {
+  width: 100%;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.live-create__field input {
+  height: var(--button-height-standard);
+  padding: 0 var(--space-4);
+}
+
+.live-create__field textarea {
+  min-height: 96px;
+  padding: var(--space-3) var(--space-4);
+  resize: vertical;
+}
+
+.live-create__field input::placeholder,
+.live-create__field textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.live-create__field input:focus,
+.live-create__field textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  outline: none;
+}
+
+.live-create__placeholder {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-8);
+  padding: var(--space-6);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+}
+
+.live-create__placeholder strong {
+  color: var(--color-text-primary);
 }
 
 .live-create__actions {
