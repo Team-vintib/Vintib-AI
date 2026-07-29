@@ -32,9 +32,12 @@ CHAT_RAG_BACKEND = os.getenv("CHAT_RAG_BACKEND", "mock")
 EMBEDDING_DIM = 1024
 
 # app/chat/registry.py의 EMBEDDER_BACKENDS["kure_v1"]["grounding_threshold"]와 같은 값을 쓰고
-# 싶지만, 워커는 AI/ 코드를 import하지 않는 원칙(worker/README.md)이라 여기 재선언한다. 실측
-# 전까지는 정책 제안치(registry.py의 POLICY_GROUNDING_THRESHOLD)를 그대로 쓴다.
-GROUNDING_THRESHOLD = 0.35
+# 싶지만, 워커는 AI/ 코드를 import하지 않는 원칙(worker/README.md)이라 여기 재선언한다.
+# 0.35는 bigram 임베딩 기준 정책 제안치였는데, KURE-v1로 실측해보니(S15P11A108-444) 무관한
+# 질문끼리도 코사인이 ~0.42까지 나와서 너무 낮았다 — bigram과 KURE-v1은 유사도 분포 자체가
+# 다르다(무관한 문장의 "기본 유사도"가 다르다). 정확한 값은 실데이터로 다시 스윕해야 하고,
+# 그 전까지는 오탐(그라운딩 오판)을 줄이는 쪽으로 넉넉히 잡는다.
+GROUNDING_THRESHOLD = 0.70
 
 
 def _mock_embedding(text: str, dim: int = EMBEDDING_DIM) -> np.ndarray:
@@ -64,7 +67,11 @@ class ChatRagWorker(BaseWorker):
 
         self._embed_model = SentenceTransformer("nlpai-lab/KURE-v1")
         text_gen = pipeline(
-            "text-generation", model="LiquidAI/LFM2.5-230M", device="cuda", max_new_tokens=200
+            "text-generation",
+            model="LiquidAI/LFM2.5-230M",
+            device="cuda",
+            max_new_tokens=200,
+            return_full_text=False,  # 기본값(True)이면 입력 프롬프트까지 답변에 그대로 섞여 나온다
         )
         self._llm = HuggingFacePipeline(pipeline=text_gen)
         print(f"[{self.worker_id}] 로딩 완료")
