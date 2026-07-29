@@ -27,6 +27,17 @@ class Settings(BaseSettings):
 
     worker_api_key: str = ""
 
+    # 가격 책정(app/pricing/)이 시세 검색에 쓰는 SSAFY 공용 게이트웨이 키.
+    # **비어 있는 것이 정상 기본값이다** — 그 경우 mock comps 백엔드로 떨어지고 서비스는 뜬다.
+    # 실호출은 팀 공용 유료 쿼터를 소모하고 LLM 웹검색은 별도 과금이라, 채우는 건 의도적 행위여야 한다.
+    gms_api_key: str = ""
+
+    # 가격 책정(app/pricing/)이 신상품(정가) 조회에 쓰는 네이버 쇼핑 오픈API 키.
+    # **비어 있는 것이 정상 기본값이다** — 그 경우 mock retail 백엔드로 떨어지고 서비스는 뜬다.
+    # GMS와 무관한 무료 API지만 쿼터가 있어, 채우는 건 의도적 행위여야 한다.
+    naver_client_id: str = ""
+    naver_client_secret: str = ""
+
     public_base_url: str = "https://i15a108.p.ssafy.io"  # 추가 필요
 
     # 추천 아티팩트(사전계산 그래프) 루트 디렉터리. 비어 있으면

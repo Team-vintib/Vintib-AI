@@ -8,9 +8,18 @@
 **`GMS_API_KEY`를 쓰는 코드를 Claude가 직접 실행하는 것을 금지한다.** 스크립트 작성·수정은
 하되, **실행은 항상 사용자가 직접 한다.**, **Cost가 비쌀 것으로 예상되는 모델들은 코드에 추가하지 않는다. 사용자가 직접 변경하도록 안내만 해준다.**
 
-- 금지 대상: `validation/pricing-model-check/*.py` 등 GMS 게이트웨이(`gms.ssafy.io`)를 경유하는
-  모든 스크립트·스모크 테스트·노트북 셀. 모델 종류(haiku/sonnet/opus/gemini)나 호출 횟수와
-  무관하게 **한 번도 실행하지 않는다.**
+- 금지 대상: GMS 게이트웨이(`gms.ssafy.io`)를 경유하는 **모든** 스크립트·스모크 테스트·노트북 셀·
+  프로덕션 코드 경로. 모델 종류(haiku/sonnet/gemini)나 호출 횟수와 무관하게 **한 번도
+  실행하지 않는다.** 구체적으로:
+  - `validation/pricing-model-check/*.py`
+  - **`app/pricing/`의 `llm_web_search` comps 백엔드** — 프로덕션 경로에도 GMS 호출이 있다.
+    `registry.ACTIVE_COMPS_SOURCE`의 기본값은 항상 `"mock"`이어야 하고, Claude가 이 값을
+    `"llm_web_search"`로 바꾸거나 그 상태로 서버·pytest를 실행하는 것을 금지한다.
+    실백엔드 전환은 사용자만 한다.
+  - **`app/pricing/`의 `naver` retail 백엔드** — GMS는 아니지만 같은 이유로 금지 대상이다.
+    `registry.ACTIVE_RETAIL_SOURCE`의 기본값은 항상 `"mock"`이어야 하고, Claude가 이 값을
+    `"naver"`로 바꾸거나 그 상태로 서버·pytest를 실행하는 것을 금지한다. 실백엔드 전환은
+    사용자만 한다.
 - 연결 확인·지연시간 측정·커버리지 비교처럼 "가볍다"고 판단되는 경우에도 예외 없다.
   판단 근거가 필요하면 실행을 사용자에게 요청하고 결과를 받아서 해석한다.
 - **이유**: GMS는 팀 공용 유료 쿼터다. 서버사이드 웹검색은 별도 과금이고, 후보 목록을 순회하는
