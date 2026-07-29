@@ -16,8 +16,49 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _CLIPSEG_PATH = _REPO_ROOT / "worker" / "models" / "clipseg"
 
 if _CLIPSEG_PATH.is_dir():
     sys.path.insert(0, str(_CLIPSEG_PATH))
+
+
+class FakeRedis:
+    """게이트웨이가 쓰는 redis 명령만 흉내내는 최소 스텁.
+
+    실 Redis는 CI에 없다. `app.gateway.router.r`(모듈 전역 클라이언트)을 이걸로 갈아끼우면
+    큐에 무엇이 실렸는지·결과 키에 무엇이 저장됐는지를 그대로 들여다볼 수 있다.
+
+    `test/` 아래에는 `__init__.py`를 둘 수 없어(stdlib `test` 패키지를 가린다) 테스트끼리
+    import가 안 된다. 그래서 공용 스텁은 여기 conftest에 둔다.
+    """
+
+    def __init__(self) -> None:
+        self.pushed: list[tuple[str, str]] = []
+        self.stored: dict[str, str] = {}
+
+    def rpush(self, key: str, value: str) -> int:
+        self.pushed.append((key, value))
+        return len(self.pushed)
+
+    def set(self, key: str, value: str, ex: int | None = None) -> bool:
+        self.stored[key] = value
+        return True
+
+    def get(self, key: str) -> str | None:
+        return self.stored.get(key)
+
+    def llen(self, key: str) -> int:
+        return sum(1 for pushed_key, _ in self.pushed if pushed_key == key)
+
+
+@pytest.fixture
+def fake_redis(monkeypatch):
+    """게이트웨이의 전역 Redis 클라이언트를 가짜로 교체한다."""
+    from app.gateway import router as gateway_router
+
+    fake = FakeRedis()
+    monkeypatch.setattr(gateway_router, "r", fake)
+    return fake
