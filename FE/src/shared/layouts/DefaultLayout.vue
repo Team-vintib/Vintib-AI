@@ -33,7 +33,7 @@ withDefaults(
 .default-layout__content {
   width: 100%;
   max-width: var(--default-layout-content-max-width);
-  padding: var(--space-10) var(--space-12);
+  padding: var(--space-6) var(--space-12);
   margin-inline: auto;
 }
 

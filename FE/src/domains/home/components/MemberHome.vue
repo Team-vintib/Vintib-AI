@@ -102,12 +102,11 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
               <img class="seller-card__avatar" :src="seller.profileImageUrl" :alt="seller.name" />
               <span class="seller-card__identity">
                 <strong class="seller-card__name">{{ seller.name }}</strong>
-                <span class="seller-card__specialty">{{ seller.specialty }}</span>
               </span>
             </span>
             <span class="seller-card__stats">
               <span>팔로워 {{ formatCompactNumber(seller.followerCount) }}</span>
-              <span>새 상품 {{ seller.newProductCount }}개</span>
+              <span>판매 상품 {{ seller.newProductCount }}개</span>
             </span>
             <strong class="seller-card__live-title">{{ seller.liveTitle }}</strong>
             <span class="seller-card__time">{{ formatSchedule(seller.liveAt) }}</span>
@@ -376,7 +375,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   line-height: 24px;
 }
 
-.seller-card__specialty,
 .seller-card__stats {
   color: var(--color-text-muted);
   font-size: 13px;
@@ -389,12 +387,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   font-size: 13px;
   font-weight: 500;
   line-height: 20px;
-}
-
-.seller-card__specialty {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .seller-card__stats {

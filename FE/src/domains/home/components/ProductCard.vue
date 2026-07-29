@@ -36,10 +36,10 @@ const handleImageError = (event: Event) => {
 
 const formatPrice = (value?: number) => {
   if (value === undefined) {
-    return '가격 확인'
+    return '시작가 미정'
   }
 
-  return `${value.toLocaleString('ko-KR')}원`
+  return `${value.toLocaleString('ko-KR')}P`
 }
 </script>
 
