@@ -2,51 +2,97 @@
 
 목업 시나리오(`data/mock_comments.json`)를 실제 파이프라인에 그대로 흘려서
 욕설·도배·반복질문·근거부족 네 경로를 한 번에 검증한다.
+
+**`chat_rag` 큐는 진짜 Redis에 안 붙는다** — `_FakeRedis`로 `app.gateway.router.r`을 갈아끼워
+job이 실제로 무엇이 실리는지만 본다(`test/quality/test_quality_router.py`와 같은 패턴). 워커의
+응답은 `gateway_router._ingest_chat_rag_result()`를 직접 호출해 흉내 낸다 — 실제 검색·랭킹·
+생성(KURE-v1/LangChain)은 워커 쪽 관심사라 여기서 검증하지 않는다.
 """
 
 import json
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.chat import registry
-from app.chat.answers import InMemoryAnswerStore
+from app.chat import rag_store, registry
+from app.chat import service as chat_service_module
+from app.chat.answers import AnswerNotFound, InMemoryAnswerStore
 from app.chat.classifier import RuleBasedClassifier
-from app.chat.faq import (
-    _DATA_DIR,
-    MockRetriever,
-    PgvectorRetriever,
-    QuestionClusterer,
-    QuestionDetector,
-    TemplateAnswerGenerator,
-)
+from app.chat.faq import _DATA_DIR, QuestionClusterer, QuestionDetector
 from app.chat.schemas import ModerateRequest, ModerationAction, Verdict
 from app.chat.service import ChatModerationService, get_chat_service
 from app.chat.spam import InMemoryStateStore, SpamDetector
+from app.gateway import router as gateway_router
+from app.gateway.schemas import Job
 from app.main import app
 
 # 테스트가 test/ 아래로 옮겨져 __file__ 기준 상대경로를 쓸 수 없다. 목업 데이터는 프로덕션
 # 패키지(app/chat/data/)에 그대로 있으므로 그쪽 상수를 재사용한다.
-# (`from app.main import app` 이 `app` 패키지 이름을 가려서 `app.chat.__file__` 은 못 쓴다.)
 _MOCK_COMMENTS = _DATA_DIR / "mock_comments.json"
 
-# 목업 시나리오에서 근거가 있어 답변이 생성되는 클러스터 / 생성되지 않는 클러스터.
 GROUNDED_QUESTION = "이거 M 사이즈 있나요?"
 UNGROUNDED_QUESTION = "매장 위치가 어디인가요?"
 
 
+class _FakeRedis:
+    """rpush/set만 흉내내는 최소 스텁 — `test/quality/test_quality_router.py`와 동일 패턴."""
+
+    def __init__(self) -> None:
+        self.pushed: list[tuple[str, str]] = []
+        self.stored: dict[str, str] = {}
+
+    def rpush(self, key: str, value: str) -> int:
+        self.pushed.append((key, value))
+        return len(self.pushed)
+
+    def set(self, key: str, value: str, ex: int | None = None) -> bool:
+        self.stored[key] = value
+        return True
+
+
+@pytest.fixture
+def fake_redis(monkeypatch):
+    fake = _FakeRedis()
+    monkeypatch.setattr(gateway_router, "r", fake)
+    return fake
+
+
+def _doc(doc_id: int, content: str) -> rag_store.RagDocument:
+    return rag_store.RagDocument(
+        id=doc_id, live_id=12, content=content, created_at=datetime.now(UTC)
+    )
+
+
+def _stub_docs(monkeypatch, docs: list[rag_store.RagDocument]) -> None:
+    """`rag_store.fetch_documents()`를 대체한다 — 실제 postgres-vector에 안 붙는다."""
+    monkeypatch.setattr(rag_store, "fetch_documents", lambda *a, **k: docs)
+
+
+def _pushed_job(fake_redis: _FakeRedis) -> Job:
+    key, raw = fake_redis.pushed[-1]
+    assert key == "queue:chat_rag"
+    return Job(**json.loads(raw))
+
+
+def _stub_singleton(monkeypatch, service: ChatModerationService) -> None:
+    """`gateway_router._ingest_chat_rag_result()`는 DI가 아니라 `get_chat_service()`
+    싱글턴을 직접 호출한다(같은 프로세스 안이라 프로덕션에선 문제없음, `service.py` 참고).
+    테스트는 매번 새 `_service()` 인스턴스를 쓰므로, 싱글턴이 그 인스턴스를 돌려주도록
+    바꿔치기해야 워커 결과가 같은 곳에 쌓인다."""
+    monkeypatch.setattr(chat_service_module, "get_chat_service", lambda: service)
+
+
 def _service(**overrides) -> ChatModerationService:
     """매번 새 상태로 조립한다(싱글턴 @lru_cache를 우회해 테스트 간 간섭을 없앰)."""
-    embedder = registry.embedder_config()
     kwargs = {
         "spam_detector": SpamDetector(InMemoryStateStore()),
         "classifier": RuleBasedClassifier(),
         "question_detector": QuestionDetector(),
-        "clusterer": QuestionClusterer(similarity_threshold=embedder["cluster_similarity"]),
-        "retriever": MockRetriever(),
-        "generator": TemplateAnswerGenerator(),
+        "clusterer": QuestionClusterer(
+            similarity_threshold=registry.embedder_config()["cluster_similarity"]
+        ),
         "answer_store": InMemoryAnswerStore(),
-        "grounding_threshold": embedder["grounding_threshold"],
     }
     kwargs.update(overrides)
     return ChatModerationService(**kwargs)
@@ -107,68 +153,107 @@ def test_normal_comment_passes():
     assert response.action is ModerationAction.pass_
 
 
-# --- 답변 생성 / 그라운딩 게이트 ------------------------------------------
+# --- 답변 생성: chat_rag job 큐 ---------------------------------------------
 
 
-def test_grounded_question_produces_an_answer():
+def test_grounded_question_produces_an_answer(monkeypatch, fake_redis):
+    _stub_docs(monkeypatch, [_doc(1, "이 니트는 M 사이즈로도 나왔습니다.")])
     service = _service()
+    _stub_singleton(monkeypatch, service)
     service.moderate(_request(content=GROUNDED_QUESTION))
     response, deferred = service.moderate(_request(content="M 사이즈도 있나요?"))
-    deferred()
+    deferred()  # 이 시점엔 job만 큐에 실린다 — 생성은 아직 안 끝남
+
+    assert len(fake_redis.pushed) == 1
+    job = _pushed_job(fake_redis)
+    assert job.payload["ticket"] == response.answer_ticket
+    assert job.payload["docs"] == [{"id": 1, "content": "이 니트는 M 사이즈로도 나왔습니다."}]
+
+    # 워커가 결과를 보냈다고 가정
+    gateway_router._ingest_chat_rag_result(
+        job,
+        {
+            "grounded": True,
+            "answer": "네, M 사이즈 있습니다.",
+            "grounding_score": 0.9,
+            "sources": [{"doc_id": "1", "score": 0.9}],
+        },
+    )
 
     answer = service.get_answer(response.answer_ticket)
     assert answer.grounded is True
-    assert answer.grounding_score >= registry.embedder_config()["grounding_threshold"]
-    assert answer.sources
-    assert answer.sources[0].doc_id == "faq_size_01"
-    assert answer.answer  # 근거 문서의 답변이 그대로 들어온다
+    assert answer.answer == "네, M 사이즈 있습니다."
+    assert answer.sources[0].doc_id == "1"
 
 
-def test_ungrounded_question_stays_silent():
-    from app.chat.answers import AnswerNotFound
-
+def test_ungrounded_question_stays_silent(monkeypatch, fake_redis):
+    _stub_docs(monkeypatch, [_doc(1, "무관한 내용")])
     service = _service()
+    _stub_singleton(monkeypatch, service)
     service.moderate(_request(content=UNGROUNDED_QUESTION))
     response, deferred = service.moderate(_request(content=UNGROUNDED_QUESTION + "?"))
     deferred()
 
-    # 반복질문으로는 잡히지만 근거가 약해 답변 자체가 만들어지지 않는다.
+    job = _pushed_job(fake_redis)
+    gateway_router._ingest_chat_rag_result(job, {"grounded": False})
+
+    # 반복질문으로는 잡히지만 워커가 근거 부족으로 판단하면 답변이 안 만들어진다.
     assert response.verdict is Verdict.repeated_question
     with pytest.raises(AnswerNotFound):
         service.get_answer(response.answer_ticket)
 
 
-def test_answer_is_generated_only_once_per_cluster():
+def test_answer_is_generated_only_once_per_cluster(monkeypatch, fake_redis):
+    _stub_docs(monkeypatch, [_doc(1, "근거 내용")])
+    service = _service()
+    _stub_singleton(monkeypatch, service)
+    service.moderate(_request(content=GROUNDED_QUESTION))
+    _, first = service.moderate(_request(content="M 사이즈도 있나요?"))
+    first()
+    job = _pushed_job(fake_redis)
+    gateway_router._ingest_chat_rag_result(
+        job, {"grounded": True, "answer": "A", "grounding_score": 0.9, "sources": []}
+    )
+    created_at = service.get_answer(job.payload["ticket"]).created_at
+
+    _, second = service.moderate(_request(content="혹시 M 사이즈 있나요??"))
+    second()
+    assert len(fake_redis.pushed) == 1  # 이미 답변된 티켓이라 새 job이 안 쌓인다
+    assert service.get_answer(job.payload["ticket"]).created_at == created_at
+
+
+def test_does_not_enqueue_duplicate_job_while_pending(monkeypatch, fake_redis):
+    """워커 응답을 기다리는 동안(poll 주기만큼) 같은 클러스터에 메시지가 더 들어와도
+    job이 중복으로 쌓이면 안 된다 — 동기 시절엔 없던, 큐로 전환하며 새로 생긴 문제다."""
+    _stub_docs(monkeypatch, [_doc(1, "근거 내용")])
     service = _service()
     service.moderate(_request(content=GROUNDED_QUESTION))
     _, first = service.moderate(_request(content="M 사이즈도 있나요?"))
     first()
-    created_at = service.get_answer(_ticket(service, GROUNDED_QUESTION)).created_at
+    assert len(fake_redis.pushed) == 1
 
-    _, second = service.moderate(_request(content="혹시 M 사이즈 있나요??"))
-    second()
-    assert service.get_answer(_ticket(service, GROUNDED_QUESTION)).created_at == created_at
-
-
-def _ticket(service: ChatModerationService, question: str) -> str:
-    answers = service.list_answers(12).answers
-    assert answers, "답변이 생성되지 않았습니다"
-    return answers[0].ticket
+    _, second = service.moderate(_request(content="사이즈 M 있어요?"))
+    second()  # 아직 워커 응답 전(pending) — 또 enqueue하면 안 된다
+    assert len(fake_redis.pushed) == 1
 
 
-def test_answer_generation_never_breaks_moderation():
-    # 지식베이스가 죽어 있어도 판정 자체는 정상적으로 끝나야 한다(채팅을 막지 않는다).
-    service = _service(retriever=PgvectorRetriever())
+def test_no_candidate_docs_skips_enqueue_but_moderation_still_completes(monkeypatch, fake_redis):
+    """이 방송에 대한 근거 문서(STT 전사문)가 아직 하나도 없으면 조용히 스킵한다.
+    판정 자체(반복질문 검출)는 그대로 완료돼야 한다 — 답변 기능 장애가 채팅을 막으면 안 된다."""
+    _stub_docs(monkeypatch, [])
+    service = _service()
     service.moderate(_request(content=GROUNDED_QUESTION))
     response, deferred = service.moderate(_request(content="M 사이즈도 있나요?"))
     assert response.verdict is Verdict.repeated_question
-    deferred()  # 예외를 밖으로 내보내지 않고 로그만 남긴다
+    deferred()  # 예외를 내지 않고 조용히 넘어간다
+    assert fake_redis.pushed == []
 
 
-# --- 목업 시나리오 E2E ----------------------------------------------------
+# --- 목업 시나리오 E2E (판정 경로만 — 생성 결과는 워커 쪽 관심사) -----------
 
 
-def test_mock_scenario_matches_expected_verdicts():
+def test_mock_scenario_matches_expected_verdicts(monkeypatch, fake_redis):
+    monkeypatch.setattr(rag_store, "fetch_documents", lambda *a, **k: [])
     service = _service()
     for row in _load_mock_comments():
         request = ModerateRequest(
@@ -181,27 +266,6 @@ def test_mock_scenario_matches_expected_verdicts():
         if deferred is not None:
             deferred()
         assert response.verdict.value == row["expected_verdict"], f"{row['note']}: {row['content']}"
-
-
-def test_mock_scenario_answers_only_grounded_clusters():
-    service = _service()
-    for row in _load_mock_comments():
-        _, deferred = service.moderate(
-            ModerateRequest(
-                live_id=row["live_id"],
-                message_id=row["message_id"],
-                user_id=row["user_id"],
-                content=row["content"],
-            )
-        )
-        if deferred is not None:
-            deferred()
-
-    answered = {a.question for a in service.list_answers(12).answers}
-    # 사이즈/배송은 지식베이스에 근거가 있고, 매장 위치는 없다.
-    assert GROUNDED_QUESTION in answered
-    assert "배송은 얼마나 걸리나요?" in answered
-    assert UNGROUNDED_QUESTION not in answered
 
 
 # --- API 계약 -------------------------------------------------------------
@@ -228,7 +292,8 @@ def test_api_moderate_returns_verdict():
         app.dependency_overrides.clear()
 
 
-def test_api_runs_answer_generation_in_background():
+def test_api_enqueues_chat_rag_job_in_background(monkeypatch, fake_redis):
+    _stub_docs(monkeypatch, [_doc(1, "근거 내용")])
     service = _service()
     client = _override(service)
     try:
@@ -243,11 +308,12 @@ def test_api_runs_answer_generation_in_background():
         ticket = resp.json()["answer_ticket"]
         assert ticket is not None
 
-        # TestClient는 응답 후 백그라운드 작업을 실행한다 — 그 시점엔 답변이 조회된다.
-        listed = client.get("/chat/lives/12/answers")
-        assert listed.status_code == 200
-        assert [a["ticket"] for a in listed.json()["answers"]] == [ticket]
-        assert client.get(f"/chat/answers/{ticket}").status_code == 200
+        # TestClient는 응답 후 백그라운드 작업을 실행한다 — 그 시점에 job이 큐에 실린다.
+        assert len(fake_redis.pushed) == 1
+        assert json.loads(fake_redis.pushed[0][1])["payload"]["ticket"] == ticket
+
+        # 워커가 아직 응답 안 했으니 답변은 아직 없다.
+        assert client.get(f"/chat/answers/{ticket}").status_code == 404
     finally:
         app.dependency_overrides.clear()
 
@@ -272,15 +338,5 @@ def test_api_404_for_unknown_ticket():
     client = _override(_service())
     try:
         assert client.get("/chat/answers/a_12_ffffff").status_code == 404
-    finally:
-        app.dependency_overrides.clear()
-
-
-def test_api_503_when_knowledge_base_not_ready():
-    client = _override(_service(retriever=PgvectorRetriever()))
-    try:
-        resp = client.get("/chat/lives/12/answers")
-        assert resp.status_code == 503
-        assert resp.json()["detail"] == "faq knowledge base not ready"
     finally:
         app.dependency_overrides.clear()

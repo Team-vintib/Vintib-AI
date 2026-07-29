@@ -7,9 +7,16 @@
 AI는 판정만 하고 실제 차단/숨김은 BE가 집행한다. 이유는 설계 문서의
 "판정 위임 vs 직접 집행" 표 참고 — 1 RTT, 게시 전 판정이라 노출 없음, AI 장애가 격리됨.
 
+**답변 생성은 게이트웨이가 직접 하지 않는다.** `rag_store.fetch_documents()`로 이 방송의 문서
+후보를 가져와 `chat_rag` job으로 워커에 넘기고, 검색·그라운딩 판단·생성은 전부 워커가
+처리한다(`worker/chat_rag_worker_example.py`, `S15P11A108-444`) — 게이트웨이(`ai` 컨테이너)엔
+torch가 없어서다. `Retriever`/`AnswerGenerator`(`app/chat/faq.py`) 인터페이스는 이제 평가
+파이프라인(`app/chat/evaluation.py`) 전용이고 이 서비스는 더 이상 참조하지 않는다.
+
 `get_chat_service()`의 조립부가 **유일한 구현 스왑 지점**이다.
 
-설계: .claude/plans/ai/003-live-comment-moderation-prototype.md
+설계: .claude/plans/ai/003-live-comment-moderation-prototype.md,
+.claude/plans/ai/009-chat-rag-generator.md
 """
 
 from __future__ import annotations
@@ -17,25 +24,15 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import datetime
 from functools import lru_cache
 
-from app.chat import registry
+from app.chat import rag_store, registry
 from app.chat.answers import AnswerNotFound, AnswerStore, build_answer_store
 from app.chat.classifier import AbuseClassifier, build_classifier
-from app.chat.faq import (
-    AnswerGenerator,
-    Cluster,
-    KnowledgeBaseNotReady,
-    QuestionClusterer,
-    QuestionDetector,
-    Retriever,
-    build_generator,
-    build_retriever,
-)
+from app.chat.faq import Cluster, QuestionClusterer, QuestionDetector
 from app.chat.schemas import (
     AnswerListResponse,
-    AnswerSource,
     FaqAnswer,
     ModerateRequest,
     ModerateResponse,
@@ -44,11 +41,11 @@ from app.chat.schemas import (
     Verdict,
 )
 from app.chat.spam import SpamDetector, build_state_store
+from app.gateway.router import enqueue_job
 
-# 라우터가 import하기 쉽도록 재노출(503/404 매핑용).
+# 라우터가 import하기 쉽도록 재노출(404 매핑용).
 __all__ = [
     "ChatModerationService",
-    "KnowledgeBaseNotReady",
     "AnswerNotFound",
     "get_chat_service",
 ]
@@ -57,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 
 class ChatModerationService:
-    """댓글 한 건을 판정하고, 반복질문이면 답변 생성 작업을 만들어 돌려준다."""
+    """댓글 한 건을 판정하고, 반복질문이면 `chat_rag` job을 큐에 넣는다."""
 
     def __init__(
         self,
@@ -65,40 +62,29 @@ class ChatModerationService:
         classifier: AbuseClassifier,
         question_detector: QuestionDetector,
         clusterer: QuestionClusterer,
-        retriever: Retriever,
-        generator: AnswerGenerator,
         answer_store: AnswerStore,
         *,
         abuse_threshold: float = registry.ABUSE_THRESHOLD,
         min_cluster_size: int = registry.MIN_CLUSTER_SIZE,
-        grounding_threshold: float | None = None,
-        top_k: int = registry.RETRIEVE_TOP_K,
+        candidate_limit: int = registry.RETRIEVE_TOP_K,
     ) -> None:
         self._spam = spam_detector
         self._classifier = classifier
         self._questions = question_detector
         self._clusterer = clusterer
-        self._retriever = retriever
-        self._generator = generator
         self._answers = answer_store
         self._abuse_threshold = abuse_threshold
         self._min_cluster_size = min_cluster_size
-        self._grounding_threshold = (
-            grounding_threshold
-            if grounding_threshold is not None
-            else registry.embedder_config()["grounding_threshold"]
-        )
-        self._top_k = top_k
+        self._candidate_limit = candidate_limit
+        # 이미 워커에 보내 결과를 기다리는 중인 티켓. 프로세스 인메모리라 다중 게이트웨이
+        # 환경에서는 안 맞는다 — InMemoryAnswerStore와 같은 한계(S15P11A108-188).
+        self._pending: set[str] = set()
 
     # -- 동기 판정 --------------------------------------------------------
     def moderate(
         self, request: ModerateRequest
     ) -> tuple[ModerateResponse, Callable[[], None] | None]:
-        """판정 결과와, 있으면 지연 실행할 답변 생성 작업을 함께 돌려준다.
-
-        지식베이스가 깨져 있어도 여기서 예외를 내지 않는다 — 답변 기능 장애가 채팅 자체를
-        막으면 안 되기 때문이다. 그 상황은 답변 조회 엔드포인트에서 503으로 드러난다.
-        """
+        """판정 결과와, 있으면 지연 실행할 작업을 함께 돌려준다."""
         started = time.perf_counter()
         moment = request.sent_at.timestamp() if request.sent_at else time.time()
 
@@ -135,7 +121,7 @@ class ChatModerationService:
         if self._questions.is_question(request.content):
             cluster = self._clusterer.add(request.live_id, request.content)
             if cluster.size >= self._min_cluster_size:
-                deferred = self._make_answer_job(cluster)
+                deferred = self._make_enqueue_job(cluster)
                 return (
                     self._response(
                         request,
@@ -186,60 +172,60 @@ class ChatModerationService:
             latency_ms=round((time.perf_counter() - started) * 1000, 3),
         )
 
-    # -- 비동기 답변 생성 --------------------------------------------------
-    def _make_answer_job(self, cluster: Cluster) -> Callable[[], None]:
+    # -- 답변 생성: chat_rag job 큐 -----------------------------------------
+    def _make_enqueue_job(self, cluster: Cluster) -> Callable[[], None]:
         def job() -> None:
-            self.generate_answer(cluster)
+            self._try_enqueue_chat_rag(cluster)
 
         return job
 
-    def generate_answer(self, cluster: Cluster) -> FaqAnswer | None:
-        """근거를 찾아 답변을 만들어 저장한다. 근거가 약하면 **아무것도 만들지 않는다**.
+    def _try_enqueue_chat_rag(self, cluster: Cluster) -> None:
+        """이미 답변됐거나 이미 워커에 보낸 티켓이면 건너뛰고, 아니면 job을 큐에 넣는다.
 
-        클러스터당 1회만 생성한다(이미 저장돼 있으면 그대로 둔다).
+        실제 검색·그라운딩 판단·생성은 워커가 한다(`worker/chat_rag_worker_example.py`) —
+        여기선 이 방송의 후보 문서를 모아 job payload에 실어 보내기만 한다.
         """
         try:
             self._answers.get(cluster.ticket)
         except AnswerNotFound:
             pass
         else:
-            return None
+            return  # 이미 답변됨
 
-        try:
-            docs = self._retriever.search(cluster.canonical, self._top_k)
-        except (KnowledgeBaseNotReady, NotImplementedError):
-            logger.warning(
-                "답변 생성 실패 — 지식베이스를 읽을 수 없습니다 (ticket=%s)", cluster.ticket
-            )
-            return None
+        if cluster.ticket in self._pending:
+            # 워커 처리가 poll 주기(수 초)만큼 걸리는 동안 같은 클러스터에 메시지가 더 들어와도
+            # moderate()는 매번 cluster.size >= min_cluster_size를 다시 통과시킨다 — 이 가드가
+            # 없으면 같은 질문에 대해 워커로 중복 job이 계속 쌓인다.
+            return
 
-        if not docs or docs[0].score < self._grounding_threshold:
-            # "근거 있는 경우에만 응답" (CHAT-02/03) — 근거가 약하면 침묵한다.
-            logger.info(
-                "근거 부족으로 답변 생략 (ticket=%s, top=%.4f < %.4f)",
-                cluster.ticket,
-                docs[0].score if docs else 0.0,
-                self._grounding_threshold,
-            )
-            return None
+        docs = rag_store.fetch_documents(cluster.live_id, limit=self._candidate_limit)
+        if not docs:
+            # 아직 이 방송에 대한 근거 문서(STT 전사문)가 하나도 없다 — 침묵.
+            return
 
-        answer = FaqAnswer(
-            ticket=cluster.ticket,
-            live_id=cluster.live_id,
-            question=cluster.canonical,
-            cluster_size=cluster.size,
-            answer=self._generator.generate(cluster.canonical, docs),
-            grounded=True,
-            grounding_score=docs[0].score,
-            sources=[AnswerSource(doc_id=d.doc_id, score=d.score) for d in docs],
-            created_at=datetime.now(UTC),
+        self._pending.add(cluster.ticket)
+        enqueue_job(
+            "chat_rag",
+            {
+                "ticket": cluster.ticket,
+                "live_id": cluster.live_id,
+                "question": cluster.canonical,
+                "cluster_size": cluster.size,
+                "docs": [{"id": d.id, "content": d.content} for d in docs],
+            },
         )
+
+    def save_generated_answer(self, answer: FaqAnswer) -> None:
+        """`chat_rag` job 결과가 근거 있음(`grounded`)일 때 게이트웨이가 호출한다."""
         self._answers.save(answer)
-        return answer
+        self._pending.discard(answer.ticket)
+
+    def mark_chat_rag_ungrounded(self, ticket: str) -> None:
+        """`chat_rag` job 결과가 근거 부족(`grounded=false`)일 때 대기 상태만 해제한다."""
+        self._pending.discard(ticket)
 
     # -- 답변 조회 --------------------------------------------------------
     def list_answers(self, live_id: int, since: datetime | None = None) -> AnswerListResponse:
-        self._ensure_knowledge_base()
         return AnswerListResponse(
             live_id=live_id,
             answers=self._answers.list_for_live(live_id, since),
@@ -249,29 +235,21 @@ class ChatModerationService:
         """없으면 `AnswerNotFound` — 미생성이거나 근거 부족으로 생성되지 않은 경우."""
         return self._answers.get(ticket)
 
-    def _ensure_knowledge_base(self) -> None:
-        """답변 기능이 살아 있는지 확인한다(빈 질의로 검색 경로를 한 번 태운다)."""
-        try:
-            self._retriever.search("", 1)
-        except NotImplementedError as exc:
-            raise KnowledgeBaseNotReady(str(exc)) from exc
-
 
 @lru_cache
 def get_chat_service() -> ChatModerationService:
     """FastAPI 의존성 주입용 서비스 프로바이더(싱글턴).
 
-    **여기가 유일한 스왑 지점이다.** 실모델/실 RAG로 갈아끼울 때는 `registry.ACTIVE_*` 키만
-    바꾸면 되고, 이 함수는 그대로 둔다.
+    **여기가 유일한 스왑 지점이다.** `app/gateway/router.py`의 `chat_rag` 결과 처리도 이
+    싱글턴을 재사용해 같은 `AnswerStore`/`_pending` 상태에 접근한다(같은 프로세스 안이라
+    `lru_cache`로 보장됨 — 다중 게이트웨이 환경에서는 안 맞는 한계는 위 `_pending` 주석과 동일).
     """
-    embedder = registry.embedder_config()
     return ChatModerationService(
         spam_detector=SpamDetector(build_state_store()),
         classifier=build_classifier(),
         question_detector=QuestionDetector(),
-        clusterer=QuestionClusterer(similarity_threshold=embedder["cluster_similarity"]),
-        retriever=build_retriever(),
-        generator=build_generator(),
+        clusterer=QuestionClusterer(
+            similarity_threshold=registry.embedder_config()["cluster_similarity"]
+        ),
         answer_store=build_answer_store(),
-        grounding_threshold=embedder["grounding_threshold"],
     )

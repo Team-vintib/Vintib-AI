@@ -12,6 +12,10 @@ from app.chat import rag_store
 from app.core.config import settings
 from app.gateway.schemas import FeatureType, Job, JobResult, new_job
 
+# app.chat.service가 이 모듈의 enqueue_job()을 가져다 쓰므로(순환 import 방지를 위해
+# 여기서는 최상단에서 app.chat.service를 import하지 않는다 — 아래 _ingest_chat_rag_result()
+# 안에서 지연 import한다).
+
 router = APIRouter()
 
 r = redis.Redis(
@@ -65,6 +69,40 @@ def _ingest_stt_result(result: dict) -> None:
         )
     except Exception as exc:  # noqa: BLE001
         print(f"[gateway] STT 결과 저장 실패(live_id={result.get('live_id')}): {exc}")
+
+
+def _ingest_chat_rag_result(job: Job, result: dict) -> None:
+    """`chat_rag` 워커 결과(검색+랭킹+그라운딩+생성을 이미 마친 상태)를 답변 저장소에 반영한다.
+
+    지연 import: `app.chat.service`가 이 모듈의 `enqueue_job()`을 top-level에서 import하므로,
+    여기서 `app.chat.service`를 top-level에서 import하면 순환 import가 된다.
+    """
+    from app.chat.schemas import AnswerSource, FaqAnswer
+    from app.chat.service import get_chat_service
+
+    service = get_chat_service()
+    ticket = job.payload["ticket"]
+
+    if not result.get("grounded"):
+        service.mark_chat_rag_ungrounded(ticket)
+        return
+
+    try:
+        answer = FaqAnswer(
+            ticket=ticket,
+            live_id=job.payload["live_id"],
+            question=job.payload["question"],
+            cluster_size=job.payload["cluster_size"],
+            answer=result["answer"],
+            grounded=True,
+            grounding_score=result.get("grounding_score", 0.0),
+            sources=[AnswerSource(**s) for s in result.get("sources", [])],
+            created_at=datetime.now(UTC),
+        )
+        service.save_generated_answer(answer)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[gateway] chat_rag 결과 저장 실패(ticket={ticket}): {exc}")
+        service.mark_chat_rag_ungrounded(ticket)
 
 
 @router.get("/health")
@@ -165,6 +203,8 @@ def submit_result(
         r.set(f"{RESULT_PREFIX}{job.job_id}", payload.model_dump_json(), ex=RESULT_TTL_SECONDS)
         if job.type == "stt" and result is not None:
             _ingest_stt_result(result)
+        elif job.type == "chat_rag" and result is not None:
+            _ingest_chat_rag_result(job, result)
         return {"ok": True}
 
     job.retry_count += 1
