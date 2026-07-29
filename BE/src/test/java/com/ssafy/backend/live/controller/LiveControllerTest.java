@@ -1,10 +1,14 @@
 package com.ssafy.backend.live.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.ssafy.backend.auth.jwt.JwtTokenProvider;
+import com.ssafy.backend.live.entity.Live;
+import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import java.time.LocalDateTime;
@@ -44,8 +48,12 @@ class LiveControllerTest {
     @Autowired
     private MemberRepository memberRepository;
 
+    @Autowired
+    private LiveRepository liveRepository;
+
     private MockMvc mockMvc;
     private String hostToken;
+    private Member hostMember;
 
     @BeforeEach
     void setUp() {
@@ -54,12 +62,19 @@ class LiveControllerTest {
                 .build();
 
         String email = "live-host-" + UUID.randomUUID() + "@example.com";
-        Member host = memberRepository.save(Member.builder()
+        hostMember = memberRepository.save(Member.builder()
                 .email(email)
                 .password("encoded")
                 .name("호스트")
                 .build());
-        hostToken = jwtTokenProvider.createAccessToken(host.getId(), email);
+        hostToken = jwtTokenProvider.createAccessToken(hostMember.getId(), email);
+    }
+
+    /** 상태 전이·시청 조회 검증에 쓸 진행 중 라이브를 하나 만들어 ID를 돌려준다. */
+    private Long 개설된_라이브_ID() {
+        return liveRepository.save(
+                        Live.openNow(hostMember, "빈티지 데님 라이브", null, LocalDateTime.now()))
+                .getId();
     }
 
     private String scheduleRequestBody(String title, String thumbnailUrl, LocalDateTime scheduledAt) {
@@ -147,6 +162,61 @@ class LiveControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 비회원도_시청_조회할_수_있다() throws Exception {
+        // Authorization 헤더 없이 200 — GET /api/lives/{liveId} 는 비회원 공개(LIVE-005).
+        Long liveId = 개설된_라이브_ID();
+
+        mockMvc.perform(get("/api/lives/{liveId}", liveId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("LIVE"))
+                .andExpect(jsonPath("$.data.products").isArray())
+                .andExpect(jsonPath("$.error").doesNotExist());
+    }
+
+    @Test
+    void 존재하지_않는_라이브를_조회하면_404를_반환한다() throws Exception {
+        mockMvc.perform(get("/api/lives/{liveId}", 99_999_999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("L001"));
+    }
+
+    @Test
+    void 상태_전이는_미인증이면_401을_반환한다() throws Exception {
+        Long liveId = 개설된_라이브_ID();
+
+        mockMvc.perform(patch("/api/lives/{liveId}/status", liveId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"ENDED\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 진행_중인_방송을_종료로_전이하면_200과_ENDED를_반환한다() throws Exception {
+        Long liveId = 개설된_라이브_ID();
+
+        mockMvc.perform(patch("/api/lives/{liveId}/status", liveId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"ENDED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ENDED"));
+    }
+
+    @Test
+    void 허용되지_않는_전이는_400을_반환한다() throws Exception {
+        // 즉시 개설이라 이미 LIVE — LIVE→LIVE 는 허용되지 않는다.
+        Long liveId = 개설된_라이브_ID();
+
+        mockMvc.perform(patch("/api/lives/{liveId}/status", liveId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"LIVE\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("L007"));
     }
 
     @Test
