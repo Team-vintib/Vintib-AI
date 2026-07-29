@@ -52,6 +52,45 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def store_job_result(
+    job_id: str,
+    status: str,
+    *,
+    result: dict | None = None,
+    error: str | None = None,
+    worker_id: str | None = None,
+) -> None:
+    """`result:{job_id}`에 상태를 기록한다. 모든 상태 전이가 거치는 유일한 지점.
+
+    TTL을 한 곳에서만 관리하려고 뽑아냈다 — 이전에는 같은 `r.set(RESULT_PREFIX...)`가 네 곳에
+    흩어져 있었다. `r`을 전역으로 조회하므로 테스트의 `monkeypatch.setattr(gateway_router, "r", ...)`
+    가 이 함수를 통과하는 경로에도 그대로 먹는다.
+    """
+    payload = JobResult(
+        job_id=job_id, status=status, result=result, error=error, worker_id=worker_id
+    )
+    r.set(f"{RESULT_PREFIX}{job_id}", payload.model_dump_json(), ex=RESULT_TTL_SECONDS)
+
+
+def new_local_job_id() -> str:
+    """**큐를 거치지 않는** job을 발급한다 — 이 프로세스가 직접 처리할 작업용.
+
+    `enqueue_job`과 달리 `queue:{feature}`에 넣지 않는다. 가격 책정처럼 워커가 없는 기능은
+    큐에 넣어 봐야 아무도 꺼내가지 않고 `/ai/workers/status`의 대기 건수만 부풀린다.
+
+    **`FeatureType`을 쓰지 않는 것도 의도다.** 조회 경로(`GET /ai/jobs/{job_id}`)는
+    `result:{job_id}`만 읽고 `JobResult`에는 `type` 필드가 없다 — 폴링 계약은 이미
+    feature 와 무관하다. 반대로 `FeatureType`에 항목을 추가하면 워커가 없는 기능이
+    `/ai/workers/status`에 영구 오프라인으로 노출되고, `POST /ai/{feature}`·
+    `GET /ai/workers/poll`로 고아 job이 만들어질 수 있다.
+
+    설계: .claude/plans/ai/CH003-pricing-service-prototype.md
+    """
+    job_id = str(uuid.uuid4())
+    store_job_result(job_id, "queued")
+    return job_id
+
+
 def _ingest_stt_result(result: dict) -> None:
     """STT 워커 결과(텍스트+임베딩)를 pgvector에 저장한다. 계산은 워커가 이미 끝냈으므로
     여기선 통과만 시킨다(`AI/docs/chat-rag-storage.md`).
@@ -117,11 +156,7 @@ def health_check() -> dict[str, str]:
 def enqueue_job(feature: FeatureType, data: dict):
     job = new_job(feature, data)
     r.rpush(f"{QUEUE_PREFIX}{feature}", job.model_dump_json())
-    r.set(
-        f"{RESULT_PREFIX}{job.job_id}",
-        JobResult(job_id=job.job_id, status="queued").model_dump_json(),
-        ex=RESULT_TTL_SECONDS,
-    )
+    store_job_result(job.job_id, "queued")
     return {"job_id": job.job_id}
 
 
@@ -179,11 +214,7 @@ def poll_job(
     _, raw_job = item
     job = json.loads(raw_job)
 
-    r.set(
-        f"{RESULT_PREFIX}{job['job_id']}",
-        JobResult(job_id=job["job_id"], status="processing").model_dump_json(),
-        ex=RESULT_TTL_SECONDS,
-    )
+    store_job_result(job["job_id"], "processing")
     return {"job": job}
 
 
@@ -199,8 +230,7 @@ def submit_result(
     _check_worker_key(x_api_key)
 
     if status == "success":
-        payload = JobResult(job_id=job.job_id, status="success", result=result, worker_id=worker_id)
-        r.set(f"{RESULT_PREFIX}{job.job_id}", payload.model_dump_json(), ex=RESULT_TTL_SECONDS)
+        store_job_result(job.job_id, "success", result=result, worker_id=worker_id)
         if job.type == "stt" and result is not None:
             _ingest_stt_result(result)
         elif job.type == "chat_rag" and result is not None:
@@ -210,12 +240,10 @@ def submit_result(
     job.retry_count += 1
     if job.retry_count > MAX_RETRY:
         r.rpush(DEAD_LETTER_KEY, job.model_dump_json())
-        payload = JobResult(job_id=job.job_id, status="failed", error=error, worker_id=worker_id)
-        r.set(f"{RESULT_PREFIX}{job.job_id}", payload.model_dump_json(), ex=RESULT_TTL_SECONDS)
+        store_job_result(job.job_id, "failed", error=error, worker_id=worker_id)
     else:
         r.rpush(f"{QUEUE_PREFIX}{job.type}", job.model_dump_json())
-        payload = JobResult(job_id=job.job_id, status="queued", worker_id=worker_id)
-        r.set(f"{RESULT_PREFIX}{job.job_id}", payload.model_dump_json(), ex=RESULT_TTL_SECONDS)
+        store_job_result(job.job_id, "queued", worker_id=worker_id)
 
     return {"ok": True}
 
