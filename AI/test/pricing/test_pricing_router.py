@@ -66,6 +66,24 @@ def test_result_is_readable_through_the_shared_gateway_path(client, fake_redis):
     assert body["result"]["model"]["retail_source"] == "mock"
 
 
+def test_retail_items_are_empty_by_default(client):
+    """트리거 기준이 정해지기 전까지는 요청에 없어도(=false) 신상품가를 안 부른다."""
+    job_id = client.post("/pricing/estimates", json=_payload()).json()["job_id"]
+    body = client.get(f"/ai/jobs/{job_id}").json()
+
+    assert body["result"]["retail_items"] == []
+    assert body["result"]["retail_notes"]
+
+
+def test_retail_items_are_populated_when_include_retail_is_true(client):
+    """include_retail=true를 HTTP로 넣었을 때 라우터→서비스→mock retail까지 실제로 이어지는지."""
+    job_id = client.post("/pricing/estimates", json=_payload(include_retail=True)).json()["job_id"]
+    body = client.get(f"/ai/jobs/{job_id}").json()
+
+    assert body["result"]["retail_items"] != []
+    assert body["result"]["model"]["retail_source"] == "mock"
+
+
 @pytest.mark.parametrize(
     "overrides",
     [
