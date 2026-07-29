@@ -50,7 +50,12 @@
 
 ## S15P11A108-418 후속 범위
 
-- 당시 공개된 BE API 연결
-- loading·empty·error·retry
-- 필터 결과 없음과 반응형 grid 최종 보강
+- 요청 계약 기준 목록 DTO·화면 adapter와 `GET /api/lives` 호출 함수
+- loading skeleton·전체 빈 목록·오류·재시도 상태
+- 필터 결과 없음과 필터 초기화
+- desktop 3열·tablet 2열·mobile 1열 grid 최종 보강
+- `/lives?mock=loading|empty|error` 상태 확인 query
 - 공개 API 계약은 `.codex/requests/be/009-live-list-api-contract.md`에서 요청
+- `origin/develop-BE` `7962ec7`에는 목록 endpoint와 category/current viewer 계약이 없어
+  `VITE_LIVE_LIST_API_ENABLED=false`로 유지
+- BE 계약 반영 후 환경 플래그를 켜 실제 응답 E2E를 추가 확인

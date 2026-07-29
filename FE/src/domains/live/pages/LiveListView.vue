@@ -1,26 +1,39 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
+import { getLiveListViewData, isLiveListApiEnabled } from '@/domains/live/api/liveListApi'
 import LiveListCard from '@/domains/live/components/LiveListCard.vue'
 import LiveListFilter from '@/domains/live/components/LiveListFilter.vue'
+import LiveListState from '@/domains/live/components/LiveListState.vue'
 import {
   LIVE_CATEGORY_FILTER_OPTIONS,
   LIVE_SORT_OPTIONS,
   LIVE_STATUS_FILTER_OPTIONS,
 } from '@/domains/live/constants/liveListFilterOptions'
-import { liveListMockData } from '@/domains/live/constants/liveListMockData'
+import { normalizeApiError } from '@/shared/api/http'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 import type {
   LiveCategoryFilter,
   LiveListItem,
+  LiveListLoadState,
+  LiveListMockScenario,
   LiveSortOption,
   LiveStatusFilter,
 } from '@/domains/live/types/liveList.types'
 
+const LIVE_LIST_MOCK_SCENARIOS: LiveListMockScenario[] = ['default', 'loading', 'empty', 'error']
+
+const route = useRoute()
+const liveList = ref<LiveListItem[]>([])
+const loadState = ref<LiveListLoadState>('loading')
+const errorMessage = ref('')
 const selectedCategory = ref<LiveCategoryFilter>('ALL')
 const selectedStatus = ref<LiveStatusFilter>('ALL')
 const selectedSort = ref<LiveSortOption>('LATEST')
+const apiEnabled = isLiveListApiEnabled()
+let loadRequestId = 0
 
 const canResetFilters = computed(
   () =>
@@ -29,17 +42,23 @@ const canResetFilters = computed(
     selectedSort.value !== 'LATEST',
 )
 
+const getMockScenario = (): LiveListMockScenario => {
+  const queryValue = Array.isArray(route.query.mock) ? route.query.mock[0] : route.query.mock
+
+  return LIVE_LIST_MOCK_SCENARIOS.includes(queryValue as LiveListMockScenario)
+    ? (queryValue as LiveListMockScenario)
+    : 'default'
+}
+
 const getOptionLabel = <T extends string>(options: { id: T; label: string }[], selectedId: T) =>
   options.find((option) => option.id === selectedId)?.label ?? selectedId
 
 const compareById = (first: LiveListItem, second: LiveListItem) => second.id - first.id
 
-const sortedLiveList = computed(() => {
-  const filteredLiveList = liveListMockData.filter((live) => {
-    if (live.status === 'ENDED') {
-      return false
-    }
+const publicLiveList = computed(() => liveList.value.filter((live) => live.status !== 'ENDED'))
 
+const sortedLiveList = computed(() => {
+  const filteredLiveList = publicLiveList.value.filter((live) => {
     const matchesCategory =
       selectedCategory.value === 'ALL' || live.category === selectedCategory.value
     const matchesStatus = selectedStatus.value === 'ALL' || live.status === selectedStatus.value
@@ -63,7 +82,25 @@ const sortedLiveList = computed(() => {
   })
 })
 
+const isLoading = computed(() => loadState.value === 'loading')
+const hasLoadError = computed(() => loadState.value === 'error')
+const isEmpty = computed(() => loadState.value === 'success' && publicLiveList.value.length === 0)
+const isFilterEmpty = computed(
+  () =>
+    loadState.value === 'success' &&
+    publicLiveList.value.length > 0 &&
+    sortedLiveList.value.length === 0,
+)
+
 const resultStatusMessage = computed(() => {
+  if (isLoading.value) {
+    return '라이브 목록을 불러오는 중입니다.'
+  }
+
+  if (hasLoadError.value) {
+    return errorMessage.value
+  }
+
   const condition = [
     getOptionLabel(LIVE_CATEGORY_FILTER_OPTIONS, selectedCategory.value),
     getOptionLabel(LIVE_STATUS_FILTER_OPTIONS, selectedStatus.value),
@@ -73,11 +110,69 @@ const resultStatusMessage = computed(() => {
   return `${condition} 조건으로 라이브 ${sortedLiveList.value.length}개를 표시합니다.`
 })
 
+const loadLiveList = async () => {
+  const requestId = ++loadRequestId
+  const scenario = getMockScenario()
+
+  liveList.value = []
+  loadState.value = 'loading'
+  errorMessage.value = ''
+
+  if (!apiEnabled && scenario === 'loading') {
+    return
+  }
+
+  try {
+    const response = await getLiveListViewData(
+      {
+        status: selectedStatus.value === 'ALL' ? undefined : selectedStatus.value,
+        sort: selectedSort.value,
+        page: 0,
+        size: 12,
+      },
+      scenario,
+    )
+
+    if (requestId !== loadRequestId) return
+
+    liveList.value = response.items
+    loadState.value = 'success'
+  } catch (error) {
+    if (requestId !== loadRequestId) return
+
+    const apiError = normalizeApiError(error)
+
+    errorMessage.value =
+      apiError.code === 'UNKNOWN_ERROR'
+        ? '라이브 목록을 불러오지 못했습니다. 네트워크 상태를 확인해 주세요.'
+        : apiError.message
+    loadState.value = 'error'
+  }
+}
+
 const resetFilters = () => {
   selectedCategory.value = 'ALL'
   selectedStatus.value = 'ALL'
   selectedSort.value = 'LATEST'
 }
+
+watch(
+  () => route.query.mock,
+  () => {
+    void loadLiveList()
+  },
+  { immediate: true },
+)
+
+watch([selectedStatus, selectedSort], () => {
+  if (apiEnabled) {
+    void loadLiveList()
+  }
+})
+
+onBeforeUnmount(() => {
+  loadRequestId += 1
+})
 </script>
 
 <template>
@@ -92,6 +187,7 @@ const resetFilters = () => {
         <LiveListFilter
           v-model:selected-category="selectedCategory"
           :can-reset="canResetFilters"
+          :disabled="isLoading"
           @reset="resetFilters"
         />
 
@@ -105,6 +201,7 @@ const resetFilters = () => {
                 role="tab"
                 :class="{ 'live-list-page__tab--active': selectedStatus === option.id }"
                 :aria-selected="selectedStatus === option.id"
+                :disabled="isLoading"
                 @click="selectedStatus = option.id"
               >
                 {{ option.label }}
@@ -112,9 +209,11 @@ const resetFilters = () => {
             </div>
 
             <div class="live-list-page__toolbar">
-              <span aria-live="polite">총 {{ sortedLiveList.length }}개</span>
+              <span aria-live="polite">
+                {{ isLoading ? '불러오는 중' : `총 ${sortedLiveList.length}개` }}
+              </span>
               <label class="sr-only" for="live-list-sort">라이브 정렬</label>
-              <select id="live-list-sort" v-model="selectedSort">
+              <select id="live-list-sort" v-model="selectedSort" :disabled="isLoading">
                 <option v-for="option in LIVE_SORT_OPTIONS" :key="option.id" :value="option.id">
                   {{ option.label }}
                 </option>
@@ -124,7 +223,32 @@ const resetFilters = () => {
 
           <p class="sr-only" aria-live="polite">{{ resultStatusMessage }}</p>
 
-          <div class="live-list-page__grid" aria-label="필터링된 라이브 방송 목록">
+          <LiveListState v-if="isLoading" variant="loading" />
+
+          <LiveListState
+            v-else-if="hasLoadError"
+            variant="error"
+            title="라이브 목록을 불러오지 못했습니다"
+            :description="errorMessage"
+            @action="loadLiveList"
+          />
+
+          <LiveListState
+            v-else-if="isEmpty"
+            variant="empty"
+            title="아직 공개된 라이브가 없습니다"
+            description="새로운 라이브가 준비되면 이곳에서 바로 확인할 수 있습니다."
+          />
+
+          <LiveListState
+            v-else-if="isFilterEmpty"
+            variant="filter-empty"
+            title="조건에 맞는 라이브가 없습니다"
+            description="다른 카테고리나 방송 상태를 선택하거나 필터를 초기화해 보세요."
+            @action="resetFilters"
+          />
+
+          <div v-else class="live-list-page__grid" aria-label="필터링된 라이브 방송 목록">
             <LiveListCard v-for="live in sortedLiveList" :key="live.id" :live="live" />
           </div>
         </div>
@@ -206,7 +330,7 @@ const resetFilters = () => {
   content: '';
 }
 
-.live-list-page__tabs button:hover,
+.live-list-page__tabs button:hover:not(:disabled),
 .live-list-page__tabs button:focus-visible,
 .live-list-page__tab--active {
   color: var(--color-primary);
@@ -216,6 +340,12 @@ const resetFilters = () => {
 .live-list-page__toolbar select:focus-visible {
   outline: 3px solid var(--color-primary-soft);
   outline-offset: 2px;
+}
+
+.live-list-page__tabs button:disabled,
+.live-list-page__toolbar select:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .live-list-page__tabs .live-list-page__tab--active::after {

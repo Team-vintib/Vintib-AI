@@ -75,10 +75,10 @@ FE/docs/frontend/screens/LIVE-LIST/
 - [x] 상태·카테고리·정렬 필터와 초기화 구현
 - [x] 결과 개수·선택 상태·접근성 구현
 - [x] 라이브 목록 BE API 요청 문서 작성
-- [ ] 최신 BE API 문서와 FE view model 비교
-- [ ] 목록 API adapter와 DTO 매핑 구현
-- [ ] 실제 로딩·빈 목록·오류·재시도 상태 구현
-- [ ] 필터 결과 없음과 최종 반응형 grid 보강
+- [x] 최신 BE API 문서와 FE view model 비교
+- [x] 목록 API adapter와 DTO 매핑 구현
+- [x] 실제 로딩·빈 목록·오류·재시도 상태 구현
+- [x] 필터 결과 없음과 최종 반응형 grid 보강
 - [x] `/lives` placeholder를 실제 View로 교체
 - [x] route-map·현재 구조·구현 상태 문서 갱신
 - [x] lint·type-check·build와 수동 화면 검증
@@ -92,6 +92,18 @@ FE/docs/frontend/screens/LIVE-LIST/
 - 필터·정렬 query parameter 제공 여부와 기본 정렬 기준을 확인한다.
 - 계약에 없는 값은 임의로 확정하지 않고 mock 전용임을 표시한다.
 - 추가 필드나 enum 협의가 필요하면 `.codex/requests/be/`에 요청 문서를 작성한다.
+
+## S15P11A108-418 API 확인 결과
+
+- 2026-07-29 `origin/develop-BE` `7962ec7` 기준으로 확인했다.
+- `GET /api/lives/{liveId}` 상세 조회는 있으나 공개 목록 `GET /api/lives`는 없다.
+- 현재 라이브 DTO에는 목록 필터에 필요한 카테고리와 현재 동시 시청자 수가 없다.
+- FE에는 요청 계약 기준 DTO·adapter와 호출 함수를 구현했지만
+  `VITE_LIVE_LIST_API_ENABLED=false`를 기본값으로 유지한다.
+- BE 목록 endpoint와 category/query/pagination 계약이 반영된 뒤 플래그를 켜고
+  실제 응답으로 E2E 검증해야 한다.
+- API 미연결 기간에는 mock adapter를 사용하며 `mock=loading|empty|error` query로
+  상태 화면을 재현한다.
 
 ## Git 및 MR 작업 단위
 

@@ -6,9 +6,12 @@ import type { LiveCategoryFilter } from '@/domains/live/types/liveList.types'
 interface Props {
   selectedCategory: LiveCategoryFilter
   canReset: boolean
+  disabled?: boolean
 }
 
-defineProps<Props>()
+withDefaults(defineProps<Props>(), {
+  disabled: false,
+})
 
 const emit = defineEmits<{
   'update:selectedCategory': [category: LiveCategoryFilter]
@@ -24,7 +27,7 @@ const handleCategoryChange = (event: Event) => {
   <aside class="live-list-filter" aria-label="라이브 필터">
     <div class="live-list-filter__heading">
       <h2>필터</h2>
-      <button type="button" :disabled="!canReset" @click="emit('reset')">초기화</button>
+      <button type="button" :disabled="disabled || !canReset" @click="emit('reset')">초기화</button>
     </div>
 
     <fieldset class="live-list-filter__group">
@@ -36,6 +39,7 @@ const handleCategoryChange = (event: Event) => {
           name="live-category"
           :value="option.id"
           :checked="selectedCategory === option.id"
+          :disabled="disabled"
           @change="handleCategoryChange"
         />
         <span>{{ option.label }}</span>
@@ -118,6 +122,11 @@ const handleCategoryChange = (event: Event) => {
   color: var(--color-text-secondary);
   font-size: 14px;
   cursor: pointer;
+}
+
+.live-list-filter__group label:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .live-list-filter__group input {

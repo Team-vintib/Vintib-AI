@@ -174,9 +174,11 @@ src/
         productList.types.ts
     live/
       api/
+        liveListApi.ts
       components/
         LiveListCard.vue
         LiveListFilter.vue
+        LiveListState.vue
       constants/
         liveListFilterOptions.ts
         liveListMockData.ts
@@ -352,11 +354,13 @@ docs/
   기존 라이브 route 이동과 미구현 CTA 안내를 제공합니다. 상세 조회의 로딩·오류·상품 없음·
   판매 완료와 AI 분석 전·중·완료·결과 없음·실패 상태를 구분하며 mock adapter에서 데이터를
   받습니다. 실제 API 계약이 확정되면 adapter 내부를 교체합니다.
-- `domains/live`에는 S15P11A108-413·415 공개 라이브 목록 View, 진행 중·예정 상태 카드,
+- `domains/live`에는 S15P11A108-413·415·418 공개 라이브 목록 View, 진행 중·예정 상태 카드,
   로컬 이미지 기반 mock 데이터와 라이브 시청 route 연결, 카테고리·방송 상태 필터,
   최신 방송·시청자·제목 정렬과 초기화가 구현되어 있습니다. 공개 목록에서는 종료 방송과
-  상품 판매 방식 조건을 제외합니다.
-  목록 상태와 실제 API 연결은 S15P11A108-418에서 이어서 구현합니다.
+  상품 판매 방식 조건을 제외합니다. 목록 DTO·adapter와 API 호출 함수, loading skeleton,
+  전체 빈 목록·필터 결과 없음·오류·재시도 상태를 제공합니다.
+  BE에 `GET /api/lives` 목록 계약이 없어 기본값은 mock adapter이며
+  `VITE_LIVE_LIST_API_ENABLED=true` 설정 후 실제 API adapter로 전환합니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.

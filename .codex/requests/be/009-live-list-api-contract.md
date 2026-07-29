@@ -13,6 +13,24 @@ FE는 공개 라이브 목록에서 카드, 방송 상태, 카테고리 필터�
 공개 목록에는 `LIVE`, `SCHEDULED` 상태만 노출합니다. `ENDED`, `CANCELED` 방송과
 경매·상시 판매 같은 판매 방식 조건은 이 화면의 필터 및 조회 대상에서 제외합니다.
 
+## 2026-07-29 현재 확인 결과
+
+`origin/develop-BE` `7962ec7` 기준으로 아래 내용을 확인했습니다.
+
+- `GET /api/lives/{liveId}` 라이브 상세 조회는 구현되어 있습니다.
+- 공개 목록용 `GET /api/lives`는 아직 구현되어 있지 않습니다.
+- `LiveDetailResponse`에는 `id`, `hostNickname`, `title`, `thumbnailUrl`, `status`,
+  `scheduledAt`, `startedAt`, `endedAt`, `peakViewerCount`가 있습니다.
+- 목록 필터에 필요한 `categoryId`, `categoryName`과 진행 중인 방송의
+  현재 `viewerCount`는 제공되지 않습니다.
+- `LiveRepository`에는 목록 필터·정렬·pagination 조회가 없습니다.
+- `GET /api/categories` 공개 카테고리 마스터는 이미 구현되어 있어 그대로 재사용할 수 있습니다.
+- `SecurityConfig`에는 상세 조회 `GET /api/lives/{liveId}`만 공개되어 있으므로
+  목록 `GET /api/lives`도 비회원 허용 규칙에 추가해야 합니다.
+
+따라서 FE는 목록 호출 함수와 DTO adapter까지 준비하되 기본 실행에서는 mock adapter를 사용합니다.
+아래 계약이 반영되기 전에는 `VITE_LIVE_LIST_API_ENABLED`를 `true`로 전환하지 않습니다.
+
 ## 요청 API 1: 공개 라이브 목록 조회
 
 - **Method / URL**: `GET /api/lives`
@@ -112,13 +130,14 @@ FE adapter는 `LIVE`이면 `startedAt`, `SCHEDULED`이면 `scheduledAt`을 카�
 - 잘못된 status, sort, 음수 page/size는 `400`과 공통 `ApiErrorBody`로 반환해 주세요.
 - 서버 오류는 `500`과 공통 오류 envelope를 사용해 주세요.
 
-## 요청 API 2: 라이브 카테고리 필터 목록
+## 확인된 API 2: 카테고리 필터 목록
 
 페이지네이션된 현재 목록에서 카테고리를 추출하면 전체 필터 항목을 구성할 수 없으므로
 카테고리 마스터 조회가 필요합니다.
 
-- 권장: 공통 상품 카테고리 API `GET /api/categories?usage=LIVE`
-- 공통 카테고리 조회 API를 구현할 예정이면 별도 라이브 endpoint를 만들지 않고 재사용해도 됩니다.
+- 현재 공통 카테고리 API `GET /api/categories`가 구현되어 있으므로 그대로 재사용합니다.
+- 라이브 전용 category endpoint 또는 `usage=LIVE` query는 요청하지 않습니다.
+- 라이브 목록 응답의 `categoryId`가 이 API의 `id`를 참조해야 합니다.
 
 응답 항목:
 
@@ -127,8 +146,10 @@ FE adapter는 `LIVE`이면 `startedAt`, `SCHEDULED`이면 `scheduledAt`을 카�
   "success": true,
   "data": [
     {
-      "categoryId": 10,
-      "categoryName": "아우터"
+      "id": 10,
+      "parentId": null,
+      "name": "아우터",
+      "depth": 1
     }
   ],
   "error": null
@@ -147,12 +168,16 @@ FE adapter는 `LIVE`이면 `startedAt`, `SCHEDULED`이면 `scheduledAt`을 카�
 
 ## FE 임시 처리
 
-- `S15P11A108-415`까지는 mock data를 브라우저에서만 필터링·정렬합니다.
+- BE 목록 endpoint가 준비될 때까지 mock data를 브라우저에서만 필터링·정렬합니다.
 - FE 임시 공개 상태는 `LIVE`, `SCHEDULED`입니다.
 - FE 임시 정렬은 `LATEST`, `VIEWERS_DESC`, `TITLE_ASC`입니다.
 - URL query 동기화와 서버 pagination은 실제 API 연결 전까지 사용하지 않습니다.
-- `S15P11A108-418`에서 Swagger 계약과 이 문서를 비교한 뒤 DTO 및 화면 adapter,
-  loading, empty, error, retry 상태를 연결합니다.
+- `S15P11A108-418`에서 요청 계약 기준 DTO·화면 adapter와 loading, empty, error,
+  retry 상태를 구현했습니다.
+- mock 상태 확인 URL은 `/lives?mock=loading`, `/lives?mock=empty`,
+  `/lives?mock=error`입니다.
+- 목록 endpoint, 카테고리 ID와 현재 시청자 수, query/pagination 계약이 반영되면
+  환경 플래그를 켜고 실제 응답 E2E를 진행합니다.
 
 ## 완료 기준
 
