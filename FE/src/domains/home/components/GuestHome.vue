@@ -10,7 +10,7 @@ import ProductCard from '@/domains/home/components/ProductCard.vue'
 import type { HomeViewData } from '@/domains/home/types/homeView.types'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
-const props = defineProps<{
+defineProps<{
   homeData: HomeViewData
   wishedProductIds: Set<number>
 }>()
