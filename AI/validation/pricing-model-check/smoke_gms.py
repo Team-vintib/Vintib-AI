@@ -30,14 +30,10 @@ from dataclasses import dataclass
 
 from gms_client import GMS_GEMINI_BASE, anthropic_client, gemini_post, gms_key
 
-# 팀이 확인한 GMS 호출 예시는 **날짜 붙은 정식 ID**(claude-haiku-4-5-20251001)였다.
-# alias 도 받는지는 미확인이라 양쪽을 다 시도한다. 통과한 ID만 model_registry.py 의
-# PRICING_* 로 승격한다.
-ANTHROPIC_CANDIDATES = [
-    "claude-haiku-4-5-20251001",  # 유일하게 실호출이 확인된 ID
-    "claude-sonnet-4-6",
-    "claude-opus-4-6",
-]
+# **기본 후보는 최저가 모델 하나뿐이다.** 상위 모델은 같은 질문에도 검색 라운드를 훨씬 많이
+# 돌아 비용이 급증한다 — 후보 목록에 두지 않고 `--model` 로 명시할 때만 호출되게 한다
+# (AI/CLAUDE.md 하드 룰: 후보 순회로 고가 모델이 자동 호출된 사고가 있었다).
+ANTHROPIC_CANDIDATES = ["claude-haiku-4-5-20251001"]
 GEMINI_CANDIDATES = ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
 
 # 최신 변형(dynamic filtering)은 Opus 4.6+ / Sonnet 4.6+ 에서만 동작한다.
@@ -189,15 +185,25 @@ def probe_gemini(api_key: str, model: str, tool_key: str) -> Verdict:
 
 
 def _probe_provider(candidates: list[str], tools: list[str], probe) -> list[Verdict]:
-    """모델 × 툴 규격을 순회하되, 통과한 조합이 나오면 나머지 규격은 건너뛴다."""
+    """모델 × 툴 규격을 순회하되, **한 조합이라도 통과하면 즉시 멈춘다.**
+
+    이 스크립트의 질문은 "이 provider로 웹검색이 되는가"이지 "어느 모델이 더 잘하는가"가
+    아니다. 모델 비교는 `comps_sources.py --model` 로 사용자가 명시할 때만 한다.
+
+    중단하지 않으면 앞 후보가 통과했는데도 뒤 후보까지 전부 호출된다 — 실제로 이 때문에
+    의도치 않은 고가 모델 호출 사고가 있었다(AI/CLAUDE.md 하드 룰 참고).
+    """
     verdicts: list[Verdict] = []
-    for model in candidates:
+    for index, model in enumerate(candidates):
         for tool in tools:
             verdict = probe(model, tool)
             print(f"  {verdict}")
             verdicts.append(verdict)
             if verdict.ok:
-                break  # 이 모델은 결론이 났다 — 구형 규격까지 시도할 이유가 없다
+                remaining = candidates[index + 1 :]
+                if remaining:
+                    print(f"  → 통과했으므로 나머지 후보는 호출하지 않는다: {remaining}")
+                return verdicts
     return verdicts
 
 
