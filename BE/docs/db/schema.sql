@@ -107,7 +107,9 @@ CREATE TABLE member_interest_category (
 CREATE TABLE product (
     id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     seller_id       BIGINT       NOT NULL REFERENCES member (id),
-    category_id     BIGINT       REFERENCES category (id),
+    -- 카테고리는 필수다. 상품이 어느 카테고리에도 속하지 않으면 검색·필터는 물론
+    -- 라이브 카테고리(편성 상품에서 유도)에서도 통째로 누락된다.
+    category_id     BIGINT       NOT NULL REFERENCES category (id),
     brand_id        BIGINT       REFERENCES brand (id),
     title           VARCHAR(200) NOT NULL,
     description     TEXT,
