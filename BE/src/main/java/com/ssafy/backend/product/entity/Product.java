@@ -102,4 +102,12 @@ public class Product extends BaseTimeEntity {
         this.price = price;
         this.saleStatus = SaleStatus.ON_SALE;
     }
+
+    public boolean isOwnedBy(Long memberId) {
+        return memberId != null && seller.getId().equals(memberId);
+    }
+
+    public boolean isPrivate() {
+        return saleStatus == SaleStatus.DRAFT || saleStatus == SaleStatus.PRIVATE;
+    }
 }

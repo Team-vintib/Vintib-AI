@@ -74,8 +74,9 @@ CREATE TABLE business_info (
 -- =============================================================================
 
 CREATE TABLE brand (
-    id   BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE
+    id      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name    VARCHAR(100) NOT NULL UNIQUE,
+    name_en VARCHAR(100)                     -- 영문명. 없는 브랜드 대비 nullable
 );
 
 CREATE TABLE category (
@@ -142,7 +143,7 @@ CREATE TABLE product (
 CREATE TABLE product_image (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     product_id BIGINT       NOT NULL REFERENCES product (id),
-    image_url  VARCHAR(500) NOT NULL,
+    image_key  VARCHAR(500) NOT NULL,
     sort_order SMALLINT     NOT NULL DEFAULT 0,
     is_primary BOOLEAN      NOT NULL DEFAULT FALSE
 );
@@ -163,6 +164,20 @@ CREATE TABLE follow (
     PRIMARY KEY (follower_id, following_id),
     CONSTRAINT ck_follow_not_self CHECK (follower_id <> following_id)
 );
+
+
+-- AI 가상 시착 결과물. product_id 를 참조하므로 product 다음에 둔다.
+-- 다중 아이템 합성("빈티지 코디" 등)은 이번 범위 밖 — 상품 1개 기준 단일 합성 결과만 다룬다.
+CREATE TABLE tryon_result (
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    member_id  BIGINT       NOT NULL REFERENCES member (id),
+    product_id BIGINT       NOT NULL REFERENCES product (id),
+    image_key  VARCHAR(500) NOT NULL,
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    deleted_at TIMESTAMPTZ
+);
+
+CREATE INDEX ix_tryon_result_member ON tryon_result (member_id, created_at DESC) WHERE deleted_at IS NULL;
 
 
 -- =============================================================================

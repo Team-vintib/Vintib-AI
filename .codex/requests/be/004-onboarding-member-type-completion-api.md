@@ -94,3 +94,12 @@ Content-Type: application/json
 - `FE/src/domains/onboard/api/onboarding.ts`
 - `FE/src/domains/onboard/pages/OnboardingMemberTypeView.vue`
 - `FE/docs/frontend/api/api-index.md`
+
+## 진행 상황 (2026-07-29)
+
+**미구현.** `POST /api/me/onboarding/complete` 엔드포인트, 관련 컨트롤러/서비스 모두 아직 없다.
+
+- `Member` 엔티티에 `memberType`(GENERAL/BUSINESS) 필드가 없다 — "BE 확인 필요 1" 미해결.
+- `Member.completeOnboarding()`은 001번 요청(기본 정보 저장)이 아직 미구현이라 여전히 존재하지 않는 메서드 호출 지점 자체가 없는 상태 — "BE 확인 필요 2"는 001·004를 함께 설계해야 풀린다.
+
+이 요청은 001(기본 정보), 002(관심 정보), 003(시착 프로필) 저장 흐름과 온보딩 완료 시점을 공유하므로, 네 요청을 한 번에 묶어서 `Member` 도메인 계획(`.claude/plans/be/`)을 세우는 게 나을 것 같다 — 순서대로 따로 구현하면 001에서 만든 완료 처리 로직을 004에서 다시 옮겨야 한다.

@@ -1,0 +1,130 @@
+[
+  {
+    "live_id": 12,
+    "message_id": 9001,
+    "user_id": 301,
+    "content": "이 옷 진짜 예쁘네요 판매자님 감사합니다",
+    "expected_verdict": "NORMAL",
+    "note": "정상 발화"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9002,
+    "user_id": 302,
+    "content": "저런 걸 옷이라고 파네 진짜 미친놈인가",
+    "expected_verdict": "ABUSIVE",
+    "note": "직접 욕설 - 사전 매칭"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9003,
+    "user_id": 303,
+    "content": "여자가 무슨 명품을 입고 방송을 하냐 꼴값이네",
+    "expected_verdict": "ABUSIVE",
+    "note": "혐오/인신공격 - 사전 매칭"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9004,
+    "user_id": 304,
+    "content": "ㅅㅂ 이게 무슨 가격이야",
+    "expected_verdict": "ABUSIVE",
+    "note": "우회: 초성체 - 낱자 자모 런 매칭"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9005,
+    "user_id": 305,
+    "content": "병 신 같은 방송이네",
+    "expected_verdict": "ABUSIVE",
+    "note": "우회: 공백 삽입 - 정규화 후 매칭"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9006,
+    "user_id": 306,
+    "content": "개새끼야ㅋㅋㅋㅋㅋ",
+    "expected_verdict": "ABUSIVE",
+    "note": "우회: 웃음 접미사 패딩 - 반복 접기 후 매칭"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9007,
+    "user_id": 307,
+    "content": "품절이요 품절이요 품절이요",
+    "expected_verdict": "NORMAL",
+    "note": "도배 1회차 - 아직 이력이 없어 통과"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9008,
+    "user_id": 307,
+    "content": "품절이요 품절이요 품절이요",
+    "expected_verdict": "NORMAL",
+    "note": "도배 2회차 - 근접중복 1건, 아직 임계 미만"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9009,
+    "user_id": 307,
+    "content": "품절이요 품절이요 품절이요",
+    "expected_verdict": "SPAM",
+    "note": "도배 3회차 - 근접중복 2건으로 임계 도달"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9010,
+    "user_id": 308,
+    "content": "이거 M 사이즈 있나요?",
+    "expected_verdict": "NORMAL",
+    "note": "반복질문 그룹 A 1회차 - 첫 질문이라 아직 반복 아님"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9011,
+    "user_id": 309,
+    "content": "M 사이즈도 있나요?",
+    "expected_verdict": "REPEATED_QUESTION",
+    "note": "반복질문 그룹 A 2회차 - 클러스터 도달, 답변 생성"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9012,
+    "user_id": 310,
+    "content": "혹시 M 사이즈 있나요??",
+    "expected_verdict": "REPEATED_QUESTION",
+    "note": "반복질문 그룹 A 3회차 - 같은 클러스터, 답변은 재생성하지 않음"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9013,
+    "user_id": 311,
+    "content": "배송은 얼마나 걸리나요?",
+    "expected_verdict": "NORMAL",
+    "note": "반복질문 그룹 B 1회차 - 그룹 A와 다른 클러스터"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9014,
+    "user_id": 312,
+    "content": "배송 얼마나 걸리나요?",
+    "expected_verdict": "REPEATED_QUESTION",
+    "note": "반복질문 그룹 B 2회차 - 답변 생성"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9015,
+    "user_id": 313,
+    "content": "매장 위치가 어디인가요?",
+    "expected_verdict": "NORMAL",
+    "note": "지식베이스에 없는 질문 1회차"
+  },
+  {
+    "live_id": 12,
+    "message_id": 9016,
+    "user_id": 314,
+    "content": "매장 위치가 어디인가요??",
+    "expected_verdict": "REPEATED_QUESTION",
+    "note": "지식베이스에 없는 질문 2회차 - 반복으로 판정되지만 근거 부족이라 답변은 생성되지 않음"
+  }
+]
