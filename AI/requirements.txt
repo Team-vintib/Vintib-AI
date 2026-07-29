@@ -14,3 +14,8 @@ pgvector==0.5.0
 # 품질 검수 Attention Map 오버레이 생성 + 목업 베이스 이미지 합성(app/quality/).
 # matplotlib은 서빙 경로에 넣지 않는다 — 히트맵은 Pillow만으로 그린다.
 Pillow==11.3.0
+# 가격 책정(app/pricing/)의 시세 검색용. torch가 아니라 HTTP 클라이언트라 서빙 경로에 둬도
+# 되는 경량 의존성이다(httpx를 함께 끌고 온다).
+# ⚠️ SDK 기본값이 timeout=10분 / max_retries=2 라 그대로 두면 job 하나가 스레드를 30분 잡는다.
+#    app/pricing/gms.py 가 timeout·max_retries 를 명시적으로 지정한다 — 지우지 말 것.
+anthropic==0.120.2
