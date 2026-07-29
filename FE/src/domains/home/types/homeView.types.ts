@@ -53,6 +53,13 @@ export interface HomeRecommendedProductItem extends HomeProductCardItem {
   recommendationReason: string
 }
 
+export interface HomeCategoryProductSection {
+  id: string
+  title: string
+  categoryName: string
+  products: HomeProductCardItem[]
+}
+
 export type HomeContentAudience = 'guest' | 'member' | 'all'
 
 export interface HomeContentCardItem {
@@ -72,5 +79,6 @@ export interface HomeViewData {
   upcomingAuctionProducts: HomeProductCardItem[]
   followedSellers: HomeFollowedSellerItem[]
   recommendedProducts: HomeRecommendedProductItem[]
+  categoryProductSections: HomeCategoryProductSection[]
   contentCards: HomeContentCardItem[]
 }

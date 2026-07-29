@@ -115,6 +115,7 @@ const toHomeViewData = (
       followingProducts.length > 0
         ? followingProducts.map(toHomeRecommendedProductItem)
         : homeMockData.recommendedProducts,
+    categoryProductSections: homeMockData.categoryProductSections,
     contentCards: homeMockData.contentCards,
   }
 }

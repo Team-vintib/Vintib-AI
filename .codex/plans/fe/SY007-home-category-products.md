@@ -2,11 +2,11 @@
 
 ## 배경/목표
 
-프로토타입에는 홈 화면에 `<테마별 상품>` 섹션이 있지만 현재 FE 홈에는 해당 섹션이 없다. GuestHome과 MemberHome 모두에서 공통으로 노출되는 `카테고리별 상품` 섹션을 추가한다.
+프로토타입에는 홈 화면에 `<테마별 상품>` 섹션이 있지만 현재 FE 홈에는 해당 섹션이 없다. GuestHome과 MemberHome 모두에서 공통으로 노출되는 `카테고리별 상품` 탭 섹션을 추가한다.
 
 ## 작업 내용
 
-- 회원/비회원 홈 모두에서 같은 카테고리별 상품 섹션을 노출한다.
+- 회원/비회원 홈 모두에서 같은 카테고리별 상품 탭 섹션을 노출한다.
 - 기존 `HomeSection`과 `ProductCard` 스타일을 재사용해 홈 화면 톤을 유지한다.
 - 현재 BE 홈 상품 응답에는 `categoryName`과 카테고리별 묶음 응답이 없으므로, 이번 FE 작업에서는 홈 mock 보조 데이터 기반으로 섹션을 구성한다.
 - 추후 BE가 `categoryName` 또는 `categoryProductSections`를 제공하면 `homeViewApi.ts` adapter만 실제 응답 매핑으로 교체한다.
@@ -14,18 +14,18 @@
 
 ## 구현 목록
 
-- [ ] `homeView.types.ts`에 카테고리별 상품 섹션 타입을 추가한다.
+- [x] `homeView.types.ts`에 카테고리별 상품 섹션 타입을 추가한다.
   - 예: `HomeCategoryProductSection`
   - 필드 후보: `id`, `title`, `description?`, `categoryName`, `products`
-- [ ] `HomeViewData`에 `categoryProductSections`를 추가한다.
-- [ ] `homeMockData.ts`에 카테고리별 상품 mock 섹션을 추가한다.
-- [ ] `homeViewApi.ts`에서 BE 응답에 없는 동안 `homeMockData.categoryProductSections`를 유지하도록 매핑한다.
-- [ ] 카테고리별 상품 전용 컴포넌트를 추가하거나, GuestHome/MemberHome 내부에서 공통 렌더링을 구성한다.
-- [ ] GuestHome에 `카테고리별 상품` 섹션을 추가한다.
-- [ ] MemberHome에도 같은 `카테고리별 상품` 섹션을 추가한다.
-- [ ] 상품 클릭은 기존과 동일하게 `/products/{id}`로 이동한다.
-- [ ] 반응형 grid는 기존 홈 상품 grid와 동일한 3열/2열/모바일 규칙을 우선 재사용한다.
-- [ ] `npm run type-check`, `npm run lint`, 가능하면 `npm run build`로 검증한다.
+- [x] `HomeViewData`에 `categoryProductSections`를 추가한다.
+- [x] `homeMockData.ts`에 카테고리별 상품 mock 섹션을 추가한다.
+- [x] `homeViewApi.ts`에서 BE 응답에 없는 동안 `homeMockData.categoryProductSections`를 유지하도록 매핑한다.
+- [x] 카테고리별 상품 전용 컴포넌트를 추가하거나, GuestHome/MemberHome 내부에서 공통 렌더링을 구성한다.
+- [x] GuestHome에 `카테고리별 상품` 섹션을 추가한다.
+- [x] MemberHome에도 같은 `카테고리별 상품` 섹션을 추가한다.
+- [x] 상품 클릭은 기존과 동일하게 `/products/{id}`로 이동한다.
+- [x] 반응형 grid는 기존 홈 상품 grid와 동일한 3열/2열/모바일 규칙을 우선 재사용한다.
+- [x] `npm run type-check`, `npm run lint`, 가능하면 `npm run build`로 검증한다.
 
 ## 배치 후보
 
@@ -66,6 +66,6 @@
 
 ## 확인이 필요한 미결정 사항
 
-- 섹션명은 프로토타입 문구인 `테마별 상품`을 쓸지, 사용자 요청 문구인 `카테고리별 상품`을 쓸지 확인이 필요하다.
-- 카테고리 탭/필터 형태로 만들지, 카테고리별 가로 섹션 묶음으로 만들지 확인이 필요하다.
+- 섹션명은 사용자 확인에 따라 `카테고리별 상품`으로 사용한다.
+- UI는 사용자 확인에 따라 카테고리 탭 형태로 구현한다.
 - 현재 BE 응답에는 카테고리별 묶음이 없으므로, 실제 데이터 전환 시 BE 계약이 필요하다.

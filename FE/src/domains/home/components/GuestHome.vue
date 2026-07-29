@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import CategoryProductTabs from '@/domains/home/components/CategoryProductTabs.vue'
 import HomeContentCard from '@/domains/home/components/HomeContentCard.vue'
 import HomeHero from '@/domains/home/components/HomeHero.vue'
 import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
@@ -100,6 +101,8 @@ const getProductPath = (productId: number) => `/products/${productId}`
         />
       </div>
     </HomeSection>
+
+    <CategoryProductTabs :sections="homeData.categoryProductSections" />
 
     <HomeSection
       title-id="auction-title"
