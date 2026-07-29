@@ -1,16 +1,22 @@
 """AI 테스트 전역 설정.
 
-**`worker/models/clipseg/`를 import 경로에 넣는다.** 리포 루트의 `worker/`는 별도 CI 잡이 없어
-(`.gitlab-ci.yml`의 `ai-test`는 `AI/**/*`만 감시한다) 그냥 두면 lint·test가 전혀 돌지 않는다.
-품질 검수 판정 로직이 그쪽으로 옮겨갔으므로, **순수 로직만이라도 AI의 pytest로 커버**한다
-(torch가 필요한 CLIPSeg 백엔드는 목업으로 우회되므로 CI에서 그대로 돈다).
+**`worker/models/clipseg/`·`worker/models/garment_measurement/`를 import 경로에 넣는다.**
+리포 루트의 `worker/`는 별도 CI 잡이 없어(`.gitlab-ci.yml`의 `ai-test`는 `AI/**/*`만 감시한다)
+그냥 두면 lint·test가 전혀 돌지 않는다. 품질검수·실측 판정 로직이 그쪽에 있으므로,
+**순수 로직만이라도 AI의 pytest로 커버**한다(torch가 필요한 백엔드는 목업으로 우회되므로
+CI에서 그대로 돈다).
 
-해당 테스트는 `test/worker/clipseg/`에 있다 — `test/`가 `app/<도메인>/`을 미러한다는 규칙의
-예외이며, 리포 루트 `worker/`를 대상으로 한다는 뜻이다.
+해당 테스트는 `test/worker/clipseg/`·`test/worker/garment_measurement/`에 있다 — `test/`가
+`app/<도메인>/`을 미러한다는 규칙의 예외이며, 리포 루트 `worker/`를 대상으로 한다는 뜻이다.
 
-워커 패키지는 `sys.path` 삽입 방식으로 import되도록 만들어져 있다(`quality_check_worker_example.py`의
-`CLIPSEG_CODE_PATH`, `tryon_worker_example.py`의 `CATVTON_CODE_PATH`와 같은 방식). 여기서도
-같은 경로를 넣어 실행 환경과 동일하게 맞춘다.
+**두 경로를 넣는 방식이 서로 다르다.** `clipseg/`는 `contracts.py`/`registry.py`/`scenarios.py`
+등을 flat하게 두고 그 디렉터리 자체를 sys.path에 넣는다(`quality_check_worker_example.py`의
+`CLIPSEG_CODE_PATH`와 같은 방식) — 바로 `import contracts`로 접근한다. `garment_measurement/`는
+같은 이름의 파일들을 갖고 있어서(둘 다 이 conftest 안에서 동시에 sys.path에 들어감) flat하게
+넣으면 `import contracts`가 어느 쪽을 가져올지 꼬인다(먼저 import된 모듈이 전역 캐시에 남는다).
+그래서 `garment_measurement/`는 진짜 서브패키지(`__init__.py` 보유)로 만들고 **부모
+디렉터리**(`worker/models/`)를 sys.path에 넣어 `from garment_measurement.xxx import ...`
+형태로만 접근한다 — CatVTON이 `model.` 네임스페이스로 같은 문제를 피한 것과 동일한 원리다.
 """
 
 import sys
@@ -20,9 +26,12 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _CLIPSEG_PATH = _REPO_ROOT / "worker" / "models" / "clipseg"
+_WORKER_MODELS_PATH = _REPO_ROOT / "worker" / "models"  # garment_measurement 패키지의 부모
 
 if _CLIPSEG_PATH.is_dir():
     sys.path.insert(0, str(_CLIPSEG_PATH))
+if _WORKER_MODELS_PATH.is_dir():
+    sys.path.insert(0, str(_WORKER_MODELS_PATH))
 
 
 class FakeRedis:
