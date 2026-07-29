@@ -23,6 +23,7 @@ S15P11A108-27(인프라 세팅) / S15P11A108-210(CatVTON 모델 연결) 관련 �
 | `tryon_worker_example.py` | 시착(CatVTON) 워커. 현재 `worker/models/catvton`의 검증 코드(`verify_fit_tryon.py`)를 기반으로 실제 모델이 연결되어 있다. |
 | `quality_check_worker_example.py` | 품질검수(CLIPSeg) 워커. 판정 로직은 `models/clipseg/`에 있고 이 파일은 오케스트레이션만 한다. **`QUALITY_BACKEND=mock`이면 GPU 없이도 전 경로가 돈다.** |
 | `stt_worker_example.py` | 라이브 발언 STT 워커. Whisper로 전사하고 같은 프로세스에서 KURE-v1 임베딩까지 계산해 게이트웨이엔 텍스트+벡터를 그대로 넘긴다(게이트웨이엔 torch가 없어서). **`STT_BACKEND=mock`(기본값)이면 GPU 없이도 전 경로가 돈다.** 실제 방송 오디오는 OpenVidu 설치 전이라 아직 없다. |
+| `chat_rag_worker_example.py` | 반복질문 답변 생성 워커. 게이트웨이가 `live_id`로 가져온 문서 후보 + 질문을 받아 KURE-v1로 임베딩·랭킹하고, 그라운딩 임계치를 넘으면 LangChain + `LiquidAI/LFM2.5-230M`으로 답변까지 생성해 돌려준다(검색·판단·생성을 왕복 1회로 처리). **`CHAT_RAG_BACKEND=mock`(기본값)이면 GPU 없이도 전 경로가 돈다.** |
 | `models/clipseg/` | 품질검수 판정 로직 — 세그멘테이션(목업/CLIPSeg) · 하자 항목화 · 점수 · 히트맵. 순수 로직은 `AI/test/worker/clipseg/`가 CI에서 검증한다. |
 | `requirements.txt` | 워커 공통 의존성. `requests`, `Pillow`(storage_utils.py가 `PIL.Image`를 다룬다). CatVTON 등 모델 자체의 의존성(torch, diffusers 등)은 각자 기존에 구성해둔 conda 환경을 그대로 쓴다 — 이 파일에 포함하지 않는다. |
 | `.env.example` | 워커 실행에 필요한 환경변수 예시. 필요한 값은 아래 "실행 방법" 참고. |
@@ -59,6 +60,13 @@ STT 워커는 아래를 쓴다:
 ```bash
 export STT_BACKEND=mock             # 기본값. GPU 불필요 — 결정적 더미 텍스트+임베딩으로 전 경로 검증
 export STT_BACKEND=faster_whisper   # 실제 Whisper(small) + KURE-v1. torch/faster-whisper/sentence-transformers 필요
+```
+
+chat_rag 워커는 아래를 쓴다:
+
+```bash
+export CHAT_RAG_BACKEND=mock             # 기본값. GPU 불필요 — 결정적 임베딩 + 최상위 근거 그대로 반환
+export CHAT_RAG_BACKEND=lfm2_langchain   # 실제 KURE-v1 + LangChain/LFM2.5-230M. torch/sentence-transformers/langchain_huggingface/transformers 필요
 ```
 
 ### 2. 실행
@@ -153,6 +161,45 @@ python tryon_worker_example.py
 OpenVidu(방송 녹화)가 로드맵상 미설치라 `audio_url`을 채워줄 곳이 없다. 지금은 로컬 오디오
 파일을 아무 파일 서버에 올려서 URL로 넘기는 식으로만 단독 검증할 수 있다.
 
+## chat_rag 워커 동작 방식
+
+라이브 채팅 반복질문 RAG(`S15P11A108-444`)의 마지막 단계 — 검색·랭킹·그라운딩 판단·생성을
+전부 이 워커 안에서 한 번에 처리한다. 방송 하나당 문서 수가 많지 않아 pgvector의 ANN 검색
+없이 후보 텍스트를 통째로 받아 인메모리로 비교하는 게 충분하다(`AI/docs/chat-rag-storage.md`).
+
+### job payload 형식
+
+```json
+{
+  "ticket": "a_42_ab12cd",
+  "live_id": 42,
+  "question": "이거 프리사이즈인가요?",
+  "cluster_size": 2,
+  "docs": [{"id": 1, "content": "이 니트는 프리사이즈이며..."}, {"id": 2, "content": "..."}]
+}
+```
+
+`docs`는 게이트웨이가 `rag_store.fetch_documents(live_id)`로 벡터 연산 없이 가져온 후보다.
+
+### 결과 형식
+
+근거 부족(무응답):
+
+```json
+{"grounded": false}
+```
+
+근거 있음:
+
+```json
+{
+  "grounded": true,
+  "answer": "네, 프리사이즈로 나왔습니다.",
+  "grounding_score": 0.62,
+  "sources": [{"doc_id": "1", "score": 0.62}]
+}
+```
+
 ## 전체 흐름 테스트
 
 ```bash
@@ -180,3 +227,5 @@ curl https://i15a108.p.ssafy.io/ai/jobs/{job_id}
 - CatVTON 모델 로딩 시간이 길 경우, 워커 기동 시점에 미리 로딩해두는 방식(lazy 대신 eager)으로 바꿀지 검토
 - STT 워커를 실제 GPU 노트북에서 `STT_BACKEND=faster_whisper`로 돌려보기 (지금까지는 `mock`으로만 검증했다)
 - OpenVidu 설치 후 실제 방송 오디오로 STT 워커 E2E 검증
+- chat_rag 워커를 실제 GPU 노트북에서 `CHAT_RAG_BACKEND=lfm2_langchain`으로 돌려보기 (지금까지는 `mock`으로만 검증했다)
+- 워커 호출 전 답변 캐시(같은 `live_id` 안 유사 질문 재사용, ONNX 임베더) — 별도 후속 작업

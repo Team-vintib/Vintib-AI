@@ -1,8 +1,14 @@
-"""라이브 댓글 관리 백엔드 레지스트리 — 모델·RAG 구현의 유일한 스왑 지점.
+"""라이브 댓글 관리 백엔드 레지스트리 — 분류기 스왑 지점 + 평가 파이프라인 설정.
 
 `test/model_selection/model_registry.py`의 프로덕션판. `ACTIVE_*` 키 하나만 바꾸면 구현이
 교체된다. `test/` 코드를 프로덕션에서 import하지 않는 규약에 따라 모델 ID는 여기서 재선언한다
 (`app/recommend/pipeline/embed_catalog.py` 선례).
+
+**`EMBEDDER_BACKENDS`/`RETRIEVER_BACKENDS`는 이제 평가 파이프라인 전용이다**
+(`app/chat/evaluation.py`, `test/chat/test_chat_evaluation.py`, `S15P11A108-196`). 실제 반복질문
+답변 생성은 `chat_rag` 워커(`worker/chat_rag_worker_example.py`)가 처리하고, 게이트웨이는
+`app/chat/rag_store.py`로 문서만 오가므로 여기 값을 참조하지 않는다(`S15P11A108-444`). 생성
+쪽 스왑 지점(`GENERATOR_BACKENDS`)은 그래서 삭제했다 — 워커 코드 자체가 그 역할을 한다.
 
 **임계치를 백엔드별로 묶어 둔 이유**: `chat_agent.ipynb` 5.3의 결론이
 "임베딩 모델마다 코사인 유사도 스케일이 달라 0.8 같은 고정 임계치를 모델 무관하게 재사용하면
@@ -51,11 +57,7 @@ EMBEDDER_BACKENDS: dict[str, EmbedderConfig] = {
         "grounding_threshold": 0.35,
     },
     # 실모델 후보. 채택 시 반드시 해당 모델 기준으로 임계치를 다시 스윕해야 한다.
-    "kanana_nano": {
-        "model_id": "kakaocorp/kanana-nano-2.1b-embedding",
-        "cluster_similarity": 0.75,  # ipynb 5.3: 0.75에서 precision/recall 1.0
-        "grounding_threshold": POLICY_GROUNDING_THRESHOLD,  # 미검증 — CHAT-003에서 확정
-    },
+    # kanana_nano(카카오)는 배제하기로 결정됨(S15P11A108-444) — kure_v1만 후보로 남긴다.
     "kure_v1": {
         "model_id": "nlpai-lab/KURE-v1",
         "cluster_similarity": 0.65,  # ipynb 5.3: 0.60~0.70에서 precision/recall 1.0
@@ -64,18 +66,11 @@ EMBEDDER_BACKENDS: dict[str, EmbedderConfig] = {
 }
 ACTIVE_EMBEDDER = "mock_bigram"  # <- 여기 키만 바꾸면 스왑
 
-# --- 반복질문 RAG: 문서 검색 / 답변 생성 ----------------------------------
+# --- 반복질문 RAG 검색: 평가 파이프라인 전용(모듈 docstring 참고) ----------
 RETRIEVER_BACKENDS: dict[str, str] = {
     "mock": "목업 FAQ JSON + 결정적 bigram 임베딩 코사인 검색",
-    "pgvector": "PostgreSQL pgvector 유사도 검색 (미구현 — S15P11A108-184)",
 }
-ACTIVE_RETRIEVER = "mock"  # <- 여기 키만 바꾸면 스왑
-
-GENERATOR_BACKENDS: dict[str, str | None] = {
-    "template": None,  # 기본 — 검색된 근거 문서의 답변을 그대로 반환(환각 없음)
-    "kanana": "kakaocorp/kanana-1.5-2.1b-instruct-2505",  # 미구현 스텁
-}
-ACTIVE_GENERATOR = "template"  # <- 여기 키만 바꾸면 스왑
+ACTIVE_RETRIEVER = "mock"  # <- 여기 키만 바꾸면 스왑(평가용)
 
 # --- 스팸 탐지 상태 저장소 -------------------------------------------------
 STATE_STORE_BACKENDS: dict[str, str] = {
