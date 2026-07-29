@@ -15,7 +15,7 @@ import type {
   LiveCreateMode,
   LiveCreateStep,
 } from '@/domains/live/types/liveCreate.types'
-import { ROUTE_NAMES } from '@/shared/constants/routes'
+import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const form = reactive<LiveCreateFormState>({
@@ -60,6 +60,14 @@ const completeDescription = computed(() =>
   form.mode === 'IMMEDIATE'
     ? '실제 방송 생성 API가 연결되면 이 단계에서 라이브 진행 화면으로 이동합니다.'
     : '실제 예약 API가 연결되면 입력한 일정으로 라이브가 등록됩니다.',
+)
+const completeActionLabel = computed(() =>
+  form.mode === 'IMMEDIATE' ? '라이브 시작' : '라이브 목록',
+)
+const completeActionTo = computed(() =>
+  form.mode === 'IMMEDIATE'
+    ? { name: ROUTE_NAMES.LIVE_WATCH, params: { liveId: 'preview' } }
+    : ROUTE_PATHS.LIVE_LIST,
 )
 const isFirstStep = computed(() => currentStepIndex.value === 0)
 const isLastStep = computed(() => currentStepIndex.value === liveCreateSteps.value.length - 1)
@@ -530,9 +538,9 @@ onBeforeUnmount(() => {
             <div class="live-create__complete-actions">
               <RouterLink
                 class="live-create__complete-link"
-                :to="{ name: ROUTE_NAMES.LIVE_WATCH, params: { liveId: 'preview' } }"
+                :to="completeActionTo"
               >
-                라이브 시작
+                {{ completeActionLabel }}
               </RouterLink>
             </div>
           </section>
