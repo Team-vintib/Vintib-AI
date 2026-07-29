@@ -55,7 +55,7 @@ COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
         "min_comps_for_pricing": 1,
     },
 }
-ACTIVE_COMPS_SOURCE = "llm_web_search"  # <- 여기 키만 바꾸면 스왑
+ACTIVE_COMPS_SOURCE = "mock"  # <- 여기 키만 바꾸면 스왑. llm_web_search 전환은 사용자만(하드 룰)
 # llm_web_search / mock
 
 
