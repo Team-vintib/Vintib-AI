@@ -51,7 +51,9 @@ public class AuctionService {
         if (!live.isHostedBy(hostId)) {
             throw new CustomException(ErrorCode.NOT_LIVE_HOST);
         }
-        if (!live.isOpenForEditing()) {
+        // 편성 변경(isOpenForEditing)과 다른 기준을 쓴다 — 경매 조건 설정은 방송 중에도 해야 한다.
+        // 실제 라이브 커머스에서 경매는 방송을 진행하면서 건다.
+        if (live.isClosed()) {
             throw new CustomException(ErrorCode.INVALID_LIVE_STATE);
         }
         if (!liveProductRepository.existsByLiveIdAndProductIdAndRemovedAtIsNull(liveId, request.productId())) {

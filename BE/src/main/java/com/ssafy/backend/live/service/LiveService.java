@@ -31,14 +31,19 @@ public class LiveService {
 
     /**
      * 예약 라이브 개설(LIVE-001). 방송 예정 시각이 미래인지는 요청 DTO({@code @Future})가 검증한다.
+     *
+     * <p><b>판매 상품을 개설과 같은 트랜잭션에서 편성한다.</b> 상품 없는 방송이 만들어지면
+     * 카테고리도 없고 팔 것도 없는 빈 방이 목록에 뜬다. 편성이 실패하면 방송도 만들어지지 않는다.
      */
     @Transactional
     public LiveResponse scheduleLive(Long hostId, LiveScheduleRequest request) {
         Member host = findHost(hostId);
 
-        Live live = Live.schedule(host, request.title(), request.thumbnailUrl(), request.scheduledAt());
+        Live live = liveRepository.save(
+                Live.schedule(host, request.title(), request.thumbnailUrl(), request.scheduledAt()));
+        liveProductService.linkProductsOnCreate(hostId, live, request.productIds());
 
-        return LiveResponse.from(liveRepository.save(live));
+        return LiveResponse.from(live);
     }
 
     /**
@@ -46,14 +51,19 @@ public class LiveService {
      *
      * <p>시작 시각은 클라이언트가 보낸 값이 아니라 서버 시각으로 박는다 — 방송 시작 순서·경매 종료
      * 판정이 전부 서버 시각 기준이어야 하기 때문이다(erd.md §6).
+     *
+     * <p>즉시 개설은 생성 즉시 {@code LIVE}가 되어 <b>이후 편성을 바꿀 수 없다.</b> 그래서
+     * 상품 편성이 개설 요청에 반드시 포함돼야 한다.
      */
     @Transactional
     public LiveResponse openLiveNow(Long hostId, LiveInstantRequest request) {
         Member host = findHost(hostId);
 
-        Live live = Live.openNow(host, request.title(), request.thumbnailUrl(), LocalDateTime.now());
+        Live live = liveRepository.save(
+                Live.openNow(host, request.title(), request.thumbnailUrl(), LocalDateTime.now()));
+        liveProductService.linkProductsOnCreate(hostId, live, request.productIds());
 
-        return LiveResponse.from(liveRepository.save(live));
+        return LiveResponse.from(live);
     }
 
     /**

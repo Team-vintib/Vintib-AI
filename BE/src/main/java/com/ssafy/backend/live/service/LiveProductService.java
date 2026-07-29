@@ -12,6 +12,7 @@ import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +33,34 @@ public class LiveProductService {
     private final ProductQueryPort productQueryPort;
 
     /**
-     * 라이브에 상품을 연결한다. 방송 전·중 모두 가능하다.
+     * 라이브 개설과 동시에 판매 상품을 편성한다.
+     *
+     * <p>개설 트랜잭션 안에서 호출되므로 라이브 조회·호스트 검증을 다시 하지 않는다. 대신
+     * 상품 소유·중복 검증은 그대로 건다. 편성 순서는 요청에 담긴 순서를 그대로 쓴다.
+     */
+    @Transactional
+    public void linkProductsOnCreate(Long hostId, Live live, List<Long> productIds) {
+        // 같은 상품을 두 번 담아 보내면 부분 UNIQUE 인덱스(ux_live_product_active)에 걸려
+        // 500 으로 새어 나간다. 저장 전에 걸러 400 으로 돌려준다.
+        if (Set.copyOf(productIds).size() != productIds.size()) {
+            throw new CustomException(ErrorCode.PRODUCT_ALREADY_LINKED);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        short sortOrder = 0;
+
+        for (Long productId : productIds) {
+            ProductSummary product = findProduct(productId);
+            if (!product.sellerId().equals(hostId)) {
+                throw new CustomException(ErrorCode.NOT_PRODUCT_OWNER);
+            }
+            liveProductRepository.save(LiveProduct.link(live, product.id(), sortOrder++, now));
+        }
+    }
+
+    /**
+     * 라이브에 상품을 연결한다. <b>방송 시작 전(SCHEDULED)에만 가능하다</b> — 방송 도중에는
+     * 편성을 바꿀 수 없다(운영 정책).
      *
      * <p>호스트 본인의 상품만 걸 수 있다 — 남의 상품을 자기 방송에 올리는 것을 막는다.
      */

@@ -11,6 +11,9 @@ import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.repository.CategoryRepository;
+import com.ssafy.backend.product.repository.ProductRepository;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,9 +54,16 @@ class LiveControllerTest {
     @Autowired
     private LiveRepository liveRepository;
 
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private MockMvc mockMvc;
     private String hostToken;
     private Member hostMember;
+    private Long productId;
 
     @BeforeEach
     void setUp() {
@@ -68,6 +78,14 @@ class LiveControllerTest {
                 .name("호스트")
                 .build());
         hostToken = jwtTokenProvider.createAccessToken(hostMember.getId(), email);
+
+        // 개설 요청에는 판매할 상품이 최소 1개 필요하다(운영 정책 — 편성은 개설 시점에 확정된다).
+        productId = productRepository.save(Product.builder()
+                        .seller(hostMember)
+                        .categoryId(categoryRepository.findAll().get(0).getId())
+                        .title("리바이스 501 빈티지")
+                        .build())
+                .getId();
     }
 
     /** 상태 전이·시청 조회 검증에 쓸 진행 중 라이브를 하나 만들어 ID를 돌려준다. */
@@ -80,8 +98,14 @@ class LiveControllerTest {
     private String scheduleRequestBody(String title, String thumbnailUrl, LocalDateTime scheduledAt) {
         String thumbnail = thumbnailUrl == null ? "null" : "\"" + thumbnailUrl + "\"";
         return """
-                {"title":"%s","thumbnailUrl":%s,"scheduledAt":"%s"}
-                """.formatted(title, thumbnail, scheduledAt);
+                {"title":"%s","thumbnailUrl":%s,"scheduledAt":"%s","productIds":[%d]}
+                """.formatted(title, thumbnail, scheduledAt, productId);
+    }
+
+    private String instantRequestBody(String title) {
+        return """
+                {"title":"%s","thumbnailUrl":null,"productIds":[%d]}
+                """.formatted(title, productId);
     }
 
     @Test
@@ -136,9 +160,7 @@ class LiveControllerTest {
 
     @Test
     void 즉시_개설하면_201과_LIVE_상태를_반환한다() throws Exception {
-        String body = """
-                {"title":"지금 바로 여는 빈티지 라이브","thumbnailUrl":null}
-                """;
+        String body = instantRequestBody("지금 바로 여는 빈티지 라이브");
 
         mockMvc.perform(post("/api/lives")
                         .header("Authorization", "Bearer " + hostToken)
@@ -153,8 +175,33 @@ class LiveControllerTest {
 
     @Test
     void 즉시_개설도_방송명이_비어_있으면_400을_반환한다() throws Exception {
+        String body = instantRequestBody("   ");
+
+        mockMvc.perform(post("/api/lives")
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 판매할_상품_없이_개설하면_400을_반환한다() throws Exception {
+        // 편성은 개설 시점에 확정된다 — 상품 없는 빈 방송이 만들어지면 안 된다.
         String body = """
-                {"title":"   ","thumbnailUrl":null}
+                {"title":"빈 방송","thumbnailUrl":null,"scheduledAt":"%s","productIds":[]}
+                """.formatted(LocalDateTime.now().plusDays(1));
+
+        mockMvc.perform(post("/api/lives/schedule")
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 즉시_개설도_상품_없이는_400을_반환한다() throws Exception {
+        String body = """
+                {"title":"빈 방송","thumbnailUrl":null,"productIds":[]}
                 """;
 
         mockMvc.perform(post("/api/lives")
@@ -221,9 +268,7 @@ class LiveControllerTest {
 
     @Test
     void 즉시_개설도_미인증이면_401을_반환한다() throws Exception {
-        String body = """
-                {"title":"지금 바로 여는 빈티지 라이브","thumbnailUrl":null}
-                """;
+        String body = instantRequestBody("지금 바로 여는 빈티지 라이브");
 
         mockMvc.perform(post("/api/lives")
                         .contentType(MediaType.APPLICATION_JSON)
