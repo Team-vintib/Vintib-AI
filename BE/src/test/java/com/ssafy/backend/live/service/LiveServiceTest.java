@@ -12,6 +12,7 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.live.dto.request.LiveInstantRequest;
 import com.ssafy.backend.live.dto.request.LiveScheduleRequest;
 import com.ssafy.backend.live.dto.request.LiveStatusUpdateRequest;
+import com.ssafy.backend.live.dto.response.LiveDetailResponse;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveStatus;
@@ -152,6 +153,31 @@ class LiveServiceTest {
         LiveStatusUpdateRequest request = new LiveStatusUpdateRequest(LiveStatus.ENDED);
 
         assertThatThrownBy(() -> liveService.transitionStatus(HOST_ID, LIVE_ID, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.LIVE_NOT_FOUND);
+    }
+
+    @Test
+    void 시청_조회는_방_정보와_편성_상품을_함께_반환한다() {
+        when(host.getId()).thenReturn(HOST_ID);
+        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        when(liveProductService.getLinkedProducts(LIVE_ID)).thenReturn(List.of());
+
+        LiveDetailResponse response = liveService.getLiveDetail(LIVE_ID);
+
+        assertThat(response.status()).isEqualTo(LiveStatus.LIVE);
+        assertThat(response.title()).isEqualTo(TITLE);
+        assertThat(response.hostId()).isEqualTo(HOST_ID);
+        assertThat(response.products()).isEmpty();
+        assertThat(response.peakViewerCount()).isZero();
+    }
+
+    @Test
+    void 존재하지_않는_라이브는_시청_조회할_수_없다() {
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> liveService.getLiveDetail(LIVE_ID))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.LIVE_NOT_FOUND);
     }
