@@ -210,7 +210,7 @@ BE/
 │       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
 │       ├── health/              # HealthController
 │       ├── response/            # ApiResponse, ErrorResponse
-│       └── storage/             # S3StorageService, LocalS3BucketInitializer(local 전용)
+│       └── storage/             # S3StorageService, S3BucketInitializer
 ├── src/main/resources/application.yml
 └── src/test/java/com/ssafy/backend/
 ```

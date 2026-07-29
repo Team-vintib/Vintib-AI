@@ -44,6 +44,15 @@ services:
         max-size: "20m"
         max-file: "5"
 
+  # 호스트 포트를 열지 않는다. 외부 접근은 caddy 가 /vintib-public·/vintib-private
+  # 경로를 프록시하는 경로로만 이뤄진다 (override.yml 의 9000/9001 발행은 로컬 전용).
+  minio:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
   ai:
     logging:
       driver: json-file

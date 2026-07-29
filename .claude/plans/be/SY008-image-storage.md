@@ -10,6 +10,9 @@
 - **시착 프로필 사진**(`member_body_profile.body_photo_url`, 시착 입력값)은 이번 계획 범위 밖이다 — 이미 `.codex/requests/be/003`에 별도 요청이 있고 사용자 원 요청("상품 이미지, 시착 결과 이미지")에도 포함되지 않는다.
 - **시착 생성(`POST .../tryons`)**은 AI 쪽에 이미지 합성 엔드포인트 자체가 없어(현재 `/health`만 존재) 이번 계획 범위에서 제외한다. AI에 계약을 제안하는 요청 문서만 작성하고, 생성 API는 후속 계획으로 미룬다. 이번 계획은 시착 결과의 **저장/조회/삭제**만 구현한다(BE가 이미지를 이미 갖고 있다고 가정).
 
+> [!IMPORTANT]
+> **운영 스토리지는 실제 AWS S3가 아니다.** 이 계획은 prod = AWS S3를 전제했으나, 팀에 AWS 계정이 없어(SSAFY 제공 EC2 한 대, 웹 콘솔 없음) 버킷·IAM을 만들 방법 자체가 없었다. `JY006`에서 운영도 EC2 안의 자체 호스팅 MinIO로 확정했다. 아래 "공용 S3 인프라" 절의 서술 중 prod 관련 부분(AWS 콘솔 수동 설정, AWS 자격증명)은 `JY006`으로 대체됐다 — 애플리케이션 코드는 S3 호환 API만 쓰므로 그대로 유효하다.
+
 ## 공용 S3 인프라
 
 - 버킷 2개: public(상품 이미지) / private(시착 결과). 버킷명·리전은 프로필별 env(`AWS_S3_PUBLIC_BUCKET`, `AWS_S3_PRIVATE_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, local 전용 `AWS_S3_ENDPOINT`)로 주입, `application.yml`에 `${..}` 기본값 패턴(기존 `ai.base-url`, `cors.allowed-origins`와 동일 스타일).
@@ -78,8 +81,8 @@
 - [x] `.claude/requests/ai/001-tryon-result-contract.md` 작성
 - [x] `ProductImageServiceTest`, `TryOnResultServiceTest` (Mockito, `S3StorageService` 목 처리)
 - [x] `.claude/skills/verify`(BE) 기준 빌드/테스트 통과 확인 — 61개 테스트 전체 통과
-- [ ] (인프라, 코드 범위 아님) prod S3 버킷 생성 + public 버킷 정책 콘솔에서 수동 설정
-- [ ] GitLab CI/CD Variables에 `AWS_REGION`/`AWS_S3_PUBLIC_BUCKET`/`AWS_S3_PRIVATE_BUCKET`/`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` 등록 (사용자 몫)
+- [x] ~~(인프라, 코드 범위 아님) prod S3 버킷 생성 + public 버킷 정책 콘솔에서 수동 설정~~ → **`JY006`으로 대체.** 운영 스토리지를 자체 호스팅 MinIO로 바꾸면서 `S3BucketInitializer`가 기동 시 자동 생성하므로 수동 설정 항목이 사라졌다.
+- [x] ~~GitLab CI/CD Variables에 `AWS_REGION`/`AWS_S3_PUBLIC_BUCKET`/`AWS_S3_PRIVATE_BUCKET`/`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` 등록~~ → **`JY006`으로 대체.** `PROD_MINIO_ROOT_USER`/`PROD_MINIO_ROOT_PASSWORD` 2개로 줄었다.
 
 ## 이미지 저장 플로우 (실제 구현된 요청/응답 형태)
 

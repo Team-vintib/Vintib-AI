@@ -44,8 +44,14 @@ volumes = [
 | 변수 | 값 | 비고 |
 | --- | --- | --- |
 | `PROD_DB_PASSWORD` | 운영 DB 비밀번호 | **Masked** 권장 |
+| `CORS_ALLOWED_ORIGINS` | API 호출을 허용할 FE 출처. 콤마로 여러 개 | |
+| `PROD_MINIO_ROOT_USER` | 운영 MinIO root 계정명 | |
+| `PROD_MINIO_ROOT_PASSWORD` | 운영 MinIO root 비밀번호 | **Masked** (8자 이상) |
 
 `DB_NAME`·`DB_USERNAME`·`SPRING_PROFILES_ACTIVE`·`IMAGE_TAG` 는 `.gitlab-ci.yml` 에서 넣으므로 등록하지 않아도 된다.
+리전·버킷명·S3 엔드포인트도 등록하지 않는다 — `deploy.sh` 와 compose 기본값이 정한다(아래 "오브젝트 스토리지" 참고).
+
+`deploy.sh` 는 `.env` 를 만들기 **전에** 위 변수가 전부 채워졌는지 검사하고, 하나라도 비면 빠진 이름을 한 번에 출력하고 멈춘다. `.env` 도 임시 파일에 쓴 뒤 교체하므로, 실패해도 운영 `.env` 가 손상되지 않는다(= 롤백용 직전 태그가 보존된다).
 
 > [!CAUTION]
 > **변수 이름에 `DB_PASSWORD`·`DB_NAME` 같은 범용 이름을 쓰지 않는다.** GitLab 은 **프로젝트(및 그룹·인스턴스) CI/CD Variables 가 `.gitlab-ci.yml` 의 job 변수보다 우선**한다. 이름이 겹치면 테스트용 값이 운영값으로 덮어써져, 서비스 컨테이너는 `POSTGRES_*`(이름이 안 겹침)로 초기화되는데 접속만 운영값으로 시도하는 어긋남이 생긴다.
@@ -72,6 +78,21 @@ volumes = [
 8. **정리** — dangling 이미지 prune (태그가 붙은 직전 이미지는 남으므로 롤백 가능)
 
 이미지는 커밋 SHA(`$CI_COMMIT_SHORT_SHA`)로 태깅된다.
+
+## 오브젝트 스토리지 (MinIO)
+
+상품 이미지·시착 결과는 AWS S3 가 아니라 **EC2 안의 MinIO 컨테이너**에 저장한다. SSAFY 가 제공하는 건 EC2 한 대(SSH 전용, 웹 콘솔 없음)뿐이라 팀에 AWS 계정이 없기 때문이다. 설계 배경은 계획 `JY006` 참고.
+
+- **외부 노출 경로**: `caddy` 가 `/vintib-public/*`, `/vintib-private/*` 만 `minio:9000` 으로 프록시한다. MinIO 는 호스트 포트를 열지 않는다(9000/9001 발행은 `docker-compose.override.yml` = 로컬 전용).
+- **버킷 생성**: `S3BucketInitializer` 가 기동 시 없으면 만들고 public 버킷에 익명 읽기 정책을 적용한다. 콘솔에서 수동으로 할 일이 없다. `aws.s3.endpoint` 가 비어 있으면(= 실제 AWS S3) 아무것도 하지 않는다.
+- **자격증명**: 백엔드의 `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` 는 compose 에서 `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` 로부터 파생된다. 둘이 어긋나면 서명 검증이 전부 실패하므로 별도 변수로 두지 않는다.
+- **데이터**: named volume `minio-data`. 주간 `docker system prune` 은 볼륨을 건드리지 않아 안전하지만, 반대로 오래된 이미지가 자동으로 줄지도 않는다. 디스크 사용량을 주기적으로 확인할 것.
+
+> [!WARNING]
+> **`PROD_MINIO_ROOT_USER`/`PROD_MINIO_ROOT_PASSWORD` 는 `minio-data` 볼륨을 처음 만들 때의 값으로 굳는다.** PostgreSQL 과 같은 함정이다. 나중에 바꾸면 백엔드의 서명 검증이 전부 실패하고, 되돌리려면 볼륨을 지워야 한다 — **업로드된 이미지가 전부 사라진다.** 처음 등록할 때 신중하게 정할 것.
+
+> [!CAUTION]
+> **EC2 가 초기화되면 업로드된 이미지도 함께 사라진다.** 별도 백업을 두지 않는 선택이므로(MVP·시연 범위), 시연 직전 재업로드가 필요할 수 있다는 점을 감안할 것.
 
 ## 롤백
 
