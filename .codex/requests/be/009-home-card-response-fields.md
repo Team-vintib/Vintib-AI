@@ -11,6 +11,8 @@ FE 홈 화면은 `GET /api/home`과 `GET /api/home/following`을 연결해 Guest
 
 홈 화면을 실제 DB 기준으로 완전히 표시하려면 BE 홈 응답에서 아래 필드를 제공해야 합니다. 이 문서는 FE 화면이 실제로 읽는 필드명, 타입, 목적을 항목별로 정리한 요청서입니다.
 
+공통 푸터의 팀 정보, 문의 번호, 운영 시간, 공지/약관/고객센터 링크는 FE 정적 UI로 처리합니다. 현재 범위에서는 BE 응답이나 API가 필요하지 않습니다.
+
 ## 현재 FE 연동 상태
 
 ### 사용 중인 API
@@ -53,7 +55,7 @@ interface HomeContentResponse {
 | `scheduledLives` | `HomeLiveCardResponse[]` | 예 | GuestHome/MemberHome의 `예약 라이브` 섹션 | BE 응답 사용 중 |
 | `onSaleProducts` | `HomeProductCardResponse[]` | 예 | GuestHome의 `판매 상품` 섹션 | BE 응답 사용 중 |
 | `upcomingAuctionProducts` | `HomeProductCardResponse[]` | 예 | GuestHome/MemberHome의 `경매 예정 상품` 섹션 | BE 응답 사용 중 |
-| `categoryProductSections` | `HomeCategoryProductSectionResponse[]` | 요청 | GuestHome/MemberHome의 `카테고리별 상품` 탭 섹션 | FE mock 유지 |
+| `categoryProductSections` | `HomeCategoryProductSectionResponse[]` | 요청 | GuestHome/MemberHome의 `카테고리별 상품` 탭 섹션 | 현재 FE mock 유지. BE 제공 시 FE adapter에 매핑 추가 필요 |
 
 ## 요청 2. 라이브 카드 응답
 
@@ -83,7 +85,7 @@ interface HomeLiveCardResponse {
 | `thumbnailUrl` | `string` | 예 | 라이브 카드 이미지 | 카드 상단 이미지 | BE 응답 사용 중. 실제 접근 가능한 URL 필요 |
 | `broadcastStatus` | `'LIVE' \| 'SCHEDULED'` | 예 | 진행 중/예약 라이브 구분 | LIVE badge, 예약 카드 variant | BE 응답 사용 중 |
 | `scheduledAt` | `string \| null` | 예약 라이브 필수 | 예약 라이브 일시 표시 | 예약 라이브 카드 상단 시간, 본문 예정 일자 | BE 응답 사용 중 |
-| `startedAt` | `string \| null` | 진행 중 라이브 요청 | 진행 중 라이브 시작 시간 표시 | 진행 중 라이브 본문 `시작 시간` | 현재 없음. 없으면 `일정 확인`으로 보임 |
+| `startedAt` | `string \| null` | 진행 중 라이브 요청 | 진행 중 라이브 시작 시간 표시 | 진행 중 라이브 본문 `시작 시간` | 현재 BE 응답/FE adapter 모두 없음. 없으면 `일정 확인`으로 보임 |
 | `viewerCount` | `number \| null` | 선택 | 현재 시청자 수 표시 후보 | 현재 화면에는 직접 노출하지 않음 | BE 응답 타입에는 있으나 현재 카드 렌더링 필수는 아님 |
 | `productCount` | `number \| null` | 선택 | 연결/예정 상품 수 표시 | 예약 카드 `예정 상품 n개` | BE 응답 사용 중 |
 
@@ -136,6 +138,8 @@ interface HomeProductCardResponse {
 | `startingBid` | `number \| null` | 경매 상품 요청 | 경매 시작가 표시 | 경매 상품 가격/보조 가격 | 현재 없음. `시작가 미정` 표시 |
 | `auctionStartsAt` | `string \| null` | 선택 | 경매 시작 예정 시각 표시 후보 | 현재 상품 카드에는 직접 노출하지 않음 | 추후 경매 시작 시각 노출 시 사용 |
 
+`sellerName`, `categoryName`, `isWished`, `startingBid`, `auctionStartsAt`은 현재 BE 응답과 FE adapter 타입에 아직 없습니다. BE에서 응답을 보강하면 FE adapter에서 `HomeViewData` 매핑을 함께 업데이트할 예정입니다.
+
 ### FE 매핑 규칙
 
 | BE 필드 | FE 필드 | 매핑 |
@@ -173,7 +177,7 @@ interface FollowingContentResponse {
 | `empty` | `boolean` | 예 | 팔로잉 콘텐츠 없음 상태 판단 | BE 응답 사용 중 |
 | `lives` | `HomeLiveCardResponse[]` | 예 | 팔로우한 판매자의 라이브를 홈 라이브 섹션에 보강 | BE 응답 사용 중 |
 | `products` | `HomeProductCardResponse[]` | 예 | 팔로우한 판매자의 상품 또는 추천 상품 후보 | BE 응답 사용 중. 현재 추천 상품으로 임시 매핑 |
-| `followedSellers` | `HomeFollowedSellerResponse[]` | 요청 | MemberHome `내가 팔로우한 판매자` 섹션 | 현재 FE mock 유지 |
+| `followedSellers` | `HomeFollowedSellerResponse[]` | 요청 | MemberHome `내가 팔로우한 판매자` 섹션 | 현재 FE mock 유지. BE 제공 시 FE adapter에 매핑 추가 필요 |
 
 ## 요청 5. 팔로잉 판매자 카드 응답
 
@@ -212,7 +216,6 @@ interface HomeFollowedSellerResponse {
 ## 요청 6. 추천 상품과 팔로잉 상품 구분
 
 현재 FE는 `/home/following.products`를 MemberHome의 `recommendedProducts`로 임시 표시합니다. 실제 서비스에서는 아래 개념을 구분할지 결정이 필요합니다.
-AI 작업과 연계하여 recommend 기능을 보강할 경우, 양 섹션을 모두 구현할 예정입니다.
 
 ### 선택지 A. 팔로잉 상품만 제공
 
@@ -359,6 +362,16 @@ GuestHome/MemberHome 하단 사진형 콘텐츠 카드 섹션은 FE 화면에서
 
 추후 운영 배너 기능을 새로 도입하는 경우에는 홈 화면 요구사항을 다시 정의한 뒤 별도 요청 문서로 진행하겠습니다.
 
+## 요청 9. 공통 푸터 처리 방식
+
+최하단 공통 푸터는 `DefaultLayout`에 FE 정적 컴포넌트로 추가했습니다.
+
+- 표시 내용: 팀명, 문의 번호, 운영 시간, 서비스/고객지원/판매자 메뉴
+- 현재 값: `S15P11A108`, `02-1234-5678`, `평일 10:00 - 18:00`
+- BE 요청 사항: 없음
+
+공지사항, 이용약관, 개인정보처리방침, 고객센터가 실제 페이지/API로 제공되는 시점에는 별도 라우트/API 계약 요청 문서로 분리하겠습니다.
+
 ## 관련 FE 파일
 
 | 파일 | 역할 |
@@ -370,6 +383,8 @@ GuestHome/MemberHome 하단 사진형 콘텐츠 카드 섹션은 FE 화면에서
 | `FE/src/domains/home/components/LiveCard.vue` | 홈 라이브 카드 |
 | `FE/src/domains/home/components/ProductCard.vue` | 홈 상품 카드 |
 | `FE/src/domains/home/components/CategoryProductTabs.vue` | 카테고리별 상품 탭 |
+| `FE/src/shared/components/AppFooter.vue` | 공통 푸터. 현재 BE 응답 불필요 |
+| `FE/src/shared/layouts/DefaultLayout.vue` | 공통 푸터 연결 레이아웃 |
 
 ## 우선순위 제안
 
