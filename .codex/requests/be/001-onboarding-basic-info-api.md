@@ -103,3 +103,13 @@ Content-Type: application/json
 - `FE/src/domains/onboard/api/onboarding.ts`
 - `FE/src/domains/onboard/pages/OnboardingBasicInfoView.vue`
 - `FE/docs/frontend/api/api-index.md`
+
+## 진행 상황 (2026-07-29)
+
+**미구현.** `PATCH /api/me/onboarding` 엔드포인트, 관련 컨트롤러/서비스 모두 아직 없다.
+
+- `Member` 엔티티는 여전히 `nickname`/`phoneNumber`/`address`/`gender`만 있고 `postalCode`, `detailAddress` 컬럼이 없다 — "BE 확인 필요 1, 2" 미해결.
+- `completeOnboarding()`도 여전히 기본 정보 저장 시점에 `onboardingCompleted=true`로 바꾸는 기존 동작 그대로다 — "BE 확인 필요 3" 미해결(004번 요청과 함께 다뤄야 함).
+- 닉네임 중복 검증도 미구현 — "BE 확인 필요 4" 미해결.
+
+착수 시 CLAUDE.md 규율상 신규 API라 `.claude/plans/be/`에 설계 계획부터 세우고 승인받아야 한다.

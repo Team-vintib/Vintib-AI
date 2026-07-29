@@ -104,3 +104,12 @@ Content-Type: application/json
 - `FE/src/domains/onboard/api/onboarding.ts`
 - `FE/src/domains/onboard/pages/OnboardingInterestsView.vue`
 - `FE/docs/frontend/api/api-index.md`
+
+## 진행 상황 (2026-07-29)
+
+**저장 API는 미구현.** `PUT /api/me/interests` 엔드포인트는 아직 없다.
+
+- 다만 "BE 확인 필요 1"에서 요청한 **브랜드·카테고리 마스터 조회 API는 이미 구현되어 있다** — `GET /api/brands`, `GET /api/categories` (SY007에서 구현, 인증 불필요). 응답이 `{ id: number, name: string, ... }` 형태로 **숫자 ID**를 내려주므로, FE가 우려한 `brand-a`/`outer` 같은 임시 문자열 식별자 문제는 이 조회 API로 해소할 수 있다. Swagger "상품(Products)" 태그에서 확인 가능.
+- 회원 관심 브랜드·카테고리를 저장하는 도메인(테이블/엔티티)은 아직 없다 — `PUT /api/me/interests` 자체와 "BE 확인 필요 2~4"는 여전히 미해결.
+
+착수 시 CLAUDE.md 규율상 신규 API라 `.claude/plans/be/`에 설계 계획부터 세우고 승인받아야 한다.
