@@ -7,6 +7,7 @@ import com.ssafy.backend.live.dto.response.LiveProductResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveProduct;
 import com.ssafy.backend.live.port.ProductQueryPort;
+import com.ssafy.backend.live.port.ProductQueryPort.CategorySummary;
 import com.ssafy.backend.live.port.ProductQueryPort.ProductSummary;
 import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
@@ -94,6 +95,22 @@ public class LiveProductService {
                 .orElseThrow(() -> new CustomException(ErrorCode.LIVE_PRODUCT_NOT_FOUND));
 
         linked.unlink(LocalDateTime.now());
+    }
+
+    /**
+     * 라이브의 카테고리. <b>편성 상품에서 유도한다</b> — {@code live} 테이블에는 카테고리 컬럼이 없다.
+     *
+     * <p>같은 사실을 두 군데 저장하면 반드시 어긋나므로, 편성 상품을 진실로 두고 카테고리는
+     * 그때그때 파생시킨다. 여러 카테고리 상품을 걸면 카테고리도 여러 개가 된다 — 대표 하나를
+     * 뽑지 않는 이유는, 아우터·하의·액세서리를 파는 방송이 세 탭 모두에서 검색돼야 하기 때문이다.
+     */
+    public List<CategorySummary> getLiveCategories(Long liveId) {
+        List<Long> productIds = liveProductRepository
+                .findByLiveIdAndRemovedAtIsNullOrderBySortOrderAsc(liveId).stream()
+                .map(LiveProduct::getProductId)
+                .toList();
+
+        return productQueryPort.findRootCategories(productIds);
     }
 
     /** 현재 연결 중인 상품 목록. 제외된 건은 빠진다. */

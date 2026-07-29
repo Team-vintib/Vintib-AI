@@ -5,6 +5,7 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.live.dto.request.LiveInstantRequest;
 import com.ssafy.backend.live.dto.request.LiveScheduleRequest;
 import com.ssafy.backend.live.dto.request.LiveStatusUpdateRequest;
+import com.ssafy.backend.live.dto.response.LiveCategoryResponse;
 import com.ssafy.backend.live.dto.response.LiveDetailResponse;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
@@ -76,7 +77,11 @@ public class LiveService {
         Live live = liveRepository.findById(liveId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LIVE_NOT_FOUND));
 
-        return LiveDetailResponse.of(live, liveProductService.getLinkedProducts(liveId));
+        List<LiveCategoryResponse> categories = liveProductService.getLiveCategories(liveId).stream()
+                .map(LiveCategoryResponse::from)
+                .toList();
+
+        return LiveDetailResponse.of(live, liveProductService.getLinkedProducts(liveId), categories);
     }
 
     /**
