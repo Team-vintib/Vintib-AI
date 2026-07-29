@@ -2,20 +2,27 @@ package com.ssafy.backend.live.service;
 
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.live.dto.request.LiveInstantRequest;
 import com.ssafy.backend.live.dto.request.LiveScheduleRequest;
+import com.ssafy.backend.live.dto.request.LiveListSort;
 import com.ssafy.backend.live.dto.request.LiveStatusUpdateRequest;
 import com.ssafy.backend.live.dto.response.LiveCategoryResponse;
 import com.ssafy.backend.live.dto.response.LiveDetailResponse;
+import com.ssafy.backend.live.dto.response.LiveListItemResponse;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveStatus;
+import com.ssafy.backend.live.port.ProductQueryPort.CategorySummary;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +36,9 @@ public class LiveService {
     private final LiveProductService liveProductService;
     // 종료 시 정리할 리소스가 늘어나면 구현체만 추가한다 — 종료 로직은 다시 열지 않는다.
     private final List<LiveCleanupHook> cleanupHooks;
+
+    // 공개 목록에는 예정·진행 중만 나온다. 종료·취소는 결과에서도 상태 필터에서도 빠진다.
+    private static final List<LiveStatus> PUBLIC_STATUSES = List.of(LiveStatus.SCHEDULED, LiveStatus.LIVE);
 
     /**
      * 예약 라이브 개설(LIVE-001). 방송 예정 시각이 미래인지는 요청 DTO({@code @Future})가 검증한다.
@@ -82,6 +92,42 @@ public class LiveService {
                 .toList();
 
         return LiveDetailResponse.of(live, liveProductService.getLinkedProducts(liveId), categories);
+    }
+
+    /**
+     * 공개 라이브 목록(LIVE-005). <b>비회원도 조회할 수 있다.</b>
+     *
+     * <p>공개 목록에는 예정·진행 중만 나온다 — 끝났거나 취소된 방송은 상태 필터 허용값에서도,
+     * 결과에서도 빠진다. 카테고리 필터는 편성 상품을 통해 걸리며, 대분류를 고르면 하위 소분류
+     * 상품을 건 방송까지 잡힌다.
+     *
+     * @param categoryIds 비어 있으면 카테고리 필터를 걸지 않는다
+     * @param status      null이면 예정·진행 중 모두
+     */
+    public PageResponse<LiveListItemResponse> getPublicLives(
+            List<Long> categoryIds, LiveStatus status, LiveListSort sort, int page, int size) {
+        List<LiveStatus> statuses = status == null ? PUBLIC_STATUSES : List.of(status);
+
+        boolean filterByCategory = categoryIds != null && !categoryIds.isEmpty();
+        List<Long> productIds = filterByCategory
+                ? liveProductService.findProductIdsInCategories(categoryIds)
+                : List.of();
+        if (filterByCategory && productIds.isEmpty()) {
+            // 해당 카테고리 상품이 하나도 없으면 매칭될 라이브도 없다. IN () 로 쿼리가 깨지는 것도 막는다.
+            return PageResponse.from(Page.empty(PageRequest.of(page, size)));
+        }
+
+        Page<Live> lives = liveRepository.findPublicLives(
+                statuses, filterByCategory, productIds, PageRequest.of(page, size, sort.toSort()));
+
+        Map<Long, List<CategorySummary>> categoriesByLiveId =
+                liveProductService.getCategoriesByLiveIds(lives.getContent().stream().map(Live::getId).toList());
+
+        return PageResponse.from(lives.map(live -> LiveListItemResponse.of(
+                live,
+                categoriesByLiveId.getOrDefault(live.getId(), List.of()).stream()
+                        .map(LiveCategoryResponse::from)
+                        .toList())));
     }
 
     /**

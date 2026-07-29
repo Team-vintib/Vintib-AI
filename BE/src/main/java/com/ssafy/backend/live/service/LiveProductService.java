@@ -12,8 +12,12 @@ import com.ssafy.backend.live.port.ProductQueryPort.ProductSummary;
 import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -111,6 +115,36 @@ public class LiveProductService {
                 .toList();
 
         return productQueryPort.findRootCategories(productIds);
+    }
+
+    /**
+     * 라이브 여러 건의 카테고리를 한 번에 구한다. 목록 화면용 — 라이브마다
+     * {@link #getLiveCategories}를 부르면 N+1이 된다.
+     */
+    public List<Long> findProductIdsInCategories(Collection<Long> categoryIds) {
+        return productQueryPort.findProductIdsInCategories(categoryIds);
+    }
+
+    public Map<Long, List<CategorySummary>> getCategoriesByLiveIds(Collection<Long> liveIds) {
+        if (liveIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<LiveProduct> linked = liveProductRepository.findByLiveIdInAndRemovedAtIsNull(liveIds);
+        Map<Long, CategorySummary> categoryByProductId = productQueryPort.findRootCategoryByProductId(
+                linked.stream().map(LiveProduct::getProductId).distinct().toList());
+
+        return linked.stream()
+                .filter(liveProduct -> categoryByProductId.containsKey(liveProduct.getProductId()))
+                .collect(Collectors.groupingBy(
+                        liveProduct -> liveProduct.getLive().getId(),
+                        Collectors.collectingAndThen(
+                                Collectors.toList(),
+                                items -> items.stream()
+                                        .map(item -> categoryByProductId.get(item.getProductId()))
+                                        .distinct()
+                                        .sorted(Comparator.comparing(CategorySummary::id))
+                                        .toList())));
     }
 
     /** 현재 연결 중인 상품 목록. 제외된 건은 빠진다. */
