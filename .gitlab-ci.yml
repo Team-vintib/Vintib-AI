@@ -15,9 +15,33 @@ workflow:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     # develop-BE 병합 시 자동 배포 (-262)
     - if: '$CI_COMMIT_BRANCH == "develop-BE"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
 
 variables:
   GIT_DEPTH: "1"
+
+# ---------- 문서/설정만 바뀐 MR ----------
+# 아래 파트별 잡(be-test/fe-test/ai-test)은 모두 changes: 필터가 걸려 있어, 파트 코드를
+# 건드리지 않는 MR(문서·계획서·.gitlab-ci.yml·docker-compose 등)에서는 생성되는 잡이 하나도
+# 없다. GitLab 은 잡이 0개인 파이프라인을 "No stages / jobs for this pipeline" 으로 거부하므로,
+# MR 이 파이프라인 실패로 표시되어 머지가 막힌다. 이 잡이 그 경우에만 실행되어 파이프라인이
+# 비지 않게 한다.
+#
+# rules 는 위에서부터 평가되고 첫 매칭에서 멈춘다 — 파트 코드가 하나라도 바뀌면 첫 규칙의
+# when: never 로 제외되고(그 파트 잡이 이미 검증한다), 그 외 MR 에서만 실행된다.
+docs-only:
+  stage: test
+  image: alpine:3.20
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - "BE/**/*"
+        - "FE/**/*"
+        - "AI/**/*"
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - echo "파트 코드(BE/FE/AI) 변경이 없는 MR입니다. 빌드·검증 대상이 없어 통과 처리합니다."
 
 # ---------- BE (Java 21 / Spring Boot 4.1.0 / Gradle) ----------
 be-test:
@@ -94,6 +118,18 @@ be-test:
       fi
   script:
     - ./gradlew build --no-daemon --build-cache -Dgradle.user.home=.gradle
+
+
+# 모든 MR에서 최소 1개의 job을 실행하여 빈 파이프라인 방지
+mr-check:
+  stage: test
+  image: alpine:3.20
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_COMMIT_BRANCH == "develop-BE"'
+  script:
+    - echo "MR pipeline initialized successfully."
 
 # ---------- FE (Vue 3.5 / Vite / TypeScript) ----------
 fe-test:

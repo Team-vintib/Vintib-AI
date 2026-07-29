@@ -6,6 +6,7 @@ Swagger 제공 전까지는 임시 후보를 사용합니다. 실제 구현 시 
 
 | 기능                 | Method | endpoint                      | 요청                                             | 응답                                              | 상태          |
 | -------------------- | ------ | ----------------------------- | ------------------------------------------------ | ------------------------------------------------- | ------------- |
+| 이메일 중복 확인     | POST   | `/api/auth/email/check-duplicate` | `email`                                       | `null`                                            | AUTH-001 연동 |
 | 이메일 인증코드 발송 | POST   | `/api/auth/email/send-code`   | `email`                                          | `null`                                            | AUTH-001 연동 |
 | 이메일 인증코드 확인 | POST   | `/api/auth/email/verify-code` | `email`, `code`                                  | `verificationToken`                               | AUTH-001 연동 |
 | 이메일 회원가입      | POST   | `/api/auth/signup`            | `name`, `email`, `password`, `verificationToken` | `id`, `email`, `name`, `onboardingCompleted`      | AUTH-001 연동 |
@@ -62,6 +63,19 @@ Content-Type: application/json
 AUTH-001에서 실제 연동한 계약입니다. 공통 응답은 `ApiResponse<T>` envelope를 사용합니다.
 
 ```http
+POST /api/auth/email/check-duplicate
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+성공하면 같은 이메일로 인증코드 발송 버튼과 인증코드 입력창을 활성화합니다.
+
+```http
 POST /api/auth/email/send-code
 Content-Type: application/json
 ```
@@ -106,6 +120,7 @@ Content-Type: application/json
 - `U007`: 인증 시도 횟수 초과
 - `U008`: 인증코드 요청 횟수 초과
 - `C001`: 입력값 검증 실패
+- 이메일 입력값이 바뀌면 중복 확인, 인증코드 발송, 인증 완료, `verificationToken` 상태를 모두 초기화합니다.
 - 로컬 Docker 환경에서 이메일 발송 500이 발생하면 BE 컨테이너에 `MAIL_*` 환경변수가 주입되는지 확인해야 합니다.
 
 ## 온보딩/내 정보
@@ -119,7 +134,7 @@ Content-Type: application/json
 | 회원 유형·온보딩 완료   | POST     | `/api/me/onboarding/complete` | S15P11A108-261 FE 선행 계약 |
 | 내 정보 수정            | PATCH    | `/api/me`                     | 후보                        |
 | 주소 조회/저장          | GET/POST | `/api/addresses`              | 후보                        |
-| 사업자 인증 제출/조회   | POST/GET | `/api/business-verifications` | 후보                        |
+| 사업자 인증 제출/조회   | POST/GET | `/api/business-verifications` | S15P11A108-400 FE 계약 제안 |
 
 ### 기본 정보 저장
 
@@ -259,6 +274,87 @@ Content-Type: application/json
 - 실패 시 선택값을 유지하며 사용자가 다시 요청할 수 있습니다.
 - BE Swagger가 제공되면 endpoint, enum과 중복 완료 정책을 실제 계약에 맞춥니다.
 
+### 사업자 인증 제출
+
+S15P11A108-400에서는 실제 API를 호출하지 않고 FE 더미 제출 상태만 구현했습니다.
+아래 내용은 BE 검토를 위한 후보 계약이며 Swagger 확정 후 타입과 API 함수를 구현합니다.
+
+```http
+POST /api/business-verifications
+Authorization: Bearer {accessToken}
+Content-Type: multipart/form-data
+```
+
+| multipart 필드 | 타입 | 필수 | FE 임시 규칙 |
+| --- | --- | --- | --- |
+| `businessRegistrationNumber` | string | 예 | 하이픈 없는 숫자 10자리 |
+| `businessName` | string | 예 | 공백 제외 값 필요 |
+| `representativeName` | string | 예 | 공백 제외 값 필요 |
+| `certificate` | image file | 예 | 한 개, `image/*` MIME 1차 확인 |
+
+성공 응답 후보:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "status": "PENDING",
+    "submittedAt": "2026-07-27T17:00:00+09:00"
+  },
+  "error": null
+}
+```
+
+- 브라우저가 multipart boundary를 생성하도록 FE는 `Content-Type` 값을 직접 고정하지
+  않습니다.
+- 사업자등록번호 체크섬, 이미지 확장자·MIME·용량·해상도와 중복 제출 정책은 미확정입니다.
+- 실제 API 연동 전까지 제출 정보는 Pinia 메모리 상태로만 BIZ-001-2에 전달합니다.
+- BIZ-001-2 상태 조회 endpoint와 승인·반려 상태 값도 BE 확인이 필요합니다.
+
+## 홈
+
+HOME-001/002는 BE의 현재 홈 전용 API를 FE adapter에서 `HomeViewData`로 변환해 사용합니다.
+공통 응답은 `ApiResponse<T>` envelope를 사용합니다.
+
+| 기능 | Method | endpoint | 상태 |
+| --- | --- | --- | --- |
+| 홈 콘텐츠 조회 | GET | `/api/home` | HOME-001 부분 연동 |
+| 팔로잉 콘텐츠 조회 | GET | `/api/home/following` | HOME-002 부분 연동, 인증 필요 |
+
+### 홈 콘텐츠 조회
+
+```http
+GET /api/home
+```
+
+성공 응답의 `data`는 아래 섹션 배열을 포함합니다.
+
+- `liveNow`
+- `scheduledLives`
+- `onSaleProducts`
+- `upcomingAuctionProducts`
+
+FE 매핑 기준:
+
+- 라이브 `liveId`, `title`, `hostNickname`, `thumbnailUrl`, `broadcastStatus`, `scheduledAt`, `viewerCount`, `productCount`를 홈 라이브 카드 모델로 변환합니다.
+- 상품 `productId`, `name`, `brand`, `thumbnailUrl`, `sellType`, `sellStatus`, `price`, `auctionScheduled`를 홈 상품 카드 모델로 변환합니다.
+- `sellType === 'NORMAL'`은 `DIRECT_SALE`, `sellType === 'AUCTION_SCHEDULED'` 또는 `auctionScheduled === true`는 `AUCTION`으로 표시합니다.
+
+### 팔로잉 콘텐츠 조회
+
+```http
+GET /api/home/following
+Authorization: Bearer {accessToken}
+```
+
+성공 응답의 `data`는 `empty`, `lives`, `products`를 포함합니다.
+
+- `lives`는 기존 홈 라이브 섹션에 중복 제거 후 보강합니다.
+- `products`는 회원 홈의 `recommendedProducts`에 `팔로우한 판매자의 상품` 표시 문구와 함께 제한 매핑합니다.
+- BE가 제공하지 않는 `followedSellers`, `contentCards`, `sellerName`, `categoryName`, `startedAt`, `reservationCount`, `isWished` 등은 FE 보조값 또는 선택 필드로 처리합니다.
+- BE mock 이미지 URL이 접근 불가할 수 있어 홈 라이브/상품 카드에서 이미지 로드 실패 fallback을 적용합니다.
+
 ## 이후 화면 후보
 
 | 영역   | 후보 endpoint                                                        |
@@ -273,6 +369,17 @@ Content-Type: application/json
 | 포인트 | `/api/points`, `/api/points/transactions`, `/api/points/withdrawals` |
 | 알림   | `/api/notifications`                                                 |
 | 팔로우 | `/api/users/{id}/follow`                                             |
+
+### 상품 목록 조회
+
+PROD-008 껍데기 화면은 실제 API를 호출하지 않는다. 목록 연동 시
+`GET /api/products`를 후보로 사용하되 아래 항목은 Swagger와 BE 계약에서 확정한다.
+
+- pagination 방식과 응답 envelope
+- 검색어, 카테고리, 상태 등급과 판매 방식 query 이름
+- 최신순·가격 낮은순·가격 높은순 정렬 값
+- 상시 판매와 경매 상품의 가격 필드 구분
+- 찜 여부를 공개 목록 응답에 포함할지 여부
 
 ## 공통 오류 코드
 
@@ -292,3 +399,31 @@ Content-Type: application/json
 - `POINT_INSUFFICIENT`
 - `REALTIME_CONNECTION_FAILED`
 - `INTERNAL_ERROR`
+
+## 2026-07-28 통합 검색 API 후보
+
+SEARCH-001/002 검색 결과 화면은 현재 mock data를 클라이언트에서 필터링합니다. 실제 API 연동 시
+아래 항목은 BE Swagger/계약 확정 후 adapter로 교체해야 합니다.
+
+### 통합 검색 조회
+
+- 후보 endpoint: `GET /api/search` 또는 도메인별 검색 endpoint 조합
+- 현재 FE query: `keyword`, `type`, `page`, `categories`, `conditions`, `saleTypes`, `minPrice`, `maxPrice`, `sort`
+- `type` 후보값: `all`, `product`, `live`, `member`
+- `page`: `product`, `live`, `member` 탭 페이지 번호. `all` 탭과 첫 페이지에서는 생략합니다.
+- `categories`: 상품 카테고리 복수 선택
+- `conditions`: 상품 상태 등급 복수 선택
+- `saleTypes`: `DIRECT`, `AUCTION`
+- `minPrice`, `maxPrice`: 숫자형 가격 범위
+- `sort`: `LATEST`, `PRICE_ASC`, `PRICE_DESC`
+- `status`: FE mock 상태 확인 전용 query이며 실제 API query가 아닙니다.
+
+확정 필요 항목:
+
+- 통합 검색 단일 endpoint 사용 여부와 path
+- 상품/라이브/회원 결과를 한 응답에 포함할지, 탭별 endpoint로 나눌지
+- 탭별 count와 pagination 응답 구조
+- `all` 탭 preview 개수와 전체보기 진입 시 page 초기화 정책
+- 상품 카드의 찜 여부와 판매 유형/가격 필드 구조
+- 라이브 카드의 실시간 상태, 시청자 수, 썸네일 필드 구조
+- 회원 카드의 팔로우 여부, 통계 필드, 프로필 상세 route

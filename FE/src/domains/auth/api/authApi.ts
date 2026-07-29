@@ -1,6 +1,7 @@
 import { http } from '@/shared/api/http'
 
 import type {
+  CheckEmailDuplicateRequest,
   LinkAccountRequest,
   LinkAccountResponse,
   LoginRequest,
@@ -16,6 +17,12 @@ import type {
 import type { ApiResponse } from '@/shared/types/api.types'
 
 const SSAFY_SSO_START_PATH = '/auth/sso/ssafy'
+
+export const checkEmailDuplicate = async (request: CheckEmailDuplicateRequest) => {
+  const { data } = await http.post<ApiResponse<null>>('/auth/email/check-duplicate', request)
+
+  return data
+}
 
 export const sendEmailVerificationCode = async (request: SendEmailVerificationCodeRequest) => {
   const { data } = await http.post<ApiResponse<null>>('/auth/email/send-code', request)
@@ -39,7 +46,7 @@ export const signUp = async (request: SignUpRequest) => {
 }
 
 export const login = async (request: LoginRequest) => {
-  const { data } = await http.post<ApiResponse<LoginResponse>>('/auth/login', request)
+  const { data } = await http.post<ApiResponse<LoginResponse>>('/auth/signin', request)
 
   return data
 }
