@@ -1,0 +1,92 @@
+# 실백엔드 config — **비용·의존성이 있으니 사용자가 직접 켠다.**
+#
+# ⚠️ `AI/CLAUDE.md` 하드 룰: 호출 비용·쿼터가 있는 외부 API 경로는 기본 off 여야 하고,
+#    Claude 가 이 파일로 실행하는 것을 금지한다. i2v.backend=http_stub 는 과금 경로다.
+#
+# 사용 전 확인 목록:
+#   1. sam3d-objects conda 환경에서 실행 중인가 (kaolin/open3d/pytorch3d/gsplat 필요)
+#   2. checkpoints/hf/ 가 채워져 있는가 (gated 접근 승인 + hf download)
+#   3. preprocess.latent_encoder=sam3d_ss 는 pipeline.models["ss_encoder"] 주입이 필요하다 —
+#      CLI 로는 아직 안 되고 노트북/스크립트에서 인코더를 넘겨야 한다 (README "데이터 주입 지점")
+#   4. VIDEOGEN_API_KEY 환경변수가 세팅됐는가
+#
+# 실행:  python -m garment3d.cli smoke --config configs/real_backends.yaml
+
+paths:
+  sam3d_repo: "~/workspace/sam-3d-objects"
+  sam3d_pipeline_config: "checkpoints/hf/pipeline.yaml"
+  sample_index: null # TODO(데이터 확보): 실인덱스 jsonl 경로
+  data_root: "data"
+  cache_dir: "artifacts/cache"
+  checkpoint_dir: "artifacts/checkpoints"
+  output_dir: "artifacts/outputs"
+
+preprocess:
+  voxelizer: "sam3d" # open3d 표면 복셀화 (upstream voxelize_mesh)
+  resolution: 64
+  latent_encoder: "sam3d_ss" # stage 1 실인코더
+  repair_non_watertight: true
+  target_faces: null
+  min_active_voxels: 64
+
+lora:
+  rank: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: ["to_qkv", "to_q", "to_kv", "to_out"]
+  target_models: ["ss_generator"]
+
+sft:
+  max_steps: 2000
+  batch_size: 1
+  grad_accum_steps: 4
+  learning_rate: 0.0001
+  save_every: 200
+  log_every: 20
+  seed: 42
+  stage: "geometry"
+  device: "cuda"
+
+dpo:
+  num_candidates: 8
+  min_margin: 0.05
+  beta: 0.1
+  max_steps: 500
+  learning_rate: 0.000005
+  save_every: 100
+  device: "cuda"
+
+render:
+  backend: "sam3d"
+  num_frames: 24
+  resolution: 512
+  fps: 24
+  write_mp4: true
+
+i2v:
+  # ⚠️ 과금 경로. endpoint/model 은 제공자 확정 후 채운다.
+  #    HttpStubAdapter 의 전송 코드는 미구현이다 (adapters.py TODO).
+  backend: "http_stub"
+  api_key_env: "VIDEOGEN_API_KEY"
+  endpoint: null
+  model: "unset"
+  num_frames: 24
+  fps: 24
+  resolution: 512
+  use_end_keyframe: true
+  use_depth_condition: false
+
+eval:
+  pose_backend: "mediapipe"
+  flow_backend: "opencv_farneback"
+  perceptual_backend: "lpips"
+  face_backend: "insightface"
+  # 실사 배경은 밝을 수 있다 — 케이스별로 맞추고 foreground_ratio_mean 으로 검증할 것.
+  background_threshold: 24
+  symmetry_offset: null
+  measure_identity: true
+
+report:
+  formats: ["markdown", "html"]
+  plots: true
+  title: "turntable vs I2V 비교 (실백엔드)"
