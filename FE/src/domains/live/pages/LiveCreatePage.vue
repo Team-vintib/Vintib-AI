@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 
 import {
   LIVE_CREATE_BASE_STEPS,
@@ -10,6 +10,7 @@ import {
   LIVE_CREATE_SCHEDULE_STEP,
 } from '@/domains/live/constants/liveCreateMockData'
 import type {
+  LiveDeviceState,
   LiveCreateFormState,
   LiveCreateMode,
   LiveCreateStep,
@@ -28,6 +29,13 @@ const form = reactive<LiveCreateFormState>({
 })
 
 const currentStepIndex = ref(0)
+const cameraPreviewElement = ref<HTMLVideoElement | null>(null)
+const cameraPreviewStream = ref<MediaStream | null>(null)
+const microphonePreviewStream = ref<MediaStream | null>(null)
+const deviceState = reactive<LiveDeviceState>({
+  camera: 'idle',
+  microphone: 'idle',
+})
 
 const liveCreateSteps = computed<LiveCreateStep[]>(() => {
   const modeStep =
@@ -46,7 +54,23 @@ const selectedMethod = computed(() =>
 )
 const isFirstStep = computed(() => currentStepIndex.value === 0)
 const isLastStep = computed(() => currentStepIndex.value === liveCreateSteps.value.length - 1)
-const canMoveNext = computed(() => currentStep.value.id !== 'method' || Boolean(form.mode))
+const isDeviceTesting = computed(
+  () => deviceState.camera === 'testing' || deviceState.microphone === 'testing',
+)
+const isDeviceReady = computed(
+  () => deviceState.camera === 'success' && deviceState.microphone === 'success',
+)
+const canMoveNext = computed(() => {
+  if (currentStep.value.id === 'method') {
+    return Boolean(form.mode)
+  }
+
+  if (currentStep.value.id === 'device') {
+    return isDeviceReady.value
+  }
+
+  return true
+})
 const selectedProductCountLabel = computed(() =>
   form.selectedProductIds.length > 0 ? `${form.selectedProductIds.length}개` : '',
 )
@@ -89,6 +113,99 @@ const toggleProductSelection = (productId: number) => {
   form.selectedProductIds = [...form.selectedProductIds, productId]
 }
 
+const getDeviceStatusLabel = (status: LiveDeviceState[keyof LiveDeviceState]) => {
+  if (status === 'testing') {
+    return '테스트 중'
+  }
+
+  if (status === 'success') {
+    return '정상'
+  }
+
+  if (status === 'failed') {
+    return '확인 실패'
+  }
+
+  return '확인 필요'
+}
+
+const stopCameraPreview = () => {
+  cameraPreviewStream.value?.getTracks().forEach((track) => {
+    track.stop()
+  })
+  cameraPreviewStream.value = null
+
+  microphonePreviewStream.value?.getTracks().forEach((track) => {
+    track.stop()
+  })
+  microphonePreviewStream.value = null
+
+  if (cameraPreviewElement.value) {
+    cameraPreviewElement.value.srcObject = null
+  }
+}
+
+const runDeviceTest = async () => {
+  if (isDeviceTesting.value) {
+    return
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    deviceState.camera = 'failed'
+    deviceState.microphone = 'failed'
+    return
+  }
+
+  deviceState.camera = 'testing'
+  deviceState.microphone = 'idle'
+
+  try {
+    stopCameraPreview()
+
+    const cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: false,
+    })
+
+    cameraPreviewStream.value = cameraStream
+
+    if (cameraPreviewElement.value) {
+      cameraPreviewElement.value.srcObject = cameraStream
+    }
+
+    deviceState.camera = cameraStream.getVideoTracks().length > 0 ? 'success' : 'failed'
+
+    if (deviceState.camera !== 'success') {
+      return
+    }
+
+    deviceState.microphone = 'testing'
+
+    const microphoneStream = await navigator.mediaDevices.getUserMedia({
+      video: false,
+      audio: true,
+    })
+
+    microphonePreviewStream.value = microphoneStream
+    deviceState.microphone = microphoneStream.getAudioTracks().length > 0 ? 'success' : 'failed'
+  } catch {
+    if (deviceState.camera === 'testing') {
+      stopCameraPreview()
+      deviceState.camera = 'failed'
+      deviceState.microphone = 'idle'
+      return
+    }
+
+    deviceState.microphone = 'failed'
+  }
+}
+
+const resetDeviceTest = () => {
+  stopCameraPreview()
+  deviceState.camera = 'idle'
+  deviceState.microphone = 'idle'
+}
+
 const moveToPreviousStep = () => {
   if (isFirstStep.value) {
     return
@@ -104,6 +221,10 @@ const moveToNextStep = () => {
 
   currentStepIndex.value += 1
 }
+
+onBeforeUnmount(() => {
+  stopCameraPreview()
+})
 </script>
 
 <template>
@@ -261,6 +382,79 @@ const moveToNextStep = () => {
               </label>
             </div>
 
+          </section>
+
+          <section
+            v-else-if="currentStep.id === 'device'"
+            class="live-create__device-panel"
+            aria-label="방송 장비 확인"
+          >
+            <div class="live-create__camera-preview">
+              <video
+                ref="cameraPreviewElement"
+                autoplay
+                muted
+                playsinline
+                aria-label="카메라 미리보기"
+              />
+              <div v-if="!cameraPreviewStream" class="live-create__camera-placeholder">
+                <strong>카메라 미리보기</strong>
+                <p>장비 테스트를 시작하면 현재 카메라 화면이 표시됩니다.</p>
+              </div>
+            </div>
+
+            <div class="live-create__device-grid">
+              <article
+                class="live-create__device-card"
+                :class="`live-create__device-card--${deviceState.camera}`"
+              >
+                <div>
+                  <strong>카메라</strong>
+                  <span>기본 카메라</span>
+                </div>
+                <em>{{ getDeviceStatusLabel(deviceState.camera) }}</em>
+              </article>
+
+              <article
+                class="live-create__device-card"
+                :class="`live-create__device-card--${deviceState.microphone}`"
+              >
+                <div>
+                  <strong>마이크</strong>
+                  <span>기본 마이크</span>
+                </div>
+                <em>{{ getDeviceStatusLabel(deviceState.microphone) }}</em>
+              </article>
+            </div>
+
+            <p class="live-create__device-message" role="status">
+              <span v-if="deviceState.camera === 'testing'">카메라 화면을 확인하고 있습니다.</span>
+              <span v-else-if="deviceState.microphone === 'testing'">마이크 입력을 확인하고 있습니다.</span>
+              <span v-else-if="isDeviceReady">장비 확인이 완료되었습니다. 다음 단계로 이동할 수 있습니다.</span>
+              <span v-else-if="deviceState.camera === 'failed' || deviceState.microphone === 'failed'">
+                장비 권한 또는 연결 상태를 확인한 뒤 다시 시도해 주세요.
+              </span>
+              <span v-else>방송 시작 전 카메라와 마이크 테스트를 진행해 주세요.</span>
+            </p>
+
+            <div class="live-create__device-actions">
+              <button
+                class="live-create__button live-create__button--primary"
+                type="button"
+                :disabled="isDeviceTesting"
+                @click="runDeviceTest"
+              >
+                {{ isDeviceReady ? '다시 테스트' : '장비 테스트' }}
+              </button>
+              <button
+                class="live-create__button live-create__button--secondary"
+                type="button"
+                :disabled="isDeviceTesting"
+                @click="resetDeviceTest"
+              >
+                초기화
+              </button>
+            </div>
           </section>
 
           <div v-else class="live-create__placeholder" role="status">
@@ -575,6 +769,137 @@ const moveToNextStep = () => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.live-create__device-panel {
+  display: grid;
+  gap: var(--space-5);
+  margin-top: var(--space-8);
+}
+
+.live-create__camera-preview {
+  position: relative;
+  overflow: hidden;
+  min-height: 300px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-live-background);
+}
+
+.live-create__camera-preview video {
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.live-create__camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: var(--space-2);
+  place-content: center;
+  padding: var(--space-6);
+  color: var(--color-live-text-secondary);
+  text-align: center;
+}
+
+.live-create__camera-placeholder strong {
+  color: var(--color-live-text-primary);
+  font-size: 18px;
+  font-weight: var(--font-weight-bold);
+}
+
+.live-create__camera-placeholder p {
+  max-width: 320px;
+  line-height: var(--line-height-body);
+}
+
+.live-create__device-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.live-create__device-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 116px;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.live-create__device-card div {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.live-create__device-card strong {
+  color: var(--color-text-primary);
+  font-size: 18px;
+  font-weight: var(--font-weight-bold);
+  line-height: 26px;
+}
+
+.live-create__device-card span {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.live-create__device-card em {
+  flex: 0 0 auto;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-badge);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: var(--font-weight-bold);
+  line-height: 16px;
+}
+
+.live-create__device-card--testing {
+  border-color: var(--color-timer);
+}
+
+.live-create__device-card--testing em {
+  background: var(--color-surface-secondary);
+  color: var(--color-timer);
+}
+
+.live-create__device-card--success {
+  border-color: var(--color-primary);
+}
+
+.live-create__device-card--success em {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.live-create__device-card--failed {
+  border-color: var(--color-error);
+}
+
+.live-create__device-card--failed em {
+  background: var(--color-error-soft);
+  color: var(--color-error);
+}
+
+.live-create__device-message {
+  min-height: 24px;
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-body);
+}
+
+.live-create__device-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
 .live-create__product-panel {
   display: grid;
   gap: var(--space-5);
@@ -837,6 +1162,14 @@ const moveToNextStep = () => {
 
   .live-create__schedule-grid {
     grid-template-columns: 1fr;
+  }
+
+  .live-create__device-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .live-create__device-actions {
+    flex-direction: column;
   }
 }
 
