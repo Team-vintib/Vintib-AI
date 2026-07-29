@@ -103,7 +103,7 @@ export const routes: RouteRecordRaw[] = [
   {
     path: ROUTE_PATHS.LIVE_LIST,
     name: ROUTE_NAMES.LIVE_LIST,
-    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    component: () => import('@/domains/live/pages/LiveListView.vue'),
     meta: { title: '라이브 목록' },
   },
   {
