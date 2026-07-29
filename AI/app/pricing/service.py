@@ -26,12 +26,15 @@ from app.gateway.router import store_job_result
 from app.pricing import registry
 from app.pricing.comps import CompsSource, CompsUnavailable, build_comps_source, build_query
 from app.pricing.pricer import Pricer, build_pricer
+from app.pricing.retail import RetailSource, build_retail_source
 from app.pricing.schemas import (
+    CompItem,
     CompsSourceKey,
     ConditionEcho,
     PricingModelInfo,
     PricingRequest,
     PricingResult,
+    RetailSourceKey,
 )
 
 __all__ = ["PricingService", "CompsUnavailable", "get_pricing_service"]
@@ -46,12 +49,14 @@ class PricingService:
         self,
         comps_source: CompsSource,
         pricer: Pricer,
+        retail_source: RetailSource,
         *,
         comps_model_id: str | None = None,
         max_concurrent: int = registry.MAX_CONCURRENT_JOBS,
     ) -> None:
         self._comps_source = comps_source
         self._pricer = pricer
+        self._retail_source = retail_source
         self._comps_model_id = comps_model_id
         self._slots = threading.BoundedSemaphore(max_concurrent)
 
@@ -74,6 +79,7 @@ class PricingService:
         started = time.perf_counter()
         query = build_query(request.product_name, request.brand, request.category)
         fetched = self._comps_source.fetch(query)
+        retail_items, retail_notes = self._fetch_retail(query)
 
         outcome = self._pricer.price(
             fetched.items,
@@ -106,10 +112,26 @@ class PricingService:
                 comps_source=CompsSourceKey(self._comps_source.key),
                 comps_model_id=self._comps_model_id,
                 pricer=self._pricer.key,
+                retail_source=RetailSourceKey(self._retail_source.key),
             ),
             notes=list(fetched.notes),
+            retail_items=retail_items,
+            retail_notes=retail_notes,
             latency_ms=round((time.perf_counter() - started) * 1000, 3),
         )
+
+    def _fetch_retail(self, query: str) -> tuple[list[CompItem], list[str]]:
+        """신상품가 수집. **여기서 나는 예외는 가격 산정을 막지 않는다.**
+
+        `RetailSource.fetch()` 자체가 예외를 던지지 않는 게 계약이지만, 구현 버그로
+        어긴 경우까지 대비한 이중 방어다 — 신상품가는 부가 정보일 뿐 필수 입력이 아니다.
+        """
+        try:
+            fetched = self._retail_source.fetch(query)
+        except Exception:  # noqa: BLE001 — 신상품가 실패가 job을 죽이면 안 된다
+            logger.exception("신상품가 수집 실패 (query=%s)", query)
+            return [], ["신상품가 조회 중 오류가 발생했습니다."]
+        return fetched.items, list(fetched.notes)
 
     # --- 백그라운드 진입점 --------------------------------------------------
 
@@ -151,5 +173,6 @@ def get_pricing_service() -> PricingService:
     return PricingService(
         build_comps_source(),
         build_pricer(min_comps=config["min_comps_for_pricing"]),
+        build_retail_source(),
         comps_model_id=config["model_id"],
     )

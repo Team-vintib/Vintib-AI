@@ -31,6 +31,7 @@ __all__ = [
     "PricingRequest",
     "PricingResult",
     "ReasonCode",
+    "RetailSourceKey",
 ]
 
 
@@ -60,6 +61,17 @@ class CompsSourceKey(str, Enum):
 
     mock = "mock"
     llm_web_search = "llm_web_search"
+
+
+class RetailSourceKey(str, Enum):
+    """어느 백엔드로 신상품(정가) 가격을 모았는지. `registry.RETAIL_BACKENDS`의 키와 같다.
+
+    `CompsSourceKey`와 별개다 — 중고 시세와 신상품가는 서로 다른 백엔드로 수집되고
+    응답에서도 `comps_used`/`retail_items`로 분리 노출된다.
+    """
+
+    mock = "mock"
+    naver = "naver"
 
 
 # --- 요청 ------------------------------------------------------------------
@@ -156,6 +168,7 @@ class PricingModelInfo(BaseModel):
     comps_source: CompsSourceKey
     comps_model_id: str | None
     pricer: str
+    retail_source: RetailSourceKey
 
 
 class PricingResult(BaseModel):
@@ -180,5 +193,12 @@ class PricingResult(BaseModel):
     model: PricingModelInfo
     notes: list[str] = Field(
         default_factory=list, description="한계·주의 문구(검색 미호출, 파싱 실패 등)"
+    )
+    retail_items: list[CompItem] = Field(
+        default_factory=list,
+        description="신상품(정가) 참고용 매물. comps_used와 별개 — 가격 산정에는 아직 반영되지 않는다",
+    )
+    retail_notes: list[str] = Field(
+        default_factory=list, description="신상품가 조회 한계·주의 문구. notes(comps용)와 분리"
     )
     latency_ms: float = Field(description="comps 수집 + 산정 소요 시간")

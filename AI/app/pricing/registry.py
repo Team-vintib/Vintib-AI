@@ -55,7 +55,36 @@ COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
         "min_comps_for_pricing": 1,
     },
 }
-ACTIVE_COMPS_SOURCE = "mock"  # <- 여기 키만 바꾸면 스왑
+ACTIVE_COMPS_SOURCE = "llm_web_search"  # <- 여기 키만 바꾸면 스왑
+# llm_web_search / mock
+
+
+class RetailSourceConfig(TypedDict):
+    """신상품(정가) 백엔드 하나의 표시 정보 + 수확 상한."""
+
+    display_name: str
+    max_items: int  # "몇 가지"만 받으면 되므로 comps보다 작게 잡는다
+    timeout_seconds: float
+
+
+# CH002 V2 실측: 네이버 쇼핑 API는 comps 평균 18건·지연 177ms로 빠르지만 중고 비율이 5%뿐이라
+# 중고 시세로는 못 쓴다 — 대신 신상품(정가) 조회용으로 재배치한다. `RetailSource`는 실패해도
+# 절대 예외를 던지지 않는다(comps.py의 `CompsUnavailable`과 계약이 다르다) — 부가 정보일 뿐
+# 가격 산정의 필수 입력이 아니기 때문이다.
+RETAIL_BACKENDS: dict[str, RetailSourceConfig] = {
+    "mock": {
+        "display_name": "mock",
+        "max_items": 3,
+        "timeout_seconds": 0.0,
+    },
+    "naver": {
+        "display_name": "네이버 쇼핑",
+        "max_items": 5,
+        "timeout_seconds": 5.0,
+    },
+}
+ACTIVE_RETAIL_SOURCE = "mock"  # <- 여기 키만 바꾸면 스왑. naver 전환은 사용자만(하드 룰)
+# naver / mock
 
 PRICER_BACKENDS: dict[str, str | None] = {
     "rule_baseline": None,  # 기본 — 중앙값 × 상태계수. 의존성 없음
@@ -109,3 +138,12 @@ def comps_config(key: str | None = None) -> CompsSourceConfig:
         return COMPS_BACKENDS[resolved]
     except KeyError as exc:
         raise ValueError(f"등록되지 않은 comps 백엔드입니다: {resolved!r}") from exc
+
+
+def retail_config(key: str | None = None) -> RetailSourceConfig:
+    """활성 신상품가 백엔드의 설정(표시 정보 + 수확 상한)을 돌려준다."""
+    resolved = key or ACTIVE_RETAIL_SOURCE
+    try:
+        return RETAIL_BACKENDS[resolved]
+    except KeyError as exc:
+        raise ValueError(f"등록되지 않은 신상품가 백엔드입니다: {resolved!r}") from exc
