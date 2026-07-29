@@ -25,6 +25,9 @@ Jira 연결 항목에는 `LIVE-005 라이브 시청`이 표시되지만 세 하�
 ### S15P11A108-415 — 라이브 목록 필터 반응 구현
 
 - 카테고리, 정렬, 방송 상태 필터를 구현한다.
+- 공개 목록에는 진행 중·예정 방송만 노출하며 종료 방송은 제외한다.
+- 상품 판매 방식인 경매·상시판매 조건은 라이브 목록 필터에 포함하지 않는다.
+- 기존 상품 목록과 같은 좌측 필터·우측 상태 탭·결과 도구 모음 구조를 사용한다.
 - 선택한 조건을 mock 목록과 결과 개수에 즉시 반영한다.
 - 정렬 결과가 같은 경우에도 카드 순서가 불안정해지지 않도록 기준을 둔다.
 - 필터의 현재 선택값과 결과 요약을 화면과 보조기술에 전달한다.
@@ -53,6 +56,7 @@ FE/src/domains/live/
     LiveListFilter.vue
     LiveListState.vue
   constants/
+    liveListFilterOptions.ts
     liveListMockData.ts
   pages/
     LiveListView.vue
@@ -68,21 +72,22 @@ FE/docs/frontend/screens/LIVE-LIST/
 - [x] LIVE 목록 요구사항 문서 작성
 - [x] 목록 타입과 mock 데이터 구성
 - [x] 카드형 목록·상태 배지·기본 반응형 grid 구현
-- [ ] 상태·카테고리·정렬 필터와 초기화 구현
-- [ ] 결과 개수·선택 상태·접근성 구현
+- [x] 상태·카테고리·정렬 필터와 초기화 구현
+- [x] 결과 개수·선택 상태·접근성 구현
+- [x] 라이브 목록 BE API 요청 문서 작성
 - [ ] 최신 BE API 문서와 FE view model 비교
 - [ ] 목록 API adapter와 DTO 매핑 구현
 - [ ] 실제 로딩·빈 목록·오류·재시도 상태 구현
 - [ ] 필터 결과 없음과 최종 반응형 grid 보강
 - [x] `/lives` placeholder를 실제 View로 교체
-- [ ] route-map·현재 구조·구현 상태 문서 갱신
-- [ ] lint·type-check·build와 수동 화면 검증
+- [x] route-map·현재 구조·구현 상태 문서 갱신
+- [x] lint·type-check·build와 수동 화면 검증
 
 ## BE API 확인 기준
 
 - 카드 필수 필드: 라이브 ID, 썸네일, 제목, 판매자 표시명, 방송 상태, 시청자 수
 - 필터 보조 필드: 카테고리, 정렬 기준 시간
-- 상태 enum이 FE의 `LIVE`, `SCHEDULED`, `ENDED`와 다른지 확인한다.
+- 공개 목록 상태가 FE의 `LIVE`, `SCHEDULED`와 맞는지 확인하고 `ENDED`, `CANCELED`는 제외한다.
 - 응답 envelope와 pagination 구조가 공통 `ApiResponse` 규칙과 맞는지 확인한다.
 - 필터·정렬 query parameter 제공 여부와 기본 정렬 기준을 확인한다.
 - 계약에 없는 값은 임의로 확정하지 않고 mock 전용임을 표시한다.

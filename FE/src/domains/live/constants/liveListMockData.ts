@@ -22,7 +22,7 @@ export const liveListMockData: LiveListItem[] = [
   },
   {
     id: 102,
-    title: '디자이너 백 빈티지 경매',
+    title: '디자이너 백 라이브 셀렉션',
     sellerName: 'Second Vault',
     thumbnailUrl: leatherBagImage,
     status: 'LIVE',
