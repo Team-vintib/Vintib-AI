@@ -114,7 +114,24 @@ comps는 인프라 오류(`CompsUnavailable`)면 여전히 job을 `failed`로 �
 - [x] `.env.example`(AI/·루트) 주석 갱신, `docker-compose.yml` env 추가, `requirements.txt`에
       `httpx` 명시
 - [x] `AI/CLAUDE.md` 하드 룰 불릿 추가
+- [x] `PricingRequest.include_retail` 추가 — 신상품가 조회를 **기본 꺼짐**으로 바꾸고
+      요청 단위로 켜게 함(아래 "호출 조건(트리거) — 미정" 참고)
 - [ ] 실네이버 전환 후 재검증 — **사용자가 직접 실행**(AI/CLAUDE.md 하드 룰)
+
+---
+
+## 호출 조건(트리거) — 아직 미정
+
+처음 설계에서는 `estimate()`가 comps 처리 뒤 매번 무조건 `_fetch_retail()`을 호출했다.
+`ACTIVE_RETAIL_SOURCE=naver`로 전환하면 **요청마다 쿼터가 소모**되므로, 임의로 항상 켜 두는
+것은 원치 않는다는 피드백을 받아 `PricingRequest.include_retail: bool = False`로
+기본 꺼짐 스위치를 추가했다. `estimate()`는 이 값이 `True`일 때만 `_fetch_retail()`을 부르고,
+`False`(기본)면 `retail_items=[]` + 사유 note만 채운다.
+
+**"언제 켤지"는 아직 정해지지 않았다** — BE/FE 팀과 트리거 기준(예: 판매자가 "미착용/새 상품"
+태그를 달았는가 등)을 논의한 뒤 결정한다. 지금은 함수 분리 + 스위치만 준비된 상태이고,
+그 판단 결과를 `include_retail`에 담아 보내는 쪽(BE) 또는 AI가 다른 필드로 내부 판단하는
+쪽 중 무엇을 택할지도 그때 정한다. 트리거가 정해지면 이 섹션과 스키마 docstring을 갱신한다.
 
 ---
 
@@ -124,6 +141,7 @@ comps는 인프라 오류(`CompsUnavailable`)면 여전히 job을 `failed`로 �
 - `RetailStats`(요약 통계)
 - BE `retail_price`(요청 필드)와 네이버 결과의 병합·우선순위 로직
 - BE/FE 연동(이미 `-338` 스코프 밖으로 확인됨)
+- `include_retail`의 실제 트리거 기준 확정 — BE/FE 협의 후 별도 결정
 
 ---
 

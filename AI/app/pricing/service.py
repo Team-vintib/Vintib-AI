@@ -79,7 +79,11 @@ class PricingService:
         started = time.perf_counter()
         query = build_query(request.product_name, request.brand, request.category)
         fetched = self._comps_source.fetch(query)
-        retail_items, retail_notes = self._fetch_retail(query)
+        retail_items, retail_notes = (
+            self._fetch_retail(query)
+            if request.include_retail
+            else ([], ["신상품가 조회를 요청하지 않았습니다(include_retail=false)."])
+        )
 
         outcome = self._pricer.price(
             fetched.items,

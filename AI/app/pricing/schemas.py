@@ -101,6 +101,14 @@ class PricingRequest(BaseModel):
     retail_price: int | None = Field(
         default=None, ge=0, description="신품 정가(원). 있으면 근거 문장에 할인율만 덧붙인다"
     )
+    include_retail: bool = Field(
+        default=False,
+        description=(
+            "신상품(정가) 참고가 조회 여부. 기본은 끔 — 백엔드가 naver로 전환되면 "
+            "요청마다 쿼터가 소모되므로, 언제 켤지는 BE/FE와 트리거 기준을 정한 뒤 "
+            "이 필드에 그 판단 결과만 담아 보낸다(임시 스위치, 트리거 기준 미정)"
+        ),
+    )
 
 
 # --- 접수 응답 --------------------------------------------------------------
