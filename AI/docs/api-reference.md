@@ -32,7 +32,9 @@ BE는 `job_id`를 받으면 그걸로 `GET /ai/jobs/{job_id}`를 반복 호출(�
 |---|---|---|---|---|
 | 헬스체크 | GET | `/ai/health` | 없음 | 누구나 |
 | job 접수 | POST | `/ai/{feature}` | 없음 | BE |
-| job 상태 조회 | GET | `/ai/jobs/{job_id}` | 없음 | BE |
+| 품질검수 접수 | POST | `/quality/inspections` | 없음 | BE |
+| **가격책정 접수** | POST | `/pricing/estimates` | 없음 | BE — 워커 없이 컨테이너가 처리. 상세는 [`.claude/requests/be/002-pricing-async.md`](../../.claude/requests/be/002-pricing-async.md) |
+| job 상태 조회 | GET | `/ai/jobs/{job_id}` | 없음 | BE — 위 세 접수 경로가 모두 이걸로 결과를 돌려준다 |
 | 워커 poll | GET | `/ai/workers/poll?feature={feature}` | `X-API-Key` | 워커(로컬 노트북) |
 | 워커 결과 제출 | POST | `/ai/workers/result` | `X-API-Key` | 워커 |
 | 워커 이미지 업로드 | POST | `/ai/workers/upload-image?prefix={prefix}` | `X-API-Key` | 워커 |
@@ -44,10 +46,15 @@ BE는 `job_id`를 받으면 그걸로 `GET /ai/jobs/{job_id}`를 반복 호출(�
 
 ## job 접수: `POST /ai/{feature}`
 
-`feature`는 `tryon` / `quality_check` / `chat_rag` / `recommend_offline` 중 하나
-(`app/gateway/schemas.py`의 `FeatureType`). **`tryon`만 워커까지 실제로 연결되어 있고,
-나머지 셋은 타입만 정의되어 있을 뿐 아직 처리하는 워커가 없다** — 지금 이 셋으로 job을
-넣으면 큐에는 쌓이지만 아무도 꺼내가지 않는다.
+`feature`는 `tryon` / `quality_check` / `chat_rag` / `recommend_offline` / `stt` 중 하나
+(`app/gateway/schemas.py`의 `FeatureType`). **`tryon`·`quality_check`·`stt`만 워커까지 실제로
+연결되어 있고, 나머지는 타입만 정의되어 있을 뿐 아직 처리하는 워커가 없다** — 지금 그것들로
+job을 넣으면 큐에는 쌓이지만 아무도 꺼내가지 않는다.
+
+> ⚠️ **가격책정(`pricing`)은 이 목록에 없다.** `FeatureType`에 일부러 넣지 않았다 — 큐를 읽는
+> 워커가 없고 `ai` 컨테이너가 직접 처리하기 때문이다. 접수는 전용 엔드포인트
+> `POST /pricing/estimates`를 쓴다. 결과 조회만 아래 공통 경로(`GET /ai/jobs/{job_id}`)를
+> 공유한다.
 
 body는 feature별로 자유 형식 dict다(게이트웨이 레벨에서는 검증하지 않는다 — 워커가
 필요한 키를 직접 읽는다).

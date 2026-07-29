@@ -16,6 +16,7 @@ AI 파트의 참조 문서 모음. 실행 방법·디렉터리 구조는 `../REA
 | BE가 **AI 게이트웨이 API를 호출**해야 한다(`AiClient.java` 등) | [`api-reference.md`](./api-reference.md) — 엔드포인트 목록, 기능별 job payload/result 필드, `APIs.md`(FE↔BE)와의 관계 (`S15P11A108-371`) |
 | 결과/입력 이미지 URL의 **접근 제어**를 검토해야 한다 | [`results-access-control.md`](./results-access-control.md) — 서명된 URL / JWT 인증 / 보관기간 정책 비교, 미결정 상태 (`S15P11A108-371`) |
 | 라이브 채팅 RAG **저장소 설계 근거**가 궁금하다 | [`chat-rag-storage.md`](./chat-rag-storage.md) — AI 전용 `postgres-vector` 컨테이너를 왜 별도로 뒀는지, 지금 벡터 검색을 안 쓰는 이유 (`S15P11A108-375`) |
+| 가격 책정이 **왜 워커 큐가 아닌지** 알고 싶다 | `infra-architecture.md` §6 — 자원이 아웃바운드 외부 API면 인바운드 제약이 없어 컨테이너 내 백그라운드로 간다. 설계 전문은 `.claude/plans/ai/CH003-pricing-service-prototype.md` (`S15P11A108-338`) |
 
 > ⚠️ `infra-architecture.md`의 "7. 저장소 디렉토리 구조" 절은 `app/` 패키지 재구성 이전 상태로
 > 남아 있다. 현재 구조는 `../README.md`의 디렉터리 구조 절을 본다.
