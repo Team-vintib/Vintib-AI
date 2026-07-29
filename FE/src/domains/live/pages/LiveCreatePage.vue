@@ -15,6 +15,7 @@ import type {
   LiveCreateMode,
   LiveCreateStep,
 } from '@/domains/live/types/liveCreate.types'
+import { ROUTE_NAMES } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const form = reactive<LiveCreateFormState>({
@@ -51,6 +52,14 @@ const liveCreateSteps = computed<LiveCreateStep[]>(() => {
 const currentStep = computed(() => liveCreateSteps.value[currentStepIndex.value])
 const selectedMethod = computed(() =>
   LIVE_CREATE_METHOD_OPTIONS.find((option) => option.id === form.mode),
+)
+const completeTitle = computed(() =>
+  form.mode === 'IMMEDIATE' ? '방송을 시작할 준비가 끝났습니다.' : '예약 라이브 정보가 준비되었습니다.',
+)
+const completeDescription = computed(() =>
+  form.mode === 'IMMEDIATE'
+    ? '실제 방송 생성 API가 연결되면 이 단계에서 라이브 진행 화면으로 이동합니다.'
+    : '실제 예약 API가 연결되면 입력한 일정으로 라이브가 등록됩니다.',
 )
 const isFirstStep = computed(() => currentStepIndex.value === 0)
 const isLastStep = computed(() => currentStepIndex.value === liveCreateSteps.value.length - 1)
@@ -219,6 +228,10 @@ const moveToNextStep = () => {
     return
   }
 
+  if (currentStep.value.id === 'device') {
+    stopCameraPreview()
+  }
+
   currentStepIndex.value += 1
 }
 
@@ -252,7 +265,10 @@ onBeforeUnmount(() => {
         </ol>
       </nav>
 
-      <div class="live-create__body">
+      <div
+        class="live-create__body"
+        :class="{ 'live-create__body--complete': currentStep.id === 'complete' }"
+      >
         <section class="live-create__panel" :aria-labelledby="`${currentStep.id}-title`">
           <h2 :id="`${currentStep.id}-title`">{{ currentStep.label }}</h2>
           <p>{{ currentStep.description }}</p>
@@ -457,13 +473,81 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
+          <section
+            v-else-if="currentStep.id === 'complete'"
+            class="live-create__complete"
+            aria-label="라이브 개설 완료"
+          >
+            <div class="live-create__complete-icon" aria-hidden="true">✓</div>
+            <h3>{{ completeTitle }}</h3>
+            <p>{{ completeDescription }}</p>
+
+            <dl class="live-create__complete-list">
+              <div>
+                <dt>라이브 유형</dt>
+                <dd>{{ selectedMethod?.title || '' }}</dd>
+              </div>
+              <div>
+                <dt>방송 제목</dt>
+                <dd>{{ form.title.trim() || '제목 미입력' }}</dd>
+              </div>
+              <div>
+                <dt>한 줄 소개</dt>
+                <dd>{{ form.description.trim() || '소개 미입력' }}</dd>
+              </div>
+              <div v-if="form.mode === 'SCHEDULED'">
+                <dt>예약 일정</dt>
+                <dd>{{ scheduleSummary || '일정 미입력' }}</dd>
+              </div>
+              <div>
+                <dt>선택 상품</dt>
+                <dd>{{ selectedProductCountLabel || '선택 없음' }}</dd>
+              </div>
+            </dl>
+
+            <div v-if="selectedProducts.length" class="live-create__complete-products">
+              <h4>판매 상품</h4>
+              <div class="live-create__complete-product-list">
+                <article v-for="product in selectedProducts" :key="product.id">
+                  <img :src="product.thumbnailUrl" :alt="product.name" />
+                  <div>
+                    <strong>{{ product.name }}</strong>
+                    <dl class="live-create__summary-product-meta">
+                      <div>
+                        <dt>브랜드</dt>
+                        <dd>{{ product.brand }}</dd>
+                      </div>
+                      <div>
+                        <dt>카테고리</dt>
+                        <dd>{{ product.category }}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <div class="live-create__complete-actions">
+              <RouterLink
+                class="live-create__complete-link"
+                :to="{ name: ROUTE_NAMES.LIVE_WATCH, params: { liveId: 'preview' } }"
+              >
+                라이브 시작
+              </RouterLink>
+            </div>
+          </section>
+
           <div v-else class="live-create__placeholder" role="status">
             <strong>{{ currentStep.label }}</strong>
             <p>이 단계의 세부 UI는 다음 작업에서 이어서 구현합니다.</p>
           </div>
         </section>
 
-        <aside class="live-create__side" aria-label="방송 정보와 단계 이동">
+        <aside
+          v-if="currentStep.id !== 'complete'"
+          class="live-create__side"
+          aria-label="방송 정보와 단계 이동"
+        >
           <section class="live-create__summary" aria-label="방송 정보">
             <h2>방송 정보</h2>
             <dl>
@@ -643,6 +727,10 @@ onBeforeUnmount(() => {
   align-items: start;
   gap: var(--space-6);
   grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+.live-create__body--complete {
+  grid-template-columns: 1fr;
 }
 
 .live-create__panel,
@@ -898,6 +986,141 @@ onBeforeUnmount(() => {
 .live-create__device-actions {
   display: flex;
   gap: var(--space-3);
+}
+
+.live-create__complete {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-5);
+  margin-top: var(--space-8);
+  padding: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+  text-align: center;
+}
+
+.live-create__complete-icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 24px;
+  font-weight: var(--font-weight-bold);
+  place-items: center;
+}
+
+.live-create__complete h3 {
+  color: var(--color-text-primary);
+  font-size: 22px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 30px;
+}
+
+.live-create__complete p {
+  max-width: 520px;
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-body);
+}
+
+.live-create__complete-list {
+  display: grid;
+  width: 100%;
+  max-width: 640px;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  text-align: left;
+}
+
+.live-create__complete-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.live-create__complete-list dt {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.live-create__complete-list dd {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
+  text-align: right;
+}
+
+.live-create__complete-products {
+  display: grid;
+  width: 100%;
+  gap: var(--space-4);
+}
+
+.live-create__complete-products h4 {
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: var(--font-weight-bold);
+  line-height: 24px;
+}
+
+.live-create__complete-product-list {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  text-align: left;
+}
+
+.live-create__complete-product-list article {
+  display: grid;
+  overflow: hidden;
+  gap: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.live-create__complete-product-list img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.live-create__complete-product-list article > div {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.live-create__complete-product-list strong {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: var(--font-weight-bold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-create__complete-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.live-create__complete-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 128px;
+  height: var(--button-height-standard);
+  padding: 0 var(--space-5);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-weight: var(--font-weight-bold);
 }
 
 .live-create__product-panel {
@@ -1171,10 +1394,18 @@ onBeforeUnmount(() => {
   .live-create__device-actions {
     flex-direction: column;
   }
+
+  .live-create__complete-product-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
   .live-create__product-list {
+    grid-template-columns: 1fr;
+  }
+
+  .live-create__complete-product-list {
     grid-template-columns: 1fr;
   }
 }
