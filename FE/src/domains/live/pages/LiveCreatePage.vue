@@ -244,6 +244,25 @@ const moveToNextStep = () => {
             </div>
           </section>
 
+          <section
+            v-else-if="currentStep.id === 'schedule'"
+            class="live-create__schedule-panel"
+            aria-label="예약 일정 설정"
+          >
+            <div class="live-create__schedule-grid">
+              <label class="live-create__field" for="live-create-scheduled-date">
+                <span>방송 날짜</span>
+                <input id="live-create-scheduled-date" v-model="form.scheduledDate" type="date" />
+              </label>
+
+              <label class="live-create__field" for="live-create-scheduled-time">
+                <span>시작 시간</span>
+                <input id="live-create-scheduled-time" v-model="form.scheduledTime" type="time" />
+              </label>
+            </div>
+
+          </section>
+
           <div v-else class="live-create__placeholder" role="status">
             <strong>{{ currentStep.label }}</strong>
             <p>이 단계의 세부 UI는 다음 작업에서 이어서 구현합니다.</p>
@@ -441,7 +460,8 @@ const moveToNextStep = () => {
 
 .live-create__panel {
   display: grid;
-  gap: var(--space-0);
+  align-content: start;
+  gap: var(--space-4);
   min-height: 320px;
   padding: var(--space-8);
 }
@@ -541,6 +561,18 @@ const moveToNextStep = () => {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-soft);
   outline: none;
+}
+
+.live-create__schedule-panel {
+  display: grid;
+  gap: var(--space-5);
+  margin-top: var(--space-8);
+}
+
+.live-create__schedule-grid {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .live-create__product-panel {
@@ -801,6 +833,10 @@ const moveToNextStep = () => {
 
   .live-create__product-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .live-create__schedule-grid {
+    grid-template-columns: 1fr;
   }
 }
 
