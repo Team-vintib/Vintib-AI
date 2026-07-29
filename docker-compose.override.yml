@@ -21,43 +21,17 @@ services:
       - "${SERVER_PORT:-8080}:8080"
     environment:
       SPRING_PROFILES_ACTIVE: local
-      # 백엔드 컨테이너 자신의 S3 직접 호출(HeadObject 등)은 컨테이너 네트워크 주소를 쓴다.
-      AWS_S3_ENDPOINT: http://minio:9000
       # presigned URL은 브라우저/FE가 여는 것이라 호스트에 발행된 포트를 가리켜야 한다.
+      # (컨테이너 네트워크 주소인 base 의 AWS_S3_ENDPOINT 로는 브라우저가 열지 못한다)
       AWS_S3_PUBLIC_ENDPOINT: http://localhost:${MINIO_API_PORT:-9000}
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    depends_on:
-      minio:
-        condition: service_healthy
 
   ai:
     ports:
       - "${AI_PORT:-8000}:8000"
 
-  # 로컬 전용 S3 호환 스토리지. prod는 실제 AWS S3를 쓰므로 base(docker-compose.yml)가 아니라
-  # 여기(override)에만 정의한다 — prod 기동(`-f docker-compose.yml -f docker-compose.prod.yml`)에는
-  # 이 파일이 섞이지 않으므로 minio 컨테이너도 뜨지 않는다.
+  # minio 서비스 자체는 base 에 있다 (운영도 MinIO 를 쓴다 — 계획 JY006).
+  # 여기서는 IDE에서 직접 붙거나 콘솔을 열 수 있게 호스트 포트만 추가로 발행한다.
   minio:
-    image: minio/minio
-    container_name: vintib-minio
-    restart: unless-stopped
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio-data:/data
-    networks:
-      - vintib-net
     ports:
       - "${MINIO_API_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-volumes:
-  minio-data:

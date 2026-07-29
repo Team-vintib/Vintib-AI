@@ -21,3 +21,12 @@ htmlcov/
 .env
 .env.*
 !.env.example
+
+# 추천 오프라인 파이프라인 산출물/입력 (아티팩트·원본 이미지)
+app/recommend/artifacts/
+app/recommend/data/images/
+app/recommend/data/brands.yaml
+# 개인화 추천 아이템 임베딩 캐시(embed_catalog 산출물). 목업 카탈로그(personalize/data/)는 커밋한다.
+app/recommend/personalize/artifacts/
+# 라이브 댓글 관리 정확도 평가 리포트(pipeline/evaluate 산출물). 평가셋은 코드(eval_dataset.py)라 커밋한다.
+app/chat/artifacts/

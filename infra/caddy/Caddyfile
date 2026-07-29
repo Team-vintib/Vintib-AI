@@ -4,14 +4,45 @@
 # HTTP(80)→HTTPS(443) 리다이렉트한 뒤 백엔드 컨테이너로 프록시한다.
 # backend 는 호스트에 포트를 열지 않고 vintib-net 내부에서 backend:8080 으로만 접근한다.
 #
+# /ai/* 는 AI 게이트웨이(ai:8000)로 라우팅한다.
+# 워커(로컬 노트북)는 Redis에 직접 붙지 않고 이 경로로만 job을 주고받는다.
+#
 # WebRTC(OpenVidu v3)는 2주차에 붙인다. 그때 이 파일에 미디어 라우팅을 추가하거나
 # OpenVidu 내장 Caddy 와 정합을 맞춘다.
 
 i15a108.p.ssafy.io {
 	encode zstd gzip
 
+	# AI 게이트웨이 (워커 poll/result, job 접수/조회)
+	handle /ai/* {
+		reverse_proxy ai:8000
+	}
+
+	handle /results/* {
+		reverse_proxy ai:8000
+	}
+
+	# 오브젝트 스토리지(MinIO). 팀에 AWS 계정이 없어 운영도 자체 호스팅한다 — 계획 JY006.
+	#
+	# 백엔드가 endpoint override 를 쓰면 SDK 가 path-style 을 강제하므로 URL 이
+	# https://i15a108.p.ssafy.io/{bucket}/{key} 형태가 된다. 그래서 버킷명을 그대로
+	# 최상위 경로로 받는다 (현재 API 는 전부 /api/* 라 충돌하지 않는다).
+	#
+	# ⚠️ handle_path 를 쓰면 안 된다. 경로 접두사를 잘라내면 SigV4 서명 대상이 달라져
+	#    presigned URL 검증이 전부 실패한다. handle 로 경로를 그대로 넘긴다.
+	# ⚠️ 서명에는 Host 도 포함된다. Caddy 는 reverse_proxy 시 원본 Host 를 보존하므로
+	#    MinIO 가 백엔드의 presigner 와 동일한 값으로 검증한다 — 여기서 Host 를 바꾸지 말 것.
+	handle /vintib-public/* {
+		reverse_proxy minio:9000
+	}
+	handle /vintib-private/* {
+		reverse_proxy minio:9000
+	}
+
 	# 헬스체크·REST·(추후)WebSocket 전부 백엔드로
-	reverse_proxy backend:8080
+	handle {
+		reverse_proxy backend:8080
+	}
 
 	# 접근 로그 (컨테이너 stdout → docker logs)
 	log {

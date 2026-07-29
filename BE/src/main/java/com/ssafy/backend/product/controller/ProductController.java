@@ -1,6 +1,7 @@
 package com.ssafy.backend.product.controller;
 
 import com.ssafy.backend.global.response.ApiResponse;
+import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductImageRegisterRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUpdateRequest;
@@ -15,9 +16,12 @@ import com.ssafy.backend.product.service.ProductImageService;
 import com.ssafy.backend.product.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -30,7 +34,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "상품", description = "상품 등록/조회 API")
+@Tag(name = "상품(Products)", description = "상품 등록/조회, 브랜드/카테고리 마스터 조회 API")
 @RestController
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
@@ -48,6 +52,7 @@ public class ProductController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
             Authentication authentication, @Valid @RequestBody ProductCreateRequest request) {
@@ -66,6 +71,7 @@ public class ProductController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @PatchMapping("/{id}/status")
     public ResponseEntity<ApiResponse<ProductResponse>> registerDirectSale(
             Authentication authentication,
@@ -73,6 +79,23 @@ public class ProductController {
             @Valid @RequestBody ProductStatusUpdateRequest request) {
         Long sellerId = (Long) authentication.getPrincipal();
         ProductResponse response = productService.registerDirectSale(sellerId, id, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "상품 목록 조회",
+            description = "상시 판매/경매 여부와 관계없이 공개된 상품 목록을 최신순으로 조회한다. "
+                    + "DRAFT/PRIVATE 상태 상품은 목록에서 제외한다. "
+                    + "정렬은 항상 최신순(createdAt DESC)으로 고정되며, sort 파라미터를 보내도 무시된다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getProductList(
+            @PageableDefault(size = 20) Pageable pageable) {
+        PageResponse<ProductResponse> response = productService.getProductList(pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -142,6 +165,7 @@ public class ProductController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/{id}/images/upload-url")
     public ResponseEntity<ApiResponse<ProductImageUploadUrlResponse>> createImageUploadUrl(
             Authentication authentication,
@@ -164,6 +188,7 @@ public class ProductController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/{id}/images")
     public ResponseEntity<ApiResponse<ProductImageResponse>> registerImage(
             Authentication authentication,
@@ -185,6 +210,7 @@ public class ProductController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 또는 이미지 없음")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @PatchMapping("/{id}/images/{imageId}")
     public ResponseEntity<ApiResponse<ProductImageResponse>> updateImage(
             Authentication authentication,
@@ -203,6 +229,7 @@ public class ProductController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 또는 이미지 없음")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @DeleteMapping("/{id}/images/{imageId}")
     public ResponseEntity<Void> deleteImage(
             Authentication authentication, @PathVariable Long id, @PathVariable Long imageId) {

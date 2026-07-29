@@ -92,4 +92,41 @@ public class Live extends BaseTimeEntity {
             Member host, String title, String thumbnailUrl, LocalDateTime startedAt) {
         return new Live(host, title, thumbnailUrl, LiveStatus.LIVE, null, startedAt);
     }
+
+    public boolean isHostedBy(Long memberId) {
+        return memberId != null && host.getId().equals(memberId);
+    }
+
+    /** 상품 편성을 바꿀 수 있는 상태인지. 종료·취소된 방송은 더 이상 손대지 않는다. */
+    public boolean isOpenForEditing() {
+        return status == LiveStatus.SCHEDULED || status == LiveStatus.LIVE;
+    }
+
+    public boolean canTransitionTo(LiveStatus target) {
+        return status.canTransitionTo(target);
+    }
+
+    /**
+     * 방송 상태를 전이시킨다. 전이 가능 여부는 {@link #canTransitionTo}로 미리 확인해야 한다
+     * — 여기서 다시 막지 않는 이유는 "왜 안 되는지"를 예외 코드로 구분해 돌려주는 책임이
+     * 서비스에 있기 때문이다.
+     *
+     * <p>상태에 따라 함께 박히는 시각이 다르다. 시각은 클라이언트 값이 아니라 서버 시각을 받는다
+     * — 경매 종료 판정이 서버 시각 기준이라 시간 축이 둘로 갈리면 안 된다(erd.md §6).
+     */
+    public void transitionTo(LiveStatus target, LocalDateTime at) {
+        this.status = target;
+        switch (target) {
+            case LIVE -> this.startedAt = at;
+            case ENDED -> this.endedAt = at;
+            default -> {
+                // SCHEDULED·CANCELED 는 별도로 박을 시각이 없다.
+            }
+        }
+    }
+
+    /** 방송을 실제로 시작하는 시점에 OpenVidu room 이름을 채운다(연동은 -449). */
+    public void assignOpenviduRoom(String openviduRoom) {
+        this.openviduRoom = openviduRoom;
+    }
 }

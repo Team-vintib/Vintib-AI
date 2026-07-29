@@ -188,8 +188,12 @@ BE/
 │   │   ├── service/
 │   │   └── dto/response/        # 카드 DTO는 현재 Mock 응답용 (2주차 실데이터 연결)
 │   ├── live/                    # 라이브 방 개설/조회/상태 전이 (LIVE) — 정윤
-│   │   ├── entity/              # Live, LiveStatus
-│   │   └── repository/
+│   │   ├── controller/          # LiveController, LiveProductController
+│   │   ├── service/             # LiveService, LiveProductService
+│   │   ├── entity/              # Live, LiveStatus, LiveProduct
+│   │   ├── repository/
+│   │   ├── port/                # ProductQueryPort — 상품 도메인 참조를 한 곳으로 격리
+│   │   └── dto/
 │   ├── auction/                 # 경매 조건 설정/진행 (AUCT) — 정윤
 │   │   ├── entity/              # Auction, AuctionStatus
 │   │   └── repository/
@@ -199,6 +203,12 @@ BE/
 │   │   ├── entity/               # TryOnResult
 │   │   ├── repository/
 │   │   └── dto/response/
+│   ├── social/                   # 상품 찜/해제 (WISH, APIs.md "팔로우 / 찜" 섹션 기준) — 서윤
+│   │   ├── controller/
+│   │   ├── service/
+│   │   ├── entity/               # Wish, WishId(복합키)
+│   │   ├── repository/
+│   │   └── dto/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
 │       ├── client/              # AiClient — Spring → FastAPI
 │       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config
@@ -206,7 +216,7 @@ BE/
 │       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
 │       ├── health/              # HealthController
 │       ├── response/            # ApiResponse, ErrorResponse
-│       └── storage/             # S3StorageService, LocalS3BucketInitializer(local 전용)
+│       └── storage/             # S3StorageService, S3BucketInitializer
 ├── src/main/resources/application.yml
 └── src/test/java/com/ssafy/backend/
 ```
@@ -216,7 +226,7 @@ BE/
 담당 분배:
 
 ```
-{auth,member,product,tryon,point,order}/   ← 서윤
+{auth,member,product,tryon,social,point,order}/   ← 서윤
 {live,auction,chat,home,search}/     ← 정윤
 ```
 

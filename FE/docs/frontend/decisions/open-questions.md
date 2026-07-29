@@ -26,6 +26,10 @@
 | 카메라 권한 거부 감지 정책 | 미확정 | 모바일 `capture="environment"` 입력 사용, 취소 시 기존 상태 유지 |
 | 회원 유형 저장·최종 온보딩 완료 API | 미확정 | `/api/me/onboarding/complete`와 `GENERAL | BUSINESS` FE 선행 계약 사용, BE Swagger 확정 시 교체 |
 | 온보딩 완료 처리 시점 | BE Entity는 기본 정보 저장 시 완료 처리, 화면 흐름은 ONBOARD-004가 최종 단계 | BE 요청 문서에서 기본 정보 저장과 최종 완료 책임 분리 요청 |
+| 회원가입 직후 인증 토큰과 온보딩/BIZ route guard | 이메일 회원가입 응답에는 토큰이 없지만 온보딩·사업자 API 후보는 Bearer 인증을 사용 | 인증 계약 확정 전 ONBOARD·BIZ route는 가드를 적용하지 않음 |
+| 사업자등록번호 검증 정책 | 숫자 10자리 외 체크섬 적용 주체 미확정 | FE는 숫자 10자리만 1차 검증 |
+| 사업자등록증 파일 정책 | 확장자, 정확한 MIME, 최대 용량과 최소 해상도 미확정 | 한 개 선택과 `image/*` MIME만 1차 검증 |
+| 사업자 인증 제출·상태 조회 API | endpoint, multipart 필드명, 오류·상태 규격 미확정 | `/api/business-verifications` 후보를 문서화하고 FE는 더미 제출 상태 사용 |
 | 일반/사업자 메뉴 차이 | 일부 미확정 | 기능 정의서 기준 |
 | 본인 상품 구매/입찰/팔로우/찜 | 미확정 | 서버 응답 기준 |
 
@@ -35,6 +39,19 @@
 | --- | --- |
 | 모바일/태블릿 breakpoint | 미확정, 1440px desktop first 우선 |
 | 파일 업로드 형식/용량/개수 | 상품 사진 최대 10장 외 세부 미확정 |
+| PROD-008 목록 API | pagination, 검색·필터·정렬 query와 상시/경매 가격 응답 구조 미확정 |
+| PROD-008 찜 표시 | 공개 목록 응답의 찜 여부와 비회원 클릭 정책 미확정 |
 | 결제 API | 추가 선정 필요 |
 | 배송 조회 API | 외부 API 미확정 |
 | 환불 조건 세부 정책 | 일부 미확정 |
+
+## 2026-07-28 검색 화면 미확정
+
+| 항목 | 현재 상태 | 임시 처리 |
+| --- | --- | --- |
+| SEARCH-001/002 통합 검색 API | endpoint, 탭별/통합 응답, pagination, count 구조 미확정 | `/search` 화면에서 mock data 클라이언트 필터링 |
+| 검색 query 계약 | `keyword`, 탭, 페이지, 카테고리, 상태, 가격, 판매 유형, 정렬 query 이름과 값 미확정 | FE query는 `keyword`, `type`, `page`, `categories`, `conditions`, `saleTypes`, `minPrice`, `maxPrice`, `sort` 사용 |
+| 전체 탭 preview 정책 | `all` 탭에서 서버가 섹션별 preview를 내려줄지, FE가 탭별 endpoint를 조합할지 미확정 | FE mock은 섹션별 3개 preview와 `전체보기` 버튼을 사용 |
+| 회원 검색 상세 route | 회원 카드 클릭 시 이동할 프로필 route 미확정 | 카드 표시와 팔로우 mock action만 구현 |
+| 검색 결과 찜/팔로우 API | 공개 목록에서 찜/팔로우 여부 노출, 비로그인 클릭 정책, mutation endpoint 미확정 | 비로그인은 login redirect, 로그인은 화면 내 mock toggle |
+| 상품 상세 mock 데이터 | 검색 결과의 상품 ID로 상세 route는 이동하지만 상세 mock adapter가 단일 Levi's 데이터를 반환 | 실제 상품 상세 API 또는 ID별 mock data 필요 |

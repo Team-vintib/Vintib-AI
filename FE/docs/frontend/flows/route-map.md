@@ -43,6 +43,7 @@ flowchart TD
   TryOn["ONBOARD-003 /onboarding/try-on"]
   MemberType["ONBOARD-004 /onboarding/member-type"]
   Biz["BIZ-001 /business/verification"]
+  BizPending["BIZ-001-2 /business/verification/pending"]
   Home["HOME /"]
 
   Profile --> Interests
@@ -50,7 +51,48 @@ flowchart TD
   TryOn --> MemberType
   MemberType --> Home
   MemberType --> Biz
-  Biz --> Home
+  Biz --> BizPending
+```
+
+## 홈 흐름
+
+```mermaid
+flowchart TD
+  Home["HOME /"]
+  GuestHome["GuestHome"]
+  MemberHome["MemberHome"]
+  Search["SEARCH /search?keyword=..."]
+  LiveList["LIVE /lives"]
+  LiveWatch["LIVE /lives/:liveId"]
+  ProductList["PROD-008 /products"]
+  ProductDetail["PROD-006 /products/:productId"]
+  FollowingHome["HOME-002 /following"]
+  Login["AUTH-002 /auth/login"]
+
+  Home --> GuestHome
+  Home --> MemberHome
+  GuestHome --> Search
+  GuestHome --> LiveList
+  GuestHome --> LiveWatch
+  GuestHome --> ProductList
+  GuestHome --> ProductDetail
+  GuestHome --> Login
+  MemberHome --> Search
+  MemberHome --> LiveList
+  MemberHome --> LiveWatch
+  MemberHome --> ProductList
+  MemberHome --> ProductDetail
+  MemberHome --> FollowingHome
+```
+
+## 상품 탐색 흐름
+
+```mermaid
+flowchart TD
+  ProductList["PROD-008 /products"]
+  ProductDetail["PROD-006 /products/:productId"]
+
+  ProductList -->|"상품 카드 선택"| ProductDetail
 ```
 
 ## 라우트 메타 초안
@@ -68,5 +110,48 @@ flowchart TD
 | `/onboarding/basic-info`  | ONBOARD-001 | false        | false     | 가입 후 필수/보완 흐름                           |
 | `/onboarding/interests`   | ONBOARD-002 | false        | false     | 건너뛰기 가능                                    |
 | `/onboarding/try-on`      | ONBOARD-003 | false        | false     | 건너뛰기 가능                                    |
-| `/onboarding/member-type` | ONBOARD-004 | true         | false     | 일반/사업자 선택                                 |
-| `/business/verification`  | BIZ-001     | true         | false     | 사업자 회원 정보 제출                            |
+| `/onboarding/member-type` | ONBOARD-004 | false        | false     | 회원가입 응답의 인증 토큰 계약 확정 전 임시      |
+| `/business/verification`  | BIZ-001     | false        | false     | 사업자 회원 정보 제출, 인증 계약 확정 전 임시    |
+| `/business/verification/pending` | BIZ-001-2 | false   | false     | FE 메모리 제출 상태가 없으면 BIZ-001로 이동      |
+| `/`                       | HOME        | false        | false     | 로그인 상태에 따라 비로그인/회원 홈 렌더링       |
+| `/following`              | HOME-002    | true         | false     | 팔로잉 홈 placeholder, 회원 홈 CTA에서 진입       |
+| `/search`                 | SEARCH      | false        | false     | 홈 검색 패널에서 `keyword` query로 진입, 결과 탭·필터·정렬·전체보기·페이지네이션·상태 화면 구현, 실제 검색 API 대기 |
+| `/lives`                  | LIVE        | false        | false     | 413·415·418 카드·필터·정렬·목록 상태와 API adapter 구현, BE 목록 계약 전 mock 사용 |
+| `/products`               | PROD-008    | false        | false     | 공개 상품 목록 껍데기, 실제 조회 API 연동 대기   |
+| `/products/:productId`    | PROD-006    | false        | false     | 상품 상세 408·410·412 UI, 실제 API 대기           |
+| `/products/new`           | PROD 신규   | true         | false     | 상품 등록 placeholder                            |
+| `/lives/new`              | LIVE 신규   | true         | false     | 라이브 시작 placeholder                          |
+| `/lives/:liveId`          | LIVE 시청   | false        | false     | 라이브 시청 placeholder                          |
+| `/notifications`          | NOTI        | true         | false     | 알림센터 placeholder                             |
+| `/my`                     | MY          | true         | false     | 마이페이지 placeholder                           |
+| `/points`                 | POINT       | true         | false     | 포인트 placeholder                               |
+
+## 2026-07-28 검색 흐름 보강
+
+```mermaid
+flowchart TD
+  HomeSearch["홈 검색 패널"]
+  SearchPage["SEARCH /search?keyword=...&type=...&page=..."]
+  ProductTab["상품 결과 탭"]
+  LiveTab["라이브 결과 탭"]
+  MemberTab["회원 결과 탭"]
+  ProductDetail["/products/:productId"]
+  LiveWatch["/lives/:liveId"]
+  Login["/auth/login?redirect=..."]
+
+  HomeSearch --> SearchPage
+  SearchPage --> ProductTab
+  SearchPage --> LiveTab
+  SearchPage --> MemberTab
+  SearchPage -->|"전체보기"| ProductTab
+  SearchPage -->|"전체보기"| LiveTab
+  SearchPage -->|"전체보기"| MemberTab
+  ProductTab --> ProductDetail
+  LiveTab --> LiveWatch
+  ProductTab -->|비로그인 찜| Login
+  MemberTab -->|비로그인 팔로우| Login
+```
+
+| 라우트 | 화면 | requiresAuth | guestOnly | 비고 |
+| --- | --- | --- | --- | --- |
+| `/search` | SEARCH-001/002 | false | false | `keyword`, `type`, `page`, `categories`, `conditions`, `saleTypes`, `minPrice`, `maxPrice`, `sort` query 기반 검색 결과 탭/전체보기/페이지네이션/필터/상태 화면. 실제 검색 API 대기 |

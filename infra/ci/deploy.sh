@@ -13,6 +13,9 @@ set -eu
 DEPLOY_DIR=/home/ubuntu/vintib
 COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml -p vintib"
 HEALTH_TIMEOUT=180
+# 브라우저가 실제로 여는 주소. presigned·공개 이미지 URL 이 이 값으로 서명된다.
+# infra/caddy/Caddyfile 의 사이트 주소와 반드시 같아야 한다 (서명에 Host 가 포함됨).
+PUBLIC_ORIGIN=https://i15a108.p.ssafy.io
 
 log() { echo "[deploy] $*"; }
 
@@ -46,9 +49,37 @@ fi
 #    값을 바꾸면 볼륨을 지우거나 ALTER USER 를 해야 백엔드가 붙는다.
 # 운영 비밀번호는 PROD_DB_PASSWORD 로 받는다. DB_PASSWORD 라는 이름을 쓰면
 # 프로젝트 변수가 be-test 의 테스트용 DB_PASSWORD 까지 덮어써 테스트가 깨진다.
+#
+# ⚠️ MINIO_ROOT_USER/PASSWORD 도 DB 와 똑같은 함정이 있다. MinIO 는 이 값을 minio-data
+#    볼륨을 처음 만들 때의 값으로 굳히므로, 나중에 바꾸면 백엔드의 서명 검증이 전부
+#    실패한다(고치려면 볼륨을 지워야 하고 = 업로드된 이미지가 전부 사라진다).
+#    이름에 PROD_ 접두사를 쓰는 이유도 DB 와 같다 — be-test 잡의 MinIO 서비스
+#    컨테이너가 MINIO_ROOT_USER 를 job 변수로 쓰는데, 프로젝트 변수가 그걸 이긴다.
+
+# heredoc 확장 전에 필수 변수를 먼저 전부 검사한다.
+# 이유 두 가지:
+#   1) set -u 만 믿으면 위에서부터 하나씩 터져, CI/CD Variables 를 한 번에 못 채운다.
+#   2) `cat > .env` 는 리다이렉션이 먼저 처리되므로 확장이 실패하면 운영 .env 가
+#      빈 파일로 남는다 → 다음 배포의 롤백 기준 태그(PREVIOUS_TAG)까지 사라진다.
+REQUIRED_VARS="DB_NAME DB_USERNAME PROD_DB_PASSWORD IMAGE_TAG CORS_ALLOWED_ORIGINS
+PROD_MINIO_ROOT_USER PROD_MINIO_ROOT_PASSWORD"
+
+missing=""
+for name in $REQUIRED_VARS; do
+    eval "value=\${$name:-}"
+    [ -n "$value" ] || missing="$missing $name"
+done
+if [ -n "$missing" ]; then
+    log "!! 필수 CI/CD Variable 이 비어 있다:$missing"
+    log "   GitLab → Settings → CI/CD → Variables 에서 등록한다."
+    log "   (Protected 로 등록하려면 develop-BE 도 protected 브랜치여야 한다)"
+    exit 1
+fi
+
 log ".env 생성"
 umask 077
-cat > "$DEPLOY_DIR/.env" <<ENV
+# 임시 파일에 쓴 뒤 교체한다. 중간에 실패해도 기존 .env 가 살아남는다.
+cat > "$DEPLOY_DIR/.env.tmp" <<ENV
 DB_NAME=${DB_NAME}
 DB_USERNAME=${DB_USERNAME}
 DB_PASSWORD=${PROD_DB_PASSWORD}
@@ -56,12 +87,11 @@ SPRING_PROFILES_ACTIVE=prod
 SERVER_PORT=8080
 IMAGE_TAG=${IMAGE_TAG}
 CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
-AWS_REGION=${AWS_REGION}
-AWS_S3_PUBLIC_BUCKET=${AWS_S3_PUBLIC_BUCKET}
-AWS_S3_PRIVATE_BUCKET=${AWS_S3_PRIVATE_BUCKET}
-AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+MINIO_ROOT_USER=${PROD_MINIO_ROOT_USER}
+MINIO_ROOT_PASSWORD=${PROD_MINIO_ROOT_PASSWORD}
+AWS_S3_PUBLIC_ENDPOINT=${PUBLIC_ORIGIN}
 ENV
+mv "$DEPLOY_DIR/.env.tmp" "$DEPLOY_DIR/.env"
 
 cd "$DEPLOY_DIR"
 
