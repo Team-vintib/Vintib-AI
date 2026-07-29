@@ -6,6 +6,7 @@ import com.ssafy.backend.live.dto.response.LiveProductResponse;
 import com.ssafy.backend.live.service.LiveProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -21,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "라이브", description = "라이브 방송 개설/조회 API")
+@Tag(name = "라이브(Lives)", description = "라이브 방송 개설/조회 API")
 @RestController
 @RequestMapping("/api/lives/{liveId}/products")
 @RequiredArgsConstructor
@@ -41,6 +42,7 @@ public class LiveProductController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "라이브 또는 상품 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "이미 연결된 상품")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping
     public ResponseEntity<ApiResponse<LiveProductResponse>> linkProduct(
             Authentication authentication,
@@ -61,6 +63,7 @@ public class LiveProductController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 라이브가 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "라이브 없음 또는 연결되지 않은 상품")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @DeleteMapping("/{productId}")
     public ResponseEntity<Void> unlinkProduct(
             Authentication authentication, @PathVariable Long liveId, @PathVariable Long productId) {
@@ -77,6 +80,7 @@ public class LiveProductController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "라이브 없음")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @GetMapping
     public ResponseEntity<ApiResponse<List<LiveProductResponse>>> getLinkedProducts(@PathVariable Long liveId) {
         List<LiveProductResponse> response = liveProductService.getLinkedProducts(liveId);

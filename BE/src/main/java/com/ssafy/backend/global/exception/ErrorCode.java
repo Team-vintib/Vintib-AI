@@ -57,7 +57,12 @@ public enum ErrorCode {
     PRODUCT_IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "P004", "존재하지 않는 상품 이미지입니다."),
     PRODUCT_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "P005", "상품 이미지는 최대 10장까지 등록할 수 있습니다."),
     INVALID_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "P006", "지원하지 않는 이미지 형식입니다."),
-    PRODUCT_IMAGE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "P007", "업로드가 확인되지 않았습니다. 먼저 파일을 업로드해주세요.");
+    PRODUCT_IMAGE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "P007", "업로드가 확인되지 않았습니다. 먼저 파일을 업로드해주세요."),
+
+    // [소셜(팔로우/찜)]
+    WISH_ALREADY_EXISTS(HttpStatus.CONFLICT, "S001", "이미 찜한 상품입니다."),
+    WISH_NOT_FOUND(HttpStatus.NOT_FOUND, "S002", "찜하지 않은 상품입니다."),
+    WISH_FORBIDDEN(HttpStatus.FORBIDDEN, "S003", "본인의 찜만 처리할 수 있습니다.");
 
     private final HttpStatus status;
     private final String code;

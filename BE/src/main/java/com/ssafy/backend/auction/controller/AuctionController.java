@@ -6,6 +6,7 @@ import com.ssafy.backend.auction.service.AuctionService;
 import com.ssafy.backend.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "경매", description = "경매 조건 설정/진행 API")
+@Tag(name = "경매(Auctions)", description = "경매 조건 설정/진행 API")
 @RestController
 @RequestMapping("/api/lives/{liveId}/auctions")
 @RequiredArgsConstructor
@@ -31,6 +32,7 @@ public class AuctionController {
             description = "라이브에 연결된 상품에 시작가·증액 단위·진행 시간을 설정한다. 생성 직후 상태는 READY이며 "
                     + "경매가 시작되지는 않는다. 라이브에 연결되지 않은 상품에는 설정할 수 없고, "
                     + "이미 진행 예정/진행 중인 경매가 있는 상품에는 다시 설정할 수 없다.")
+    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "설정 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패 또는 종료·취소된 방송"),

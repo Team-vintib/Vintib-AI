@@ -7,6 +7,7 @@ import com.ssafy.backend.tryon.dto.response.TryOnResultResponse;
 import com.ssafy.backend.tryon.service.TryOnResultService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 // 저장/조회/삭제만 다룬다 (.claude/requests/ai/001-tryon-result-contract.md 참고).
 // 경로는 APIs.md의 `/users/{id}/tryons` 스펙을 그대로 따른다(userId/id 두 path variable을
 // 구분해야 해서 바깥쪽을 {userId}로 표기 — 같은 문서의 /users/{userId}/wishes/{id}와 동일한 표기 관례).
-@Tag(name = "AI 가상 시착", description = "시착 결과 조회/삭제 API")
+@Tag(name = "AI 가상 시착(TryOns)", description = "시착 결과 조회/삭제 API")
 @RestController
 @RequestMapping("/api/users/{userId}/tryons")
 @RequiredArgsConstructor
@@ -38,6 +39,7 @@ public class TryOnController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자의 시착 결과를 조회하려 함")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @GetMapping
     public ResponseEntity<ApiResponse<List<TryOnResultResponse>>> getResults(
             Authentication authentication, @PathVariable Long userId) {
@@ -52,6 +54,7 @@ public class TryOnController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인의 시착 결과가 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "시착 결과 없음")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<TryOnResultResponse>> getResult(
             Authentication authentication, @PathVariable Long userId, @PathVariable Long id) {
@@ -66,6 +69,7 @@ public class TryOnController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인의 시착 결과가 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "시착 결과 없음")
     })
+    @SecurityRequirement(name = "bearerAuth")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteResult(
             Authentication authentication, @PathVariable Long userId, @PathVariable Long id) {

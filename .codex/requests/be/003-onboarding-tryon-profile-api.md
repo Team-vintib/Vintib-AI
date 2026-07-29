@@ -102,3 +102,12 @@ Content-Type: multipart/form-data
 - `FE/src/domains/onboard/api/onboarding.ts`
 - `FE/src/domains/onboard/pages/OnboardingTryOnView.vue`
 - `FE/docs/frontend/api/api-index.md`
+
+## 진행 상황 (2026-07-29)
+
+**미구현.** `PUT /api/me/tryon` 엔드포인트, 관련 컨트롤러/서비스 모두 아직 없다.
+
+- `tryon` 패키지에는 현재 `TryOnResult`(AI 합성 결과 저장/조회/삭제, `/api/users/{userId}/tryons`)만 있고, 이 요청이 필요로 하는 "신체 프로필"(전신 사진, 키/몸무게/가슴/허리/엉덩이) 엔티티는 없다 — "BE 확인 필요 1~6" 전부 미해결.
+- 이미지 저장 자체는 S3 연동(SY008, presigned 업로드)이 구현돼 있어 재사용 가능한 인프라(`S3StorageService`)는 있다. 다만 이 요청은 multipart 직접 업로드 방식이라 presigned 흐름과는 다르게 설계해야 한다.
+
+착수 시 CLAUDE.md 규율상 신규 API라 `.claude/plans/be/`에 설계 계획부터 세우고 승인받아야 한다. 특히 "BE 확인 필요 4"(개인정보 동의/보관 정책)는 `FE/docs/frontend/decisions/open-questions.md`에도 미확정으로 남아 있어 사용자 확인이 먼저 필요하다.
