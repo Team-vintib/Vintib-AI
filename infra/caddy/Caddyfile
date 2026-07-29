@@ -18,9 +18,15 @@ i15a108.p.ssafy.io {
 		reverse_proxy ai:8000
 	}
 
-	handle /results/* {         
-		reverse_proxy ai:8000     
-	}                            
+	handle /results/* {
+		reverse_proxy ai:8000
+	}
+
+	# 라이브 댓글 관리(욕설·도배 판정, 반복질문 답변) — 동기 REST, /ai 큐를 안 거친다.
+	# 판정 자체는 rule-based라 가벼워 게이트웨이 컨테이너 안에서 바로 처리한다.
+	handle /chat/* {
+		reverse_proxy ai:8000
+	}
 
 	# 헬스체크·REST·(추후)WebSocket 전부 백엔드로
 	handle {
