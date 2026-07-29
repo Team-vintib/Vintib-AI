@@ -87,7 +87,15 @@ SPAM_DUPLICATE_COUNT = 2  # 윈도우 내 근접중복이 이 개수 이상이�
 ABUSE_THRESHOLD = 0.5  # 악성 판정 하한
 
 MIN_CLUSTER_SIZE = 2  # 같은 질문이 이 횟수 이상 들어와야 답변 생성
-RETRIEVE_TOP_K = 3  # 근거 문서 검색 개수
+RETRIEVE_TOP_K = 3  # 평가 파이프라인(MockRetriever) 전용 — 이미 순위 매겨진 결과 중 상위 k개.
+
+# chat_rag 워커에 넘길 후보 문서 개수 상한(app/chat/rag_store.fetch_documents의 limit).
+# RETRIEVE_TOP_K와 의미가 다르다 — 이건 "순위 매겨진 결과"가 아니라 "워커가 랭킹을 매길
+# 재료" 전체다. 너무 작게 잡으면(예: 3) 방송 초반에 한 번만 언급된 정보(사이즈 등)가 이후
+# STT 문서가 쌓이면서 "최근 N개" 밖으로 밀려나 영영 근거로 못 쓰인다(S15P11A108-444 실측으로
+# 발견). 방송 하나당 문서 수가 원래 많지 않다고 가정하고 설계했으니(워커 인메모리 랭킹의
+# 전제) 넉넉하게 잡는다 — 그래도 무제한은 아니게 상한은 둔다.
+CHAT_RAG_CANDIDATE_LIMIT = 200
 
 
 def embedder_config(key: str | None = None) -> EmbedderConfig:
