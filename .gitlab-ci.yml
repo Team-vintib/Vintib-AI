@@ -103,6 +103,16 @@ be-test:
   script:
     - ./gradlew build --no-daemon --build-cache -Dgradle.user.home=.gradle
 
+
+# 모든 MR에서 최소 1개의 job을 실행하여 빈 파이프라인 방지
+mr-check:
+  stage: test
+  image: alpine:3.20
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - echo "MR pipeline initialized successfully."
+
 # ---------- FE (Vue 3.5 / Vite / TypeScript) ----------
 fe-test:
   stage: test
