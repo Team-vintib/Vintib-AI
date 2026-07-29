@@ -7,6 +7,7 @@ import type { RouteLocationRaw } from 'vue-router'
 withDefaults(
   defineProps<{
     product: HomeProductCardItem
+    isWished?: boolean
     to?: RouteLocationRaw
     badgeLabel?: string
     badgeVariant?: 'direct' | 'auction'
@@ -15,6 +16,7 @@ withDefaults(
     actionLabel?: string
   }>(),
   {
+    isWished: false,
     to: undefined,
     badgeLabel: undefined,
     badgeVariant: undefined,
@@ -23,6 +25,10 @@ withDefaults(
     actionLabel: undefined,
   },
 )
+
+const emit = defineEmits<{
+  toggleWish: [productId: number]
+}>()
 
 const fallbackImageUrl =
   'https://images.unsplash.com/photo-1516762689617-e1cffcef479d?auto=format&fit=crop&w=900&q=80'
@@ -65,6 +71,20 @@ const formatPrice = (value?: number) => {
       >
         {{ badgeLabel }}
       </span>
+      <button
+        class="product-card__wish"
+        :class="{ 'product-card__wish--active': isWished }"
+        type="button"
+        :aria-label="isWished ? `${product.title} 찜 해제` : `${product.title} 찜하기`"
+        :aria-pressed="isWished"
+        @click="emit('toggleWish', product.id)"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path
+            d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z"
+          />
+        </svg>
+      </button>
     </span>
     <span class="product-card__body">
       <span class="product-card__brand">{{ product.brandName }}</span>
@@ -164,6 +184,45 @@ const formatPrice = (value?: number) => {
 
 .product-card__tag--direct {
   background: var(--color-direct-sale);
+}
+
+.product-card__wish {
+  position: absolute;
+  z-index: 3;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(225, 224, 218, 0.84);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--color-text-secondary);
+}
+
+.product-card__wish svg {
+  width: 20px;
+  height: 20px;
+  fill: transparent;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.product-card__wish:hover,
+.product-card__wish--active {
+  color: var(--color-auction);
+}
+
+.product-card__wish--active svg {
+  fill: currentColor;
+}
+
+.product-card__wish:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 2px;
 }
 
 .product-card__body {

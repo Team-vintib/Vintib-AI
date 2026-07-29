@@ -1,28 +1,68 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { getHomeViewData } from '@/domains/home/api/homeViewApi'
 import GuestHome from '@/domains/home/components/GuestHome.vue'
 import MemberHome from '@/domains/home/components/MemberHome.vue'
-import type { HomeViewData } from '@/domains/home/types/homeView.types'
+import type { HomeProductCardItem, HomeViewData } from '@/domains/home/types/homeView.types'
+import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const authStore = useAuthStore()
+const router = useRouter()
 
 authStore.hydrateSession()
 
 const homeData = ref<HomeViewData | null>(null)
+const wishedProductIds = ref(new Set<number>())
 const isLoading = ref(true)
 const errorMessage = ref('')
 const homeComponent = computed(() => (authStore.isAuthenticated ? MemberHome : GuestHome))
+
+const getInitialWishedProductIds = (data: HomeViewData) => {
+  const productGroups: HomeProductCardItem[][] = [
+    data.directSaleProducts,
+    data.upcomingAuctionProducts,
+    data.recommendedProducts,
+    ...data.categoryProductSections.map((section) => section.products),
+  ]
+
+  return new Set(
+    productGroups.flat().filter((product) => product.isWished).map((product) => product.id),
+  )
+}
+
+const handleToggleWish = (productId: number) => {
+  if (!authStore.isAuthenticated) {
+    void router.push({
+      name: ROUTE_NAMES.AUTH_LOGIN,
+      query: { redirect: ROUTE_PATHS.HOME },
+    })
+    return
+  }
+
+  const nextWishedProductIds = new Set(wishedProductIds.value)
+
+  if (nextWishedProductIds.has(productId)) {
+    nextWishedProductIds.delete(productId)
+  } else {
+    nextWishedProductIds.add(productId)
+  }
+
+  wishedProductIds.value = nextWishedProductIds
+}
 
 const loadHomeData = async () => {
   isLoading.value = true
   errorMessage.value = ''
 
   try {
-    homeData.value = await getHomeViewData({ isAuthenticated: authStore.isAuthenticated })
+    const nextHomeData = await getHomeViewData({ isAuthenticated: authStore.isAuthenticated })
+
+    homeData.value = nextHomeData
+    wishedProductIds.value = getInitialWishedProductIds(nextHomeData)
   } catch {
     errorMessage.value = '홈 데이터를 불러오지 못했습니다.'
   } finally {
@@ -46,7 +86,13 @@ onMounted(() => {
       <button class="home-state__action" type="button" @click="loadHomeData">다시 시도</button>
     </section>
 
-    <component v-else-if="homeData" :is="homeComponent" :home-data="homeData" />
+    <component
+      v-else-if="homeData"
+      :is="homeComponent"
+      :home-data="homeData"
+      :wished-product-ids="wishedProductIds"
+      @toggle-wish="handleToggleWish"
+    />
   </DefaultLayout>
 </template>
 

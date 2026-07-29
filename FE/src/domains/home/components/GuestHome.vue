@@ -14,6 +14,11 @@ import { ROUTE_PATHS } from '@/shared/constants/routes'
 
 const props = defineProps<{
   homeData: HomeViewData
+  wishedProductIds: Set<number>
+}>()
+
+const emit = defineEmits<{
+  toggleWish: [productId: number]
 }>()
 
 const guestContentCards = computed(() =>
@@ -98,11 +103,17 @@ const getProductPath = (productId: number) => `/products/${productId}`
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
+          :is-wished="wishedProductIds.has(product.id)"
+          @toggle-wish="emit('toggleWish', $event)"
         />
       </div>
     </HomeSection>
 
-    <CategoryProductTabs :sections="homeData.categoryProductSections" />
+    <CategoryProductTabs
+      :sections="homeData.categoryProductSections"
+      :wished-product-ids="wishedProductIds"
+      @toggle-wish="emit('toggleWish', $event)"
+    />
 
     <HomeSection
       title-id="auction-title"
@@ -123,6 +134,8 @@ const getProductPath = (productId: number) => `/products/${productId}`
           price-prefix="가격 "
           :action-to="ROUTE_PATHS.AUTH_LOGIN"
           action-label="경매 알림 받기"
+          :is-wished="wishedProductIds.has(product.id)"
+          @toggle-wish="emit('toggleWish', $event)"
         />
       </div>
     </HomeSection>

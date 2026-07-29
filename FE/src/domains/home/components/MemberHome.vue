@@ -14,6 +14,11 @@ import { ROUTE_PATHS } from '@/shared/constants/routes'
 
 const props = defineProps<{
   homeData: HomeViewData
+  wishedProductIds: Set<number>
+}>()
+
+const emit = defineEmits<{
+  toggleWish: [productId: number]
 }>()
 
 const memberContentCards = computed(() =>
@@ -179,11 +184,17 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
           :to="getProductPath(product.id)"
           :badge-label="product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'"
           :badge-variant="product.saleType === 'AUCTION' ? 'auction' : 'direct'"
+          :is-wished="wishedProductIds.has(product.id)"
+          @toggle-wish="emit('toggleWish', $event)"
         />
       </div>
     </HomeSection>
 
-    <CategoryProductTabs :sections="homeData.categoryProductSections" />
+    <CategoryProductTabs
+      :sections="homeData.categoryProductSections"
+      :wished-product-ids="wishedProductIds"
+      @toggle-wish="emit('toggleWish', $event)"
+    />
 
     <HomeSection
       title-id="auction-title"
@@ -202,6 +213,8 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
           badge-label="경매 예정"
           badge-variant="auction"
           price-prefix="가격 "
+          :is-wished="wishedProductIds.has(product.id)"
+          @toggle-wish="emit('toggleWish', $event)"
         />
       </div>
     </HomeSection>

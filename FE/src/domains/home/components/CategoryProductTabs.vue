@@ -8,6 +8,11 @@ import { ROUTE_PATHS } from '@/shared/constants/routes'
 
 const props = defineProps<{
   sections: HomeCategoryProductSection[]
+  wishedProductIds: Set<number>
+}>()
+
+const emit = defineEmits<{
+  toggleWish: [productId: number]
 }>()
 
 const activeSectionId = ref(props.sections[0]?.id ?? '')
@@ -70,6 +75,8 @@ const getProductPath = (productId: number) => `/products/${productId}`
           :to="getProductPath(product.id)"
           :badge-label="product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'"
           :badge-variant="product.saleType === 'AUCTION' ? 'auction' : 'direct'"
+          :is-wished="wishedProductIds.has(product.id)"
+          @toggle-wish="emit('toggleWish', $event)"
         />
       </div>
     </div>
