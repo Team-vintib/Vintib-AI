@@ -3,7 +3,9 @@ package com.ssafy.backend.wish.controller;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.ApiResponse;
+import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.wish.dto.request.WishCreateRequest;
+import com.ssafy.backend.wish.dto.response.WishItemResponse;
 import com.ssafy.backend.wish.dto.response.WishResponse;
 import com.ssafy.backend.wish.service.WishService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,10 +13,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -60,6 +65,23 @@ public class WishController {
         requireSelf(authentication, userId);
         wishService.unwish(userId, id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "찜 목록 조회",
+            description = "찜한 상품 목록을 찜한 시각 최신순으로 조회한다. 찜한 이후 상품이 판매완료(SOLD)·비공개(PRIVATE)로 "
+                    + "바뀌어도 목록에서 제외하지 않고 현재 상태를 그대로 보여준다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자의 찜 목록을 조회하려 함")
+    })
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<WishItemResponse>>> getWishList(
+            Authentication authentication, @PathVariable Long userId, @PageableDefault(size = 20) Pageable pageable) {
+        requireSelf(authentication, userId);
+        PageResponse<WishItemResponse> response = wishService.getWishList(userId, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     // path의 userId가 인증된 본인이 아니면 존재 자체를 드러내지 않고 403으로 막는다(IDOR 방지).

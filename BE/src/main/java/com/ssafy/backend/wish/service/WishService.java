@@ -2,15 +2,21 @@ package com.ssafy.backend.wish.service;
 
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.ProductRepository;
+import com.ssafy.backend.wish.dto.response.WishItemResponse;
 import com.ssafy.backend.wish.dto.response.WishResponse;
 import com.ssafy.backend.wish.entity.Wish;
 import com.ssafy.backend.wish.entity.WishId;
 import com.ssafy.backend.wish.repository.WishRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,5 +54,13 @@ public class WishService {
             throw new CustomException(ErrorCode.WISH_NOT_FOUND);
         }
         wishRepository.deleteById(wishId);
+    }
+
+    public PageResponse<WishItemResponse> getWishList(Long memberId, Pageable pageable) {
+        // 찜한 시각 최신순 고정 — 클라이언트가 다른 sort를 보내도 무시한다(ProductService.getProductList와 동일한 정책).
+        Pageable sortedByLatest = PageRequest.of(
+                pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Wish> wishes = wishRepository.findByMember_Id(memberId, sortedByLatest);
+        return PageResponse.from(wishes.map(WishItemResponse::of));
     }
 }

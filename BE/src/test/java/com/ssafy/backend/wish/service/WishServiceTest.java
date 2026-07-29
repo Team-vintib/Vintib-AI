@@ -3,26 +3,33 @@ package com.ssafy.backend.wish.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.repository.ProductRepository;
+import com.ssafy.backend.wish.dto.response.WishItemResponse;
 import com.ssafy.backend.wish.dto.response.WishResponse;
 import com.ssafy.backend.wish.entity.Wish;
 import com.ssafy.backend.wish.entity.WishId;
 import com.ssafy.backend.wish.repository.WishRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -120,5 +127,45 @@ class WishServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.WISH_NOT_FOUND);
+    }
+
+    @Test
+    void 찜_목록을_최신순으로_반환한다() {
+        when(wisher.getId()).thenReturn(MEMBER_ID);
+        Wish wish = Wish.builder().member(wisher).product(product).build();
+        Pageable pageable = PageRequest.of(0, 20);
+        when(wishRepository.findByMember_Id(eq(MEMBER_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(wish), pageable, 1));
+
+        PageResponse<WishItemResponse> response = wishService.getWishList(MEMBER_ID, pageable);
+
+        assertThat(response.content()).hasSize(1);
+        assertThat(response.content().get(0).product().id()).isEqualTo(PRODUCT_ID);
+    }
+
+    @Test
+    void 비공개_또는_판매완료_상품도_목록에서_제외되지_않고_상태가_표시된다() {
+        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.PRIVATE);
+        when(wisher.getId()).thenReturn(MEMBER_ID);
+        Wish wish = Wish.builder().member(wisher).product(product).build();
+        Pageable pageable = PageRequest.of(0, 20);
+        when(wishRepository.findByMember_Id(eq(MEMBER_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(wish), pageable, 1));
+
+        PageResponse<WishItemResponse> response = wishService.getWishList(MEMBER_ID, pageable);
+
+        assertThat(response.content()).hasSize(1);
+        assertThat(response.content().get(0).product().saleStatus()).isEqualTo(SaleStatus.PRIVATE);
+    }
+
+    @Test
+    void 찜한_상품이_없으면_빈_목록을_반환한다() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(wishRepository.findByMember_Id(eq(MEMBER_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        PageResponse<WishItemResponse> response = wishService.getWishList(MEMBER_ID, pageable);
+
+        assertThat(response.content()).isEmpty();
     }
 }
