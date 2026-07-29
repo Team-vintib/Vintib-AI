@@ -292,10 +292,13 @@ SOURCES = {
     "mock": lambda q, m: fetch_mock(q),
 }
 
+# 기본값은 각 provider의 **최저가 모델**이다. 상위 모델은 `--model` 로 명시할 때만 호출된다
+# (AI/CLAUDE.md 하드 룰). 모델을 바꿔 비교하려면 `--source gemini --model gemini-3.5-flash`.
 DEFAULT_MODELS = {
-    # GMS 확인된 호출 예시가 날짜 붙은 정식 ID였다. smoke_gms.py 결과로 갱신할 것.
     "anthropic": "claude-haiku-4-5-20251001",
-    "gemini": "gemini-3.5-flash",
+    # grounding 실측이 끝난 건 gemini-3.5-flash(9건)다. lite 가 grounding을 못 하면
+    # 결과가 "grounding 미발생(응답 폐기)"으로 떨어지므로 그때 3.5-flash 로 올린다.
+    "gemini": "gemini-2.5-flash-lite",
     "naver": "",
     "mock": "",
 }
