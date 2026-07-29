@@ -60,6 +60,10 @@ const isActivePath = (path: RoutePath) => {
     return route.path === ROUTE_PATHS.HOME
   }
 
+  if (path === ROUTE_PATHS.LIVE_LIST && route.path === ROUTE_PATHS.LIVE_CREATE) {
+    return false
+  }
+
   return route.path === path || route.path.startsWith(`${path}/`)
 }
 

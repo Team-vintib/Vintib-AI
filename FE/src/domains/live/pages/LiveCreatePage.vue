@@ -8,6 +8,7 @@ import {
   LIVE_CREATE_METHOD_OPTIONS,
   LIVE_CREATE_MOCK_PRODUCTS,
   LIVE_CREATE_SCHEDULE_STEP,
+  LIVE_CREATE_VALIDATION_MESSAGES,
 } from '@/domains/live/constants/liveCreateMockData'
 import type {
   LiveDeviceState,
@@ -17,6 +18,8 @@ import type {
 } from '@/domains/live/types/liveCreate.types'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
+
+type LiveCreateField = 'mode' | 'title' | 'description' | 'mainBrand' | 'products' | 'scheduledDate' | 'scheduledTime'
 
 const form = reactive<LiveCreateFormState>({
   mode: '',
@@ -37,6 +40,15 @@ const deviceState = reactive<LiveDeviceState>({
   camera: 'idle',
   microphone: 'idle',
 })
+const touched = reactive<Record<LiveCreateField, boolean>>({
+  mode: false,
+  title: false,
+  description: false,
+  mainBrand: false,
+  products: false,
+  scheduledDate: false,
+  scheduledTime: false,
+})
 
 const liveCreateSteps = computed<LiveCreateStep[]>(() => {
   const modeStep =
@@ -54,12 +66,14 @@ const selectedMethod = computed(() =>
   LIVE_CREATE_METHOD_OPTIONS.find((option) => option.id === form.mode),
 )
 const completeTitle = computed(() =>
-  form.mode === 'IMMEDIATE' ? '방송을 시작할 준비가 끝났습니다.' : '예약 라이브 정보가 준비되었습니다.',
+  form.mode === 'IMMEDIATE'
+    ? '라이브를 시작할 수 있습니다.'
+    : '예약 라이브 정보가 준비되었습니다.',
 )
 const completeDescription = computed(() =>
   form.mode === 'IMMEDIATE'
-    ? '실제 방송 생성 API가 연결되면 이 단계에서 라이브 진행 화면으로 이동합니다.'
-    : '실제 예약 API가 연결되면 입력한 일정으로 라이브가 등록됩니다.',
+    ? ''
+    : '입력한 일정과 상품 정보로 예약 라이브를 확인할 수 있습니다.',
 )
 const completeActionLabel = computed(() =>
   form.mode === 'IMMEDIATE' ? '라이브 시작' : '라이브 목록',
@@ -77,9 +91,41 @@ const isDeviceTesting = computed(
 const isDeviceReady = computed(
   () => deviceState.camera === 'success' && deviceState.microphone === 'success',
 )
+const isInfoStepValid = computed(
+  () => Boolean(form.title.trim()) && Boolean(form.description.trim()) && Boolean(form.mainBrand.trim()),
+)
+const isProductsStepValid = computed(() => form.selectedProductIds.length > 0)
+const scheduledDateTime = computed(() => {
+  if (!form.scheduledDate || !form.scheduledTime) {
+    return null
+  }
+
+  const date = new Date(`${form.scheduledDate}T${form.scheduledTime}`)
+
+  return Number.isNaN(date.getTime()) ? null : date
+})
+const isScheduleStepValid = computed(() => {
+  if (form.mode !== 'SCHEDULED') {
+    return true
+  }
+
+  return scheduledDateTime.value !== null && scheduledDateTime.value.getTime() > Date.now()
+})
 const canMoveNext = computed(() => {
   if (currentStep.value.id === 'method') {
     return Boolean(form.mode)
+  }
+
+  if (currentStep.value.id === 'info') {
+    return isInfoStepValid.value
+  }
+
+  if (currentStep.value.id === 'products') {
+    return isProductsStepValid.value
+  }
+
+  if (currentStep.value.id === 'schedule') {
+    return isScheduleStepValid.value
   }
 
   if (currentStep.value.id === 'device') {
@@ -114,20 +160,76 @@ const filteredProducts = computed(() => {
 const selectedProducts = computed(() =>
   LIVE_CREATE_MOCK_PRODUCTS.filter((product) => form.selectedProductIds.includes(product.id)),
 )
+const fieldErrors = computed<Record<LiveCreateField, string>>(() => ({
+  mode: touched.mode && !form.mode ? LIVE_CREATE_VALIDATION_MESSAGES.modeRequired : '',
+  title:
+    touched.title && !form.title.trim() ? LIVE_CREATE_VALIDATION_MESSAGES.titleRequired : '',
+  description:
+    touched.description && !form.description.trim()
+      ? LIVE_CREATE_VALIDATION_MESSAGES.descriptionRequired
+      : '',
+  mainBrand:
+    touched.mainBrand && !form.mainBrand.trim()
+      ? LIVE_CREATE_VALIDATION_MESSAGES.mainBrandRequired
+      : '',
+  products:
+    touched.products && form.selectedProductIds.length === 0
+      ? LIVE_CREATE_VALIDATION_MESSAGES.productRequired
+      : '',
+  scheduledDate:
+    touched.scheduledDate && !form.scheduledDate
+      ? LIVE_CREATE_VALIDATION_MESSAGES.scheduledDateRequired
+      : '',
+  scheduledTime:
+    touched.scheduledTime && !form.scheduledTime
+      ? LIVE_CREATE_VALIDATION_MESSAGES.scheduledTimeRequired
+      : touched.scheduledTime && scheduledDateTime.value !== null && scheduledDateTime.value.getTime() <= Date.now()
+        ? LIVE_CREATE_VALIDATION_MESSAGES.scheduledDateTimePast
+        : '',
+}))
 
 const selectMode = (mode: LiveCreateMode) => {
   form.mode = mode
+  touched.mode = true
 }
 
 const isProductSelected = (productId: number) => form.selectedProductIds.includes(productId)
 
 const toggleProductSelection = (productId: number) => {
+  touched.products = true
+
   if (isProductSelected(productId)) {
-    form.selectedProductIds = form.selectedProductIds.filter((selectedId) => selectedId !== productId)
+    form.selectedProductIds = form.selectedProductIds.filter(
+      (selectedId) => selectedId !== productId,
+    )
     return
   }
 
   form.selectedProductIds = [...form.selectedProductIds, productId]
+}
+
+const markCurrentStepTouched = () => {
+  if (currentStep.value.id === 'method') {
+    touched.mode = true
+    return
+  }
+
+  if (currentStep.value.id === 'info') {
+    touched.title = true
+    touched.description = true
+    touched.mainBrand = true
+    return
+  }
+
+  if (currentStep.value.id === 'products') {
+    touched.products = true
+    return
+  }
+
+  if (currentStep.value.id === 'schedule') {
+    touched.scheduledDate = true
+    touched.scheduledTime = true
+  }
 }
 
 const getDeviceStatusLabel = (status: LiveDeviceState[keyof LiveDeviceState]) => {
@@ -232,6 +334,8 @@ const moveToPreviousStep = () => {
 }
 
 const moveToNextStep = () => {
+  markCurrentStepTouched()
+
   if (isLastStep.value || !canMoveNext.value) {
     return
   }
@@ -281,24 +385,25 @@ onBeforeUnmount(() => {
           <h2 :id="`${currentStep.id}-title`">{{ currentStep.label }}</h2>
           <p>{{ currentStep.description }}</p>
 
-          <div
-            v-if="currentStep.id === 'method'"
-            class="live-create__method-grid"
-            aria-label="라이브 유형 선택"
-          >
-            <button
-              v-for="method in LIVE_CREATE_METHOD_OPTIONS"
-              :key="method.id"
-              class="live-create__method"
-              :class="{ 'live-create__method--selected': form.mode === method.id }"
-              type="button"
-              :aria-pressed="form.mode === method.id"
-              @click="selectMode(method.id)"
-            >
-              <strong>{{ method.title }}</strong>
-              <span>{{ method.description }}</span>
-            </button>
-          </div>
+          <template v-if="currentStep.id === 'method'">
+            <div class="live-create__method-grid" aria-label="라이브 유형 선택">
+              <button
+                v-for="method in LIVE_CREATE_METHOD_OPTIONS"
+                :key="method.id"
+                class="live-create__method"
+                :class="{ 'live-create__method--selected': form.mode === method.id }"
+                type="button"
+                :aria-pressed="form.mode === method.id"
+                @click="selectMode(method.id)"
+              >
+                <strong>{{ method.title }}</strong>
+                <span>{{ method.description }}</span>
+              </button>
+            </div>
+            <p v-if="fieldErrors.mode" class="live-create__field-error" role="alert">
+              {{ fieldErrors.mode }}
+            </p>
+          </template>
 
           <form
             v-else-if="currentStep.id === 'info'"
@@ -313,7 +418,18 @@ onBeforeUnmount(() => {
                 type="text"
                 maxlength="60"
                 placeholder="예: 빈티지 레더 특집 경매"
+                :aria-invalid="fieldErrors.title ? 'true' : 'false'"
+                aria-describedby="live-create-title-error"
+                @blur="touched.title = true"
               />
+              <span
+                v-if="fieldErrors.title"
+                id="live-create-title-error"
+                class="live-create__field-error"
+                role="alert"
+              >
+                {{ fieldErrors.title }}
+              </span>
             </label>
 
             <label class="live-create__field" for="live-create-description-input">
@@ -324,7 +440,18 @@ onBeforeUnmount(() => {
                 maxlength="120"
                 rows="3"
                 placeholder="시청자에게 보여질 소개 문구를 입력해 주세요"
+                :aria-invalid="fieldErrors.description ? 'true' : 'false'"
+                aria-describedby="live-create-description-error"
+                @blur="touched.description = true"
               />
+              <span
+                v-if="fieldErrors.description"
+                id="live-create-description-error"
+                class="live-create__field-error"
+                role="alert"
+              >
+                {{ fieldErrors.description }}
+              </span>
             </label>
 
             <label class="live-create__field" for="live-create-brand-input">
@@ -335,7 +462,18 @@ onBeforeUnmount(() => {
                 type="text"
                 maxlength="40"
                 placeholder="예: Burberry, Levi's"
+                :aria-invalid="fieldErrors.mainBrand ? 'true' : 'false'"
+                aria-describedby="live-create-brand-error"
+                @blur="touched.mainBrand = true"
               />
+              <span
+                v-if="fieldErrors.mainBrand"
+                id="live-create-brand-error"
+                class="live-create__field-error"
+                role="alert"
+              >
+                {{ fieldErrors.mainBrand }}
+              </span>
             </label>
           </form>
 
@@ -387,6 +525,10 @@ onBeforeUnmount(() => {
               <strong>검색 결과가 없습니다.</strong>
               <p>다른 상품명이나 브랜드로 다시 검색해 주세요.</p>
             </div>
+
+            <p v-if="fieldErrors.products" class="live-create__field-error" role="alert">
+              {{ fieldErrors.products }}
+            </p>
           </section>
 
           <section
@@ -397,15 +539,44 @@ onBeforeUnmount(() => {
             <div class="live-create__schedule-grid">
               <label class="live-create__field" for="live-create-scheduled-date">
                 <span>방송 날짜</span>
-                <input id="live-create-scheduled-date" v-model="form.scheduledDate" type="date" />
+                <input
+                  id="live-create-scheduled-date"
+                  v-model="form.scheduledDate"
+                  type="date"
+                  :aria-invalid="fieldErrors.scheduledDate ? 'true' : 'false'"
+                  aria-describedby="live-create-scheduled-date-error"
+                  @blur="touched.scheduledDate = true"
+                />
+                <span
+                  v-if="fieldErrors.scheduledDate"
+                  id="live-create-scheduled-date-error"
+                  class="live-create__field-error"
+                  role="alert"
+                >
+                  {{ fieldErrors.scheduledDate }}
+                </span>
               </label>
 
               <label class="live-create__field" for="live-create-scheduled-time">
                 <span>시작 시간</span>
-                <input id="live-create-scheduled-time" v-model="form.scheduledTime" type="time" />
+                <input
+                  id="live-create-scheduled-time"
+                  v-model="form.scheduledTime"
+                  type="time"
+                  :aria-invalid="fieldErrors.scheduledTime ? 'true' : 'false'"
+                  aria-describedby="live-create-scheduled-time-error"
+                  @blur="touched.scheduledTime = true"
+                />
+                <span
+                  v-if="fieldErrors.scheduledTime"
+                  id="live-create-scheduled-time-error"
+                  class="live-create__field-error"
+                  role="alert"
+                >
+                  {{ fieldErrors.scheduledTime }}
+                </span>
               </label>
             </div>
-
           </section>
 
           <section
@@ -453,9 +624,13 @@ onBeforeUnmount(() => {
 
             <p class="live-create__device-message" role="status">
               <span v-if="deviceState.camera === 'testing'">카메라 화면을 확인하고 있습니다.</span>
-              <span v-else-if="deviceState.microphone === 'testing'">마이크 입력을 확인하고 있습니다.</span>
+              <span v-else-if="deviceState.microphone === 'testing'"
+                >마이크 입력을 확인하고 있습니다.</span
+              >
               <span v-else-if="isDeviceReady">장비 확인이 완료되었습니다. 다음 단계로 이동할 수 있습니다.</span>
-              <span v-else-if="deviceState.camera === 'failed' || deviceState.microphone === 'failed'">
+              <span
+                v-else-if="deviceState.camera === 'failed' || deviceState.microphone === 'failed'"
+              >
                 장비 권한 또는 연결 상태를 확인한 뒤 다시 시도해 주세요.
               </span>
               <span v-else>방송 시작 전 카메라와 마이크 테스트를 진행해 주세요.</span>
@@ -488,7 +663,7 @@ onBeforeUnmount(() => {
           >
             <div class="live-create__complete-icon" aria-hidden="true">✓</div>
             <h3>{{ completeTitle }}</h3>
-            <p>{{ completeDescription }}</p>
+            <p v-if="completeDescription">{{ completeDescription }}</p>
 
             <dl class="live-create__complete-list">
               <div>
@@ -536,10 +711,7 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="live-create__complete-actions">
-              <RouterLink
-                class="live-create__complete-link"
-                :to="completeActionTo"
-              >
+              <RouterLink class="live-create__complete-link" :to="completeActionTo">
                 {{ completeActionLabel }}
               </RouterLink>
             </div>
@@ -851,6 +1023,17 @@ onBeforeUnmount(() => {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-soft);
   outline: none;
+}
+
+.live-create__field input[aria-invalid='true'],
+.live-create__field textarea[aria-invalid='true'] {
+  border-color: var(--color-error);
+}
+
+.live-create__field-error {
+  color: var(--color-error);
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .live-create__schedule-panel {
