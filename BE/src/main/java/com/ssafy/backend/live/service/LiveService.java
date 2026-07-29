@@ -4,6 +4,7 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.live.dto.request.LiveInstantRequest;
 import com.ssafy.backend.live.dto.request.LiveScheduleRequest;
+import com.ssafy.backend.live.dto.request.LiveStatusUpdateRequest;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.repository.LiveRepository;
@@ -47,6 +48,28 @@ public class LiveService {
         Live live = Live.openNow(host, request.title(), request.thumbnailUrl(), LocalDateTime.now());
 
         return LiveResponse.from(liveRepository.save(live));
+    }
+
+    /**
+     * 방송 상태 전이(예정→진행→종료). 호스트 본인만 바꿀 수 있다.
+     *
+     * <p>전이 시각은 서버 시각으로 박는다. 종료로 전이되면 리소스 정리 훅을 부른다.
+     */
+    @Transactional
+    public LiveResponse transitionStatus(Long hostId, Long liveId, LiveStatusUpdateRequest request) {
+        Live live = liveRepository.findById(liveId)
+                .orElseThrow(() -> new CustomException(ErrorCode.LIVE_NOT_FOUND));
+
+        if (!live.isHostedBy(hostId)) {
+            throw new CustomException(ErrorCode.NOT_LIVE_HOST);
+        }
+        if (!live.canTransitionTo(request.status())) {
+            throw new CustomException(ErrorCode.INVALID_LIVE_STATE);
+        }
+
+        live.transitionTo(request.status(), LocalDateTime.now());
+
+        return LiveResponse.from(live);
     }
 
     private Member findHost(Long hostId) {
