@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 _FETCH_TIMEOUT_SECONDS = 10.0
 _FETCH_MAX_BYTES = 20 * 1024 * 1024
@@ -26,7 +26,12 @@ class ImageFetchFailed(Exception):
 
 
 def load_image(url: str) -> Image.Image:
-    """실측 대상 이미지를 RGB로 읽는다. HTTP(S) URL과 로컬 경로를 모두 받는다."""
+    """실측 대상 이미지를 RGB로 읽는다. HTTP(S) URL과 로컬 경로를 모두 받는다.
+
+    `ImageOps.exif_transpose`로 EXIF 방향 태그를 반영한다 — 휴대폰(특히 iOS)이 찍은 사진은
+    센서 방향 그대로 저장하고 EXIF `Orientation` 태그로 "보여줄 때 이렇게 돌려라"만 적어두는
+    경우가 흔하다. 이걸 무시하면 랜드마크 좌표가 사람이 보는(화면에 표시되는) 방향과 어긋난다.
+    """
     try:
         if url.startswith(("http://", "https://")):
             request = urllib.request.Request(
@@ -38,8 +43,10 @@ def load_image(url: str) -> Image.Image:
                 payload = response.read(_FETCH_MAX_BYTES + 1)
             if len(payload) > _FETCH_MAX_BYTES:
                 raise ImageFetchFailed(f"이미지가 너무 큽니다(>{_FETCH_MAX_BYTES}B): {url}")
-            return Image.open(io.BytesIO(payload)).convert("RGB")
-        return Image.open(Path(url)).convert("RGB")
+            image = Image.open(io.BytesIO(payload))
+        else:
+            image = Image.open(Path(url))
+        return ImageOps.exif_transpose(image).convert("RGB")
     except ImageFetchFailed:
         raise
     except (urllib.error.URLError, OSError, ValueError) as exc:

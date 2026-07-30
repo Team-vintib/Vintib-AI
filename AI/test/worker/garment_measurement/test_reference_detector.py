@@ -96,3 +96,22 @@ def test_off_ratio_rectangle_is_rejected():
         assert result.found is False
     finally:
         Path(tmp.name).unlink(missing_ok=True)
+
+
+def test_tiny_a4_shaped_noise_is_ignored_in_favor_of_no_match():
+    """실사진(`valid_image2.jpg`)에서 원단 주름이 만든 손톱만 한 4각형이 우연히 A4 비율을
+    통과해 "면적 1등"으로 채택되는 사례를 봤다 — 진짜 기준 물체가 없으면(비율 맞는 후보가
+    손톱만 한 노이즈뿐이면) found=False여야지, 그 노이즈를 기준 물체로 삼으면 안 된다."""
+    frame = np.zeros((600, 800, 3), dtype=np.uint8)
+    # A4 비율(1:1.414)이지만 크기가 손톱만 한 사각형 — 전체 프레임의 0.1% 미만.
+    cv2.rectangle(frame, (400, 300), (410, 314), (255, 255, 255), thickness=-1)
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    tmp.close()
+    cv2.imwrite(tmp.name, frame)
+    try:
+        detector = OpenCVContourReferenceDetector()
+        result = detector.detect(tmp.name, product_id=1)
+        assert result.found is False
+    finally:
+        Path(tmp.name).unlink(missing_ok=True)

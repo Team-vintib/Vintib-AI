@@ -11,7 +11,10 @@
 **상의(SHORT_SLEEVE_TOP) / 원피스(LONG_SLEEVE_DRESS) 공통**:
 - SHOULDER_WIDTH = 거리(SHOULDER_LEFT, SHOULDER_RIGHT)
 - SLEEVE_LENGTH  = 거리(SHOULDER, SLEEVE_END) 좌우 평균
-- TOTAL_LENGTH   = 거리(NECKLINE_CENTER, HEM_CENTER)
+- TOTAL_LENGTH   = 거리(SHOULDER, HEM_CENTER) 좌우 평균 — 옷의 실제 최고점은 목선 중심(칼라가
+  파여 있어 더 낮다)이 아니라 어깨 끝점이다. 실사진 검증(`AI/validation/garment-landmark-check/
+  real-photo-test-result.md`)에서 NECKLINE_CENTER 기준으로 재던 첫 버전이 총장을 실제보다
+  짧게 잡는 걸 확인해 어깨 기준으로 바꿨다.
 - HEM_WIDTH      = 거리(HEM_LEFT, HEM_RIGHT)
 
 가슴단면(pit-to-pit)은 겨드랑이 랜드마크가 아직 `LandmarkType`에 없어서 범위 밖이다.
@@ -34,7 +37,6 @@ from .contracts import Landmark, LandmarkType, Measurement, MeasurementType
 # 좌/우 구분 없이 한 쌍으로 재는 항목(카테고리 무관하게 이 중 landmark가 갖춰진 것만 계산됨).
 _PAIRED_MEASUREMENTS: dict[MeasurementType, tuple[LandmarkType, LandmarkType]] = {
     MeasurementType.shoulder_width: (LandmarkType.shoulder_left, LandmarkType.shoulder_right),
-    MeasurementType.total_length: (LandmarkType.neckline_center, LandmarkType.hem_center),
     MeasurementType.hem_width: (LandmarkType.hem_left, LandmarkType.hem_right),
     MeasurementType.waist_width: (LandmarkType.waist_left, LandmarkType.waist_right),
 }
@@ -44,6 +46,10 @@ _AVERAGED_MEASUREMENTS: dict[MeasurementType, tuple[tuple[LandmarkType, Landmark
     MeasurementType.sleeve_length: (
         (LandmarkType.shoulder_left, LandmarkType.sleeve_end_left),
         (LandmarkType.shoulder_right, LandmarkType.sleeve_end_right),
+    ),
+    MeasurementType.total_length: (
+        (LandmarkType.shoulder_left, LandmarkType.hem_center),
+        (LandmarkType.shoulder_right, LandmarkType.hem_center),
     ),
     MeasurementType.inseam_length: (
         (LandmarkType.crotch, LandmarkType.hem_left_inner),

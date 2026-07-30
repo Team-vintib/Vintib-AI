@@ -30,6 +30,13 @@ _ASPECT_TOLERANCE = 0.15
 _CANNY_LOW = 20
 _CANNY_HIGH = 60
 
+# 후보 사각형의 최소 면적(전체 프레임 대비 비율). 실사진 테스트(`valid_image2.jpg` — 원단 특유의
+# 주름/태그가 만든 손톱만 한 4각형이 우연히 A4 비율을 통과해 "면적 1등"으로 채택된 사례)에서,
+# 넓이 기준 없이 "비율만 맞으면 가장 큰 후보"로 뽑는 로직이 노이즈를 기준 물체로 오인하는 걸
+# 확인했다 — 실제 기준 물체는 측정 사진에서 눈에 띄게 크게 찍혀야 정상이므로, 터무니없이 작은
+# 후보는 아예 후보에서 제외한다.
+_MIN_AREA_RATIO = 0.01
+
 
 @dataclass(frozen=True)
 class ReferenceDetection:
@@ -91,6 +98,9 @@ class OpenCVContourReferenceDetector(ReferenceDetector):
 
         contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
+        frame_height, frame_width = frame.shape[:2]
+        min_area = _MIN_AREA_RATIO * frame_width * frame_height
+
         best_sides: tuple[float, float] | None = None
         best_area = 0.0
         for contour in contours:
@@ -99,7 +109,7 @@ class OpenCVContourReferenceDetector(ReferenceDetector):
             if len(approx) != 4 or not cv2.isContourConvex(approx):
                 continue
 
-            (_, (w, h), _) = cv2.minAreaRect(approx)
+            _, (w, h), _ = cv2.minAreaRect(approx)
             if w <= 0 or h <= 0:
                 continue
 
@@ -110,6 +120,8 @@ class OpenCVContourReferenceDetector(ReferenceDetector):
                 continue
 
             area = w * h
+            if area < min_area:
+                continue
             if area > best_area:
                 best_sides = (short_side, long_side)
                 best_area = area

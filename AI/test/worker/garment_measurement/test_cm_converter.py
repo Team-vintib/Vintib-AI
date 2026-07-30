@@ -71,15 +71,43 @@ def test_sleeve_length_uses_one_side_when_only_one_is_available():
     assert sleeve.value_cm == 15.0
 
 
-def test_total_length_uses_neckline_to_hem_center():
+def test_total_length_uses_shoulder_to_hem_center_not_neckline():
+    """총장의 시작점은 목선 중심(NECKLINE_CENTER, 칼라가 파여 있어 옷의 최고점보다 낮다)이
+    아니라 어깨 끝점(SHOULDER_LEFT/RIGHT, 실제 최고점)이어야 한다 — 실사진 검증에서 목선
+    기준으로 재면 총장이 실제보다 짧게 나오는 걸 확인해 바꿨다."""
     landmarks = [
-        _landmark(LandmarkType.neckline_center, 100.0, 50.0),
-        _landmark(LandmarkType.hem_center, 100.0, 550.0),
+        _landmark(LandmarkType.neckline_center, 0.0, 80.0),  # 어깨보다 아래(칼라가 파임)
+        _landmark(LandmarkType.shoulder_left, 0.0, 0.0),
+        _landmark(LandmarkType.shoulder_right, 0.0, 0.0),
+        _landmark(LandmarkType.hem_center, 0.0, 550.0),
     ]
     measurements = convert(landmarks, pixel_to_cm_ratio=0.1)
 
     total = next(m for m in measurements if m.type is MeasurementType.total_length)
-    assert total.value_cm == 50.0  # 500px * 0.1
+    assert total.value_cm == 55.0  # 550px(어깨~밑단) * 0.1 — 목선 기준(47.0px*0.1=47.0)이 아니다
+
+
+def test_total_length_averages_both_shoulders_when_heights_differ():
+    landmarks = [
+        _landmark(LandmarkType.shoulder_left, 0.0, 0.0),
+        _landmark(LandmarkType.shoulder_right, 0.0, 40.0),  # 오른쪽 어깨가 더 낮게 검출됨
+        _landmark(LandmarkType.hem_center, 0.0, 500.0),
+    ]
+    measurements = convert(landmarks, pixel_to_cm_ratio=0.1)
+
+    total = next(m for m in measurements if m.type is MeasurementType.total_length)
+    assert total.value_cm == 48.0  # (500 + 460) / 2 * 0.1
+
+
+def test_total_length_uses_one_shoulder_when_only_one_is_available():
+    landmarks = [
+        _landmark(LandmarkType.shoulder_left, 0.0, 0.0),
+        _landmark(LandmarkType.hem_center, 0.0, 400.0),
+    ]
+    measurements = convert(landmarks, pixel_to_cm_ratio=0.1)
+
+    total = next(m for m in measurements if m.type is MeasurementType.total_length)
+    assert total.value_cm == 40.0
 
 
 # --- 바지(TROUSERS) 전용 측정 --------------------------------------------------
