@@ -54,11 +54,15 @@ class LiveServiceTest {
     @Mock
     private LiveCleanupHook cleanupHook;
 
+    @Mock
+    private LiveViewerService liveViewerService;
+
     private LiveService liveService;
 
     @BeforeEach
     void setUp() {
-        liveService = new LiveService(liveRepository, memberRepository, liveProductService, List.of());
+        liveService = new LiveService(
+                liveRepository, memberRepository, liveProductService, liveViewerService, List.of());
     }
 
     @Test
@@ -100,7 +104,8 @@ class LiveServiceTest {
     @Test
     void 진행_중인_방송을_종료하면_ENDED로_바뀌고_정리_훅이_불린다() {
         LiveService 훅이_달린_서비스 =
-                new LiveService(liveRepository, memberRepository, liveProductService, List.of(cleanupHook));
+                new LiveService(
+                        liveRepository, memberRepository, liveProductService, liveViewerService, List.of(cleanupHook));
         when(host.getId()).thenReturn(HOST_ID);
         Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
@@ -115,7 +120,8 @@ class LiveServiceTest {
     @Test
     void 예정_방송을_시작하면_LIVE로_바뀌고_정리_훅은_불리지_않는다() {
         LiveService 훅이_달린_서비스 =
-                new LiveService(liveRepository, memberRepository, liveProductService, List.of(cleanupHook));
+                new LiveService(
+                        liveRepository, memberRepository, liveProductService, liveViewerService, List.of(cleanupHook));
         when(host.getId()).thenReturn(HOST_ID);
         Live live = Live.schedule(host, TITLE, THUMBNAIL_URL, LocalDateTime.now().plusDays(1));
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
@@ -169,6 +175,7 @@ class LiveServiceTest {
         Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
         when(liveProductService.getLinkedProducts(LIVE_ID)).thenReturn(List.of());
+        when(liveViewerService.getViewerCount(LIVE_ID)).thenReturn(37);
 
         LiveDetailResponse response = liveService.getLiveDetail(LIVE_ID);
 
@@ -176,7 +183,9 @@ class LiveServiceTest {
         assertThat(response.title()).isEqualTo(TITLE);
         assertThat(response.hostId()).isEqualTo(HOST_ID);
         assertThat(response.products()).isEmpty();
+        // 최고치는 아직 갱신된 적이 없고, 현재 값은 실시간 집계에서 온다 — 두 필드는 별개다.
         assertThat(response.peakViewerCount()).isZero();
+        assertThat(response.currentViewerCount()).isEqualTo(37);
     }
 
     @Test

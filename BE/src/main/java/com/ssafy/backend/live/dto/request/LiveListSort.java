@@ -7,9 +7,6 @@ import org.springframework.data.domain.Sort;
  *
  * <p><b>모든 정렬의 마지막 기준은 {@code id DESC}다.</b> 동률일 때 순서가 흔들리면 페이지를
  * 넘길 때 같은 라이브가 두 번 보이거나 빠진다.
- *
- * <p>FE 요청서의 {@code VIEWERS_DESC}(시청자 수 순)는 아직 제공하지 않는다 — 현재 동시 시청자 수를
- * 집계하는 작업(-450)이 끝나야 값이 생긴다. 전부 0으로 내리면 정렬이 무의미하다.
  */
 public enum LiveListSort {
 
@@ -26,7 +23,21 @@ public enum LiveListSort {
             Sort.Order.desc("id"))),
 
     /** 제목 오름차순. */
-    TITLE_ASC(Sort.by(Sort.Order.asc("title"), Sort.Order.desc("id")));
+    TITLE_ASC(Sort.by(Sort.Order.asc("title"), Sort.Order.desc("id"))),
+
+    /**
+     * 시청자 수 많은 순(-450).
+     *
+     * <p><b>이 정렬만 SQL 로 처리되지 않는다.</b> 현재 시청자 수는 Redis 에만 있는 휘발성 값이라
+     * {@code ORDER BY} 로 걸 컬럼이 없다. 그래서 {@code LiveService} 가 후보를 한 번에 읽어
+     * 메모리에서 정렬하고 페이지를 잘라낸다 — 여기서 돌려주는 {@link Sort} 는 그 후보를 뽑을 때
+     * 쓰는 <b>안정적인 기준 순서</b>일 뿐, 최종 정렬 기준이 아니다.
+     *
+     * <p>같은 값을 {@code live} 테이블에도 저장하면 SQL 정렬이 가능해지지만, 시청자가 들고 날
+     * 때마다 DB write 가 발생한다. 목록에 나올 수 있는 방송(예정·진행 중)의 수가 훨씬 작으므로
+     * 메모리 정렬이 싸다.
+     */
+    VIEWERS_DESC(Sort.by(Sort.Order.desc("id")));
 
     private final Sort sort;
 
@@ -36,5 +47,10 @@ public enum LiveListSort {
 
     public Sort toSort() {
         return sort;
+    }
+
+    /** 정렬을 DB 가 아니라 메모리에서 해야 하는지. */
+    public boolean isInMemory() {
+        return this == VIEWERS_DESC;
     }
 }

@@ -42,8 +42,18 @@ public record LiveDetailResponse(
         @Schema(description = "방송 종료 시각. 진행 중이면 null", example = "2026-07-28T22:30:00")
         LocalDateTime endedAt,
 
-        @Schema(description = "최고 시청자 수", example = "152")
+        @Schema(
+                description = "최고 시청자 수. **누적 기록이며 방송이 끝나도 남는다.** "
+                        + "현재 값은 currentViewerCount를 봐야 한다",
+                example = "152")
         int peakViewerCount,
+
+        @Schema(
+                description = "현재 동시 시청자 수. **화면 진입 시 이 값으로 시작하고, 이후 변화는 "
+                        + "`/topic/lives/{liveId}/viewers` 구독으로 받는다.** 구독 직후 브로드캐스트가 "
+                        + "오는 것은 보장되지 않으므로 초기값을 토픽에서 기다리면 안 된다",
+                example = "128")
+        int currentViewerCount,
 
         @Schema(description = "편성된 상품 목록. 제외된 상품은 빠진다")
         List<LiveProductResponse> products,
@@ -55,7 +65,10 @@ public record LiveDetailResponse(
 ) {
 
     public static LiveDetailResponse of(
-            Live live, List<LiveProductResponse> products, List<LiveCategoryResponse> categories) {
+            Live live,
+            List<LiveProductResponse> products,
+            List<LiveCategoryResponse> categories,
+            int currentViewerCount) {
         return new LiveDetailResponse(
                 live.getId(),
                 live.getHost().getId(),
@@ -67,6 +80,7 @@ public record LiveDetailResponse(
                 live.getStartedAt(),
                 live.getEndedAt(),
                 live.getPeakViewerCount(),
+                currentViewerCount,
                 products,
                 categories);
     }
