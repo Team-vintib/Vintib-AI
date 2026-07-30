@@ -1,6 +1,6 @@
 # 현재 프로젝트 구조
 
-확인일: 2026-07-29
+확인일: 2026-07-30
 
 ## 기술 스택
 
@@ -175,20 +175,30 @@ src/
     live/
       api/
         liveListApi.ts
+        liveWatchApi.ts
       components/
         LiveListCard.vue
         LiveListFilter.vue
         LiveListState.vue
+        LiveProductQueue.vue
+        LiveSelectedProduct.vue
+        LiveVideoStage.vue
+        LiveWatchHeader.vue
+        LiveWatchSidePanel.vue
+        LiveWatchState.vue
       constants/
         liveCreateMockData.ts
         liveListFilterOptions.ts
         liveListMockData.ts
+        liveWatchMockData.ts
       pages/
         LiveCreatePage.vue
         LiveListView.vue
+        LiveWatchPage.vue
       types/
         liveCreate.types.ts
         liveList.types.ts
+        liveWatch.types.ts
     chat/
       api/
       components/
@@ -333,8 +343,7 @@ docs/
 
 - 라우터는 `router/routes.ts`로 route 배열을 분리했으며 AUTH-001~AUTH-004 후보,
   ONBOARD-001~ONBOARD-004, BIZ-001·BIZ-001-2, HOME, FOLLOWING_HOME placeholder,
-  LIVE_LIST 실제 화면, LIVE_CREATE 실제 화면, LIVE_WATCH placeholder, 공개 PROD-008
-  route가 등록되어 있습니다.
+  LIVE_LIST·LIVE_CREATE·LIVE_WATCH 실제 화면, 공개 PROD-008 route가 등록되어 있습니다.
 - `router/index.ts`에는 `requiresAuth`, `guestOnly` 메타 기반 인증 guard가 구현되어 있습니다.
 - `App.vue`는 `RouterView`만 렌더링합니다.
 - 기능 ID prefix 기준 도메인 폴더와 공통 폴더가 생성되어 있습니다.
@@ -362,13 +371,20 @@ docs/
   최신 방송·시청자·제목 정렬과 초기화가 구현되어 있습니다. 공개 목록에서는 종료 방송과
   상품 판매 방식 조건을 제외합니다. 목록 DTO·adapter와 API 호출 함수, loading skeleton,
   전체 빈 목록·필터 결과 없음·오류·재시도 상태를 제공합니다.
-  BE에 `GET /api/lives` 목록 계약이 없어 기본값은 mock adapter이며
-  `VITE_LIVE_LIST_API_ENABLED=true` 설정 후 실제 API adapter로 전환합니다.
+  `origin/develop-BE@dd6a0b6`에 `GET /api/lives`가 구현됐지만 최종 `009` 계약의
+  복수 `categories[]`, 공통 `PageResponse.content`, nullable `viewerCount`와
+  `VIEWERS_DESC` 미지원 정책을 기존 418 adapter에 반영하기 전까지 기본값은 mock입니다.
 - `domains/live`에는 LIVE-001/002 라이브 개설 화면이 구현되어 있습니다. `/lives/new`에서
   라이브 유형, 방송 정보, 판매 상품, 예약 일정, 장비 확인, 완료 단계를 순차 진행하며
   필수값과 과거 일정을 검증합니다. 상품 검색/선택은 mock 데이터로 처리하고, 즉시 시작의
   장비 확인은 `navigator.mediaDevices.getUserMedia` 기반 카메라 미리보기와 마이크 권한
   확인을 순차 실행합니다. 실제 생성/예약 API와 방송 SDK 연동은 후속 작업 대기 중입니다.
+- `domains/live`에는 S15P11A108-419 LIVE-005 시청 화면 전체 구조가 구현되어 있습니다.
+  `/lives/:liveId`에서 방송 헤더, 상품 큐, mock 영상 stage, 선택 상품 정보와 후속 경매 패널
+  영역을 dark live layout으로 제공합니다. loading·오류·방송 없음·상품 없음·예정·종료
+  상태를 mock query로 확인할 수 있고 `GET /api/lives/{liveId}` DTO adapter를 분리했습니다.
+  현재 동시 시청자, 현재 상품과 상세 상품 정보는 Swagger 계약에 없으므로 기본값은 mock이며
+  실제 스트리밍·채팅·경매·AI 시착 연동은 후속 작업 대기 중입니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.
