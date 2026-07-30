@@ -88,6 +88,7 @@ export interface ProductRegistrationDraft {
   name: string
   brand: string
   color: string
+  customColor: string
   categoryId: string
   description: string
   purchasedAt: string

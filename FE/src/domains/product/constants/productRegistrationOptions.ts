@@ -48,6 +48,7 @@ export const PRODUCT_REGISTRATION_CATEGORY_OPTIONS: ProductRegistrationOption[] 
   { id: 'dress', label: '원피스' },
   { id: 'shoes', label: '신발' },
   { id: 'accessory', label: '액세서리' },
+  { id: 'etc', label: '기타' },
 ]
 
 export const PRODUCT_REGISTRATION_CONDITION_OPTIONS: ProductRegistrationOption[] = [
@@ -68,6 +69,7 @@ export const PRODUCT_REGISTRATION_COLOR_OPTIONS: ProductRegistrationOption[] = [
   { id: 'white', label: '화이트' },
   { id: 'camel', label: '카멜' },
   { id: 'gray', label: '그레이' },
+  { id: 'etc', label: '기타' },
 ]
 
 export const PRODUCT_REGISTRATION_SIZE_OPTIONS: ProductRegistrationOption[] = [
@@ -88,6 +90,7 @@ export const PRODUCT_REGISTRATION_VALIDATION_MESSAGES = {
   nameRequired: '상품명을 입력해 주세요.',
   brandRequired: '브랜드를 입력해 주세요.',
   colorRequired: '색상을 입력해 주세요.',
+  customColorRequired: '기타 색상을 입력해 주세요.',
   categoryRequired: '카테고리를 선택해 주세요.',
   sizeRequired: '사이즈를 입력해 주세요.',
   measurementRequired: '실측 정보를 입력해 주세요.',

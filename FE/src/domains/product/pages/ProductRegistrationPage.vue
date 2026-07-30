@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 
 import ProductPhotoUploader from '@/domains/product/components/ProductPhotoUploader.vue'
 import {
+  PRODUCT_REGISTRATION_CATEGORY_OPTIONS,
+  PRODUCT_REGISTRATION_COLOR_OPTIONS,
   PRODUCT_REGISTRATION_STEPS,
   PRODUCT_REGISTRATION_VALIDATION_MESSAGES,
 } from '@/domains/product/constants/productRegistrationOptions'
@@ -22,6 +24,12 @@ const currentStepIndex = ref(0)
 const draftSaveMessage = ref('')
 const photoStepTouched = ref(false)
 const photoUploadError = ref('')
+const basicStepTouched = reactive({
+  name: false,
+  brand: false,
+  color: false,
+  categoryId: false,
+})
 
 const draft = reactive<ProductRegistrationDraft>({
   photos: [],
@@ -29,6 +37,7 @@ const draft = reactive<ProductRegistrationDraft>({
   name: '',
   brand: '',
   color: '',
+  customColor: '',
   categoryId: '',
   description: '',
   purchasedAt: '',
@@ -79,16 +88,62 @@ const photoStepErrors = computed(() => ({
     ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.representativePhotoRequired
     : '',
 }))
+const basicStepErrors = computed(() => ({
+  name:
+    basicStepTouched.name && !draft.name.trim()
+      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.nameRequired
+      : '',
+  brand:
+    basicStepTouched.brand && !draft.brand.trim()
+      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.brandRequired
+      : '',
+  color:
+    basicStepTouched.color && !draft.color
+      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.colorRequired
+      : basicStepTouched.color && draft.color === 'etc' && !draft.customColor.trim()
+        ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.customColorRequired
+        : '',
+  categoryId:
+    basicStepTouched.categoryId && !draft.categoryId
+      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.categoryRequired
+      : '',
+}))
 const isPhotoStepValid = computed(
   () =>
     frontPhotos.value.length > 0 &&
     backPhotos.value.length > 0 &&
     Boolean(draft.representativePhotoId),
 )
+const isBasicStepValid = computed(
+  () =>
+    Boolean(draft.name.trim()) &&
+    Boolean(draft.brand.trim()) &&
+    Boolean(draft.color) &&
+    (draft.color !== 'etc' || Boolean(draft.customColor.trim())) &&
+    Boolean(draft.categoryId),
+)
+const selectedColorLabel = computed(
+  () =>
+    draft.color === 'etc'
+      ? draft.customColor.trim() || '기타'
+      :
+    PRODUCT_REGISTRATION_COLOR_OPTIONS.find((option) => option.id === draft.color)?.label ||
+    draft.color ||
+    '미선택',
+)
+const selectedCategoryLabel = computed(
+  () =>
+    PRODUCT_REGISTRATION_CATEGORY_OPTIONS.find((option) => option.id === draft.categoryId)?.label ||
+    '미선택',
+)
 
 const canMoveCurrentStepNext = computed(() => {
   if (currentStep.value.id === 'photos') {
     return isPhotoStepValid.value
+  }
+
+  if (currentStep.value.id === 'basic') {
+    return isBasicStepValid.value
   }
 
   return true
@@ -191,6 +246,14 @@ const selectRepresentativePhoto = (photoId: string) => {
 const markCurrentStepTouched = () => {
   if (currentStep.value.id === 'photos') {
     photoStepTouched.value = true
+    return
+  }
+
+  if (currentStep.value.id === 'basic') {
+    basicStepTouched.name = true
+    basicStepTouched.brand = true
+    basicStepTouched.color = true
+    basicStepTouched.categoryId = true
   }
 }
 
@@ -327,6 +390,167 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
+          <form
+            v-else-if="currentStep.id === 'basic'"
+            class="product-registration__form"
+            aria-label="상품 기본 정보 입력"
+          >
+            <label class="product-registration__field" for="product-registration-name">
+              <span>상품명</span>
+              <input
+                id="product-registration-name"
+                v-model="draft.name"
+                type="text"
+                maxlength="60"
+                placeholder="예: 90s 오버핏 데님 재킷"
+                :aria-invalid="basicStepErrors.name ? 'true' : 'false'"
+                aria-describedby="product-registration-name-error"
+                @blur="basicStepTouched.name = true"
+              />
+              <span
+                v-if="basicStepErrors.name"
+                id="product-registration-name-error"
+                class="product-registration__field-error"
+                role="alert"
+              >
+                {{ basicStepErrors.name }}
+              </span>
+            </label>
+
+            <label class="product-registration__field" for="product-registration-brand">
+              <span>브랜드</span>
+              <input
+                id="product-registration-brand"
+                v-model="draft.brand"
+                type="text"
+                maxlength="40"
+                placeholder="예: Levi's, Burberry"
+                :aria-invalid="basicStepErrors.brand ? 'true' : 'false'"
+                aria-describedby="product-registration-brand-error"
+                @blur="basicStepTouched.brand = true"
+              />
+              <span
+                v-if="basicStepErrors.brand"
+                id="product-registration-brand-error"
+                class="product-registration__field-error"
+                role="alert"
+              >
+                {{ basicStepErrors.brand }}
+              </span>
+            </label>
+
+            <div class="product-registration__form-grid">
+              <label class="product-registration__field" for="product-registration-color">
+                <span>색상</span>
+                <select
+                  id="product-registration-color"
+                  v-model="draft.color"
+                  :aria-invalid="basicStepErrors.color ? 'true' : 'false'"
+                  aria-describedby="product-registration-color-error"
+                  @blur="basicStepTouched.color = true"
+                >
+                  <option value="">색상 선택</option>
+                  <option
+                    v-for="option in PRODUCT_REGISTRATION_COLOR_OPTIONS"
+                    :key="option.id"
+                    :value="option.id"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+                <span
+                  v-if="basicStepErrors.color"
+                  id="product-registration-color-error"
+                  class="product-registration__field-error"
+                  role="alert"
+                >
+                  {{ basicStepErrors.color }}
+                </span>
+              </label>
+
+              <label class="product-registration__field" for="product-registration-category">
+                <span>카테고리</span>
+                <select
+                  id="product-registration-category"
+                  v-model="draft.categoryId"
+                  :aria-invalid="basicStepErrors.categoryId ? 'true' : 'false'"
+                  aria-describedby="product-registration-category-error"
+                  @blur="basicStepTouched.categoryId = true"
+                >
+                  <option value="">카테고리 선택</option>
+                  <option
+                    v-for="option in PRODUCT_REGISTRATION_CATEGORY_OPTIONS"
+                    :key="option.id"
+                    :value="option.id"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+                <span
+                  v-if="basicStepErrors.categoryId"
+                  id="product-registration-category-error"
+                  class="product-registration__field-error"
+                  role="alert"
+                >
+                  {{ basicStepErrors.categoryId }}
+                </span>
+              </label>
+            </div>
+
+            <label
+              v-if="draft.color === 'etc'"
+              class="product-registration__field"
+              for="product-registration-custom-color"
+            >
+              <span>기타 색상</span>
+              <input
+                id="product-registration-custom-color"
+                v-model="draft.customColor"
+                type="text"
+                maxlength="30"
+                placeholder="색상을 직접 입력해 주세요"
+                :aria-invalid="basicStepErrors.color ? 'true' : 'false'"
+                aria-describedby="product-registration-color-error"
+                @blur="basicStepTouched.color = true"
+              />
+            </label>
+
+            <label class="product-registration__field" for="product-registration-description">
+              <span>상품 설명</span>
+              <textarea
+                id="product-registration-description"
+                v-model="draft.description"
+                maxlength="500"
+                rows="4"
+                placeholder="상품의 특징, 착용감, 구매자에게 알리고 싶은 내용을 입력해 주세요."
+              />
+            </label>
+
+            <div class="product-registration__form-grid">
+              <label class="product-registration__field" for="product-registration-purchased-at">
+                <span>구매 시기</span>
+                <input
+                  id="product-registration-purchased-at"
+                  v-model="draft.purchasedAt"
+                  type="text"
+                  maxlength="40"
+                  placeholder="예: 1990년대, 2005년"
+                />
+              </label>
+
+              <label class="product-registration__field" for="product-registration-purchased-country">
+                <span>구매 국가</span>
+                <input
+                  id="product-registration-purchased-country"
+                  v-model="draft.purchasedCountry"
+                  type="text"
+                  maxlength="40"
+                  placeholder="예: 미국, 일본, 영국"
+                />
+              </label>
+            </div>
+          </form>
+
           <div
             v-else-if="!isCompleteStep"
             class="product-registration__placeholder"
@@ -413,6 +637,14 @@ onBeforeUnmount(() => {
             <div>
               <dt>브랜드</dt>
               <dd>{{ draft.brand || '미입력' }}</dd>
+            </div>
+            <div>
+              <dt>색상</dt>
+              <dd>{{ selectedColorLabel }}</dd>
+            </div>
+            <div>
+              <dt>카테고리</dt>
+              <dd>{{ selectedCategoryLabel }}</dd>
             </div>
             <div>
               <dt>판매 방식</dt>
@@ -589,6 +821,75 @@ onBeforeUnmount(() => {
   line-height: 20px;
 }
 
+.product-registration__form {
+  display: grid;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.product-registration__form-grid {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.product-registration__field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.product-registration__field span:first-child {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  line-height: 20px;
+}
+
+.product-registration__field input,
+.product-registration__field select,
+.product-registration__field textarea {
+  width: 100%;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.product-registration__field input,
+.product-registration__field select {
+  height: var(--button-height-standard);
+  padding: 0 var(--space-4);
+}
+
+.product-registration__field textarea {
+  min-height: 112px;
+  padding: var(--space-3) var(--space-4);
+  resize: vertical;
+}
+
+.product-registration__field input::placeholder,
+.product-registration__field textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.product-registration__field input:focus,
+.product-registration__field select:focus,
+.product-registration__field textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  outline: none;
+}
+
+.product-registration__field input[aria-invalid='true'],
+.product-registration__field select[aria-invalid='true'],
+.product-registration__field textarea[aria-invalid='true'] {
+  border-color: var(--color-error);
+}
+
 .product-registration__complete {
   display: grid;
   justify-items: center;
@@ -710,6 +1011,10 @@ onBeforeUnmount(() => {
 
   .product-registration__actions {
     flex-wrap: wrap;
+  }
+
+  .product-registration__form-grid {
+    grid-template-columns: 1fr;
   }
 }
 
