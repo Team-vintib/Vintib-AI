@@ -4,9 +4,9 @@
 넓혔다. 사진이 하나씩 늘어날 때마다 진짜 버그 3개를 찾아 고쳤고, 고칠 수 없는(고치면
 오히려 더 위험해지는) 근본 한계 하나도 확인했다 — 아래 순서대로 정리한다.
 
-재현 스크립트: [run_real_photo_test.py](run_real_photo_test.py)(사진 1),
-[run_real_photo_test2.py](run_real_photo_test2.py)(사진 2),
-[run_real_photo_test3.py](run_real_photo_test3.py)(사진 3) — 전부 프로덕션 클래스
+재현 스크립트: [verify_real_photo.py](verify_real_photo.py)(사진 1),
+[verify_real_photo2.py](verify_real_photo2.py)(사진 2),
+[verify_real_photo3.py](verify_real_photo3.py)(사진 3) — 전부 프로덕션 클래스
 (`OpenCVContourReferenceDetector`, `GrabCutGarmentSegmenter`, `HRNetLandmarkDetector`)를
 그대로 가져와 돌린다.
 
