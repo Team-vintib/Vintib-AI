@@ -1,0 +1,63 @@
+"""학습 — LoRA 부착 / SFT / DPO."""
+
+from .dpo import (
+    Candidate,
+    DeterministicScorer,
+    DpoTrainer,
+    DummyCandidateGenerator,
+    build_preference_pairs,
+    collect_candidates,
+    dpo_logits,
+    flow_dpo_loss,
+)
+from .lora import (
+    LoraAttachError,
+    LoraTargetReport,
+    assert_lora_targets_safe,
+    attach_lora,
+    check_lora_targets,
+    load_lora_state_dict,
+    lora_state_dict,
+    mark_only_lora_trainable,
+    resolve_backbone,
+)
+from .sft import (
+    MicroStep,
+    Sam3dFlowLoss,
+    SftTrainer,
+    TrainState,
+    checkpoint_path,
+    iter_micro_steps,
+    latest_checkpoint,
+    prepare_lora_model,
+    should_save,
+)
+
+__all__ = [
+    "Candidate",
+    "DeterministicScorer",
+    "DpoTrainer",
+    "DummyCandidateGenerator",
+    "LoraAttachError",
+    "LoraTargetReport",
+    "MicroStep",
+    "Sam3dFlowLoss",
+    "SftTrainer",
+    "TrainState",
+    "assert_lora_targets_safe",
+    "attach_lora",
+    "build_preference_pairs",
+    "check_lora_targets",
+    "checkpoint_path",
+    "collect_candidates",
+    "dpo_logits",
+    "flow_dpo_loss",
+    "iter_micro_steps",
+    "latest_checkpoint",
+    "load_lora_state_dict",
+    "lora_state_dict",
+    "mark_only_lora_trainable",
+    "prepare_lora_model",
+    "resolve_backbone",
+    "should_save",
+]
