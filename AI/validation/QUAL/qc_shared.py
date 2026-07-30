@@ -1,7 +1,8 @@
-"""품질검수 스파이크 두 개(SAM3 / CLIPSeg)가 공유하는 프롬프트·임계치·필터 로직.
+"""품질검수 스파이크 세 개(SAM3 / CLIPSeg / 하이브리드)가 공유하는 프롬프트·임계치·필터 로직.
 
-`sam3-condition-check/sam3_qc_test.ipynb` 와 `clipseg-condition-check/clipseg_qc_test.ipynb`
-가 **같은 이미지 · 같은 프롬프트 · 같은 후처리**로 돌아야 두 모델 비교가 성립한다.
+`sam3-condition-check/sam3_qc_test.ipynb`, `clipseg-condition-check/clipseg_qc_test.ipynb`,
+`clipseg-sam3tracker-hybrid-check/hybrid_qc_test.ipynb` 가 **같은 이미지 · 같은 프롬프트 ·
+같은 후처리**로 돌아야 아키텍처 비교가 성립한다.
 각 노트북에 상수를 복사해 두면 한쪽만 고쳐져 조용히 어긋나므로 여기 한 곳에만 둔다.
 
 노트북에서 쓰는 법(노트북 CWD 가 자기 폴더라 상위를 경로에 넣는다):
@@ -21,51 +22,51 @@ _HERE = Path(__file__).resolve().parent
 
 # 두 노트북이 같은 이미지를 봐야 하므로 sam3 쪽 폴더를 공용으로 쓴다(gitignore 되어 있다).
 SHARED_IMAGE_DIR = _HERE / "sam3-condition-check" / "sample_images"
-SAM3_OUTPUT_DIR = _HERE / "sam3-condition-check" / "outputs"
+# sam3_qc_test.ipynb(SAM3 단독)의 결과 위치. outputs/ 아래 노트북 이름으로 하위 폴더를 두는
+# 이유는 같은 폴더(sam3-condition-check/)에 bbox_crop/masking 변형 노트북도 있어 파일명이
+# 겹치면 서로 결과를 덮어쓰기 때문 — 노트북마다 outputs/<노트북 이름>/ 하나씩 쓴다.
+SAM3_OUTPUT_DIR = _HERE / "sam3-condition-check" / "outputs" / "sam3_qc_test"
 IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
 
 
 # --------------------------------------------------------------------------
 # 하자 프롬프트 세트
 # --------------------------------------------------------------------------
-# 맨 명사("a scratch")는 **바닥·소품의 긁힘까지** 잡는다 — 실측에서 한 장에 29건이
-# 검출됐고 상당수가 배경이었다. 프로덕션 CLIPSeg 프롬프트가
-# "a stain on {color} {garment} fabric" 처럼 원단을 명시하는 이유가 이것이다.
+# [2026-07-30 정정] 카테고리를 verify_clipseg.py(LAB-12 원본 스파이크)·프로덕션
+# (`worker/models/clipseg/`)의 하자 유형과 동일하게 맞춘다 — STAIN / DIRT_MARK / HOLE_TEAR
+# 세 가지뿐이다. 이전엔 SCRATCH를 추가하고 TEAR/HOLE을 분리했었는데, 그 taxonomy는
+# LAB-12가 실측하지도, 프로덕션이 채택하지도 않은 것이었다(구멍과 찢어짐을 한 유형으로
+# 다루는 이유는 005 설계 문서 §5.3 참고 — 둘 다 "찢어짐·훼손은 잘 판단 못함"으로 같이 취급됨).
+# SCRATCH는 검증된 적 없는 프롬프트였고 실측에서 배경(바닥·소품) 오탐이 컸다.
 #
 # 다만 SAM3 는 논문상 **짧은 명사구**(예: "yellow school bus")로 학습돼 있어 문장을 길게
 # 늘이면 오히려 나빠질 수 있다. 어느 표현이 실제로 나은지는 실측 대상이므로 세트로 만들어
 # 두고 ACTIVE_PROMPT_SET 만 바꿔 비교한다.
 # DIRT_MARK("a dirty mark")는 세 세트 모두 **똑같은 문구**를 쓴다 — LAB-12 가 검증한 게 이
-# 표현 하나뿐이라 "on fabric"/"on clothing" 을 붙인 변형은 검증된 적이 없다. CLIPSeg 노트북을
-# SAM3 와 같은 프롬프트로 맞추면서(공정 비교 목적) 이 개념이 빠졌었는데, LAB-12·프로덕션
-# (`worker/models/clipseg/prompts.py`)이 검증한 오염 계열 핵심 프롬프트라 다시 넣는다.
+# 표현 하나뿐이라 "on fabric"/"on clothing" 을 붙인 변형은 검증된 적이 없다.
+# HOLE_TEAR("a hole or tear in fabric")도 fabric 세트 기준으로는 verify_clipseg.py 와
+# **완전히 같은 문자열**이다 — bare/garment 세트만 그 골격을 유지한 변형이다.
 PROMPT_SETS: dict[str, dict[str, str]] = {
     # 대조군 — 기존 프롬프트. 배경 오탐이 가장 많다.
     "bare": {
         "STAIN": "a stain",
-        "SCRATCH": "a scratch",
-        "TEAR": "a tear",
-        "HOLE": "a hole",
+        "HOLE_TEAR": "a hole or tear",
         "DIRT_MARK": "a dirty mark",
     },
-    # 원단 한정. LAB-12 CLIPSeg 프롬프트와 같은 골격이다.
+    # 원단 한정. LAB-12/verify_clipseg.py 의 프롬프트와 같은 골격이다.
     "fabric": {
         "STAIN": "a stain on fabric",
-        "SCRATCH": "a scratch on fabric",
-        "TEAR": "a tear in fabric",
-        "HOLE": "a hole in fabric",
+        "HOLE_TEAR": "a hole or tear in fabric",
         "DIRT_MARK": "a dirty mark",
     },
     # 의류 명시. 명사구를 짧게 유지하려고 "clothing" 한 단어만 덧붙였다.
     "garment": {
         "STAIN": "a stain on clothing",
-        "SCRATCH": "a scratch on clothing",
-        "TEAR": "a tear in clothing",
-        "HOLE": "a hole in clothing",
+        "HOLE_TEAR": "a hole or tear in clothing",
         "DIRT_MARK": "a dirty mark",
     },
 }
-ACTIVE_PROMPT_SET = "fabric"  # <- 여기만 바꾸면 두 노트북이 함께 스왑된다
+ACTIVE_PROMPT_SET = "fabric"  # <- 여기만 바꾸면 세 노트북이 함께 스왑된다
 DEFECT_PROMPTS: dict[str, str] = PROMPT_SETS[ACTIVE_PROMPT_SET]
 
 
@@ -80,10 +81,11 @@ DEFECT_PROMPTS: dict[str, str] = PROMPT_SETS[ACTIVE_PROMPT_SET]
 #
 # 양성 후보를 **두 종류로 나눈다** — 억제 조건이 다르다.
 #
-# 1) 구조적 개구부(STRUCTURAL) — 암홀·넥라인·밑단·소매끝. "a hole in fabric" 프롬프트 자체가
-#    손상된 구멍과 의류가 원래 갖고 있는 개구부를 구분하지 못한다(둘 다 "구멍"이라는 단어로는
-#    같은 개념). 실측(검정 티셔츠 1장)에서 넥라인 1건 + 밑단 1건 + 소매끝 2건, 총 4건이 전부
-#    HOLE 오탐이었다 — 처음엔 암홀·넥라인만 등록했는데 밑단·소매끝은 못 걸러 범위를 넓혔다.
+# 1) 구조적 개구부(STRUCTURAL) — 암홀·넥라인·밑단·소매끝. "a hole or tear in fabric" 프롬프트
+#    자체가 손상된 구멍과 의류가 원래 갖고 있는 개구부를 구분하지 못한다(둘 다 "구멍"이라는
+#    단어로는 같은 개념). 실측(검정 티셔츠 1장)에서 넥라인 1건 + 밑단 1건 + 소매끝 2건, 총
+#    4건이 전부 HOLE_TEAR 오탐이었다 — 처음엔 암홀·넥라인만 등록했는데 밑단·소매끝은 못
+#    걸러 범위를 넓혔다.
 #    크롭 여부와 무관하게 원본 이미지에서도 재현되는 문제다(git aa9a977, 크롭 도입 전에도
 #    동일 프롬프트로 재현됨).
 #    **이 항목들은 겹치면 confidence 비교 없이 곧바로 억제한다** — 실제 손상이 정확히 같은
@@ -117,7 +119,7 @@ BENIGN_PROMPTS: dict[str, str] = {**STRUCTURAL_BENIGN_PROMPTS, **TEXTURE_BENIGN_
 # 의류 영역 게이트 — 배경(바닥·소품) 탐지를 구조적으로 걷어낸다.
 # 005 계획 §고도화 경로 3(의류 영역 마스크로 배경 제외)에 해당한다.
 GARMENT_PROMPT = "clothing"
-GARMENT_OVERLAP_MIN = 0.6  # 하자 마스크의 이 비율 이상이 의류 안에 있어야 채택
+GARMENT_OVERLAP_MIN = 0.7  # 하자 마스크의 이 비율 이상이 의류 안에 있어야 채택
 RESTRICT_TO_GARMENT = True
 
 # ⚠️ 크롭(crop-then-detect) 여부 토글과 그 여유 비율(`GARMENT_CROP_PAD_RATIO`)은 **여기 없다.**
@@ -132,7 +134,7 @@ RESTRICT_TO_GARMENT = True
 # 가설: ① 의류 마스크가 소매 끝·밑단을 못 덮으면 그 부분이 통째로 잘려나간다 ② 확대되면서
 # 유형을 구분하던 주변 맥락이 좁아져 개념 매칭이 한쪽으로 쏠린다. 상세 데이터·크롭 버전
 # 스냅샷은 각 노트북의 `CROP_BEFORE_DETECT` 지역 변수 옆 주석과
-# `sam3-condition-check/sam3_qc_test_seg_ver.ipynb` 참고.
+# `sam3-condition-check/sam3_qc_test_bbox_crop.ipynb` 참고.
 BENIGN_CONTAINMENT = 0.6  # 하자 마스크가 양성 마스크에 이만큼 잠기면 억제 후보
 SUPPRESS_BENIGN = True
 
@@ -167,9 +169,7 @@ MIN_AREA_RATIO = 0.0015  # 이보다 작은 blob 은 노이즈로 버린다 (reg
 # --------------------------------------------------------------------------
 KOREAN_LABELS: dict[str, str] = {
     "STAIN": "오염",
-    "SCRATCH": "스크래치",
-    "TEAR": "찢어짐",
-    "HOLE": "구멍",
+    "HOLE_TEAR": "구멍/찢어짐",
     "DIRT_MARK": "얼룩",  # worker/models/clipseg/scoring.py 의 DEFECT_LABELS 와 같은 한글
     # 양성(억제용) 태그도 함께 둔다 — 디버깅 시각화(§6 히트맵 등)에서 재사용한다.
     "WRINKLE": "주름",
@@ -240,6 +240,66 @@ def containment(a: np.ndarray, b: np.ndarray) -> float:
     if area == 0:
         return 0.0
     return float(np.logical_and(a_bool, b.astype(bool)).sum() / area)
+
+
+def mask_iou(a: np.ndarray, b: np.ndarray) -> float:
+    """|a ∩ b| / |a ∪ b| — 대칭 겹침 비율. 둘 다 비면 0.
+
+    `containment` 와 달리 방향이 없다. 마스크 **정제 전/후 비교**에 쓴다 — 정제는 같은 대상의
+    경계만 다듬는 것이라 IoU 가 높아야 정상이고, 낮으면 "정제"가 아니라 "대상이 바뀐" 것이다
+    (SAM3Tracker 는 class-agnostic 이라 실제로 이 일이 일어난다).
+    """
+    a_bool, b_bool = a.astype(bool), b.astype(bool)
+    union = int(np.logical_or(a_bool, b_bool).sum())
+    if union == 0:
+        return 0.0
+    return float(np.logical_and(a_bool, b_bool).sum() / union)
+
+
+def probs_to_instances(prob_map, tag, prompt, threshold, min_area_ratio=MIN_AREA_RATIO):
+    """확률 히트맵 1장 -> 인스턴스 리스트. SAM3 PCS 출력과 같은 dict 스키마로 맞춘다.
+
+    CLIPSeg 에는 인스턴스 개념이 없다(프롬프트당 확률맵 1장이 전부). 임계치로 이진화하고
+    연결요소를 뽑아 `{type, prompt, bbox, confidence, mask}` 형태로 만들어야
+    `filter_by_garment`/`suppress_benign`/`decide_verdict` 를 SAM3 와 똑같이 태울 수 있다.
+
+    - `confidence` 는 blob 내부 확률의 **최댓값**(peak) — 프로덕션 `findings.py` 와 같다.
+    - `min_area_ratio` 미만 blob 은 노이즈로 버린다 — `registry.py` 와 같은 값이 기본이다.
+    - `threshold` 에 기본값을 두지 않는다. 백엔드마다 확률 스케일이 달라(`BACKEND_THRESHOLDS`)
+      호출부가 어떤 임계치를 쓰는지 항상 명시해야 한다.
+
+    ⚠️ 프로덕션(`worker/models/clipseg/findings.py`)은 scipy 없이 돌리려고 순수 numpy
+    flood-fill 을 쓰고 여기는 `cv2.connectedComponentsWithStats` 를 쓴다. 결과는 같지만
+    프로덕션 수치와 1:1 로 대조할 때는 확인이 필요하다.
+    """
+    import cv2
+
+    binary = (prob_map > threshold).astype(np.uint8)
+    total = prob_map.size
+    if binary.sum() == 0:
+        return []
+
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(binary, connectivity=4)
+    found = []
+    for label in range(1, count):  # 0 은 배경
+        area = int(stats[label, cv2.CC_STAT_AREA])
+        if area / total < min_area_ratio:
+            continue
+        mask = (labels == label).astype(np.uint8)
+        x = int(stats[label, cv2.CC_STAT_LEFT])
+        y = int(stats[label, cv2.CC_STAT_TOP])
+        w = int(stats[label, cv2.CC_STAT_WIDTH])
+        h = int(stats[label, cv2.CC_STAT_HEIGHT])
+        found.append(
+            {
+                "type": tag,
+                "prompt": prompt,
+                "bbox": [x, y, x + w, y + h],
+                "confidence": round(float(prob_map[mask.astype(bool)].max()), 4),
+                "mask": mask,
+            }
+        )
+    return found
 
 
 # --------------------------------------------------------------------------
