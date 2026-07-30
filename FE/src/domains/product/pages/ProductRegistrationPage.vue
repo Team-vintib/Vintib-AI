@@ -233,17 +233,6 @@ const selectedSizeLabel = computed(
     PRODUCT_REGISTRATION_SIZE_OPTIONS.find((option) => option.id === draft.size)?.label ||
     '',
 )
-const measurementSummaryLabel = computed(() => {
-  if (!requiresMeasurements.value) {
-    return '해당 없음'
-  }
-
-  const completedCount = activeMeasurementFields.value.filter((field) =>
-    isPositiveMeasurement(draft.measurements[field.id] ?? ''),
-  ).length
-
-  return `${completedCount}/${activeMeasurementFields.value.length}개`
-})
 const measurementReviewItems = computed(() =>
   activeMeasurementFields.value.map((field) => ({
     id: field.id,
