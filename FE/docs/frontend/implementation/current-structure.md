@@ -270,6 +270,7 @@ src/
       authTokenStorage.ts
       http.ts
     components/
+      AppSearchBar.vue
       GlobalNavigation.vue
       RoutePlaceholder.vue
     composables/
@@ -330,7 +331,7 @@ docs/
 | --------------------- | ------------------------------------------------------------------------------------------------- |
 | `app/`                | 앱 조립 계층. 라우터/Pinia provider 등 전역 설정 후보                                             |
 | `shared/api/`         | Axios 인스턴스, 공통 API 유틸. 현재 `http.ts` 제공                                                |
-| `shared/components/`  | 2개 이상 도메인에서 재사용되는 UI 컴포넌트                                                        |
+| `shared/components/`  | 2개 이상 도메인에서 재사용되는 UI 컴포넌트. 현재 공통 검색바, 전역 내비게이션, route placeholder 제공 |
 | `shared/composables/` | 2개 이상 도메인에서 재사용되는 Composition API 함수                                               |
 | `shared/constants/`   | 라우트명, 전역 옵션 등 공통 상수. 현재 `routes.ts` 제공                                           |
 | `shared/layouts/`     | 인증, 기본 서비스, 라이브 등 공통 레이아웃. 현재 `AuthLayout`, `DefaultLayout`, `LiveLayout` 제공. `DefaultLayout`은 화면별 `contentMaxWidth` 지정 가능 |
@@ -361,14 +362,15 @@ docs/
   컴포넌트, FE 더미 제출 상태 store와 BIZ-001-2 인증 대기 화면이 구현되어 있습니다.
   BIZ-001-2의 메인 이동은 HOME route로 연결되어 있으며, 실제 인증 API는 후속 작업 대기 중입니다.
 - `domains/home`에는 HOME 공개 route, 로그인 여부에 따른 `GuestHome`/`MemberHome`
-  분기, 홈 검색 패널, 섹션 shell, 공통 홈 hero/content 카드, 라이브 카드, 상품 카드,
+  분기, 공통 검색바 기반 홈 검색 패널, 섹션 shell, 공통 홈 hero/content 카드, 라이브 카드, 상품 카드,
   화면 확인용 mock 데이터와 `HomeViewData` view model 타입이 구현되어 있습니다.
   `homeViewApi.ts`는 현재 mock 데이터를 반환하는 adapter 자리이며, `HomePage`는
   loading/error/retry 상태를 처리합니다.
   실제 HOME API 계약이 확정되면 adapter 내부를 HTTP 호출과 응답 매핑으로 교체합니다.
 - `domains/product`에는 PROD-008 상품 목록 View, S15P11A108-408·410·412 상품 상세 UI,
   S15P11A108-409·411·414 상품 등록 화면이 구현되어 있습니다. 상품 목록은 실사형 로컬 WebP를
-  사용하고 최소·최대 가격 범위를 검증해 mock 상품을 필터링하며 결과 없음 상태를 제공합니다.
+  사용하고 공통 검색바에서 통합 검색 상품 탭으로 이동하며, 최소·최대 가격 범위를 검증해
+  mock 상품을 필터링하고 결과 없음 상태를 제공합니다.
   상품 목록 카드는 상품 ID가 포함된 상세 route로 이동합니다. 상세 화면은 썸네일과 대표 이미지·AI
   원본/검수 이미지 쌍을 함께 변경하며 찜·장바구니·라이브 알림 상태, 기존 라이브 route 이동과
   미구현 CTA 안내를 제공합니다. 구매 영역 아래에는 유사 상품의 가격대 분포와 선택 상품 상세 이동을
@@ -381,8 +383,9 @@ docs/
   확정 후 adapter 내부를 교체합니다.
 - `domains/live`에는 S15P11A108-413·415·418 공개 라이브 목록 View, 진행 중·예정 상태 카드,
   로컬 이미지 기반 mock 데이터와 라이브 시청 route 연결, 카테고리·방송 상태 필터,
-  최신 방송·시청자·제목 정렬과 초기화가 구현되어 있습니다. 공개 목록에서는 종료 방송과
-  상품 판매 방식 조건을 제외합니다. 목록 DTO·adapter와 API 호출 함수, loading skeleton,
+  최신 방송·시청자·제목 정렬과 초기화가 구현되어 있습니다. 라이브 목록 검색바는 통합 검색
+  라이브 탭으로 이동합니다. 공개 목록에서는 종료 방송과 상품 판매 방식 조건을 제외합니다.
+  목록 DTO·adapter와 API 호출 함수, loading skeleton,
   전체 빈 목록·필터 결과 없음·오류·재시도 상태를 제공합니다.
   `origin/develop-BE@dd6a0b6`에 `GET /api/lives`가 구현됐지만 최종 `009` 계약의
   복수 `categories[]`, 공통 `PageResponse.content`, nullable `viewerCount`와

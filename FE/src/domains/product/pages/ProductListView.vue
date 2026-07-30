@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import ProductCard from '@/domains/product/components/ProductCard.vue'
 import ProductFilterPanel from '@/domains/product/components/ProductFilterPanel.vue'
@@ -12,8 +13,11 @@ import type {
   ProductSaleTypeTab,
   ProductSortOption,
 } from '@/domains/product/types/productList.types'
+import AppSearchBar from '@/shared/components/AppSearchBar.vue'
+import { ROUTE_NAMES } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
+const router = useRouter()
 const selectedCategoryIds = ref<string[]>([])
 const selectedConditionIds = ref<string[]>([])
 const selectedSaleType = ref<ProductSaleTypeTab['id']>('ALL')
@@ -104,10 +108,11 @@ const handleFilterApply = () => {
       : '전체 상품 조건을 선택했습니다.'
 }
 
-const handleSearch = () => {
-  filterStatusMessage.value = searchKeyword.value.trim()
-    ? `'${searchKeyword.value.trim()}' 검색 UI를 확인했습니다.`
-    : '검색어를 입력해 주세요.'
+const handleSearch = async (keyword: string) => {
+  await router.push({
+    name: ROUTE_NAMES.SEARCH,
+    query: keyword ? { keyword, type: 'product' } : { type: 'product' },
+  })
 }
 
 const handleToggleLike = (productId: number) => {
@@ -126,22 +131,17 @@ const handleToggleLike = (productId: number) => {
 <template>
   <DefaultLayout>
     <section class="product-list-page" aria-labelledby="product-list-title">
-      <form class="product-list-page__search" role="search" @submit.prevent="handleSearch">
-        <label class="sr-only" for="product-list-search">상품 검색</label>
-        <svg class="product-list-page__search-icon" aria-hidden="true" viewBox="0 0 24 24">
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.8-3.8" />
-        </svg>
-        <input
-          id="product-list-search"
-          v-model="searchKeyword"
-          type="search"
-          placeholder="브랜드, 상품명, 판매자 또는 라이브를 검색해 보세요"
-        />
-        <button type="submit">검색</button>
-      </form>
+      <header class="product-list-page__header">
+        <h1 id="product-list-title">상품</h1>
+        <p>지금 구매 가능한 상품과 라이브 경매 예정 상품을 둘러보세요.</p>
+      </header>
 
-      <h1 id="product-list-title" class="product-list-page__title">상품</h1>
+      <AppSearchBar
+        v-model="searchKeyword"
+        search-label="상품 검색"
+        placeholder="브랜드, 상품명, 판매자 또는 라이브를 검색해 보세요"
+        @submit="handleSearch"
+      />
 
       <div class="product-list-page__content">
         <ProductFilterPanel
@@ -258,73 +258,27 @@ const handleToggleLike = (productId: number) => {
 }
 
 .product-list-page {
+  display: grid;
+  gap: var(--space-8);
   width: 100%;
 }
 
-.product-list-page__search {
+.product-list-page__header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  min-height: 52px;
-  padding: 0 var(--space-2) 0 var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
+  gap: var(--space-2);
 }
 
-.product-list-page__search:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
-}
-
-.product-list-page__search-icon {
-  width: 20px;
-  height: 20px;
-  color: var(--color-text-muted);
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 1.8;
-}
-
-.product-list-page__search input {
-  min-width: 0;
-  height: 50px;
-  padding: 0 var(--space-3);
-  border: 0;
-  outline: 0;
-  background: transparent;
+.product-list-page__header h1 {
   color: var(--color-text-primary);
-}
-
-.product-list-page__search input::placeholder {
-  color: var(--color-text-muted);
-}
-
-.product-list-page__search button {
-  min-width: 72px;
-  height: var(--button-height-small);
-  border: 0;
-  border-radius: var(--radius-control);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  font-weight: 600;
-}
-
-.product-list-page__search button:hover {
-  background: var(--color-primary-hover);
-}
-
-.product-list-page__search button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
-  outline-offset: 2px;
-}
-
-.product-list-page__title {
-  margin-top: var(--space-12);
   font-size: 36px;
   font-weight: 700;
   line-height: 48px;
+}
+
+.product-list-page__header p {
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  line-height: 26px;
 }
 
 .product-list-page__content {
@@ -519,8 +473,7 @@ const handleToggleLike = (productId: number) => {
 }
 
 @media (max-width: 720px) {
-  .product-list-page__title {
-    margin-top: var(--space-8);
+  .product-list-page__header h1 {
     font-size: 30px;
     line-height: 40px;
   }
