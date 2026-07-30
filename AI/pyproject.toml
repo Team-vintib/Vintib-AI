@@ -9,8 +9,8 @@ line-length = 100
 target-version = "py312"
 # 외부/서드파티 코드라 lint 대상이 아니다(PoC로 통째로 가져온 것).
 extend-exclude = [
-"validation/AI_tryon/tryondiffusion",
-"validation/AI_tryon/CatVTON",
+"validation/TRYON/AI_tryon/tryondiffusion",
+"validation/TRYON/AI_tryon/CatVTON",
 "validation/garment-landmark-check",
 ]
 
@@ -24,8 +24,8 @@ line-length = 100
 target-version = ["py312"]
 extend-exclude = '''
 (
-  validation/AI_tryon/tryondiffusion
-  | validation/AI_tryon/CatVTON
+  validation/TRYON/AI_tryon/tryondiffusion
+  | validation/TRYON/AI_tryon/CatVTON
   | validation/garment-landmark-check
 )
 '''
