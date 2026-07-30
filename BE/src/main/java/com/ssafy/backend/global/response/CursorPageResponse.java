@@ -29,6 +29,10 @@ public record CursorPageResponse<T>(
     /**
      * 조회 결과에서 응답을 만든다. {@code items}에는 <b>요청 size보다 1건 더</b> 조회한 결과를
      * 넘긴다 — 초과분이 있으면 다음 페이지가 있다는 뜻이므로 COUNT 쿼리 없이 판정된다.
+     *
+     * <p>{@code nextCursor}는 <b>조회 순서상 마지막 항목</b>에서 뽑는다. 최신순 조회면 그것이
+     * 가장 오래된 ID, 오래된 순 조회면 가장 새로운 ID다 — 어느 방향이든 "다음 요청에 그대로
+     * 넣으면 이어진다"는 성질이 유지된다.
      */
     public static <E, T> CursorPageResponse<T> of(
             List<E> items, int size, Function<E, T> mapper, Function<E, Long> cursorExtractor) {

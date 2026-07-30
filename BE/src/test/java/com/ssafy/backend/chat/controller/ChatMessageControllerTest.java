@@ -153,4 +153,79 @@ class ChatMessageControllerTest {
         mockMvc.perform(get("/api/lives/{liveId}/chat-messages", liveId).param("size", "0"))
                 .andExpect(status().isBadRequest());
     }
+
+    /** 첫 페이지의 첫 메시지 ID를 꺼낸다. after 방향 검증의 기준점으로 쓴다. */
+    private long 가장_오래된_메시지_ID() {
+        return chatMessageRepository.findPageByLiveId(
+                        liveId, null, org.springframework.data.domain.PageRequest.of(0, 100))
+                .stream()
+                .mapToLong(ChatMessage::getId)
+                .min()
+                .orElseThrow();
+    }
+
+    @Test
+    void after를_주면_그보다_새로운_메시지를_오래된_순으로_준다() throws Exception {
+        메시지_저장(5);
+        long oldest = 가장_오래된_메시지_ID();
+
+        // "메시지 1"(가장 오래된 것) 이후를 요청하면 2, 3 이 순서대로 와야 한다.
+        // 최신순으로 자르면 5, 4 가 와서 끊긴 지점과 사이에 구멍이 생긴다 — 그것을 막는 것이 목적이다.
+        mockMvc.perform(get("/api/lives/{liveId}/chat-messages", liveId)
+                        .param("after", String.valueOf(oldest))
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(2))
+                .andExpect(jsonPath("$.data.content[0].content").value("메시지 2"))
+                .andExpect(jsonPath("$.data.content[1].content").value("메시지 3"))
+                .andExpect(jsonPath("$.data.hasNext").value(true));
+    }
+
+    @Test
+    void after_방향도_nextCursor로_이어서_받을_수_있다() throws Exception {
+        메시지_저장(5);
+        long oldest = 가장_오래된_메시지_ID();
+
+        String first = mockMvc.perform(get("/api/lives/{liveId}/chat-messages", liveId)
+                        .param("after", String.valueOf(oldest))
+                        .param("size", "2"))
+                .andReturn().getResponse().getContentAsString();
+        long next = Long.parseLong(first.replaceAll(".*\"nextCursor\":(\\d+).*", "$1"));
+
+        mockMvc.perform(get("/api/lives/{liveId}/chat-messages", liveId)
+                        .param("after", String.valueOf(next))
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].content").value("메시지 4"))
+                .andExpect(jsonPath("$.data.content[1].content").value("메시지 5"))
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+    }
+
+    @Test
+    void 가장_최신_메시지_이후를_요청하면_빈_목록을_준다() throws Exception {
+        메시지_저장(3);
+        // 최신순 조회의 첫 건이 가장 새로운 메시지다.
+        long latest = chatMessageRepository.findPageByLiveId(
+                        liveId, null, org.springframework.data.domain.PageRequest.of(0, 1))
+                .get(0)
+                .getId();
+
+        mockMvc.perform(get("/api/lives/{liveId}/chat-messages", liveId)
+                        .param("after", String.valueOf(latest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(0))
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+    }
+
+    @Test
+    void cursor와_after를_동시에_주면_400을_반환한다() throws Exception {
+        // 어느 방향을 의도한 것인지 알 수 없다. 임의로 하나를 고르면 FE 가 원인을 알 수 없다.
+        메시지_저장(2);
+
+        mockMvc.perform(get("/api/lives/{liveId}/chat-messages", liveId)
+                        .param("cursor", "100")
+                        .param("after", "1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
 }
