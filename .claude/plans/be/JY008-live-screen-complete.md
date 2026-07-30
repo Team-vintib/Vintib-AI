@@ -193,16 +193,32 @@ CONNECT 프레임에는 `liveId`가 없다. 어느 방송인지는 구독 시점
 | 재접속 누락 보충 | 마지막 수신 `messageId`를 커서로 과거 조회 API 호출 |
 | 종료 후 정책 | 읽기 허용, 쓰기 차단 |
 
-### Phase 3 — 시청자 수 + 반응 이모지 · `-450` + 신규 · 브랜치 `feat/217-live-realtime-signals`
+### Phase 3 — 시청자 수 + 반응 이모지 · `-450` `-471` · 브랜치 `feat/217-live-realtime-signals` ✅ 완료
 
-- [ ] `-450` SUBSCRIBE/UNSUBSCRIBE/DISCONNECT 리스너 + `sessionId → liveId` 매핑
-- [ ] `-450` Redis 카운터, 기동 시 stale 키 정리
-- [ ] `-450` 최대치 갱신 시에만 `live.peakViewerCount` — 매 접속마다 DB를 때리지 않는다
-- [ ] `-450` `/topic/lives/{liveId}/viewers` 브로드캐스트
-- [ ] `-450` `LiveListItemResponse.viewerCount` 실제 값 + `LiveListSort.VIEWERS_DESC` 개방
-- [ ] `-450` 라이브 상세에 `currentViewerCount` 추가 (`peakViewerCount`와 별 필드)
-- [ ] **신규** 반응 이모지 — `ReactionType` enum, rate limit, 브로드캐스트 (저장 없음)
-- [ ] `.codex/requests/be/009-live-list-api-contract.md` **삭제** — 잔여 항목이 여기서 해소된다
+- [x] `-450` SUBSCRIBE/UNSUBSCRIBE/DISCONNECT 리스너 + `sessionId → liveId` 매핑
+- [x] `-450` Redis 집계, 기동 시 stale 키 정리
+- [x] `-450` 최대치 갱신 시에만 `live.peakViewerCount` — 매 접속마다 DB를 때리지 않는다
+- [x] `-450` `/topic/lives/{liveId}/viewers` 브로드캐스트
+- [x] `-450` `LiveListItemResponse.viewerCount` 실제 값 + `LiveListSort.VIEWERS_DESC` 개방
+- [x] `-450` 라이브 상세에 `currentViewerCount` 추가 (`peakViewerCount`와 별 필드)
+- [x] `-471` 반응 이모지 — `ReactionType` enum, rate limit, 브로드캐스트 (저장 없음)
+- [x] `.codex/requests/be/009-live-list-api-contract.md` **삭제** — 잔여 항목이 해소됐다
+- [x] FE 인계 문서 `003-viewer-count-reaction-handoff.md` + STOMP 계약 문서 갱신
+
+**구현 중 계획과 달라진 것**
+
+| 항목 | 계획 | 실제 | 이유 |
+| --- | --- | --- | --- |
+| 시청자 집계 자료구조 | Redis **카운터**(INCR) | Redis **Set**(세션 ID) | FE 한 명이 같은 방송의 여러 토픽을 구독한다. 구독마다 INCR 하면 한 사람이 네 명으로 잡힌다. `SADD`는 멱등해서 몇 번 구독해도 `SCARD`가 사람 수를 준다 |
+| `sessionId → liveId` 매핑 | 단일 값 | `sessionId + subscriptionId → liveId` 해시 | UNSUBSCRIBE 프레임에는 destination 이 없다. 구독 단위로 남겨야 "채팅만 끊고 경매는 계속 보는" 경우에 시청자에서 잘못 빼지 않는다 |
+| `peakViewerCount` 갱신 | 읽고 비교 후 저장 | 조건부 `UPDATE` 한 문장 | 동시 입장 시 두 스레드가 같은 최고치를 읽고 각자 덮어써 더 큰 값이 사라진다. 조건을 `WHERE`에 두면 원자적이다 |
+| STOMP 예외 처리 | 컨트롤러별 핸들러 | `@ControllerAdvice`(`StompExceptionAdvice`) | 컨트롤러마다 복사하면 **새 STOMP 컨트롤러를 추가할 때 빼먹은 곳만 조용히 무응답**이 된다. 역직렬화 실패(`MessageConversionException`)도 여기서 잡는다 — 핸들러 실행 **전**에 터지므로 서비스 검증으로는 못 잡는다 |
+
+**남은 빚**
+
+- `VIEWERS_DESC`는 SQL 로 정렬할 수 없어 후보 500개까지만 메모리 정렬한다. 그 정렬에서
+  `totalElements`는 전체 개수가 아니라 정렬 대상 수다. 규모가 커지면 `live` 에 현재 시청자 수
+  컬럼을 두고 SQL 정렬로 옮긴다
 
 ### Phase 4 — 영상 · `-448`(사용자) → `-449` · 브랜치 `feat/217-live-openvidu`
 

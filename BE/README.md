@@ -124,12 +124,13 @@ BE/
 │   │   ├── controller/
 │   │   ├── service/
 │   │   └── dto/response/        # 카드 DTO는 현재 Mock 응답용 (2주차 실데이터 연결)
-│   ├── live/                    # 라이브 방 개설/조회/상태 전이 (LIVE) — 정윤
-│   │   ├── controller/          # LiveController, LiveProductController
-│   │   ├── service/             # LiveService, LiveProductService
-│   │   ├── entity/              # Live, LiveStatus, LiveProduct
+│   ├── live/                    # 라이브 방 개설/조회/상태 전이, 시청자 수, 반응 (LIVE) — 정윤
+│   │   ├── controller/          # LiveController, LiveProductController, LiveReactionStompController(STOMP)
+│   │   ├── service/             # LiveService, LiveProductService, LiveViewerService, LiveReactionService
+│   │   ├── entity/              # Live, LiveStatus, LiveProduct, ReactionType(저장 안 함)
 │   │   ├── repository/
 │   │   ├── port/                # ProductQueryPort — 상품 도메인 참조를 한 곳으로 격리
+│   │   ├── websocket/           # LiveSessionEventListener — SUBSCRIBE/DISCONNECT를 시청자 수로
 │   │   └── dto/
 │   ├── chat/                    # 라이브 실시간 채팅 (CHAT) — 정윤
 │   │   ├── controller/          # ChatStompController(STOMP), ChatMessageController(이력 REST)
@@ -160,12 +161,13 @@ BE/
 │   │   └── dto/response/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
 │       ├── client/              # AiClient — Spring → FastAPI
-│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config
+│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig
 │       ├── entity/              # BaseTimeEntity 등 공통 베이스 엔티티
 │       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
 │       ├── health/              # HealthController
-│       ├── response/            # ApiResponse, ErrorResponse
-│       └── storage/             # S3StorageService, S3BucketInitializer
+│       ├── response/            # ApiResponse, ErrorResponse, PageResponse, CursorPageResponse
+│       ├── storage/             # S3StorageService, S3BucketInitializer
+│       └── websocket/           # STOMP 인증(StompAuthChannelInterceptor)·공통 예외(StompExceptionAdvice)
 ├── src/main/resources/application.yml
 └── src/test/java/com/ssafy/backend/
 ```

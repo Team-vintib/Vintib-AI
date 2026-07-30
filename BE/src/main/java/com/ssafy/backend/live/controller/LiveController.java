@@ -87,7 +87,9 @@ public class LiveController {
                     + "카테고리는 편성 상품에서 유도하므로 라이브 하나가 여러 카테고리를 가질 수 있고, "
                     + "대분류를 고르면 그 하위 소분류 상품을 건 방송까지 잡힌다. "
                     + "조건에 맞는 라이브가 없으면 404가 아니라 200과 빈 목록을 준다. "
-                    + "정렬 중 시청자 수 순은 실시간 집계 도입 전이라 아직 제공하지 않는다.")
+                    + "`viewerCount`는 실시간 집계 값이며, 예약 방송은 0이다. "
+                    + "`sort=VIEWERS_DESC`(시청자 수 많은 순)는 Redis 값으로 정렬하므로 최대 500개 방송까지만 "
+                    + "대상으로 삼고, 그때 `totalElements`는 정렬 대상이 된 수를 뜻한다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "허용되지 않는 status·sort 값 또는 음수 page·size")
@@ -121,7 +123,10 @@ public class LiveController {
     @Operation(
             summary = "라이브 시청 정보 조회",
             description = "라이브 방 정보와 편성된 상품 목록을 함께 반환한다. **비회원도 조회할 수 있다.** "
-                    + "영상 접속 토큰은 별도 발급 API가 담당한다.")
+                    + "영상 접속 토큰은 별도 발급 API가 담당한다. "
+                    + "`currentViewerCount`는 현재 동시 시청자 수의 **초기값**이다 — 이후 변화는 "
+                    + "`/topic/lives/{liveId}/viewers` 구독으로 받으며, 구독 직후 브로드캐스트가 오는 것은 "
+                    + "보장되지 않으므로 초기값을 토픽에서 기다리면 안 된다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "라이브 없음")

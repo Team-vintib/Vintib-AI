@@ -278,10 +278,20 @@ class LiveControllerTest {
     }
 
     @Test
-    void 시청자_수_정렬은_아직_지원하지_않아_400을_반환한다() throws Exception {
-        // 시청자 수 집계(-450) 전이라 정렬 기준 자체가 없다.
+    void 시청자_수_정렬을_지원한다() throws Exception {
+        // 실시간 집계(-450)가 들어와 정렬 기준이 생겼다. Redis 값이라 DB 로 정렬할 수 없어
+        // 서비스가 메모리에서 세우지만, 계약상으로는 다른 정렬과 똑같이 동작해야 한다.
         mockMvc.perform(get("/api/lives").param("sort", "VIEWERS_DESC"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isArray());
+    }
+
+    @Test
+    void 시청자가_없으면_viewerCount는_0으로_나온다() throws Exception {
+        // 이전에는 항상 null 이었다. 0 과 null 을 FE 가 구분해야 했던 이유가 없어졌다.
+        mockMvc.perform(get("/api/lives"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].viewerCount").value(0));
     }
 
     @Test

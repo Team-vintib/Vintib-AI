@@ -6,8 +6,10 @@ import java.util.Collection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface LiveRepository extends JpaRepository<Live, Long> {
 
@@ -34,4 +36,21 @@ public interface LiveRepository extends JpaRepository<Live, Long> {
             @Param("filterByCategory") boolean filterByCategory,
             @Param("productIds") Collection<Long> productIds,
             Pageable pageable);
+
+    /**
+     * 최고 시청자 수를 끌어올린다. 지금 값보다 크지 않으면 아무 행도 바뀌지 않는다.
+     *
+     * <p><b>읽고 비교한 뒤 쓰지 않는 이유.</b> 시청자가 동시에 들어오면 두 스레드가 같은 최고치를
+     * 읽고 각자 덮어써 더 큰 값이 사라질 수 있다. 조건을 {@code WHERE} 에 두면 갱신 판정과 쓰기가
+     * 한 문장에서 원자적으로 끝난다.
+     *
+     * @return 실제로 갱신된 행 수(0 또는 1)
+     */
+    @Transactional
+    @Modifying
+    @Query("""
+            UPDATE Live l SET l.peakViewerCount = :count
+            WHERE l.id = :liveId AND l.peakViewerCount < :count
+            """)
+    int raisePeakViewerCount(@Param("liveId") Long liveId, @Param("count") int count);
 }

@@ -43,13 +43,14 @@ public record LiveListItemResponse(
         LocalDateTime startedAt,
 
         @Schema(
-                description = "현재 동시 시청자 수. **실시간 집계 도입 전까지 항상 null이다.** "
-                        + "FE는 null이면 시청자 수 표시를 생략한다",
+                description = "현재 동시 시청자 수. **실시간 집계 값이다.** 예약 방송은 아직 아무도 "
+                        + "보고 있지 않으므로 0이며, 진행 중인데 0이면 실제로 시청자가 없는 것이다",
                 example = "128")
-        Integer viewerCount
+        int viewerCount
 ) {
 
-    public static LiveListItemResponse of(Live live, List<LiveCategoryResponse> categories) {
+    public static LiveListItemResponse of(
+            Live live, List<LiveCategoryResponse> categories, int viewerCount) {
         return new LiveListItemResponse(
                 live.getId(),
                 live.getTitle(),
@@ -60,8 +61,6 @@ public record LiveListItemResponse(
                 categories,
                 live.getScheduledAt(),
                 live.getStartedAt(),
-                // 현재 동시 시청자 수는 WebSocket 세션 집계(-450)가 있어야 나온다.
-                // peakViewerCount(최고치)를 대신 내리면 FE가 현재 값으로 오해한다.
-                null);
+                viewerCount);
     }
 }
