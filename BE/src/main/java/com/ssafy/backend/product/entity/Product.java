@@ -110,6 +110,12 @@ public class Product extends BaseTimeEntity {
         this.saleStatus = SaleStatus.ON_SALE;
     }
 
+    public void scheduleAuction() {
+        this.saleType = SaleType.AUCTION;
+        this.price = null;
+        this.saleStatus = SaleStatus.AUCTION_SCHEDULED;
+    }
+
     public void update(
             String title,
             String description,

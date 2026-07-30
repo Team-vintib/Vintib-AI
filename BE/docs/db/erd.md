@@ -128,7 +128,7 @@ stateDiagram-v2
     DRAFT --> ON_SALE : 상시 판매 등록
     DRAFT --> AUCTION_SCHEDULED : 경매 예정 설정
     ON_SALE --> AUCTION_SCHEDULED : 경매 전환 (PROD-004)
-    AUCTION_SCHEDULED --> ON_SALE : 상시 판매 전환 (PROD-005)
+    AUCTION_SCHEDULED --> ON_SALE : 상시 판매 전환 (PROD-004/PROD-005)
     AUCTION_SCHEDULED --> AUCTION_IN_PROGRESS : 경매 시작 (AUCT-002)
     AUCTION_IN_PROGRESS --> AUCTION_SCHEDULED : 입찰자 없이 종료 (AUCT-014)
     ON_SALE --> SOLD : 상시 구매

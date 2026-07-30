@@ -87,6 +87,27 @@ public class ProductController {
     }
 
     @Operation(
+            summary = "경매 상품 등록 및 경매 전환",
+            description = "DRAFT(최초 등록, PROD-003) 또는 ON_SALE(상시 판매 상품의 경매 전환, PROD-004) 상태 상품을 "
+                    + "경매 예정(AUCTION_SCHEDULED) 상태로 전환한다. "
+                    + "시작가·증액 단위·경매 시간은 여기서 다루지 않으며, 경매 시작 전 별도 API로 설정한다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "등록 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "DRAFT/ON_SALE 상태가 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @PatchMapping("/{id}/auction-schedule")
+    public ResponseEntity<ApiResponse<ProductResponse>> scheduleAuction(
+            Authentication authentication, @PathVariable Long id) {
+        Long sellerId = (Long) authentication.getPrincipal();
+        ProductResponse response = productService.scheduleAuction(sellerId, id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
             summary = "상품 목록 조회",
             description = "상시 판매/경매 여부와 관계없이 공개된 상품 목록을 최신순으로 조회한다. "
                     + "DRAFT 상태 상품은 목록에서 제외한다. "

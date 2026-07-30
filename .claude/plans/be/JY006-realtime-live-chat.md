@@ -1,132 +1,179 @@
-# 실시간 라이브(WebRTC) + 채팅 착수 계획
+# 실시간 라이브(WebRTC) + 채팅 구현 계획
 
-- Jira 에픽: [S15P11A108-217](https://ssafy.atlassian.net/browse/S15P11A108-217) `[LIVE]`, [S15P11A108-208](https://ssafy.atlassian.net/browse/S15P11A108-208) `[CHAT]`
-- 선행: JY005(라이브 도메인 REST) — 오늘 -388~-392로 마무리
-- **AI 채팅 매니저(CHAT-002/003/004)는 보류** (사용자 지시 2026-07-28). 이 계획은 사람 간 채팅과 영상 송출까지만 다룬다.
+- Jira 에픽: [S15P11A108-217](https://ssafy.atlassian.net/browse/S15P11A108-217) `[LIVE]`, [S15P11A108-208](https://ssafy.atlassian.net/browse/S15P11A108-208) `[CHAT]`, [S15P11A108-27](https://ssafy.atlassian.net/browse/S15P11A108-27) `[INFRA]`
+- 갱신: 2026-07-30 (JY007 머지 직후 `develop-BE` `dd6a0b6` 기준 재확인)
+- **AI 채팅 매니저(CHAT-002/003/004)는 보류.** 이 계획은 사람 간 채팅과 영상 송출까지만 다룬다.
+- ⚠️ **이 문서는 [JY008](JY008-live-screen-complete.md)에 흡수됐다.** 라이브 화면 전체 계획은 JY008을 본다 — 여기는 Phase 1~4에 해당한다.
+- 티켓은 전부 기존 것(-447~-454)을 쓴다. **새로 만들지 않는다.**
 
-## 배경/목표
+## 목표
 
-JY005로 "방을 만들고·조회하고·상태를 바꾸고·경매 조건을 거는" REST 토대가 끝난다. 하지만 **실시간 계층은 코드가 한 줄도 없다.** 방송 영상도, 채팅도, 경매 이벤트도 전부 그 위에 올라간다.
+**"방에 들어가서 영상을 보며 채팅할 수 있는 상태"** 까지.
 
-목표는 **"방에 들어가서 영상을 보며 채팅할 수 있는 상태"** 까지다.
+## 현황 (2026-07-30 재확인)
 
-## 최신 develop-BE 기준 현황 (2026-07-28 확인)
-
-지난 점검 이후 서윤 쪽 작업으로 두 가지가 해소됐다.
+REST 토대는 끝났다. 실시간 계층은 여전히 코드가 0이다.
 
 | 항목 | 상태 |
 | --- | --- |
-| CORS | ✅ 해결 — `SecurityConfig`에 `CorsConfigurationSource` 빈 추가, 허용 오리진은 설정값 주입 |
-| Swagger `Authorize` 버튼 | ✅ 해결 — `SwaggerConfig`에 `bearerAuth` SecurityScheme 추가(-311) |
-| 파일 스토리지 | ✅ MinIO 도입 — 라이브 썸네일 업로드에 재사용 가능 |
-| **WebSocket 설정** | ❌ 없음 — starter 의존성만 있고 config·핸들러·엔드포인트 전무 |
-| **OpenVidu** | ❌ 없음 — 의존성·클라이언트·설정 전무. **서버도 미설치**(compose에 없음, Caddyfile·ec2.md에 "2주차에 붙인다" 메모만) |
-| **chat 패키지** | ❌ 없음 — ERD `chat_message` 테이블은 확정, 코드는 0 |
+| 라이브 REST (개설·목록·상세·상태 전이·편성·정리 훅) | ✅ 완료 — `dd6a0b6`까지 머지 |
+| CORS / Swagger `bearerAuth` / MinIO | ✅ 완료 |
+| `spring-boot-starter-websocket` 의존성 | ✅ 있음 (`websocket-test`도 있음) |
+| **WebSocket 설정·핸들러** | ❌ 없음 — 코드 0 |
+| **chat 패키지** | ❌ 없음 — `chat_message` 테이블만 확정 |
+| **OpenVidu** | ❌ 코드 0, **서버도 미설치** — compose에 서비스 없음 |
+| `live.openviduRoom` / `assignOpenviduRoom()` | 🟡 컬럼·메서드만 있고 호출부 없음 |
+| `LiveCleanupHook` | 🟡 인터페이스 + 로깅 구현체만. room 해제 구현체 자리 비어 있음 |
+| `viewerCount` (목록 응답) | 🟡 항상 `null` — FE에 통보 완료 |
 
-**CORS가 풀린 것이 큰 변화다.** 지난 점검에서 이게 WebSocket 핸드셰이크까지 막는 선행 과제였는데 해소됐다. 다만 STOMP 엔드포인트는 `setAllowedOriginPatterns`를 따로 지정해야 하므로 그대로 통과되지는 않는다.
+메모리는 문제없다. EC2 15GiB에 OpenVidu 2.5GB 예산이 이미 잡혀 있다. **실질 제약은 4 vCPU** — 방송 중 배포·빌드 금지.
 
-## 착수 전 필요한 작업
+## 설계 판단 (착수 전 확정할 것)
 
-### 1. WebSocket 기반 (최우선 — 채팅·경매 공통 토대)
+### 1. OpenVidu v3 = LiveKit이라 순서를 바꿀 수 있다
 
-채팅만의 것이 아니다. 다음 주 경매 실시간 이벤트(현재가·최고입찰자·5초 연장)도 같은 채널을 쓴다. 여기를 먼저 세워야 두 기능이 갈라지지 않는다.
+OpenVidu v3는 LiveKit 기반이고, **접속 토큰은 API key/secret으로 로컬 서명한다 — 서버에 요청하지 않는다.** room도 첫 참가 시 자동 생성된다.
 
-- `WebSocketConfig` — `@EnableWebSocketMessageBroker`, STOMP 엔드포인트 `/ws`, 브로커 `/topic`, 앱 prefix `/app`
-- **핸드셰이크 JWT 인증** — `ChannelInterceptor`로 CONNECT 프레임의 `Authorization` 헤더를 검증해 principal에 `memberId`를 심는다. 기존 `JwtTokenProvider` 재사용
-- `SecurityConfig` `PUBLIC_ENDPOINTS`에 `/ws/**` 추가 — **비회원도 시청·채팅 읽기가 가능**해야 하므로 핸드셰이크 자체는 열고, 발언 시점에 principal 유무로 막는다
-- STOMP 엔드포인트에 `setAllowedOriginPatterns` 설정(HTTP CORS와 별개)
+즉 **-449(연동·토큰 발급)의 코드 대부분은 -448(서버 구축) 없이 쓸 수 있다.** 서버는 "실제로 영상이 오가는지" 검증할 때만 필요하다. 계획에서 -448이 유일한 병목이었는데, 이 사실이 위험을 크게 줄인다.
 
-### 2. OpenVidu v3 — 인프라가 먼저다
+> ⚠️ 이건 문서 기반 판단이다. -449 착수 시 LiveKit Java SDK로 **먼저 확인**하고, 서버 호출이 필요하면 -448을 앞으로 당긴다.
 
-**코드보다 서버가 없는 것이 문제다.** compose에 서비스가 없고 UFW·Caddy 정합도 안 돼 있다. 리드타임이 있으므로 **가장 먼저 착수**하되 코드 작업과 병렬로 굴린다.
+### 2. 시청자 수는 CONNECT가 아니라 SUBSCRIBE로 센다
 
-- EC2에 OpenVidu v3 설치 + 미디어 UDP 포트 UFW 개방 + Caddy 정합(또는 OpenVidu 내장 Caddy로 일원화)
-- `OpenViduClient` — 기존 `AiClient`(Spring → FastAPI) 패턴을 따라 `global/client`에 둔다
-- 방송 시작 시 room 생성 → `live.openviduRoom` 저장 (컬럼은 이미 있고 채우는 코드만 없다)
-- 호스트/시청자 토큰 발급 API
-- 종료 시 room 정리 → **-391에서 만든 정리 훅에 구현체로 끼운다**
+티켓 -450 설명에는 `SessionConnectedEvent`/`SessionDisconnectEvent`로 적어 뒀는데 **그대로는 안 된다. CONNECT 프레임에는 liveId가 없다.** 어느 방송을 보는지는 `/topic/lives/{liveId}/...` 구독 시점에 처음 드러난다.
 
-### 3. 채팅 (CHAT-001, 사람 간 채팅만)
+- `SessionSubscribeEvent` → `sessionId → liveId` 매핑 저장 + 카운트 증가
+- `SessionUnsubscribeEvent` / `SessionDisconnectEvent` → 매핑으로 liveId를 찾아 감소
+- **매핑을 안 남기면 연결이 끊길 때 어느 카운터를 내릴지 알 수 없다**
 
-- `chat` 패키지 + `ChatMessage` 엔티티·리포지토리 (ERD `chat_message` 그대로)
-- STOMP 송수신 — 발행 `/app/lives/{liveId}/chat`, 구독 `/topic/lives/{liveId}/chat`
-- 과거 메시지 조회 REST — `ix_chat_live_created (live_id, created_at DESC)` 인덱스에 맞춰 커서 페이징
-- 발언 권한 — 회원만. ERD `ck_chat_user_has_member`가 DB에서도 막는다
+### 3. Redis 시청자 수는 기동 시 비운다
 
-### 4. 시청자 수 (LIVE-005 보완)
+프로세스가 죽으면 WS 세션은 전부 끊기는데 Redis 값은 남는다. 그대로 두면 **아무도 안 보는 방송이 시청자 300명으로 표시된다.** 기동 시 `live:viewers:*` 키를 정리한다. 단일 인스턴스라 가능한 단순화다.
 
-- WS 세션 연결/해제 이벤트로 현재 시청자 수 집계 → Redis
-- 최대치 갱신 시 `live.peakViewerCount` 반영
+### 4. JWT는 STOMP CONNECT 프레임 헤더로 받는다
 
-## 확정 결정 (2026-07-28)
+브라우저 WebSocket API는 **핸드셰이크 HTTP 요청에 `Authorization` 헤더를 붙일 수 없다.** 그래서 핸드셰이크가 아니라 STOMP CONNECT 프레임의 native header에서 토큰을 읽는다. FE 계약에 명시해야 하는 항목이다.
 
-- **메시지 브로커는 Spring 내장 SimpleBroker.** 백엔드 1대라 Redis Pub/Sub의 이득이 없다. 교체 지점은 `WebSocketConfig` 한 곳.
-- **새 티켓은 스프린트에 넣지 않는다** — 진행 중인 Sprint 3에 추가 금지. 전부 백로그로 생성했다.
-- **작업의 parent는 에픽, 스토리는 Relates 링크** (기존 -388 패턴과 동일. 하위작업 미사용).
+### 5. SockJS는 쓰지 않는다 (제안)
 
-## 구현 목록
+FE가 Vue 3 + 최신 브라우저 대상이라 fallback이 필요 없다. SockJS를 끼우면 URL·프레임 규약이 바뀌고 테스트도 복잡해진다. **plain WebSocket + STOMP로 간다.**
 
-### Phase 0 — 오늘 (JY005 잔여, Sprint 3)
+### 6. 토픽 네임스페이스는 경매까지 보고 잡는다
 
-| 작업 | 내용 | SP |
+경매 실시간(AUCT-002 이후)이 같은 채널을 쓴다. 나중에 갈아엎지 않도록 지금 확정한다.
+
+| 방향 | destination | 인증 |
 | --- | --- | --- |
-| [-388](https://ssafy.atlassian.net/browse/S15P11A108-388) | 시청 조회 API | 3 |
-| [-389](https://ssafy.atlassian.net/browse/S15P11A108-389) | 시청 조회 테스트 | 1 |
-| [-390](https://ssafy.atlassian.net/browse/S15P11A108-390) | 상태 전이 API·서비스 | 5 |
-| [-391](https://ssafy.atlassian.net/browse/S15P11A108-391) | 종료 시 정리 훅 | 1 |
-| [-392](https://ssafy.atlassian.net/browse/S15P11A108-392) | 상태 전이 테스트 | 1 |
+| 발행 | `/app/lives/{liveId}/chat` | 회원만 |
+| 구독 | `/topic/lives/{liveId}/chat` | 비회원 허용 |
+| 구독 | `/topic/lives/{liveId}/viewers` | 비회원 허용 |
+| 구독 | `/topic/lives/{liveId}/auction` | (다음 단계 예약) |
 
-브랜치 `feat/217-live-state-view` 하나에 커밋 5개. 순서는 -390 → -391 → -392 → -388 → -389 (시청 조회가 상태 전이 결과를 응답에 담으므로 뒤).
+### 7. 커서 페이징 키는 `id`
 
-### Phase 1 — 실시간 기반 (백로그)
+`chat_message.id`는 IDENTITY 증가라 삽입 순서와 정확히 일치한다. `created_at`은 같은 밀리초에 두 건이 들어오면 동률이 생겨 경계에서 메시지가 밀리거나 중복된다. **커서는 `id`로 잡는다.** 인덱스가 `(live_id, created_at DESC)`라 `(live_id, id DESC)` 인덱스 추가가 필요한지는 -453에서 실행계획으로 확인한다.
 
-| 작업 | 내용 | SP | 연결 |
-| --- | --- | --- | --- |
-| [-447](https://ssafy.atlassian.net/browse/S15P11A108-447) | WebSocket(STOMP) 기반 구성 및 핸드셰이크 인증 | 3 | 에픽 -27 직속 |
-| [-448](https://ssafy.atlassian.net/browse/S15P11A108-448) | OpenVidu v3 미디어 서버 구축 (EC2) | 3 | 에픽 -27 직속 |
+## 실행 순서
 
-**-448은 서버 작업이라 리드타임이 있다. 가장 먼저 착수한다.** 코드 작업(-447 이후)과 병렬로 굴린다.
-
-### Phase 2 — 채팅 (백로그, CHAT-001 `-91`)
-
-| 작업 | 내용 | SP |
-| --- | --- | --- |
-| [-451](https://ssafy.atlassian.net/browse/S15P11A108-451) | chat 패키지·ChatMessage 엔티티 | 2 |
-| [-452](https://ssafy.atlassian.net/browse/S15P11A108-452) | 실시간 채팅 송수신 (STOMP) | 5 |
-| [-453](https://ssafy.atlassian.net/browse/S15P11A108-453) | 과거 메시지 조회 API | 3 |
-| [-454](https://ssafy.atlassian.net/browse/S15P11A108-454) | 실시간 채팅 테스트 | 3 |
-
--451은 선행 의존이 없어 -447과 병렬 가능하다.
-
-### Phase 3 — 영상 송출 (백로그, LIVE-005 `-88`)
-
-| 작업 | 내용 | SP |
-| --- | --- | --- |
-| [-449](https://ssafy.atlassian.net/browse/S15P11A108-449) | OpenVidu 연동 및 송출·시청 토큰 발급 | 5 |
-| [-450](https://ssafy.atlassian.net/browse/S15P11A108-450) | 실시간 시청자 수 집계 | 3 |
-
--449는 -448(서버) + -390/-391(상태 전이·정리 훅)에 의존한다. -450은 -447에 의존한다.
-
-### 의존 관계 요약
+브랜치는 에픽 기준, 커밋은 작업 단위(기존 방식과 동일). **`develop-BE`에 직접 커밋하지 않는다.**
 
 ```
--448 (미디어 서버) ─────────────┐
-                                ├─→ -449 (OpenVidu 연동)
-Phase 0 -390/-391 (상태·훅) ────┘
-
--447 (WS 기반) ──┬─→ -452 (채팅 송수신) ─┬─→ -454 (채팅 테스트)
-                 └─→ -450 (시청자 수)     │
--451 (엔티티) ───┴─→ -453 (과거 조회) ────┘
+[병렬 A: 인프라]  -448 OpenVidu 서버 ─────────────────┐
+                                                      ↓
+[병렬 B: 코드]    -447 WS 기반 ──┬─→ -450 시청자 수    -449 토큰·연동
+                                 │
+                  -451 엔티티 ───┴─→ -452 송수신 ─┬─→ -454 테스트
+                                     -453 과거조회 ┘
 ```
 
-### 공통
-- [x] Jira 티켓 신규 생성 — 8건(-447~-454), 전부 백로그
-- [ ] 각 단계 BE 검증 하네스 통과 후 커밋
-- [ ] `BE/README.md` 디렉터리 구조 갱신 (`chat` 패키지 추가 시)
+### Step 1 — `-447` WebSocket(STOMP) 기반 · 브랜치 `feat/27-websocket-base`
 
-## 확인이 필요한 미결정 사항
+채팅만의 것이 아니다. 시청자 수와 다음 단계 경매 이벤트가 전부 이 위에 올라간다. **여기가 어긋나면 세 기능을 같이 고쳐야 한다.**
 
-1. **OpenVidu v3 서버를 언제 누가 올리나** — 이 계획에서 유일하게 코드로 해결되지 않는 항목이다. 미설치 상태라 착수 시점을 먼저 잡아야 한다. 막히면 Phase 2(채팅)를 먼저 끝내고 영상은 뒤로 미룬다.
-2. ~~Redis Pub/Sub을 쓸지~~ — **SimpleBroker로 확정**(2026-07-28). 로드맵에는 Redis Pub/Sub이 적혀 있으나 단일 인스턴스에서 이득이 없어 뒤집었다. 확장 필요 시 `WebSocketConfig` 한 곳만 교체한다.
-3. **경매 실시간(AUCT-002 이후)은 이 계획 밖** — 입찰 동시성의 Redis 분산락 설계가 미확정이라 착수 전 별도 확인이 필요하다(BE/CLAUDE.md 규칙).
-4. **AI 채팅 매니저 보류** — AI팀(-183·-192·-196·-197)은 완료 상태로 BE 협의를 기다리고 있다. 재개 시 "답변 전달 폴링→푸시", "답변 노출 화자", "비매너 판정 동기 차단 vs 비동기 숨김" 세 가지를 정해야 한다.
+- [ ] `WebSocketConfig` — `@EnableWebSocketMessageBroker`, 엔드포인트 `/ws`, 앱 prefix `/app`, SimpleBroker `/topic`
+- [ ] `setAllowedOriginPatterns` — HTTP CORS와 **별개**다. 안 하면 핸드셰이크에서 막힌다
+- [ ] `StompAuthChannelInterceptor` — CONNECT 프레임의 `Authorization` native header 검증, principal에 `memberId` 주입. `JwtTokenProvider` 재사용
+- [ ] **토큰이 없으면 익명으로 통과시킨다.** 비회원도 시청·채팅 읽기가 가능해야 한다. 토큰이 *잘못된* 경우만 거부
+- [ ] `SecurityConfig` `PUBLIC_ENDPOINTS`에 `/ws/**`
+- [ ] 테스트 — 유효 토큰 CONNECT 성공 / 토큰 없이 CONNECT 성공(익명) / 잘못된 토큰 거부
+
+### Step 2 — `-451` `ChatMessage` 엔티티 · `-447`과 병렬 가능
+
+- [ ] `chat` 패키지 스캐폴딩 (`.claude/skills/scaffold`)
+- [ ] `ChatMessage` 엔티티 — `schema.sql`의 `chat_message` 그대로. `senderType` enum(`USER`/`SYSTEM`/`AI`)
+- [ ] 정적 팩토리 `userMessage()` / `systemMessage()` — `@Builder`를 쓰면 "USER인데 작성자 없음" 같은 잘못된 조합이 만들어진다. DB `ck_chat_user_has_member`와 같은 규칙을 코드에서도 막는다
+- [ ] `ChatMessageRepository`
+- [ ] 엔티티 단위 테스트
+- [ ] `BE/README.md` 디렉터리 구조에 `chat` 추가
+
+### Step 3 — `-452` 실시간 채팅 송수신 · 선행 `-447`, `-451`
+
+- [ ] `@MessageMapping("/lives/{liveId}/chat")` 핸들러
+- [ ] 저장 → `/topic/lives/{liveId}/chat` 브로드캐스트
+- [ ] **비회원 발언 차단** — principal 유무로 판정. DB CHECK는 최후 방어선일 뿐, 여기서 먼저 막는다
+- [ ] **종료·취소된 방송 발언 차단** — `Live.isClosed()` 재사용 (JY007에서 만든 것)
+- [ ] 메시지 길이 검증, 빈 문자열 거부
+- [ ] STOMP 에러 응답 규약 — `/user/queue/errors`. REST의 `ApiResponse`와 다르므로 FE와 맞춰야 한다
+
+### Step 4 — `-453` 과거 메시지 조회 API · 선행 `-451`
+
+- [ ] `GET /api/lives/{liveId}/chat-messages` — `id` 커서 페이징(위 판단 7)
+- [ ] **비회원 조회 허용** — `SecurityConfig` 공개 경로 추가
+- [ ] 인덱스 실행계획 확인 후 필요하면 `(live_id, id DESC)` 추가
+- [ ] Swagger 문서화 (`.claude/skills/swagger`)
+
+### Step 5 — `-454` 채팅 테스트 · 선행 `-452`, `-453`
+
+- [ ] STOMP 통합 테스트 — 구독자가 브로드캐스트를 받는지, 저장이 함께 되는지
+- [ ] 권한 분기 — 회원 발언 성공 / 비회원 발언 차단 / 비회원 구독 허용
+- [ ] 종료된 방송 발언 차단
+- [ ] 과거 조회 커서 경계, 비회원 200
+
+> Spring Boot 4 함정 (이미 두 번 밟음): 테스트 컨텍스트에 `ObjectMapper` 빈이 없다(JSON 직접 조립), `@AutoConfigureMockMvc` 사용 불가(`MockMvcBuilders.webAppContextSetup`).
+
+### Step 6 — `-450` 실시간 시청자 수 · 선행 `-447`
+
+- [ ] `SessionSubscribeEvent`/`SessionUnsubscribeEvent`/`SessionDisconnectEvent` 리스너 (위 판단 2)
+- [ ] Redis 카운터 + `sessionId → liveId` 매핑
+- [ ] 기동 시 stale 키 정리 (위 판단 3)
+- [ ] 최대치 갱신 시에만 `live.peakViewerCount` 반영 — 매 접속마다 DB를 때리지 않는다
+- [ ] `/topic/lives/{liveId}/viewers` 브로드캐스트
+- [ ] `LiveListItemResponse.viewerCount` 실제 값 연결 + `LiveListSort.VIEWERS_DESC` 개방
+- [ ] **FE 회신** — `.codex/requests/be/009-live-list-api-contract.md` 잔여 항목 해소 후 문서 삭제
+
+### Step 7 — `-448` OpenVidu v3 서버 구축 · 코드와 병렬, 지금 착수
+
+**유일하게 코드로 해결되지 않는 항목이다.** 리드타임이 있으니 Step 1과 동시에 시작한다.
+
+- [ ] OpenVidu v3 설치 + `docker-compose` 반영 (메모리 2.5GB 예산 내)
+- [ ] 미디어 UDP 포트 UFW 개방 (TURN 포함)
+- [ ] Caddy 정합 — 기존 `infra/caddy/Caddyfile`에 미디어 라우팅 추가 또는 OpenVidu 내장 Caddy로 일원화
+- [ ] API key/secret을 GitLab CI/CD Variables로 (**레포 커밋 금지**)
+- [ ] `BE/docs/infra/ec2.md` 갱신
+
+### Step 8 — `-449` OpenVidu 연동·토큰 발급 · 선행 `-448`(검증 단계만)
+
+- [ ] LiveKit Java SDK 의존성 추가 후 **판단 1을 먼저 검증** — 토큰 발급에 서버가 필요한가
+- [ ] `OpenViduClient` — 기존 `AiClient`(Spring → FastAPI) 패턴대로 `global/client`에 배치
+- [ ] 방송 시작(`SCHEDULED → LIVE`) 시 room 이름 생성 → `Live.assignOpenviduRoom()` 호출. **메서드는 이미 있고 부르는 곳만 없다**
+- [ ] 호스트 송출 토큰 / 시청자 구독 토큰 발급 API. **시청 토큰은 비회원도 받을 수 있어야 한다**(LIVE-005 비회원 공개)
+- [ ] 종료 시 room 정리 — `LiveCleanupHook` 구현체로 등록. **종료 로직 자체는 다시 열지 않는다**
+- [ ] 실제 브라우저 2개로 영상 송수신 확인
+
+### Step 9 — FE 계약 문서 (Step 3 직후)
+
+FE 티켓 -423(채팅·경매 패널 UI)·-432가 이 계약 없이는 못 움직인다. **-452 완료 시점에 바로 낸다.**
+
+- [ ] `.claude/requests/fe/`에 STOMP 계약 문서 — 엔드포인트 `/ws`, destination 표(판단 6), CONNECT 헤더 인증 방식(판단 4), 메시지 payload, 에러 규약, 비회원 제약
+
+## 남은 미결정
+
+1. **-448을 언제 착수하나.** 이 계획에서 유일한 외부 의존이다. 막히면 Step 1~6(채팅·시청자 수)을 먼저 끝낸다 — 영상에 의존하지 않는다.
+2. **경매 실시간(AUCT-002 이후)은 이 계획 밖.** 입찰 동시성의 Redis 분산락 설계가 미확정이라 착수 전 사용자 확인이 필요하다(`BE/CLAUDE.md` 규칙).
+3. **AI 채팅 매니저 보류.** 재개 시 "답변 전달 폴링→푸시", "답변 노출 화자", "비매너 판정 동기 차단 vs 비동기 숨김" 세 가지를 정해야 한다.
+
+## 공통 규율
+
+- [ ] 각 단계마다 `.claude/skills/BE:verify` 통과 후 커밋 — **빈 DB로도 한 번 돌린다**(CI 실패 재발 방지)
+- [ ] 새 엔드포인트는 Swagger 어노테이션 동반
+- [ ] push는 사용자가 직접

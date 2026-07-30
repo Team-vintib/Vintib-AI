@@ -77,6 +77,26 @@ public class ProductService {
         return ProductResponse.from(product);
     }
 
+    // DRAFT(최초 등록, PROD-003) 또는 ON_SALE(상시 판매 상품의 경매 전환, PROD-004)에서 호출된다.
+    // 시작가/증액 단위/경매 시간은 여기서 다루지 않는다 — "경매 시작 전에 설정한다"고 명시돼 있고,
+    // 그건 AUCT-001(경매 조건 설정) 영역이다.
+    @Transactional
+    public ProductResponse scheduleAuction(Long sellerId, Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        if (!product.isOwnedBy(sellerId)) {
+            throw new CustomException(ErrorCode.NOT_PRODUCT_OWNER);
+        }
+        if (product.getSaleStatus() != SaleStatus.DRAFT && product.getSaleStatus() != SaleStatus.ON_SALE) {
+            throw new CustomException(ErrorCode.INVALID_PRODUCT_STATE);
+        }
+
+        product.scheduleAuction();
+
+        return ProductResponse.from(product);
+    }
+
     public PageResponse<ProductResponse> getProductList(Pageable pageable) {
         // 정렬은 최신순 고정(PROD-008 범위 밖) — 클라이언트가 Pageable에 다른 sort를 실어 보내도 무시하고 createdAt DESC로 강제한다.
         Pageable sortedByLatest = PageRequest.of(

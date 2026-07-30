@@ -147,10 +147,67 @@ class ProductServiceTest {
     }
 
     @Test
-    void AUCTION_SCHEDULED_상품에_가격을_설정하면_상시_판매_상태로_전환된다() {
-        // 경매 예정 상품의 상시 판매 전환(PROD-004) — 미낙찰 후속 처리(PROD-005/AUCT-014)도 같은 경로다.
-        // 입찰자 없이 경매가 끝나도 상품은 AUCTION_SCHEDULED에
-        // 그대로 남아있고, 판매자가 이 엔드포인트로 가격을 넣어 상시 판매로 전환할 수 있다.
+    void DRAFT_상품을_경매_예정으로_등록한다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductResponse response = productService.scheduleAuction(SELLER_ID, 1L);
+
+        assertThat(response.saleStatus()).isEqualTo(SaleStatus.AUCTION_SCHEDULED);
+        assertThat(response.saleType()).isEqualTo(SaleType.AUCTION);
+        assertThat(response.price()).isNull();
+    }
+
+    @Test
+    void ON_SALE_상품을_경매_예정으로_전환한다() {
+        // 상시 판매 상품의 경매 전환(PROD-004) — DRAFT에서 경매 예정으로 등록하는 것과 같은 메서드를 쓴다.
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        product.registerDirectSale(50000L);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductResponse response = productService.scheduleAuction(SELLER_ID, 1L);
+
+        assertThat(response.saleStatus()).isEqualTo(SaleStatus.AUCTION_SCHEDULED);
+        assertThat(response.saleType()).isEqualTo(SaleType.AUCTION);
+        assertThat(response.price()).isNull();
+    }
+
+    @Test
+    void DRAFT_또는_ON_SALE이_아니면_경매_등록시_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.SOLD);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.scheduleAuction(SELLER_ID, 1L))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PRODUCT_STATE);
+    }
+
+    @Test
+    void 본인이_아니면_경매_등록시_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.scheduleAuction(2L, 1L))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_PRODUCT_OWNER);
+    }
+
+    @Test
+    void 존재하지_않는_상품이면_경매_등록시_예외를_던진다() {
+        when(productRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> productService.scheduleAuction(SELLER_ID, 1L))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PRODUCT_NOT_FOUND);
+    }
+
+    @Test
+    void 미낙찰_상품을_상시_판매로_전환한다() {
         when(seller.getId()).thenReturn(SELLER_ID);
         Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
         ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.AUCTION_SCHEDULED);

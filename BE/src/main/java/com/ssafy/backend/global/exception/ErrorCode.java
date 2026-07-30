@@ -32,6 +32,8 @@ public enum ErrorCode {
     PRODUCT_ALREADY_LINKED(HttpStatus.CONFLICT, "L005", "이미 라이브에 연결된 상품입니다."),
     LIVE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "L006", "라이브에 연결되지 않은 상품입니다."),
     INVALID_LIVE_STATE(HttpStatus.BAD_REQUEST, "L007", "현재 방송 상태에서는 해당 처리를 할 수 없습니다."),
+    CHAT_GUEST_NOT_ALLOWED(HttpStatus.UNAUTHORIZED, "L008", "채팅은 로그인 후 이용할 수 있습니다."),
+    CHAT_CONTENT_INVALID(HttpStatus.BAD_REQUEST, "L009", "메시지는 1자 이상 500자 이하여야 합니다."),
 
     // [경매/입찰]
     AUCTION_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "A001", "현재 진행 중인 경매가 아닙니다."),
