@@ -133,7 +133,7 @@ export const routes: RouteRecordRaw[] = [
   {
     path: ROUTE_PATHS.LIVE_WATCH,
     name: ROUTE_NAMES.LIVE_WATCH,
-    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    component: () => import('@/domains/live/pages/LiveWatchPage.vue'),
     meta: { title: '라이브 시청' },
   },
   {
