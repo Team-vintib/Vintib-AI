@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import {
+  getBrands,
+  getCategories,
+  getCategoryCode,
+  type BrandDto,
+  type CategoryDto,
+} from '@/domains/product/api/productApi'
 import { submitProductRegistrationDraft } from '@/domains/product/api/productRegistrationApi'
 import ProductPhotoUploader from '@/domains/product/components/ProductPhotoUploader.vue'
 import {
@@ -61,6 +68,20 @@ const isAdditionalAiPhotoPickerOpen = ref(false)
 const registeredProductId = ref('')
 const isSubmittingRegistration = ref(false)
 const registrationSubmitError = ref('')
+const brands = ref<BrandDto[]>([])
+const categories = ref<CategoryDto[]>([])
+const registrationCategoryOptions = computed(() => {
+  if (!categories.value.length) {
+    return PRODUCT_REGISTRATION_CATEGORY_OPTIONS
+  }
+
+  return categories.value
+    .filter((category) => category.depth <= 2)
+    .map((category) => ({
+      id: String(category.id),
+      label: category.name,
+    }))
+})
 
 const priceRecommendationBuckets: ProductRegistrationPriceBucket[] = [
   { id: 'under-30', label: '~3만', productCount: 6 },
@@ -182,8 +203,17 @@ const getMeasurementError = (fieldId: string, value: string | number) => {
     : PRODUCT_REGISTRATION_VALIDATION_MESSAGES.measurementInvalid
 }
 
+const selectedCategoryCode = computed(() => {
+  if (PRODUCT_REGISTRATION_MEASUREMENT_FIELDS_BY_CATEGORY[draft.categoryId]) {
+    return draft.categoryId
+  }
+
+  const selectedCategory = categories.value.find((category) => String(category.id) === draft.categoryId)
+
+  return selectedCategory ? getCategoryCode(selectedCategory.name) : ''
+})
 const activeMeasurementFields = computed(
-  () => PRODUCT_REGISTRATION_MEASUREMENT_FIELDS_BY_CATEGORY[draft.categoryId] ?? [],
+  () => PRODUCT_REGISTRATION_MEASUREMENT_FIELDS_BY_CATEGORY[selectedCategoryCode.value] ?? [],
 )
 const attributesStepErrors = computed(() => ({
   size:
@@ -228,7 +258,7 @@ const selectedColorLabel = computed(
 )
 const selectedCategoryLabel = computed(
   () =>
-    PRODUCT_REGISTRATION_CATEGORY_OPTIONS.find((option) => option.id === draft.categoryId)?.label ||
+    registrationCategoryOptions.value.find((option) => option.id === draft.categoryId)?.label ||
     '',
 )
 const selectedSizeLabel = computed(
@@ -692,7 +722,10 @@ const moveToNextStep = async () => {
     isSubmittingRegistration.value = true
 
     try {
-      const submitResult = await submitProductRegistrationDraft(draft)
+      const submitResult = await submitProductRegistrationDraft(draft, {
+        brands: brands.value,
+        categories: categories.value,
+      })
       registeredProductId.value = submitResult.productId
     } catch {
       registrationSubmitError.value = '상품 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.'
@@ -759,6 +792,22 @@ const continueRegistration = () => {
 const moveToRegisteredProduct = () => {
   router.push({ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId: registeredProductId.value || 'preview' } })
 }
+
+const loadProductMasterData = async () => {
+  try {
+    const [brandResponse, categoryResponse] = await Promise.all([getBrands(), getCategories()])
+
+    brands.value = brandResponse
+    categories.value = categoryResponse
+  } catch {
+    brands.value = []
+    categories.value = []
+  }
+}
+
+onMounted(() => {
+  void loadProductMasterData()
+})
 
 onBeforeUnmount(() => {
   draft.photos.forEach((photo) => {
@@ -943,7 +992,7 @@ onBeforeUnmount(() => {
                 >
                   <option value="">카테고리 선택</option>
                   <option
-                    v-for="option in PRODUCT_REGISTRATION_CATEGORY_OPTIONS"
+                    v-for="option in registrationCategoryOptions"
                     :key="option.id"
                     :value="option.id"
                   >

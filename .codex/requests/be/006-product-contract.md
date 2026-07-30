@@ -273,3 +273,96 @@ Content-Type: application/json
 - `FE/docs/frontend/api/product-detail-price-distribution.md`
 - `FE/docs/frontend/screens/PROD-001/requirements.md`
 - `FE/docs/frontend/screens/PROD-006/requirements.md`
+
+## 7. 상품 API 연동 전 추가 확인 요청
+
+FE에서 다음 작업으로 상품 목록/상세/등록/찜 API를 실제 연동할 예정이다. 현재 BE에 구현된 API 중 바로 붙일 수 있는 부분과 화면 구현상 부족한 부분을 아래 기준으로 추가 확인 요청한다.
+
+### 7.1 상품 목록 조회 계약
+
+현재 `GET /api/products`는 `Pageable`만 받고 최신순 고정으로 동작한다. 상품 목록 화면은 아래 상태를 가지고 있어 query 계약이 필요하다.
+
+| FE 화면 상태 | 요청 query 제안 | 비고 |
+| --- | --- | --- |
+| 검색어 | `keyword` | 상품명/브랜드명 검색 범위 확인 필요 |
+| 카테고리 | `categoryIds` | 다중 선택 가능 여부 확인 필요 |
+| 상태 등급 | `conditionGrades` | `S`, `A`, `B`, `C` |
+| 판매 방식 | `saleType` | `DIRECT`, `AUCTION`, `ALL` 중 BE enum과 매핑 필요 |
+| 가격 범위 | `minPrice`, `maxPrice` | 원 단위 number |
+| 정렬 | `sort` | `LATEST`, `PRICE_ASC`, `PRICE_DESC` |
+| 페이지 | `page`, `size` | Spring `Pageable` 기준 |
+
+목록 카드에 필요한 응답 필드:
+
+| 필드 | 타입 | 필요 이유 |
+| --- | --- | --- |
+| `id` | number | 상세 이동 |
+| `brandName` | string | 카드 상단 브랜드 표시 |
+| `title` | string | 상품명 |
+| `price` | number/null | 가격 표시 |
+| `conditionGrade` | `S`/`A`/`B`/`C` | 상태 배지 |
+| `saleType` | `DIRECT_SALE`/`AUCTION` | 탭/배지 |
+| `primaryImageUrl` | string/null | 카드 썸네일 |
+| `isWished` | boolean | 로그인 사용자 기준 찜 상태. 비로그인 false |
+
+현재 `ProductResponse`에는 `brandId`만 있고 `brandName`, `primaryImageUrl`, `isWished`가 없어 FE에서 카드 품질이 떨어진다. 목록 응답에 포함 가능 여부 확인을 요청한다.
+
+### 7.2 상품 목록 인증 정책
+
+`ProductController#getProductList`는 Swagger 설명상 `401 인증 필요`와 `bearerAuth`가 붙어 있다. 화면상 상품 목록은 비회원도 볼 수 있는 공개 탐색 화면으로 쓰는 것이 자연스럽다.
+
+요청:
+
+- `GET /api/products`를 비회원 조회 가능으로 열 수 있는지 확인
+- 비회원 조회가 가능하다면 `isWished=false`로 응답
+- 로그인 사용자가 access token을 보낸 경우에만 `isWished` 계산
+
+### 7.3 상품 상세 화면 필드
+
+현재 상세 UI가 필요로 하는 필드 중 BE `ProductDetailResponse`에 없는 항목:
+
+| 필드 | 타입 | 필요 이유 |
+| --- | --- | --- |
+| `brandName` | string | 상세 기본 정보 |
+| `categoryName` | string | 상세 기본 정보 |
+| `color` | string/null | 등록 정보 표시 |
+| `material` | string/null | 등록 정보 표시 |
+| `measurements` | object/null | 실측 정보 표시 |
+| `purchasedAt` | string/null | 빈티지 구매/연식 정보 표시 |
+| `purchasedCountry` | string/null | 구매 국가 표시 |
+| `isWished` | boolean | 상세 찜 초기 상태 |
+| `seller.followerCount` | number | 판매자 요약 |
+| `seller.productCount` | number | 판매자 요약 |
+| `linkedLive` | object/null | 해당 상품이 예정/진행 라이브에 연결된 경우 표시 |
+| `sellerDisclosedDefects` | array | 판매자 고지 하자 |
+| `aiQualityAnalysis` | object/null | AI 품질 분석 결과 |
+| `similarProducts` 또는 `priceDistribution` | object/array | 유사 상품 가격 분포 |
+
+FE는 우선 BE가 제공하는 기본 상세와 images만 붙이고, 위 항목은 BE 계약이 생기기 전까지 빈 상태 또는 기존 목업 fallback으로 처리할 예정이다.
+
+### 7.4 찜 API와 상품 응답의 관계
+
+찜 생성/삭제 API는 구현되어 있으나 목록/상세 응답에 현재 사용자의 찜 여부가 없다.
+
+요청:
+
+- `GET /api/products`, `GET /api/products/{id}` 응답에 `isWished` 포함 가능 여부 확인
+- 어렵다면 `GET /api/users/{userId}/wishes`로 FE가 초기 찜 Set을 구성해도 되는지 확인
+- `DELETE /api/users/{userId}/wishes/{id}`의 `{id}`는 찜 PK가 아니라 상품 ID라는 점을 Swagger/문서에 계속 명시
+
+### 7.5 상품 등록 플로우 확정
+
+현재 바로 가능한 직접 판매 등록 흐름:
+
+1. `POST /api/products`로 DRAFT 생성
+2. 이미지마다 `POST /api/products/{id}/images/upload-url`
+3. 발급받은 presigned URL로 `PUT` 업로드
+4. `POST /api/products/{id}/images`로 이미지 등록
+5. 직접 판매라면 `PATCH /api/products/{id}/status`로 가격 설정 및 `ON_SALE` 전환
+
+추가 확인 요청:
+
+- `PATCH /api/products/{id}/status`가 직접 판매 전용인지, 다른 상태 전환에도 재사용할 예정인지
+- 경매 상품 등록 시 상품 상태를 `AUCTION_SCHEDULED`로 만드는 API 또는 플로우
+- `POST /api/lives/{liveId}/products`와 경매 생성 API를 상품 등록 완료 시점에 같이 호출해도 되는지
+- 이미지 업로드 중 일부 실패 시 FE가 이미 생성된 DRAFT 상품/이미지를 정리할 수 있는 삭제 API가 필요한지
