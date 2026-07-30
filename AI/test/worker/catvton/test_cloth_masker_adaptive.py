@@ -26,6 +26,23 @@ def _torso_densepose(height: int, width: int, torso_top: int, torso_bottom: int)
     return densepose
 
 
+def _torso_and_legs_densepose(
+    height: int,
+    width: int,
+    torso_top: int,
+    torso_bottom: int,
+    legs_top: int,
+    legs_bottom: int,
+):
+    """torso(위쪽)와 legs(아래쪽)가 서로 다른 행 범위에 있는 합성 densepose 마스크 —
+    실사진에서 재현된 버그(바지 마스크에 torso 행 범위를 기준으로 컷오프를 적용해 다리
+    마스크 전체가 잘려나감)를 재현하기 위한 헬퍼. `legs` 인덱스는 `DENSE_INDEX_MAP`의 11."""
+    densepose = np.zeros((height, width), dtype=np.uint8)
+    densepose[torso_top:torso_bottom, :] = 1  # torso
+    densepose[legs_top:legs_bottom, :] = 11  # legs
+    return densepose
+
+
 def test_zero_dilation_and_full_cutoff_leaves_mask_unchanged():
     """dilation_px=0, cutoff_ratio=1.0(둘 다 무조정 신호)이면 원본 마스크 그대로여야 한다."""
     mask = _rectangle_mask(100, 100, top=20, bottom=80, left=20, right=80)
@@ -76,3 +93,23 @@ def test_cutoff_ratio_below_one_removes_lower_portion():
 
     assert result[40, 50] == 1  # torso 상단 근처는 남아있어야 한다
     assert result[90, 50] == 0  # torso 하단은 잘려나가야 한다
+
+
+def test_lower_part_uses_legs_row_range_not_torso():
+    """회귀 테스트: 바지 마스크에 컷오프를 적용할 때 torso(마스크와 무관하게 훨씬 위쪽에
+    있는) 행 범위를 기준으로 삼으면 다리 마스크 전체가 잘려나가는 버그가 실사진 검증
+    (`AI/validation/TRYON/AI_tryon/CatVTON/verify_adaptive_masking.py`)에서 발견됐다 —
+    `part='lower'`면 legs 행 범위를 기준으로 삼아야 한다."""
+    # torso는 0~20행(다리 마스크와 겹치지 않는 훨씬 위쪽), legs는 60~100행.
+    mask = _rectangle_mask(100, 100, top=60, bottom=100, left=20, right=80)
+    densepose = _torso_and_legs_densepose(
+        100, 100, torso_top=0, torso_bottom=20, legs_top=60, legs_bottom=100
+    )
+
+    result = cloth_masker.apply_adaptive_adjustment(
+        mask, densepose, dilation_px=0.0, cutoff_ratio=0.7, part="lower"
+    )
+
+    # torso 행 범위(0~20) 기준으로 컷오프를 계산했다면 cutoff가 20보다 작아 다리 마스크
+    # 전체(60행부터 시작)가 사라진다 — legs 범위 기준이면 대부분 살아남아야 한다.
+    assert result.sum() > mask.sum() * 0.5

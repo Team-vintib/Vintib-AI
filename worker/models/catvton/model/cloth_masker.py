@@ -210,17 +210,27 @@ def adjust_mask_for_fit(
 # =========================================================
 
 
+_LENGTH_REFERENCE_DENSE_PARTS = {"upper": ["torso"], "lower": ["thighs", "legs"]}
+
+
 def apply_adaptive_adjustment(
     mask_area: np.ndarray,
     densepose_mask: np.ndarray,
     dilation_px: float,
     cutoff_ratio: float,
+    part: str = "upper",
 ) -> np.ndarray:
     """`compute_mask_adjustment()`가 계산한 연속값을 실제 마스크 배열에 적용한다.
 
     `adjust_mask_for_fit()`의 고정 커널 dilate(오버사이즈)·70% 고정 컷오프(크롭)를 대체하는
     연속 버전 — 고정 커널 반복 대신 distance transform을 재threshold해서 팽창/수축 폭을
     픽셀 단위로 정밀하게 조절한다.
+
+    **길이 컷오프 기준 신체 부위는 `part`에 따라 다르다.** `adjust_mask_for_fit`의 원래
+    `cropped` 로직은 항상 torso 행 범위를 썼는데(상의 전용으로만 쓰였으니 문제 없었다),
+    바지(`part='lower'`)에 그대로 재사용하면 torso 행 범위(대개 다리 마스크보다 훨씬 위쪽)를
+    기준으로 컷오프를 계산해버려서 다리 마스크 전체가 거의 다 잘려나간다 — 실사진으로 검증
+    중 발견한 버그. `part='lower'`면 다리(thighs/legs) 행 범위를 기준으로 삼는다.
     """
     mask_area = mask_area.astype(np.uint8)
 
@@ -228,11 +238,12 @@ def apply_adaptive_adjustment(
         mask_area = _resize_by_distance_transform(mask_area, dilation_px)
 
     if cutoff_ratio < 1.0:
-        torso_area = part_mask_of(['torso'], densepose_mask, DENSE_INDEX_MAP)
-        torso_rows = np.where(torso_area.any(axis=1))[0]
-        if len(torso_rows) > 0:
-            torso_top, torso_bottom = torso_rows.min(), torso_rows.max()
-            cutoff = torso_top + int((torso_bottom - torso_top) * cutoff_ratio)
+        reference_parts = _LENGTH_REFERENCE_DENSE_PARTS.get(part, ["torso"])
+        reference_area = part_mask_of(reference_parts, densepose_mask, DENSE_INDEX_MAP)
+        reference_rows = np.where(reference_area.any(axis=1))[0]
+        if len(reference_rows) > 0:
+            top, bottom = reference_rows.min(), reference_rows.max()
+            cutoff = top + int((bottom - top) * cutoff_ratio)
             mask_area = mask_area.copy()
             mask_area[cutoff:, :] = 0
 
@@ -357,7 +368,9 @@ class AutoMasker:
         adjustment = compute_mask_adjustment(part, body_measurements, garment_measurements)
         if adjustment is not None:
             dilation_px, cutoff_ratio = adjustment
-            mask_area = apply_adaptive_adjustment(mask_area, densepose_mask, dilation_px, cutoff_ratio)
+            mask_area = apply_adaptive_adjustment(
+                mask_area, densepose_mask, dilation_px, cutoff_ratio, part=part
+            )
         else:
             mask_area = adjust_mask_for_fit(mask_area, densepose_mask, fit_type)
         mask_area = mask_area & (~strong_protect_area)  # 안전을 위해 재확인
