@@ -131,7 +131,7 @@ RESTRICT_TO_GARMENT = True
 # 가설: ① 의류 마스크가 소매 끝·밑단을 못 덮으면 그 부분이 통째로 잘려나간다 ② 확대되면서
 # 유형을 구분하던 주변 맥락이 좁아져 개념 매칭이 한쪽으로 쏠린다. 상세 데이터·크롭 버전
 # 스냅샷은 각 노트북의 `CROP_BEFORE_DETECT` 지역 변수 옆 주석과
-# `sam3-condition-check/sam3_qc_test_seg_ver.ipynb` 참고.
+# `sam3-condition-check/sam3_qc_test_bbox_crop.ipynb` 참고.
 BENIGN_CONTAINMENT = 0.6  # 하자 마스크가 양성 마스크에 이만큼 잠기면 억제 후보
 SUPPRESS_BENIGN = True
 

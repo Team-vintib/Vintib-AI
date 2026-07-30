@@ -110,8 +110,19 @@ LAB-46 문서의 점검 기준 7개 중 이번에 실측 가능한 것:
 | `AI/validation/QUAL/clipseg-condition-check/clipseg_qc_test.ipynb` | `probs_to_instances` 지역 정의 제거 → `qc_shared` import로 교체(+ 미사용이 된 `cv2`·`MIN_AREA_RATIO` import 정리, §2 마크다운에 이관 사실 명시) |
 | `AI/.gitignore` | 새 `clipseg-sam3tracker-hybrid-check/outputs/` 산출물 경로 추가 |
 
-`sam3_qc_test.ipynb`(§9 로딩·변환 패턴만 참고), `sam3_qc_test_seg_ver.ipynb`,
-프로덕션(`worker/`)은 건드리지 않았다.
+`sam3_qc_test.ipynb`(§9 로딩·변환 패턴만 참고), 프로덕션(`worker/`)은 건드리지 않았다.
+
+**[2026-07-30 추가 변경]** 이후 대화에서 크롭 전략 자체를 실험하는 방향으로 스코프가 넓어졌다.
+`sam3_qc_test_seg_ver.ipynb`(항상 bbox 크롭이던 스냅샷)에 §10(bbox vs 마스크 마스킹 비교)을
+한 번 추가했다가, 파일을 아예 **역할별로 분리**하는 쪽으로 정리했다:
+
+- `sam3_qc_test_seg_ver.ipynb` → **`sam3_qc_test_bbox_crop.ipynb`로 개명**(git mv) — 파일이
+  실제로 하는 일(사각형 bbox 크롭, 배경 노출)을 이름으로 드러낸다.
+- **`sam3_qc_test_masking.ipynb` 신규** — 같은 파이프라인을 그대로 두고 크롭 함수만 마스크
+  밖 배경을 검정(0)으로 채우는 버전으로 교체.
+- §10(같은 파일 안에서 bbox/mask 동시 비교)은 **제거** — 두 전용 노트북이 각자
+  `outputs/*_qc_summary.json`을 저장하므로, 비교는 그 산출물을 나중에 대조하는 쪽으로 옮긴다
+  (SAM3 단독 vs CLIPSeg 비교가 이미 이 패턴을 쓰고 있다).
 
 ### 초안 대비 설계 보강 2가지
 
