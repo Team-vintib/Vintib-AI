@@ -159,4 +159,4 @@ public class Product extends BaseTimeEntity {
                 || saleStatus == SaleStatus.ON_SALE
                 || saleStatus == SaleStatus.PRIVATE;
     }
-}
+}
