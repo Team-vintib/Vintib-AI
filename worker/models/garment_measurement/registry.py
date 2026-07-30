@@ -13,6 +13,8 @@
 
 from typing import TypedDict
 
+from .contracts import GarmentCategory, LandmarkType
+
 
 class BackendConfig(TypedDict):
     model_id: str | None
@@ -70,6 +72,66 @@ LANDMARK_BACKENDS: dict[str, BackendConfig] = {
     },
 }
 ACTIVE_LANDMARK_BACKEND = "mock"
+
+# DeepFashion2는 294개 랜드마크를 13개 카테고리에 나눠 정의한다(카테고리마다 포인트 개수·배치가
+# 다름) — 모델은 항상 294개를 전부 예측하지만, 실제로 의미 있는 건 해당 카테고리 구간뿐이다.
+# 순서는 DeepFashion2 공식 category_id 순(1~13)과 같다: short_sleeve_top(25), long_sleeve_top(33),
+# short_sleeve_outwear(31), long_sleeve_outwear(39), vest(15), sling(15), shorts(10), trousers(14),
+# skirt(8), short_sleeve_dress(29), long_sleeve_dress(37), vest_dress(19), sling_dress(19).
+# 실사진으로 검증한 3개만 채운다 — 나머지는 검증 전까지 오프셋을 몰라도 되니 안 둔다.
+_DF2_CATEGORY_SIZES = [25, 33, 31, 39, 15, 15, 10, 14, 8, 29, 37, 19, 19]
+
+
+def _df2_offset(category_index_1based: int) -> int:
+    """category_id(1~13) 앞에 오는 카테고리들의 랜드마크 개수 합 — 이 카테고리 구간의 시작 인덱스."""
+    return sum(_DF2_CATEGORY_SIZES[: category_index_1based - 1])
+
+
+# (DF2 category_id, 이 카테고리의 랜드마크 개수). `AI/validation/garment-landmark-check/`에서
+# 실제 사진 + `verify_hrnet_landmarks.py`로 인덱스를 찍어 눈으로 확인한 값이다.
+DF2_CATEGORY_RANGES: dict[GarmentCategory, tuple[int, int]] = {
+    GarmentCategory.short_sleeve_top: (_df2_offset(1), _DF2_CATEGORY_SIZES[0]),
+    GarmentCategory.trousers: (_df2_offset(8), _DF2_CATEGORY_SIZES[7]),
+    GarmentCategory.long_sleeve_dress: (_df2_offset(11), _DF2_CATEGORY_SIZES[10]),
+}
+
+# 카테고리별 "이 로컬 인덱스(DeepFashion2 표기, 1-based)가 어떤 LandmarkType인지".
+# 값이 없는 로컬 인덱스(예: short_sleeve_top의 10~13, 19~22)는 겨드랑이 부근에 몰린 세부
+# 포인트라 지금 쓰는 4가지 실측 항목엔 안 쓴다 — 필요해지면(가슴단면 등) 여기 추가한다.
+DF2_LANDMARK_MAPPING: dict[GarmentCategory, dict[int, LandmarkType]] = {
+    GarmentCategory.short_sleeve_top: {
+        4: LandmarkType.neckline_center,
+        7: LandmarkType.shoulder_left,
+        25: LandmarkType.shoulder_right,
+        9: LandmarkType.sleeve_end_left,
+        23: LandmarkType.sleeve_end_right,
+        15: LandmarkType.hem_left,
+        16: LandmarkType.hem_center,
+        17: LandmarkType.hem_right,
+    },
+    GarmentCategory.trousers: {
+        1: LandmarkType.waist_left,
+        2: LandmarkType.waist_center,
+        3: LandmarkType.waist_right,
+        4: LandmarkType.hip_left,
+        14: LandmarkType.hip_right,
+        9: LandmarkType.crotch,
+        6: LandmarkType.hem_left_outer,
+        7: LandmarkType.hem_left_inner,
+        11: LandmarkType.hem_right_inner,
+        12: LandmarkType.hem_right_outer,
+    },
+    GarmentCategory.long_sleeve_dress: {
+        4: LandmarkType.neckline_center,
+        7: LandmarkType.shoulder_left,
+        37: LandmarkType.shoulder_right,
+        11: LandmarkType.sleeve_end_left,  # 손목 쪽 커프 바깥 모서리
+        32: LandmarkType.sleeve_end_right,
+        21: LandmarkType.hem_left,
+        22: LandmarkType.hem_center,
+        23: LandmarkType.hem_right,
+    },
+}
 
 
 def reference_backend_config(key: str | None = None) -> BackendConfig:

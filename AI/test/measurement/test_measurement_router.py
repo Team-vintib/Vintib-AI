@@ -49,7 +49,7 @@ def _payload(**overrides) -> dict:
     body = {
         "product_id": 1042,
         "image_url": "https://example.test/scan.jpg",
-        "category": "TOP",
+        "category": "SHORT_SLEEVE_TOP",
     }
     body.update(overrides)
     return body
@@ -83,12 +83,12 @@ def test_job_lands_on_the_garment_measurement_queue(client, fake_redis):
 
 def test_payload_carries_everything_the_worker_needs(client, fake_redis):
     """워커는 payload만 보고 처리한다 — 여기서 빠지면 워커가 job을 처리할 수 없다."""
-    client.post("/measurement/scans", json=_payload(category="BOTTOM"))
+    client.post("/measurement/scans", json=_payload(category="TROUSERS"))
 
     payload = json.loads(fake_redis.pushed[0][1])["payload"]
     assert set(payload) == {"product_id", "image_url", "category", "reference_object"}
     # enum이 객체가 아니라 문자열로 직렬화돼야 워커가 그대로 파싱한다.
-    assert payload["category"] == "BOTTOM"
+    assert payload["category"] == "TROUSERS"
     assert payload["reference_object"] == "A4_PAPER"
 
 

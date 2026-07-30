@@ -81,7 +81,7 @@ class GarmentMeasurementWorker(BaseWorker):
         {
             "product_id": 1042,
             "image_url": "https://.../scan.jpg",
-            "category": "TOP",
+            "category": "SHORT_SLEEVE_TOP",
             "reference_object": "A4_PAPER"
         }
         """

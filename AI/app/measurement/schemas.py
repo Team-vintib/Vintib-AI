@@ -2,10 +2,16 @@
 
 **BE 계약이 바뀌면 이 파일만 고친다.** AI는 측정만 하고 상품 등록 확정·저장은 BE가 한다.
 
-`category`는 v1 범위(상의/하의)만 다룬다 — 랜드마크 세트가 카테고리마다 달라서, 원피스·아우터
-등은 이후 확장 대상이다. `quality/schemas.py`의 `GarmentCategory`와 이름이 겹치지만 값 집합이
-달라 재사용하지 않고 이 도메인 전용으로 별도 선언한다(품질검수 쪽 관례와 동일한 이유 —
-BE 확정 전까지 AI 자체 enum으로 둔다).
+`category`는 **Phase 4 PoC에서 실제 사진 + DeepFashion2 공식 랜드마크 정의도로 눈으로 대조
+검증한 3종만** 다룬다(`AI/validation/garment-landmark-check/verify_hrnet_landmarks.py`) —
+DeepFashion2가 정의하는 나머지 10개 카테고리(긴팔상의/아우터 2종/조끼/슬링/반바지/치마/
+반팔원피스/조끼원피스/슬링원피스)는 대조할 실제 사진이 없어 이번 범위에서 뺐다. 카테고리마다
+294개 랜드마크 중 다른 구간을 쓰고 포인트 배치도 달라서, 검증 안 된 카테고리를 넣으면 조용히
+틀린 값이 나올 위험이 있다 — 실제 사진이 확보되는 대로 하나씩 검증해 추가한다.
+
+`quality/schemas.py`의 `GarmentCategory`와 이름이 겹치지만 값 집합이 달라 재사용하지 않고 이
+도메인 전용으로 별도 선언한다(품질검수 쪽 관례와 동일한 이유 — BE 확정 전까지 AI 자체 enum으로
+둔다).
 
 설계: .claude/plans/ai/010-garment-measurement-scan.md
 """
@@ -28,10 +34,16 @@ class ReferenceObjectType(str, Enum):
 
 
 class GarmentCategory(str, Enum):
-    """랜드마크 세트를 고르는 키. v1은 상의/하의만 다룬다."""
+    """랜드마크 세트를 고르는 키 — DeepFashion2 13개 카테고리 중 실사진으로 검증된 3개만.
 
-    top = "TOP"
-    bottom = "BOTTOM"
+    각 값은 DeepFashion2의 294개 랜드마크 중 서로 다른 구간(카테고리별 고정 오프셋)을 쓴다.
+    구간·포인트 배치 매핑은 `worker/models/garment_measurement/registry.py`의
+    `DF2_CATEGORY_RANGES`/`DF2_LANDMARK_MAPPING` 참고.
+    """
+
+    short_sleeve_top = "SHORT_SLEEVE_TOP"
+    trousers = "TROUSERS"
+    long_sleeve_dress = "LONG_SLEEVE_DRESS"
 
 
 class LandmarkType(str, Enum):
@@ -39,9 +51,12 @@ class LandmarkType(str, Enum):
 
     DeepFashion2 사전학습 모델(HRNet)은 294종을 예측하지만, cm 환산에 실제로 쓰는 건 이 중
     일부뿐이다 — Phase 4 PoC(`AI/validation/garment-landmark-check/`) 결과 보고 필요하면
-    확장한다.
+    확장한다. 상의류(SHORT_SLEEVE_TOP/LONG_SLEEVE_DRESS)는 위쪽 6종을, 하의(TROUSERS)는
+    아래쪽 항목을 쓴다 — 카테고리가 달라도 같은 이름을 재사용할 수 있으면 재사용한다(예:
+    SHOULDER_LEFT는 상의든 원피스든 "어깨점"이라는 같은 의미).
     """
 
+    # 상의/원피스 공통
     shoulder_left = "SHOULDER_LEFT"
     shoulder_right = "SHOULDER_RIGHT"
     sleeve_end_left = "SLEEVE_END_LEFT"
@@ -51,14 +66,35 @@ class LandmarkType(str, Enum):
     hem_center = "HEM_CENTER"
     hem_right = "HEM_RIGHT"
 
+    # 하의(바지) 전용
+    waist_left = "WAIST_LEFT"
+    waist_center = "WAIST_CENTER"
+    waist_right = "WAIST_RIGHT"
+    hip_left = "HIP_LEFT"
+    hip_right = "HIP_RIGHT"
+    crotch = "CROTCH"
+    hem_left_outer = "HEM_LEFT_OUTER"
+    hem_left_inner = "HEM_LEFT_INNER"
+    hem_right_outer = "HEM_RIGHT_OUTER"
+    hem_right_inner = "HEM_RIGHT_INNER"
+
 
 class MeasurementType(str, Enum):
-    """산출하는 실측 항목. 가슴단면(pit-to-pit)은 겨드랑이 랜드마크가 아직 없어 v1 범위 밖."""
+    """산출하는 실측 항목. 가슴단면(pit-to-pit)은 겨드랑이 랜드마크가 아직 없어 범위 밖.
+
+    상의/원피스: SHOULDER_WIDTH/SLEEVE_LENGTH/TOTAL_LENGTH/HEM_WIDTH.
+    하의(바지): WAIST_WIDTH/INSEAM_LENGTH/OUTSEAM_LENGTH/LEG_OPENING_WIDTH.
+    """
 
     shoulder_width = "SHOULDER_WIDTH"
     sleeve_length = "SLEEVE_LENGTH"
     total_length = "TOTAL_LENGTH"
     hem_width = "HEM_WIDTH"
+
+    waist_width = "WAIST_WIDTH"
+    inseam_length = "INSEAM_LENGTH"
+    outseam_length = "OUTSEAM_LENGTH"
+    leg_opening_width = "LEG_OPENING_WIDTH"
 
 
 class RetakeReason(str, Enum):

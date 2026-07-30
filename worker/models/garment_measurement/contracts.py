@@ -24,11 +24,15 @@ class ReferenceObjectType(str, Enum):
 
 
 class GarmentCategory(str, Enum):
-    top = "TOP"
-    bottom = "BOTTOM"
+    """DeepFashion2 13개 카테고리 중 실사진으로 검증된 3개만. 나머지는 검증 전까지 범위 밖."""
+
+    short_sleeve_top = "SHORT_SLEEVE_TOP"
+    trousers = "TROUSERS"
+    long_sleeve_dress = "LONG_SLEEVE_DRESS"
 
 
 class LandmarkType(str, Enum):
+    # 상의/원피스 공통
     shoulder_left = "SHOULDER_LEFT"
     shoulder_right = "SHOULDER_RIGHT"
     sleeve_end_left = "SLEEVE_END_LEFT"
@@ -38,12 +42,29 @@ class LandmarkType(str, Enum):
     hem_center = "HEM_CENTER"
     hem_right = "HEM_RIGHT"
 
+    # 하의(바지) 전용
+    waist_left = "WAIST_LEFT"
+    waist_center = "WAIST_CENTER"
+    waist_right = "WAIST_RIGHT"
+    hip_left = "HIP_LEFT"
+    hip_right = "HIP_RIGHT"
+    crotch = "CROTCH"
+    hem_left_outer = "HEM_LEFT_OUTER"
+    hem_left_inner = "HEM_LEFT_INNER"
+    hem_right_outer = "HEM_RIGHT_OUTER"
+    hem_right_inner = "HEM_RIGHT_INNER"
+
 
 class MeasurementType(str, Enum):
     shoulder_width = "SHOULDER_WIDTH"
     sleeve_length = "SLEEVE_LENGTH"
     total_length = "TOTAL_LENGTH"
     hem_width = "HEM_WIDTH"
+
+    waist_width = "WAIST_WIDTH"
+    inseam_length = "INSEAM_LENGTH"
+    outseam_length = "OUTSEAM_LENGTH"
+    leg_opening_width = "LEG_OPENING_WIDTH"
 
 
 class RetakeReason(str, Enum):

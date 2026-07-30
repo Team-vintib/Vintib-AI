@@ -38,7 +38,7 @@ def _request(**overrides) -> dict:
     payload = {
         "product_id": 1042,
         "image_url": "https://example.test/scan.jpg",
-        "category": "TOP",
+        "category": "SHORT_SLEEVE_TOP",
     }
     payload.update(overrides)
     return payload
@@ -71,8 +71,13 @@ def test_enum_values_are_unique(enum_cls):
     assert len(set(values)) == len(values)
 
 
-def test_categories_cover_top_and_bottom_only():
-    assert {c.value for c in GarmentCategory} == {"TOP", "BOTTOM"}
+def test_categories_are_limited_to_photo_verified_ones():
+    """실사진 + DeepFashion2 정의도로 대조 검증된 3개만 — 나머지 10개는 검증 전까지 범위 밖."""
+    assert {c.value for c in GarmentCategory} == {
+        "SHORT_SLEEVE_TOP",
+        "TROUSERS",
+        "LONG_SLEEVE_DRESS",
+    }
 
 
 def test_reference_object_is_a4_only_for_privacy_reasons():
@@ -86,7 +91,7 @@ def test_reference_object_is_a4_only_for_privacy_reasons():
 def test_minimal_request_defaults_to_a4_reference():
     request = MeasurementScanRequest(**_request())
     assert request.reference_object is ReferenceObjectType.a4_paper
-    assert request.category is GarmentCategory.top
+    assert request.category is GarmentCategory.short_sleeve_top
 
 
 @pytest.mark.parametrize(

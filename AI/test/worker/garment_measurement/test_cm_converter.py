@@ -80,3 +80,64 @@ def test_total_length_uses_neckline_to_hem_center():
 
     total = next(m for m in measurements if m.type is MeasurementType.total_length)
     assert total.value_cm == 50.0  # 500px * 0.1
+
+
+# --- 바지(TROUSERS) 전용 측정 --------------------------------------------------
+
+
+def test_waist_width_is_the_pixel_distance_times_ratio():
+    landmarks = [
+        _landmark(LandmarkType.waist_left, 0.0, 0.0),
+        _landmark(LandmarkType.waist_right, 400.0, 0.0),
+    ]
+    measurements = convert(landmarks, pixel_to_cm_ratio=0.1)
+
+    waist = next(m for m in measurements if m.type is MeasurementType.waist_width)
+    assert waist.value_cm == 40.0
+
+
+def test_inseam_length_averages_both_legs_from_crotch():
+    landmarks = [
+        _landmark(LandmarkType.crotch, 100.0, 0.0),
+        _landmark(LandmarkType.hem_left_inner, 100.0, 300.0),  # 좌: 300px
+        _landmark(LandmarkType.hem_right_inner, 100.0, 340.0),  # 우: 340px
+    ]
+    measurements = convert(landmarks, pixel_to_cm_ratio=0.1)
+
+    inseam = next(m for m in measurements if m.type is MeasurementType.inseam_length)
+    assert inseam.value_cm == 32.0  # (300 + 340) / 2 * 0.1
+
+
+def test_outseam_length_averages_both_legs_from_waist():
+    landmarks = [
+        _landmark(LandmarkType.waist_left, 0.0, 0.0),
+        _landmark(LandmarkType.hem_left_outer, 0.0, 900.0),
+        _landmark(LandmarkType.waist_right, 400.0, 0.0),
+        _landmark(LandmarkType.hem_right_outer, 400.0, 900.0),
+    ]
+    measurements = convert(landmarks, pixel_to_cm_ratio=0.1)
+
+    outseam = next(m for m in measurements if m.type is MeasurementType.outseam_length)
+    assert outseam.value_cm == 90.0
+
+
+def test_leg_opening_width_uses_one_side_when_only_one_is_available():
+    landmarks = [
+        _landmark(LandmarkType.hem_left_outer, 0.0, 0.0),
+        _landmark(LandmarkType.hem_left_inner, 160.0, 0.0),
+    ]
+    measurements = convert(landmarks, pixel_to_cm_ratio=0.1)
+
+    opening = next(m for m in measurements if m.type is MeasurementType.leg_opening_width)
+    assert opening.value_cm == 16.0
+
+
+def test_top_and_trouser_landmarks_never_produce_each_others_measurements():
+    """상의/바지 랜드마크가 섞여 들어와도, 실제로 있는 것만 계산된다(카테고리 분기가 없어도 됨)."""
+    landmarks = [
+        _landmark(LandmarkType.shoulder_left, 0.0, 0.0),
+        _landmark(LandmarkType.waist_left, 0.0, 0.0),
+    ]
+    measurements = convert(landmarks, pixel_to_cm_ratio=0.1)
+
+    assert measurements == []
