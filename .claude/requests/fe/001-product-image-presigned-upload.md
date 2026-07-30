@@ -1,4 +1,4 @@
-# 상품 이미지 업로드 — presigned 2단계 업로드 연동 요청
+# 상품 이미지 업로드 — presigned 3단계 업로드 연동 요청
 
 **요청자 파트**: BE
 **대상 파트**: FE
@@ -33,3 +33,8 @@
 
 - Swagger: `/swagger-ui/index.html` — "상품" 태그 하위 이미지 관련 4개 엔드포인트(업로드 URL 발급/등록/수정/삭제)
 - `BE/src/main/java/com/ssafy/backend/product/controller/ProductController.java`
+
+## 처리 결과
+
+- 2026-07-30: FE 문서 반영 완료.
+- 반영 위치: `FE/docs/frontend/api/api-index.md`, `FE/docs/frontend/implementation/status.md`, `FE/docs/frontend/decisions/open-questions.md`

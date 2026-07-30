@@ -379,15 +379,16 @@ docs/
   상태를 구분하며 mock adapter에서 데이터를 받습니다. 상품 등록은 `/products/new`에서 사진 등록,
   기본 정보, 사이즈/소재, 상태/하자와 AI 품질 검증, 가격, 검토, 완료 7단계를 제공하고 단계별
   필수값·이미지·가격·등록 실패 상태를 처리합니다. 등록 완료는 `productRegistrationApi.ts` mock
-  adapter를 통해 확인하며, 실제 BE 계약은 `.codex/requests/be/014-product-registration-api-contract.md`
-  확정 후 adapter 내부를 교체합니다.
+  adapter를 통해 확인합니다. 상품 이미지 presigned 업로드와 찜 API 계약은 FE API 문서에 반영됐고,
+  실제 상품 등록 확장·이미지 역할·AI 품질 검증·가격 추천·경매 등록 계약은
+  `.codex/requests/be/006-product-contract.md` 확정 후 adapter 내부를 교체합니다.
 - `domains/live`에는 S15P11A108-413·415·418 공개 라이브 목록 View, 진행 중·예정 상태 카드,
   로컬 이미지 기반 mock 데이터와 라이브 시청 route 연결, 카테고리·방송 상태 필터,
   최신 방송·시청자·제목 정렬과 초기화가 구현되어 있습니다. 라이브 목록 검색바는 통합 검색
   라이브 탭으로 이동합니다. 공개 목록에서는 종료 방송과 상품 판매 방식 조건을 제외합니다.
   목록 DTO·adapter와 API 호출 함수, loading skeleton,
   전체 빈 목록·필터 결과 없음·오류·재시도 상태를 제공합니다.
-  `origin/develop-BE@dd6a0b6`에 `GET /api/lives`가 구현됐지만 최종 `009` 계약의
+  `origin/develop-BE@dd6a0b6`에 `GET /api/lives`가 구현됐지만 최종 라이브 계약의
   복수 `categories[]`, 공통 `PageResponse.content`, nullable `viewerCount`와
   `VIEWERS_DESC` 미지원 정책을 기존 418 adapter에 반영하기 전까지 기본값은 mock입니다.
 - `domains/live`에는 LIVE-001/002 라이브 개설 화면이 구현되어 있습니다. `/lives/new`에서
@@ -407,11 +408,11 @@ docs/
 - `domains/auction`에는 S15P11A108-423 시청자 경매 패널이 구현되어 있습니다. 현재가·다음
   입찰가·타이머·최고 입찰자·사용 가능 포인트와 입찰 CTA를 표시하고, mock 처리 중·최근
   입찰자·포인트 부족·예정·종료·상품 없음 상태를 제공합니다. 실제 snapshot·입찰·event와
-  포인트 처리는 `012-live-watch-detail-contract-gaps.md` 계약 확정 후 연결합니다.
+  포인트 처리는 `.codex/requests/be/007-live-tryon-contract.md` 계약 확정 후 연결합니다.
 - `domains/tryon`에는 S15P11A108-425 라이브 AI 시착 패널이 구현되어 있습니다. 등록 사진
   있음·없음, 로컬 이미지 변경, 생성 중·결과·실패·재시도와 결과 저장 피드백을 mock으로
   제공하며, 상품 변경 시 이전 결과를 초기화합니다. 실제 사진·생성·저장 계약은
-  `013-live-tryon-contract.md` 확정 후 연결합니다.
+  `.codex/requests/be/007-live-tryon-contract.md` 확정 후 연결합니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.

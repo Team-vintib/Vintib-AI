@@ -18,8 +18,8 @@
 | 사업자 인증 화면 | 부분   | BIZ-001 필수값·숫자 10자리·이미지 MIME 검증, 제출 활성화·중복 방지와 BIZ-001-2 더미 인증 대기 및 HOME 이동 연결 완료, BE API 대기                    |
 | 홈 화면         | 부분   | HOME 공개 route, 로그인별 Guest/Member 홈 분기, 공통 검색바 기반 검색 패널·섹션·라이브 카드·상품 카드·empty·loading/error/retry 상태 구현, `/api/home`·로그인 시 `/api/home/following` 부분 연동. BE 미제공 필드와 콘텐츠 카드는 FE 보조값 유지 |
 | 상품 목록 화면   | 부분   | PROD-008 공개 route, 홈과 같은 공통 검색바의 통합 검색 상품 탭 이동, 실사형 로컬 이미지·최소/최대 가격 검증과 mock 목록 필터링·빈 상태·상품 카드→상세 route 이동 완료, 실제 조회·찜 API 대기 |
-| 상품 상세 화면   | 부분   | S15P11A108-408 정적 UI, 410 상호작용, 412 로딩·오류·상품 없음·판매 완료 및 AI 분석 전·중·완료·결과 없음·실패 상태 화면과 유사 상품 가격대 분포·상품 상세 이동 구현, 실제 상세·추천 API 대기 |
-| 상품 등록 화면   | 부분   | S15P11A108-409·411·414 `/products/new` route, 사진 등록·기본 정보·사이즈/소재·상태/하자와 AI 품질 검증·가격·검토·완료 7단계 UI 구현. 필수값·이미지·가격·등록 실패 상태와 mock 등록 adapter 구현 완료, 실제 상품 등록·이미지 역할·AI 품질 검증·가격 추천·경매 등록 API 계약은 `014-product-registration-api-contract.md` 기준 BE 협의 대기 |
+| 상품 상세 화면   | 부분   | S15P11A108-408 정적 UI, 410 상호작용, 412 로딩·오류·상품 없음·판매 완료 및 AI 분석 전·중·완료·결과 없음·실패 상태 화면과 유사 상품 가격대 분포·상품 상세 이동 구현. BE 상품 상세에 `images`는 추가 확인됐고, 찜 API 실제 경로도 확인됨. 판매자 상세·연결 라이브·AI 품질 분석·추천 API는 추가 계약 대기 |
+| 상품 등록 화면   | 부분   | S15P11A108-409·411·414 `/products/new` route, 사진 등록·기본 정보·사이즈/소재·상태/하자와 AI 품질 검증·가격·검토·완료 7단계 UI 구현. 필수값·이미지·가격·등록 실패 상태와 mock 등록 adapter 구현 완료. BE presigned 이미지 업로드 3단계 계약은 FE 문서에 반영됐고, 실제 상품 등록·이미지 역할·AI 품질 검증·가격 추천·경매 등록 API 연결 대기 |
 | 라이브 목록 화면 | 부분   | S15P11A108-413·415·418 카드·필터·정렬과 상태 화면, 홈과 같은 공통 검색바의 통합 검색 라이브 탭 이동 구현. `origin/develop-BE@dd6a0b6`에 `GET /api/lives`가 구현됐으며, 최종 009 계약의 복수 `categories[]`·공통 `PageResponse.content`·nullable `viewerCount`·`VIEWERS_DESC` 미지원 정책을 418 adapter에 반영하기 전까지 기본값은 mock |
 | 라이브 개설 화면 | 부분   | LIVE-001/002 `/lives/new` route, 라이브 유형·방송 정보·판매 상품·예약 일정·장비 확인·완료 단계 UI, 필수값/과거 일정 검증, 상품 mock 검색/선택, `getUserMedia` 기반 카메라 미리보기와 마이크 순차 확인 구현. 실제 라이브 생성/예약 API와 방송 SDK 연동 대기 |
 | 라이브 시청 화면 | 부분   | 419 방송 헤더·상품 큐·영상 stage·선택 상품·상태 화면, 423 채팅·반응·경매 패널, 425 사진 중심 AI 시착 패널과 등록 전·생성·결과·실패 mock 상태 구현. 실제 스트리밍·채팅 STOMP·경매·AI API 연동 대기 |
@@ -42,3 +42,11 @@
 | 영역 | 상태 | 비고 |
 | --- | --- | --- |
 | 앱 초기 스플래시 | 완료 | 새 탭 최초 진입 시 `vintib_moving_logo.gif`를 1회 재생한 뒤 요청된 라우트 화면으로 전환. 같은 탭 내 이동에서는 재생하지 않도록 `sessionStorage` 기준 적용. |
+
+## 2026-07-30 FE 요청 문서 반영
+
+| 영역 | 상태 | 비고 |
+| --- | --- | --- |
+| 상품 이미지 업로드 계약 | 문서 반영 | `.claude/requests/fe/001-product-image-presigned-upload.md` 기준으로 `POST /api/products/{productId}/images/upload-url` → S3 `PUT` → `POST /api/products/{productId}/images` 3단계 흐름, 이미지 수정/삭제, 오류 코드 `P004`~`P007`을 API 문서에 반영 |
+| 상품 찜 계약 | 문서 반영 | `.claude/requests/fe/002-wish-api-contract.md` 기준으로 실제 경로 `/api/users/{userId}/wishes`와 0-base 목록 pagination, 오류 코드 `P001`, `S001`~`S003`을 API 문서에 반영 |
+| 인증 계약 | 문서 반영 | `.codex/requests/be/001-auth-contract.md` 기준으로 FE API 문서의 로그인 endpoint를 `/api/auth/signin`, 토큰 재발급을 `/api/auth/reissue`로 정정하고 현재 BE 응답/추가 필요 사항을 분리 |
