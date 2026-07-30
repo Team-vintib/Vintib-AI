@@ -31,7 +31,6 @@ const PRODUCT_REGISTRATION_MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
 
 const router = useRouter()
 const currentStepIndex = ref(0)
-const draftSaveMessage = ref('')
 const photoStepTouched = ref(false)
 const photoUploadError = ref('')
 const basicStepTouched = reactive({
@@ -58,6 +57,7 @@ const pricingStepTouched = reactive({
 })
 const currentAiResultIndex = ref(0)
 const isAdditionalAiPhotoPickerOpen = ref(false)
+const registeredProductId = ref('')
 
 const priceRecommendationBuckets: ProductRegistrationPriceBucket[] = [
   { id: 'under-30', label: '~3만', productCount: 6 },
@@ -81,7 +81,7 @@ const auctionLiveOptions = [
   { id: 'live-20260801-1', label: '8월 1일 19:30 주말 경매 라이브' },
 ]
 
-const draft = reactive<ProductRegistrationDraft>({
+const createInitialDraft = (): ProductRegistrationDraft => ({
   photos: [],
   representativePhotoId: '',
   name: '',
@@ -105,6 +105,8 @@ const draft = reactive<ProductRegistrationDraft>({
   auctionStartPrice: '',
   linkedLiveId: '',
 })
+
+const draft = reactive<ProductRegistrationDraft>(createInitialDraft())
 
 const currentStep = computed(() => PRODUCT_REGISTRATION_STEPS[currentStepIndex.value])
 const isFirstStep = computed(() => currentStepIndex.value === 0)
@@ -689,6 +691,10 @@ const moveToNextStep = () => {
     return
   }
 
+  if (isReviewStep.value) {
+    registeredProductId.value = `preview-${Date.now()}`
+  }
+
   currentStepIndex.value += 1
   scrollToPageTop()
 }
@@ -704,22 +710,44 @@ const moveToStep = (stepId: ProductRegistrationStepId) => {
   scrollToPageTop()
 }
 
-const saveDraft = () => {
-  draftSaveMessage.value = '임시저장은 실제 API 확정 전까지 화면 상태로만 표시합니다.'
-}
-
 const cancelRegistration = () => {
   router.push(ROUTE_PATHS.PRODUCT_LIST)
 }
 
+const resetRegistrationDraft = () => {
+  draft.photos.forEach((photo) => {
+    revokePhotoPreviewUrl(photo)
+  })
+  Object.assign(draft, createInitialDraft())
+  photoStepTouched.value = false
+  photoUploadError.value = ''
+  basicStepTouched.name = false
+  basicStepTouched.brand = false
+  basicStepTouched.color = false
+  basicStepTouched.categoryId = false
+  attributesStepTouched.size = false
+  attributesStepTouched.measurements = {}
+  conditionStepTouched.conditionGrade = false
+  conditionStepTouched.hasDefect = false
+  conditionStepTouched.sellerDefectDescription = false
+  conditionStepTouched.aiPhotos = false
+  conditionStepTouched.aiConfirmation = false
+  pricingStepTouched.saleType = false
+  pricingStepTouched.directSalePrice = false
+  pricingStepTouched.auctionStartPrice = false
+  currentAiResultIndex.value = 0
+  isAdditionalAiPhotoPickerOpen.value = false
+  registeredProductId.value = ''
+}
+
 const continueRegistration = () => {
+  resetRegistrationDraft()
   currentStepIndex.value = 0
-  draftSaveMessage.value = ''
   scrollToPageTop()
 }
 
 const moveToRegisteredProduct = () => {
-  router.push({ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId: 'preview' } })
+  router.push({ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId: registeredProductId.value || 'preview' } })
 }
 
 onBeforeUnmount(() => {
@@ -754,7 +782,10 @@ onBeforeUnmount(() => {
         </ol>
       </nav>
 
-      <div class="product-registration__body">
+      <div
+        class="product-registration__body"
+        :class="{ 'product-registration__body--centered': isReviewStep || isCompleteStep }"
+      >
         <section class="product-registration__panel" :aria-labelledby="`${currentStep.id}-title`">
           <h2 :id="`${currentStep.id}-title`">{{ currentStep.label }}</h2>
           <p>{{ currentStep.description }}</p>
@@ -1430,7 +1461,7 @@ onBeforeUnmount(() => {
                     @input="updateDirectSalePrice"
                     @blur="pricingStepTouched.directSalePrice = true"
                   />
-                  <span>원</span>
+                  <span>P</span>
                 </span>
                 <span
                   v-if="pricingStepErrors.directSalePrice"
@@ -1453,7 +1484,7 @@ onBeforeUnmount(() => {
                       @input="updateAuctionStartPrice"
                       @blur="pricingStepTouched.auctionStartPrice = true"
                     />
-                    <span>원</span>
+                    <span>P</span>
                   </span>
                   <span
                     v-if="pricingStepErrors.auctionStartPrice"
@@ -1638,7 +1669,25 @@ onBeforeUnmount(() => {
           <div v-else class="product-registration__complete" role="status">
             <span class="product-registration__complete-icon" aria-hidden="true">✓</span>
             <h3>상품 등록이 완료되었습니다.</h3>
-            <p>실제 등록 API가 확정되면 등록된 상품 ID로 상세 화면에 이동합니다.</p>
+            <p>등록한 상품을 확인하거나 이어서 새 상품을 등록할 수 있습니다.</p>
+            <dl class="product-registration__complete-summary">
+              <div>
+                <dt>등록 상품</dt>
+                <dd>{{ draft.name.trim() }}</dd>
+              </div>
+              <div>
+                <dt>브랜드</dt>
+                <dd>{{ draft.brand.trim() }}</dd>
+              </div>
+              <div>
+                <dt>판매 유형</dt>
+                <dd>{{ selectedSaleTypeLabel }}</dd>
+              </div>
+              <div>
+                <dt>가격</dt>
+                <dd>{{ selectedPriceLabel }}</dd>
+              </div>
+            </dl>
             <div class="product-registration__complete-actions">
               <button
                 class="product-registration__button product-registration__button--primary"
@@ -1657,10 +1706,6 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <p v-if="draftSaveMessage" class="product-registration__notice" role="status">
-            {{ draftSaveMessage }}
-          </p>
-
           <div v-if="!isCompleteStep" class="product-registration__actions">
             <button
               class="product-registration__button product-registration__button--ghost"
@@ -1668,13 +1713,6 @@ onBeforeUnmount(() => {
               @click="cancelRegistration"
             >
               취소
-            </button>
-            <button
-              class="product-registration__button product-registration__button--secondary"
-              type="button"
-              @click="saveDraft"
-            >
-              임시저장
             </button>
             <button
               class="product-registration__button product-registration__button--secondary"
@@ -1694,7 +1732,11 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <aside class="product-registration__summary" aria-labelledby="registration-summary-title">
+        <aside
+          v-if="!isReviewStep && !isCompleteStep"
+          class="product-registration__summary"
+          aria-labelledby="registration-summary-title"
+        >
           <h2 id="registration-summary-title">상품 정보</h2>
           <div class="product-registration__summary-image">
             <img v-if="representativePhoto" :src="representativePhoto.previewUrl" :alt="representativePhoto.fileName" />
@@ -1840,6 +1882,11 @@ onBeforeUnmount(() => {
   align-items: start;
   gap: var(--space-6);
   grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+.product-registration__body--centered {
+  justify-content: center;
+  grid-template-columns: minmax(0, 880px);
 }
 
 .product-registration__panel,
@@ -2621,6 +2668,33 @@ onBeforeUnmount(() => {
   line-height: var(--line-height-body);
 }
 
+.product-registration__complete-summary {
+  display: grid;
+  width: min(100%, 420px);
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.product-registration__complete-summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.product-registration__complete-summary dt {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.product-registration__complete-summary dd {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
+  text-align: right;
+}
+
 .product-registration__complete-actions,
 .product-registration__actions {
   display: flex;
@@ -2630,16 +2704,6 @@ onBeforeUnmount(() => {
 
 .product-registration__complete-actions {
   justify-content: center;
-}
-
-.product-registration__notice {
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-control);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  font-size: 14px;
-  font-weight: var(--font-weight-semibold);
-  line-height: 20px;
 }
 
 .product-registration__button {
