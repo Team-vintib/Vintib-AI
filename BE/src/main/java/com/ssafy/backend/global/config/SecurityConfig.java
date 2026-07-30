@@ -86,6 +86,9 @@ public class SecurityConfig {
                         // 라이브 목록·시청 조회(LIVE-005)는 비회원도 가능. 개설·상태 전이는 인증 필요로 남긴다.
                         .requestMatchers(HttpMethod.GET, "/api/lives").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/lives/{liveId}").permitAll()
+                        // 채팅 이력 조회(CHAT-001)도 비회원 공개. 시청이 열려 있으니 대화 읽기도
+                        // 열어야 한다. 발언은 STOMP 쪽에서 principal 유무로 막는다.
+                        .requestMatchers(HttpMethod.GET, "/api/lives/{liveId}/chat-messages").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
