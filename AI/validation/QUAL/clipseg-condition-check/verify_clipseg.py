@@ -75,6 +75,8 @@ for image_path in IMAGE_PATHS:
 
     plt.tight_layout()
     out_path = OUTPUT_DIR / f"clipseg_result_{image_path.stem}.png"
-    plt.savefig(out_path, dpi=120)
+    # bbox_inches="tight": 2줄짜리 타이틀(prompt + max=..)이 tight_layout 만으로는 위쪽이
+    # 잘려서, 실제 렌더링된 텍스트 범위를 다시 계산해 저장하도록 명시한다.
+    plt.savefig(out_path, dpi=120, bbox_inches="tight", pad_inches=0.2)
     plt.close(fig)
     print(f"saved -> {out_path}")
