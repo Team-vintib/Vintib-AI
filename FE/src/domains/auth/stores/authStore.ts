@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
+import { logout } from '@/domains/auth/api/authApi'
 import type {
   AuthUser,
   LinkAccountResponse,
@@ -47,6 +48,16 @@ export const useAuthStore = defineStore('auth', () => {
     clearStoredAuthSession()
   }
 
+  const logoutSession = async () => {
+    try {
+      await logout()
+    } catch {
+      // Local session cleanup must still complete when the server logout endpoint is unavailable.
+    } finally {
+      clearSession()
+    }
+  }
+
   const hydrateSession = () => {
     if (isHydrated.value) {
       return
@@ -69,6 +80,7 @@ export const useAuthStore = defineStore('auth', () => {
     isOnboardingCompleted,
     setSession,
     clearSession,
+    logoutSession,
     hydrateSession,
   }
 })

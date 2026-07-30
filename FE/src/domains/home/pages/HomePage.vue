@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
@@ -73,6 +73,13 @@ const loadHomeData = async () => {
 onMounted(() => {
   void loadHomeData()
 })
+
+watch(
+  () => authStore.isAuthenticated,
+  () => {
+    void loadHomeData()
+  },
+)
 </script>
 
 <template>

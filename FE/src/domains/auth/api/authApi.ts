@@ -51,6 +51,12 @@ export const login = async (request: LoginRequest) => {
   return data
 }
 
+export const logout = async () => {
+  const { data } = await http.post<ApiResponse<null>>('/auth/logout')
+
+  return data
+}
+
 export const completeSsafySsoCallback = async (request: SsafySsoCallbackRequest) => {
   const { data } = await http.post<ApiResponse<SsafySsoCallbackResponse>>(
     '/auth/ssafy/callback',
