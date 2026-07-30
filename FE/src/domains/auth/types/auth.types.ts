@@ -41,7 +41,10 @@ export interface AuthUser {
 export interface LoginRequest {
   email: string
   password: string
-  rememberMe: boolean
+}
+
+export interface ReissueTokenRequest {
+  refreshToken: string
 }
 
 export interface LoginResponse {

@@ -3,6 +3,7 @@ package com.ssafy.backend.live.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,6 +35,7 @@ class LiveServiceTest {
     private static final Long HOST_ID = 1L;
     private static final Long OTHER_MEMBER_ID = 2L;
     private static final Long LIVE_ID = 101L;
+    private static final List<Long> PRODUCT_IDS = List.of(2001L);
     private static final String TITLE = "빈티지 데님 라이브";
     private static final String THUMBNAIL_URL = "https://cdn.example.com/live/1.jpg";
 
@@ -52,11 +54,15 @@ class LiveServiceTest {
     @Mock
     private LiveCleanupHook cleanupHook;
 
+    @Mock
+    private LiveViewerService liveViewerService;
+
     private LiveService liveService;
 
     @BeforeEach
     void setUp() {
-        liveService = new LiveService(liveRepository, memberRepository, liveProductService, List.of());
+        liveService = new LiveService(
+                liveRepository, memberRepository, liveProductService, liveViewerService, List.of());
     }
 
     @Test
@@ -67,13 +73,15 @@ class LiveServiceTest {
         when(liveRepository.save(any(Live.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         LiveResponse response =
-                liveService.scheduleLive(HOST_ID, new LiveScheduleRequest(TITLE, THUMBNAIL_URL, scheduledAt));
+                liveService.scheduleLive(HOST_ID, new LiveScheduleRequest(TITLE, THUMBNAIL_URL, scheduledAt, PRODUCT_IDS));
 
         assertThat(response.status()).isEqualTo(LiveStatus.SCHEDULED);
         assertThat(response.scheduledAt()).isEqualTo(scheduledAt);
         assertThat(response.startedAt()).isNull();
         assertThat(response.hostId()).isEqualTo(HOST_ID);
         assertThat(response.title()).isEqualTo(TITLE);
+        // 상품 편성은 개설과 같은 트랜잭션에서 함께 이뤄진다 — 빈 방이 만들어지면 안 된다.
+        verify(liveProductService).linkProductsOnCreate(eq(HOST_ID), any(Live.class), eq(PRODUCT_IDS));
     }
 
     @Test
@@ -83,18 +91,21 @@ class LiveServiceTest {
         when(host.getId()).thenReturn(HOST_ID);
         when(liveRepository.save(any(Live.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        LiveResponse response = liveService.openLiveNow(HOST_ID, new LiveInstantRequest(TITLE, THUMBNAIL_URL));
+        LiveResponse response = liveService.openLiveNow(HOST_ID, new LiveInstantRequest(TITLE, THUMBNAIL_URL, PRODUCT_IDS));
 
         assertThat(response.status()).isEqualTo(LiveStatus.LIVE);
         assertThat(response.scheduledAt()).isNull();
         // 시작 시각은 클라이언트 값이 아니라 서버 시각이어야 한다.
         assertThat(response.startedAt()).isBetween(개설_직전, LocalDateTime.now());
+        // 즉시 개설은 곧바로 진행 중이 되어 이후 편성을 못 바꾸므로, 개설 시 반드시 편성돼야 한다.
+        verify(liveProductService).linkProductsOnCreate(eq(HOST_ID), any(Live.class), eq(PRODUCT_IDS));
     }
 
     @Test
     void 진행_중인_방송을_종료하면_ENDED로_바뀌고_정리_훅이_불린다() {
         LiveService 훅이_달린_서비스 =
-                new LiveService(liveRepository, memberRepository, liveProductService, List.of(cleanupHook));
+                new LiveService(
+                        liveRepository, memberRepository, liveProductService, liveViewerService, List.of(cleanupHook));
         when(host.getId()).thenReturn(HOST_ID);
         Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
@@ -109,7 +120,8 @@ class LiveServiceTest {
     @Test
     void 예정_방송을_시작하면_LIVE로_바뀌고_정리_훅은_불리지_않는다() {
         LiveService 훅이_달린_서비스 =
-                new LiveService(liveRepository, memberRepository, liveProductService, List.of(cleanupHook));
+                new LiveService(
+                        liveRepository, memberRepository, liveProductService, liveViewerService, List.of(cleanupHook));
         when(host.getId()).thenReturn(HOST_ID);
         Live live = Live.schedule(host, TITLE, THUMBNAIL_URL, LocalDateTime.now().plusDays(1));
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
@@ -163,6 +175,7 @@ class LiveServiceTest {
         Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
         when(liveProductService.getLinkedProducts(LIVE_ID)).thenReturn(List.of());
+        when(liveViewerService.getViewerCount(LIVE_ID)).thenReturn(37);
 
         LiveDetailResponse response = liveService.getLiveDetail(LIVE_ID);
 
@@ -170,7 +183,9 @@ class LiveServiceTest {
         assertThat(response.title()).isEqualTo(TITLE);
         assertThat(response.hostId()).isEqualTo(HOST_ID);
         assertThat(response.products()).isEmpty();
+        // 최고치는 아직 갱신된 적이 없고, 현재 값은 실시간 집계에서 온다 — 두 필드는 별개다.
         assertThat(response.peakViewerCount()).isZero();
+        assertThat(response.currentViewerCount()).isEqualTo(37);
     }
 
     @Test
@@ -186,7 +201,7 @@ class LiveServiceTest {
     void 존재하지_않는_회원이_개설하면_예외가_발생한다() {
         when(memberRepository.findById(HOST_ID)).thenReturn(Optional.empty());
         LiveScheduleRequest request =
-                new LiveScheduleRequest(TITLE, THUMBNAIL_URL, LocalDateTime.now().plusDays(1));
+                new LiveScheduleRequest(TITLE, THUMBNAIL_URL, LocalDateTime.now().plusDays(1), PRODUCT_IDS);
 
         assertThatThrownBy(() -> liveService.scheduleLive(HOST_ID, request))
                 .isInstanceOf(CustomException.class);

@@ -1,10 +1,23 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 
+import {
+  type BackendChatMessage,
+  type BackendReaction,
+  type BackendReactionType,
+  type BackendViewerCount,
+  getLiveChatMessages,
+} from '@/domains/chat/api/liveChatApi'
 import {
   LIVE_CHAT_MOCK_MESSAGES,
   LIVE_REACTION_EMOJIS,
 } from '@/domains/chat/constants/liveChatMockData'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
+import {
+  isLiveRealtimeApiEnabled,
+  LiveRealtimeClient,
+} from '@/domains/live/api/liveRealtimeClient'
 
 import type {
   LiveChatMessage,
@@ -13,7 +26,13 @@ import type {
 import type { LiveWatchStatus } from '@/domains/live/types/liveWatch.types'
 
 const props = defineProps<{
+  liveId: number
+  hostId: number
   status: LiveWatchStatus
+}>()
+
+const emit = defineEmits<{
+  viewerCount: [count: number]
 }>()
 
 interface LiveReactionParticle {
@@ -22,15 +41,38 @@ interface LiveReactionParticle {
   offset: number
 }
 
-const messages = ref<LiveChatMessage[]>([...LIVE_CHAT_MOCK_MESSAGES])
+const REACTION_TYPES: BackendReactionType[] = ['HEART', 'FIRE', 'CLAP', 'WOW']
+const REALTIME_ENABLED = isLiveRealtimeApiEnabled()
+
+const authStore = useAuthStore()
+const { isAuthenticated } = storeToRefs(authStore)
+const messages = ref<LiveChatMessage[]>(REALTIME_ENABLED ? [] : [...LIVE_CHAT_MOCK_MESSAGES])
 const draft = ref('')
 const activeReaction = ref<LiveReactionEmoji | null>(null)
 const reactionParticles = ref<LiveReactionParticle[]>([])
 const messageList = ref<HTMLElement | null>(null)
+const isConnected = ref(false)
+const errorMessage = ref('')
+let realtimeClient: LiveRealtimeClient | null = null
 let mockMessageSequence = 0
 let reactionSequence = 0
 let reactionTimer: number | null = null
 const reactionParticleTimers = new Map<number, number>()
+
+const canPublishRealtime = computed(
+  () => !REALTIME_ENABLED || (isConnected.value && isAuthenticated.value),
+)
+
+const composerPlaceholder = computed(() => {
+  if (props.status !== 'LIVE') return '방송 중에만 채팅할 수 있습니다'
+  if (REALTIME_ENABLED && !isAuthenticated.value) return '로그인 후 채팅할 수 있습니다'
+  if (REALTIME_ENABLED && !isConnected.value) return '채팅 연결 중...'
+  return '채팅...'
+})
+
+const canSubmitMessage = computed(
+  () => props.status === 'LIVE' && draft.value.trim().length > 0 && canPublishRealtime.value,
+)
 
 const scrollToLatestMessage = async () => {
   await nextTick()
@@ -40,17 +82,130 @@ const scrollToLatestMessage = async () => {
   }
 }
 
+const loadChatHistory = async () => {
+  if (!REALTIME_ENABLED) {
+    messages.value = [...LIVE_CHAT_MOCK_MESSAGES]
+    void scrollToLatestMessage()
+    return
+  }
+
+  try {
+    const response = await getLiveChatMessages(props.liveId)
+    messages.value = response.content
+      .slice()
+      .reverse()
+      .map((message) => mapChatMessage(message, props.hostId))
+    void scrollToLatestMessage()
+  } catch {
+    messages.value = []
+    errorMessage.value = '채팅 내역을 불러오지 못했습니다.'
+  }
+}
+
+const connectRealtime = () => {
+  disconnectRealtime()
+
+  if (!REALTIME_ENABLED || props.status !== 'LIVE') {
+    isConnected.value = false
+    return
+  }
+
+  realtimeClient = new LiveRealtimeClient({
+    onConnect: () => {
+      isConnected.value = true
+      errorMessage.value = ''
+      subscribeRealtime()
+    },
+    onDisconnect: () => {
+      isConnected.value = false
+    },
+    onError: () => {
+      errorMessage.value = '실시간 연결을 확인해 주세요.'
+    },
+  })
+  realtimeClient.connect()
+}
+
+const subscribeRealtime = () => {
+  if (!realtimeClient) return
+
+  realtimeClient.subscribe(`/topic/lives/${props.liveId}/chat`, (body) => {
+    if (!isBackendChatMessage(body)) return
+
+    const nextMessage = mapChatMessage(body, props.hostId)
+    const existingIndex = body.clientMessageId
+      ? messages.value.findIndex((message) => message.id === body.clientMessageId)
+      : -1
+
+    if (existingIndex >= 0) {
+      messages.value.splice(existingIndex, 1, nextMessage)
+    } else {
+      messages.value.push(nextMessage)
+    }
+
+    void scrollToLatestMessage()
+  })
+
+  realtimeClient.subscribe(`/topic/lives/${props.liveId}/reactions`, (body) => {
+    if (!isBackendReaction(body)) return
+
+    const emoji = reactionEmojiOf(body.type)
+
+    if (emoji) {
+      showReactionParticle(emoji)
+    }
+  })
+
+  realtimeClient.subscribe(`/topic/lives/${props.liveId}/viewers`, (body) => {
+    if (isBackendViewerCount(body)) {
+      emit('viewerCount', body.viewerCount)
+    }
+  })
+
+  realtimeClient.subscribe('/user/queue/errors', (body) => {
+    errorMessage.value = getRealtimeErrorMessage(body)
+  })
+}
+
+const disconnectRealtime = () => {
+  realtimeClient?.disconnect()
+  realtimeClient = null
+  isConnected.value = false
+}
+
 const submitMessage = () => {
   const body = draft.value.trim()
 
   if (!body || props.status !== 'LIVE') return
 
-  mockMessageSequence += 1
+  if (!REALTIME_ENABLED) {
+    mockMessageSequence += 1
+    messages.value.push({
+      id: `local-chat-${mockMessageSequence}`,
+      author: '나',
+      body,
+      role: 'VIEWER',
+    })
+    draft.value = ''
+    void scrollToLatestMessage()
+    return
+  }
+
+  if (!realtimeClient?.connected() || !isAuthenticated.value) {
+    errorMessage.value = '로그인 후 채팅할 수 있습니다.'
+    return
+  }
+
+  const clientMessageId = `local-chat-${Date.now()}-${mockMessageSequence++}`
   messages.value.push({
-    id: `local-chat-${mockMessageSequence}`,
-    author: '나',
+    id: clientMessageId,
+    author: authStore.user?.name || authStore.user?.email || '나',
     body,
-    role: 'VIEWER',
+    role: authStore.user?.id === props.hostId ? 'HOST' : 'VIEWER',
+  })
+  realtimeClient.publish(`/app/lives/${props.liveId}/chat`, {
+    content: body,
+    clientMessageId,
   })
   draft.value = ''
   void scrollToLatestMessage()
@@ -59,6 +214,26 @@ const submitMessage = () => {
 const react = (emoji: LiveReactionEmoji) => {
   if (props.status !== 'LIVE') return
 
+  if (!REALTIME_ENABLED) {
+    showReactionParticle(emoji)
+    return
+  }
+
+  if (!realtimeClient?.connected() || !isAuthenticated.value) {
+    errorMessage.value = '로그인 후 반응할 수 있습니다.'
+    return
+  }
+
+  const reactionType = reactionTypeOf(emoji)
+
+  if (reactionType) {
+    realtimeClient.publish(`/app/lives/${props.liveId}/reactions`, {
+      type: reactionType,
+    })
+  }
+}
+
+const showReactionParticle = (emoji: LiveReactionEmoji) => {
   activeReaction.value = emoji
   reactionSequence += 1
 
@@ -89,7 +264,19 @@ const react = (emoji: LiveReactionEmoji) => {
   }, 420)
 }
 
+watch(
+  () => [props.liveId, props.status],
+  () => {
+    errorMessage.value = ''
+    void loadChatHistory()
+    connectRealtime()
+  },
+  { immediate: true },
+)
+
 onBeforeUnmount(() => {
+  disconnectRealtime()
+
   if (reactionTimer !== null) {
     window.clearTimeout(reactionTimer)
   }
@@ -99,6 +286,66 @@ onBeforeUnmount(() => {
   })
   reactionParticleTimers.clear()
 })
+
+function mapChatMessage(message: BackendChatMessage, hostId: number): LiveChatMessage {
+  return {
+    id: String(message.messageId),
+    author: message.senderNickname || (message.senderType === 'SYSTEM' ? '시스템' : '사용자'),
+    body: message.content,
+    role: message.senderId === hostId ? 'HOST' : 'VIEWER',
+  }
+}
+
+function reactionTypeOf(emoji: LiveReactionEmoji): BackendReactionType | null {
+  const index = LIVE_REACTION_EMOJIS.indexOf(emoji)
+  return REACTION_TYPES[index] ?? null
+}
+
+function reactionEmojiOf(type: BackendReactionType): LiveReactionEmoji | null {
+  const index = REACTION_TYPES.indexOf(type)
+  return LIVE_REACTION_EMOJIS[index] ?? null
+}
+
+function isBackendChatMessage(body: unknown): body is BackendChatMessage {
+  return Boolean(
+    body &&
+      typeof body === 'object' &&
+      'messageId' in body &&
+      'content' in body &&
+      typeof (body as BackendChatMessage).content === 'string',
+  )
+}
+
+function isBackendReaction(body: unknown): body is BackendReaction {
+  return Boolean(
+    body &&
+      typeof body === 'object' &&
+      'type' in body &&
+      typeof (body as BackendReaction).type === 'string',
+  )
+}
+
+function isBackendViewerCount(body: unknown): body is BackendViewerCount {
+  return Boolean(
+    body &&
+      typeof body === 'object' &&
+      'viewerCount' in body &&
+      typeof (body as BackendViewerCount).viewerCount === 'number',
+  )
+}
+
+function getRealtimeErrorMessage(body: unknown) {
+  if (
+    body &&
+    typeof body === 'object' &&
+    'error' in body &&
+    (body as { error?: { message?: unknown } }).error?.message
+  ) {
+    return String((body as { error: { message: unknown } }).error.message)
+  }
+
+  return '메시지를 보내지 못했습니다.'
+}
 </script>
 
 <template>
@@ -140,18 +387,22 @@ onBeforeUnmount(() => {
         </li>
       </ul>
 
+      <p v-if="errorMessage" class="live-chat-overlay__error" role="status">
+        {{ errorMessage }}
+      </p>
+
       <form class="live-chat-overlay__composer" @submit.prevent="submitMessage">
         <input
           v-model="draft"
           type="text"
           maxlength="200"
-          :disabled="status !== 'LIVE'"
-          :placeholder="status === 'LIVE' ? '채팅...' : '방송 중에만 채팅할 수 있습니다'"
+          :disabled="status !== 'LIVE' || (REALTIME_ENABLED && !canPublishRealtime)"
+          :placeholder="composerPlaceholder"
           aria-label="채팅 메시지"
         />
         <button
           type="submit"
-          :disabled="status !== 'LIVE' || draft.trim().length === 0"
+          :disabled="!canSubmitMessage"
           aria-label="채팅 보내기"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -304,6 +555,14 @@ onBeforeUnmount(() => {
   font-size: 11px;
   line-height: 15px;
   overflow-wrap: anywhere;
+}
+
+.live-chat-overlay__error {
+  margin: 0 0 6px;
+  color: #ffb0b6;
+  font-size: 11px;
+  line-height: 15px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
 }
 
 .live-chat-overlay__composer {

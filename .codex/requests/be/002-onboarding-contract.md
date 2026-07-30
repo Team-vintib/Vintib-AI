@@ -1,31 +1,71 @@
-# 온보딩 도메인 API 통합 구현 요청
+# 002 Onboarding API 요청
 
-## 요청자 파트 / 대상 파트
+## 1. 요청 개요
 
-- 요청자: FE
-- 대상: BE
+- 요청 파트: FE
+- 대상 파트: BE
+- 요청 목적: FE 온보딩 화면에서 입력한 기본 정보, 관심 정보, AI 시착 프로필, 회원 유형을 BE에 저장할 수 있도록 API 계약을 정리한다.
+- 우선순위: P0
+- 시연 필수 여부: 온보딩 진입을 시연하면 필수. Auth 시연만 진행하면 mock-success 유지 가능.
 
-## 배경/이유
+## 2. 현재 연동 상태
 
-FE에는 ONBOARD-001 기본 정보, ONBOARD-002 관심 정보, ONBOARD-003 AI 시착 프로필, ONBOARD-004 회원 유형 선택 및 온보딩 완료 화면이 구현되어 있다. 현재 BE에는 이 흐름을 처리하는 `/api/me/**` 온보딩 API가 없으므로 FE 구현 기준으로 한 번에 설계/구현 요청한다.
+- 연동 완료 API: 없음
+- FE 구현 완료 범위
+  - `OnboardingBasicInfoView.vue`: 닉네임, 성별, 연락처, 주소 입력 화면
+  - `OnboardingInterestsView.vue`: 관심 브랜드/카테고리 선택 화면
+  - `OnboardingTryOnView.vue`: 전신 사진과 신체 치수 입력 화면
+  - `OnboardingMemberTypeView.vue`: 일반/사업자 회원 유형 선택 화면
+- 현재 임시 처리 또는 Mock 사용 여부
+  - `VITE_ONBOARDING_API_ENABLED !== 'true'`이면 FE가 `ApiResponse<null>` mock-success를 반환한다.
+  - 실제 저장 API가 없어 새로고침 또는 재로그인 후 온보딩 진행 상태 복원은 불가하다.
 
-기존 개별 요청 `001-onboarding-basic-info-api.md`, `002-onboarding-interests-api.md`, `003-onboarding-tryon-profile-api.md`, `004-onboarding-member-type-completion-api.md`를 이 문서로 병합한다.
+## 3. 추가 구현 요청
 
-## 현재 BE 구현 확인
+### 3.1 기본 정보 저장
 
-- `Member`에는 `email`, `password`, `name`, `nickname`, `phoneNumber`, `address`, `gender`, `onboardingCompleted`가 있다.
-- `Gender` enum은 `MALE`, `FEMALE`, `OTHER`가 있으나 FE 온보딩은 `MALE | FEMALE`만 사용한다.
-- `Member.completeOnboarding(nickname, phoneNumber, address, gender)`는 기본 정보 저장과 동시에 `onboardingCompleted=true`로 바꾸는 형태다.
-- `memberType`, `postalCode`, `detailAddress` 필드는 없다.
-- 회원 관심 브랜드/카테고리 저장 도메인과 `/api/me/interests`는 없다.
-- 시착 프로필 엔티티와 `/api/me/tryon`은 없다. 현재 `tryon` 패키지는 시착 결과(`/api/users/{userId}/tryons`)만 구현되어 있다.
-- 브랜드/카테고리 마스터 조회는 이미 `GET /api/brands`, `GET /api/categories`로 구현되어 있고 응답 ID는 number다.
+- Method / Endpoint: `PATCH /api/me/onboarding`
+- 요청 목적: 온보딩 1단계에서 입력한 사용자 기본 정보를 저장한다.
+- FE 사용처: `OnboardingBasicInfoView.vue`
+- 요청 데이터
+  - Header: `Authorization: Bearer {accessToken}`
+  - Body
+    - `nickname`: string, 필수
+    - `gender`: `MALE` | `FEMALE`, 필수
+    - `phoneNumber`: string, 필수
+    - `postalCode`: string | null
+    - `address`: string, 필수
+    - `detailAddress`: string, 필수
+- 응답 데이터
+  - `id`: number
+  - `nickname`: string
+  - `onboardingCompleted`: boolean
+- 응답 예시
 
-## 공통 응답 규격
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "nickname": "vintagelover",
+    "onboardingCompleted": false
+  },
+  "error": null
+}
+```
 
-모든 API는 현재 BE 공통 envelope를 사용한다.
+### 3.2 관심 정보 저장
 
-성공:
+- Method / Endpoint: `PUT /api/me/interests`
+- 요청 목적: 홈 개인화와 추천에 사용할 관심 브랜드/카테고리를 저장한다.
+- FE 사용처: `OnboardingInterestsView.vue`
+- 요청 데이터
+  - Header: `Authorization: Bearer {accessToken}`
+  - Body
+    - `brandIds`: number[], 필수, 빈 배열 허용
+    - `categoryIds`: number[], 필수, 빈 배열 허용
+- 응답 데이터: `null` 또는 저장된 관심사 요약
+- 응답 예시
 
 ```json
 {
@@ -35,184 +75,94 @@ FE에는 ONBOARD-001 기본 정보, ONBOARD-002 관심 정보, ONBOARD-003 AI �
 }
 ```
 
-검증 실패:
+### 3.3 AI 시착 프로필 저장
+
+- Method / Endpoint: `PUT /api/me/tryon`
+- 요청 목적: AI 시착에 사용할 전신 사진과 신체 치수를 저장한다.
+- FE 사용처: `OnboardingTryOnView.vue`, 라이브 시착 패널
+- 요청 데이터
+  - Header: `Authorization: Bearer {accessToken}`
+  - `multipart/form-data`
+    - `bodyPhoto`: image file | null
+    - `heightCm`: number | null
+    - `weightKg`: number | null
+    - `chest`: number | null
+    - `waist`: number | null
+    - `hip`: number | null
+- 응답 데이터: 저장된 시착 프로필 요약 또는 `null`
+- 응답 예시
 
 ```json
 {
-  "success": false,
-  "data": null,
-  "error": {
-    "code": "C001",
-    "message": "잘못된 입력값입니다.",
-    "errors": [
-      {
-        "field": "nickname",
-        "value": "!",
-        "reason": "닉네임은 한글, 영문, 숫자 2~10자로 입력해주세요."
-      }
-    ]
-  }
+  "success": true,
+  "data": {
+    "tryonProfileId": 1,
+    "bodyPhotoUrl": "https://cdn.example.com/body/1.jpg",
+    "heightCm": 170,
+    "weightKg": 60
+  },
+  "error": null
 }
 ```
 
-`error.errors[].field`는 FE 요청 필드명과 동일해야 한다.
+### 3.4 온보딩 완료
 
-## 1. 기본 정보 저장
-
-```http
-PATCH /api/me/onboarding
-Authorization: Bearer {accessToken}
-Content-Type: application/json
-```
-
-요청:
+- Method / Endpoint: `POST /api/me/onboarding/complete`
+- 요청 목적: 회원 유형을 저장하고 온보딩 완료 상태로 전환한다.
+- FE 사용처: `OnboardingMemberTypeView.vue`
+- 요청 데이터
+  - Header: `Authorization: Bearer {accessToken}`
+  - Body
+    - `memberType`: `GENERAL` | `BUSINESS`
+- 응답 데이터
+  - `id`: number
+  - `memberType`: `GENERAL` | `BUSINESS`
+  - `onboardingCompleted`: boolean
+  - `nextStep`: `HOME` | `BUSINESS_VERIFICATION`
+- 응답 예시
 
 ```json
 {
-  "nickname": "빈티지러버",
-  "gender": "FEMALE",
-  "phoneNumber": "010-1234-5678",
-  "postalCode": "06236",
-  "address": "서울 강남구 테헤란로 212",
-  "detailAddress": "3층"
+  "success": true,
+  "data": {
+    "id": 1,
+    "memberType": "BUSINESS",
+    "onboardingCompleted": true,
+    "nextStep": "BUSINESS_VERIFICATION"
+  },
+  "error": null
 }
 ```
 
-필드 규칙:
+## 4. 기존 API 변경 요청
 
-| 필드 | 타입 | 필수 | 규칙 |
-| --- | --- | --- | --- |
-| `nickname` | string | 필수 | 한글, 영문, 숫자 2~10자 |
-| `gender` | enum | 필수 | FE는 `MALE`, `FEMALE`만 전송 |
-| `phoneNumber` | string | 필수 | 국내 전화번호 형식 |
-| `postalCode` | string/null | 선택 | Kakao 주소 검색 결과. 직접 입력 주소는 `null` 가능 |
-| `address` | string | 필수 | 기본 주소 |
-| `detailAddress` | string | 필수 | 상세 주소 |
+- 기존 요청·응답에서 변경할 내용: 없음
+- 추가할 필드: 없음
+- 변경 영향 범위: 없음
 
-요청 사항:
+## 5. 보류 또는 시연 제외 범위
 
-- 인증 토큰에서 현재 회원을 식별하고 클라이언트가 회원 ID를 보내지 않는다.
-- 기본 정보 저장 시 `onboardingCompleted`를 true로 바꾸지 않는다.
-- `postalCode`, `address`, `detailAddress`를 분리 저장할지, 기존 `address`에 결합 저장할지 확정한다.
-- 닉네임 중복 검증과 오류 코드/HTTP status를 확정한다.
-- `gender=OTHER`는 온보딩 API에서 받을지, 기존 enum에는 유지하되 FE 온보딩 계약에서는 제외할지 확정한다.
+- 현재 구현하지 않아도 되는 기능
+  - Auth 시연만 진행하면 온보딩 API는 mock-success 유지 가능
+  - 전신 사진 저장 정책이 미확정이면 `PUT /api/me/tryon`은 보류 가능
+- 추후 구현 예정 기능
+  - 온보딩 진행 단계 조회
+  - 관심 정보 수정 화면
+  - 시착 프로필 다중 관리
 
-## 2. 관심 정보 저장
+## 6. 협의 필요 사항
 
-```http
-PUT /api/me/interests
-Authorization: Bearer {accessToken}
-Content-Type: application/json
-```
+- FE·BE 간 결정이 필요한 내용
+  - 기본 정보 저장과 온보딩 완료 처리를 분리할지 여부
+  - 관심 브랜드/카테고리를 numeric id 기준으로 확정할지 여부
+  - 전신 사진 multipart 필드명과 저장 URL 반환 여부
+  - `memberType` 저장 시점과 기본값
+- 아직 확정되지 않은 응답 구조나 정책
+  - 각 단계 저장 응답을 `null`로 할지 저장된 요약 객체로 할지
+  - 신체 치수 단위와 허용 범위
+  - 주소 필드 중 `postalCode` 필수 여부
 
-요청:
+## 7. 추가 요청 없음
 
-```json
-{
-  "brandIds": [1, 3],
-  "categoryIds": [2, 5]
-}
-```
-
-건너뛰기:
-
-```json
-{
-  "brandIds": [],
-  "categoryIds": []
-}
-```
-
-필드 규칙:
-
-| 필드 | 타입 | 필수 | 규칙 |
-| --- | --- | --- | --- |
-| `brandIds` | number[] | 필수 | `GET /api/brands`의 `id`, 중복 없음, 빈 배열 허용 |
-| `categoryIds` | number[] | 필수 | `GET /api/categories`의 `id`, 중복 없음, 빈 배열 허용 |
-
-기존 FE 초기 요청은 `string[]`였지만 BE 브랜드/카테고리 마스터가 number ID로 구현되어 있으므로 최종 계약은 number ID 기준으로 확정 요청한다. FE는 실제 연동 시 타입을 number 배열로 맞춘다.
-
-요청 사항:
-
-- PUT은 회원의 기존 관심 브랜드/카테고리를 요청 배열 전체로 교체한다.
-- 두 배열이 모두 비어 있으면 관심 정보 없이 건너뛴 상태로 저장한다.
-- 존재하지 않는 ID, 비활성화 ID, 중복 ID에 대한 오류 규격을 확정한다.
-- 저장 테이블/엔티티를 설계한다.
-
-## 3. AI 시착 프로필 저장
-
-```http
-PUT /api/me/tryon
-Authorization: Bearer {accessToken}
-Content-Type: multipart/form-data
-```
-
-multipart 필드 규칙:
-
-| 필드 | 타입 | 필수 | FE 규칙 |
-| --- | --- | --- | --- |
-| `bodyPhoto` | image file | 선택 | MIME type `image/*` |
-| `heightCm` | integer string | 선택 | 0보다 큰 정수, cm |
-| `weightKg` | integer string | 선택 | 0보다 큰 정수, kg |
-| `chest` | integer string | 선택 | 0보다 큰 정수, 단위 확정 필요 |
-| `waist` | integer string | 선택 | 0보다 큰 정수, 단위 확정 필요 |
-| `hip` | integer string | 선택 | 0보다 큰 정수, 단위 확정 필요 |
-
-요청 사항:
-
-- 값이 없는 필드는 multipart 요청에서 생략한다.
-- 사진만, 신체 정보 일부만, 사진과 신체 정보를 함께 저장할 수 있어야 한다.
-- PUT은 전달된 값을 현재 회원의 AI 시착 프로필에 반영하는 멱등 요청으로 사용한다.
-- 미전달 값은 기존 값을 유지하는지, null로 지우는지 명시한다. FE 현재 의도는 미전달 값 유지다.
-- 건너뛰기와 모든 값이 빈 다음 단계는 FE가 API를 호출하지 않는다.
-- `member_body_profile` 또는 동등한 테이블에 `body_photo_url`, `height_cm`, `weight_kg`, `chest`, `waist`, `hip` 저장 여부를 확정한다.
-- 숫자 필드 최소/최대, 소수 허용 여부, 가슴/허리/엉덩이 단위를 확정한다.
-- 사진 허용 형식, 최대 용량, 최소 해상도와 S3 저장 정책을 확정한다.
-- 전신 사진 개인정보 동의, 보관 기간, 변경·삭제 정책을 확정한다.
-- 기존 사진 삭제는 별도 endpoint로 둘지 확정한다.
-
-필드 오류명은 `bodyPhoto`, `heightCm`, `weightKg`, `chest`, `waist`, `hip`을 사용한다.
-
-## 4. 회원 유형 저장 및 온보딩 완료
-
-```http
-POST /api/me/onboarding/complete
-Authorization: Bearer {accessToken}
-Content-Type: application/json
-```
-
-요청:
-
-```json
-{
-  "memberType": "GENERAL"
-}
-```
-
-필드 규칙:
-
-| 필드 | 타입 | 필수 | 규칙 |
-| --- | --- | --- | --- |
-| `memberType` | enum | 필수 | `GENERAL`, `BUSINESS` |
-
-요청 사항:
-
-- 회원 유형 저장과 `onboardingCompleted=true` 변경을 하나의 트랜잭션으로 처리한다.
-- `Member.completeOnboarding()` 책임을 기본 정보 저장과 최종 완료 처리로 분리한다.
-- `member.member_type` 컬럼과 Java enum 매핑을 추가한다.
-- 이미 완료한 회원의 재요청을 멱등 성공으로 볼지, 회원 유형 변경 오류로 볼지 정책을 확정한다.
-- 완료 이후 인증 응답 또는 내 정보 조회에서 `memberType`, `onboardingCompleted`를 제공한다.
-
-성공 후 FE 라우팅:
-
-- `GENERAL`: 홈
-- `BUSINESS`: 사업자 인증 화면
-
-## FE 관련 파일
-
-- `FE/src/domains/onboard/api/onboarding.ts`
-- `FE/src/domains/onboard/pages/OnboardingBasicInfoView.vue`
-- `FE/src/domains/onboard/pages/OnboardingInterestsView.vue`
-- `FE/src/domains/onboard/pages/OnboardingTryOnView.vue`
-- `FE/src/domains/onboard/pages/OnboardingMemberTypeView.vue`
-- `FE/docs/frontend/api/api-index.md`
+- 이미 정상 연동된 API: 없음
+- 기존 규격을 유지하면 되는 기능: 없음

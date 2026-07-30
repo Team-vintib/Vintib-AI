@@ -20,12 +20,14 @@
 - [x] 로그인 상태에서만 `http.get<ApiResponse<FollowingContentResponse>>('/home/following')`을 호출한다.
 - [x] BE 라이브 카드 응답을 `HomeLiveCardItem`으로 변환한다.
 - [x] BE 상품 카드 응답을 `HomeProductCardItem`으로 변환한다.
-- [x] `following.lives`와 `following.products`는 현재 회원 홈의 `followedSellers`/`recommendedProducts` 구조에 직접 맞지 않으므로, 우선 `liveNow`/`directSaleProducts` 보강 또는 `recommendedProducts` 보조 매핑 중 한 방식으로 제한 적용한다.
+- [x] `following.products`는 회원 홈의 `recommendedProducts`로 매핑하고, `following.lives`는 판매자 카드 구조가 확정될 때까지 라이브 섹션에 섞지 않는다.
 - [x] `contentCards`는 BE 응답에 없으므로 기존 mock 값을 유지한다.
 - [x] `followedSellers`는 BE 응답에 판매자 카드 필드가 없으므로 기존 mock 유지 또는 빈 배열 처리 중 화면 영향이 적은 방식을 택한다.
 - [x] 이미지 로드 실패 시 기본 이미지 또는 기존 mock 이미지 fallback을 적용한다.
 - [x] `FE/docs/frontend/api/api-index.md`, `FE/docs/frontend/implementation/status.md`에 홈 API 연동 상태와 BE 미제공 필드 처리 방식을 갱신한다.
 - [x] `npm run type-check`로 타입 검증한다.
+- [x] auth 세션 검증 이후 로그인 상태에서만 `/home/following`을 호출하는 흐름을 재확인한다.
+- [x] `npm run build`로 번들 검증한다.
 
 ## 매핑 기준
 
@@ -57,6 +59,7 @@
 
 ## 확인이 필요한 미결정 사항
 
-- 팔로잉 API의 `products`를 회원 홈의 `recommendedProducts`로 보여줄지, 별도 팔로잉 상품 섹션이 생길 때까지 `directSaleProducts` 보강에만 사용할지 결정이 필요하다.
+- 팔로잉 API의 `products`는 회원 홈의 `recommendedProducts`로 표시한다.
+- 팔로잉 API의 `lives`는 추후 BE가 판매자 카드에 필요한 `followedSellers` 구조를 제공하면 `내가 팔로우한 판매자` 섹션에 연결한다.
 - BE mock 이미지 URL이 실제 접근 가능한 CDN이 아니므로 FE fallback 이미지가 필요하다.
 - 검색 화면 `SearchResultsPage.vue`는 현재 mock 기반이라 이번 홈 연동의 직접 수정 대상은 아니다. 다만 추후 검색 API도 같은 `http + ApiResponse + adapter` 패턴으로 분리하는 것이 맞다.

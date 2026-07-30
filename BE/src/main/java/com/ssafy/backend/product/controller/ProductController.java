@@ -7,6 +7,7 @@ import com.ssafy.backend.product.dto.request.ProductImageRegisterRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUploadUrlRequest;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
+import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
@@ -62,10 +63,14 @@ public class ProductController {
 
     @Operation(
             summary = "판매 가격 설정 및 상시 판매 등록",
-            description = "DRAFT 상태 상품에 가격을 설정해 상시 판매(ON_SALE) 상태로 전환한다.")
+            description = "DRAFT(최초 등록) 또는 AUCTION_SCHEDULED(경매 예정 상품의 상시 판매 전환, "
+                    + "PROD-004/PROD-005/AUCT-014) "
+                    + "상태 상품에 가격을 설정해 상시 판매(ON_SALE) 상태로 전환한다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "전환 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패 또는 DRAFT 상태가 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "요청값 검증 실패 또는 DRAFT/AUCTION_SCHEDULED 상태가 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
@@ -82,9 +87,30 @@ public class ProductController {
     }
 
     @Operation(
+            summary = "경매 상품 등록 및 경매 전환",
+            description = "DRAFT(최초 등록, PROD-003) 또는 ON_SALE(상시 판매 상품의 경매 전환, PROD-004) 상태 상품을 "
+                    + "경매 예정(AUCTION_SCHEDULED) 상태로 전환한다. "
+                    + "시작가·증액 단위·경매 시간은 여기서 다루지 않으며, 경매 시작 전 별도 API로 설정한다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "등록 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "DRAFT/ON_SALE 상태가 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @PatchMapping("/{id}/auction-schedule")
+    public ResponseEntity<ApiResponse<ProductResponse>> scheduleAuction(
+            Authentication authentication, @PathVariable Long id) {
+        Long sellerId = (Long) authentication.getPrincipal();
+        ProductResponse response = productService.scheduleAuction(sellerId, id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
             summary = "상품 목록 조회",
             description = "상시 판매/경매 여부와 관계없이 공개된 상품 목록을 최신순으로 조회한다. "
-                    + "DRAFT/PRIVATE 상태 상품은 목록에서 제외한다. "
+                    + "DRAFT 상태 상품은 목록에서 제외한다. "
                     + "정렬은 항상 최신순(createdAt DESC)으로 고정되며, sort 파라미터를 보내도 무시된다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
@@ -101,10 +127,10 @@ public class ProductController {
     @Operation(
             summary = "상품 상세 조회",
             description = "상품 상세 정보를 조회한다. 비회원도 조회 가능하다. "
-                    + "DRAFT/PRIVATE 상태 상품은 판매자 본인만 조회할 수 있으며, 그 외에는 존재하지 않는 것처럼 404를 반환한다.")
+                    + "DRAFT 상태 상품은 판매자 본인만 조회할 수 있으며, 그 외에는 존재하지 않는 것처럼 404를 반환한다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품이 없거나 비공개 상품을 본인 외 사용자가 조회함")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품이 없거나 DRAFT 상품을 본인 외 사용자가 조회함")
     })
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ProductDetailResponse>> getProductDetail(
@@ -112,6 +138,45 @@ public class ProductController {
         Long viewerId = authentication != null ? (Long) authentication.getPrincipal() : null;
         ProductDetailResponse response = productService.getProductDetail(viewerId, id);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "상품 정보 수정",
+            description = "제목/설명/카테고리/브랜드/상태등급/사이즈를 부분 수정한다. 요청에 포함된 필드만 반영한다. "
+                    + "DRAFT/ON_SALE 상태의 상품만 수정할 수 있다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패 또는 수정 불가 상태"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @PatchMapping("/{id}")
+    public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody ProductUpdateRequest request) {
+        Long sellerId = (Long) authentication.getPrincipal();
+        ProductResponse response = productService.updateProduct(sellerId, id, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "상품 삭제",
+            description = "상품을 소프트 삭제한다(deleted_at 기록, DB row는 유지). "
+                    + "DRAFT/ON_SALE 상태의 상품만 삭제할 수 있으며, 삭제 후에는 상세 조회 등에서 존재하지 않는 상품으로 취급된다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "삭제 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "삭제 불가 상태"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteProduct(Authentication authentication, @PathVariable Long id) {
+        Long sellerId = (Long) authentication.getPrincipal();
+        productService.deleteProduct(sellerId, id);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(

@@ -14,10 +14,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(
@@ -29,12 +31,12 @@ import lombok.NoArgsConstructor;
                 @CheckConstraint(
                         name = "ck_product_sale_status",
                         constraint = "sale_status IN ("
-                                + "'DRAFT', 'ON_SALE', 'AUCTION_SCHEDULED', 'AUCTION_IN_PROGRESS', "
-                                + "'AUCTION_FAILED', 'SOLD', 'PRIVATE')"),
+                                + "'DRAFT', 'ON_SALE', 'AUCTION_SCHEDULED', 'AUCTION_IN_PROGRESS', 'SOLD')"),
                 @CheckConstraint(
                         name = "ck_product_price_by_type",
                         constraint = "sale_type <> 'DIRECT_SALE' OR price IS NOT NULL")
         })
+@SQLRestriction("deleted_at IS NULL")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Product extends BaseTimeEntity {
@@ -47,7 +49,9 @@ public class Product extends BaseTimeEntity {
     @JoinColumn(name = "seller_id", nullable = false)
     private Member seller;
 
-    @Column(name = "category_id")
+    // 카테고리는 필수다. 미분류 상품은 검색·필터에서 누락되고, 라이브 카테고리(편성 상품에서
+    // 유도)도 만들 수 없다.
+    @Column(name = "category_id", nullable = false)
     private Long categoryId;
 
     @Column(name = "brand_id")
@@ -78,6 +82,9 @@ public class Product extends BaseTimeEntity {
 
     private Long price;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @Builder
     private Product(
             Member seller,
@@ -103,11 +110,56 @@ public class Product extends BaseTimeEntity {
         this.saleStatus = SaleStatus.ON_SALE;
     }
 
+    public void scheduleAuction() {
+        this.saleType = SaleType.AUCTION;
+        this.price = null;
+        this.saleStatus = SaleStatus.AUCTION_SCHEDULED;
+    }
+
+    public void update(
+            String title,
+            String description,
+            Long categoryId,
+            Long brandId,
+            String conditionGrade,
+            String sizeLabel) {
+        if (title != null) {
+            this.title = title;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+        if (categoryId != null) {
+            this.categoryId = categoryId;
+        }
+        if (brandId != null) {
+            this.brandId = brandId;
+        }
+        if (conditionGrade != null) {
+            this.conditionGrade = conditionGrade;
+        }
+        if (sizeLabel != null) {
+            this.sizeLabel = sizeLabel;
+        }
+    }
+
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
     public boolean isOwnedBy(Long memberId) {
         return memberId != null && seller.getId().equals(memberId);
     }
 
-    public boolean isPrivate() {
-        return saleStatus == SaleStatus.DRAFT || saleStatus == SaleStatus.PRIVATE;
+    public boolean isDraft() {
+        return saleStatus == SaleStatus.DRAFT;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    public boolean isEditable() {
+        return saleStatus == SaleStatus.DRAFT || saleStatus == SaleStatus.ON_SALE;
     }
 }

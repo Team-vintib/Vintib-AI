@@ -2,6 +2,7 @@ package com.ssafy.backend.product.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 public record ProductCreateRequest(
 
@@ -12,7 +13,8 @@ public record ProductCreateRequest(
         @Schema(example = "1990년대 리바이스 데님 자켓, 상태 양호")
         String description,
 
-        @Schema(example = "1")
+        @Schema(description = "카테고리 ID. 필수다", example = "1")
+        @NotNull
         Long categoryId,
 
         @Schema(example = "1")

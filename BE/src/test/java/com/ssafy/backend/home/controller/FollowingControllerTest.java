@@ -62,4 +62,30 @@ class FollowingControllerTest {
                 .andExpect(jsonPath("$.data.empty").value(false))
                 .andExpect(jsonPath("$.error").doesNotExist());
     }
+
+    @Test
+    void 팔로잉_응답에_팔로우한_판매자_목록이_담긴다() throws Exception {
+        // FE 가 mock 으로 유지하던 섹션(FE 요청 009-home-card-response-fields 요청 5).
+        String token = jwtTokenProvider.createAccessToken(1L, "user@example.com");
+
+        mockMvc.perform(get("/api/home/following").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.followedSellers").isArray())
+                .andExpect(jsonPath("$.data.followedSellers[0].sellerId").isNumber())
+                .andExpect(jsonPath("$.data.followedSellers[0].sellerName").isNotEmpty())
+                .andExpect(jsonPath("$.data.followedSellers[0].profileImageUrl").isNotEmpty())
+                .andExpect(jsonPath("$.data.followedSellers[0].coverImageUrl").isNotEmpty())
+                .andExpect(jsonPath("$.data.followedSellers[0].followerCount").isNumber());
+    }
+
+    @Test
+    void 방송_중이_아닌_판매자는_라이브_정보가_비어_있다() throws Exception {
+        String token = jwtTokenProvider.createAccessToken(1L, "user@example.com");
+
+        mockMvc.perform(get("/api/home/following").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.followedSellers[0].liveStatus").value("LIVE"))
+                .andExpect(jsonPath("$.data.followedSellers[1].liveStatus").doesNotExist())
+                .andExpect(jsonPath("$.data.followedSellers[1].liveId").doesNotExist());
+    }
 }

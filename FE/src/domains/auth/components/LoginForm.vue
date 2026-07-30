@@ -119,7 +119,6 @@ const handleSubmit = async () => {
     const response = await login({
       email: form.email.trim(),
       password: form.password,
-      rememberMe: form.rememberMe,
     })
 
     if (!response.success) {

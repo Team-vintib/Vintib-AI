@@ -1,121 +1,103 @@
-# 홈 도메인 API 계약 보완 요청
+# 004 Home API 요청
 
-## 요청자 파트 / 대상 파트
+## 1. 요청 개요
 
-- 요청자: FE
-- 대상: BE
+- 요청 파트: FE
+- 대상 파트: BE
+- 요청 목적: 홈/팔로잉 홈 화면에서 사용하는 카드 필드와 남은 보강 항목을 정리한다.
+- 우선순위: P1
+- 시연 필수 여부: 홈 화면 시연은 현재 API로 가능. `hostId`와 노출 정책은 품질 보강 항목.
 
-## 배경/이유
+## 2. 현재 연동 상태
 
-FE 홈 화면은 실제 `/api/home`, `/api/home/following`에 일부 연동되어 있다. BE 홈 구현은 현재 mock 응답 중심이고 카드 표시용 일부 필드가 부족하므로, 홈 도메인 계약을 한 문서로 정리한다.
+- 연동 완료 API
+  - `GET /api/home`
+  - `GET /api/home/following`
+- FE 구현 완료 범위
+  - 홈 섹션 렌더링
+  - 라이브 카드 표시 및 라이브 상세 이동
+  - 상품 카드 표시 및 상품 상세 이동
+- 현재 임시 처리 또는 Mock 사용 여부
+  - 화면 렌더링 자체는 실제 API 응답으로 가능하다.
+  - 일부 프로필 이동용 id는 응답에 없으면 이동 기능을 제한하거나 숨겨야 한다.
 
-기존 `006-home-api-contract.md`, `009-home-card-response-fields.md`를 이 문서로 병합한다.
+## 3. 추가 구현 요청
 
-## 현재 BE에서 그대로 사용할 수 있는 홈 계약
+### 3.1 라이브 카드 hostId 제공
 
-| 기능 | Method | Endpoint | 인증 | 현재 BE 구현 |
-| --- | --- | --- | --- | --- |
-| 홈 콘텐츠 조회 | `GET` | `/api/home` | 선택/불필요 | 구현됨, 현재 mock 응답 |
-| 팔로잉 콘텐츠 조회 | `GET` | `/api/home/following` | 필요 | 구현됨, 현재 mock 응답 |
-
-현재 홈 응답 DTO:
-
-```json
-{
-  "liveNow": [],
-  "scheduledLives": [],
-  "onSaleProducts": [],
-  "upcomingAuctionProducts": []
-}
-```
-
-현재 `LiveCardResponse` 필드:
-
-| 필드 | 타입 |
-| --- | --- |
-| `liveId` | number |
-| `title` | string |
-| `hostNickname` | string |
-| `thumbnailUrl` | string |
-| `broadcastStatus` | `LIVE`, `SCHEDULED` |
-| `scheduledAt` | string/null |
-| `viewerCount` | number/null |
-| `productCount` | number/null |
-
-현재 `ProductCardResponse` 필드:
-
-| 필드 | 타입 |
-| --- | --- |
-| `productId` | number |
-| `name` | string |
-| `brand` | string |
-| `thumbnailUrl` | string |
-| `sellType` | `NORMAL`, `AUCTION_SCHEDULED` |
-| `sellStatus` | `ON_SALE`, `RESERVED`, `SOLD_OUT` |
-| `price` | number/null |
-| `auctionScheduled` | boolean |
-
-## 홈 필수 보완 요청
-
-FE 홈 화면은 아래 필드를 추가로 사용한다. BE가 실데이터로 전환할 때 응답 보강을 요청한다.
-
-### 라이브 카드 추가 필드
-
-| 필드 | 타입 | 필수 | 규칙 |
-| --- | --- | --- | --- |
-| `hostId` | number | 권장 | 판매자/호스트 상세 이동용 |
-| `startedAt` | string/null | 선택 | 진행 중 방송 시작 시각 |
-| `reservationCount` | number/null | 선택 | 예약 방송 알림/예약 수 |
-| `categoryId` | number/null | 선택 | 카테고리 필터/표시용 |
-| `categoryName` | string/null | 선택 | 카드 표시용 |
-
-### 상품 카드 추가 필드
-
-| 필드 | 타입 | 필수 | 규칙 |
-| --- | --- | --- | --- |
-| `sellerId` | number | 권장 | 판매자 상세 이동용 |
-| `sellerName` | string | 필수 | 현재 FE는 fallback 사용 중 |
-| `categoryId` | number/null | 선택 | 카테고리 섹션용 |
-| `categoryName` | string/null | 선택 | 카드 표시용 |
-| `isWished` | boolean | 선택 | 로그인 사용자 기준 찜 여부, 비로그인 false |
-| `startingBid` | number/null | 경매 상품 | 경매 예정 시작가 |
-| `auctionStartsAt` | string/null | 경매 상품 | 예정 경매 시작 시각 |
-
-현재 FE는 `sellerName`과 `isWished`를 임시값으로 처리한다. BE에서 붙일 수 있는 기존 필드는 그대로 쓰고 위 필드만 추가 보강하면 된다.
-
-## 페이지 응답 규격 정합성 요청
-
-현재 BE `PageResponse<T>`는 아래 구조다.
+- Method / Endpoint: `GET /api/home`, `GET /api/home/following`
+- 요청 목적: 홈 라이브 카드에서 호스트/판매자 프로필 이동을 지원한다.
+- FE 사용처: 홈 라이브 카드, 팔로잉 홈 라이브 카드
+- 요청 데이터: 없음
+- 응답 데이터
+  - live card item에 `hostId`: number | null 추가
+- 응답 예시
 
 ```json
 {
-  "content": [],
-  "page": 0,
-  "size": 20,
-  "totalElements": 0,
-  "totalPages": 0,
-  "hasNext": false
+  "success": true,
+  "data": {
+    "lives": [
+      {
+        "liveId": 1,
+        "hostId": 10,
+        "title": "빈티지 라이브",
+        "hostNickname": "vintagelover",
+        "thumbnailUrl": null,
+        "broadcastStatus": "LIVE",
+        "viewerCount": 120
+      }
+    ]
+  },
+  "error": null
 }
 ```
 
-현재 FE 공통 타입은 아래 구조를 기대한다.
+### 3.2 홈 섹션 노출 정책 문서화
 
-```json
-{
-  "items": [],
-  "meta": {
-    "page": 1,
-    "size": 20,
-    "totalElements": 0,
-    "totalPages": 0
-  }
-}
-```
+- Method / Endpoint: `GET /api/home`, `GET /api/home/following`
+- 요청 목적: FE가 빈 섹션, 정렬 기준, 최대 노출 개수를 예측 가능하게 처리한다.
+- FE 사용처: 홈 섹션 렌더링
+- 요청 데이터: 없음
+- 응답 데이터
+  - 기존 응답 유지 가능
+  - 문서로 섹션별 정렬 기준, 최대 노출 개수, 빈 섹션 포함 여부 명시 요청
+- 응답 예시: 기존 응답 유지
 
-BE 전체 페이지 응답을 바꾸지 않는다면 FE가 adapter에서 `content -> items`, 나머지 필드 -> `meta`로 매핑할 수 있다. 다만 신규 API 문서에는 실제 BE 응답 구조를 명확히 표기해 달라.
+## 4. 기존 API 변경 요청
 
-## FE 관련 파일
+- 기존 요청·응답에서 변경할 내용
+  - live card item에 `hostId` 추가 요청
+- 추가할 필드
+  - `hostId`: number | null
+- 변경 영향 범위
+  - 홈 라이브 카드에서 호스트 프로필 이동
+  - 공개 프로필 API 연결 시 진입점
 
-- `FE/src/domains/home/api/homeViewApi.ts`
-- `FE/src/domains/home/types/homeView.types.ts`
-- `FE/docs/frontend/api/api-index.md`
+## 5. 보류 또는 시연 제외 범위
+
+- 현재 구현하지 않아도 되는 기능
+  - 홈 카드에서 호스트 프로필 이동
+  - 개인화 정렬 고도화
+- 추후 구현 예정 기능
+  - 추천 사유 표시
+  - 섹션별 더보기 API 분리
+
+## 6. 협의 필요 사항
+
+- FE·BE 간 결정이 필요한 내용
+  - 홈 섹션 정렬 기준
+  - 섹션별 최대 노출 개수
+  - 빈 섹션 노출 여부
+  - 비회원 홈에서 `isWished`를 `false`로 줄지 `null`로 줄지
+- 아직 확정되지 않은 응답 구조나 정책
+  - 없음
+
+## 7. 추가 요청 없음
+
+- 이미 정상 연동된 API
+  - `GET /api/home`
+  - `GET /api/home/following`
+- 기존 규격을 유지하면 되는 기능
+  - Home 현재 화면 렌더링
+  - product card 기본 표시 필드

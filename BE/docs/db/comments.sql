@@ -51,7 +51,7 @@ COMMENT ON COLUMN product.seller_id       IS '판매자.';
 COMMENT ON COLUMN product.condition_grade IS '중고 상태 등급. ⚠️ 등급 체계 미확정이라 자유 문자열.';
 COMMENT ON COLUMN product.size_label      IS '사이즈 표기(S/M/L, 95/100 등). 브랜드마다 달라 문자열로 둔다.';
 COMMENT ON COLUMN product.sale_type       IS 'DIRECT_SALE(상시 판매) | AUCTION(경매)';
-COMMENT ON COLUMN product.sale_status     IS 'DRAFT | ON_SALE | AUCTION_SCHEDULED | AUCTION_IN_PROGRESS | AUCTION_FAILED | SOLD | PRIVATE';
+COMMENT ON COLUMN product.sale_status     IS 'DRAFT | ON_SALE | AUCTION_SCHEDULED | AUCTION_IN_PROGRESS | SOLD';
 COMMENT ON COLUMN product.price           IS '상시 판매가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002).';
 COMMENT ON COLUMN product.view_count      IS '누적 조회수(집계값). ⚠️ 회원별 조회 이력은 남지 않는다 — REC-001 착수 시 재검토 필요.';
 COMMENT ON COLUMN product.deleted_at      IS '삭제 시각. 주문 이력 보존을 위해 물리 삭제하지 않는다.';

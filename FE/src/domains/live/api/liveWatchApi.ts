@@ -64,7 +64,7 @@ const mapLiveDetailDto = (dto: LiveDetailDto): LiveWatchViewData => ({
   scheduledAt: dto.scheduledAt,
   startedAt: dto.startedAt,
   endedAt: dto.endedAt,
-  currentViewerCount: null,
+  currentViewerCount: dto.currentViewerCount ?? null,
   peakViewerCount: dto.peakViewerCount,
   currentProductId: null,
   products: [...dto.products]
