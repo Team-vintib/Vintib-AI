@@ -4,6 +4,7 @@
       "reference_found": true,
       "pixel_to_cm_ratio": 0.2645,
       "garment_found": true,
+      "bbox": [140.0, 150.0, 660.0, 600.0],
       "landmarks": {
         "SHOULDER_LEFT": { "x": 320.0, "y": 210.0, "confidence": 0.93 },
         "SHOULDER_RIGHT": { "x": 610.0, "y": 208.0, "confidence": 0.94 },

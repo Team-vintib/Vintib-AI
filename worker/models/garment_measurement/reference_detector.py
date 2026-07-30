@@ -23,9 +23,12 @@ from .scenarios import get_scenario
 # 실제 샘플 사진으로 계속 보정해야 하는 첫 버전 상수다.
 _ASPECT_TOLERANCE = 0.15
 
-# Canny 엣지 검출 임계값. 배경(단색 매트/책상)과 흰 A4 용지의 대비가 크다는 전제로 잡은 값.
-_CANNY_LOW = 50
-_CANNY_HIGH = 150
+# Canny 엣지 검출 임계값. 처음엔 (50, 150)로 뒀는데, 배경이 순백/순흑처럼 극단적이지 않고
+# 회색 계열(예: 스튜디오 배경지)일 때 대비가 부족해 A4 사각형을 놓치는 걸 합성 이미지 테스트로
+# 확인했다 — (20, 60)로 낮춰서 그 케이스를 잡는다(Phase 6 실측, S15P11A108-339). 실제 사진으로
+# 계속 보정해야 하는 값인 건 여전하다.
+_CANNY_LOW = 20
+_CANNY_HIGH = 60
 
 
 @dataclass(frozen=True)

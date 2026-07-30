@@ -115,7 +115,9 @@ class GarmentMeasurementWorker(BaseWorker):
                 pixel_to_cm_ratio=reference.pixel_to_cm_ratio,
             )
 
-        landmarks = self._landmark_detector.detect(image_url, product_id, category)
+        landmarks = self._landmark_detector.detect(
+            image_url, product_id, category, bbox=segmentation.bbox
+        )
         measurements = cm_converter.convert(landmarks, reference.pixel_to_cm_ratio)
 
         overall_confidence = min((lm.confidence for lm in landmarks), default=0.0)

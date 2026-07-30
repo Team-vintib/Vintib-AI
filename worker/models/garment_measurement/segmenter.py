@@ -33,10 +33,16 @@ _MIN_FOREGROUND_AREA_RATIO = 0.03
 
 @dataclass(frozen=True)
 class SegmentationResult:
-    """원단 분할 결과. v1은 "찾았는지" 여부만 쓴다 — 마스크 자체는 랜드마크 검출 단계가
-    이미지에서 직접 다시 찾으므로 여기서 넘길 필요가 없다."""
+    """원단 분할 결과.
+
+    `bbox`는 (x, y, w, h), 원본 이미지 픽셀 좌표 — 랜드마크 검출 단계가 이 영역을 중심으로
+    크롭해서 HRNet에 넣는다(전신 사진 안에서 옷 부분만 좁혀주는 역할). 마스크 자체는 넘기지
+    않는다 — 랜드마크 검출은 정확한 픽셀 단위 마스크가 아니라 대략의 위치(bbox)만 있으면 된다.
+    `found=False`면 `bbox`는 `None`이다.
+    """
 
     found: bool
+    bbox: tuple[float, float, float, float] | None = None
 
 
 class GarmentSegmenterNotReady(Exception):
@@ -56,7 +62,9 @@ class MockGarmentSegmenter(GarmentSegmenter):
 
     def segment(self, image_url: str, product_id: int) -> SegmentationResult:
         scenario = get_scenario(product_id)
-        return SegmentationResult(found=scenario["garment_found"])
+        found = scenario["garment_found"]
+        bbox = tuple(scenario["bbox"]) if found and "bbox" in scenario else None
+        return SegmentationResult(found=found, bbox=bbox)
 
 
 class GrabCutGarmentSegmenter(GarmentSegmenter):
@@ -98,12 +106,17 @@ class GrabCutGarmentSegmenter(GarmentSegmenter):
         )
 
         # GC_FGD(확정 전경)와 GC_PR_FGD(추정 전경) 둘 다 "원단"으로 센다.
-        foreground = np.isin(mask, [cv2.GC_FGD, cv2.GC_PR_FGD])
+        foreground = np.isin(mask, [cv2.GC_FGD, cv2.GC_PR_FGD]).astype(np.uint8)
         foreground_ratio = foreground.sum() / foreground.size
 
         # numpy.bool_은 JSON 직렬화도 안 되고 `is True/False` 비교도 파이썬 bool과 다르게
         # 동작한다 — 명시적으로 파이썬 bool로 바꾼다.
-        return SegmentationResult(found=bool(foreground_ratio >= _MIN_FOREGROUND_AREA_RATIO))
+        found = bool(foreground_ratio >= _MIN_FOREGROUND_AREA_RATIO)
+        if not found:
+            return SegmentationResult(found=False)
+
+        x, y, w, h = cv2.boundingRect(foreground)
+        return SegmentationResult(found=True, bbox=(float(x), float(y), float(w), float(h)))
 
 
 def build_segmenter(key: str | None = None) -> GarmentSegmenter:

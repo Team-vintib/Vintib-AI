@@ -65,10 +65,12 @@ LANDMARK_BACKENDS: dict[str, BackendConfig] = {
         "model_id": None,
         "description": "목업 시나리오 기반 결정적 결과(의존성 없음)",
     },
-    # Phase 4 PoC(AI/validation/garment-landmark-check/) 통과 후에만 활성화.
+    # Phase 4 PoC(AI/validation/garment-landmark-check/)로 실사진 검증 후 구현.
+    # 체크포인트는 OneDrive 수동 다운로드 필요 — HRNET_CHECKPOINT_PATH, worker/README.md 참고.
     "hrnet_deepfashion2": {
         "model_id": "svip-lab/HRNet-for-Fashion-Landmark-Estimation.PyTorch",
-        "description": "DeepFashion2 사전학습 HRNet. torch 필요 — validation/ PoC 결과 대기 중, 미구현",
+        "description": "DeepFashion2 사전학습 HRNet. torch/torchvision/yacs/opencv-python 필요, "
+        "체크포인트 수동 배치 필요",
     },
 }
 ACTIVE_LANDMARK_BACKEND = "mock"

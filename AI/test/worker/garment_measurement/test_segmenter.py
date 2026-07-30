@@ -49,8 +49,22 @@ def test_finds_a_high_contrast_central_region(garment_like_image_path):
     assert result.found is True
 
 
+def test_found_result_carries_a_bbox_roughly_matching_the_shape(garment_like_image_path):
+    """랜드마크 검출 단계가 이 bbox로 크롭한다 — 좌표가 대략 빨강 사각형(150,100)~(650,500) 자리여야 한다."""
+    segmenter = GrabCutGarmentSegmenter()
+    result = segmenter.segment(garment_like_image_path, product_id=1)
+
+    assert result.bbox is not None
+    x, y, w, h = result.bbox
+    assert 100 <= x <= 200
+    assert 50 <= y <= 150
+    assert 400 <= w <= 600
+    assert 300 <= h <= 500
+
+
 def test_uniform_image_is_not_found(uniform_image_path):
     segmenter = GrabCutGarmentSegmenter()
     result = segmenter.segment(uniform_image_path, product_id=1)
 
     assert result.found is False
+    assert result.bbox is None
