@@ -62,7 +62,7 @@
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 알림 목록 조회 | GET | `/users/{id}/alerts` |  | NOTI-001~005 |  |
+| 알림 목록 조회 | GET | `/users/{id}/alerts` | ✓ | NOTI-001~005 | ✓ |
 | 알림 읽음 처리 | PATCH | `/users/{userId}/alerts/{id}` | ✓ | NOTI-001 | ✓ |
 
 ## 상품 (Products)
