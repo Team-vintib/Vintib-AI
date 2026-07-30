@@ -121,7 +121,7 @@ export const routes: RouteRecordRaw[] = [
   {
     path: ROUTE_PATHS.PRODUCT_CREATE,
     name: ROUTE_NAMES.PRODUCT_CREATE,
-    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    component: () => import('@/domains/product/pages/ProductRegistrationPage.vue'),
     meta: { requiresAuth: true, title: '상품 등록' },
   },
   {

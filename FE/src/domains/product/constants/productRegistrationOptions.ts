@@ -1,0 +1,101 @@
+import type {
+  ProductRegistrationOption,
+  ProductRegistrationStep,
+} from '@/domains/product/types/productRegistration.types'
+
+export const PRODUCT_REGISTRATION_STEPS: ProductRegistrationStep[] = [
+  {
+    id: 'photos',
+    label: '사진 등록',
+    description: '앞면과 뒷면 사진을 등록하고 대표 이미지를 선택합니다.',
+  },
+  {
+    id: 'basic',
+    label: '기본 정보',
+    description: '상품명, 브랜드, 색상과 카테고리를 입력합니다.',
+  },
+  {
+    id: 'attributes',
+    label: '사이즈/소재',
+    description: '사이즈와 실측 정보를 입력합니다.',
+  },
+  {
+    id: 'condition',
+    label: '상태/하자',
+    description: '판매자 고지 정보와 AI 품질 검증 결과를 확인합니다.',
+  },
+  {
+    id: 'pricing',
+    label: '가격',
+    description: 'AI 추천가를 참고해 판매 방식과 가격을 설정합니다.',
+  },
+  {
+    id: 'review',
+    label: '검토',
+    description: '등록 전 입력한 정보를 최종 확인합니다.',
+  },
+  {
+    id: 'complete',
+    label: '완료',
+    description: '등록 결과를 확인합니다.',
+  },
+]
+
+export const PRODUCT_REGISTRATION_CATEGORY_OPTIONS: ProductRegistrationOption[] = [
+  { id: 'outer', label: '아우터' },
+  { id: 'top', label: '상의' },
+  { id: 'bottom', label: '하의' },
+  { id: 'dress', label: '원피스' },
+  { id: 'shoes', label: '신발' },
+  { id: 'accessory', label: '액세서리' },
+]
+
+export const PRODUCT_REGISTRATION_CONDITION_OPTIONS: ProductRegistrationOption[] = [
+  { id: 'S', label: 'S급' },
+  { id: 'A', label: 'A급' },
+  { id: 'B', label: 'B급' },
+  { id: 'C', label: 'C급' },
+]
+
+export const PRODUCT_REGISTRATION_SALE_TYPE_OPTIONS: ProductRegistrationOption[] = [
+  { id: 'DIRECT', label: '상시 판매' },
+  { id: 'AUCTION', label: '경매 예정' },
+]
+
+export const PRODUCT_REGISTRATION_COLOR_OPTIONS: ProductRegistrationOption[] = [
+  { id: 'indigo', label: '인디고' },
+  { id: 'black', label: '블랙' },
+  { id: 'white', label: '화이트' },
+  { id: 'camel', label: '카멜' },
+  { id: 'gray', label: '그레이' },
+]
+
+export const PRODUCT_REGISTRATION_SIZE_OPTIONS: ProductRegistrationOption[] = [
+  { id: 'XS', label: 'XS' },
+  { id: 'S', label: 'S' },
+  { id: 'M', label: 'M' },
+  { id: 'L', label: 'L' },
+  { id: 'XL', label: 'XL' },
+  { id: 'FREE', label: 'Free' },
+]
+
+export const PRODUCT_REGISTRATION_VALIDATION_MESSAGES = {
+  frontPhotoRequired: '앞면 사진을 업로드해 주세요.',
+  backPhotoRequired: '뒷면 사진을 업로드해 주세요.',
+  representativePhotoRequired: '대표 이미지를 선택해 주세요.',
+  nameRequired: '상품명을 입력해 주세요.',
+  brandRequired: '브랜드를 입력해 주세요.',
+  colorRequired: '색상을 입력해 주세요.',
+  categoryRequired: '카테고리를 선택해 주세요.',
+  sizeRequired: '사이즈를 입력해 주세요.',
+  measurementRequired: '실측 정보를 입력해 주세요.',
+  conditionRequired: '상품 상태를 선택해 주세요.',
+  defectRequired: '하자 여부를 선택해 주세요.',
+  aiPhotoRequired: 'AI 품질 검증에 사용할 앞면과 뒷면 사진을 선택해 주세요.',
+  aiPhotoConfirmationRequired: '품질 검증 사진별 확인을 완료해 주세요.',
+  saleTypeRequired: '판매 방식을 선택해 주세요.',
+  directSalePriceRequired: '판매가를 입력해 주세요.',
+  auctionStartPriceRequired: '시작가를 입력해 주세요.',
+  priceInvalid: '가격은 0보다 큰 숫자로 입력해 주세요.',
+} as const
+

@@ -15,9 +15,9 @@
 ## 구현 목록
 
 - [x] 상품 등록 요구사항 문서를 `FE/docs/frontend/screens/PROD-001/requirements.md`로 정리한다.
-- [ ] 라우트 상수와 `/products/new` route를 실제 `ProductRegistrationPage`로 연결한다.
-- [ ] 상품 등록 타입을 `domains/product/types/`에 추가한다.
-- [ ] 카테고리, 상태, 판매 방식, 색상/사이즈 후보 등 화면 전용 옵션 상수를 추가한다.
+- [x] 라우트 상수와 `/products/new` route를 실제 `ProductRegistrationPage`로 연결한다.
+- [x] 상품 등록 타입을 `domains/product/types/`에 추가한다.
+- [x] 카테고리, 상태, 판매 방식, 색상/사이즈 후보 등 화면 전용 옵션 상수를 추가한다.
 - [ ] 상품 사진 업로더 컴포넌트를 구현한다.
   - 앞면/뒷면 사진 필수 업로드
   - 추가 사진 개수 제한 없음
