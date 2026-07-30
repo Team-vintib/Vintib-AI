@@ -32,7 +32,9 @@ if not IMAGE_PATHS:
 
 PROMPTS = ["a stain on fabric", "a dirty mark", "a hole or tear in fabric", "clean fabric"]
 
-OUTPUT_DIR = Path("./outputs")
+OUTPUT_DIR = Path(
+    "./outputs/verify_clipseg"
+)  # 노트북별 하위 폴더 — clipseg_qc_test.ipynb 결과와 안 섞이게
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 for image_path in IMAGE_PATHS:

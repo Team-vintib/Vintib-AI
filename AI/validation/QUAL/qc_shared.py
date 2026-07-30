@@ -22,7 +22,10 @@ _HERE = Path(__file__).resolve().parent
 
 # 두 노트북이 같은 이미지를 봐야 하므로 sam3 쪽 폴더를 공용으로 쓴다(gitignore 되어 있다).
 SHARED_IMAGE_DIR = _HERE / "sam3-condition-check" / "sample_images"
-SAM3_OUTPUT_DIR = _HERE / "sam3-condition-check" / "outputs"
+# sam3_qc_test.ipynb(SAM3 단독)의 결과 위치. outputs/ 아래 노트북 이름으로 하위 폴더를 두는
+# 이유는 같은 폴더(sam3-condition-check/)에 bbox_crop/masking 변형 노트북도 있어 파일명이
+# 겹치면 서로 결과를 덮어쓰기 때문 — 노트북마다 outputs/<노트북 이름>/ 하나씩 쓴다.
+SAM3_OUTPUT_DIR = _HERE / "sam3-condition-check" / "outputs" / "sam3_qc_test"
 IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
 
 
