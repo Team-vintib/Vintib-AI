@@ -7,7 +7,7 @@ export const PRODUCT_REGISTRATION_STEPS: ProductRegistrationStep[] = [
   {
     id: 'photos',
     label: '사진 등록',
-    description: '앞면과 뒷면 사진을 등록하고 대표 이미지를 선택합니다.',
+    description: '상품의 전체 모습과 상세 상태가 잘 보이는 사진을 등록해 주세요.',
   },
   {
     id: 'basic',
@@ -83,6 +83,8 @@ export const PRODUCT_REGISTRATION_VALIDATION_MESSAGES = {
   frontPhotoRequired: '앞면 사진을 업로드해 주세요.',
   backPhotoRequired: '뒷면 사진을 업로드해 주세요.',
   representativePhotoRequired: '대표 이미지를 선택해 주세요.',
+  imageTypeInvalid: '이미지 파일만 업로드할 수 있습니다.',
+  imageSizeInvalid: '이미지는 10MB 이하로 업로드해 주세요.',
   nameRequired: '상품명을 입력해 주세요.',
   brandRequired: '브랜드를 입력해 주세요.',
   colorRequired: '색상을 입력해 주세요.',
@@ -98,4 +100,3 @@ export const PRODUCT_REGISTRATION_VALIDATION_MESSAGES = {
   auctionStartPriceRequired: '시작가를 입력해 주세요.',
   priceInvalid: '가격은 0보다 큰 숫자로 입력해 주세요.',
 } as const
-

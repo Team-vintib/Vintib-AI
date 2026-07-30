@@ -64,6 +64,10 @@ const isActivePath = (path: RoutePath) => {
     return false
   }
 
+  if (path === ROUTE_PATHS.PRODUCT_LIST && route.path === ROUTE_PATHS.PRODUCT_CREATE) {
+    return false
+  }
+
   return route.path === path || route.path.startsWith(`${path}/`)
 }
 

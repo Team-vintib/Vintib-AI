@@ -1,15 +1,27 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { PRODUCT_REGISTRATION_STEPS } from '@/domains/product/constants/productRegistrationOptions'
-import type { ProductRegistrationDraft } from '@/domains/product/types/productRegistration.types'
+import ProductPhotoUploader from '@/domains/product/components/ProductPhotoUploader.vue'
+import {
+  PRODUCT_REGISTRATION_STEPS,
+  PRODUCT_REGISTRATION_VALIDATION_MESSAGES,
+} from '@/domains/product/constants/productRegistrationOptions'
+import type {
+  ProductRegistrationDraft,
+  ProductRegistrationPhotoDraft,
+  ProductRegistrationPhotoRole,
+} from '@/domains/product/types/productRegistration.types'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
+
+const PRODUCT_REGISTRATION_MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
 
 const router = useRouter()
 const currentStepIndex = ref(0)
 const draftSaveMessage = ref('')
+const photoStepTouched = ref(false)
+const photoUploadError = ref('')
 
 const draft = reactive<ProductRegistrationDraft>({
   photos: [],
@@ -46,6 +58,141 @@ const isReviewStep = computed(() => currentStep.value.id === 'review')
 const isCompleteStep = computed(() => currentStep.value.id === 'complete')
 const nextActionLabel = computed(() => (isReviewStep.value ? '등록 완료' : '다음'))
 const selectedStepLabel = computed(() => `${currentStepIndex.value + 1}. ${currentStep.value.label}`)
+const frontPhotos = computed(() => draft.photos.filter((photo) => photo.role === 'front'))
+const backPhotos = computed(() => draft.photos.filter((photo) => photo.role === 'back'))
+const additionalPhotos = computed(() =>
+  draft.photos.filter((photo) => photo.role === 'additional'),
+)
+const frontPhotoCountLabel = computed(() => `(${Math.min(frontPhotos.value.length, 1)}/1)`)
+const backPhotoCountLabel = computed(() => `(${Math.min(backPhotos.value.length, 1)}/1)`)
+const representativePhoto = computed(
+  () => draft.photos.find((photo) => photo.id === draft.representativePhotoId) ?? null,
+)
+const photoStepErrors = computed(() => ({
+  front: photoStepTouched.value && frontPhotos.value.length === 0
+    ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.frontPhotoRequired
+    : '',
+  back: photoStepTouched.value && backPhotos.value.length === 0
+    ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.backPhotoRequired
+    : '',
+  representative: photoStepTouched.value && !draft.representativePhotoId
+    ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.representativePhotoRequired
+    : '',
+}))
+const isPhotoStepValid = computed(
+  () =>
+    frontPhotos.value.length > 0 &&
+    backPhotos.value.length > 0 &&
+    Boolean(draft.representativePhotoId),
+)
+
+const canMoveCurrentStepNext = computed(() => {
+  if (currentStep.value.id === 'photos') {
+    return isPhotoStepValid.value
+  }
+
+  return true
+})
+
+const revokePhotoPreviewUrl = (photo: ProductRegistrationPhotoDraft) => {
+  if (photo.previewUrl) {
+    URL.revokeObjectURL(photo.previewUrl)
+  }
+}
+
+const createPhotoDraft = (
+  role: ProductRegistrationPhotoRole,
+  file: File,
+): ProductRegistrationPhotoDraft => ({
+  id: `${role}-${Date.now()}-${crypto.randomUUID()}`,
+  role,
+  file,
+  previewUrl: URL.createObjectURL(file),
+  fileName: file.name,
+  isRepresentative: false,
+})
+
+const validateImageFile = (file: File) => {
+  if (!file.type.startsWith('image/')) {
+    return PRODUCT_REGISTRATION_VALIDATION_MESSAGES.imageTypeInvalid
+  }
+
+  if (file.size > PRODUCT_REGISTRATION_MAX_IMAGE_SIZE_BYTES) {
+    return PRODUCT_REGISTRATION_VALIDATION_MESSAGES.imageSizeInvalid
+  }
+
+  return ''
+}
+
+const addPhotos = (role: ProductRegistrationPhotoRole, files: File[]) => {
+  photoUploadError.value = ''
+  photoStepTouched.value = true
+
+  const validPhotos: ProductRegistrationPhotoDraft[] = []
+
+  for (const file of files) {
+    const error = validateImageFile(file)
+
+    if (error) {
+      photoUploadError.value = error
+      continue
+    }
+
+    validPhotos.push(createPhotoDraft(role, file))
+  }
+
+  if (validPhotos.length === 0) {
+    return
+  }
+
+  if (role === 'front' || role === 'back') {
+    draft.photos
+      .filter((photo) => photo.role === role)
+      .forEach((photo) => {
+        revokePhotoPreviewUrl(photo)
+      })
+
+    draft.photos = draft.photos.filter((photo) => photo.role !== role)
+    draft.photos.push(validPhotos[0])
+
+    if (draft.representativePhotoId && !draft.photos.some((photo) => photo.id === draft.representativePhotoId)) {
+      draft.representativePhotoId = ''
+    }
+
+    return
+  }
+
+  draft.photos.push(...validPhotos)
+}
+
+const removePhoto = (photoId: string) => {
+  const photo = draft.photos.find((item) => item.id === photoId)
+
+  if (!photo) {
+    return
+  }
+
+  revokePhotoPreviewUrl(photo)
+  draft.photos = draft.photos.filter((item) => item.id !== photoId)
+
+  if (draft.representativePhotoId === photoId) {
+    draft.representativePhotoId = ''
+  }
+}
+
+const selectRepresentativePhoto = (photoId: string) => {
+  draft.representativePhotoId = photoId
+  draft.photos = draft.photos.map((photo) => ({
+    ...photo,
+    isRepresentative: photo.id === photoId,
+  }))
+}
+
+const markCurrentStepTouched = () => {
+  if (currentStep.value.id === 'photos') {
+    photoStepTouched.value = true
+  }
+}
 
 const moveToPreviousStep = () => {
   if (isFirstStep.value || isCompleteStep.value) {
@@ -56,7 +203,13 @@ const moveToPreviousStep = () => {
 }
 
 const moveToNextStep = () => {
+  markCurrentStepTouched()
+
   if (isCompleteStep.value) {
+    return
+  }
+
+  if (!canMoveCurrentStepNext.value) {
     return
   }
 
@@ -79,6 +232,12 @@ const continueRegistration = () => {
 const moveToRegisteredProduct = () => {
   router.push({ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId: 'preview' } })
 }
+
+onBeforeUnmount(() => {
+  draft.photos.forEach((photo) => {
+    revokePhotoPreviewUrl(photo)
+  })
+})
 </script>
 
 <template>
@@ -112,8 +271,64 @@ const moveToRegisteredProduct = () => {
           <h2 :id="`${currentStep.id}-title`">{{ currentStep.label }}</h2>
           <p>{{ currentStep.description }}</p>
 
+          <div v-if="currentStep.id === 'photos'" class="product-registration__photo-step">
+            <ul class="product-registration__photo-guide">
+              <li>대표 이미지를 직접 선택해 주세요.</li>
+            </ul>
+
+            <ProductPhotoUploader
+              id="product-front-photo"
+              title="앞면 이미지 업로드"
+              description="옷의 앞면이 잘 보이는 사진을 등록해 주세요."
+              :requirement-label="frontPhotoCountLabel"
+              :requirement-met="frontPhotos.length > 0"
+              role="front"
+              :photos="frontPhotos"
+              :representative-photo-id="draft.representativePhotoId"
+              :error="photoStepErrors.front"
+              @upload="addPhotos"
+              @remove="removePhoto"
+              @select-representative="selectRepresentativePhoto"
+            />
+
+            <ProductPhotoUploader
+              id="product-back-photo"
+              title="뒷면 이미지 업로드"
+              description="옷의 뒷면이 잘 보이는 사진을 등록해 주세요."
+              :requirement-label="backPhotoCountLabel"
+              :requirement-met="backPhotos.length > 0"
+              role="back"
+              :photos="backPhotos"
+              :representative-photo-id="draft.representativePhotoId"
+              :error="photoStepErrors.back"
+              @upload="addPhotos"
+              @remove="removePhoto"
+              @select-representative="selectRepresentativePhoto"
+            />
+
+            <ProductPhotoUploader
+              id="product-additional-photo"
+              title="추가 사진"
+              description="디테일, 라벨, 착용감이 드러나는 사진을 더 등록할 수 있습니다."
+              role="additional"
+              multiple
+              :photos="additionalPhotos"
+              :representative-photo-id="draft.representativePhotoId"
+              @upload="addPhotos"
+              @remove="removePhoto"
+              @select-representative="selectRepresentativePhoto"
+            />
+
+            <p v-if="photoStepErrors.representative" class="product-registration__field-error" role="alert">
+              {{ photoStepErrors.representative }}
+            </p>
+            <p v-if="photoUploadError" class="product-registration__field-error" role="alert">
+              {{ photoUploadError }}
+            </p>
+          </div>
+
           <div
-            v-if="!isCompleteStep"
+            v-else-if="!isCompleteStep"
             class="product-registration__placeholder"
             role="status"
           >
@@ -185,7 +400,11 @@ const moveToRegisteredProduct = () => {
           <dl>
             <div>
               <dt>대표 이미지</dt>
-              <dd>{{ draft.representativePhotoId ? '선택됨' : '미선택' }}</dd>
+              <dd>{{ representativePhoto?.fileName || '미선택' }}</dd>
+            </div>
+            <div>
+              <dt>사진</dt>
+              <dd>{{ draft.photos.length }}장</dd>
             </div>
             <div>
               <dt>상품명</dt>
@@ -348,6 +567,26 @@ const moveToRegisteredProduct = () => {
 
 .product-registration__placeholder strong {
   color: var(--color-text-primary);
+}
+
+.product-registration__photo-step {
+  display: grid;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.product-registration__photo-guide {
+  padding: var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-primary-soft);
+  color: var(--color-text-primary);
+  line-height: var(--line-height-body);
+}
+
+.product-registration__field-error {
+  color: var(--color-error);
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .product-registration__complete {

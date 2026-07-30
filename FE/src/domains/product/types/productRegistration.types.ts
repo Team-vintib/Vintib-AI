@@ -38,6 +38,7 @@ export interface ProductRegistrationPhotoDraft {
   role: ProductRegistrationPhotoRole
   file: File | null
   previewUrl: string
+  fileName: string
   isRepresentative: boolean
 }
 
@@ -104,4 +105,3 @@ export interface ProductRegistrationDraft {
   auctionStartPrice: string
   linkedLiveId: string
 }
-
