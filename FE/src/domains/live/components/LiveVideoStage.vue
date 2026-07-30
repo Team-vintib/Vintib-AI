@@ -3,10 +3,22 @@ import { computed } from 'vue'
 
 import type { LiveWatchStatus } from '@/domains/live/types/liveWatch.types'
 
-const props = defineProps<{
-  title: string
-  posterUrl: string | null
-  status: LiveWatchStatus
+const props = withDefaults(
+  defineProps<{
+    title: string
+    posterUrl: string | null
+    status: LiveWatchStatus
+    tryOnDisabled?: boolean
+    tryOnOpen?: boolean
+  }>(),
+  {
+    tryOnDisabled: false,
+    tryOnOpen: false,
+  },
+)
+
+const emit = defineEmits<{
+  openTryOn: []
 }>()
 
 const stageMessage = computed(() => {
@@ -51,10 +63,17 @@ const stageMessage = computed(() => {
     </div>
 
     <button
+      v-if="!tryOnOpen"
       class="live-video-stage__try-on"
       type="button"
+      :disabled="tryOnDisabled"
       aria-label="선택한 상품 AI 시착"
-      title="AI 시착 상세 기능은 후속 작업에서 연결됩니다."
+      :title="
+        tryOnDisabled
+          ? '라이브 중 선택한 상품이 있을 때 AI 시착을 이용할 수 있습니다.'
+          : '선택한 상품 AI 시착 열기'
+      "
+      @click="emit('openTryOn')"
     >
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="m12 3 1.35 4.15L17.5 8.5l-4.15 1.35L12 14l-1.35-4.15L6.5 8.5l4.15-1.35L12 3Z" />
@@ -200,8 +219,16 @@ const stageMessage = computed(() => {
   font-weight: 600;
 }
 
-.live-video-stage__try-on:hover {
+.live-video-stage__try-on:hover:not(:disabled) {
   opacity: 0.9;
+}
+
+.live-video-stage__try-on:disabled {
+  cursor: not-allowed;
+  background: var(--color-live-surface-raised);
+  box-shadow: none;
+  color: var(--color-live-text-secondary);
+  opacity: 0.72;
 }
 
 .live-video-stage__try-on:focus-visible {
