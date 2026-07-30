@@ -33,11 +33,11 @@ app/chat/artifacts/
 
 # SAM3 QC 스파이크의 입력 이미지·시각화 산출물. 둘 다 재생성 가능하다
 # (sample_images/ 는 노트북이 공개 URL 에서 받아 채우고, outputs/ 는 히트맵 PNG).
-validation/sam3-condition-check/sample_images/
-validation/sam3-condition-check/outputs/
-validation/clipseg-condition-check/outputs/
+validation/QUAL/sam3-condition-check/sample_images/
+validation/QUAL/sam3-condition-check/outputs/
+validation/QUAL/clipseg-condition-check/outputs/
 # SAM 3D 스파이크 산출물(.ply splat + 턴테이블 GIF). splat 은 장당 수십 MB 라 커밋 금지.
-validation/sam3d-condition-check/outputs/
+validation/TRYON/sam3d-condition-check/outputs/
 # 의류 파인튜닝 스캐폴드의 산출물 — 더미 데이터·캐시·체크포인트·렌더·리포트 전부 재생성 가능하다.
-validation/sam3d-garment-finetune-check/artifacts/
+validation/TRYON/sam3d-garment-finetune-check/artifacts/
 
