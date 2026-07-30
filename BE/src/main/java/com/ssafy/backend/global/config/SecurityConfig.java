@@ -39,6 +39,10 @@ public class SecurityConfig {
             // 카테고리/브랜드 마스터 조회는 비회원도 가능(SY007)
             "/api/categories",
             "/api/brands",
+            // STOMP 핸드셰이크는 비회원도 통과해야 한다(라이브 시청·채팅 읽기). 인증은 여기서
+            // 하지 않고 CONNECT 프레임에서 StompAuthChannelInterceptor 가 처리한다 — 브라우저는
+            // 핸드셰이크 요청에 Authorization 헤더를 붙일 수 없다.
+            "/ws/**",
             "/actuator/**",
             "/swagger-ui/**",
             "/v3/api-docs/**"
