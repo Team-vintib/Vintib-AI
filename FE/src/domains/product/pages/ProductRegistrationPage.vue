@@ -22,6 +22,7 @@ import type {
   ProductRegistrationPhotoRole,
   ProductRegistrationRecommendedPrice,
   ProductRegistrationSaleType,
+  ProductRegistrationStepId,
 } from '@/domains/product/types/productRegistration.types'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
@@ -241,6 +242,13 @@ const measurementSummaryLabel = computed(() => {
 
   return `${completedCount}/${activeMeasurementFields.value.length}개`
 })
+const measurementReviewItems = computed(() =>
+  activeMeasurementFields.value.map((field) => ({
+    id: field.id,
+    label: field.label,
+    value: draft.measurements[field.id] ? `${draft.measurements[field.id]}cm` : '',
+  })),
+)
 const selectedConditionLabel = computed(
   () =>
     PRODUCT_REGISTRATION_CONDITION_OPTIONS.find((option) => option.id === draft.conditionGrade)?.label ||
@@ -311,12 +319,28 @@ const isConditionStepValid = computed(
     areAllAiPhotosConfirmed.value,
 )
 const isPositivePrice = (value: string) => {
-  const normalizedValue = value.trim().replaceAll(',', '')
+  const normalizedValue = value.trim()
   const parsedValue = Number(normalizedValue)
 
   return normalizedValue !== '' && Number.isFinite(parsedValue) && parsedValue > 0
 }
 const formatPrice = (price: number) => `${price.toLocaleString('ko-KR')}원`
+const getNumericInputValue = (event: Event) => {
+  if (!(event.target instanceof HTMLInputElement)) {
+    return ''
+  }
+
+  const numericValue = event.target.value.replace(/\D/g, '')
+  event.target.value = numericValue
+
+  return numericValue
+}
+const updateDirectSalePrice = (event: Event) => {
+  draft.directSalePrice = getNumericInputValue(event)
+}
+const updateAuctionStartPrice = (event: Event) => {
+  draft.auctionStartPrice = getNumericInputValue(event)
+}
 const selectedSaleTypeLabel = computed(
   () =>
     PRODUCT_REGISTRATION_SALE_TYPE_OPTIONS.find((option) => option.id === draft.saleType)?.label ||
@@ -324,15 +348,18 @@ const selectedSaleTypeLabel = computed(
 )
 const selectedPriceLabel = computed(() => {
   if (draft.saleType === 'DIRECT' && isPositivePrice(draft.directSalePrice)) {
-    return formatPrice(Number(draft.directSalePrice.trim().replaceAll(',', '')))
+    return formatPrice(Number(draft.directSalePrice.trim()))
   }
 
   if (draft.saleType === 'AUCTION' && isPositivePrice(draft.auctionStartPrice)) {
-    return formatPrice(Number(draft.auctionStartPrice.trim().replaceAll(',', '')))
+    return formatPrice(Number(draft.auctionStartPrice.trim()))
   }
 
   return ''
 })
+const selectedAuctionLiveLabel = computed(
+  () => auctionLiveOptions.find((live) => live.id === draft.linkedLiveId)?.label || '',
+)
 const maxPriceBucketCount = computed(() =>
   Math.max(...priceRecommendationBuckets.map((bucket) => bucket.productCount)),
 )
@@ -663,6 +690,17 @@ const moveToNextStep = () => {
   }
 
   currentStepIndex.value += 1
+  scrollToPageTop()
+}
+
+const moveToStep = (stepId: ProductRegistrationStepId) => {
+  const targetStepIndex = PRODUCT_REGISTRATION_STEPS.findIndex((step) => step.id === stepId)
+
+  if (targetStepIndex < 0) {
+    return
+  }
+
+  currentStepIndex.value = targetStepIndex
   scrollToPageTop()
 }
 
@@ -1385,12 +1423,14 @@ onBeforeUnmount(() => {
                 <span>판매가</span>
                 <span class="product-registration__price-input">
                   <input
-                    v-model="draft.directSalePrice"
+                    :value="draft.directSalePrice"
                     inputmode="numeric"
+                    pattern="[0-9]*"
                     placeholder="판매가를 입력해 주세요"
+                    @input="updateDirectSalePrice"
                     @blur="pricingStepTouched.directSalePrice = true"
                   />
-                  <span>P</span>
+                  <span>원</span>
                 </span>
                 <span
                   v-if="pricingStepErrors.directSalePrice"
@@ -1406,9 +1446,11 @@ onBeforeUnmount(() => {
                   <span>시작가</span>
                   <span class="product-registration__price-input">
                     <input
-                      v-model="draft.auctionStartPrice"
+                      :value="draft.auctionStartPrice"
                       inputmode="numeric"
+                      pattern="[0-9]*"
                       placeholder="시작가를 입력해 주세요"
+                      @input="updateAuctionStartPrice"
                       @blur="pricingStepTouched.auctionStartPrice = true"
                     />
                     <span>원</span>
@@ -1438,6 +1480,151 @@ onBeforeUnmount(() => {
               </div>
             </section>
           </form>
+
+          <section
+            v-else-if="currentStep.id === 'review'"
+            class="product-registration__review"
+            aria-label="상품 등록 검토"
+          >
+            <article class="product-registration__review-section">
+              <div class="product-registration__review-header">
+                <h3>사진</h3>
+                <button type="button" @click="moveToStep('photos')">수정</button>
+              </div>
+              <div class="product-registration__review-hero">
+                <img
+                  v-if="representativePhoto"
+                  :src="representativePhoto.previewUrl"
+                  :alt="representativePhoto.fileName"
+                />
+              </div>
+              <div class="product-registration__review-photos" aria-label="업로드 이미지">
+                <figure
+                  v-for="photo in draft.photos"
+                  :key="photo.id"
+                  :class="{ 'product-registration__review-photo--representative': photo.isRepresentative }"
+                >
+                  <img :src="photo.previewUrl" :alt="photo.fileName" />
+                  <figcaption>
+                    {{
+                      photo.role === 'front'
+                        ? 'Front View'
+                        : photo.role === 'back'
+                          ? 'Back View'
+                          : '추가'
+                    }}
+                  </figcaption>
+                </figure>
+              </div>
+            </article>
+
+            <article class="product-registration__review-section">
+              <div class="product-registration__review-header">
+                <h3>기본 정보</h3>
+                <button type="button" @click="moveToStep('basic')">수정</button>
+              </div>
+              <dl class="product-registration__review-list">
+                <div>
+                  <dt>상품명</dt>
+                  <dd>{{ draft.name.trim() }}</dd>
+                </div>
+                <div>
+                  <dt>브랜드</dt>
+                  <dd>{{ draft.brand.trim() }}</dd>
+                </div>
+                <div>
+                  <dt>색상</dt>
+                  <dd>{{ selectedColorLabel }}</dd>
+                </div>
+                <div>
+                  <dt>카테고리</dt>
+                  <dd>{{ selectedCategoryLabel }}</dd>
+                </div>
+                <div>
+                  <dt>상품 설명</dt>
+                  <dd>{{ draft.description.trim() }}</dd>
+                </div>
+                <div>
+                  <dt>구매 시기</dt>
+                  <dd>{{ draft.purchasedAt }}</dd>
+                </div>
+                <div>
+                  <dt>구매 국가</dt>
+                  <dd>{{ draft.purchasedCountry.trim() }}</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article class="product-registration__review-section">
+              <div class="product-registration__review-header">
+                <h3>사이즈/소재</h3>
+                <button type="button" @click="moveToStep('attributes')">수정</button>
+              </div>
+              <dl class="product-registration__review-list">
+                <div>
+                  <dt>사이즈</dt>
+                  <dd>{{ selectedSizeLabel }}</dd>
+                </div>
+                <div>
+                  <dt>소재</dt>
+                  <dd>{{ draft.material.trim() }}</dd>
+                </div>
+                <div
+                  v-for="item in measurementReviewItems"
+                  :key="item.id"
+                >
+                  <dt>{{ item.label }}</dt>
+                  <dd>{{ item.value }}</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article class="product-registration__review-section">
+              <div class="product-registration__review-header">
+                <h3>상태/하자</h3>
+                <button type="button" @click="moveToStep('condition')">수정</button>
+              </div>
+              <dl class="product-registration__review-list">
+                <div>
+                  <dt>상태</dt>
+                  <dd>{{ selectedConditionLabel }}</dd>
+                </div>
+                <div>
+                  <dt>하자 여부</dt>
+                  <dd>{{ draft.hasDefect === true ? '하자 있음' : '하자 없음' }}</dd>
+                </div>
+                <div>
+                  <dt>하자 설명</dt>
+                  <dd>{{ draft.sellerDefectDescription.trim() }}</dd>
+                </div>
+                <div>
+                  <dt>AI 검증</dt>
+                  <dd>{{ draft.aiPhotoResults.length }}장 저장 완료</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article class="product-registration__review-section">
+              <div class="product-registration__review-header">
+                <h3>가격</h3>
+                <button type="button" @click="moveToStep('pricing')">수정</button>
+              </div>
+              <dl class="product-registration__review-list">
+                <div>
+                  <dt>판매 유형</dt>
+                  <dd>{{ selectedSaleTypeLabel }}</dd>
+                </div>
+                <div>
+                  <dt>가격</dt>
+                  <dd>{{ selectedPriceLabel }}</dd>
+                </div>
+                <div v-if="draft.saleType === 'AUCTION'">
+                  <dt>경매 라이브</dt>
+                  <dd>{{ selectedAuctionLiveLabel }}</dd>
+                </div>
+              </dl>
+            </article>
+          </section>
 
           <div
             v-else-if="!isCompleteStep"
@@ -2288,6 +2475,115 @@ onBeforeUnmount(() => {
   font-weight: var(--font-weight-bold);
 }
 
+.product-registration__review {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.product-registration__review-section {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+}
+
+.product-registration__review-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.product-registration__review-header h3 {
+  color: var(--color-text-primary);
+  font-size: 18px;
+  font-weight: var(--font-weight-extrabold);
+}
+
+.product-registration__review-header button {
+  height: var(--button-height-small);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: var(--font-weight-bold);
+}
+
+.product-registration__review-hero {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.product-registration__review-hero img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.product-registration__review-photos {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.product-registration__review-photos figure {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.product-registration__review-photo--representative {
+  border-color: var(--color-live);
+}
+
+.product-registration__review-photos img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.product-registration__review-photos figcaption {
+  padding: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+
+.product-registration__review-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.product-registration__review-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.product-registration__review-list dt {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.product-registration__review-list dd {
+  min-width: 0;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
 .product-registration__complete {
   display: grid;
   justify-items: center;
@@ -2443,6 +2739,10 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .product-registration__review-photos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .product-registration__section-header,
   .product-registration__ai-card {
     flex-direction: column;
@@ -2462,6 +2762,15 @@ onBeforeUnmount(() => {
 
   .product-registration__additional-ai-panel {
     grid-template-columns: 1fr;
+  }
+
+  .product-registration__review-list div {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .product-registration__review-list dd {
+    text-align: left;
   }
 }
 </style>
