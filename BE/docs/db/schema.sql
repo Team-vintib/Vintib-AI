@@ -130,12 +130,11 @@ CREATE TABLE product (
         'ON_SALE',            -- 상시 판매 중
         'AUCTION_SCHEDULED',  -- 경매 예정
         'AUCTION_IN_PROGRESS',-- 경매 진행 중 (상시 구매 즉시 중단, LIVE-006)
-        'AUCTION_FAILED',     -- 미낙찰 — 판매자 재설정 대기 (AUCT-014 / PROD-005)
         'SOLD'                -- 판매 완료(낙찰 포함)
     )),
     -- 상시 판매 상품은 가격이 반드시 있어야 한다.
-    -- 경매 상품의 가격은 강제하지 않는다 — 미낙찰 후 상시 판매로 전환(PROD-005)하는
-    -- 과도기에 sale_type 과 price 갱신 순서를 애플리케이션이 자유롭게 잡을 수 있어야 한다.
+    -- 경매 상품의 가격은 강제하지 않는다 — 미낙찰 후 상시 판매로 전환(PROD-005)할 때
+    -- sale_type 과 price 갱신 순서를 애플리케이션이 자유롭게 잡을 수 있어야 한다.
     CONSTRAINT ck_product_price_by_type CHECK (
         sale_type <> 'DIRECT_SALE' OR price IS NOT NULL
     )

@@ -74,9 +74,8 @@
 | 상품 기본 정보 저장 | POST | `/products` | ✓ | PROD-001 | ✓ |
 | 상품 이미지 등록 | POST | `/products/{id}/images` | ✓ | PROD-001 | ✓ |
 | 상품 이미지 업로드 URL 발급 | POST | `/products/{id}/images/upload-url` | ✓ | PROD-001 | ✓ |
-| 판매 가격 설정 및 상시 판매 등록 | PATCH | `/products/{id}/status` | ✓ | PROD-002 | ✓ |
-| 경매 상품 등록 | PATCH | `/products/{id}/auction-schedule` | ✓ | PROD-003 | ✓ |
-| 미낙찰 상품 후속 처리 | PATCH | `/products/{id}/auction-result` | ✓ | PROD-005, AUCT-014 | ✓ |
+| 경매 상품 등록 및 경매 전환 | PATCH | `/products/{id}/auction-schedule` | ✓ | PROD-003, PROD-004 | ✓ |
+| 판매 가격 설정 및 상시 판매 등록 | PATCH | `/products/{id}/status` | ✓ | PROD-002, PROD-004, PROD-005, AUCT-014 | ✓ |
 | 상품 이미지 삭제 | DELETE | `/products/{id}/images/{imgId}` | ✓ | PROD-001 | ✓ |
 | 상품 이미지 수정 | PATCH | `/products/{id}/images/{imageId}` | ✓ | PROD-001 | ✓ |
 | 상품 상세 조회 | GET | `/products/{id}` |  | PROD-006 | ✓ |
