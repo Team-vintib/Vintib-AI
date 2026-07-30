@@ -13,6 +13,7 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.product.dto.request.ProductAuctionResultRequest;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
@@ -159,7 +160,145 @@ class ProductServiceTest {
     }
 
     @Test
-    void 상품_목록_조회시_DRAFT와_PRIVATE_상태는_제외하고_조회한다() {
+    void DRAFT_상품을_경매_예정으로_등록한다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductResponse response = productService.scheduleAuction(SELLER_ID, 1L);
+
+        assertThat(response.saleStatus()).isEqualTo(SaleStatus.AUCTION_SCHEDULED);
+        assertThat(response.saleType()).isEqualTo(SaleType.AUCTION);
+        assertThat(response.price()).isNull();
+    }
+
+    @Test
+    void DRAFT_상태가_아니면_경매_등록시_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        product.registerDirectSale(50000L);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.scheduleAuction(SELLER_ID, 1L))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PRODUCT_STATE);
+    }
+
+    @Test
+    void 본인이_아니면_경매_등록시_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.scheduleAuction(2L, 1L))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_PRODUCT_OWNER);
+    }
+
+    @Test
+    void 존재하지_않는_상품이면_경매_등록시_예외를_던진다() {
+        when(productRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> productService.scheduleAuction(SELLER_ID, 1L))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PRODUCT_NOT_FOUND);
+    }
+
+    @Test
+    void 미낙찰_상품을_상시_판매로_전환한다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.AUCTION_FAILED);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductResponse response = productService.resolveAuctionFailure(
+                SELLER_ID, 1L, new ProductAuctionResultRequest(ProductAuctionResultRequest.NextStatus.ON_SALE, 30000L));
+
+        assertThat(response.saleStatus()).isEqualTo(SaleStatus.ON_SALE);
+        assertThat(response.saleType()).isEqualTo(SaleType.DIRECT_SALE);
+        assertThat(response.price()).isEqualTo(30000L);
+    }
+
+    @Test
+    void 미낙찰_상품을_경매_예정으로_전환한다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.AUCTION_FAILED);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductResponse response = productService.resolveAuctionFailure(
+                SELLER_ID,
+                1L,
+                new ProductAuctionResultRequest(ProductAuctionResultRequest.NextStatus.AUCTION_SCHEDULED, null));
+
+        assertThat(response.saleStatus()).isEqualTo(SaleStatus.AUCTION_SCHEDULED);
+        assertThat(response.saleType()).isEqualTo(SaleType.AUCTION);
+        assertThat(response.price()).isNull();
+    }
+
+    @Test
+    void 미낙찰_상태가_아니면_후속_처리시_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.ON_SALE);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.resolveAuctionFailure(
+                        SELLER_ID,
+                        1L,
+                        new ProductAuctionResultRequest(ProductAuctionResultRequest.NextStatus.ON_SALE, 30000L)))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PRODUCT_STATE);
+    }
+
+    @Test
+    void 본인이_아니면_미낙찰_후속_처리시_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.AUCTION_FAILED);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.resolveAuctionFailure(
+                        2L,
+                        1L,
+                        new ProductAuctionResultRequest(ProductAuctionResultRequest.NextStatus.ON_SALE, 30000L)))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_PRODUCT_OWNER);
+    }
+
+    @Test
+    void 상시_판매_선택인데_가격이_없으면_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.AUCTION_FAILED);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.resolveAuctionFailure(
+                        SELLER_ID,
+                        1L,
+                        new ProductAuctionResultRequest(ProductAuctionResultRequest.NextStatus.ON_SALE, null)))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+    }
+
+    @Test
+    void 경매_예정_선택인데_가격을_같이_보내면_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.AUCTION_FAILED);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.resolveAuctionFailure(
+                        SELLER_ID,
+                        1L,
+                        new ProductAuctionResultRequest(
+                                ProductAuctionResultRequest.NextStatus.AUCTION_SCHEDULED, 30000L)))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+    }
+
+    @Test
+    void 상품_목록_조회시_DRAFT_상태는_제외하고_조회한다() {
         Product onSale = Product.builder().seller(seller).title("상시 판매 상품").build();
         onSale.registerDirectSale(10000L);
         Pageable pageable = PageRequest.of(0, 20);
@@ -168,9 +307,7 @@ class ProductServiceTest {
 
         PageResponse<ProductResponse> response = productService.getProductList(pageable);
 
-        verify(productRepository)
-                .findBySaleStatusNotIn(
-                        eq(List.of(SaleStatus.DRAFT, SaleStatus.PRIVATE)), any(Pageable.class));
+        verify(productRepository).findBySaleStatusNotIn(eq(List.of(SaleStatus.DRAFT)), any(Pageable.class));
         assertThat(response.content()).hasSize(1);
         assertThat(response.content().get(0).saleStatus()).isEqualTo(SaleStatus.ON_SALE);
     }
@@ -221,7 +358,7 @@ class ProductServiceTest {
     }
 
     @Test
-    void DRAFT_또는_PRIVATE_상품은_본인만_조회할_수_있다() {
+    void DRAFT_상품은_본인만_조회할_수_있다() {
         when(seller.getId()).thenReturn(SELLER_ID);
         when(seller.getNickname()).thenReturn("판매자");
         Product product = Product.builder().seller(seller).title("빈티지 자켓").build();

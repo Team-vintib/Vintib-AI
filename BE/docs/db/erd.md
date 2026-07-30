@@ -134,7 +134,6 @@ stateDiagram-v2
     AUCTION_IN_PROGRESS --> AUCTION_FAILED : 입찰자 없이 종료
     AUCTION_FAILED --> ON_SALE : 판매자가 상시 판매 선택
     AUCTION_FAILED --> AUCTION_SCHEDULED : 경매 예정 유지
-    AUCTION_FAILED --> PRIVATE : 비공개 선택
     SOLD --> [*]
 ```
 
@@ -146,9 +145,12 @@ stateDiagram-v2
 | `AUCTION_IN_PROGRESS` | 경매 진행 중 — 상시 구매 즉시 중단 (LIVE-006) |
 | `AUCTION_FAILED` | 미낙찰 — **판매자 재설정 대기** |
 | `SOLD` | 판매 완료(낙찰 포함) |
-| `PRIVATE` | 비공개 |
 
-> **`AUCTION_FAILED`를 별도 상태로 둔 이유.** `AUCT-014`는 "자동 상시 판매 전환 금지"이고 `PROD-005`는 판매자가 상시 판매 / 경매 예정 유지 / 비공개 중 고르게 되어 있다. 자동 전이가 금지된 이상 **선택을 기다리는 중간 상태가 반드시 필요**하다. 이 상태가 없으면 미낙찰 상품이 갈 곳이 없다.
+> **`AUCTION_FAILED`를 별도 상태로 둔 이유.** `AUCT-014`는 "자동 상시 판매 전환 금지"이고 `PROD-005`는 판매자가 상시 판매 / 경매 예정 유지 중 고르게 되어 있다. 자동 전이가 금지된 이상 **선택을 기다리는 중간 상태가 반드시 필요**하다. 이 상태가 없으면 미낙찰 상품이 갈 곳이 없다.
+>
+> **`PRIVATE`는 없앴다.** 처음엔 미낙찰 후속 선택지에 "비공개"도 있었지만 기획에서 빠졌다. 이
+> 상태로 들어오는 화살표가 이거 하나뿐이었어서, 선택지가 없어지면 `PRIVATE`는 영원히 도달 불가능한
+> 죽은 상태가 된다. 그래서 enum·CHECK 제약에서 완전히 제거했다.
 
 ### 3-2. 방송 상태 `live.status`
 

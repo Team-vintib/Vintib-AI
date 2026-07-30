@@ -38,7 +38,7 @@ public class WishController {
 
     private final WishService wishService;
 
-    @Operation(summary = "상품 찜", description = "관심 상품을 찜한다. DRAFT/PRIVATE 상태 상품은 찜할 수 없다.")
+    @Operation(summary = "상품 찜", description = "관심 상품을 찜한다. DRAFT 상태 상품은 찜할 수 없다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "찜 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
@@ -73,7 +73,7 @@ public class WishController {
 
     @Operation(
             summary = "찜 목록 조회",
-            description = "찜한 상품 목록을 찜한 시각 최신순으로 조회한다. 찜한 이후 상품이 판매완료(SOLD)·비공개(PRIVATE)로 "
+            description = "찜한 상품 목록을 찜한 시각 최신순으로 조회한다. 찜한 이후 상품이 판매완료(SOLD) 등으로 "
                     + "바뀌어도 목록에서 제외하지 않고 현재 상태를 그대로 보여준다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
