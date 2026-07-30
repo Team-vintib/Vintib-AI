@@ -27,3 +27,8 @@
 
 - Swagger: `/swagger-ui/index.html` — "팔로우 / 찜(Socials)" 태그
 - `BE/src/main/java/com/ssafy/backend/social/controller/WishController.java`
+
+## 처리 결과
+
+- 2026-07-30: FE 문서 반영 완료.
+- 반영 위치: `FE/docs/frontend/api/api-index.md`, `FE/docs/frontend/implementation/status.md`, `FE/docs/frontend/decisions/open-questions.md`

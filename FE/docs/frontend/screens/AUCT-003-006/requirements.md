@@ -11,7 +11,7 @@
 - `docs/notion/화면 기반 개발 요구 문서.md`
 - `docs/notion/기능 정의서.md`
 - `docs/notion/프론트엔드 디자인 구현 규칙.md`
-- `.codex/requests/be/012-live-watch-detail-contract-gaps.md`
+- `.codex/requests/be/007-live-tryon-contract.md`
 
 ## 채팅 UI
 
@@ -45,7 +45,7 @@
 ## API 경계
 
 실제 연결에 필요한 채팅 STOMP, 과거 메시지 조회, 경매 snapshot·입찰·입찰 내역·낙찰 결과와
-reaction event 계약은 `012-live-watch-detail-contract-gaps.md`에 이미 정리돼 있다.
+reaction event 계약은 `.codex/requests/be/007-live-tryon-contract.md`에 정리돼 있다.
 이번 작업은 별도 API를 호출하지 않으며 화면 데이터는 mock 전용 타입과 상수로 관리한다.
 
 ## 제외 범위
