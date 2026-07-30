@@ -64,11 +64,19 @@ class TryOnOptions(BaseModel):
 
     `body_*`/`garment_measurements`는 전부 선택값이다 — 온보딩을 건너뛴 회원이거나 상품에
     실측이 안 되어 있으면 비어 있는 게 정상이고, 그 경우 `fit_type` 고정 3단계로 그대로
-    동작한다(적응형 마스킹은 둘 다 있을 때만 켜진다). `body_chest_cm`/`body_waist_cm`/
-    `body_hip_cm`은 BE `member_body_profile`에 아직 컬럼이 없어(단위·범위도 미확정,
-    `.codex/requests/be/003-onboarding-tryon-profile-api.md` 열린 질문 참고) 지금은 항상
-    `None`으로 들어오지만, 나중에 컬럼이 생겼을 때 AI 쪽 스키마를 또 안 건드리게 미리
-    열어둔다.
+    동작한다.
+
+    **적응형 마스킹은 지금 바지 허리 너비(스키니/배기) 축 하나만 계산한다** —
+    `body_waist_cm` ↔ `garment_measurements["WAIST_WIDTH"]`. 기장(길이) 축은 의도적으로
+    없다 — 마스크 하단을 잘라 기장을 줄이면 그 자리에 diffusion이 맨살을 새로 생성해야 하는데,
+    AI 가드레일상 정책적으로 피해야 해서 뺐다(`worker/models/catvton/model/adaptive_fit.py`
+    참고). `body_height_cm`/`body_weight_kg`/`garment_measurements`의 다른 키(TOTAL_LENGTH 등)는
+    지금은 적응형 계산에 안 쓰이지만, BE가 어차피 같이 보내는 값이라 스키마에 남겨둔다.
+
+    `body_chest_cm`/`body_waist_cm`/`body_hip_cm`은 BE `member_body_profile`에 아직 컬럼이
+    없어(단위·범위도 미확정, `.codex/requests/be/003-onboarding-tryon-profile-api.md` 열린
+    질문 참고) 지금은 항상 `None`으로 들어오지만, 나중에 컬럼이 생겼을 때 AI 쪽 스키마를 또
+    안 건드리게 미리 열어둔다.
     """
 
     mask_type: MaskType = Field(default=MaskType.upper, description="마스킹할 의류 부위")
@@ -99,7 +107,8 @@ class TryOnOptions(BaseModel):
         default=None,
         description=(
             "measurement 도메인 MeasurementType 값을 키로 쓰는 실측 결과 "
-            '(예: {"TOTAL_LENGTH": 68.0, "WAIST_WIDTH": 42.0}). '
-            "다른 도메인 enum을 직접 import하지 않고 문자열 키로만 느슨하게 결합한다."
+            '(예: {"WAIST_WIDTH": 42.0}). 지금 적응형 계산이 실제로 쓰는 키는 '
+            "WAIST_WIDTH뿐이다. 다른 도메인 enum을 직접 import하지 않고 문자열 키로만 "
+            "느슨하게 결합한다."
         ),
     )

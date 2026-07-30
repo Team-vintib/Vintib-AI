@@ -94,14 +94,16 @@ class TryonWorker(BaseWorker):
             "user_image_url": "https://.../person.jpg",
             "product_image_url": "https://.../cloth.jpg",
             "fit_type": "regular",   # regular | oversized | cropped — 아래 두 값이 있으면 무시됨
-            "body_measurements": {"height_cm": 172.0, "waist_cm": 80.0},   # 선택
-            "garment_measurements": {"OUTSEAM_LENGTH": 102.0, "WAIST_WIDTH": 42.0}   # 선택
+            "body_measurements": {"waist_cm": 80.0},   # 선택
+            "garment_measurements": {"WAIST_WIDTH": 42.0}   # 선택
         }
 
-        `body_measurements`/`garment_measurements`는 둘 다 있을 때만 적응형 마스킹이
-        켜진다(`model.adaptive_fit.compute_mask_adjustment` 참고) — 하나라도 없으면
-        `fit_type` 고정 3단계로 그대로 동작한다. AI는 이 값들을 BE에 재조회하지 않고
-        payload로 받은 그대로 쓴다.
+        `body_measurements`/`garment_measurements`는 둘 다 있고 바지(mask_type="lower")
+        허리 너비 축에 필요한 키(`waist_cm`/`WAIST_WIDTH`)가 있을 때만 적응형 마스킹이
+        켜진다(`model.adaptive_fit.compute_mask_adjustment` 참고) — 그 외에는 `fit_type`
+        고정 3단계로 그대로 동작한다. 기장(길이) 축은 없다 — 마스크를 잘라 기장을 줄이면
+        그 자리에 맨살을 새로 생성해야 해서 AI 가드레일상 정책적으로 뺐다. AI는 이 값들을
+        BE에 재조회하지 않고 payload로 받은 그대로 쓴다.
         """
         self._ensure_loaded()
 

@@ -9,37 +9,24 @@ cv2 등 무거운 의존성이 전혀 없다 — `garment_measurement/cm_convert
 **입력이 없으면(`None`) 결과도 `None`이다.** "측정값 없음"과 "비율 1.0(무변화)"은 다른
 상태라서 구분해야 한다 — 호출부가 `None`을 보면 기존 `fit_type` 고정 로직으로 폴백한다.
 
-지금 실제로 짝지을 수 있는 축:
-- 길이(상의/원피스/바지): body_height_cm ↔ TOTAL_LENGTH/OUTSEAM_LENGTH. "키 대비 적정 기장"은
-  인구통계 데이터 없이는 근사치일 수밖에 없어서 `reference_ratio` 상수(첫 버전 어림값)를
-  쓴다 — 알파 테스트 데이터가 쌓이면 보정 대상이다.
-- 너비(바지 허리): body_waist_cm ↔ WAIST_WIDTH. 평평하게 편 원단 폭은 몸에 딱 맞았을 때
-  둘레의 절반과 같다는 물리적 관계를 쓰므로 인체 비율 가정이 없어 길이 축보다 근거가
-  명확하다. 다만 BE `member_body_profile`에 waist 컬럼이 아직 없어(`.claude/requests/be/
-  005-tryon-adaptive-fit-data.md`) 실제로는 `body_circumference_cm=None`이 들어와 항상
-  스킵된다 — 데이터가 생기면 바로 켜지는 구조로만 미리 준비해둔다.
-- 상의/원피스 가슴(bust) 너비 축은 범위 밖이다 — 겨드랑이 랜드마크가 없어 대응하는 의류
-  치수 자체가 없다(`AI/app/measurement/schemas.py`의 `MeasurementType` 참고).
+**길이(기장) 축은 의도적으로 뺐다.** 처음엔 키 대비 총장 비율로 마스크 하단을 잘라 크롭
+길이를 연속적으로 조절하려 했는데, 이 방식은 항상 잘려나간 부분(팔뚝·다리 등)의 맨살을
+diffusion이 새로 생성해야 한다 — AI 가드레일상 맨살 생성은 정책적으로 피해야 해서 폐기했다.
+실제로 우리가 원했던 건 "옷이 짧아지는 것"이 아니라 "핏(스키니/배기)이 조절되는 것"이라, 옷이
+덮는 신체 범위 자체는 그대로 두고 폭만 조절하는 너비 축만 남긴다.
+
+지금 실제로 쓰는 축:
+- **너비(바지 허리)**: body_waist_cm ↔ WAIST_WIDTH. 평평하게 편 원단 폭은 몸에 딱 맞았을 때
+  둘레의 절반과 같다는 물리적 관계를 쓴다. 다만 BE `member_body_profile`에 waist 컬럼이
+  아직 없어(`.claude/requests/be/005-tryon-adaptive-fit-data.md`) 실제로는
+  `body_circumference_cm=None`이 들어와 항상 스킵된다 — 데이터가 생기면 바로 켜지는 구조로만
+  미리 준비해둔다.
+- **상의/원피스는 아직 축이 없다** — 가슴(bust) 너비 축에 대응하는 의류 치수가 없다(겨드랑이
+  랜드마크 미지원, `AI/app/measurement/schemas.py`의 `MeasurementType` 참고). 데이터가 없는
+  동안은 `fit_type` 고정 로직으로 폴백한다.
 """
 
 from __future__ import annotations
-
-
-def compute_length_adjustment(
-    body_height_cm: float | None,
-    garment_length_cm: float | None,
-    reference_ratio: float,
-) -> float | None:
-    """ "이 사람 키 대비 이 옷이 얼마나 길거나 짧은지"를 비율로 반환한다.
-
-    1.0이면 `reference_ratio`대로 정확히 맞는 기장, 1보다 크면 상대적으로 긴 기장,
-    작으면 상대적으로 짧은 기장이다. 둘 중 하나라도 없거나 0 이하면 `None`.
-    """
-    if body_height_cm is None or garment_length_cm is None:
-        return None
-    if body_height_cm <= 0 or garment_length_cm <= 0:
-        return None
-    return (garment_length_cm / body_height_cm) / reference_ratio
 
 
 def compute_width_adjustment(
@@ -49,7 +36,7 @@ def compute_width_adjustment(
     """옷이 몸통 둘레 대비 얼마나 여유(또는 타이트)있게 재단됐는지를 비율로 반환한다.
 
     평평하게 편 원단 폭(앞판+뒷판 중 한쪽)은 몸에 딱 맞았을 때 둘레의 절반과 같다는 물리적
-    관계를 쓴다. 1.0이면 몸에 딱 맞는 폭, 1보다 크면 여유 있음(오버사이즈), 작으면 타이트.
+    관계를 쓴다. 1.0이면 몸에 딱 맞는 폭, 1보다 크면 여유 있음(배기), 작으면 타이트(스키니).
     """
     if body_circumference_cm is None or garment_flat_width_cm is None:
         return None
@@ -70,7 +57,7 @@ def ratio_to_dilation_px(
     """폭 비율(1.0 근처가 중립)을 실제 팽창 픽셀 수로 매핑한다.
 
     `ratio`가 `None`이면(측정값 없음) 0.0 — 마스크를 전혀 안 건드린다. 1.0보다 크면 양수
-    (팽창=여유), 작으면 음수(수축=타이트)를 돌려준다. `cloth_masker.py`가 이 값을
+    (팽창=배기), 작으면 음수(수축=스키니)를 돌려준다. `cloth_masker.py`가 이 값을
     `distanceTransform` 기반 재threshold에 그대로 쓴다(음수는 수축).
     """
     if ratio is None:
@@ -78,65 +65,30 @@ def ratio_to_dilation_px(
     return _clamp((ratio - 1.0) * scale_px, -max_px, max_px)
 
 
-def ratio_to_cutoff_ratio(
-    ratio: float | None,
-    base: float = 0.7,
-    scale: float = 0.3,
-) -> float:
-    """길이 비율(1.0 근처가 중립)을 torso 컷오프 비율로 매핑한다.
-
-    `ratio`가 `None`이면 1.0(컷오프 없음 — 원본 길이 그대로) — 기존 `regular` 동작과 같다.
-    `base`는 기존 `adjust_mask_for_fit`의 `cropped` 고정값(0.7)을 그대로 이어받은 중립점이다.
-    """
-    if ratio is None:
-        return 1.0
-    return _clamp(base + (ratio - 1.0) * scale, 0.3, 1.0)
-
-
-# "키 대비 적정 기장" 근사 상수 — 인구통계 데이터 없이 잡은 첫 버전 어림값이라, 알파 테스트
-# (`AI/docs/tryon-alpha-test-data-format.md`) 데이터가 쌓이면 보정 대상이다.
-_REFERENCE_LENGTH_RATIO = {
-    "upper": 0.38,  # 상의/원피스: 총장(TOTAL_LENGTH) / 키
-    "lower": 0.60,  # 바지: 겉단기장(OUTSEAM_LENGTH) / 키
-}
-_LENGTH_GARMENT_KEY = {"upper": "TOTAL_LENGTH", "lower": "OUTSEAM_LENGTH"}
-
-
 def compute_mask_adjustment(
     part: str,
     body_measurements: dict | None,
     garment_measurements: dict | None,
-) -> tuple[float, float] | None:
+) -> float | None:
     """`part`(CatVTON `mask_type`, 'upper'/'lower'/'overall'/'inner'/'outer')에 맞는
-    신체/의류 측정값 쌍을 골라 (dilation_px, cutoff_ratio)를 계산한다.
+    신체/의류 측정값 쌍을 골라 `dilation_px`를 계산한다.
 
     `body_measurements`는 `{"height_cm": ..., "waist_cm": ...}` 형태(BE `member_body_profile`
     필드명에서 `body_` 접두어만 뗀 키), `garment_measurements`는 `AI/app/measurement/schemas.py`
     `MeasurementType` 값을 키로 쓰는 dict다.
 
-    둘 중 하나라도 `None`/빈 dict면 적응형 계산 자체를 스킵한다는 뜻으로 `None`을 반환한다
-    (호출부는 이때 기존 `adjust_mask_for_fit(fit_type)`으로 폴백해야 한다). `part`가 'lower'가
-    아니면(상의/원피스 계열) 길이 축만 계산한다 — 가슴 너비 축은 대응하는 의류 치수
-    (bust/가슴단면)가 아직 없어 범위 밖이다(`AI/app/measurement/schemas.py` 참고).
+    측정값이 없거나(`None`/빈 dict), `part`가 'lower'가 아니어서 대응하는 너비 축 자체가
+    없으면 `None`을 반환한다 — 호출부는 이때 기존 `adjust_mask_for_fit(fit_type)`으로
+    폴백해야 한다.
     """
-    if not body_measurements or not garment_measurements:
+    if not body_measurements or not garment_measurements or part != "lower":
         return None
 
-    length_axis = "lower" if part == "lower" else "upper"
-    length_ratio = compute_length_adjustment(
-        body_measurements.get("height_cm"),
-        garment_measurements.get(_LENGTH_GARMENT_KEY[length_axis]),
-        reference_ratio=_REFERENCE_LENGTH_RATIO[length_axis],
+    width_ratio = compute_width_adjustment(
+        body_measurements.get("waist_cm"),
+        garment_measurements.get("WAIST_WIDTH"),
     )
-
-    width_ratio = None
-    if part == "lower":
-        width_ratio = compute_width_adjustment(
-            body_measurements.get("waist_cm"),
-            garment_measurements.get("WAIST_WIDTH"),
-        )
-
-    if length_ratio is None and width_ratio is None:
+    if width_ratio is None:
         return None
 
-    return ratio_to_dilation_px(width_ratio), ratio_to_cutoff_ratio(length_ratio)
+    return ratio_to_dilation_px(width_ratio)
