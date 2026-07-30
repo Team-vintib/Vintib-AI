@@ -1,0 +1,27 @@
+# facebook/sam3 (SAM 3) 품질 검수 백엔드 전용 의존성.
+#
+# `worker/requirements.txt`(공용, torch/transformers 없음) 규약 그대로 — 모델 자체 의존성은
+# 이 백엔드를 실행할 conda 환경에만 설치한다(worker/models/catvton/requirements.txt와 같은
+# 관례). AI/validation/QUAL/sam3-condition-check/requirements-sam3.txt 스파이크 검증 산출물을
+# 그대로 이식했다.
+#
+#   conda create -n quality-sam3 python=3.12 -y
+#   conda activate quality-sam3
+#   cd worker/models/sam3
+#   pip install -r requirements.txt
+#
+# ⚠️ torch는 반드시 pip로만 넣는다. conda의 pytorch 패키지를 같이 깔면 아래 cu130 휠과 섞여
+#    깨진다.
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch>=2.4
+torchvision>=0.19
+
+# SAM3는 transformers v5.0.0에서 추가됐다. 하한을 5.0 미만으로 내리면 Sam3Model 임포트가
+# 실패한다. AI/validation/requirements-test.txt(Kanana 임베딩용, transformers<5)와 같은
+# 환경에 절대 설치하지 말 것 — 그쪽과 정면으로 충돌한다.
+transformers>=5.0
+accelerate>=1.0
+huggingface_hub>=0.34
+
+numpy>=1.26
+Pillow>=10.0
