@@ -153,6 +153,7 @@ src/
     product/
       api/
         productDetailApi.ts
+        productRegistrationApi.ts
       components/
         AiQualityAnalysisPanel.vue
         ProductCard.vue
@@ -161,17 +162,21 @@ src/
         ProductDetailStatePanel.vue
         ProductFilterPanel.vue
         ProductImageGallery.vue
+        ProductPhotoUploader.vue
         ProductPurchaseSummary.vue
         ProductSellerLivePanel.vue
       constants/
         productDetailMockData.ts
         productListMockData.ts
+        productRegistrationOptions.ts
       pages/
         ProductDetailView.vue
         ProductListView.vue
+        ProductRegistrationPage.vue
       types/
         productDetail.types.ts
         productList.types.ts
+        productRegistration.types.ts
     live/
       api/
         liveListApi.ts
@@ -361,16 +366,19 @@ docs/
   `homeViewApi.ts`는 현재 mock 데이터를 반환하는 adapter 자리이며, `HomePage`는
   loading/error/retry 상태를 처리합니다.
   실제 HOME API 계약이 확정되면 adapter 내부를 HTTP 호출과 응답 매핑으로 교체합니다.
-- `domains/product`에는 PROD-008 상품 목록 View와 S15P11A108-408·410·412 상품 상세 UI가
-  구현되어 있습니다. 상품 목록은 실사형 로컬 WebP를 사용하고 최소·최대 가격 범위를 검증해
-  mock 상품을 필터링하며 결과 없음 상태를 제공합니다. 상품 목록 카드는 상품 ID가 포함된 상세
-  route로 이동합니다. 상세 화면은
-  썸네일과 대표 이미지·AI 원본/검수 이미지 쌍을 함께 변경하며 찜·장바구니·라이브 알림 상태,
-  기존 라이브 route 이동과 미구현 CTA 안내를 제공합니다. 구매 영역 아래에는 유사 상품의
-  가격대 분포와 선택 상품 상세 이동을 제공하는 `ProductPriceDistribution`이 있으며, 실제
-  추천 API 전까지 명시적인 mock view model을 사용합니다. 상세 조회의 로딩·오류·상품 없음·
-  판매 완료와 AI 분석 전·중·완료·결과 없음·실패 상태를 구분하며 mock adapter에서 데이터를
-  받습니다. 실제 API 계약이 확정되면 adapter 내부를 교체합니다.
+- `domains/product`에는 PROD-008 상품 목록 View, S15P11A108-408·410·412 상품 상세 UI,
+  S15P11A108-409·411·414 상품 등록 화면이 구현되어 있습니다. 상품 목록은 실사형 로컬 WebP를
+  사용하고 최소·최대 가격 범위를 검증해 mock 상품을 필터링하며 결과 없음 상태를 제공합니다.
+  상품 목록 카드는 상품 ID가 포함된 상세 route로 이동합니다. 상세 화면은 썸네일과 대표 이미지·AI
+  원본/검수 이미지 쌍을 함께 변경하며 찜·장바구니·라이브 알림 상태, 기존 라이브 route 이동과
+  미구현 CTA 안내를 제공합니다. 구매 영역 아래에는 유사 상품의 가격대 분포와 선택 상품 상세 이동을
+  제공하는 `ProductPriceDistribution`이 있으며, 실제 추천 API 전까지 명시적인 mock view model을
+  사용합니다. 상세 조회의 로딩·오류·상품 없음·판매 완료와 AI 분석 전·중·완료·결과 없음·실패
+  상태를 구분하며 mock adapter에서 데이터를 받습니다. 상품 등록은 `/products/new`에서 사진 등록,
+  기본 정보, 사이즈/소재, 상태/하자와 AI 품질 검증, 가격, 검토, 완료 7단계를 제공하고 단계별
+  필수값·이미지·가격·등록 실패 상태를 처리합니다. 등록 완료는 `productRegistrationApi.ts` mock
+  adapter를 통해 확인하며, 실제 BE 계약은 `.codex/requests/be/014-product-registration-api-contract.md`
+  확정 후 adapter 내부를 교체합니다.
 - `domains/live`에는 S15P11A108-413·415·418 공개 라이브 목록 View, 진행 중·예정 상태 카드,
   로컬 이미지 기반 mock 데이터와 라이브 시청 route 연결, 카테고리·방송 상태 필터,
   최신 방송·시청자·제목 정렬과 초기화가 구현되어 있습니다. 공개 목록에서는 종료 방송과
