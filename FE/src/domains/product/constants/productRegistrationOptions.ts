@@ -97,6 +97,7 @@ export const PRODUCT_REGISTRATION_VALIDATION_MESSAGES = {
   measurementInvalid: '실측은 0보다 큰 숫자로 입력해 주세요.',
   conditionRequired: '상품 상태를 선택해 주세요.',
   defectRequired: '하자 여부를 선택해 주세요.',
+  sellerDefectDescriptionRequired: '판매자가 확인한 하자 설명을 입력해 주세요.',
   aiPhotoRequired: 'AI 품질 검증에 사용할 앞면과 뒷면 사진을 선택해 주세요.',
   aiPhotoConfirmationRequired: '품질 검증 사진별 확인을 완료해 주세요.',
   saleTypeRequired: '판매 방식을 선택해 주세요.',

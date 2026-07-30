@@ -99,7 +99,6 @@ const handleFileChange = (event: Event) => {
 
     <div v-else class="product-photo-uploader__empty" role="status">
       <strong>아직 선택한 사진이 없습니다.</strong>
-      <span>JPG, PNG, WebP 등 브라우저에서 미리보기 가능한 이미지를 등록해 주세요.</span>
     </div>
   </section>
 </template>

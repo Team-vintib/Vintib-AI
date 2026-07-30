@@ -6,12 +6,15 @@ import ProductPhotoUploader from '@/domains/product/components/ProductPhotoUploa
 import {
   PRODUCT_REGISTRATION_CATEGORY_OPTIONS,
   PRODUCT_REGISTRATION_COLOR_OPTIONS,
+  PRODUCT_REGISTRATION_CONDITION_OPTIONS,
   PRODUCT_REGISTRATION_SIZE_OPTIONS,
   PRODUCT_REGISTRATION_STEPS,
   PRODUCT_REGISTRATION_VALIDATION_MESSAGES,
 } from '@/domains/product/constants/productRegistrationOptions'
 import type {
   ProductRegistrationDraft,
+  ProductRegistrationAiDefectCandidate,
+  ProductRegistrationAiPhotoResult,
   ProductRegistrationPhotoDraft,
   ProductRegistrationPhotoRole,
 } from '@/domains/product/types/productRegistration.types'
@@ -38,6 +41,15 @@ const attributesStepTouched = reactive({
   sleeve: false,
   length: false,
 })
+const conditionStepTouched = reactive({
+  conditionGrade: false,
+  hasDefect: false,
+  sellerDefectDescription: false,
+  aiPhotos: false,
+  aiConfirmation: false,
+})
+const currentAiResultIndex = ref(0)
+const isAdditionalAiPhotoPickerOpen = ref(false)
 
 const draft = reactive<ProductRegistrationDraft>({
   photos: [],
@@ -190,6 +202,75 @@ const selectedSizeLabel = computed(
     PRODUCT_REGISTRATION_SIZE_OPTIONS.find((option) => option.id === draft.size)?.label ||
     '미선택',
 )
+const selectedConditionLabel = computed(
+  () =>
+    PRODUCT_REGISTRATION_CONDITION_OPTIONS.find((option) => option.id === draft.conditionGrade)?.label ||
+    '미선택',
+)
+const requiredAiSelectablePhotos = computed(() =>
+  draft.photos.filter((photo) => photo.role === 'front' || photo.role === 'back'),
+)
+const additionalAiSelectablePhotos = computed(() =>
+  draft.photos.filter((photo) => photo.role === 'additional'),
+)
+const selectedAiPhotos = computed(() =>
+  draft.photos.filter((photo) => draft.aiCheckPhotoIds.includes(photo.id)),
+)
+const currentAiResult = computed<ProductRegistrationAiPhotoResult | null>(
+  () => draft.aiPhotoResults[currentAiResultIndex.value] ?? null,
+)
+const currentAiPhoto = computed(() =>
+  currentAiResult.value
+    ? draft.photos.find((photo) => photo.id === currentAiResult.value?.photoId) ?? null
+    : null,
+)
+const hasRequiredAiPhotos = computed(() => {
+  const selectedPhotos = selectedAiPhotos.value
+
+  return (
+    selectedPhotos.some((photo) => photo.role === 'front') &&
+    selectedPhotos.some((photo) => photo.role === 'back')
+  )
+})
+const areAllAiPhotosConfirmed = computed(
+  () =>
+    draft.aiCheckPhotoIds.length > 0 &&
+    draft.aiCheckPhotoIds.every((photoId) =>
+      draft.aiPhotoResults.some((result) => result.photoId === photoId && result.confirmed),
+    ),
+)
+const conditionStepErrors = computed(() => ({
+  conditionGrade:
+    conditionStepTouched.conditionGrade && !draft.conditionGrade
+      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.conditionRequired
+      : '',
+  hasDefect:
+    conditionStepTouched.hasDefect && draft.hasDefect === null
+      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.defectRequired
+      : '',
+  sellerDefectDescription:
+    conditionStepTouched.sellerDefectDescription &&
+    draft.hasDefect === true &&
+    !draft.sellerDefectDescription.trim()
+      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.sellerDefectDescriptionRequired
+      : '',
+  aiPhotos:
+    conditionStepTouched.aiPhotos && !hasRequiredAiPhotos.value
+      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.aiPhotoRequired
+      : '',
+  aiConfirmation:
+    conditionStepTouched.aiConfirmation && !areAllAiPhotosConfirmed.value
+      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.aiPhotoConfirmationRequired
+      : '',
+}))
+const isConditionStepValid = computed(
+  () =>
+    Boolean(draft.conditionGrade) &&
+    draft.hasDefect !== null &&
+    (draft.hasDefect !== true || Boolean(draft.sellerDefectDescription.trim())) &&
+    hasRequiredAiPhotos.value &&
+    areAllAiPhotosConfirmed.value,
+)
 
 const canMoveCurrentStepNext = computed(() => {
   if (currentStep.value.id === 'photos') {
@@ -202,6 +283,10 @@ const canMoveCurrentStepNext = computed(() => {
 
   if (currentStep.value.id === 'attributes') {
     return isAttributesStepValid.value
+  }
+
+  if (currentStep.value.id === 'condition') {
+    return isConditionStepValid.value
   }
 
   return true
@@ -301,6 +386,108 @@ const selectRepresentativePhoto = (photoId: string) => {
   }))
 }
 
+const selectConditionGrade = (conditionGrade: string) => {
+  if (!['S', 'A', 'B', 'C'].includes(conditionGrade)) {
+    return
+  }
+
+  draft.conditionGrade = conditionGrade as ProductRegistrationDraft['conditionGrade']
+  conditionStepTouched.conditionGrade = true
+}
+
+const selectHasDefect = (hasDefect: boolean) => {
+  draft.hasDefect = hasDefect
+  conditionStepTouched.hasDefect = true
+}
+
+const toggleAiCheckPhoto = (photoId: string) => {
+  conditionStepTouched.aiPhotos = true
+
+  if (draft.aiCheckPhotoIds.includes(photoId)) {
+    draft.aiCheckPhotoIds = draft.aiCheckPhotoIds.filter((selectedPhotoId) => selectedPhotoId !== photoId)
+    draft.aiPhotoResults = draft.aiPhotoResults.filter((result) => result.photoId !== photoId)
+    currentAiResultIndex.value = Math.min(currentAiResultIndex.value, Math.max(draft.aiPhotoResults.length - 1, 0))
+    return
+  }
+
+  draft.aiCheckPhotoIds = [...draft.aiCheckPhotoIds, photoId]
+}
+
+const selectedAdditionalAiPhotoCount = computed(
+  () =>
+    additionalAiSelectablePhotos.value.filter((photo) => draft.aiCheckPhotoIds.includes(photo.id))
+      .length,
+)
+
+const createMockAiCandidates = (): ProductRegistrationAiDefectCandidate[] => [
+  {
+    id: crypto.randomUUID(),
+    labelNumber: 1,
+    description: '소매 끝단 마모 의심',
+    box: { x: 58, y: 18, width: 24, height: 18 },
+    isActualDefect: true,
+  },
+  {
+    id: crypto.randomUUID(),
+    labelNumber: 2,
+    description: '전면 하단 오염 후보',
+    box: { x: 22, y: 56, width: 30, height: 20 },
+    isActualDefect: true,
+  },
+]
+
+const runAiQualityCheck = () => {
+  conditionStepTouched.aiPhotos = true
+  conditionStepTouched.aiConfirmation = true
+
+  if (!hasRequiredAiPhotos.value) {
+    return
+  }
+
+  draft.aiPhotoResults = draft.aiCheckPhotoIds.map((photoId) => ({
+    photoId,
+    status: 'completed',
+    candidates: createMockAiCandidates(),
+    regeneratedImageUrl: '',
+    confirmed: false,
+  }))
+  currentAiResultIndex.value = 0
+}
+
+const moveAiResult = (direction: -1 | 1) => {
+  if (draft.aiPhotoResults.length === 0) {
+    return
+  }
+
+  currentAiResultIndex.value =
+    (currentAiResultIndex.value + direction + draft.aiPhotoResults.length) %
+    draft.aiPhotoResults.length
+}
+
+const toggleAiDefectCandidate = (candidateId: string) => {
+  if (!currentAiResult.value) {
+    return
+  }
+
+  currentAiResult.value.confirmed = false
+  currentAiResult.value.status = 'completed'
+  currentAiResult.value.candidates = currentAiResult.value.candidates.map((candidate) => ({
+    ...candidate,
+    isActualDefect: candidate.id === candidateId ? !candidate.isActualDefect : candidate.isActualDefect,
+  }))
+}
+
+const confirmCurrentAiPhoto = () => {
+  if (!currentAiResult.value || !currentAiPhoto.value) {
+    return
+  }
+
+  currentAiResult.value.status = 'confirmed'
+  currentAiResult.value.regeneratedImageUrl = currentAiPhoto.value.previewUrl
+  currentAiResult.value.confirmed = true
+  conditionStepTouched.aiConfirmation = true
+}
+
 const markCurrentStepTouched = () => {
   if (currentStep.value.id === 'photos') {
     photoStepTouched.value = true
@@ -321,6 +508,15 @@ const markCurrentStepTouched = () => {
     attributesStepTouched.chest = true
     attributesStepTouched.sleeve = true
     attributesStepTouched.length = true
+    return
+  }
+
+  if (currentStep.value.id === 'condition') {
+    conditionStepTouched.conditionGrade = true
+    conditionStepTouched.hasDefect = true
+    conditionStepTouched.sellerDefectDescription = true
+    conditionStepTouched.aiPhotos = true
+    conditionStepTouched.aiConfirmation = true
   }
 }
 
@@ -768,6 +964,257 @@ onBeforeUnmount(() => {
             </fieldset>
           </form>
 
+          <form
+            v-else-if="currentStep.id === 'condition'"
+            class="product-registration__form"
+            aria-label="상품 상태와 하자 입력"
+          >
+            <section class="product-registration__section" aria-labelledby="condition-grade-title">
+              <h3 id="condition-grade-title">상품 상태</h3>
+              <div class="product-registration__option-grid" role="radiogroup" aria-label="상품 상태 선택">
+                <button
+                  v-for="option in PRODUCT_REGISTRATION_CONDITION_OPTIONS"
+                  :key="option.id"
+                  class="product-registration__option"
+                  :class="{ 'product-registration__option--selected': draft.conditionGrade === option.id }"
+                  type="button"
+                  :aria-pressed="draft.conditionGrade === option.id"
+                  @click="selectConditionGrade(option.id)"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+              <p
+                v-if="conditionStepErrors.conditionGrade"
+                class="product-registration__field-error"
+                role="alert"
+              >
+                {{ conditionStepErrors.conditionGrade }}
+              </p>
+            </section>
+
+            <section class="product-registration__section" aria-labelledby="seller-defect-title">
+              <h3 id="seller-defect-title">판매자 고지 하자</h3>
+              <div class="product-registration__option-grid" role="radiogroup" aria-label="하자 여부 선택">
+                <button
+                  class="product-registration__option"
+                  :class="{ 'product-registration__option--selected': draft.hasDefect === false }"
+                  type="button"
+                  :aria-pressed="draft.hasDefect === false"
+                  @click="selectHasDefect(false)"
+                >
+                  하자 없음
+                </button>
+                <button
+                  class="product-registration__option"
+                  :class="{ 'product-registration__option--selected': draft.hasDefect === true }"
+                  type="button"
+                  :aria-pressed="draft.hasDefect === true"
+                  @click="selectHasDefect(true)"
+                >
+                  하자 있음
+                </button>
+              </div>
+              <p
+                v-if="conditionStepErrors.hasDefect"
+                class="product-registration__field-error"
+                role="alert"
+              >
+                {{ conditionStepErrors.hasDefect }}
+              </p>
+
+              <label
+                v-if="draft.hasDefect"
+                class="product-registration__field"
+                for="product-registration-seller-defect"
+              >
+                <span>하자 설명</span>
+                <textarea
+                  id="product-registration-seller-defect"
+                  v-model="draft.sellerDefectDescription"
+                  maxlength="300"
+                  rows="3"
+                  placeholder="판매자가 직접 확인한 하자를 입력해 주세요."
+                  :aria-invalid="conditionStepErrors.sellerDefectDescription ? 'true' : 'false'"
+                  aria-describedby="product-registration-seller-defect-error"
+                  @blur="conditionStepTouched.sellerDefectDescription = true"
+                />
+                <span
+                  v-if="conditionStepErrors.sellerDefectDescription"
+                  id="product-registration-seller-defect-error"
+                  class="product-registration__field-error"
+                  role="alert"
+                >
+                  {{ conditionStepErrors.sellerDefectDescription }}
+                </span>
+              </label>
+            </section>
+
+            <section class="product-registration__section" aria-labelledby="ai-quality-title">
+              <div class="product-registration__section-header">
+                <div>
+                  <h3 id="ai-quality-title">AI 품질 검증</h3>
+                  <p>앞면과 뒷면 사진은 필수로 선택하고, 필요하면 추가 사진을 더 선택할 수 있습니다.</p>
+                </div>
+                <button
+                  class="product-registration__button product-registration__button--secondary"
+                  type="button"
+                  @click="runAiQualityCheck"
+                >
+                  확인
+                </button>
+              </div>
+
+              <div class="product-registration__ai-photo-list" aria-label="AI 품질 검증 사진 선택">
+                <button
+                  v-for="photo in requiredAiSelectablePhotos"
+                  :key="photo.id"
+                  class="product-registration__ai-photo"
+                  :class="{ 'product-registration__ai-photo--selected': draft.aiCheckPhotoIds.includes(photo.id) }"
+                  type="button"
+                  :aria-pressed="draft.aiCheckPhotoIds.includes(photo.id)"
+                  @click="toggleAiCheckPhoto(photo.id)"
+                >
+                  <img
+                    :src="photo.previewUrl"
+                    :alt="`${photo.role === 'front' ? '앞면' : '뒷면'} 품질 검증 사진`"
+                  />
+                  <span>
+                    {{ photo.role === 'front' ? '앞면 필수' : '뒷면 필수' }}
+                  </span>
+                </button>
+              </div>
+              <button
+                v-if="additionalAiSelectablePhotos.length"
+                class="product-registration__add-ai-photo-button"
+                type="button"
+                @click="isAdditionalAiPhotoPickerOpen = !isAdditionalAiPhotoPickerOpen"
+              >
+                추가 선택
+                <span>{{ selectedAdditionalAiPhotoCount }}개 선택</span>
+              </button>
+              <div
+                v-if="isAdditionalAiPhotoPickerOpen"
+                class="product-registration__additional-ai-panel"
+                aria-label="추가 AI 품질 검증 사진 선택"
+              >
+                <button
+                  v-for="photo in additionalAiSelectablePhotos"
+                  :key="photo.id"
+                  class="product-registration__additional-ai-photo"
+                  :class="{
+                    'product-registration__additional-ai-photo--selected': draft.aiCheckPhotoIds.includes(photo.id),
+                  }"
+                  type="button"
+                  :aria-pressed="draft.aiCheckPhotoIds.includes(photo.id)"
+                  @click="toggleAiCheckPhoto(photo.id)"
+                >
+                  <img :src="photo.previewUrl" :alt="`${photo.fileName} 추가 품질 검증 사진`" />
+                  <span>{{ draft.aiCheckPhotoIds.includes(photo.id) ? '선택됨' : '선택' }}</span>
+                </button>
+              </div>
+              <p v-if="conditionStepErrors.aiPhotos" class="product-registration__field-error" role="alert">
+                {{ conditionStepErrors.aiPhotos }}
+              </p>
+
+              <div v-if="currentAiResult && currentAiPhoto" class="product-registration__ai-result">
+                <div class="product-registration__ai-result-toolbar">
+                  <button type="button" aria-label="이전 사진" @click="moveAiResult(-1)">
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path
+                        d="M15 18 9 12l6-6"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                      />
+                    </svg>
+                  </button>
+                  <strong>
+                    {{ currentAiResultIndex + 1 }} / {{ draft.aiPhotoResults.length }}
+                    {{
+                      currentAiPhoto.role === 'front'
+                        ? '앞면'
+                        : currentAiPhoto.role === 'back'
+                          ? '뒷면'
+                          : '추가'
+                    }}
+                    검증 결과
+                  </strong>
+                  <button type="button" aria-label="다음 사진" @click="moveAiResult(1)">
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path
+                        d="m9 18 6-6-6-6"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                <div class="product-registration__ai-image">
+                  <img :src="currentAiPhoto.previewUrl" :alt="`${currentAiPhoto.fileName} AI 품질 검증 결과`" />
+                  <span
+                    v-for="candidate in currentAiResult.candidates"
+                    :key="candidate.id"
+                    class="product-registration__ai-box"
+                    :class="{ 'product-registration__ai-box--actual': candidate.isActualDefect }"
+                    :style="{
+                      left: `${candidate.box.x}%`,
+                      top: `${candidate.box.y}%`,
+                      width: `${candidate.box.width}%`,
+                      height: `${candidate.box.height}%`,
+                    }"
+                  >
+                    {{ candidate.labelNumber }}
+                  </span>
+                </div>
+
+                <div class="product-registration__ai-cards">
+                  <article
+                    v-for="candidate in currentAiResult.candidates"
+                    :key="candidate.id"
+                    class="product-registration__ai-card"
+                    :class="{ 'product-registration__ai-card--actual': candidate.isActualDefect }"
+                  >
+                    <div>
+                      <strong>{{ candidate.labelNumber }}번</strong>
+                      <p>{{ candidate.description }}</p>
+                    </div>
+                    <button type="button" @click="toggleAiDefectCandidate(candidate.id)">
+                      {{ candidate.isActualDefect ? '하자 제외' : '하자로 표시' }}
+                    </button>
+                  </article>
+                </div>
+
+                <button
+                  class="product-registration__button product-registration__button--primary"
+                  type="button"
+                  @click="confirmCurrentAiPhoto"
+                >
+                  {{ currentAiResult.confirmed ? '확인 완료' : '사진 확인' }}
+                </button>
+              </div>
+
+              <div v-else class="product-registration__ai-empty" role="status">
+                <strong>AI 품질 검증 결과가 없습니다.</strong>
+                <p>앞면과 뒷면 사진을 필수로 선택한 뒤 확인 버튼을 눌러 주세요.</p>
+              </div>
+
+              <p
+                v-if="conditionStepErrors.aiConfirmation"
+                class="product-registration__field-error"
+                role="alert"
+              >
+                {{ conditionStepErrors.aiConfirmation }}
+              </p>
+            </section>
+          </form>
+
           <div
             v-else-if="!isCompleteStep"
             class="product-registration__placeholder"
@@ -870,6 +1317,14 @@ onBeforeUnmount(() => {
             <div>
               <dt>소재</dt>
               <dd>{{ draft.material || '미입력' }}</dd>
+            </div>
+            <div>
+              <dt>상태</dt>
+              <dd>{{ selectedConditionLabel }}</dd>
+            </div>
+            <div>
+              <dt>AI 검증</dt>
+              <dd>{{ areAllAiPhotosConfirmed ? '완료' : '미완료' }}</dd>
             </div>
             <div>
               <dt>판매 방식</dt>
@@ -1137,6 +1592,296 @@ onBeforeUnmount(() => {
   line-height: 20px;
 }
 
+.product-registration__section {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.product-registration__section h3 {
+  color: var(--color-text-primary);
+  font-size: 18px;
+  font-weight: var(--font-weight-bold);
+  line-height: 26px;
+}
+
+.product-registration__section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.product-registration__section-header div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.product-registration__section-header p {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.product-registration__option-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.product-registration__option {
+  min-height: var(--button-height-standard);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.product-registration__option--selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.product-registration__ai-photo-list {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.product-registration__ai-photo {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
+}
+
+.product-registration__ai-photo--selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.product-registration__ai-photo img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.product-registration__ai-photo span {
+  padding: var(--space-3);
+  font-weight: var(--font-weight-bold);
+}
+
+.product-registration__add-ai-photo-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--button-height-standard);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.product-registration__add-ai-photo-button span {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.product-registration__additional-ai-panel {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+}
+
+.product-registration__additional-ai-photo {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.product-registration__additional-ai-photo--selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.product-registration__additional-ai-photo img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.product-registration__additional-ai-photo span {
+  padding: var(--space-2);
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+}
+
+.product-registration__ai-result {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+}
+
+.product-registration__ai-result-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.product-registration__ai-result-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.product-registration__ai-result-toolbar button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.product-registration__ai-result-toolbar svg {
+  width: 20px;
+  height: 20px;
+}
+
+.product-registration__ai-result-toolbar strong {
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+.product-registration__ai-image {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.product-registration__ai-image img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.product-registration__ai-box {
+  position: absolute;
+  display: grid;
+  border: 2px solid #2563eb;
+  background: rgb(37 99 235 / 12%);
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  place-items: start;
+}
+
+.product-registration__ai-box--actual {
+  border-color: var(--color-error);
+  background: rgb(220 38 38 / 12%);
+  color: var(--color-error);
+}
+
+.product-registration__ai-cards {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.product-registration__ai-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.product-registration__ai-card--actual {
+  border-color: var(--color-error);
+}
+
+.product-registration__ai-card div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.product-registration__ai-card strong {
+  color: var(--color-text-primary);
+}
+
+.product-registration__ai-card p {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.product-registration__ai-card button {
+  min-width: 88px;
+  height: var(--button-height-small);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.product-registration__ai-card--actual button {
+  border-color: var(--color-error);
+  background: var(--color-error-soft);
+  color: var(--color-error);
+}
+
+.product-registration__ai-empty {
+  display: grid;
+  gap: var(--space-1);
+  min-height: 132px;
+  place-content: center;
+  padding: var(--space-5);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.product-registration__ai-empty strong {
+  color: var(--color-text-primary);
+}
+
 .product-registration__complete {
   display: grid;
   justify-items: center;
@@ -1267,6 +2012,21 @@ onBeforeUnmount(() => {
   .product-registration__form-grid {
     grid-template-columns: 1fr;
   }
+
+  .product-registration__option-grid,
+  .product-registration__ai-photo-list {
+    grid-template-columns: 1fr;
+  }
+
+  .product-registration__additional-ai-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .product-registration__section-header,
+  .product-registration__ai-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1277,6 +2037,10 @@ onBeforeUnmount(() => {
   .product-registration__complete-actions,
   .product-registration__actions {
     flex-direction: column;
+  }
+
+  .product-registration__additional-ai-panel {
+    grid-template-columns: 1fr;
   }
 }
 </style>
