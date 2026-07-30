@@ -99,8 +99,8 @@ class WishServiceTest {
     }
 
     @Test
-    void 비공개_상품을_찜하면_예외를_던진다() {
-        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.PRIVATE);
+    void DRAFT_상품을_찜하면_예외를_던진다() {
+        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.DRAFT);
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
 
         assertThatThrownBy(() -> wishService.wish(MEMBER_ID, PRODUCT_ID))
@@ -144,8 +144,8 @@ class WishServiceTest {
     }
 
     @Test
-    void 비공개_또는_판매완료_상품도_목록에서_제외되지_않고_상태가_표시된다() {
-        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.PRIVATE);
+    void 판매완료_상태로_바뀌어도_목록에서_제외되지_않고_상태가_표시된다() {
+        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.SOLD);
         when(wisher.getId()).thenReturn(MEMBER_ID);
         Wish wish = Wish.builder().member(wisher).product(product).build();
         Pageable pageable = PageRequest.of(0, 20);
@@ -155,7 +155,7 @@ class WishServiceTest {
         PageResponse<WishItemResponse> response = wishService.getWishList(MEMBER_ID, pageable);
 
         assertThat(response.content()).hasSize(1);
-        assertThat(response.content().get(0).product().saleStatus()).isEqualTo(SaleStatus.PRIVATE);
+        assertThat(response.content().get(0).product().saleStatus()).isEqualTo(SaleStatus.SOLD);
     }
 
     @Test
