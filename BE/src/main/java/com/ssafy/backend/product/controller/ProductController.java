@@ -2,6 +2,7 @@ package com.ssafy.backend.product.controller;
 
 import com.ssafy.backend.global.response.ApiResponse;
 import com.ssafy.backend.global.response.PageResponse;
+import com.ssafy.backend.product.dto.request.ProductAuctionResultRequest;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductImageRegisterRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUpdateRequest;
@@ -83,9 +84,33 @@ public class ProductController {
     }
 
     @Operation(
+            summary = "미낙찰 상품 후속 처리",
+            description = "AUCTION_FAILED 상태 상품의 이후 방식을 선택한다. "
+                    + "ON_SALE로 전환하려면 가격을 함께 보내야 하고, AUCTION_SCHEDULED를 선택하면 가격을 보내면 안 된다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "전환 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "요청값 검증 실패, AUCTION_FAILED 상태가 아님, 또는 nextStatus와 price 조합이 잘못됨"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @PatchMapping("/{id}/auction-result")
+    public ResponseEntity<ApiResponse<ProductResponse>> resolveAuctionFailure(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody ProductAuctionResultRequest request) {
+        Long sellerId = (Long) authentication.getPrincipal();
+        ProductResponse response = productService.resolveAuctionFailure(sellerId, id, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
             summary = "상품 목록 조회",
             description = "상시 판매/경매 여부와 관계없이 공개된 상품 목록을 최신순으로 조회한다. "
-                    + "DRAFT/PRIVATE 상태 상품은 목록에서 제외한다. "
+                    + "DRAFT 상태 상품은 목록에서 제외한다. "
                     + "정렬은 항상 최신순(createdAt DESC)으로 고정되며, sort 파라미터를 보내도 무시된다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
@@ -102,10 +127,10 @@ public class ProductController {
     @Operation(
             summary = "상품 상세 조회",
             description = "상품 상세 정보를 조회한다. 비회원도 조회 가능하다. "
-                    + "DRAFT/PRIVATE 상태 상품은 판매자 본인만 조회할 수 있으며, 그 외에는 존재하지 않는 것처럼 404를 반환한다.")
+                    + "DRAFT 상태 상품은 판매자 본인만 조회할 수 있으며, 그 외에는 존재하지 않는 것처럼 404를 반환한다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품이 없거나 비공개 상품을 본인 외 사용자가 조회함")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품이 없거나 DRAFT 상품을 본인 외 사용자가 조회함")
     })
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ProductDetailResponse>> getProductDetail(
@@ -118,7 +143,7 @@ public class ProductController {
     @Operation(
             summary = "상품 정보 수정",
             description = "제목/설명/카테고리/브랜드/상태등급/사이즈를 부분 수정한다. 요청에 포함된 필드만 반영한다. "
-                    + "DRAFT/ON_SALE/PRIVATE 상태의 상품만 수정할 수 있다.")
+                    + "DRAFT/ON_SALE 상태의 상품만 수정할 수 있다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패 또는 수정 불가 상태"),
@@ -139,7 +164,7 @@ public class ProductController {
     @Operation(
             summary = "상품 삭제",
             description = "상품을 소프트 삭제한다(deleted_at 기록, DB row는 유지). "
-                    + "DRAFT/ON_SALE/PRIVATE 상태의 상품만 삭제할 수 있으며, 삭제 후에는 상세 조회 등에서 존재하지 않는 상품으로 취급된다.")
+                    + "DRAFT/ON_SALE 상태의 상품만 삭제할 수 있으며, 삭제 후에는 상세 조회 등에서 존재하지 않는 상품으로 취급된다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "삭제 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "삭제 불가 상태"),

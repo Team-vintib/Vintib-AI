@@ -32,7 +32,7 @@ import org.hibernate.annotations.SQLRestriction;
                         name = "ck_product_sale_status",
                         constraint = "sale_status IN ("
                                 + "'DRAFT', 'ON_SALE', 'AUCTION_SCHEDULED', 'AUCTION_IN_PROGRESS', "
-                                + "'AUCTION_FAILED', 'SOLD', 'PRIVATE')"),
+                                + "'AUCTION_FAILED', 'SOLD')"),
                 @CheckConstraint(
                         name = "ck_product_price_by_type",
                         constraint = "sale_type <> 'DIRECT_SALE' OR price IS NOT NULL")
@@ -111,6 +111,12 @@ public class Product extends BaseTimeEntity {
         this.saleStatus = SaleStatus.ON_SALE;
     }
 
+    public void scheduleAuction() {
+        this.saleType = SaleType.AUCTION;
+        this.price = null;
+        this.saleStatus = SaleStatus.AUCTION_SCHEDULED;
+    }
+
     public void update(
             String title,
             String description,
@@ -146,8 +152,8 @@ public class Product extends BaseTimeEntity {
         return memberId != null && seller.getId().equals(memberId);
     }
 
-    public boolean isPrivate() {
-        return saleStatus == SaleStatus.DRAFT || saleStatus == SaleStatus.PRIVATE;
+    public boolean isDraft() {
+        return saleStatus == SaleStatus.DRAFT;
     }
 
     public boolean isDeleted() {
@@ -155,8 +161,6 @@ public class Product extends BaseTimeEntity {
     }
 
     public boolean isEditable() {
-        return saleStatus == SaleStatus.DRAFT
-                || saleStatus == SaleStatus.ON_SALE
-                || saleStatus == SaleStatus.PRIVATE;
+        return saleStatus == SaleStatus.DRAFT || saleStatus == SaleStatus.ON_SALE;
     }
 }

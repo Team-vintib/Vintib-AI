@@ -4,6 +4,7 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.product.dto.request.ProductAuctionResultRequest;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
@@ -28,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ProductService {
 
-    private static final List<SaleStatus> HIDDEN_FROM_LIST = List.of(SaleStatus.DRAFT, SaleStatus.PRIVATE);
+    private static final List<SaleStatus> HIDDEN_FROM_LIST = List.of(SaleStatus.DRAFT);
 
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
@@ -76,6 +77,36 @@ public class ProductService {
         return ProductResponse.from(product);
     }
 
+    @Transactional
+    public ProductResponse resolveAuctionFailure(Long sellerId, Long productId, ProductAuctionResultRequest request) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        if (!product.isOwnedBy(sellerId)) {
+            throw new CustomException(ErrorCode.NOT_PRODUCT_OWNER);
+        }
+        if (product.getSaleStatus() != SaleStatus.AUCTION_FAILED) {
+            throw new CustomException(ErrorCode.INVALID_PRODUCT_STATE);
+        }
+
+        switch (request.nextStatus()) {
+            case ON_SALE -> {
+                if (request.price() == null) {
+                    throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+                }
+                product.registerDirectSale(request.price());
+            }
+            case AUCTION_SCHEDULED -> {
+                if (request.price() != null) {
+                    throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+                }
+                product.scheduleAuction();
+            }
+        }
+
+        return ProductResponse.from(product);
+    }
+
     public PageResponse<ProductResponse> getProductList(Pageable pageable) {
         // 정렬은 최신순 고정(PROD-008 범위 밖) — 클라이언트가 Pageable에 다른 sort를 실어 보내도 무시하고 createdAt DESC로 강제한다.
         Pageable sortedByLatest = PageRequest.of(
@@ -91,7 +122,7 @@ public class ProductService {
         if (product.isDeleted()) {
             throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
         }
-        if (product.isPrivate() && !product.isOwnedBy(viewerId)) {
+        if (product.isDraft() && !product.isOwnedBy(viewerId)) {
             throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
         }
         return ProductDetailResponse.from(product, productImageService.getImages(productId));
