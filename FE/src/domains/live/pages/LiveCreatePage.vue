@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 
+import { createLiveNow, scheduleLive } from '@/domains/live/api/liveCreateApi'
 import {
   LIVE_CREATE_BASE_STEPS,
   LIVE_CREATE_COMPLETE_STEP,
@@ -33,6 +34,9 @@ const form = reactive<LiveCreateFormState>({
 })
 
 const currentStepIndex = ref(0)
+const createdLiveId = ref<number | null>(null)
+const isSubmittingLive = ref(false)
+const submitError = ref('')
 const cameraPreviewElement = ref<HTMLVideoElement | null>(null)
 const cameraPreviewStream = ref<MediaStream | null>(null)
 const microphonePreviewStream = ref<MediaStream | null>(null)
@@ -80,7 +84,7 @@ const completeActionLabel = computed(() =>
 )
 const completeActionTo = computed(() =>
   form.mode === 'IMMEDIATE'
-    ? { name: ROUTE_NAMES.LIVE_WATCH, params: { liveId: 'preview' } }
+    ? { name: ROUTE_NAMES.LIVE_WATCH, params: { liveId: createdLiveId.value ?? 'preview' } }
     : ROUTE_PATHS.LIVE_LIST,
 )
 const isFirstStep = computed(() => currentStepIndex.value === 0)
@@ -325,6 +329,47 @@ const resetDeviceTest = () => {
   deviceState.microphone = 'idle'
 }
 
+const getScheduledAt = () => {
+  if (!form.scheduledDate || !form.scheduledTime) {
+    return ''
+  }
+
+  return `${form.scheduledDate}T${form.scheduledTime}:00`
+}
+
+const submitLiveCreate = async () => {
+  if (createdLiveId.value) {
+    return true
+  }
+
+  isSubmittingLive.value = true
+  submitError.value = ''
+
+  try {
+    const baseRequest = {
+      title: form.title.trim(),
+      thumbnailUrl: null,
+      productIds: form.selectedProductIds,
+    }
+    const response =
+      form.mode === 'SCHEDULED'
+        ? await scheduleLive({
+            ...baseRequest,
+            scheduledAt: getScheduledAt(),
+          })
+        : await createLiveNow(baseRequest)
+
+    createdLiveId.value = response.id
+    return true
+  } catch (error) {
+    submitError.value =
+      error instanceof Error ? error.message : '라이브를 생성하지 못했습니다.'
+    return false
+  } finally {
+    isSubmittingLive.value = false
+  }
+}
+
 const moveToPreviousStep = () => {
   if (isFirstStep.value) {
     return
@@ -333,11 +378,19 @@ const moveToPreviousStep = () => {
   currentStepIndex.value -= 1
 }
 
-const moveToNextStep = () => {
+const moveToNextStep = async () => {
   markCurrentStepTouched()
 
   if (isLastStep.value || !canMoveNext.value) {
     return
+  }
+
+  if (currentStep.value.id === 'schedule' || currentStep.value.id === 'device') {
+    const isSubmitted = await submitLiveCreate()
+
+    if (!isSubmitted) {
+      return
+    }
   }
 
   if (currentStep.value.id === 'device') {
@@ -774,11 +827,15 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
+          <p v-if="submitError" class="live-create__field-error" role="alert">
+            {{ submitError }}
+          </p>
+
           <div class="live-create__actions">
             <button
               class="live-create__button live-create__button--secondary"
               type="button"
-              :disabled="isFirstStep"
+              :disabled="isFirstStep || isSubmittingLive"
               @click="moveToPreviousStep"
             >
               이전
@@ -786,7 +843,7 @@ onBeforeUnmount(() => {
             <button
               class="live-create__button live-create__button--primary"
               type="button"
-              :disabled="isLastStep || !canMoveNext"
+              :disabled="isLastStep || !canMoveNext || isSubmittingLive"
               @click="moveToNextStep"
             >
               {{ isLastStep ? '완료' : '다음' }}

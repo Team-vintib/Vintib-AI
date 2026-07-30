@@ -13,6 +13,15 @@ import type {
 } from '@/domains/live/types/liveList.types'
 import type { ApiResponse, PageResponse } from '@/shared/types/api.types'
 
+interface BackendPageResponse<T> {
+  content: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  hasNext: boolean
+}
+
 const MOCK_DELAY_MS = 450
 const LIVE_LIST_API_ENABLED = import.meta.env.VITE_LIVE_LIST_API_ENABLED === 'true'
 const PUBLIC_LIVE_STATUSES: LiveBroadcastStatus[] = ['LIVE', 'SCHEDULED']
@@ -43,8 +52,10 @@ const mapLiveListDto = (dto: LiveListDto): LiveListItem | null => {
     return null
   }
 
-  if (!isLiveCategory(dto.categoryName)) {
-    throw new LiveListContractError(`지원하지 않는 라이브 카테고리입니다: ${dto.categoryName}`)
+  const categoryName = dto.categories?.[0]?.name ?? dto.categoryName ?? ''
+
+  if (!isLiveCategory(categoryName)) {
+    throw new LiveListContractError(`지원하지 않는 라이브 카테고리입니다. ${categoryName}`)
   }
 
   const broadcastAt = dto.broadcastStatus === 'LIVE' ? dto.startedAt : dto.scheduledAt
@@ -60,14 +71,14 @@ const mapLiveListDto = (dto: LiveListDto): LiveListItem | null => {
     thumbnailUrl: dto.thumbnailUrl || fallbackThumbnail,
     status: dto.broadcastStatus,
     viewerCount: dto.viewerCount,
-    category: dto.categoryName,
+    category: categoryName,
     broadcastAt,
   }
 }
 
 const requestLiveList = async (query: LiveListQuery): Promise<LiveListViewData> => {
-  const response = await http.get<ApiResponse<PageResponse<LiveListDto>>>('/lives', {
-    params: query,
+  const response = await http.get<ApiResponse<PageResponse<LiveListDto> | BackendPageResponse<LiveListDto>>>('/lives', {
+    params: toLiveListParams(query),
   })
   const responseBody = response.data
 
@@ -75,12 +86,40 @@ const requestLiveList = async (query: LiveListQuery): Promise<LiveListViewData> 
     throw new LiveListContractError(responseBody.error?.message)
   }
 
+  const pageResponse = normalizePageResponse(responseBody.data)
+
   return {
-    items: responseBody.data.items
+    items: pageResponse.items
       .map(mapLiveListDto)
       .filter((item): item is LiveListItem => item !== null),
-    totalElements: responseBody.data.meta.totalElements,
-    totalPages: responseBody.data.meta.totalPages,
+    totalElements: pageResponse.meta.totalElements,
+    totalPages: pageResponse.meta.totalPages,
+  }
+}
+
+const toLiveListParams = (query: LiveListQuery) => ({
+  categoryIds: query.categoryId,
+  status: query.status,
+  sort: query.sort,
+  page: Math.max(query.page - 1, 0),
+  size: query.size,
+})
+
+const normalizePageResponse = <T>(
+  response: PageResponse<T> | BackendPageResponse<T>,
+): PageResponse<T> => {
+  if ('items' in response) {
+    return response
+  }
+
+  return {
+    items: response.content,
+    meta: {
+      page: response.page + 1,
+      size: response.size,
+      totalElements: response.totalElements,
+      totalPages: response.totalPages,
+    },
   }
 }
 

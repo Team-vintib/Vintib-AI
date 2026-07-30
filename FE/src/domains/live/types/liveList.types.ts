@@ -35,8 +35,12 @@ export interface LiveListDto {
   hostNickname: string
   thumbnailUrl: string | null
   broadcastStatus: LiveBroadcastStatus | 'CANCELED'
-  categoryId: number
-  categoryName: string
+  categories?: {
+    id: number
+    name: string
+  }[]
+  categoryId?: number
+  categoryName?: string
   scheduledAt: string | null
   startedAt: string | null
   viewerCount: number
