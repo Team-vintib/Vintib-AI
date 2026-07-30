@@ -2,6 +2,9 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import { LIVE_AUCTION_MOCK_STATES } from '@/domains/auction/constants/liveAuctionMockData'
+import LiveAuctionPanel from '@/domains/auction/components/LiveAuctionPanel.vue'
+import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import {
   getLiveWatchViewData,
   isLiveWatchApiEnabled,
@@ -11,12 +14,12 @@ import LiveProductQueue from '@/domains/live/components/LiveProductQueue.vue'
 import LiveSelectedProduct from '@/domains/live/components/LiveSelectedProduct.vue'
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchHeader from '@/domains/live/components/LiveWatchHeader.vue'
-import LiveWatchSidePanel from '@/domains/live/components/LiveWatchSidePanel.vue'
 import LiveWatchState from '@/domains/live/components/LiveWatchState.vue'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import LiveLayout from '@/shared/layouts/LiveLayout.vue'
 
+import type { LiveAuctionMockState } from '@/domains/auction/types/liveAuction.types'
 import type {
   LiveWatchLoadState,
   LiveWatchMockScenario,
@@ -59,6 +62,16 @@ const getMockScenario = (): LiveWatchMockScenario => {
     ? (queryValue as LiveWatchMockScenario)
     : 'default'
 }
+
+const auctionMockState = computed<LiveAuctionMockState>(() => {
+  const queryValue = Array.isArray(route.query.auction)
+    ? route.query.auction[0]
+    : route.query.auction
+
+  return LIVE_AUCTION_MOCK_STATES.includes(queryValue as LiveAuctionMockState)
+    ? (queryValue as LiveAuctionMockState)
+    : 'BIDDABLE'
+})
 
 const selectedProduct = computed(
   () => live.value?.products.find((product) => product.id === selectedProductId.value) ?? null,
@@ -238,7 +251,11 @@ onBeforeUnmount(() => {
         />
 
         <main class="live-watch-page__content">
-          <LiveVideoStage :title="live.title" :poster-url="live.posterUrl" :status="live.status" />
+          <LiveVideoStage :title="live.title" :poster-url="live.posterUrl" :status="live.status">
+            <template #overlay>
+              <LiveChatOverlay :status="live.status" />
+            </template>
+          </LiveVideoStage>
 
           <div class="live-watch-page__details">
             <LiveSelectedProduct
@@ -247,7 +264,11 @@ onBeforeUnmount(() => {
               @view-product="goToProduct"
               @toggle-wish="toggleWish"
             />
-            <LiveWatchSidePanel :product="selectedProduct" :status="live.status" />
+            <LiveAuctionPanel
+              :product="selectedProduct"
+              :status="live.status"
+              :mock-state="auctionMockState"
+            />
           </div>
         </main>
       </div>

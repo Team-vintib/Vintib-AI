@@ -28,7 +28,9 @@ const stageMessage = computed(() => {
     </div>
 
     <div class="live-video-stage__shade" aria-hidden="true"></div>
-    <div class="live-video-stage__chat-region" aria-hidden="true"></div>
+    <div class="live-video-stage__overlay">
+      <slot name="overlay"></slot>
+    </div>
 
     <div v-if="status !== 'LIVE'" class="live-video-stage__notice" role="status">
       <span aria-hidden="true"></span>
@@ -116,12 +118,10 @@ const stageMessage = computed(() => {
     linear-gradient(90deg, rgba(0, 0, 0, 0.18), transparent 30%);
 }
 
-.live-video-stage__chat-region {
+.live-video-stage__overlay {
   position: absolute;
-  bottom: 54px;
-  left: var(--space-4);
-  width: min(360px, calc(100% - 32px));
-  min-height: 180px;
+  z-index: 1;
+  inset: 0;
   pointer-events: none;
 }
 
@@ -157,6 +157,7 @@ const stageMessage = computed(() => {
   align-items: center;
   gap: var(--space-2);
   color: rgba(255, 255, 255, 0.88);
+  z-index: 2;
 }
 
 .live-video-stage__controls > span {
@@ -228,6 +229,5 @@ const stageMessage = computed(() => {
   .live-video-stage {
     min-height: 320px;
   }
-
 }
 </style>

@@ -380,11 +380,18 @@ docs/
   장비 확인은 `navigator.mediaDevices.getUserMedia` 기반 카메라 미리보기와 마이크 권한
   확인을 순차 실행합니다. 실제 생성/예약 API와 방송 SDK 연동은 후속 작업 대기 중입니다.
 - `domains/live`에는 S15P11A108-419 LIVE-005 시청 화면 전체 구조가 구현되어 있습니다.
-  `/lives/:liveId`에서 방송 헤더, 상품 큐, mock 영상 stage, 선택 상품 정보와 후속 경매 패널
+  `/lives/:liveId`에서 방송 헤더, 상품 큐, mock 영상 stage, 선택 상품 정보와 경매 패널
   영역을 dark live layout으로 제공합니다. loading·오류·방송 없음·상품 없음·예정·종료
   상태를 mock query로 확인할 수 있고 `GET /api/lives/{liveId}` DTO adapter를 분리했습니다.
   현재 동시 시청자, 현재 상품과 상세 상품 정보는 Swagger 계약에 없으므로 기본값은 mock이며
-  실제 스트리밍·채팅·경매·AI 시착 연동은 후속 작업 대기 중입니다.
+  실제 스트리밍과 AI 시착 연동은 후속 작업 대기 중입니다.
+- `domains/chat`에는 S15P11A108-423 라이브 채팅 overlay가 구현되어 있습니다. Figma 더미
+  메시지 목록, 판매자 메시지 구분, 하트·불·박수·놀람 반응과 로컬 입력을 제공하며 실제
+  WebSocket/STOMP·과거 메시지·AI 답변 연동은 대기 중입니다.
+- `domains/auction`에는 S15P11A108-423 시청자 경매 패널이 구현되어 있습니다. 현재가·다음
+  입찰가·타이머·최고 입찰자·사용 가능 포인트와 입찰 CTA를 표시하고, mock 처리 중·최근
+  입찰자·포인트 부족·예정·종료·상품 없음 상태를 제공합니다. 실제 snapshot·입찰·event와
+  포인트 처리는 `012-live-watch-detail-contract-gaps.md` 계약 확정 후 연결합니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.
