@@ -86,39 +86,39 @@ FE axios 기본 `baseURL`은 `VITE_API_BASE_URL ?? '/api'`다. 따라서 FE API 
 
 ### 회원가입
 
-- [ ] `FE/src/domains/auth/api/authApi.ts` 메일 회원가입 함수 경로/타입 최종 확인
-- [ ] `FE/src/domains/auth/types/auth.types.ts`의 `SignUpRequest`, `SignUpResponse`, `VerifyEmailCodeResponse`가 BE DTO와 일치하는지 확인
-- [ ] `SignupForm.vue`에서 중복 확인 전에는 인증코드 발송을 막는 흐름 확인
-- [ ] 이메일 변경 시 중복 확인/인증/토큰 상태 초기화 확인
-- [ ] 인증코드 확인 성공 시 `verificationToken` 저장 확인
-- [ ] 회원가입 요청 payload가 `{ email, password, name, verificationToken }`만 보내도록 확인
-- [ ] 회원가입 성공 후 자동 로그인하지 않고 로그인 페이지로 이동하는 정책 반영
+- [x] `FE/src/domains/auth/api/authApi.ts` 메일 회원가입 함수 경로/타입 최종 확인
+- [x] `FE/src/domains/auth/types/auth.types.ts`의 `SignUpRequest`, `SignUpResponse`, `VerifyEmailCodeResponse`가 BE DTO와 일치하는지 확인
+- [x] `SignupForm.vue`에서 중복 확인 전에는 인증코드 발송을 막는 흐름 확인
+- [x] 이메일 변경 시 중복 확인/인증/토큰 상태 초기화 확인
+- [x] 인증코드 확인 성공 시 `verificationToken` 저장 확인
+- [x] 회원가입 요청 payload가 `{ email, password, name, verificationToken }`만 보내도록 확인
+- [x] 회원가입 성공 후 자동 로그인하지 않고 로그인 페이지로 이동하는 정책 반영
 - [ ] BE error field를 FE field로 매핑하는 로직 점검
 - [ ] 네트워크 오류, 중복 이메일, 인증코드 오류, 인증 토큰 만료 케이스의 사용자 메시지 점검
 
 ### 로그인/세션
 
-- [ ] `FE/src/domains/auth/types/auth.types.ts`에서 로그인 요청 타입을 화면 form 타입과 API payload 타입으로 분리
-- [ ] `FE/src/domains/auth/api/authApi.ts`의 `login`이 BE에 `{ email, password }`만 보내도록 수정
-- [ ] `FE/src/domains/auth/api/authApi.ts`에 `reissue` API 함수 추가 검토
-- [ ] `LoginResponse`를 현재 BE 응답인 `accessToken`, `refreshToken` 기준으로 안전하게 처리
-- [ ] `LoginForm.vue`에서 `rememberMe`는 `authStore.setSession` 저장소 선택에만 사용
-- [ ] `LoginForm.vue`의 성공 후 이동 정책 점검
-- [ ] `authStore.ts`가 `user` 없는 세션도 정상 저장/복구하는지 확인
-- [ ] `logoutSession`이 BE 실패와 무관하게 로컬 세션을 정리하는지 확인
+- [x] `FE/src/domains/auth/types/auth.types.ts`에서 로그인 요청 타입을 화면 form 타입과 API payload 타입으로 분리
+- [x] `FE/src/domains/auth/api/authApi.ts`의 `login`이 BE에 `{ email, password }`만 보내도록 수정
+- [x] `FE/src/domains/auth/api/authApi.ts`에 `reissue` API 함수 추가 검토
+- [x] `LoginResponse`를 현재 BE 응답인 `accessToken`, `refreshToken` 기준으로 안전하게 처리
+- [x] `LoginForm.vue`에서 `rememberMe`는 `authStore.setSession` 저장소 선택에만 사용
+- [x] `LoginForm.vue`의 성공 후 이동 정책 점검
+- [x] `authStore.ts`가 `user` 없는 세션도 정상 저장/복구하는지 확인
+- [x] `logoutSession`이 BE 실패와 무관하게 로컬 세션을 정리하는지 확인
 - [ ] 인증 에러 메시지 매핑 점검
-- [ ] SSAFY SSO API/화면은 이번 범위에서 건드리지 않도록 확인
+- [x] SSAFY SSO API/화면은 이번 범위에서 건드리지 않도록 확인
 
 ### 검증
 
-- [ ] `npm run type-check` 실행
-- [ ] `npm run build` 실행
+- [x] `npm run type-check` 실행
+- [x] `npm run build` 실행
 
 ## BE 요청 문서
 
 인증 도메인 연동 중 BE에 확인/보완이 필요한 내용은 아래 문서에 정리한다.
 
-- `.codex/requests/be/015-auth-contract.md`
+- `.codex/requests/be/001-auth-contract.md`
 
 요청 핵심:
 

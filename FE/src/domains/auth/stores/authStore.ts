@@ -1,14 +1,16 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { logout } from '@/domains/auth/api/authApi'
+import { logout, reissueToken } from '@/domains/auth/api/authApi'
 import type {
   AuthUser,
   LinkAccountResponse,
   LoginResponse,
   SsafySsoCallbackResponse,
 } from '@/domains/auth/types/auth.types'
+import { normalizeApiError } from '@/shared/api/http'
 import {
+  type AuthStorageType,
   clearStoredAuthSession,
   readStoredAuthSession,
   writeStoredAuthSession,
@@ -21,6 +23,10 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshToken = ref('')
   const user = ref<AuthUser | null>(null)
   const isHydrated = ref(false)
+  const isSessionValidated = ref(false)
+  const storageType = ref<AuthStorageType>('local')
+  const isValidatingSession = ref(false)
+  let sessionValidationPromise: Promise<void> | null = null
 
   const isAuthenticated = computed(() => Boolean(accessToken.value))
   const isOnboardingCompleted = computed(() => user.value?.onboardingCompleted === true)
@@ -29,14 +35,17 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = session.accessToken || ''
     refreshToken.value = session.refreshToken || ''
     user.value = session.user || user.value
+    storageType.value = rememberMe ? 'local' : 'session'
+    isSessionValidated.value = true
 
     writeStoredAuthSession(
       {
         accessToken: accessToken.value || undefined,
         refreshToken: refreshToken.value || undefined,
+        storageType: storageType.value,
         user: user.value || undefined,
       },
-      rememberMe ? 'local' : 'session',
+      storageType.value,
     )
   }
 
@@ -44,6 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = ''
     refreshToken.value = ''
     user.value = null
+    isSessionValidated.value = true
 
     clearStoredAuthSession()
   }
@@ -68,7 +78,55 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = storedSession.accessToken || ''
     refreshToken.value = storedSession.refreshToken || ''
     user.value = (storedSession.user as AuthUser | undefined) || null
+    storageType.value = storedSession.storageType
     isHydrated.value = true
+  }
+
+  const validateStoredSession = async () => {
+    hydrateSession()
+
+    if (isSessionValidated.value) {
+      return
+    }
+
+    if (!refreshToken.value) {
+      if (accessToken.value) {
+        clearSession()
+      }
+      isSessionValidated.value = true
+      return
+    }
+
+    if (sessionValidationPromise) {
+      return sessionValidationPromise
+    }
+
+    isValidatingSession.value = true
+    sessionValidationPromise = reissueToken({ refreshToken: refreshToken.value })
+      .then((response) => {
+        if (!response.success || !response.data?.accessToken) {
+          clearSession()
+          isSessionValidated.value = true
+          return
+        }
+
+        setSession(response.data, storageType.value === 'local')
+        isSessionValidated.value = true
+      })
+      .catch((error: unknown) => {
+        const apiError = normalizeApiError(error)
+
+        if (apiError.code !== 'NETWORK_ERROR' && apiError.code !== 'REQUEST_TIMEOUT') {
+          clearSession()
+          isSessionValidated.value = true
+        }
+      })
+      .finally(() => {
+        isValidatingSession.value = false
+        sessionValidationPromise = null
+      })
+
+    return sessionValidationPromise
   }
 
   return {
@@ -77,10 +135,13 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     isAuthenticated,
     isHydrated,
+    isSessionValidated,
+    isValidatingSession,
     isOnboardingCompleted,
     setSession,
     clearSession,
     logoutSession,
     hydrateSession,
+    validateStoredSession,
   }
 })

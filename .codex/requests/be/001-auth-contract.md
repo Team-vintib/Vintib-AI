@@ -268,6 +268,19 @@ Content-Type: application/json
 
 `memberType`은 온보딩 통합 요청의 `GENERAL | BUSINESS`와 같은 enum을 사용한다.
 
+### 2-1. FE 세션 복구 검증용 내 정보 조회
+
+FE는 브라우저 `localStorage`/`sessionStorage`에 남은 토큰만으로 로그인 상태를 확정하지 않도록 수정했다. 현재는 저장된 `refreshToken`으로 `POST /api/auth/reissue`를 1회 호출해 Redis refresh token과 회원 존재 여부를 검증하고, 실패하면 로컬 세션을 정리한다.
+
+다만 이 방식은 앱 진입 시 refresh token을 회전시키므로, 장기적으로는 아래 중 하나가 필요하다.
+
+- `GET /api/users/me` 또는 `GET /api/me` 제공
+- 해당 endpoint는 access token의 서명/만료와 회원 존재 여부를 모두 검증
+- 성공 시 최소 사용자 정보 반환
+- 실패 시 `401`과 `U010` 또는 `U011` 반환
+
+이 endpoint가 확정되면 FE는 앱 시작 세션 검증을 `reissue` 대신 내 정보 조회로 교체할 수 있다.
+
 ### 3. 토큰 만료 정보
 
 현재 `TokenResponse`의 `accessToken`, `refreshToken`만으로 1차 연동은 가능하다. 추후 자동 갱신 정확도를 높이려면 `accessTokenExpiresIn` 또는 `accessTokenExpiresAt` 추가 여부를 확정 요청한다.

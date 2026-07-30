@@ -8,6 +8,7 @@ export type AuthStorageType = 'local' | 'session'
 export interface StoredAuthSession {
   accessToken?: string
   refreshToken?: string
+  storageType: AuthStorageType
   user?: unknown
 }
 
@@ -41,6 +42,7 @@ export const readStoredAuthSession = (): StoredAuthSession => {
     user: parseStoredUser(
       primaryStorage?.getItem(AUTH_USER_KEY) || fallbackStorage?.getItem(AUTH_USER_KEY) || '',
     ),
+    storageType,
   }
 }
 
