@@ -29,44 +29,41 @@ IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
 # --------------------------------------------------------------------------
 # 하자 프롬프트 세트
 # --------------------------------------------------------------------------
-# 맨 명사("a scratch")는 **바닥·소품의 긁힘까지** 잡는다 — 실측에서 한 장에 29건이
-# 검출됐고 상당수가 배경이었다. 프로덕션 CLIPSeg 프롬프트가
-# "a stain on {color} {garment} fabric" 처럼 원단을 명시하는 이유가 이것이다.
+# [2026-07-30 정정] 카테고리를 verify_clipseg.py(LAB-12 원본 스파이크)·프로덕션
+# (`worker/models/clipseg/`)의 하자 유형과 동일하게 맞춘다 — STAIN / DIRT_MARK / HOLE_TEAR
+# 세 가지뿐이다. 이전엔 SCRATCH를 추가하고 TEAR/HOLE을 분리했었는데, 그 taxonomy는
+# LAB-12가 실측하지도, 프로덕션이 채택하지도 않은 것이었다(구멍과 찢어짐을 한 유형으로
+# 다루는 이유는 005 설계 문서 §5.3 참고 — 둘 다 "찢어짐·훼손은 잘 판단 못함"으로 같이 취급됨).
+# SCRATCH는 검증된 적 없는 프롬프트였고 실측에서 배경(바닥·소품) 오탐이 컸다.
 #
 # 다만 SAM3 는 논문상 **짧은 명사구**(예: "yellow school bus")로 학습돼 있어 문장을 길게
 # 늘이면 오히려 나빠질 수 있다. 어느 표현이 실제로 나은지는 실측 대상이므로 세트로 만들어
 # 두고 ACTIVE_PROMPT_SET 만 바꿔 비교한다.
 # DIRT_MARK("a dirty mark")는 세 세트 모두 **똑같은 문구**를 쓴다 — LAB-12 가 검증한 게 이
-# 표현 하나뿐이라 "on fabric"/"on clothing" 을 붙인 변형은 검증된 적이 없다. CLIPSeg 노트북을
-# SAM3 와 같은 프롬프트로 맞추면서(공정 비교 목적) 이 개념이 빠졌었는데, LAB-12·프로덕션
-# (`worker/models/clipseg/prompts.py`)이 검증한 오염 계열 핵심 프롬프트라 다시 넣는다.
+# 표현 하나뿐이라 "on fabric"/"on clothing" 을 붙인 변형은 검증된 적이 없다.
+# HOLE_TEAR("a hole or tear in fabric")도 fabric 세트 기준으로는 verify_clipseg.py 와
+# **완전히 같은 문자열**이다 — bare/garment 세트만 그 골격을 유지한 변형이다.
 PROMPT_SETS: dict[str, dict[str, str]] = {
     # 대조군 — 기존 프롬프트. 배경 오탐이 가장 많다.
     "bare": {
         "STAIN": "a stain",
-        "SCRATCH": "a scratch",
-        "TEAR": "a tear",
-        "HOLE": "a hole",
+        "HOLE_TEAR": "a hole or tear",
         "DIRT_MARK": "a dirty mark",
     },
-    # 원단 한정. LAB-12 CLIPSeg 프롬프트와 같은 골격이다.
+    # 원단 한정. LAB-12/verify_clipseg.py 의 프롬프트와 같은 골격이다.
     "fabric": {
         "STAIN": "a stain on fabric",
-        "SCRATCH": "a scratch on fabric",
-        "TEAR": "a tear in fabric",
-        "HOLE": "a hole in fabric",
+        "HOLE_TEAR": "a hole or tear in fabric",
         "DIRT_MARK": "a dirty mark",
     },
     # 의류 명시. 명사구를 짧게 유지하려고 "clothing" 한 단어만 덧붙였다.
     "garment": {
         "STAIN": "a stain on clothing",
-        "SCRATCH": "a scratch on clothing",
-        "TEAR": "a tear in clothing",
-        "HOLE": "a hole in clothing",
+        "HOLE_TEAR": "a hole or tear in clothing",
         "DIRT_MARK": "a dirty mark",
     },
 }
-ACTIVE_PROMPT_SET = "fabric"  # <- 여기만 바꾸면 두 노트북이 함께 스왑된다
+ACTIVE_PROMPT_SET = "fabric"  # <- 여기만 바꾸면 세 노트북이 함께 스왑된다
 DEFECT_PROMPTS: dict[str, str] = PROMPT_SETS[ACTIVE_PROMPT_SET]
 
 
@@ -81,10 +78,11 @@ DEFECT_PROMPTS: dict[str, str] = PROMPT_SETS[ACTIVE_PROMPT_SET]
 #
 # 양성 후보를 **두 종류로 나눈다** — 억제 조건이 다르다.
 #
-# 1) 구조적 개구부(STRUCTURAL) — 암홀·넥라인·밑단·소매끝. "a hole in fabric" 프롬프트 자체가
-#    손상된 구멍과 의류가 원래 갖고 있는 개구부를 구분하지 못한다(둘 다 "구멍"이라는 단어로는
-#    같은 개념). 실측(검정 티셔츠 1장)에서 넥라인 1건 + 밑단 1건 + 소매끝 2건, 총 4건이 전부
-#    HOLE 오탐이었다 — 처음엔 암홀·넥라인만 등록했는데 밑단·소매끝은 못 걸러 범위를 넓혔다.
+# 1) 구조적 개구부(STRUCTURAL) — 암홀·넥라인·밑단·소매끝. "a hole or tear in fabric" 프롬프트
+#    자체가 손상된 구멍과 의류가 원래 갖고 있는 개구부를 구분하지 못한다(둘 다 "구멍"이라는
+#    단어로는 같은 개념). 실측(검정 티셔츠 1장)에서 넥라인 1건 + 밑단 1건 + 소매끝 2건, 총
+#    4건이 전부 HOLE_TEAR 오탐이었다 — 처음엔 암홀·넥라인만 등록했는데 밑단·소매끝은 못
+#    걸러 범위를 넓혔다.
 #    크롭 여부와 무관하게 원본 이미지에서도 재현되는 문제다(git aa9a977, 크롭 도입 전에도
 #    동일 프롬프트로 재현됨).
 #    **이 항목들은 겹치면 confidence 비교 없이 곧바로 억제한다** — 실제 손상이 정확히 같은
@@ -168,9 +166,7 @@ MIN_AREA_RATIO = 0.0015  # 이보다 작은 blob 은 노이즈로 버린다 (reg
 # --------------------------------------------------------------------------
 KOREAN_LABELS: dict[str, str] = {
     "STAIN": "오염",
-    "SCRATCH": "스크래치",
-    "TEAR": "찢어짐",
-    "HOLE": "구멍",
+    "HOLE_TEAR": "구멍/찢어짐",
     "DIRT_MARK": "얼룩",  # worker/models/clipseg/scoring.py 의 DEFECT_LABELS 와 같은 한글
     # 양성(억제용) 태그도 함께 둔다 — 디버깅 시각화(§6 히트맵 등)에서 재사용한다.
     "WRINKLE": "주름",
