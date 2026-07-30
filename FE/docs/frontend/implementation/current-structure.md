@@ -1,6 +1,6 @@
 # 현재 프로젝트 구조
 
-확인일: 2026-07-29
+확인일: 2026-07-30
 
 ## 기술 스택
 
@@ -153,6 +153,7 @@ src/
     product/
       api/
         productDetailApi.ts
+        productRegistrationApi.ts
       components/
         AiQualityAnalysisPanel.vue
         ProductCard.vue
@@ -161,34 +162,48 @@ src/
         ProductDetailStatePanel.vue
         ProductFilterPanel.vue
         ProductImageGallery.vue
+        ProductPhotoUploader.vue
         ProductPurchaseSummary.vue
         ProductSellerLivePanel.vue
       constants/
         productDetailMockData.ts
         productListMockData.ts
+        productRegistrationOptions.ts
       pages/
         ProductDetailView.vue
         ProductListView.vue
+        ProductRegistrationPage.vue
       types/
         productDetail.types.ts
         productList.types.ts
+        productRegistration.types.ts
     live/
       api/
         liveListApi.ts
+        liveWatchApi.ts
       components/
         LiveListCard.vue
         LiveListFilter.vue
         LiveListState.vue
+        LiveProductQueue.vue
+        LiveSelectedProduct.vue
+        LiveVideoStage.vue
+        LiveWatchHeader.vue
+        LiveWatchSidePanel.vue
+        LiveWatchState.vue
       constants/
         liveCreateMockData.ts
         liveListFilterOptions.ts
         liveListMockData.ts
+        liveWatchMockData.ts
       pages/
         LiveCreatePage.vue
         LiveListView.vue
+        LiveWatchPage.vue
       types/
         liveCreate.types.ts
         liveList.types.ts
+        liveWatch.types.ts
     chat/
       api/
       components/
@@ -204,9 +219,12 @@ src/
     tryon/
       api/
       components/
+        LiveTryOnPanel.vue
       constants/
+        liveTryOnMockData.ts
       pages/
       types/
+        liveTryOn.types.ts
     point/
       api/
       components/
@@ -252,6 +270,7 @@ src/
       authTokenStorage.ts
       http.ts
     components/
+      AppSearchBar.vue
       GlobalNavigation.vue
       RoutePlaceholder.vue
     composables/
@@ -312,7 +331,7 @@ docs/
 | --------------------- | ------------------------------------------------------------------------------------------------- |
 | `app/`                | 앱 조립 계층. 라우터/Pinia provider 등 전역 설정 후보                                             |
 | `shared/api/`         | Axios 인스턴스, 공통 API 유틸. 현재 `http.ts` 제공                                                |
-| `shared/components/`  | 2개 이상 도메인에서 재사용되는 UI 컴포넌트                                                        |
+| `shared/components/`  | 2개 이상 도메인에서 재사용되는 UI 컴포넌트. 현재 공통 검색바, 전역 내비게이션, route placeholder 제공 |
 | `shared/composables/` | 2개 이상 도메인에서 재사용되는 Composition API 함수                                               |
 | `shared/constants/`   | 라우트명, 전역 옵션 등 공통 상수. 현재 `routes.ts` 제공                                           |
 | `shared/layouts/`     | 인증, 기본 서비스, 라이브 등 공통 레이아웃. 현재 `AuthLayout`, `DefaultLayout`, `LiveLayout` 제공. `DefaultLayout`은 화면별 `contentMaxWidth` 지정 가능 |
@@ -333,8 +352,7 @@ docs/
 
 - 라우터는 `router/routes.ts`로 route 배열을 분리했으며 AUTH-001~AUTH-004 후보,
   ONBOARD-001~ONBOARD-004, BIZ-001·BIZ-001-2, HOME, FOLLOWING_HOME placeholder,
-  LIVE_LIST 실제 화면, LIVE_CREATE 실제 화면, LIVE_WATCH placeholder, 공개 PROD-008
-  route가 등록되어 있습니다.
+  LIVE_LIST·LIVE_CREATE·LIVE_WATCH 실제 화면, 공개 PROD-008 route가 등록되어 있습니다.
 - `router/index.ts`에는 `requiresAuth`, `guestOnly` 메타 기반 인증 guard가 구현되어 있습니다.
 - `App.vue`는 `RouterView`만 렌더링합니다.
 - 기능 ID prefix 기준 도메인 폴더와 공통 폴더가 생성되어 있습니다.
@@ -344,31 +362,56 @@ docs/
   컴포넌트, FE 더미 제출 상태 store와 BIZ-001-2 인증 대기 화면이 구현되어 있습니다.
   BIZ-001-2의 메인 이동은 HOME route로 연결되어 있으며, 실제 인증 API는 후속 작업 대기 중입니다.
 - `domains/home`에는 HOME 공개 route, 로그인 여부에 따른 `GuestHome`/`MemberHome`
-  분기, 홈 검색 패널, 섹션 shell, 공통 홈 hero/content 카드, 라이브 카드, 상품 카드,
+  분기, 공통 검색바 기반 홈 검색 패널, 섹션 shell, 공통 홈 hero/content 카드, 라이브 카드, 상품 카드,
   화면 확인용 mock 데이터와 `HomeViewData` view model 타입이 구현되어 있습니다.
   `homeViewApi.ts`는 현재 mock 데이터를 반환하는 adapter 자리이며, `HomePage`는
   loading/error/retry 상태를 처리합니다.
   실제 HOME API 계약이 확정되면 adapter 내부를 HTTP 호출과 응답 매핑으로 교체합니다.
-- `domains/product`에는 PROD-008 상품 목록 View와 S15P11A108-408·410·412 상품 상세 UI가
-  구현되어 있습니다. 상품 목록은 실사형 로컬 WebP를 사용하고 최소·최대 가격 범위를 검증해
-  mock 상품을 필터링하며 결과 없음 상태를 제공합니다. 상품 목록 카드는 상품 ID가 포함된 상세
-  route로 이동합니다. 상세 화면은
-  썸네일과 대표 이미지·AI 원본/검수 이미지 쌍을 함께 변경하며 찜·장바구니·라이브 알림 상태,
-  기존 라이브 route 이동과 미구현 CTA 안내를 제공합니다. 상세 조회의 로딩·오류·상품 없음·
-  판매 완료와 AI 분석 전·중·완료·결과 없음·실패 상태를 구분하며 mock adapter에서 데이터를
-  받습니다. 실제 API 계약이 확정되면 adapter 내부를 교체합니다.
+- `domains/product`에는 PROD-008 상품 목록 View, S15P11A108-408·410·412 상품 상세 UI,
+  S15P11A108-409·411·414 상품 등록 화면이 구현되어 있습니다. 상품 목록은 실사형 로컬 WebP를
+  사용하고 공통 검색바에서 통합 검색 상품 탭으로 이동하며, 최소·최대 가격 범위를 검증해
+  mock 상품을 필터링하고 결과 없음 상태를 제공합니다.
+  상품 목록 카드는 상품 ID가 포함된 상세 route로 이동합니다. 상세 화면은 썸네일과 대표 이미지·AI
+  원본/검수 이미지 쌍을 함께 변경하며 찜·장바구니·라이브 알림 상태, 기존 라이브 route 이동과
+  미구현 CTA 안내를 제공합니다. 구매 영역 아래에는 유사 상품의 가격대 분포와 선택 상품 상세 이동을
+  제공하는 `ProductPriceDistribution`이 있으며, 실제 추천 API 전까지 명시적인 mock view model을
+  사용합니다. 상세 조회의 로딩·오류·상품 없음·판매 완료와 AI 분석 전·중·완료·결과 없음·실패
+  상태를 구분하며 mock adapter에서 데이터를 받습니다. 상품 등록은 `/products/new`에서 사진 등록,
+  기본 정보, 사이즈/소재, 상태/하자와 AI 품질 검증, 가격, 검토, 완료 7단계를 제공하고 단계별
+  필수값·이미지·가격·등록 실패 상태를 처리합니다. 등록 완료는 `productRegistrationApi.ts` mock
+  adapter를 통해 확인하며, 실제 BE 계약은 `.codex/requests/be/014-product-registration-api-contract.md`
+  확정 후 adapter 내부를 교체합니다.
 - `domains/live`에는 S15P11A108-413·415·418 공개 라이브 목록 View, 진행 중·예정 상태 카드,
   로컬 이미지 기반 mock 데이터와 라이브 시청 route 연결, 카테고리·방송 상태 필터,
-  최신 방송·시청자·제목 정렬과 초기화가 구현되어 있습니다. 공개 목록에서는 종료 방송과
-  상품 판매 방식 조건을 제외합니다. 목록 DTO·adapter와 API 호출 함수, loading skeleton,
+  최신 방송·시청자·제목 정렬과 초기화가 구현되어 있습니다. 라이브 목록 검색바는 통합 검색
+  라이브 탭으로 이동합니다. 공개 목록에서는 종료 방송과 상품 판매 방식 조건을 제외합니다.
+  목록 DTO·adapter와 API 호출 함수, loading skeleton,
   전체 빈 목록·필터 결과 없음·오류·재시도 상태를 제공합니다.
-  BE에 `GET /api/lives` 목록 계약이 없어 기본값은 mock adapter이며
-  `VITE_LIVE_LIST_API_ENABLED=true` 설정 후 실제 API adapter로 전환합니다.
+  `origin/develop-BE@dd6a0b6`에 `GET /api/lives`가 구현됐지만 최종 `009` 계약의
+  복수 `categories[]`, 공통 `PageResponse.content`, nullable `viewerCount`와
+  `VIEWERS_DESC` 미지원 정책을 기존 418 adapter에 반영하기 전까지 기본값은 mock입니다.
 - `domains/live`에는 LIVE-001/002 라이브 개설 화면이 구현되어 있습니다. `/lives/new`에서
   라이브 유형, 방송 정보, 판매 상품, 예약 일정, 장비 확인, 완료 단계를 순차 진행하며
   필수값과 과거 일정을 검증합니다. 상품 검색/선택은 mock 데이터로 처리하고, 즉시 시작의
   장비 확인은 `navigator.mediaDevices.getUserMedia` 기반 카메라 미리보기와 마이크 권한
   확인을 순차 실행합니다. 실제 생성/예약 API와 방송 SDK 연동은 후속 작업 대기 중입니다.
+- `domains/live`에는 S15P11A108-419 LIVE-005 시청 화면 전체 구조가 구현되어 있습니다.
+  `/lives/:liveId`에서 방송 헤더, 상품 큐, mock 영상 stage, 선택 상품 정보와 경매 패널
+  영역을 dark live layout으로 제공합니다. loading·오류·방송 없음·상품 없음·예정·종료
+  상태를 mock query로 확인할 수 있고 `GET /api/lives/{liveId}` DTO adapter를 분리했습니다.
+  현재 동시 시청자, 현재 상품과 상세 상품 정보는 Swagger 계약에 없으므로 기본값은 mock이며
+  실제 스트리밍과 상세 API 연동은 후속 작업 대기 중입니다.
+- `domains/chat`에는 S15P11A108-423 라이브 채팅 overlay가 구현되어 있습니다. Figma 더미
+  메시지 목록, 판매자 메시지 구분, 하트·불·박수·놀람 반응과 로컬 입력을 제공하며 실제
+  WebSocket/STOMP·과거 메시지·AI 답변 연동은 대기 중입니다.
+- `domains/auction`에는 S15P11A108-423 시청자 경매 패널이 구현되어 있습니다. 현재가·다음
+  입찰가·타이머·최고 입찰자·사용 가능 포인트와 입찰 CTA를 표시하고, mock 처리 중·최근
+  입찰자·포인트 부족·예정·종료·상품 없음 상태를 제공합니다. 실제 snapshot·입찰·event와
+  포인트 처리는 `012-live-watch-detail-contract-gaps.md` 계약 확정 후 연결합니다.
+- `domains/tryon`에는 S15P11A108-425 라이브 AI 시착 패널이 구현되어 있습니다. 등록 사진
+  있음·없음, 로컬 이미지 변경, 생성 중·결과·실패·재시도와 결과 저장 피드백을 mock으로
+  제공하며, 상품 변경 시 이전 결과를 초기화합니다. 실제 사진·생성·저장 계약은
+  `013-live-tryon-contract.md` 확정 후 연결합니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.

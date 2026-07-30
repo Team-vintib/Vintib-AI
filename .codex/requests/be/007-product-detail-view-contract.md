@@ -28,8 +28,20 @@
   구분하고, 완료 시 원본 이미지·검수 이미지·하자 유형·위치·설명을 조회할 수 있어야 한다.
 - 품질 등급, 정품·가품 판별과 품질 보증 값은 응답 및 화면 노출 대상에서 제외한다.
 
+### 유사 상품 가격 분포
+
+- 상품 상세 구매 영역에서 비슷한 상품들의 가격대를 비교할 수 있도록 특정 상품 기준
+  유사 상품 목록 조회 계약을 요청한다.
+- endpoint 후보는 `GET /api/products/{productId}/similar`이며 실제 path와 추천 정책은
+  BE에서 확정한다.
+- 화면에 필요한 최소 응답 필드는 상품 ID, 제목, 가격, 썸네일 URL, 판매 방식, 판매 상태다.
+- 유사도 점수는 서버 내부 선별에 사용할 수 있지만 현재 FE 화면에는 노출하지 않는다.
+- `GET /api/products` 전체 목록을 FE가 내려받아 유사 상품을 임의 판별하지 않도록 한다.
+- 삭제·비공개·판매 불가 상품의 포함 여부와 최대 반환 개수는 BE 정책으로 확정한다.
+
 ## 관련 자료
 
 - Notion 기능 정의서 `PROD-006`, `PROD-009`, `PROD-010`
 - FE 화면 요구사항 `FE/docs/frontend/screens/PROD-006/requirements.md`
+- FE API 정리 `FE/docs/frontend/api/product-detail-price-distribution.md`
 - AI 비동기 검수 계약 `origin/develop-AI:.claude/requests/be/001-quality-inspection-async.md`
