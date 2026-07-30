@@ -29,16 +29,21 @@ JPA 엔티티/리포지토리/서비스/컨트롤러가 아직 없다. 이번 �
 
 ## 구현 목록
 
-- [ ] `notification/entity/Notification.java` — schema.sql 컬럼 매핑, `markAsRead()` 메서드
-- [ ] `notification/repository/NotificationRepository.java` — `findById` 등 읽음 처리에 필요한 최소 메서드
-- [ ] `notification/dto/response/NotificationResponse.java`
-- [ ] `notification/service/NotificationService.java` — `markAsRead(memberId, notificationId)`
-- [ ] `notification/controller/NotificationController.java` — `PATCH /api/users/{userId}/alerts/{id}`
-- [ ] `global/exception/ErrorCode`에 `NOTIFICATION_NOT_FOUND`, `NOTIFICATION_FORBIDDEN` 추가
-- [ ] 서비스/컨트롤러 테스트 (한글 메서드명)
-- [ ] Swagger 어노테이션
-- [ ] APIs.md 알림 읽음 처리 행 갱신 (인증 필요 여부 ✓, 구현 완료 여부 ✓)
-- [ ] `BE:verify` (CI와 동일한 검증 스크립트) 통과 확인
+- [x] `notification/entity/Notification.java` — schema.sql 컬럼 매핑, `markAsRead()` 메서드
+- [x] `notification/repository/NotificationRepository.java` — `findById` 등 읽음 처리에 필요한 최소 메서드
+- [x] `notification/dto/response/NotificationResponse.java`
+- [x] `notification/service/NotificationService.java` — `markAsRead(memberId, notificationId)`
+- [x] `notification/controller/NotificationController.java` — `PATCH /api/users/{userId}/alerts/{id}`
+- [x] `global/exception/ErrorCode`에 `NOTIFICATION_NOT_FOUND`, `NOTIFICATION_FORBIDDEN` 추가
+- [x] 서비스/컨트롤러 테스트 (한글 메서드명)
+- [x] Swagger 어노테이션
+- [x] APIs.md 알림 읽음 처리 행 갱신 (인증 필요 여부 ✓, 구현 완료 여부 ✓)
+- [x] `BE:verify` (CI와 동일한 검증 스크립트) 통과 확인
+
+## 완료
+
+`S15P11A108-379` 커밋으로 구현 완료. 목록 조회는 [[SY011-notification-list]], 전체 읽음 처리는
+[[SY012-notification-read-all]]에서 이어서 진행한다.
 
 ## 확인 필요한 미결정 사항
 

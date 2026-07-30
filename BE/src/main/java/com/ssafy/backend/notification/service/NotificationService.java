@@ -4,6 +4,7 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.notification.dto.response.NotificationItemResponse;
+import com.ssafy.backend.notification.dto.response.NotificationReadAllResponse;
 import com.ssafy.backend.notification.dto.response.NotificationResponse;
 import com.ssafy.backend.notification.entity.Notification;
 import com.ssafy.backend.notification.repository.NotificationRepository;
@@ -46,5 +47,12 @@ public class NotificationService {
                 : notificationRepository.findByMember_Id(memberId, sorted);
 
         return PageResponse.from(notifications.map(NotificationItemResponse::of));
+    }
+
+    // 대상이 0건이어도 에러 없이 처리한다(빈 알림함에 눌러도 정상 동작).
+    @Transactional
+    public NotificationReadAllResponse markAllAsRead(Long memberId) {
+        int updatedCount = notificationRepository.markAllAsReadByMemberId(memberId);
+        return new NotificationReadAllResponse(updatedCount);
     }
 }

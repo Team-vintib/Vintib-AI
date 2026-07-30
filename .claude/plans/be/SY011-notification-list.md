@@ -28,16 +28,20 @@ APIs.md "알림(Notifications)" 섹션의 `GET /users/{id}/alerts` (NOTI-001)를
 
 ## 구현 목록
 
-- [ ] `notification/repository/NotificationRepository.java`에 `findByMember_Id`, `findByMember_IdAndReadFalse`
+- [x] `notification/repository/NotificationRepository.java`에 `findByMember_Id`, `findByMember_IdAndReadFalse`
       (둘 다 `Pageable` 인자, 고정 정렬은 서비스에서 `Sort.by(asc("read"), desc("createdAt"))`로 구성) 추가
-- [ ] `notification/dto/response/NotificationItemResponse.java` 신설
-- [ ] `notification/service/NotificationService.java`에 `getNotifications(memberId, unreadOnly, pageable)` 추가
-- [ ] `notification/controller/NotificationController.java`에 `GET /api/users/{userId}/alerts` 추가
+- [x] `notification/dto/response/NotificationItemResponse.java` 신설
+- [x] `notification/service/NotificationService.java`에 `getNotifications(memberId, unreadOnly, pageable)` 추가
+- [x] `notification/controller/NotificationController.java`에 `GET /api/users/{userId}/alerts` 추가
       (기존 `PATCH /{id}`와 같은 클래스, 같은 `@RequestMapping` 하위)
-- [ ] 서비스 테스트 (한글 메서드명): 전체 조회, unreadOnly 필터, 빈 목록, 정렬 순서(읽지 않음 우선) 확인
-- [ ] Swagger 어노테이션
-- [ ] APIs.md 알림 목록 조회 행 갱신 (인증 필요 여부 ✓, 구현 완료 여부 ✓)
-- [ ] `BE:verify` 통과 확인
+- [x] 서비스 테스트 (한글 메서드명): 전체 조회, unreadOnly 필터, 빈 목록, 정렬 순서(읽지 않음 우선) 확인
+- [x] Swagger 어노테이션
+- [x] APIs.md 알림 목록 조회 행 갱신 (인증 필요 여부 ✓, 구현 완료 여부 ✓)
+- [x] `BE:verify` 통과 확인
+
+## 완료
+
+`S15P11A108-378` 커밋으로 구현 완료. "모두 읽음" 일괄 처리는 [[SY012-notification-read-all]]에서 이어서 진행한다.
 
 ## 확인 필요한 미결정 사항
 

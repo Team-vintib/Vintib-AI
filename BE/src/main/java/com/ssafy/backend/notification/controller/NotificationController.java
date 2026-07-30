@@ -5,6 +5,7 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.ApiResponse;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.notification.dto.response.NotificationItemResponse;
+import com.ssafy.backend.notification.dto.response.NotificationReadAllResponse;
 import com.ssafy.backend.notification.dto.response.NotificationResponse;
 import com.ssafy.backend.notification.service.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,7 +24,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-// 경로는 APIs.md "알림(Notifications)" 섹션의 `/users/{id}/alerts`, `/users/{userId}/alerts/{id}` 스펙을 그대로 따른다.
+// 경로는 APIs.md "알림(Notifications)" 섹션의 `/users/{id}/alerts`, `/users/{userId}/alerts/read-all`,
+// `/users/{userId}/alerts/{id}` 스펙을 그대로 따른다.
 @Tag(name = "알림(Notifications)", description = "알림함 조회/읽음 처리 API")
 @RestController
 @RequestMapping("/api/users/{userId}/alerts")
@@ -51,6 +53,23 @@ public class NotificationController {
         requireSelf(authentication, userId);
         PageResponse<NotificationItemResponse> response =
                 notificationService.getNotifications(userId, unreadOnly, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "알림 전체 읽음 처리",
+            description = "본인의 읽지 않은 알림을 모두 읽음 처리한다. 대상이 없어도 에러 없이 처리된다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "읽음 처리 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자의 알림함을 처리하려 함")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @PatchMapping("/read-all")
+    public ResponseEntity<ApiResponse<NotificationReadAllResponse>> markAllAsRead(
+            Authentication authentication, @PathVariable Long userId) {
+        requireSelf(authentication, userId);
+        NotificationReadAllResponse response = notificationService.markAllAsRead(userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

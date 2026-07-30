@@ -13,6 +13,7 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.notification.dto.response.NotificationItemResponse;
+import com.ssafy.backend.notification.dto.response.NotificationReadAllResponse;
 import com.ssafy.backend.notification.dto.response.NotificationResponse;
 import com.ssafy.backend.notification.entity.Notification;
 import com.ssafy.backend.notification.repository.NotificationRepository;
@@ -141,5 +142,24 @@ class NotificationServiceTest {
                 notificationService.getNotifications(MEMBER_ID, false, requested);
 
         assertThat(response.content()).isEmpty();
+    }
+
+    @Test
+    void 읽지_않은_알림이_있으면_전부_읽음_처리하고_처리_건수를_반환한다() {
+        when(notificationRepository.markAllAsReadByMemberId(MEMBER_ID)).thenReturn(3);
+
+        NotificationReadAllResponse response = notificationService.markAllAsRead(MEMBER_ID);
+
+        assertThat(response.updatedCount()).isEqualTo(3);
+        verify(notificationRepository).markAllAsReadByMemberId(MEMBER_ID);
+    }
+
+    @Test
+    void 이미_모두_읽은_상태면_0건을_반환한다() {
+        when(notificationRepository.markAllAsReadByMemberId(MEMBER_ID)).thenReturn(0);
+
+        NotificationReadAllResponse response = notificationService.markAllAsRead(MEMBER_ID);
+
+        assertThat(response.updatedCount()).isEqualTo(0);
     }
 }
