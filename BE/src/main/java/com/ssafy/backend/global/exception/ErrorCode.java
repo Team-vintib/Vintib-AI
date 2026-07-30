@@ -34,6 +34,8 @@ public enum ErrorCode {
     INVALID_LIVE_STATE(HttpStatus.BAD_REQUEST, "L007", "현재 방송 상태에서는 해당 처리를 할 수 없습니다."),
     CHAT_GUEST_NOT_ALLOWED(HttpStatus.UNAUTHORIZED, "L008", "채팅은 로그인 후 이용할 수 있습니다."),
     CHAT_CONTENT_INVALID(HttpStatus.BAD_REQUEST, "L009", "메시지는 1자 이상 500자 이하여야 합니다."),
+    REACTION_GUEST_NOT_ALLOWED(HttpStatus.UNAUTHORIZED, "L010", "반응 보내기는 로그인 후 이용할 수 있습니다."),
+    REACTION_TOO_FREQUENT(HttpStatus.TOO_MANY_REQUESTS, "L011", "반응을 너무 빠르게 보내고 있습니다. 잠시 후 다시 시도해주세요."),
 
     // [경매/입찰]
     AUCTION_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "A001", "현재 진행 중인 경매가 아닙니다."),
