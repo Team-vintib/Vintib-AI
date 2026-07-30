@@ -33,4 +33,25 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             """)
     List<ChatMessage> findPageByLiveId(
             @Param("liveId") Long liveId, @Param("cursor") Long cursor, Pageable pageable);
+
+    /**
+     * 지정한 ID <b>이후(더 새로운)</b> 메시지를 오래된 순으로 가져온다. 재접속 후 끊긴 구간을
+     * 메우는 용도다.
+     *
+     * <p><b>정렬이 위와 반대인 것은 의도다.</b> 앞으로 채우는 조회에서 최신순으로 자르면
+     * "가장 새로운 30건"이 와서 끊긴 지점과 그 사이에 구멍이 남는다. 오래된 순으로 자르면
+     * 마지막으로 본 메시지 바로 다음부터 이어지므로 구멍이 생기지 않는다.
+     */
+    @Query("""
+            select c
+            from ChatMessage c
+            join fetch c.live
+            left join fetch c.sender
+            where c.live.id = :liveId
+              and c.blocked = false
+              and c.id > :after
+            order by c.id asc
+            """)
+    List<ChatMessage> findPageAfterByLiveId(
+            @Param("liveId") Long liveId, @Param("after") Long after, Pageable pageable);
 }
