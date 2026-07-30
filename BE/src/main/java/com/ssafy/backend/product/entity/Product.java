@@ -31,8 +31,7 @@ import org.hibernate.annotations.SQLRestriction;
                 @CheckConstraint(
                         name = "ck_product_sale_status",
                         constraint = "sale_status IN ("
-                                + "'DRAFT', 'ON_SALE', 'AUCTION_SCHEDULED', 'AUCTION_IN_PROGRESS', "
-                                + "'AUCTION_FAILED', 'SOLD')"),
+                                + "'DRAFT', 'ON_SALE', 'AUCTION_SCHEDULED', 'AUCTION_IN_PROGRESS', 'SOLD')"),
                 @CheckConstraint(
                         name = "ck_product_price_by_type",
                         constraint = "sale_type <> 'DIRECT_SALE' OR price IS NOT NULL")
@@ -109,12 +108,6 @@ public class Product extends BaseTimeEntity {
         this.saleType = SaleType.DIRECT_SALE;
         this.price = price;
         this.saleStatus = SaleStatus.ON_SALE;
-    }
-
-    public void scheduleAuction() {
-        this.saleType = SaleType.AUCTION;
-        this.price = null;
-        this.saleStatus = SaleStatus.AUCTION_SCHEDULED;
     }
 
     public void update(

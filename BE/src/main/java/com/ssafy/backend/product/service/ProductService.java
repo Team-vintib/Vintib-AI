@@ -4,7 +4,6 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
-import com.ssafy.backend.product.dto.request.ProductAuctionResultRequest;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
@@ -60,6 +59,7 @@ public class ProductService {
         return ProductResponse.from(productRepository.save(product));
     }
 
+    // DRAFT(최초 등록) 또는 AUCTION_SCHEDULED(경매 예정 상품의 상시 판매 전환, PROD-004/PROD-005/AUCT-014)에서 호출된다.
     @Transactional
     public ProductResponse registerDirectSale(Long sellerId, Long productId, ProductStatusUpdateRequest request) {
         Product product = productRepository.findById(productId)
@@ -68,41 +68,11 @@ public class ProductService {
         if (!product.isOwnedBy(sellerId)) {
             throw new CustomException(ErrorCode.NOT_PRODUCT_OWNER);
         }
-        if (product.getSaleStatus() != SaleStatus.DRAFT) {
+        if (product.getSaleStatus() != SaleStatus.DRAFT && product.getSaleStatus() != SaleStatus.AUCTION_SCHEDULED) {
             throw new CustomException(ErrorCode.INVALID_PRODUCT_STATE);
         }
 
         product.registerDirectSale(request.price());
-
-        return ProductResponse.from(product);
-    }
-
-    @Transactional
-    public ProductResponse resolveAuctionFailure(Long sellerId, Long productId, ProductAuctionResultRequest request) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
-
-        if (!product.isOwnedBy(sellerId)) {
-            throw new CustomException(ErrorCode.NOT_PRODUCT_OWNER);
-        }
-        if (product.getSaleStatus() != SaleStatus.AUCTION_FAILED) {
-            throw new CustomException(ErrorCode.INVALID_PRODUCT_STATE);
-        }
-
-        switch (request.nextStatus()) {
-            case ON_SALE -> {
-                if (request.price() == null) {
-                    throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-                }
-                product.registerDirectSale(request.price());
-            }
-            case AUCTION_SCHEDULED -> {
-                if (request.price() != null) {
-                    throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-                }
-                product.scheduleAuction();
-            }
-        }
 
         return ProductResponse.from(product);
     }

@@ -2,7 +2,6 @@ package com.ssafy.backend.product.controller;
 
 import com.ssafy.backend.global.response.ApiResponse;
 import com.ssafy.backend.global.response.PageResponse;
-import com.ssafy.backend.product.dto.request.ProductAuctionResultRequest;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductImageRegisterRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUpdateRequest;
@@ -64,10 +63,14 @@ public class ProductController {
 
     @Operation(
             summary = "판매 가격 설정 및 상시 판매 등록",
-            description = "DRAFT 상태 상품에 가격을 설정해 상시 판매(ON_SALE) 상태로 전환한다.")
+            description = "DRAFT(최초 등록) 또는 AUCTION_SCHEDULED(경매 예정 상품의 상시 판매 전환, "
+                    + "PROD-004/PROD-005/AUCT-014) "
+                    + "상태 상품에 가격을 설정해 상시 판매(ON_SALE) 상태로 전환한다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "전환 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패 또는 DRAFT 상태가 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "요청값 검증 실패 또는 DRAFT/AUCTION_SCHEDULED 상태가 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
@@ -80,30 +83,6 @@ public class ProductController {
             @Valid @RequestBody ProductStatusUpdateRequest request) {
         Long sellerId = (Long) authentication.getPrincipal();
         ProductResponse response = productService.registerDirectSale(sellerId, id, request);
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
-
-    @Operation(
-            summary = "미낙찰 상품 후속 처리",
-            description = "AUCTION_FAILED 상태 상품의 이후 방식을 선택한다. "
-                    + "ON_SALE로 전환하려면 가격을 함께 보내야 하고, AUCTION_SCHEDULED를 선택하면 가격을 보내면 안 된다.")
-    @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "전환 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "요청값 검증 실패, AUCTION_FAILED 상태가 아님, 또는 nextStatus와 price 조합이 잘못됨"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인이 등록한 상품이 아님"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
-    })
-    @SecurityRequirement(name = "bearerAuth")
-    @PatchMapping("/{id}/auction-result")
-    public ResponseEntity<ApiResponse<ProductResponse>> resolveAuctionFailure(
-            Authentication authentication,
-            @PathVariable Long id,
-            @Valid @RequestBody ProductAuctionResultRequest request) {
-        Long sellerId = (Long) authentication.getPrincipal();
-        ProductResponse response = productService.resolveAuctionFailure(sellerId, id, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
