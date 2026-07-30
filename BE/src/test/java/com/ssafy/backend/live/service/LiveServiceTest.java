@@ -3,6 +3,7 @@ package com.ssafy.backend.live.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,6 +35,7 @@ class LiveServiceTest {
     private static final Long HOST_ID = 1L;
     private static final Long OTHER_MEMBER_ID = 2L;
     private static final Long LIVE_ID = 101L;
+    private static final List<Long> PRODUCT_IDS = List.of(2001L);
     private static final String TITLE = "빈티지 데님 라이브";
     private static final String THUMBNAIL_URL = "https://cdn.example.com/live/1.jpg";
 
@@ -67,13 +69,15 @@ class LiveServiceTest {
         when(liveRepository.save(any(Live.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         LiveResponse response =
-                liveService.scheduleLive(HOST_ID, new LiveScheduleRequest(TITLE, THUMBNAIL_URL, scheduledAt));
+                liveService.scheduleLive(HOST_ID, new LiveScheduleRequest(TITLE, THUMBNAIL_URL, scheduledAt, PRODUCT_IDS));
 
         assertThat(response.status()).isEqualTo(LiveStatus.SCHEDULED);
         assertThat(response.scheduledAt()).isEqualTo(scheduledAt);
         assertThat(response.startedAt()).isNull();
         assertThat(response.hostId()).isEqualTo(HOST_ID);
         assertThat(response.title()).isEqualTo(TITLE);
+        // 상품 편성은 개설과 같은 트랜잭션에서 함께 이뤄진다 — 빈 방이 만들어지면 안 된다.
+        verify(liveProductService).linkProductsOnCreate(eq(HOST_ID), any(Live.class), eq(PRODUCT_IDS));
     }
 
     @Test
@@ -83,12 +87,14 @@ class LiveServiceTest {
         when(host.getId()).thenReturn(HOST_ID);
         when(liveRepository.save(any(Live.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        LiveResponse response = liveService.openLiveNow(HOST_ID, new LiveInstantRequest(TITLE, THUMBNAIL_URL));
+        LiveResponse response = liveService.openLiveNow(HOST_ID, new LiveInstantRequest(TITLE, THUMBNAIL_URL, PRODUCT_IDS));
 
         assertThat(response.status()).isEqualTo(LiveStatus.LIVE);
         assertThat(response.scheduledAt()).isNull();
         // 시작 시각은 클라이언트 값이 아니라 서버 시각이어야 한다.
         assertThat(response.startedAt()).isBetween(개설_직전, LocalDateTime.now());
+        // 즉시 개설은 곧바로 진행 중이 되어 이후 편성을 못 바꾸므로, 개설 시 반드시 편성돼야 한다.
+        verify(liveProductService).linkProductsOnCreate(eq(HOST_ID), any(Live.class), eq(PRODUCT_IDS));
     }
 
     @Test
@@ -186,7 +192,7 @@ class LiveServiceTest {
     void 존재하지_않는_회원이_개설하면_예외가_발생한다() {
         when(memberRepository.findById(HOST_ID)).thenReturn(Optional.empty());
         LiveScheduleRequest request =
-                new LiveScheduleRequest(TITLE, THUMBNAIL_URL, LocalDateTime.now().plusDays(1));
+                new LiveScheduleRequest(TITLE, THUMBNAIL_URL, LocalDateTime.now().plusDays(1), PRODUCT_IDS);
 
         assertThatThrownBy(() -> liveService.scheduleLive(HOST_ID, request))
                 .isInstanceOf(CustomException.class);

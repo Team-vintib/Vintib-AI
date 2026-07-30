@@ -46,10 +46,16 @@ public record LiveDetailResponse(
         int peakViewerCount,
 
         @Schema(description = "편성된 상품 목록. 제외된 상품은 빠진다")
-        List<LiveProductResponse> products
+        List<LiveProductResponse> products,
+
+        @Schema(
+                description = "라이브 카테고리(대분류). **편성 상품에서 유도한 값이며 여러 개일 수 있다.** "
+                        + "아우터·하의를 함께 파는 방송은 두 카테고리 모두에 잡힌다")
+        List<LiveCategoryResponse> categories
 ) {
 
-    public static LiveDetailResponse of(Live live, List<LiveProductResponse> products) {
+    public static LiveDetailResponse of(
+            Live live, List<LiveProductResponse> products, List<LiveCategoryResponse> categories) {
         return new LiveDetailResponse(
                 live.getId(),
                 live.getHost().getId(),
@@ -61,6 +67,7 @@ public record LiveDetailResponse(
                 live.getStartedAt(),
                 live.getEndedAt(),
                 live.getPeakViewerCount(),
-                products);
+                products,
+                categories);
     }
 }

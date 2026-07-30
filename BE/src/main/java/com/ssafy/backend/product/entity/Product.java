@@ -50,7 +50,9 @@ public class Product extends BaseTimeEntity {
     @JoinColumn(name = "seller_id", nullable = false)
     private Member seller;
 
-    @Column(name = "category_id")
+    // 카테고리는 필수다. 미분류 상품은 검색·필터에서 누락되고, 라이브 카테고리(편성 상품에서
+    // 유도)도 만들 수 없다.
+    @Column(name = "category_id", nullable = false)
     private Long categoryId;
 
     @Column(name = "brand_id")

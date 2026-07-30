@@ -1,5 +1,8 @@
 package com.ssafy.backend.live.port;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -17,6 +20,30 @@ public interface ProductQueryPort {
     Optional<ProductSummary> findById(Long productId);
 
     /**
+     * 주어진 상품들이 속한 <b>대분류</b> 카테고리 집합. 중복은 제거되고 ID 오름차순으로 정렬된다.
+     *
+     * <p>상품은 소분류(자켓·스카프)에 달리지만 라이브 카드에 붙는 배지는 대분류(아우터·액세서리)다.
+     * 소분류를 그대로 노출하면 배지가 대여섯 개씩 붙어 읽히지 않는다. 그래서 여기서 부모로 올린다.
+     */
+    List<CategorySummary> findRootCategories(Collection<Long> productIds);
+
+    /**
+     * 상품 ID → 그 상품이 속한 대분류 카테고리 매핑.
+     *
+     * <p>목록 화면처럼 라이브 여러 건의 카테고리를 한 번에 구할 때 쓴다. 라이브마다
+     * {@link #findRootCategories}를 부르면 N+1이 된다.
+     */
+    Map<Long, CategorySummary> findRootCategoryByProductId(Collection<Long> productIds);
+
+    /**
+     * 주어진 카테고리에 속한 상품 ID 목록. <b>대분류를 주면 그 하위 소분류 상품까지 포함한다.</b>
+     *
+     * <p>목록 화면의 카테고리 필터가 쓴다 — 사용자가 '아우터'를 고르면 자켓·코트 상품을 건
+     * 라이브가 모두 나와야 하고, '스카프'를 고르면 스카프 상품을 건 라이브만 나와야 한다.
+     */
+    List<Long> findProductIdsInCategories(Collection<Long> categoryIds);
+
+    /**
      * 라이브가 상품에 대해 알아야 하는 최소 정보.
      *
      * @param id        상품 ID
@@ -24,5 +51,9 @@ public interface ProductQueryPort {
      * @param title     상품명 — 시청 화면·연결 목록 표시용
      */
     record ProductSummary(Long id, Long sellerId, String title) {
+    }
+
+    /** 카테고리 표시용 최소 정보. */
+    record CategorySummary(Long id, String name) {
     }
 }

@@ -3,9 +3,11 @@ package com.ssafy.backend.live.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 예약 라이브 개설(LIVE-001) 요청.
@@ -27,6 +29,13 @@ public record LiveScheduleRequest(
         @Schema(description = "방송 예정 시각. 반드시 미래여야 한다", example = "2026-08-01T20:00:00")
         @NotNull
         @Future
-        LocalDateTime scheduledAt
+        LocalDateTime scheduledAt,
+
+        @Schema(
+                description = "판매할 상품 ID 목록. **개설 시점에 정하며 최소 1개가 필요하다.** "
+                        + "미리 등록해 둔 본인 상품 중에서 고른다",
+                example = "[2001, 2002]")
+        @NotEmpty
+        List<Long> productIds
 ) {
 }

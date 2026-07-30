@@ -97,9 +97,24 @@ public class Live extends BaseTimeEntity {
         return memberId != null && host.getId().equals(memberId);
     }
 
-    /** 상품 편성을 바꿀 수 있는 상태인지. 종료·취소된 방송은 더 이상 손대지 않는다. */
+    /**
+     * 상품 편성을 바꿀 수 있는 상태인지.
+     *
+     * <p><b>방송이 시작되면 편성을 바꿀 수 없다</b>(운영 정책) — 시청자가 보고 있는 판매 목록이
+     * 도중에 바뀌면 안 되고, 라이브 카테고리도 편성에서 유도하므로 함께 흔들린다.
+     * 따라서 예약 상태에서만 허용한다. 즉시 개설 방송은 생성 시점에 이미 진행 중이라
+     * 개설 요청에 담아 보낸 편성이 그대로 확정된다.
+     */
     public boolean isOpenForEditing() {
-        return status == LiveStatus.SCHEDULED || status == LiveStatus.LIVE;
+        return status == LiveStatus.SCHEDULED;
+    }
+
+    /**
+     * 방송이 끝났는지(종료 또는 취소). 편성 변경과 달리 <b>경매 조건 설정처럼 방송 중에도
+     * 허용해야 하는 작업</b>은 이 판정을 쓴다 — 경매를 거는 것은 편성을 바꾸는 것이 아니다.
+     */
+    public boolean isClosed() {
+        return status == LiveStatus.ENDED || status == LiveStatus.CANCELED;
     }
 
     public boolean canTransitionTo(LiveStatus target) {

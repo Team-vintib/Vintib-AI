@@ -12,6 +12,7 @@ import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.SaleStatus;
+import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -32,11 +33,18 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
     private final ProductImageService productImageService;
+    private final CategoryRepository categoryRepository;
 
     @Transactional
     public ProductResponse createProduct(Long sellerId, ProductCreateRequest request) {
         Member seller = memberRepository.findById(sellerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // 카테고리는 필수이며 실제로 존재해야 한다. DTO의 @NotNull 은 "값이 있는지"만 보므로
+        // 없는 ID 를 그대로 넣으면 FK 위반이 500 으로 새어 나간다.
+        if (!categoryRepository.existsById(request.categoryId())) {
+            throw new CustomException(ErrorCode.CATEGORY_NOT_FOUND);
+        }
 
         Product product = Product.builder()
                 .seller(seller)
@@ -92,6 +100,12 @@ public class ProductService {
     @Transactional
     public ProductResponse updateProduct(Long sellerId, Long productId, ProductUpdateRequest request) {
         Product product = getOwnedEditableProduct(sellerId, productId);
+
+        // 등록과 같은 이유로 존재 여부를 본다 — product.category_id 에 FK 가 걸려 있어
+        // 없는 ID 를 그대로 넣으면 제약 위반이 500 으로 새어 나간다.
+        if (request.categoryId() != null && !categoryRepository.existsById(request.categoryId())) {
+            throw new CustomException(ErrorCode.CATEGORY_NOT_FOUND);
+        }
 
         product.update(
                 request.title(),

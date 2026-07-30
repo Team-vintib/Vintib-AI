@@ -95,6 +95,9 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 > `data-dictionary.md`와 `docs/db/img/`는 **자동 생성물이다.** 직접 고치지 말고 `bash docs/db/regen.sh` / `bash docs/db/export-erd.sh`로 다시 뽑는다.
 
 경매 동시성 정책(`LIVE-004`, `AUCT-004/006/008/009`)은 애플리케이션 검증뿐 아니라 **DB 제약으로도 막혀 있다.** 입찰 로직을 손볼 때는 [`erd.md` §4](./docs/db/erd.md)를 먼저 읽을 것 — 특히 포인트 보류 해제 순서를 잘못 잡으면 제약이 무력화된다.
+
+**`live` 테이블에는 카테고리 컬럼이 없다.** 라이브의 카테고리는 편성 상품(`live_product` → `product.category_id`)에서 유도해 대분류로 롤업한다. 같은 사실을 두 군데 저장하면 반드시 어긋나기 때문이다. 그 결과 **라이브 하나가 카테고리를 여러 개 가질 수 있고**(응답이 `categories[]`, 필터가 `categoryIds` 복수인 이유), 편성이 확정되는 시점 = 카테고리가 확정되는 시점이다. 그래서 개설 요청에 `productIds`가 필수이고 방송 시작 후에는 편성을 바꿀 수 없다.
+
 ### 1) 전부 컨테이너로 (권장 — EC2와 동일 구성)
 
 레포 루트에서:

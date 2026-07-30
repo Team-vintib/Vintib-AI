@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.global.exception.CustomException;
+import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
@@ -19,6 +21,7 @@ import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.entity.SaleType;
+import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +40,7 @@ import org.springframework.data.domain.Pageable;
 class ProductServiceTest {
 
     private static final Long SELLER_ID = 1L;
+    private static final Long CATEGORY_ID = 10L;
 
     @Mock
     private ProductRepository productRepository;
@@ -48,23 +52,28 @@ class ProductServiceTest {
     private ProductImageService productImageService;
 
     @Mock
+    private CategoryRepository categoryRepository;
+
+    @Mock
     private Member seller;
 
     private ProductService productService;
 
     @BeforeEach
     void setUp() {
-        productService = new ProductService(productRepository, memberRepository, productImageService);
+        productService =
+                new ProductService(productRepository, memberRepository, productImageService, categoryRepository);
     }
 
     @Test
     void 상품_기본_정보를_저장하면_saleType_없이_DRAFT_상태로_생성된다() {
         when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.of(seller));
         when(seller.getId()).thenReturn(SELLER_ID);
+        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request =
-                new ProductCreateRequest("빈티지 자켓", "설명", 1L, 2L, "A급", "M");
+                new ProductCreateRequest("빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M");
 
         ProductResponse response = productService.createProduct(SELLER_ID, request);
 
@@ -72,16 +81,34 @@ class ProductServiceTest {
         assertThat(response.saleType()).isNull();
         assertThat(response.sellerId()).isEqualTo(SELLER_ID);
         assertThat(response.title()).isEqualTo("빈티지 자켓");
+        assertThat(response.categoryId()).isEqualTo(CATEGORY_ID);
     }
 
     @Test
     void 존재하지_않는_판매자면_예외를_던진다() {
         when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.empty());
 
-        ProductCreateRequest request = new ProductCreateRequest("빈티지 자켓", null, null, null, null, null);
+        ProductCreateRequest request =
+                new ProductCreateRequest("빈티지 자켓", null, CATEGORY_ID, null, null, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 존재하지_않는_카테고리면_상품을_등록할_수_없다() {
+        // @NotNull 은 "값이 있는지"만 본다. 없는 ID 를 그대로 넣으면 FK 위반이 500 으로 새어 나가므로
+        // 서비스에서 존재를 확인한다.
+        when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.of(seller));
+        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(false);
+
+        ProductCreateRequest request =
+                new ProductCreateRequest("빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M");
+
+        assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CATEGORY_NOT_FOUND);
+        verify(productRepository, never()).save(any());
     }
 
     @Test
@@ -293,5 +320,20 @@ class ProductServiceTest {
 
         assertThatThrownBy(() -> productService.deleteProduct(SELLER_ID, 1L))
                 .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 존재하지_않는_카테고리로는_수정할_수_없다() {
+        // 등록과 같은 규칙이다 — category_id 에 FK 가 걸려 있어 그냥 통과시키면 500 이 된다.
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).categoryId(CATEGORY_ID).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(false);
+
+        ProductUpdateRequest request = new ProductUpdateRequest(null, null, CATEGORY_ID, null, null, null);
+
+        assertThatThrownBy(() -> productService.updateProduct(SELLER_ID, 1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CATEGORY_NOT_FOUND);
     }
 }
