@@ -16,7 +16,7 @@ SAM 3D Objects 를 "의류 단독" 3D 재구성으로 특화 파인튜닝하고,
 ## 시작하기
 
 ```bash
-cd AI/validation/sam3d-garment-finetune-check
+cd AI/validation/TRYON/sam3d-garment-finetune-check
 
 python -m venv .venv && .venv/Scripts/activate    # Windows
 # source .venv/bin/activate                        # macOS/Linux
@@ -43,9 +43,9 @@ python -m garment3d.cli --config configs/default.yaml --work-dir artifacts/work 
 lint 는 **AI 루트 설정(`AI/pyproject.toml`)을 따른다** — 리포 규칙과 어긋나지 않게:
 
 ```bash
-cd ../..            # AI/
-python -m ruff check validation/sam3d-garment-finetune-check
-python -m black --check validation/sam3d-garment-finetune-check
+cd ../../..         # AI/
+python -m ruff check validation/TRYON/sam3d-garment-finetune-check
+python -m black --check validation/TRYON/sam3d-garment-finetune-check
 ```
 
 ## 선결 조사 결과 (요약 — 전문은 `REPORT.md`)
