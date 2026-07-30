@@ -1,42 +1,98 @@
-# BE 요청 문서 인덱스
+# 012 BE 요청 문서 인덱스
 
-## 요청 파트 / 대상 파트
+## 1. 요청 개요
 
-- 요청: FE
-- 대상: BE
+- 요청 파트: FE
+- 대상 파트: BE
+- 요청 목적: 2026-07-31 기준 FE 화면/흐름과 BE controller를 대조한 요청 문서 목록을 한 곳에서 추적한다.
+- 우선순위: P0
+- 시연 필수 여부: 각 도메인 문서 기준을 따른다.
 
-## 목적
+## 2. 현재 연동 상태
 
-2026-07-31 기준 BE 최신 구현을 확인한 뒤, FE API 연동에 필요한 요청 문서를 도메인별로 정리한다. 실제 구현이 확인된 항목은 FE adapter에서 바로 사용할 수 있고, 미구현/부족 항목은 각 요청 문서 기준으로 BE 보완을 요청한다.
+- 연동 완료 API
+  - Auth: `/api/auth/email/check-duplicate`, `/api/auth/email/send-code`, `/api/auth/email/verify-code`, `/api/auth/signup`, `/api/auth/signin`, `/api/auth/reissue`, `/api/auth/logout`
+  - Home: `/api/home`, `/api/home/following`
+  - Product: `/api/brands`, `/api/categories`, `/api/products`, `/api/products/{id}`, `/api/products/{id}/status`, `/api/products/{id}/auction-schedule`, `/api/products/{id}/images/upload-url`, `/api/products/{id}/images`, `/api/users/{userId}/wishes`
+  - Live: `/api/lives`, `/api/lives/schedule`, `/api/lives/{liveId}`
+  - Chat/STOMP: `/api/lives/{liveId}/chat-messages`, `/ws`, `/topic/lives/{liveId}/chat`, `/topic/lives/{liveId}/reactions`, `/topic/lives/{liveId}/viewers`
+- FE 구현 완료 범위
+  - Auth, Home, Product 일부, Live 일부, Chat realtime 일부는 실제 API 연결 완료
+  - Onboarding, Business, Search, Auction, Commerce, MyPage는 mock 또는 미구현 범위가 남아 있음
+- 현재 임시 처리 또는 Mock 사용 여부
+  - Onboarding: mock-success fallback
+  - Business: mock `PENDING` fallback
+  - Search: mock data 기반 화면
+  - Auction: mock snapshot
+  - Commerce/Wallet, MyPage: FE 화면 없음
 
-## 문서 목록
+## 3. 추가 구현 요청
 
-| 번호 | 문서 | 도메인 | 상태 |
-| --- | --- | --- | --- |
-| 001 | `001-auth-contract.md` | 인증 | 이메일 auth 구현됨, SSO와 `GET /api/me` 필요 |
-| 002 | `002-onboarding-contract.md` | 온보딩 | `/api/me/**` 온보딩 API 미구현 |
-| 003 | `003-business-contract.md` | 사업자 인증 | 미구현 |
-| 004 | `004-home-contract.md` | 홈 | 대부분 구현됨, `hostId` 등 일부 보강 필요 |
-| 005 | `005-search-contract.md` | 검색 | 미구현 |
-| 006 | `006-product-contract.md` | 상품 | 기본 API 구현됨, 목록/상세 필드와 query 보강 필요 |
-| 007 | `007-live-tryon-contract.md` | 라이브/AI 시착 | 라이브 기본 구현됨, 영상/경매 진행/시착 생성 보강 필요 |
-| 008 | `008-social-notification-contract.md` | 소셜/알림 | 찜/알림 일부 구현됨, 팔로우와 액션 상태 보강 필요 |
-| 009 | `009-auction-chat-contract.md` | 경매/채팅 | 채팅/반응 일부 구현됨, 경매 진행 계약 필요 |
-| 010 | `010-commerce-wallet-contract.md` | 주문/배송/환불/포인트 | 미구현 |
-| 011 | `011-user-mypage-contract.md` | 회원/마이페이지 | 미구현 |
+### 3.1 도메인별 요청 문서 확인
 
-## FE 우선 연동 가능 순서
+- Method / Endpoint: 해당 없음
+- 요청 목적: BE 구현 시 도메인별 상세 요청 문서를 기준으로 우선순위와 필드를 확인한다.
+- FE 사용처: FE-BE 계약 추적
+- 요청 데이터: 없음
+- 응답 데이터: 없음
+- 응답 예시: 없음
 
-1. Auth 이메일 로그인/회원가입
-2. Home
-3. Product master/등록/이미지/상세 일부
-4. Wish
-5. Live 목록/상세 일부
-6. Notification 목록/읽음
-7. Chat 이력/STOMP
+| 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
+| --- | --- | --- | --- | --- |
+| 001 | `001-auth-contract.md` | Auth | 이메일 auth API 연결 완료 | `GET /api/me`, auth 응답 `user/nextStep`, SSAFY SSO |
+| 002 | `002-onboarding-contract.md` | Onboarding | FE 화면 있음, mock fallback | `/api/me/onboarding`, `/api/me/interests`, `/api/me/tryon`, complete |
+| 003 | `003-business-contract.md` | Business | FE 화면/API adapter 있음, mock fallback | 사업자 인증 제출/조회 |
+| 004 | `004-home-contract.md` | Home | 홈/팔로잉 홈 연결 완료 | live card `hostId`, 정렬/노출 정책 문서화 |
+| 005 | `005-search-contract.md` | Search | FE 화면/adapter 있음, BE `/api/search` 없음 | 통합 검색 API |
+| 006 | `006-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | 목록 필터 query 구현, 상세 응답 보강, AI 분석/가격 추천 |
+| 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성 연결 완료 | 생성용 상품 조회, 영상 token, AI 시착 생성, `/api/me/tryon` |
+| 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜 연결 완료 | 팔로우 API, 알림 type/ref 문서화 |
+| 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수 연결 완료 | 경매 snapshot/start/bid/close/STOMP |
+| 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | FE 화면 없음, BE controller 없음 | 주문/배송/환불/포인트 전체 |
+| 011 | `011-user-mypage-contract.md` | User/MyPage | FE 화면 없음, BE API 없음 | `/api/me`, 공개 프로필, 마이페이지 요약 |
 
-## 공통 주의
+## 4. 기존 API 변경 요청
 
-- BE `PageResponse<T>`는 `content/page/size/totalElements/totalPages/hasNext` 구조다. FE 공통 타입의 `items/meta`로 adapter 변환이 필요하다.
-- FE axios `baseURL`은 `/api`이므로 FE API 함수에서는 `/auth/...`, `/home`처럼 `/api`를 제외하고 호출한다.
-- 비회원 요청에서 사용자별 상태(`isWished`, `isFollowing`)가 `false`인지 `null`인지 endpoint별 문서화가 필요하다.
+- 기존 요청·응답에서 변경할 내용
+  - 세부 내용은 각 도메인 문서의 4번 섹션을 따른다.
+- 추가할 필드
+  - Auth: `user`, `nextStep`
+  - Home: live card `hostId`
+  - Product: 목록 필터 반영, 상세 응답 보강
+  - Social/Notification: 알림 `type/refType/refId` 문서화
+- 변경 영향 범위
+  - route guard
+  - 홈/상품/라이브 카드 이동
+  - 검색/상품 필터
+  - 알림 클릭 이동
+
+## 5. 보류 또는 시연 제외 범위
+
+- 현재 구현하지 않아도 되는 기능
+  - FE 화면이 없는 Commerce/Wallet 전체
+  - FE 화면이 없는 MyPage/공개 프로필
+  - 상품 수정/삭제/이미지 수정/삭제 API 연결
+  - 라이브 상품 관리 UI
+  - 찜 목록/알림 목록 UI
+- 추후 구현 예정 기능
+  - 각 도메인 문서의 5번 섹션을 따른다.
+
+## 6. 협의 필요 사항
+
+- FE·BE 간 결정이 필요한 내용
+  - FE axios `baseURL`은 `/api`이므로 FE API 함수에서는 `/auth/...`, `/home`처럼 `/api`를 제외하고 호출한다.
+  - BE `PageResponse<T>`는 `content/page/size/totalElements/totalPages/hasNext` 구조다. FE adapter에서 `items/meta`로 변환한다.
+  - 비회원 요청에서 `isWished`, `isFollowing`을 `false`로 줄지 `null`로 줄지 endpoint별 문서화가 필요하다.
+  - FE 화면이 없는 API는 임의로 UI를 새로 만들지 않고 FE 설계 후 연결한다.
+- 아직 확정되지 않은 응답 구조나 정책
+  - 각 도메인 문서의 6번 섹션을 따른다.
+
+## 7. 추가 요청 없음
+
+- 이미 정상 연동된 API
+  - Auth 기본 이메일 인증/로그인/토큰/로그아웃
+  - Home 현재 화면 렌더링
+  - Chat/Reaction/Viewer realtime
+  - Product 등록 기본 흐름과 찜 토글
+- 기존 규격을 유지하면 되는 기능
+  - BE에는 있지만 FE 화면/진입점이 없어 아직 미연결인 API는 각 도메인 화면 설계 후 연결한다.

@@ -1,121 +1,175 @@
-# 경매/채팅 실시간 API 계약 보완 요청
+# 009 Auction/Chat API 요청
 
-## 요청 파트 / 대상 파트
+## 1. 요청 개요
 
-- 요청: FE
-- 대상: BE
+- 요청 파트: FE
+- 대상 파트: BE
+- 요청 목적: 라이브 채팅/반응/시청자 수 연동 상태와 경매 진행 API 및 STOMP 계약 요청을 정리한다.
+- 우선순위: P0
+- 시연 필수 여부: 채팅/반응/시청자 수는 현재 시연 가능. 경매 패널 시연 시 경매 API가 필수.
 
-## 배경/이유
+## 2. 현재 연동 상태
 
-라이브 시청 화면에는 채팅, 반응, 경매 패널이 함께 표시된다. 현재 BE는 채팅 이력, 채팅 STOMP, 반응 STOMP, 경매 조건 설정까지만 구현되어 있어 실제 입찰/낙찰/경매 상태 동기화는 FE mock을 유지해야 한다.
+- 연동 완료 API/topic
+  - `GET /api/lives/{liveId}/chat-messages`
+  - WebSocket `/ws`
+  - publish `/app/lives/{liveId}/chat`
+  - subscribe `/topic/lives/{liveId}/chat`
+  - publish `/app/lives/{liveId}/reactions`
+  - subscribe `/topic/lives/{liveId}/reactions`
+  - subscribe `/topic/lives/{liveId}/viewers`
+- FE 구현 완료 범위
+  - 채팅 내역 표시
+  - 채팅 발송
+  - 반응 발송/표시
+  - 시청자 수 표시
+  - 경매 패널 UI
+- 현재 임시 처리 또는 Mock 사용 여부
+  - 경매 snapshot과 입찰 진행은 mock snapshot 기반으로 표시 중이다.
+  - 경매 시작/입찰/종료 STOMP 이벤트는 실제 계약이 필요하다.
 
-## 현재 BE에서 사용할 수 있는 계약
+## 3. 추가 구현 요청
 
-| 기능 | Method/Protocol | Endpoint/Destination | 현재 BE 상태 |
-| --- | --- | --- | --- |
-| 채팅 이력 조회 | `GET` | `/api/lives/{liveId}/chat-messages` | 구현됨 |
-| 채팅 발행 | STOMP publish | `/app/lives/{liveId}/chat` | 구현됨 |
-| 채팅 구독 | STOMP subscribe | `/topic/lives/{liveId}/chat` | 구현됨 |
-| 반응 발행 | STOMP publish | `/app/lives/{liveId}/reactions` | 구현됨 |
-| 반응 구독 | STOMP subscribe | `/topic/lives/{liveId}/reactions` | 구현됨 |
-| 시청자 수 구독 | STOMP subscribe | `/topic/lives/{liveId}/viewers` | DTO 존재 |
-| 경매 조건 설정 | `POST` | `/api/lives/{liveId}/auctions` | 구현됨 |
+### 3.1 경매 snapshot
 
-## 추가 구현 요청
-
-### 1. 경매 snapshot 조회
-
-라이브 진입 시 현재 경매 상태를 초기화할 수 있어야 한다.
-
-```http
-GET /api/lives/{liveId}/auctions/current
-GET /api/auctions/{auctionId}
-```
-
-응답 후보:
+- Method / Endpoint: `GET /api/lives/{liveId}/auctions/current`
+- 요청 목적: 라이브 진입 시 현재 진행 중이거나 준비 중인 경매 상태를 초기화한다.
+- FE 사용처: 라이브 경매 패널
+- 요청 데이터
+  - Path: `liveId`
+- 응답 데이터
+  - `auctionId`: number
+  - `liveId`: number
+  - `productId`: number
+  - `productTitle`: string
+  - `status`: `READY` | `IN_PROGRESS` | `ENDED`
+  - `startPrice`: number
+  - `bidUnit`: number
+  - `currentPrice`: number
+  - `highestBidderId`: number | null
+  - `highestBidderNickname`: string | null
+  - `bidCount`: number
+  - `startedAt`: string(datetime) | null
+  - `endsAt`: string(datetime) | null
+  - `serverNow`: string(datetime)
+- 응답 예시
 
 ```json
 {
-  "auctionId": 301,
-  "liveId": 101,
-  "productId": 2001,
-  "productTitle": "리바이스 501 빈티지",
-  "status": "READY",
-  "startPrice": 10000,
-  "bidUnit": 1000,
-  "currentPrice": 0,
-  "highestBidderId": null,
-  "highestBidderNickname": null,
-  "startedAt": null,
-  "endsAt": null,
-  "serverNow": "2026-07-31T01:30:00"
+  "success": true,
+  "data": {
+    "auctionId": 1,
+    "liveId": 1,
+    "productId": 10,
+    "productTitle": "빈티지 자켓",
+    "status": "IN_PROGRESS",
+    "startPrice": 30000,
+    "bidUnit": 3000,
+    "currentPrice": 45000,
+    "highestBidderId": 7,
+    "highestBidderNickname": "buyer",
+    "bidCount": 5,
+    "startedAt": "2026-07-31T12:00:00",
+    "endsAt": "2026-07-31T12:05:00",
+    "serverNow": "2026-07-31T12:03:00"
+  },
+  "error": null
 }
 ```
 
-### 2. 경매 시작/종료/입찰 API
+### 3.2 경매 진행 API
 
-요청 endpoint 후보:
+- Method / Endpoint
+  - `POST /api/auctions/{auctionId}/start`
+  - `POST /api/auctions/{auctionId}/bids`
+  - `POST /api/auctions/{auctionId}/close`
+  - `GET /api/auctions/{auctionId}/bids`
+  - `GET /api/auctions/{auctionId}/winner`
+- 요청 목적: 호스트 경매 진행, 사용자 입찰, 입찰 내역/낙찰 결과 조회를 처리한다.
+- FE 사용처: 라이브 경매 패널
+- 요청 데이터
+  - 입찰: `{ "amount": number }`
+- 응답 데이터: 경매 snapshot 또는 bid result
+- 응답 예시
 
-```http
-POST /api/auctions/{auctionId}/start
-POST /api/auctions/{auctionId}/bids
-POST /api/auctions/{auctionId}/close
-GET /api/auctions/{auctionId}/bids
-GET /api/auctions/{auctionId}/winner
+```json
+{
+  "success": true,
+  "data": {
+    "auctionId": 1,
+    "bidId": 10,
+    "amount": 48000,
+    "bidderId": 7,
+    "bidderNickname": "buyer",
+    "createdAt": "2026-07-31T12:03:30"
+  },
+  "error": null
+}
 ```
 
-요청 사항:
+### 3.3 경매 STOMP topic
 
-- 입찰 요청 body와 응답을 확정한다.
-- 최고 입찰자 본인 재입찰 허용 여부를 확정한다.
-- 입찰 단위 미달, 경매 종료, 포인트 부족, 본인 상품 입찰 등 오류 코드를 문서화한다.
-- 서버 시간을 기준으로 남은 시간을 계산할 수 있도록 `serverNow`, `endsAt`을 제공한다.
-
-### 3. 경매 STOMP topic
-
-입찰과 상태 변경을 모든 시청자에게 동기화해야 한다.
-
-후보:
-
-```text
-/topic/lives/{liveId}/auctions
-/topic/auctions/{auctionId}
-/user/queue/errors
-```
-
-payload 후보:
+- Method / Endpoint
+  - subscribe `/topic/lives/{liveId}/auctions`
+  - subscribe `/topic/auctions/{auctionId}`
+- 요청 목적: 경매 시작/입찰/종료 이벤트를 실시간 반영한다.
+- FE 사용처: 라이브 경매 패널
+- 요청 데이터: 없음
+- 응답 데이터
+  - `type`: `AUCTION_STARTED` | `BID_PLACED` | `AUCTION_CLOSED`
+  - `auction`: snapshot
+- 응답 예시
 
 ```json
 {
   "type": "BID_PLACED",
-  "auctionId": 301,
-  "productId": 2001,
-  "status": "IN_PROGRESS",
-  "currentPrice": 53000,
-  "highestBidderId": 7,
-  "highestBidderNickname": "vintagebuyer",
-  "bidCount": 12,
-  "endsAt": "2026-07-31T01:35:00",
-  "serverNow": "2026-07-31T01:34:11"
+  "auction": {
+    "auctionId": 1,
+    "currentPrice": 48000,
+    "highestBidderId": 7,
+    "bidCount": 6,
+    "serverNow": "2026-07-31T12:03:30"
+  }
 }
 ```
 
-### 4. 채팅/반응 오류 payload 문서화
+## 4. 기존 API 변경 요청
 
-STOMP 실패가 `/user/queue/errors`로 내려가는 구조는 확인되었다. FE가 메시지를 표시할 수 있도록 오류 payload 필드를 문서화해 달라.
+- 기존 요청·응답에서 변경할 내용
+  - 채팅/반응/시청자 수는 현재 연결되어 있어 변경 요청 없음
+- 추가할 필드
+  - 없음
+- 변경 영향 범위
+  - 없음
 
-요청 필드:
+## 5. 보류 또는 시연 제외 범위
 
-- `code`
-- `message`
-- `destination`
-- `clientMessageId`
-- `timestamp`
+- 현재 구현하지 않아도 되는 기능
+  - 경매 시연이 없으면 경매 API/topic은 보류 가능
+  - 낙찰 후 주문 생성 연동은 Commerce 범위로 보류 가능
+- 추후 구현 예정 기능
+  - 경매 예약/상품 큐 관리
+  - 경매 입찰 내역 상세 모달
+  - 낙찰자 결제 유도
 
-## FE 관련 파일
+## 6. 협의 필요 사항
 
-- `FE/src/domains/live/pages/LiveWatchPage.vue`
-- `FE/src/domains/chat/components/LiveChatOverlay.vue`
-- `FE/src/domains/auction/components/LiveAuctionPanel.vue`
-- `FE/src/domains/auction/types/liveAuction.types.ts`
-- `FE/src/domains/live/api/liveWatchApi.ts`
+- FE·BE 간 결정이 필요한 내용
+  - 경매 topic을 live 기준으로 통일할지 auction 기준 topic도 제공할지
+  - `serverNow` 포함 여부
+  - 자동 종료 시점과 연장 입찰 정책
+  - 최고 입찰자가 본인일 때 재입찰 허용 여부
+- 아직 확정되지 않은 응답 구조나 정책
+  - bid error code
+  - 경매 상태 enum
+  - 종료/낙찰 이벤트 payload
+
+## 7. 추가 요청 없음
+
+- 이미 정상 연동된 API
+  - 채팅 내역
+  - 채팅 STOMP
+  - 반응 STOMP
+  - 시청자 수 STOMP
+- 기존 규격을 유지하면 되는 기능
+  - 채팅/반응/시청자 수 연결

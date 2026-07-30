@@ -1,82 +1,169 @@
-# 소셜/알림 도메인 API 계약 보완 요청
+# 008 Social/Notification API 요청
 
-## 요청 파트 / 대상 파트
+## 1. 요청 개요
 
-- 요청: FE
-- 대상: BE
+- 요청 파트: FE
+- 대상 파트: BE
+- 요청 목적: 찜, 팔로우, 알림 API의 FE 연동 상태와 남은 계약 요청을 정리한다.
+- 우선순위: P1
+- 시연 필수 여부: 상품 상세 찜은 현재 시연 가능. 팔로우/알림 화면을 시연하면 추가 구현 필요.
 
-## 배경/이유
+## 2. 현재 연동 상태
 
-FE 검색, 상품 상세, 마이페이지, 알림 화면에서 팔로우/찜/알림 상태가 필요하다. 현재 BE에는 찜과 알림 일부 API가 구현되어 있지만 팔로우 API와 공개 목록 응답의 사용자 액션 상태가 부족하다.
+- 연동 완료 API
+  - `POST /api/users/{userId}/wishes`
+  - `DELETE /api/users/{userId}/wishes/{productId}`
+- FE 구현 완료 범위
+  - 상품 상세 찜 추가/해제
+  - 상품 목록/검색/상세에서 `isWished` 표시 후보
+- 현재 임시 처리 또는 Mock 사용 여부
+  - 팔로우/언팔로우 화면 연결은 아직 없다.
+  - 알림 목록 화면은 route만 있고 실제 UI/연동은 제한적이다.
 
-## 현재 BE에서 사용할 수 있는 계약
+## 3. 추가 구현 요청
 
-| 기능 | Method | Endpoint | 인증 | 현재 BE 상태 |
-| --- | --- | --- | --- | --- |
-| 상품 찜 등록 | `POST` | `/api/users/{userId}/wishes` | 필요 | 구현됨 |
-| 상품 찜 해제 | `DELETE` | `/api/users/{userId}/wishes/{productId}` | 필요 | 구현됨 |
-| 상품 찜 목록 | `GET` | `/api/users/{userId}/wishes` | 필요 | 구현됨 |
-| 알림 목록 | `GET` | `/api/users/{userId}/alerts` | 필요 | 구현됨 |
-| 알림 단건 읽음 | `PATCH` | `/api/users/{userId}/alerts/{id}` | 필요 | 구현됨 |
-| 알림 전체 읽음 | `PATCH` | `/api/users/{userId}/alerts/read-all` | 필요 | 구현됨 |
+### 3.1 팔로우/언팔로우
 
-공통 주의:
+- Method / Endpoint
+  - `POST /api/users/{targetUserId}/followers`
+  - `DELETE /api/users/{targetUserId}/followers`
+- 요청 목적: 공개 프로필/검색 결과에서 사용자를 팔로우하거나 해제한다.
+- FE 사용처: 검색 회원 카드, 공개 프로필, 판매자 영역
+- 요청 데이터
+  - Header: `Authorization: Bearer {accessToken}`
+  - Path: `targetUserId`
+- 응답 데이터
+  - `targetUserId`: number
+  - `isFollowing`: boolean
+  - `followerCount`: number
+- 응답 예시
 
-- `{userId}`는 인증 사용자 ID와 같아야 하며 다르면 403을 반환한다.
-- 목록 응답은 BE `PageResponse<T>` 구조다.
-- 찜 해제 path의 `{productId}`는 찜 row ID가 아니라 상품 ID다.
-
-## 추가 구현 요청
-
-### 1. 팔로우/언팔로우 API
-
-FE 검색 결과와 판매자 카드에서 회원 팔로우 상태를 표시하고 토글해야 한다.
-
-요청 endpoint 후보:
-
-```http
-POST /api/users/{targetUserId}/followers
-DELETE /api/users/{targetUserId}/followers
-GET /api/users/{userId}/followers
-GET /api/users/{userId}/followings
+```json
+{
+  "success": true,
+  "data": {
+    "targetUserId": 10,
+    "isFollowing": true,
+    "followerCount": 124
+  },
+  "error": null
+}
 ```
 
-요청 사항:
+### 3.2 팔로워/팔로잉 목록
 
-- 인증 사용자와 대상 사용자 관계로 팔로우를 생성/해제한다.
-- 자기 자신 팔로우 가능 여부와 오류 코드를 확정한다.
-- 중복 팔로우/미팔로우 해제 요청의 HTTP status와 오류 코드를 확정한다.
-- 목록 응답에 `id`, `nickname`, `profileImageUrl`, `followerCount`, `productCount`, `isFollowing`을 포함한다.
+- Method / Endpoint
+  - `GET /api/users/{userId}/followers`
+  - `GET /api/users/{userId}/followings`
+- 요청 목적: 공개 프로필 또는 마이페이지에서 팔로워/팔로잉 목록을 표시한다.
+- FE 사용처: 공개 프로필, 마이페이지
+- 요청 데이터
+  - Path: `userId`
+  - Query: `page`, `size`
+- 응답 데이터
+  - `id`: number
+  - `nickname`: string
+  - `profileImageUrl`: string | null
+  - `followerCount`: number
+  - `productCount`: number
+  - `isFollowing`: boolean
+- 응답 예시
 
-### 2. 공개 목록/검색 응답의 사용자 액션 상태
+```json
+{
+  "success": true,
+  "data": {
+    "content": [
+      {
+        "id": 10,
+        "nickname": "seller",
+        "profileImageUrl": null,
+        "followerCount": 124,
+        "productCount": 8,
+        "isFollowing": true
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1,
+    "hasNext": false
+  },
+  "error": null
+}
+```
 
-상품 목록, 상품 상세, 홈, 검색 결과에서 FE가 별도 찜 목록을 매번 조합하지 않도록 다음 필드를 응답에 포함해 달라.
+### 3.3 알림 type/ref 문서화
 
-| 응답 | 요청 필드 |
-| --- | --- |
-| 상품 카드/상세 | `isWished` |
-| 회원 카드 | `isFollowing` |
-| 판매자 요약 | `followerCount`, `productCount` |
+- Method / Endpoint
+  - `GET /api/users/{userId}/alerts`
+  - `PATCH /api/users/{userId}/alerts/read-all`
+  - `PATCH /api/users/{userId}/alerts/{id}`
+- 요청 목적: 알림 목록에서 아이콘, 문구, 이동 대상을 안정적으로 분기한다.
+- FE 사용처: 알림센터
+- 요청 데이터
+  - Header: `Authorization: Bearer {accessToken}`
+- 응답 데이터
+  - `id`, `type`, `title`, `message`, `isRead`, `refType`, `refId`, `createdAt`
+- 응답 예시
 
-비회원 요청 정책:
+```json
+{
+  "success": true,
+  "data": {
+    "content": [
+      {
+        "id": 1,
+        "type": "BID_OUTBID",
+        "title": "상위 입찰이 발생했습니다",
+        "message": "다른 사용자가 더 높은 금액으로 입찰했습니다.",
+        "isRead": false,
+        "refType": "AUCTION",
+        "refId": 1,
+        "createdAt": "2026-07-31T12:00:00"
+      }
+    ]
+  },
+  "error": null
+}
+```
 
-- `isWished`와 `isFollowing`을 `false`로 줄지 `null`로 줄지 endpoint별로 문서화한다.
-- FE는 `null`이면 비로그인/확인 불가 상태로 처리한다.
+## 4. 기존 API 변경 요청
 
-### 3. 알림 생성 이벤트와 ref 이동 계약
+- 기존 요청·응답에서 변경할 내용
+  - `DELETE /api/users/{userId}/wishes/{productId}`에서 path id가 wish row id인지 product id인지 문서화 요청
+- 추가할 필드
+  - 알림 item의 `refType`, `refId` enum 문서화
+- 변경 영향 범위
+  - 찜 해제 API adapter
+  - 알림 클릭 이동
 
-현재 알림 조회/읽음 API는 있으나, 어떤 이벤트가 어떤 `type`, `refType`, `refId`로 생성되는지 FE가 알 수 없다.
+## 5. 보류 또는 시연 제외 범위
 
-요청:
+- 현재 구현하지 않아도 되는 기능
+  - 팔로우/언팔로우 UI가 시연 범위가 아니면 보류 가능
+  - 알림센터 화면을 시연하지 않으면 알림 목록/읽음 연결 보류 가능
+- 추후 구현 예정 기능
+  - 찜 목록 화면
+  - 팔로워/팔로잉 목록 화면
+  - 알림 실시간 push
 
-- 알림 `type` enum 전체 목록을 문서화한다. 예: `AUCTION_WON`, `BID_OUTBID`, `ORDER_CREATED`, `SHIPMENT_STARTED`, `LIVE_STARTED`.
-- `refType`별 FE 이동 경로를 확정할 수 있도록 `refType` enum과 `refId` 의미를 문서화한다.
-- 알림 보관 기간, 읽음 처리 후 목록 유지 여부, `unreadOnly=true`의 정렬 정책을 명시한다.
+## 6. 협의 필요 사항
 
-## FE 관련 파일
+- FE·BE 간 결정이 필요한 내용
+  - wish delete path의 `{productId}` 의미 확정
+  - 비회원 요청에서 `isWished`, `isFollowing`을 `false` 또는 `null` 중 무엇으로 줄지
+  - 알림 `type`, `refType` enum 목록
+- 아직 확정되지 않은 응답 구조나 정책
+  - 팔로우 중복 요청 처리
+  - 자기 자신 팔로우 요청 처리
+  - 알림 읽음 처리 응답 body
 
-- `FE/src/domains/product/api/productApi.ts`
-- `FE/src/domains/search/pages/SearchResultsPage.vue`
-- `FE/src/domains/home/api/homeViewApi.ts`
-- `FE/docs/frontend/api/api-index.md`
-- `FE/docs/frontend/decisions/open-questions.md`
+## 7. 추가 요청 없음
+
+- 이미 정상 연동된 API
+  - 상품 상세 찜 추가
+  - 상품 상세 찜 해제
+- 기존 규격을 유지하면 되는 기능
+  - 찜 목록 API endpoint 자체는 BE에 있으나 FE 화면이 없어 미연결
+  - 알림 목록/읽음 API endpoint 자체는 BE에 있으나 FE 화면 정비 후 연결

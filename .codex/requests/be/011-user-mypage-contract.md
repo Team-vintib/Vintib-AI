@@ -1,146 +1,193 @@
-# 회원/마이페이지 API 계약 요청
+# 011 User/MyPage API 요청
 
-## 요청 파트 / 대상 파트
+## 1. 요청 개요
 
-- 요청: FE
-- 대상: BE
+- 요청 파트: FE
+- 대상 파트: BE
+- 요청 목적: 내 정보, 공개 프로필, 마이페이지 요약 API 계약을 정리한다.
+- 우선순위: P1
+- 시연 필수 여부: 마이페이지/공개 프로필 화면이 없어 현재 시연 필수 아님. Auth guard 안정화 목적의 `GET /api/me`는 P0 Auth 요청과 중복된다.
 
-## 배경/이유
+## 2. 현재 연동 상태
 
-FE 인증, 온보딩, 마이페이지, 판매자 프로필 화면에서 현재 로그인 사용자 정보와 공개 회원 정보를 조회해야 한다. 현재 BE에는 `Member` 엔티티와 인증은 있으나 `/api/me`, 회원 상세, 프로필 이미지, 판매자 요약, 마이페이지 집계 API가 없다.
+- 연동 완료 API: 없음
+- FE 구현 완료 범위
+  - `domains/my` 마이페이지 화면 없음
+  - 공개 프로필 상세 화면 없음
+  - auth route guard는 현재 `authStore.user`의 최소 정보만 사용
+- 현재 임시 처리 또는 Mock 사용 여부
+  - `GET /api/me`가 없어 Auth에서는 JWT payload와 로그인/재발급 응답에 의존한다.
+  - 마이페이지/공개 프로필은 화면 설계 후 연결해야 한다.
 
-## 현재 BE 구현 확인
+## 3. 추가 구현 요청
 
-- `/api/me` 없음
-- `/api/users/{id}` 회원 상세 없음
-- `/api/users/{id}/business` 없음
-- 팔로워/팔로잉 API 없음
-- 마이페이지 요약/판매자 프로필 API 없음
+### 3.1 내 정보 조회
 
-## 요청 API
-
-### 1. 내 정보 조회
-
-```http
-GET /api/me
-Authorization: Bearer {accessToken}
-```
-
-응답 최소 필드:
-
-```json
-{
-  "id": 1,
-  "email": "user@example.com",
-  "name": "홍길동",
-  "nickname": "vintagelover",
-  "phoneNumber": "010-1234-5678",
-  "profileImageUrl": null,
-  "memberType": "GENERAL",
-  "onboardingCompleted": true
-}
-```
-
-요청 사항:
-
-- FE 앱 시작 시 저장된 token의 유효성을 확인할 수 있도록 access token 기반 조회를 제공한다.
-- 로그인 응답에 `user/nextStep`을 넣지 않는다면 `/api/me`는 필수다.
-- `memberType` enum을 확정한다. 후보: `GENERAL`, `BUSINESS`.
-
-### 2. 내 정보 수정
-
-```http
-PATCH /api/me
-Authorization: Bearer {accessToken}
-Content-Type: application/json
-```
-
-요청 후보:
+- Method / Endpoint: `GET /api/me`
+- 요청 목적: 현재 로그인 사용자의 최신 정보를 조회한다.
+- FE 사용처: auth route guard, 마이페이지, 온보딩 완료 여부 확인, 사업자 인증 상태 확인, 사용자별 API path의 `userId` 결정
+- 요청 데이터
+  - Header: `Authorization: Bearer {accessToken}`
+- 응답 데이터
+  - `id`: number
+  - `email`: string
+  - `name`: string
+  - `nickname`: string | null
+  - `phoneNumber`: string | null
+  - `postalCode`: string | null
+  - `address`: string | null
+  - `detailAddress`: string | null
+  - `profileImageUrl`: string | null
+  - `memberType`: `GENERAL` | `BUSINESS`
+  - `onboardingCompleted`: boolean
+  - `businessVerificationStatus`: `NONE` | `PENDING` | `APPROVED` | `REJECTED` | null
+- 응답 예시
 
 ```json
 {
-  "nickname": "vintagelover",
-  "phoneNumber": "010-1234-5678",
-  "postalCode": "06236",
-  "address": "서울 강남구 테헤란로 212",
-  "detailAddress": "3층"
-}
-```
-
-요청 사항:
-
-- 온보딩 기본 정보 저장 API와 마이페이지 수정 API를 같은 endpoint로 쓸지 분리할지 확정한다.
-- 닉네임 중복 검증 endpoint 또는 PATCH 오류 코드를 확정한다.
-- 주소를 단일 문자열로 저장할지 `postalCode/address/detailAddress`로 분리할지 확정한다.
-
-### 3. 공개 회원/판매자 프로필 조회
-
-```http
-GET /api/users/{userId}
-```
-
-응답 후보:
-
-```json
-{
-  "id": 31,
-  "nickname": "빈티지장인",
-  "profileImageUrl": null,
-  "coverImageUrl": null,
-  "description": "",
-  "followerCount": 1284,
-  "followingCount": 12,
-  "productCount": 37,
-  "liveCount": 4,
-  "isFollowing": false,
-  "businessVerified": true
-}
-```
-
-요청 사항:
-
-- 비회원 조회 가능 여부를 확정한다.
-- 로그인 사용자 기준 `isFollowing`을 포함한다.
-- 판매자 프로필에서 노출할 상품/라이브 목록 endpoint를 확정한다.
-
-### 4. 마이페이지 요약
-
-```http
-GET /api/users/{userId}/mypage
-Authorization: Bearer {accessToken}
-```
-
-응답 후보:
-
-```json
-{
-  "user": {
+  "success": true,
+  "data": {
     "id": 1,
+    "email": "user@example.com",
+    "name": "홍길동",
     "nickname": "vintagelover",
+    "phoneNumber": "010-1234-5678",
+    "postalCode": "06234",
+    "address": "서울시 강남구",
+    "detailAddress": "101호",
     "profileImageUrl": null,
     "memberType": "GENERAL",
+    "onboardingCompleted": true,
     "businessVerificationStatus": "NONE"
   },
-  "counts": {
-    "orders": 3,
-    "sales": 2,
-    "wishes": 10,
-    "followers": 12,
-    "unreadNotifications": 4
-  },
-  "pointBalance": 120000
+  "error": null
 }
 ```
 
-요청 사항:
+### 3.2 내 정보 수정
 
-- FE가 여러 도메인 API를 조합하지 않고 마이페이지 첫 화면을 그릴 수 있는 요약 API가 필요한지 검토해 달라.
-- business verification 상태 enum을 확정한다. 후보: `NONE`, `PENDING`, `APPROVED`, `REJECTED`.
+- Method / Endpoint: `PATCH /api/me`
+- 요청 목적: 현재 로그인 사용자의 프로필/연락처/주소 정보를 수정한다.
+- FE 사용처: 향후 마이페이지 프로필 수정
+- 요청 데이터
+  - Header: `Authorization: Bearer {accessToken}`
+  - Body: `nickname`, `phoneNumber`, `postalCode`, `address`, `detailAddress`, `profileImageUrl`
+- 응답 데이터: 수정된 내 정보
+- 응답 예시: `GET /api/me` 응답과 동일
 
-## FE 관련 파일
+### 3.3 공개 회원/판매자 프로필
 
-- `FE/src/domains/auth/stores/authStore.ts`
-- `FE/src/domains/onboard/api/onboarding.ts`
-- `FE/docs/frontend/api/api-index.md`
-- `FE/docs/frontend/decisions/open-questions.md`
-- 추후 `FE/src/domains/my`
+- Method / Endpoint: `GET /api/users/{userId}`
+- 요청 목적: 상품 상세 판매자, 검색 회원, 라이브 호스트의 공개 프로필을 조회한다.
+- FE 사용처: 공개 프로필 화면, 상품 상세 판매자 영역, 검색 회원 결과
+- 요청 데이터
+  - Path: `userId`
+- 응답 데이터
+  - `id`, `nickname`, `profileImageUrl`, `coverImageUrl`, `description`, `followerCount`, `followingCount`, `productCount`, `liveCount`, `isFollowing`, `businessVerified`
+- 응답 예시
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 10,
+    "nickname": "seller",
+    "profileImageUrl": null,
+    "coverImageUrl": null,
+    "description": "빈티지 셀러입니다.",
+    "followerCount": 124,
+    "followingCount": 20,
+    "productCount": 8,
+    "liveCount": 3,
+    "isFollowing": false,
+    "businessVerified": true
+  },
+  "error": null
+}
+```
+
+### 3.4 마이페이지 요약
+
+- Method / Endpoint: `GET /api/users/{userId}/mypage`
+- 요청 목적: 마이페이지 첫 화면에 필요한 카운터와 요약 정보를 한 번에 조회한다.
+- FE 사용처: 향후 마이페이지 첫 화면
+- 요청 데이터
+  - Header: `Authorization: Bearer {accessToken}`
+  - Path: `userId`
+- 응답 데이터
+  - `user.id`, `user.nickname`, `user.profileImageUrl`, `user.memberType`, `user.businessVerificationStatus`
+  - `counts.orders`, `counts.sales`, `counts.wishes`, `counts.followers`, `counts.unreadNotifications`
+  - `pointBalance`
+- 응답 예시
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": 1,
+      "nickname": "vintagelover",
+      "profileImageUrl": null,
+      "memberType": "GENERAL",
+      "businessVerificationStatus": "NONE"
+    },
+    "counts": {
+      "orders": 0,
+      "sales": 0,
+      "wishes": 3,
+      "followers": 12,
+      "unreadNotifications": 1
+    },
+    "pointBalance": 10000
+  },
+  "error": null
+}
+```
+
+### 3.5 판매자 프로필용 목록
+
+- Method / Endpoint: `GET /api/users/{userId}/products`, `GET /api/users/{userId}/lives` 또는 기존 목록 API에 `sellerId`/`hostId` filter 추가
+- 요청 목적: 공개 프로필에 판매자의 상품/라이브 목록을 표시한다.
+- FE 사용처: 공개 프로필 화면
+- 요청 데이터
+  - Path 또는 Query: `userId`
+  - Query: `page`, `size`
+- 응답 데이터: 기존 product/live card DTO 재사용 권장
+- 응답 예시: 기존 상품/라이브 목록 응답과 동일
+
+## 4. 기존 API 변경 요청
+
+- 기존 요청·응답에서 변경할 내용
+  - 기존 상품/라이브 목록 API에 `sellerId` 또는 `hostId` filter를 추가하면 공개 프로필용 별도 목록 API를 줄일 수 있다.
+- 추가할 필드
+  - 없음
+- 변경 영향 범위
+  - 공개 프로필 상품/라이브 목록
+
+## 5. 보류 또는 시연 제외 범위
+
+- 현재 구현하지 않아도 되는 기능
+  - 마이페이지 화면
+  - 공개 프로필 화면
+  - 내 정보 수정
+- 추후 구현 예정 기능
+  - 프로필 이미지 업로드
+  - 소개글/커버 이미지 수정
+  - 사용자 활동 내역
+
+## 6. 협의 필요 사항
+
+- FE·BE 간 결정이 필요한 내용
+  - `GET /api/me`를 Auth 문서 요청과 중복 없이 어느 도메인에서 담당할지
+  - 공개 프로필과 마이페이지 요약을 분리할지
+  - 프로필 이미지 업로드 방식
+  - 비회원 공개 프로필의 `isFollowing` 값 정책
+- 아직 확정되지 않은 응답 구조나 정책
+  - 마이페이지 카운터 범위
+  - 포인트 잔액 노출 여부
+  - 판매자 프로필 상품/라이브 목록 endpoint 방식
+
+## 7. 추가 요청 없음
+
+- 이미 정상 연동된 API: 없음
+- 기존 규격을 유지하면 되는 기능: 없음

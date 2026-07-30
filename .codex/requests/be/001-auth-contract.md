@@ -1,148 +1,60 @@
-# 인증 도메인 API 계약 보완 요청
+# 001 Auth API 요청
 
-## 요청자 파트 / 대상 파트
+## 1. 요청 개요
 
-- 요청자: FE
-- 대상: BE
+- 요청 파트: FE
+- 대상 파트: BE
+- 요청 목적: FE 인증 흐름에서 로그인 세션, 온보딩 진입 여부, SSAFY SSO 계정 연결 분기를 안정적으로 판단할 수 있도록 Auth API 계약을 정리한다.
+- 우선순위: P0
+- 시연 필수 여부: 이메일 인증/회원가입/로그인/세션 복구는 필수. SSAFY SSO는 시연 범위에 포함하지 않으면 보류 가능.
 
-## 배경/이유
+## 2. 현재 연동 상태
 
-FE는 메일 회원가입, 로그인, 토큰 저장, 재발급, 로그아웃을 실제 BE API에 붙일 수 있다. 다만 회원가입/로그인 직후 라우팅에 필요한 사용자 정보와 `nextStep`, 내 정보 조회, SSO 범위가 아직 확정되지 않아 인증 도메인 계약을 한 문서로 정리한다.
+- 연동 완료 API
+  - `POST /api/auth/email/check-duplicate`
+  - `POST /api/auth/email/send-code`
+  - `POST /api/auth/email/verify-code`
+  - `POST /api/auth/signup`
+  - `POST /api/auth/signin`
+  - `POST /api/auth/reissue`
+  - `POST /api/auth/logout`
+- FE 구현 완료 범위
+  - 이메일 중복 확인, 인증 코드 발송, 인증 코드 확인, 이메일 회원가입 화면 구현 완료
+  - 로그인 화면 구현 및 `POST /api/auth/signin` 호출 연결 완료
+  - 저장된 refreshToken 기반 `POST /api/auth/reissue` 세션 복구 구현 완료
+  - 로그아웃 시 `POST /api/auth/logout` 호출 후 로컬 세션 정리 구현 완료
+  - route guard에서 로그인 필요 화면과 guestOnly 화면 분기 구현 완료
+  - SSAFY SSO 시작/콜백/계정 연결 화면 구현 완료
+- 현재 임시 처리 또는 Mock 사용 여부
+  - 로그인/재발급 응답에 `user`가 없으면 FE가 JWT payload의 `sub`, `email`만 파싱해 사용자 상태를 임시 복원한다.
+  - `onboardingCompleted`가 없으면 온보딩 필요 여부를 안정적으로 판단할 수 없어 일부 guard가 완전하게 동작하지 않는다.
+  - `GET /api/me`는 FE 사용처가 있으나 BE 구현이 확인되지 않아 아직 실제 호출로 연결하지 않았다.
+  - SSAFY SSO endpoint는 FE 화면과 타입만 선행 구현되어 있고 BE 구현이 확인되지 않았다.
 
-## 현재 BE에서 그대로 사용할 수 있는 계약
+## 3. 추가 구현 요청
 
-FE axios `baseURL`은 `VITE_API_BASE_URL ?? '/api'`이고 FE API 함수는 `/auth/...`를 호출하므로 실제 요청은 `/api/auth/...`로 나간다.
+### 3.1 현재 사용자 조회
 
-| 기능 | Method | Endpoint | 인증 | 현재 BE 구현 |
-| --- | --- | --- | --- | --- |
-| 이메일 중복 확인 | `POST` | `/api/auth/email/check-duplicate` | 불필요 | 구현됨 |
-| 이메일 인증코드 발송 | `POST` | `/api/auth/email/send-code` | 불필요 | 구현됨 |
-| 이메일 인증코드 확인 | `POST` | `/api/auth/email/verify-code` | 불필요 | 구현됨 |
-| 메일 회원가입 | `POST` | `/api/auth/signup` | 불필요 | 구현됨 |
-| 메일 로그인 | `POST` | `/api/auth/signin` | 불필요 | 구현됨 |
-| 토큰 재발급 | `POST` | `/api/auth/reissue` | 불필요 | 구현됨 |
-| 로그아웃 | `POST` | `/api/auth/logout` | 필요 | 구현됨 |
-| SSAFY SSO 시작 | `GET` | `/api/auth/sso/ssafy` | 불필요 예상 | 미구현 |
-| SSAFY SSO 콜백 | `POST` | `/api/auth/ssafy/callback` | 불필요 예상 | 미구현 |
-| SSAFY 계정 연결 | `POST` | `/api/auth/ssafy/link-account` | 필요 예상 | 미구현 |
-
-공통 응답 envelope는 현재 BE `ApiResponse<T>`를 그대로 사용한다.
-
-```json
-{
-  "success": true,
-  "data": {},
-  "error": null
-}
-```
-
-오류 응답은 현재 BE `ErrorResponse` 구조를 그대로 사용한다.
-
-```json
-{
-  "success": false,
-  "data": null,
-  "error": {
-    "code": "C001",
-    "message": "잘못된 입력값입니다.",
-    "errors": [
-      {
-        "field": "email",
-        "value": "bad-email",
-        "reason": "올바른 형식의 이메일 주소여야 합니다."
-      }
-    ]
-  }
-}
-```
-
-## 현재 요청/응답 규격
-
-### 이메일 중복 확인
-
-```http
-POST /api/auth/email/check-duplicate
-Content-Type: application/json
-```
-
-```json
-{
-  "email": "user@example.com"
-}
-```
-
-성공은 `200 OK`, `ApiResponse<null>`이다. 이미 가입된 이메일은 `409`, `U003`이다.
-
-### 이메일 인증코드 발송
-
-```http
-POST /api/auth/email/send-code
-Content-Type: application/json
-```
-
-```json
-{
-  "email": "user@example.com"
-}
-```
-
-성공은 `200 OK`, `ApiResponse<null>`이다.
-
-운영 정책은 현재 구현 기준으로 확정 가능하다.
-
-- 인증코드 유효 시간: 5분
-- 재발송 가능 간격: 60초
-- 발송 제한: 5분 동안 최대 5회
-- 인증 실패 허용 횟수: 5회
-- 실패 횟수 초과 시 기존 인증코드 삭제
-- 인증 성공 시 기존 인증코드와 실패 횟수 삭제
-- 같은 이메일로 재발송하면 기존 `email:verify:code:{email}` 값은 새 코드로 대체
-
-### 이메일 인증코드 확인
-
-```http
-POST /api/auth/email/verify-code
-Content-Type: application/json
-```
-
-```json
-{
-  "email": "user@example.com",
-  "code": "123456"
-}
-```
-
-성공:
-
-```json
-{
-  "success": true,
-  "data": {
-    "verificationToken": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-  },
-  "error": null
-}
-```
-
-`verificationToken` 유효 시간은 30분이며 회원가입 성공 시 삭제되어 재사용할 수 없다.
-
-### 메일 회원가입
-
-```http
-POST /api/auth/signup
-Content-Type: application/json
-```
-
-```json
-{
-  "email": "user@example.com",
-  "password": "password12!",
-  "name": "홍길동",
-  "verificationToken": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-}
-```
-
-현재 BE 성공 응답:
+- Method / Endpoint: `GET /api/me`
+- 요청 목적: 저장된 accessToken 또는 재발급된 accessToken으로 현재 로그인 사용자의 최신 상태를 조회한다.
+- FE 사용처
+  - 앱 시작 시 저장된 token 기반 세션 검증
+  - route guard에서 온보딩 필요 여부 판단
+  - 헤더/마이페이지에서 현재 사용자 표시
+  - 사업자 인증, 상품 등록, 라이브 생성 가능 여부 판단
+- 요청 데이터
+  - Header: `Authorization: Bearer {accessToken}`
+- 응답 데이터
+  - `id`: number, 필수
+  - `email`: string, 필수
+  - `name`: string, 필수
+  - `nickname`: string | null, 온보딩 전 null 가능
+  - `phoneNumber`: string | null
+  - `profileImageUrl`: string | null
+  - `memberType`: `GENERAL` | `BUSINESS`
+  - `onboardingCompleted`: boolean
+  - `businessVerificationStatus`: `NONE` | `PENDING` | `APPROVED` | `REJECTED` | null
+- 응답 예시
 
 ```json
 {
@@ -151,189 +63,154 @@ Content-Type: application/json
     "id": 1,
     "email": "user@example.com",
     "name": "홍길동",
-    "onboardingCompleted": false
+    "nickname": "vintagelover",
+    "phoneNumber": "010-1234-5678",
+    "profileImageUrl": null,
+    "memberType": "GENERAL",
+    "onboardingCompleted": false,
+    "businessVerificationStatus": "NONE"
   },
   "error": null
 }
 ```
 
-### 메일 로그인
+### 3.2 SSAFY SSO 시작
 
-```http
-POST /api/auth/signin
-Content-Type: application/json
-```
+- Method / Endpoint: `GET /api/auth/sso/ssafy`
+- 요청 목적: SSAFY SSO 인증 페이지로 이동할 시작 URL을 제공하거나 redirect를 수행한다.
+- FE 사용처: `SsafySsoStartCard`, SSAFY 로그인/회원가입 진입 화면
+- 요청 데이터: 없음
+- 응답 데이터: BE 정책에 따라 redirect 또는 `{ "redirectUrl": string }`
+- 응답 예시
 
 ```json
 {
-  "email": "user@example.com",
-  "password": "password12!"
+  "success": true,
+  "data": {
+    "redirectUrl": "https://ssafy.example.com/oauth/authorize?client_id=..."
+  },
+  "error": null
 }
 ```
 
-현재 BE 성공 응답:
+### 3.3 SSAFY SSO 콜백 처리
+
+- Method / Endpoint: `POST /api/auth/ssafy/callback`
+- 요청 목적: SSO authorization code를 BE에서 검증하고, 기존 계정 연결 여부에 따라 로그인 또는 계정 연결 플로우로 분기한다.
+- FE 사용처: `SsafySsoCallbackPage`
+- 요청 데이터
+  - `authorizationCode`: string
+  - `redirectUri`: string
+- 응답 데이터
+  - `linked`: boolean
+  - `accessToken`: string | null
+  - `refreshToken`: string | null
+  - `user`: object | null
+  - `email`: string | null
+  - `linkToken`: string | null
+  - `nextStep`: `HOME` | `ONBOARD_PROFILE` | `LINK_ACCOUNT`
+- 응답 예시
+
+```json
+{
+  "success": true,
+  "data": {
+    "linked": false,
+    "email": "user@ssafy.com",
+    "linkToken": "link-token",
+    "nextStep": "LINK_ACCOUNT"
+  },
+  "error": null
+}
+```
+
+### 3.4 SSAFY 기존 계정 연결
+
+- Method / Endpoint: `POST /api/auth/ssafy/link-account`
+- 요청 목적: SSO에서 받은 linkToken을 기존 이메일 계정과 연결하고 로그인 세션을 발급한다.
+- FE 사용처: `AuthLinkAccountPage`
+- 요청 데이터
+  - `linkToken`: string
+  - `agree`: boolean
+- 응답 데이터
+  - `accessToken`: string
+  - `refreshToken`: string
+  - `user`: object
+  - `nextStep`: `HOME` | `ONBOARD_PROFILE`
+- 응답 예시
 
 ```json
 {
   "success": true,
   "data": {
     "accessToken": "eyJ...",
-    "refreshToken": "eyJ..."
+    "refreshToken": "eyJ...",
+    "user": {
+      "id": 1,
+      "email": "user@example.com",
+      "name": "홍길동",
+      "onboardingCompleted": false
+    },
+    "nextStep": "ONBOARD_PROFILE"
   },
   "error": null
 }
 ```
 
-FE의 `rememberMe`는 BE로 보내지 않고 localStorage/sessionStorage 선택에만 사용한다.
+## 4. 기존 API 변경 요청
 
-### 토큰 재발급
+- 기존 요청·응답에서 변경할 내용
+  - `POST /api/auth/signin`과 `POST /api/auth/reissue`의 현재 BE 응답은 `accessToken`, `refreshToken`만 포함한다.
+  - FE route guard와 온보딩 자동 이동을 위해 `user`, `nextStep`을 함께 내려주기 바란다.
+  - `POST /api/auth/signup`은 현재 `id`, `email`, `name`, `onboardingCompleted`를 내려준다. 회원가입 직후 자동 로그인까지 BE 정책으로 포함한다면 `accessToken`, `refreshToken`, `user`, `nextStep` 구조로 맞춰주기 바란다. 자동 로그인하지 않는 정책이면 현재처럼 가입 성공 후 로그인 화면으로 이동해도 된다.
+- 추가할 필드
+  - `user.id`: number
+  - `user.email`: string
+  - `user.name`: string
+  - `user.nickname`: string | null
+  - `user.memberType`: `GENERAL` | `BUSINESS`
+  - `user.onboardingCompleted`: boolean
+  - `nextStep`: `HOME` | `ONBOARD_PROFILE` | `LINK_ACCOUNT`
+- 변경 영향 범위
+  - `authStore.setSession`
+  - `router.beforeEach` guestOnly/auth guard
+  - 로그인 후 이동 처리
+  - 온보딩 완료 전 사용자 redirect
+  - 사업자 인증/상품 등록/라이브 생성 접근 제어
 
-```http
-POST /api/auth/reissue
-Content-Type: application/json
-```
+## 5. 보류 또는 시연 제외 범위
 
-```json
-{
-  "refreshToken": "eyJ..."
-}
-```
+- 현재 구현하지 않아도 되는 기능
+  - SSAFY SSO가 시연 범위가 아니면 `GET /api/auth/sso/ssafy`, `POST /api/auth/ssafy/callback`, `POST /api/auth/ssafy/link-account`는 보류 가능
+  - 회원가입 직후 자동 로그인은 정책 미확정이면 보류 가능
+- 추후 구현 예정 기능
+  - 현재 사용자 프로필 수정
+  - 소셜 계정 연결 해제
+  - refreshToken rotation 상세 정책 고도화
 
-현재 BE 성공 응답은 `accessToken`, `refreshToken`만 포함한다.
+## 6. 협의 필요 사항
 
-현재 구현 기준:
+- FE·BE 간 결정이 필요한 내용
+  - 회원가입 성공 후 자동 로그인할지, 로그인 페이지로 이동할지 결정 필요
+  - `GET /api/me`를 Auth 범위로 둘지 Member 범위로 둘지 결정 필요
+  - `memberType` 기본값과 온보딩 완료 시점 결정 필요
+  - 사업자 인증 상태를 `GET /api/me`에 포함할지, 별도 사업자 API에서만 조회할지 결정 필요
+  - SSAFY SSO 시작 API가 HTTP redirect인지 JSON `redirectUrl` 응답인지 결정 필요
+- 아직 확정되지 않은 응답 구조나 정책
+  - SSO 미연결 사용자 응답의 `linkToken` 만료 시간
+  - `nextStep` enum 유지 여부
+  - 로그인/재발급 응답의 `user` 필수 여부
+  - accessToken 만료 시 FE가 자동으로 `reissue`를 재시도해도 되는 정책
 
-- refresh token은 Redis `auth:refresh:{memberId}` 키로 저장된다.
-- 회원 1명당 refresh token 1개만 저장된다.
-- 새 로그인 또는 재발급 시 기존 refresh token은 새 값으로 덮어써진다.
-- body refresh token의 JWT 검증과 Redis 저장값 일치 검증을 통과해야 새 토큰을 발급한다.
-- 로그아웃은 Redis refresh token을 삭제한다.
-- 로그아웃 후 access token은 JWT 만료 전까지 형식상 유효할 수 있으나 refresh token은 재발급에 사용할 수 없다.
+## 7. 추가 요청 없음
 
-## BE에 요청하는 보완 사항
-
-### 1. 회원가입 성공 후 로그인 정책
-
-회원가입 직후 사용자를 로그인 상태로 만들고 온보딩 시작 화면으로 진입시키는 정책으로 확정 요청한다.
-
-요청 응답 `data` 후보:
-
-```json
-{
-  "accessToken": "eyJ...",
-  "refreshToken": "eyJ...",
-  "user": {
-    "id": 1,
-    "email": "user@example.com",
-    "name": "홍길동",
-    "nickname": "vintagelover",
-    "onboardingCompleted": false
-  },
-  "nextStep": "ONBOARD_PROFILE"
-}
-```
-
-필드 규칙:
-
-| 필드 | 타입 | 필수 | 규칙 |
-| --- | --- | --- | --- |
-| `accessToken` | string | 필수 | Bearer access token |
-| `refreshToken` | string | 필수 | refresh token |
-| `user.id` | number | 필수 | 회원 ID |
-| `user.email` | string | 필수 | 가입 이메일 |
-| `user.name` | string | 필수 | 가입 이름 |
-| `user.nickname` | string/null | 선택 | 온보딩 전이면 null 가능 |
-| `user.onboardingCompleted` | boolean | 필수 | 온보딩 완료 여부 |
-| `nextStep` | enum | 필수 | `HOME`, `ONBOARD_PROFILE`, `LINK_ACCOUNT` |
-
-### 2. 로그인 응답 또는 내 정보 조회
-
-로그인 성공 직후 FE가 온보딩 분기를 판단할 수 있어야 한다.
-
-- `POST /api/auth/signin` 응답에 `user`, `nextStep`을 포함하거나
-- 별도 `GET /api/users/me` 또는 `GET /api/me`를 제공한다.
-
-내 정보 조회 응답 `data` 최소 필드:
-
-```json
-{
-  "id": 1,
-  "email": "user@example.com",
-  "name": "홍길동",
-  "nickname": "vintagelover",
-  "memberType": "GENERAL",
-  "onboardingCompleted": false
-}
-```
-
-`memberType`은 온보딩 통합 요청의 `GENERAL | BUSINESS`와 같은 enum을 사용한다.
-
-### 2-1. FE 세션 복구 검증용 내 정보 조회
-
-FE는 브라우저 `localStorage`/`sessionStorage`에 남은 토큰만으로 로그인 상태를 확정하지 않도록 수정했다. 현재는 저장된 `refreshToken`으로 `POST /api/auth/reissue`를 1회 호출해 Redis refresh token과 회원 존재 여부를 검증하고, 실패하면 로컬 세션을 정리한다.
-
-다만 이 방식은 앱 진입 시 refresh token을 회전시키므로, 장기적으로는 아래 중 하나가 필요하다.
-
-- `GET /api/users/me` 또는 `GET /api/me` 제공
-- 해당 endpoint는 access token의 서명/만료와 회원 존재 여부를 모두 검증
-- 성공 시 최소 사용자 정보 반환
-- 실패 시 `401`과 `U010` 또는 `U011` 반환
-
-이 endpoint가 확정되면 FE는 앱 시작 세션 검증을 `reissue` 대신 내 정보 조회로 교체할 수 있다.
-
-### 3. 토큰 만료 정보
-
-현재 `TokenResponse`의 `accessToken`, `refreshToken`만으로 1차 연동은 가능하다. 추후 자동 갱신 정확도를 높이려면 `accessTokenExpiresIn` 또는 `accessTokenExpiresAt` 추가 여부를 확정 요청한다.
-
-### 4. 에러 코드와 필드명 문서화
-
-현재 BE `ErrorCode` 기준으로 FE가 매핑할 주요 코드는 아래와 같다. Swagger 또는 별도 문서에 HTTP status와 함께 노출 요청한다.
-
-| 코드 | 의미 | FE 처리 |
-| --- | --- | --- |
-| `C001` | validation 실패 | `errors[].field` 기준 필드 표시 |
-| `U003` | 이미 가입된 이메일 | email 필드 오류 |
-| `U005` | 인증코드 불일치/만료 | code 필드 오류 |
-| `U006` | 이메일 인증 필요 | verificationToken/공통 오류 |
-| `U007` | 인증 시도 횟수 초과 | code 공통 오류 |
-| `U008` | 인증코드 요청 과다 | email 공통 오류 |
-| `U009` | 이메일 또는 비밀번호 불일치 | 로그인 공통 오류 |
-| `U010` | 유효하지 않은 토큰 | 세션 정리/재로그인 |
-| `U011` | 만료된 토큰 | refresh 재시도 후보 |
-
-FE가 매핑하기 쉬운 필드명은 `email`, `code`, `verificationToken`, `password`, `name`이다.
-
-### 5. SSAFY SSO
-
-시연 전 범위에서는 SSAFY SSO를 보류한다. 이후 구현 시 FE 예상 endpoint는 아래와 같다.
-
-- `GET /api/auth/sso/ssafy`
-- `POST /api/auth/ssafy/callback`
-- `POST /api/auth/ssafy/link-account`
-
-## FE 관련 파일
-
-- `FE/src/domains/auth/api/authApi.ts`
-- `FE/src/domains/auth/types/auth.types.ts`
-- `FE/src/domains/auth/stores/authStore.ts`
-- `.codex/plans/fe/SY012-auth-api.md`
-
-## 2026-07-31 최신 BE 확인 결과
-
-### 반영 확인
-
-| 항목 | 현재 BE 상태 |
-| --- | --- |
-| 이메일 중복 확인 | `POST /api/auth/email/check-duplicate` 구현됨 |
-| 이메일 인증코드 발송 | `POST /api/auth/email/send-code` 구현됨 |
-| 이메일 인증코드 확인 | `POST /api/auth/email/verify-code` 구현됨. `verificationToken` 반환 |
-| 이메일 회원가입 | `POST /api/auth/signup` 구현됨. 토큰은 반환하지 않음 |
-| 이메일 로그인 | `POST /api/auth/signin` 구현됨. `accessToken`, `refreshToken` 반환 |
-| 토큰 재발급 | `POST /api/auth/reissue` 구현됨 |
-| 로그아웃 | `POST /api/auth/logout` 구현됨 |
-
-### 남은 요청
-
-- SSAFY SSO 시작/callback/account-link API는 아직 BE에 없다.
-- 로그인 또는 회원가입 직후 FE route guard에 필요한 `user`, `nextStep`이 없다. 로그인 응답 확장 또는 `GET /api/me` 제공이 필요하다.
-- access token 만료 시 자동 재발급 정책과 주요 오류 코드(`U010`, `U011`)를 Swagger에 고정해 달라.
+- 이미 정상 연동된 API
+  - `POST /api/auth/email/check-duplicate`
+  - `POST /api/auth/email/send-code`
+  - `POST /api/auth/email/verify-code`
+  - `POST /api/auth/logout`
+- 기존 규격을 유지하면 되는 기능
+  - 이메일 인증 코드 확인 응답의 `verificationToken`
+  - 로그인 요청의 `email`, `password`
+  - 재발급 요청의 `refreshToken`
+  - 공통 응답 envelope `{ success, data, error }`
