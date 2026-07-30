@@ -83,6 +83,55 @@ FE 홈 화면은 아래 필드를 추가로 사용한다. BE가 실데이터로 
 
 현재 FE는 `sellerName`과 `isWished`를 임시값으로 처리한다. BE에서 붙일 수 있는 기존 필드는 그대로 쓰고 위 필드만 추가 보강하면 된다.
 
+## 카테고리별 상품 섹션 요청
+
+현재 FE의 `카테고리별 상품` 섹션은 `homeMockData.categoryProductSections`를 사용한다. BE 실데이터로 전환하려면 `GET /api/home` 응답에 카테고리별 상품 섹션을 추가하거나, 별도 endpoint를 제공해야 한다.
+
+권장 응답 필드:
+
+```json
+{
+  "categoryProductSections": [
+    {
+      "categoryId": "outer",
+      "categoryName": "아우터",
+      "title": "아우터",
+      "products": []
+    }
+  ]
+}
+```
+
+`products`는 기존 `ProductCardResponse`를 재사용하되, 카드 표시 품질을 위해 `sellerName`, `categoryName`, `isWished` 보강이 필요하다.
+
+## 팔로잉 홈 응답 보강 요청
+
+현재 FE는 로그인 상태에서만 `GET /api/home/following`을 호출한다. 이 요청이 실패하면 홈 전체를 실패 처리하지 않고 공개 홈 데이터와 FE 보조값으로 화면을 유지한다.
+
+실데이터 전환 시 HOME-002 요구사항을 제대로 표시하려면 아래 구조 보강이 필요하다.
+
+- `empty`: 팔로잉 기반 콘텐츠가 없는지 여부
+- `lives`: 팔로우한 판매자/회원의 라이브 목록. 현재 FE는 이 값을 라이브 섹션에 섞지 않고, 추후 `followedSellers` 카드 구성에 사용할 예정
+- `products`: 팔로우한 판매자/회원의 상품 목록
+- `followedSellers`: 팔로우한 판매자 카드 목록. 현재 FE는 mock 유지 중
+- `recommendedProducts` 또는 추천 회원/상품 대체 섹션. `empty=true`일 때 표시할 콘텐츠
+
+`lives`, `products`는 HOME-001의 카드 DTO를 재사용해도 된다. 단, 판매자 카드와 추천/대체 섹션은 현재 BE 응답에 없어서 FE가 완전한 HOME-002 화면으로 전환하지 못한다.
+
+## Mock 이미지 리소스 요청
+
+BE mock 응답의 `thumbnailUrl`은 현재 `https://cdn.example.com/...` 형태라 브라우저에서 실제 이미지로 확인하기 어렵다. 첨부된 placeholder 이미지를 BE 정적 리소스로 두고 mock 응답에서 같은 URL을 재사용하는 방식을 요청한다.
+
+권장 위치:
+
+- `BE/src/main/resources/static/mock/home/product-placeholder.png`
+
+권장 응답 URL:
+
+- `/mock/home/product-placeholder.png`
+
+Spring Security에서 정적 mock 이미지를 막지 않도록 `/mock/**`는 `permitAll`에 추가가 필요하다.
+
 ## 페이지 응답 규격 정합성 요청
 
 현재 BE `PageResponse<T>`는 아래 구조다.

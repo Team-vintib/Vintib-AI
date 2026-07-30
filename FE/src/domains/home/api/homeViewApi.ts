@@ -96,18 +96,11 @@ const toHomeViewData = (
   homeContent: HomeContentResponse,
   followingContent: FollowingContentResponse | null,
 ): HomeViewData => {
-  const followingLives = followingContent?.empty ? [] : followingContent?.lives ?? []
-  const followingProducts = followingContent?.empty ? [] : followingContent?.products ?? []
+  const followingProducts = followingContent?.empty ? [] : (followingContent?.products ?? [])
 
   return {
-    liveNow: mergeLiveItems(
-      followingLives.filter((live) => live.broadcastStatus === 'LIVE').map(toHomeLiveCardItem),
-      homeContent.liveNow.map(toHomeLiveCardItem),
-    ),
-    scheduledLives: mergeLiveItems(
-      followingLives.filter((live) => live.broadcastStatus === 'SCHEDULED').map(toHomeLiveCardItem),
-      homeContent.scheduledLives.map(toHomeLiveCardItem),
-    ),
+    liveNow: homeContent.liveNow.map(toHomeLiveCardItem),
+    scheduledLives: homeContent.scheduledLives.map(toHomeLiveCardItem),
     directSaleProducts: homeContent.onSaleProducts.map(toHomeProductCardItem),
     upcomingAuctionProducts: homeContent.upcomingAuctionProducts.map(toHomeProductCardItem),
     followedSellers: homeMockData.followedSellers,
@@ -159,17 +152,4 @@ const toHomeProductSaleStatus = (product: HomeProductCardResponse): HomeProductS
   }
 
   return product.sellStatus
-}
-
-const mergeLiveItems = (
-  primaryItems: HomeLiveCardItem[],
-  fallbackItems: HomeLiveCardItem[],
-): HomeLiveCardItem[] => {
-  const liveItems = new Map<number, HomeLiveCardItem>()
-
-  for (const live of [...primaryItems, ...fallbackItems]) {
-    liveItems.set(live.id, live)
-  }
-
-  return [...liveItems.values()]
 }

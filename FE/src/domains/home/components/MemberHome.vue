@@ -80,11 +80,7 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
       empty-message="팔로우한 판매자가 없습니다."
     >
       <div class="seller-grid">
-        <article
-          v-for="seller in homeData.followedSellers"
-          :key="seller.id"
-          class="seller-card"
-        >
+        <article v-for="seller in homeData.followedSellers" :key="seller.id" class="seller-card">
           <span class="seller-card__cover">
             <img class="seller-card__cover-image" :src="seller.coverImageUrl" :alt="seller.name" />
             <span
@@ -163,7 +159,7 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
     <HomeSection
       title-id="recommended-product-title"
       eyebrow="Taste pick"
-      title="내 취향의 빈티지 상품"
+      title="팔로우한 판매자의 상품"
       :link-to="ROUTE_PATHS.PRODUCT_LIST"
       :is-empty="homeData.recommendedProducts.length === 0"
       empty-message="추천할 상품이 없습니다."
@@ -210,7 +206,6 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
         />
       </div>
     </HomeSection>
-
   </div>
 </template>
 
@@ -429,6 +424,5 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
     grid-template-columns: 1fr;
     gap: var(--space-3);
   }
-
 }
 </style>
