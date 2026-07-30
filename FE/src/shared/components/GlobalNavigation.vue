@@ -29,8 +29,8 @@ authStore.hydrateSession()
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const displayName = computed(() => authStore.user?.name || '회원')
 const profileInitial = computed(() => displayName.value.slice(0, 1).toUpperCase())
-const cartItemCount = computed(() => 2)
-const unreadNotificationCount = computed(() => 3)
+const cartItemCount = computed<number | null>(() => null)
+const unreadNotificationCount = computed<number | null>(() => null)
 const isLoggingOut = ref(false)
 
 const primaryMenuItems = [
@@ -51,14 +51,14 @@ const userActionItems = computed<UserActionItem[]>(() => [
     icon: 'cart',
     path: ROUTE_PATHS.MY,
     query: { section: 'cart' },
-    badge: cartItemCount.value,
+    badge: cartItemCount.value ?? '',
   },
   {
     label: '알림',
     icon: 'bell',
     path: ROUTE_PATHS.NOTIFICATIONS,
     query: undefined,
-    badge: unreadNotificationCount.value,
+    badge: unreadNotificationCount.value ?? '',
   },
 ])
 
@@ -145,11 +145,10 @@ const handleLogout = async () => {
           class="global-nav__points"
           :class="{ 'global-nav__points--active': isActivePath(ROUTE_PATHS.POINT) }"
           type="button"
-          aria-label="사용 가능 포인트 125,000P"
+          aria-label="포인트"
           @click="goToPath(ROUTE_PATHS.POINT, { authRequired: true })"
         >
-          <span class="global-nav__icon" aria-hidden="true">₩</span>
-          125,000P
+          포인트
         </button>
       </nav>
 
