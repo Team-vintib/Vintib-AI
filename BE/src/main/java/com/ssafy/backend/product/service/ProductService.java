@@ -6,6 +6,7 @@ import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
+import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.global.response.PageResponse;
@@ -87,10 +88,54 @@ public class ProductService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
 
+        if (product.isDeleted()) {
+            throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
+        }
         if (product.isPrivate() && !product.isOwnedBy(viewerId)) {
             throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
         }
-
         return ProductDetailResponse.from(product, productImageService.getImages(productId));
     }
-}
+
+    @Transactional
+    public ProductResponse updateProduct(Long sellerId, Long productId, ProductUpdateRequest request) {
+        Product product = getOwnedEditableProduct(sellerId, productId);
+
+        // 등록과 같은 이유로 존재 여부를 본다 — product.category_id 에 FK 가 걸려 있어
+        // 없는 ID 를 그대로 넣으면 제약 위반이 500 으로 새어 나간다.
+        if (request.categoryId() != null && !categoryRepository.existsById(request.categoryId())) {
+            throw new CustomException(ErrorCode.CATEGORY_NOT_FOUND);
+        }
+
+        product.update(
+                request.title(),
+                request.description(),
+                request.categoryId(),
+                request.brandId(),
+                request.conditionGrade(),
+                request.sizeLabel());
+
+        return ProductResponse.from(product);
+    }
+
+    @Transactional
+    public void deleteProduct(Long sellerId, Long productId) {
+        Product product = getOwnedEditableProduct(sellerId, productId);
+
+        product.softDelete();
+    }
+
+    private Product getOwnedEditableProduct(Long sellerId, Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        if (!product.isOwnedBy(sellerId)) {
+            throw new CustomException(ErrorCode.NOT_PRODUCT_OWNER);
+        }
+        if (!product.isEditable()) {
+            throw new CustomException(ErrorCode.INVALID_PRODUCT_STATE);
+        }
+
+        return product;
+    }
+}

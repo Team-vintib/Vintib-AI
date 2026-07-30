@@ -14,10 +14,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(
@@ -35,6 +37,7 @@ import lombok.NoArgsConstructor;
                         name = "ck_product_price_by_type",
                         constraint = "sale_type <> 'DIRECT_SALE' OR price IS NOT NULL")
         })
+@SQLRestriction("deleted_at IS NULL")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Product extends BaseTimeEntity {
@@ -80,6 +83,9 @@ public class Product extends BaseTimeEntity {
 
     private Long price;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @Builder
     private Product(
             Member seller,
@@ -105,6 +111,37 @@ public class Product extends BaseTimeEntity {
         this.saleStatus = SaleStatus.ON_SALE;
     }
 
+    public void update(
+            String title,
+            String description,
+            Long categoryId,
+            Long brandId,
+            String conditionGrade,
+            String sizeLabel) {
+        if (title != null) {
+            this.title = title;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+        if (categoryId != null) {
+            this.categoryId = categoryId;
+        }
+        if (brandId != null) {
+            this.brandId = brandId;
+        }
+        if (conditionGrade != null) {
+            this.conditionGrade = conditionGrade;
+        }
+        if (sizeLabel != null) {
+            this.sizeLabel = sizeLabel;
+        }
+    }
+
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
     public boolean isOwnedBy(Long memberId) {
         return memberId != null && seller.getId().equals(memberId);
     }
@@ -112,4 +149,14 @@ public class Product extends BaseTimeEntity {
     public boolean isPrivate() {
         return saleStatus == SaleStatus.DRAFT || saleStatus == SaleStatus.PRIVATE;
     }
-}
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    public boolean isEditable() {
+        return saleStatus == SaleStatus.DRAFT
+                || saleStatus == SaleStatus.ON_SALE
+                || saleStatus == SaleStatus.PRIVATE;
+    }
+}

@@ -15,6 +15,7 @@ import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
+import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.product.entity.Product;
@@ -29,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -241,4 +243,97 @@ class ProductServiceTest {
         assertThatThrownBy(() -> productService.getProductDetail(SELLER_ID, 1L))
                 .isInstanceOf(CustomException.class);
     }
-}
+
+    @Test
+    void 본인_상품을_부분_수정하면_반영된_필드만_바뀐다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder()
+                .seller(seller)
+                .title("빈티지 자켓")
+                .description("기존 설명")
+                .sizeLabel("M")
+                .build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductUpdateRequest request = new ProductUpdateRequest("수정된 제목", null, null, null, null, null);
+        ProductResponse response = productService.updateProduct(SELLER_ID, 1L, request);
+
+        assertThat(response.title()).isEqualTo("수정된 제목");
+        assertThat(response.description()).isEqualTo("기존 설명");
+        assertThat(response.sizeLabel()).isEqualTo("M");
+    }
+
+    @Test
+    void 본인이_아니면_수정시_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductUpdateRequest request = new ProductUpdateRequest("수정된 제목", null, null, null, null, null);
+
+        assertThatThrownBy(() -> productService.updateProduct(2L, 1L, request))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 수정_불가_상태면_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.SOLD);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductUpdateRequest request = new ProductUpdateRequest("수정된 제목", null, null, null, null, null);
+
+        assertThatThrownBy(() -> productService.updateProduct(SELLER_ID, 1L, request))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 본인_상품을_삭제하면_이후_상세조회가_404가_된다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        productService.deleteProduct(SELLER_ID, 1L);
+
+        assertThat(product.isDeleted()).isTrue();
+        assertThatThrownBy(() -> productService.getProductDetail(SELLER_ID, 1L))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 본인이_아니면_삭제시_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.deleteProduct(2L, 1L))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 삭제_불가_상태면_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.AUCTION_IN_PROGRESS);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.deleteProduct(SELLER_ID, 1L))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 존재하지_않는_카테고리로는_수정할_수_없다() {
+        // 등록과 같은 규칙이다 — category_id 에 FK 가 걸려 있어 그냥 통과시키면 500 이 된다.
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).categoryId(CATEGORY_ID).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(false);
+
+        ProductUpdateRequest request = new ProductUpdateRequest(null, null, CATEGORY_ID, null, null, null);
+
+        assertThatThrownBy(() -> productService.updateProduct(SELLER_ID, 1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CATEGORY_NOT_FOUND);
+    }
+}
