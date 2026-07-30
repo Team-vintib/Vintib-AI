@@ -36,10 +36,10 @@ __all__ = [
     "build_retail_source",
 ]
 
-# validation/pricing-model-check/gms_client.py:26 과 동일 — import는 금지 규약이라 값만 복사한다.
+# validation/PRICE/pricing-model-check/gms_client.py:26 과 동일 — import는 금지 규약이라 값만 복사한다.
 _NAVER_SHOP_URL = "https://openapi.naver.com/v1/search/shop.json"
 
-# 문서상 4·5·6이 중고다(validation/pricing-model-check/comps_sources.py 실측 근거).
+# 문서상 4·5·6이 중고다(validation/PRICE/pricing-model-check/comps_sources.py 실측 근거).
 # 신상품가 소스이므로 섞이면 목적과 어긋나 드롭한다.
 _USED_PRODUCT_TYPES = {"4", "5", "6"}
 

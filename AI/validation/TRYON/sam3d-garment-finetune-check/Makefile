@@ -24,11 +24,11 @@ test-fast:
 	$(PYTHON) -m pytest tests -q -p no:cacheprovider -k "not smoke"
 
 lint:
-	cd ../.. && $(PYTHON) -m ruff check validation/sam3d-garment-finetune-check
-	cd ../.. && $(PYTHON) -m black --check validation/sam3d-garment-finetune-check
+	cd ../../.. && $(PYTHON) -m ruff check validation/TRYON/sam3d-garment-finetune-check
+	cd ../../.. && $(PYTHON) -m black --check validation/TRYON/sam3d-garment-finetune-check
 
 fmt:
-	cd ../.. && $(PYTHON) -m black validation/sam3d-garment-finetune-check
+	cd ../../.. && $(PYTHON) -m black validation/TRYON/sam3d-garment-finetune-check
 
 smoke:
 	$(PYTHON) -m garment3d.cli --config configs/default.yaml --work-dir artifacts/work smoke
