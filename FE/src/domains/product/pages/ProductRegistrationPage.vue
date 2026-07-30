@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { submitProductRegistrationDraft } from '@/domains/product/api/productRegistrationApi'
 import ProductPhotoUploader from '@/domains/product/components/ProductPhotoUploader.vue'
 import {
   PRODUCT_REGISTRATION_CATEGORY_OPTIONS,
@@ -58,6 +59,8 @@ const pricingStepTouched = reactive({
 const currentAiResultIndex = ref(0)
 const isAdditionalAiPhotoPickerOpen = ref(false)
 const registeredProductId = ref('')
+const isSubmittingRegistration = ref(false)
+const registrationSubmitError = ref('')
 
 const priceRecommendationBuckets: ProductRegistrationPriceBucket[] = [
   { id: 'under-30', label: '~3만', productCount: 6 },
@@ -112,8 +115,9 @@ const currentStep = computed(() => PRODUCT_REGISTRATION_STEPS[currentStepIndex.v
 const isFirstStep = computed(() => currentStepIndex.value === 0)
 const isReviewStep = computed(() => currentStep.value.id === 'review')
 const isCompleteStep = computed(() => currentStep.value.id === 'complete')
-const nextActionLabel = computed(() => (isReviewStep.value ? '등록 완료' : '다음'))
-const selectedStepLabel = computed(() => `${currentStepIndex.value + 1}. ${currentStep.value.label}`)
+const nextActionLabel = computed(() =>
+  isReviewStep.value && isSubmittingRegistration.value ? '등록 중' : isReviewStep.value ? '등록 완료' : '다음',
+)
 const frontPhotos = computed(() => draft.photos.filter((photo) => photo.role === 'front'))
 const backPhotos = computed(() => draft.photos.filter((photo) => photo.role === 'back'))
 const additionalPhotos = computed(() =>
@@ -668,7 +672,11 @@ const moveToPreviousStep = () => {
   scrollToPageTop()
 }
 
-const moveToNextStep = () => {
+const moveToNextStep = async () => {
+  if (isSubmittingRegistration.value) {
+    return
+  }
+
   markCurrentStepTouched()
 
   if (isCompleteStep.value) {
@@ -680,7 +688,19 @@ const moveToNextStep = () => {
   }
 
   if (isReviewStep.value) {
-    registeredProductId.value = `preview-${Date.now()}`
+    registrationSubmitError.value = ''
+    isSubmittingRegistration.value = true
+
+    try {
+      const submitResult = await submitProductRegistrationDraft(draft)
+      registeredProductId.value = submitResult.productId
+    } catch {
+      registrationSubmitError.value = '상품 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.'
+      isSubmittingRegistration.value = false
+      return
+    }
+
+    isSubmittingRegistration.value = false
   }
 
   currentStepIndex.value += 1
@@ -726,6 +746,8 @@ const resetRegistrationDraft = () => {
   currentAiResultIndex.value = 0
   isAdditionalAiPhotoPickerOpen.value = false
   registeredProductId.value = ''
+  isSubmittingRegistration.value = false
+  registrationSubmitError.value = ''
 }
 
 const continueRegistration = () => {
@@ -1449,7 +1471,7 @@ onBeforeUnmount(() => {
                     @input="updateDirectSalePrice"
                     @blur="pricingStepTouched.directSalePrice = true"
                   />
-                  <span>P</span>
+                  <span>원</span>
                 </span>
                 <span
                   v-if="pricingStepErrors.directSalePrice"
@@ -1472,7 +1494,7 @@ onBeforeUnmount(() => {
                       @input="updateAuctionStartPrice"
                       @blur="pricingStepTouched.auctionStartPrice = true"
                     />
-                    <span>P</span>
+                    <span>원</span>
                   </span>
                   <span
                     v-if="pricingStepErrors.auctionStartPrice"
@@ -1645,15 +1667,6 @@ onBeforeUnmount(() => {
             </article>
           </section>
 
-          <div
-            v-else-if="!isCompleteStep"
-            class="product-registration__placeholder"
-            role="status"
-          >
-            <strong>{{ selectedStepLabel }} 입력 UI를 연결할 영역입니다.</strong>
-            <p>현재 작업은 단계 이동, 공통 액션과 화면 골격 연결 범위입니다.</p>
-          </div>
-
           <div v-else class="product-registration__complete" role="status">
             <span class="product-registration__complete-icon" aria-hidden="true">✓</span>
             <h3>상품 등록이 완료되었습니다.</h3>
@@ -1694,6 +1707,14 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
+          <p
+            v-if="registrationSubmitError"
+            class="product-registration__field-error"
+            role="alert"
+          >
+            {{ registrationSubmitError }}
+          </p>
+
           <div v-if="!isCompleteStep" class="product-registration__actions">
             <button
               class="product-registration__button product-registration__button--ghost"
@@ -1705,7 +1726,7 @@ onBeforeUnmount(() => {
             <button
               class="product-registration__button product-registration__button--secondary"
               type="button"
-              :disabled="isFirstStep"
+              :disabled="isFirstStep || isSubmittingRegistration"
               @click="moveToPreviousStep"
             >
               이전
@@ -1713,6 +1734,7 @@ onBeforeUnmount(() => {
             <button
               class="product-registration__button product-registration__button--primary"
               type="button"
+              :disabled="isSubmittingRegistration"
               @click="moveToNextStep"
             >
               {{ nextActionLabel }}
@@ -1898,21 +1920,6 @@ onBeforeUnmount(() => {
   font-size: 24px;
   font-weight: var(--font-weight-extrabold);
   line-height: 32px;
-}
-
-.product-registration__placeholder {
-  display: grid;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-  padding: var(--space-6);
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-secondary);
-  color: var(--color-text-secondary);
-}
-
-.product-registration__placeholder strong {
-  color: var(--color-text-primary);
 }
 
 .product-registration__photo-step {
