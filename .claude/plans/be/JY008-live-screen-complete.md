@@ -128,24 +128,21 @@ CONNECT 프레임에는 `liveId`가 없다. 어느 방송인지는 구독 시점
   - 그대로 두고 나중에 또 경매 (가격 없이 목록에 노출)
   - `ON_SALE`로 전환해 가격을 정하고 상시 판매
 
-**`AUCTION_FAILED` 상태는 없앴다** (사용자 결정 2026-07-30). 이전 ERD에는 유찰 직후 선택을 기다리는 중간 상태가 있었으나, 유찰이면 곧바로 `AUCTION_SCHEDULED`로 돌린다.
+**`AUCTION_FAILED` 중간 상태는 유지한다.** 한때 없애기로 했다가 되돌렸다 — **서윤이 그 상태를 전제로 한 유찰 처리 API를 이미 머지해 뒀다**(`ProductService.resolveAuctionFailure`). 상태를 없애면 그 메서드가 도달 불가능한 상태를 검사하는 죽은 코드가 된다.
 
-**없애도 되는 이유는 유찰 사실이 이미 `auction` 테이블에 있기 때문이다.** "이 방송에서 유찰된 상품"은 `auction`에서 `live_id`와 `status = 'FAILED'`로 뽑으면 된다. 같은 사실을 `product.sale_status`에 한 번 더 담을 필요가 없다 — JY007에서 카테고리를 유도로 간 것과 같은 판단이다.
-
-`AUCT-014`의 "자동 상시 판매 전환 금지"는 그대로 지켜진다. 유찰 상품은 가격 없는 `AUCTION_SCHEDULED`로 남아 다시 경매할 수 있고, **판매자가 명시적으로 고를 때만** `ON_SALE`(가격 설정)이나 `PRIVATE`로 넘어간다.
+서윤 구현이 사용자 정책과 정확히 일치한다. `ProductAuctionResultRequest.NextStatus`가 `{ON_SALE, AUCTION_SCHEDULED}` 딱 둘이다.
 
 ```
-경매 조건 설정  →  AUCTION_SCHEDULED
+경매 예정 등록  →  AUCTION_SCHEDULED   (서윤 `Product.scheduleAuction()`)
 경매 시작       →  AUCTION_IN_PROGRESS
    ├ 낙찰       →  SOLD
-   └ 유찰       →  AUCTION_SCHEDULED  ─┬→ (그대로) 다시 경매, 가격 없음
-                                       ├→ ON_SALE  (가격 정하고 상시 판매)
-                                       └→ PRIVATE  (비공개)
+   └ 유찰       →  AUCTION_FAILED  ─┬→ AUCTION_SCHEDULED (다시 경매, 가격 없음)
+                                    └→ ON_SALE          (가격 정하고 상시 판매)
 ```
 
-**제거 작업은 완료했다** — `SaleStatus` enum, `Product` `@CheckConstraint`, `schema.sql`, `comments.sql`, `erd.md`, 그리고 자동 생성물(`data-dictionary.md`, `img/product-status.*`) 재생성까지. 로직 참조가 없었고 DB에도 해당 행이 없어 안전했다.
+상태를 유지하면 **FE `-440`(미낙찰 상품 처리 UI)이 상태만으로 목록을 뽑을 수 있다**는 이점도 그대로 남는다.
 
-> `.claude/plans/be/SY004`·`SY006`·`SY007`·`SY009`(서윤 계획 문서)에 `AUCTION_FAILED` 언급이 남아 있다. 과거 설계 기록이라 손대지 않았다.
+> `PRIVATE` 상태는 서윤이 제거했다. `PROD-005`의 "비공개" 선택지도 함께 빠져 선택은 두 갈래뿐이다.
 
 ### 11. 이 정책 때문에 드러난 누락 5건
 
@@ -153,11 +150,11 @@ CONNECT 프레임에는 `liveId`가 없다. 어느 방송인지는 구독 시점
 
 | 지점 | 문제 | 처리 |
 | --- | --- | --- |
-| `-394` 경매 조건 설정 (**머지 완료**) | `AuctionService`가 `sale_status`를 전혀 건드리지 않는다. ERD는 이 시점에 `AUCTION_SCHEDULED`가 돼야 한다고 본다 | Phase 6에서 보완 |
+| `AUCTION_SCHEDULED` 진입 | ~~어디서도 설정하지 않았다~~ | **서윤이 해결** — `Product.scheduleAuction()` + `POST` 경매 상품 등록(`-237`) |
 | `-461` 경매 시작 | `AUCTION_SCHEDULED → AUCTION_IN_PROGRESS` 누락 | Phase 6 체크리스트 추가 |
 | `-467` 낙찰 확정 | `→ SOLD` 누락. 낙찰자만 기록하고 상품은 그대로였다 | Phase 8 체크리스트 추가 |
-| `-468` 유찰 | "상품 상태 복원"이라고만 적혀 무엇으로 되돌리는지 불명확 | `AUCTION_SCHEDULED`로 명시 |
-| **방송 후 판매 방식 선택** | 계획에 아예 없었다. 스토리 `-89`(LIVE-006 라이브 상시 판매 연결)가 이미 있다 | Phase 8에 추가 |
+| `-468` 유찰 | "상품 상태 복원"이라고만 적혀 무엇으로 되돌리는지 불명확 | **`AUCTION_FAILED`로 전이**로 명시 |
+| 방송 후 판매 방식 선택 | ~~계획에 아예 없었다~~ | **서윤이 해결** — `ProductService.resolveAuctionFailure`. `-470`은 방송별 유찰 목록 조회만 남긴다 |
 
 **`product`는 서윤 담당 영역이다.** 경매가 상품 상태를 바꾸는 것은 피할 수 없으니, 기존 `ProductQueryPort`처럼 **상태 변경도 포트로 격리**한다. 경매 서비스가 `ProductRepository`를 직접 잡지 않게 한다.
 
@@ -262,27 +259,23 @@ FE `NOW` 배지와 진입 시 기본 선택 상품의 원천이다. 지금은 �
 - [ ] 자동 연장(AUCT-010) — 종료 임박 입찰이면 `scheduled_end_at` 연장 + `extension_count++`. **입찰 트랜잭션 안에서**
 - [ ] 낙찰(AUCT-012) — 경매 `SUCCESS`, `winner_id`·`final_price`, 최고 입찰 `WON`, 나머지 `LOST`
 - [ ] **낙찰 시 상품 `→ SOLD`** (설계 판단 10). 티켓에 빠져 있던 항목이다 — 낙찰자만 기록하고 상품이 그대로면 같은 물건을 또 팔 수 있다
-- [ ] 유찰(AUCT-014) — 경매 `FAILED`, **상품 `→ AUCTION_SCHEDULED`**(가격 없이 다시 경매 가능). `AUCTION_FAILED` 상태는 없앴다 (설계 판단 10)
+- [ ] 유찰(AUCT-014) — 경매 `FAILED`, **상품 `→ AUCTION_FAILED`**(판매자 선택 대기). 그 이후 처리는 서윤의 `resolveAuctionFailure`가 이미 담당한다 (설계 판단 10)
 - [ ] `GET /api/auctions/{auctionId}/winner` — 결과 조회
 - [ ] `/topic/lives/{liveId}/auction` 종료 이벤트
 - [ ] 방송 종료 시 진행 중 경매 마감 — `LiveCleanupHook` 구현체
 - [ ] 테스트 — 연장 경계, 입찰 0건 유찰, 방송 종료 시 강제 마감, **상품 상태 전이 검증**
 
-#### Phase 8-b — 방송 후 판매 방식 선택 · `-89`(LIVE-006) 신규 작업
+#### Phase 8-b — 방송별 유찰 상품 목록 · `-89`(LIVE-006) · `-470`
 
-**계획에 없던 항목이다.** 유찰 상품을 판매자가 상시 판매로 돌릴 경로가 없다. FE `-438`(방송 종료 대시보드)·`-440`(미낙찰 상품 처리 UI)이 이 API를 필요로 한다.
+**판매 방식 선택 자체는 서윤이 이미 구현했다** — `PATCH` + `ProductService.resolveAuctionFailure`. 상시 판매 전환과 다시 경매 둘 다 된다. 중복 구현하지 않는다.
 
-**유찰 목록은 `product.sale_status`가 아니라 `auction`에서 뽑는다** — `live_id` + `status = FAILED`. 상태를 없앴으니 이쪽이 유일한 근거다.
+남은 것은 **라이브 쪽 조회 하나**다. FE `-438`(방송 종료 대시보드)·`-440`(미낙찰 상품 처리 UI)이 "이 방송에서 안 팔린 상품"을 물어볼 곳이 없다.
 
-- [ ] `GET /api/lives/{liveId}/unsold-products` — 이 방송에서 유찰된 상품 목록. 호스트만
-- [ ] `PATCH /api/products/{productId}/after-auction` — 판매자 선택
-  - `DIRECT_SALE` → `ON_SALE` + 가격 필수 (상시 판매)
-  - `HIDE` → `PRIVATE`
-  - **그대로 두는 것은 API 호출이 필요 없다** — 유찰 시 이미 `AUCTION_SCHEDULED`다
-- [ ] **`AUCTION_SCHEDULED`에서만 호출 가능**하게 상태 검증. 진행 중이거나 팔린 상품에 부르면 400
-- [ ] `DIRECT_SALE`인데 가격이 없으면 400 — `ck_product_price_by_type` 제약이 최후 방어선
-- [ ] **서윤 확인 필요** — 기존 `registerDirectSale`(`DRAFT → ON_SALE`)과 겹친다. 재사용할지 분리할지 협의
+- [ ] `GET /api/lives/{liveId}/unsold-products` — 이 방송의 유찰 상품. 호스트만
+- [ ] 근거는 `auction` 테이블 — `live_id` + `status = 'FAILED'`. 상품 상태로 찾으면 "다른 방송에서 유찰된 것"까지 섞인다
+- [ ] 응답에 판매자가 다음 행동을 고를 수 있을 만큼 담는다 — `productId`, `title`, `thumbnailUrl`, 마지막 경매의 `startPrice`
 - [ ] Swagger + 테스트
+- [ ] `-470` 티켓 범위를 이 조회로 축소 (판매 방식 선택 부분 삭제)
 
 ### Phase 9 — 포인트 보류·참여 제한 · `-99`(AUCT-007~009) 신규 작업 · **서윤 선행 필요**
 
@@ -356,7 +349,7 @@ FE 계약 회신 문서는 별도 티켓으로 빼지 않고 `-462`(경매)·`-4
 
 ## 미결정
 
-`AUCTION_FAILED` 제거는 확정되어 반영을 마쳤다. 남은 것은 하나뿐이다.
+`AUCTION_FAILED`는 유지로 결론 났다(설계 판단 10). 남은 것은 하나뿐이다.
 
 1. **`ProductCommandPort` 신설을 서윤과 맞출 것.** 경매가 상품 상태를 바꾸는 것은 피할 수 없으니, 직접 리포지토리를 잡는 대신 포트로 격리한다. **Phase 6 착수 전**에 정해지면 된다 — Phase 3~5는 영향이 없다.
 
