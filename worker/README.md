@@ -24,8 +24,10 @@ S15P11A108-27(인프라 세팅) / S15P11A108-210(CatVTON 모델 연결) 관련 �
 | `quality_check_worker_example.py` | 품질검수(CLIPSeg) 워커. 판정 로직은 `models/clipseg/`에 있고 이 파일은 오케스트레이션만 한다. **`QUALITY_BACKEND=mock`이면 GPU 없이도 전 경로가 돈다.** |
 | `stt_worker_example.py` | 라이브 발언 STT 워커. Whisper로 전사하고 같은 프로세스에서 KURE-v1 임베딩까지 계산해 게이트웨이엔 텍스트+벡터를 그대로 넘긴다(게이트웨이엔 torch가 없어서). **`STT_BACKEND=mock`(기본값)이면 GPU 없이도 전 경로가 돈다.** 실제 방송 오디오는 OpenVidu 설치 전이라 아직 없다. |
 | `chat_rag_worker_example.py` | 반복질문 답변 생성 워커. 게이트웨이가 `live_id`로 가져온 문서 후보 + 질문을 받아 KURE-v1로 임베딩·랭킹하고, 그라운딩 임계치를 넘으면 LangChain + `LiquidAI/LFM2.5-230M`으로 답변까지 생성해 돌려준다(검색·판단·생성을 왕복 1회로 처리). **`CHAT_RAG_BACKEND=mock`(기본값)이면 GPU 없이도 전 경로가 돈다.** |
+| `garment_measurement_worker_example.py` | 의류 실측(cm) 측정 워커. 기준 물체(A4) 검출 → 원단 분할 → 랜드마크 검출 → cm 환산을 순서대로 처리하고, 앞 단계가 실패하면 뒷 단계(특히 GPU가 필요한 랜드마크 검출)를 아예 건너뛴다. 세 단계 모두 독립적으로 스왑 가능해 환경변수도 3개다. **전부 `mock`(기본값)이면 GPU/opencv 없이도 전 경로가 돈다.** |
 | `models/clipseg/` | 품질검수 판정 로직 — 세그멘테이션(목업/CLIPSeg) · 하자 항목화 · 점수 · 히트맵. 순수 로직은 `AI/test/worker/clipseg/`가 CI에서 검증한다. |
-| `requirements.txt` | 워커 공통 의존성. `requests`, `Pillow`(storage_utils.py가 `PIL.Image`를 다룬다). CatVTON 등 모델 자체의 의존성(torch, diffusers 등)은 각자 기존에 구성해둔 conda 환경을 그대로 쓴다 — 이 파일에 포함하지 않는다. |
+| `models/garment_measurement/` | 실측 판정 로직 — 기준물체 검출(목업/OpenCV) · 원단 분할(목업/GrabCut) · 랜드마크 검출(목업/HRNet) · cm 환산. clipseg와 달리 **진짜 서브패키지**다(`__init__.py` 보유) — 이유는 아래 "왜 서브패키지인가" 참고. 순수 로직은 `AI/test/worker/garment_measurement/`가 CI에서 검증한다. |
+| `requirements.txt` | 워커 공통 의존성. `requests`, `Pillow`(storage_utils.py가 `PIL.Image`를 다룬다), `opencv-python-headless`(기준물체 검출·원단 분할, torch 불필요라 공용). CatVTON·HRNet 등 무거운 모델 자체의 의존성(torch, diffusers 등)은 각자 기존에 구성해둔 conda 환경을 그대로 쓴다 — 이 파일에 포함하지 않는다. |
 | `.env.example` | 워커 실행에 필요한 환경변수 예시. 필요한 값은 아래 "실행 방법" 참고. |
 
 ## 실행 방법
@@ -81,6 +83,42 @@ chat_rag 워커는 아래를 쓴다:
 ```bash
 export CHAT_RAG_BACKEND=mock             # 기본값. GPU 불필요 — 결정적 임베딩 + 최상위 근거 그대로 반환
 export CHAT_RAG_BACKEND=lfm2_langchain   # 실제 KURE-v1 + LangChain/LFM2.5-230M. torch/sentence-transformers/langchain_huggingface/transformers 필요
+```
+
+실측 워커는 3단계 각각 독립적인 환경변수를 쓴다(`worker/models/garment_measurement/registry.py`의
+`*_BACKENDS` 딕셔너리 키):
+
+```bash
+export REFERENCE_BACKEND=mock            # 기본값. GPU/opencv 불필요
+export REFERENCE_BACKEND=opencv_contour  # 실제 A4 검출. opencv-python-headless만 필요(torch 불필요)
+
+export SEGMENTATION_BACKEND=mock         # 기본값. GPU/opencv 불필요
+export SEGMENTATION_BACKEND=grabcut      # 실제 GrabCut. opencv-python-headless만 필요(torch 불필요)
+
+export LANDMARK_BACKEND=mock             # 기본값. GPU/torch 불필요
+export LANDMARK_BACKEND=hrnet_deepfashion2   # 실제 HRNet. torch/torchvision/yacs/opencv-python 필요
+
+# hrnet_deepfashion2를 쓸 때만 필요. 체크포인트는 HuggingFace가 아니라 OneDrive 수동 다운로드다.
+export HRNET_CHECKPOINT_PATH=/path/to/pose_hrnet-w48_384x288-deepfashion2_mAP_0.7017.pth
+# 기본값: worker/models/garment_measurement/hrnet/models/pose_hrnet-w48_384x288-deepfashion2_mAP_0.7017.pth
+```
+
+**HRNet 체크포인트 받는 법**: [OneDrive](https://shanghaitecheducn-my.sharepoint.com/:f:/g/personal/qianshh_shanghaitech_edu_cn/Eo1g551GvWpHtrXxdeYptH4BGUqWCI81fbT1prL93e0z2Q?e=cj6phH)의
+`models/pose_hrnet-w48_384x288-deepfashion2_mAP_0.7017.pth`만 받으면 된다(같은 폴더의
+`data/`·`checkpoints/`는 학습·평가용이라 필요 없다). `HRNET_CHECKPOINT_PATH`로 위치를
+지정하거나, 위 기본 경로에 그대로 두면 된다 — `worker/models/garment_measurement/hrnet/.gitignore`가
+`models/`를 무시하므로 실수로 커밋될 걱정은 없다.
+
+**왜 `models/garment_measurement/`만 서브패키지인가**: `clipseg/`처럼
+`contracts.py`/`registry.py`/`scenarios.py`/`segmenter.py`를 flat하게 sys.path에 바로 두면,
+두 폴더가 같은 이름의 파일을 가지고 있어서(AI의 pytest 세션에서 둘 다 동시에 sys.path에 들어감)
+`import contracts`가 어느 쪽을 가져올지 꼬인다(먼저 import된 모듈이 전역 캐시에 남음 —
+`S15P11A108-339` 구현 중 실제로 겪은 버그). 그래서 `garment_measurement/`는 `__init__.py`를 둬서
+진짜 패키지로 만들고, `MEASUREMENT_CODE_PATH`(기본값: `worker/models/`, 즉 이 폴더의 **부모**)를
+sys.path에 넣어 `from garment_measurement.xxx import ...` 형태로만 접근한다.
+
+```bash
+export MEASUREMENT_CODE_PATH=/path/to/worker/models   # 기본값: worker/ 기준 models (garment_measurement의 부모)
 ```
 
 ### 2. 실행
@@ -214,6 +252,49 @@ OpenVidu(방송 녹화)가 로드맵상 미설치라 `audio_url`을 채워줄 �
 }
 ```
 
+## 실측 워커 동작 방식
+
+의류 실측(cm) 측정(`S15P11A108-339`)의 3단계를 전부 이 워커 안에서 순서대로 처리한다: 기준
+물체(A4) 검출 → (실패 시 즉시 재촬영 사유 반환) → 원단 분할 → (실패 시 즉시 반환) → 랜드마크
+검출 → cm 환산. 원단 분할이 찾은 bbox를 랜드마크 검출에 그대로 넘겨서 크롭 영역으로 쓴다.
+
+카테고리는 DeepFashion2 13종 중 실사진 + 공식 정의도로 대조 검증된 3개만 지원한다
+(`SHORT_SLEEVE_TOP`/`TROUSERS`/`LONG_SLEEVE_DRESS`) — 나머지는 검증 전까지 범위 밖이다
+(`worker/models/garment_measurement/registry.py`의 `DF2_CATEGORY_RANGES` 참고).
+
+### job payload 형식
+
+```json
+{
+  "product_id": 1042,
+  "image_url": "https://.../scan.jpg",
+  "category": "SHORT_SLEEVE_TOP",
+  "reference_object": "A4_PAPER"
+}
+```
+
+### 결과 형식
+
+```json
+{
+  "measurement_id": "scan_1042_...",
+  "product_id": 1042,
+  "model": {"reference_backend": "opencv_contour", "segmentation_backend": "grabcut", "landmark_backend": "hrnet_deepfashion2"},
+  "reference_object_found": true,
+  "pixel_to_cm_ratio": 0.2645,
+  "landmarks": [{"type": "SHOULDER_LEFT", "pixel_x": 320.0, "pixel_y": 210.0, "confidence": 0.93}, ...],
+  "measurements": [{"type": "SHOULDER_WIDTH", "value_cm": 52.0, "confidence": 0.9}, ...],
+  "overall_confidence": 0.87,
+  "needs_retake": false,
+  "retake_reason": null,
+  "notes": [],
+  "latency_ms": 340.5
+}
+```
+
+`needs_retake=true`면 `landmarks`/`measurements`가 비어 있다 — `retake_reason`으로 어느 단계에서
+막혔는지(`REFERENCE_NOT_FOUND`/`GARMENT_NOT_FOUND`/`LOW_LANDMARK_CONFIDENCE`) 알 수 있다.
+
 ## 전체 흐름 테스트
 
 ```bash
@@ -243,3 +324,9 @@ curl https://i15a108.p.ssafy.io/ai/jobs/{job_id}
 - OpenVidu 설치 후 실제 방송 오디오로 STT 워커 E2E 검증
 - chat_rag 워커를 실제 GPU 노트북에서 `CHAT_RAG_BACKEND=lfm2_langchain`으로 돌려보기 (지금까지는 `mock`으로만 검증했다)
 - 워커 호출 전 답변 캐시(같은 `live_id` 안 유사 질문 재사용, ONNX 임베더) — 별도 후속 작업
+- 실측 워커: `opencv_contour`/`grabcut`의 임계치(Canny, GrabCut 초기 사각형 마진 등)를 실제
+  판매자 촬영 사진으로 계속 보정 — 지금까지는 합성 이미지로만 검증했다
+  (`AI/test/worker/garment_measurement/`)
+- 실측 워커: DeepFashion2 나머지 10개 카테고리(긴팔상의/아우터 2종/조끼/슬링/반바지/치마/
+  반팔원피스/조끼원피스/슬링원피스) — 실사진 확보되는 대로 `AI/validation/garment-landmark-check/
+  verify_hrnet_landmarks.py`로 눈으로 대조 검증 후 `registry.py`에 추가
