@@ -11,6 +11,7 @@ import ProductDetailInformation from '@/domains/product/components/ProductDetail
 import ProductDetailSkeleton from '@/domains/product/components/ProductDetailSkeleton.vue'
 import ProductDetailStatePanel from '@/domains/product/components/ProductDetailStatePanel.vue'
 import ProductImageGallery from '@/domains/product/components/ProductImageGallery.vue'
+import ProductPriceDistribution from '@/domains/product/components/ProductPriceDistribution.vue'
 import ProductPurchaseSummary from '@/domains/product/components/ProductPurchaseSummary.vue'
 import ProductSellerLivePanel from '@/domains/product/components/ProductSellerLivePanel.vue'
 import type {
@@ -119,6 +120,10 @@ const handlePurchase = () =>
 
 const handleViewSeller = () => showTemporaryMessage('판매자 프로필 화면은 준비 중입니다.')
 
+const handleViewSimilarProduct = (productId: number) => {
+  void router.push({ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId } })
+}
+
 const handleToggleReminder = () => {
   isReminderSet.value = !isReminderSet.value
 }
@@ -201,6 +206,13 @@ onBeforeUnmount(() => {
           @view-seller="handleViewSeller"
         />
       </div>
+
+      <ProductPriceDistribution
+        :current-product-id="product.id"
+        :current-price="product.price"
+        :products="product.similarProducts"
+        @view-product="handleViewSimilarProduct"
+      />
 
       <p v-if="actionMessage" class="product-detail__action-message" role="status">
         {{ actionMessage }}
