@@ -42,12 +42,7 @@ export interface ProductRegistrationPhotoDraft {
   isRepresentative: boolean
 }
 
-export interface ProductRegistrationMeasurementDraft {
-  shoulder: string
-  chest: string
-  sleeve: string
-  length: string
-}
+export type ProductRegistrationMeasurementDraft = Record<string, string>
 
 export interface ProductRegistrationAiDefectCandidate {
   id: string
