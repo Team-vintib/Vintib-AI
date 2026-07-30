@@ -61,13 +61,45 @@ class TryOnOptions(BaseModel):
 
     실제 이미지 파일은 이 모델에 담기지 않는다 — multipart로 따로 받아 저장하고,
     job payload에는 경로/URL만 싣는다.
+
+    `body_*`/`garment_measurements`는 전부 선택값이다 — 온보딩을 건너뛴 회원이거나 상품에
+    실측이 안 되어 있으면 비어 있는 게 정상이고, 그 경우 `fit_type` 고정 3단계로 그대로
+    동작한다(적응형 마스킹은 둘 다 있을 때만 켜진다). `body_chest_cm`/`body_waist_cm`/
+    `body_hip_cm`은 BE `member_body_profile`에 아직 컬럼이 없어(단위·범위도 미확정,
+    `.codex/requests/be/003-onboarding-tryon-profile-api.md` 열린 질문 참고) 지금은 항상
+    `None`으로 들어오지만, 나중에 컬럼이 생겼을 때 AI 쪽 스키마를 또 안 건드리게 미리
+    열어둔다.
     """
 
     mask_type: MaskType = Field(default=MaskType.upper, description="마스킹할 의류 부위")
-    fit_type: MaskFitType = Field(default=MaskFitType.regular, description="핏 옵션")
+    fit_type: MaskFitType = Field(
+        default=MaskFitType.regular,
+        description="핏 옵션. body/garment 측정값이 둘 다 있으면 적응형 계산이 이 값을 대체한다",
+    )
     num_inference_steps: int = Field(
         default=30, ge=10, le=50, description="디퓨전 스텝 수. 클수록 품질↑ 속도↓"
     )
     guidance_scale: float = Field(
         default=2.5, ge=1.0, le=10.0, description="condition 이미지 반영 강도"
+    )
+
+    # --- 적응형 마스킹 입력(전부 선택) ------------------------------------------
+    body_height_cm: float | None = Field(default=None, description="BE에 확정 컬럼 있음")
+    body_weight_kg: float | None = Field(default=None, description="BE에 확정 컬럼 있음")
+    body_chest_cm: float | None = Field(
+        default=None, description="BE DB 컬럼 미확정 — 항상 None으로 들어올 수 있음"
+    )
+    body_waist_cm: float | None = Field(
+        default=None, description="BE DB 컬럼 미확정 — 항상 None으로 들어올 수 있음"
+    )
+    body_hip_cm: float | None = Field(
+        default=None, description="BE DB 컬럼 미확정 — 항상 None으로 들어올 수 있음"
+    )
+    garment_measurements: dict[str, float] | None = Field(
+        default=None,
+        description=(
+            "measurement 도메인 MeasurementType 값을 키로 쓰는 실측 결과 "
+            '(예: {"TOTAL_LENGTH": 68.0, "WAIST_WIDTH": 42.0}). '
+            "다른 도메인 enum을 직접 import하지 않고 문자열 키로만 느슨하게 결합한다."
+        ),
     )
