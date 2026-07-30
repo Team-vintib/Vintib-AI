@@ -128,13 +128,11 @@ stateDiagram-v2
     DRAFT --> ON_SALE : 상시 판매 등록
     DRAFT --> AUCTION_SCHEDULED : 경매 예정 설정
     ON_SALE --> AUCTION_SCHEDULED : 경매 전환 (PROD-004)
+    AUCTION_SCHEDULED --> ON_SALE : 상시 판매 전환 (PROD-004/PROD-005)
     AUCTION_SCHEDULED --> AUCTION_IN_PROGRESS : 경매 시작 (AUCT-002)
+    AUCTION_IN_PROGRESS --> AUCTION_SCHEDULED : 입찰자 없이 종료 (AUCT-014)
     ON_SALE --> SOLD : 상시 구매
     AUCTION_IN_PROGRESS --> SOLD : 낙찰 (AUCT-012)
-    AUCTION_IN_PROGRESS --> AUCTION_FAILED : 입찰자 없이 종료
-    AUCTION_FAILED --> ON_SALE : 판매자가 상시 판매 선택
-    AUCTION_FAILED --> AUCTION_SCHEDULED : 경매 예정 유지
-    AUCTION_FAILED --> PRIVATE : 비공개 선택
     SOLD --> [*]
 ```
 
@@ -142,13 +140,20 @@ stateDiagram-v2
 | --- | --- |
 | `DRAFT` | 등록 중(미공개) |
 | `ON_SALE` | 상시 판매 중 |
-| `AUCTION_SCHEDULED` | 경매 예정 — 가격 없음, 홈에서 '경매 예정'으로 표시 |
+| `AUCTION_SCHEDULED` | 경매 예정 — 가격 없음, 홈에서 '경매 예정'으로 표시. 입찰자 없이 경매가 끝나도 다시 이 상태로 남는다 |
 | `AUCTION_IN_PROGRESS` | 경매 진행 중 — 상시 구매 즉시 중단 (LIVE-006) |
-| `AUCTION_FAILED` | 미낙찰 — **판매자 재설정 대기** |
 | `SOLD` | 판매 완료(낙찰 포함) |
-| `PRIVATE` | 비공개 |
 
-> **`AUCTION_FAILED`를 별도 상태로 둔 이유.** `AUCT-014`는 "자동 상시 판매 전환 금지"이고 `PROD-005`는 판매자가 상시 판매 / 경매 예정 유지 / 비공개 중 고르게 되어 있다. 자동 전이가 금지된 이상 **선택을 기다리는 중간 상태가 반드시 필요**하다. 이 상태가 없으면 미낙찰 상품이 갈 곳이 없다.
+> **`AUCTION_FAILED`라는 별도 상태를 두지 않는 이유.** 입찰자 없이 경매가 끝나도 상품은 그냥
+> `AUCTION_SCHEDULED`로 돌아간다(경매 도메인이 실패 시 `product`를 건드릴 필요가 없어짐). 판매자는
+> 이 상태의 상품을 아무 때나 골라 가격을 넣고 `ON_SALE`로 전환하거나(PROD-005), 그냥 둬서 다음
+> 라이브에서 다시 경매되게 할 수 있다 — "그대로 둔다"는 선택은 아무 것도 안 하면 되므로 API도
+> 필요 없다. 이 상품이 예전에 실패한 적이 있다는 이력은 `product.sale_status`에는 안 남지만
+> `auction` 테이블에 그 시도가 `status='FAILED'`인 row로 남아 있어 사라지지 않는다.
+>
+> **`PRIVATE`는 없앴다.** 처음엔 미낙찰 후속 선택지에 "비공개"도 있었지만 기획에서 빠졌다. 이
+> 상태로 들어오는 화살표가 이거 하나뿐이었어서, 선택지가 없어지면 `PRIVATE`는 영원히 도달 불가능한
+> 죽은 상태가 된다. 그래서 enum·CHECK 제약에서 완전히 제거했다.
 
 ### 3-2. 방송 상태 `live.status`
 

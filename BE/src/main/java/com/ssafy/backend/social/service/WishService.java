@@ -32,7 +32,7 @@ public class WishService {
     @Transactional
     public WishResponse wish(Long memberId, Long productId) {
         Product product = productRepository.findById(productId)
-                .filter(p -> !p.isPrivate())
+                .filter(p -> !p.isDraft())
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
 
         WishId wishId = new WishId(memberId, productId);

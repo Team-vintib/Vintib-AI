@@ -2,19 +2,29 @@ package com.ssafy.backend.live.service;
 
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.live.dto.request.LiveInstantRequest;
 import com.ssafy.backend.live.dto.request.LiveScheduleRequest;
+import com.ssafy.backend.live.dto.request.LiveListSort;
 import com.ssafy.backend.live.dto.request.LiveStatusUpdateRequest;
+import com.ssafy.backend.live.dto.response.LiveCategoryResponse;
 import com.ssafy.backend.live.dto.response.LiveDetailResponse;
+import com.ssafy.backend.live.dto.response.LiveListItemResponse;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveStatus;
+import com.ssafy.backend.live.port.ProductQueryPort.CategorySummary;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,19 +36,38 @@ public class LiveService {
     private final LiveRepository liveRepository;
     private final MemberRepository memberRepository;
     private final LiveProductService liveProductService;
+    private final LiveViewerService liveViewerService;
     // 종료 시 정리할 리소스가 늘어나면 구현체만 추가한다 — 종료 로직은 다시 열지 않는다.
     private final List<LiveCleanupHook> cleanupHooks;
 
+    // 공개 목록에는 예정·진행 중만 나온다. 종료·취소는 결과에서도 상태 필터에서도 빠진다.
+    private static final List<LiveStatus> PUBLIC_STATUSES = List.of(LiveStatus.SCHEDULED, LiveStatus.LIVE);
+
+    /**
+     * 시청자 수 정렬에서 한 번에 고려하는 방송 수의 상한.
+     *
+     * <p>이 정렬은 SQL 로 자를 수 없어 후보를 모두 읽어 메모리에서 세운다. 상한이 없으면 방송이
+     * 쌓일수록 한 요청이 테이블 전체를 끌어온다. 공개 목록에 나올 수 있는 것은 예정·진행 중뿐이라
+     * 실제로는 이 값에 한참 못 미치지만, 넘어설 규모가 되면 {@code live} 에 현재 시청자 수 컬럼을
+     * 두고 SQL 정렬로 바꾸는 것이 맞다.
+     */
+    private static final int MAX_VIEWERS_SORT_CANDIDATES = 500;
+
     /**
      * 예약 라이브 개설(LIVE-001). 방송 예정 시각이 미래인지는 요청 DTO({@code @Future})가 검증한다.
+     *
+     * <p><b>판매 상품을 개설과 같은 트랜잭션에서 편성한다.</b> 상품 없는 방송이 만들어지면
+     * 카테고리도 없고 팔 것도 없는 빈 방이 목록에 뜬다. 편성이 실패하면 방송도 만들어지지 않는다.
      */
     @Transactional
     public LiveResponse scheduleLive(Long hostId, LiveScheduleRequest request) {
         Member host = findHost(hostId);
 
-        Live live = Live.schedule(host, request.title(), request.thumbnailUrl(), request.scheduledAt());
+        Live live = liveRepository.save(
+                Live.schedule(host, request.title(), request.thumbnailUrl(), request.scheduledAt()));
+        liveProductService.linkProductsOnCreate(hostId, live, request.productIds());
 
-        return LiveResponse.from(liveRepository.save(live));
+        return LiveResponse.from(live);
     }
 
     /**
@@ -46,14 +75,19 @@ public class LiveService {
      *
      * <p>시작 시각은 클라이언트가 보낸 값이 아니라 서버 시각으로 박는다 — 방송 시작 순서·경매 종료
      * 판정이 전부 서버 시각 기준이어야 하기 때문이다(erd.md §6).
+     *
+     * <p>즉시 개설은 생성 즉시 {@code LIVE}가 되어 <b>이후 편성을 바꿀 수 없다.</b> 그래서
+     * 상품 편성이 개설 요청에 반드시 포함돼야 한다.
      */
     @Transactional
     public LiveResponse openLiveNow(Long hostId, LiveInstantRequest request) {
         Member host = findHost(hostId);
 
-        Live live = Live.openNow(host, request.title(), request.thumbnailUrl(), LocalDateTime.now());
+        Live live = liveRepository.save(
+                Live.openNow(host, request.title(), request.thumbnailUrl(), LocalDateTime.now()));
+        liveProductService.linkProductsOnCreate(hostId, live, request.productIds());
 
-        return LiveResponse.from(liveRepository.save(live));
+        return LiveResponse.from(live);
     }
 
     /**
@@ -66,7 +100,113 @@ public class LiveService {
         Live live = liveRepository.findById(liveId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LIVE_NOT_FOUND));
 
-        return LiveDetailResponse.of(live, liveProductService.getLinkedProducts(liveId));
+        List<LiveCategoryResponse> categories = liveProductService.getLiveCategories(liveId).stream()
+                .map(LiveCategoryResponse::from)
+                .toList();
+
+        return LiveDetailResponse.of(
+                live,
+                liveProductService.getLinkedProducts(liveId),
+                categories,
+                // 화면 진입 시 초기값. 이후 변화는 /topic/lives/{liveId}/viewers 로 간다.
+                liveViewerService.getViewerCount(liveId));
+    }
+
+    /**
+     * 공개 라이브 목록(LIVE-005). <b>비회원도 조회할 수 있다.</b>
+     *
+     * <p>공개 목록에는 예정·진행 중만 나온다 — 끝났거나 취소된 방송은 상태 필터 허용값에서도,
+     * 결과에서도 빠진다. 카테고리 필터는 편성 상품을 통해 걸리며, 대분류를 고르면 하위 소분류
+     * 상품을 건 방송까지 잡힌다.
+     *
+     * @param categoryIds 비어 있으면 카테고리 필터를 걸지 않는다
+     * @param status      null이면 예정·진행 중 모두
+     */
+    public PageResponse<LiveListItemResponse> getPublicLives(
+            List<Long> categoryIds, LiveStatus status, LiveListSort sort, int page, int size) {
+        List<LiveStatus> statuses = status == null ? PUBLIC_STATUSES : List.of(status);
+
+        boolean filterByCategory = categoryIds != null && !categoryIds.isEmpty();
+        List<Long> productIds = filterByCategory
+                ? liveProductService.findProductIdsInCategories(categoryIds)
+                : List.of();
+        if (filterByCategory && productIds.isEmpty()) {
+            // 해당 카테고리 상품이 하나도 없으면 매칭될 라이브도 없다. IN () 로 쿼리가 깨지는 것도 막는다.
+            return PageResponse.from(Page.empty(PageRequest.of(page, size)));
+        }
+
+        if (sort.isInMemory()) {
+            return getPublicLivesByViewerCount(statuses, filterByCategory, productIds, page, size);
+        }
+
+        Page<Live> lives = liveRepository.findPublicLives(
+                statuses, filterByCategory, productIds, PageRequest.of(page, size, sort.toSort()));
+
+        List<Long> liveIds = idsOf(lives.getContent());
+        Map<Long, List<CategorySummary>> categoriesByLiveId =
+                liveProductService.getCategoriesByLiveIds(liveIds);
+        Map<Long, Integer> viewerCounts = liveViewerService.getViewerCounts(liveIds);
+
+        return PageResponse.from(lives.map(live -> toListItem(live, categoriesByLiveId, viewerCounts)));
+    }
+
+    /**
+     * 시청자 수 많은 순 목록(-450).
+     *
+     * <p><b>SQL 로 정렬할 수 없어 후보를 읽어 메모리에서 정렬한다.</b> 현재 시청자 수는 Redis 에만
+     * 있는 값이라 {@code ORDER BY} 로 걸 컬럼이 없다.
+     *
+     * <p>후보는 {@link #MAX_VIEWERS_SORT_CANDIDATES} 까지만 본다. 그래서 {@code totalElements} 도
+     * 전체 개수가 아니라 <b>실제로 정렬 대상이 된 수</b>다 — 전체 개수를 내려보내면 도달할 수 없는
+     * 페이지가 있다고 알려주는 셈이 된다.
+     */
+    private PageResponse<LiveListItemResponse> getPublicLivesByViewerCount(
+            List<LiveStatus> statuses, boolean filterByCategory, List<Long> productIds, int page, int size) {
+        List<Live> candidates = liveRepository.findPublicLives(
+                        statuses,
+                        filterByCategory,
+                        productIds,
+                        PageRequest.of(0, MAX_VIEWERS_SORT_CANDIDATES, LiveListSort.VIEWERS_DESC.toSort()))
+                .getContent();
+
+        Map<Long, Integer> viewerCounts = liveViewerService.getViewerCounts(idsOf(candidates));
+
+        // 동률에서 id DESC 로 한 번 더 세운다 — 시청자 0명인 예약 방송이 여럿이면 그쪽이 전부
+        // 동률이라, 마지막 기준이 없으면 페이지를 넘길 때 순서가 흔들린다.
+        List<Live> sorted = candidates.stream()
+                .sorted(Comparator.<Live>comparingInt(live -> viewerCounts.getOrDefault(live.getId(), 0))
+                        .reversed()
+                        .thenComparing(Live::getId, Comparator.reverseOrder()))
+                .toList();
+
+        // page 는 상한이 없어 곱셈이 int 를 넘을 수 있다. long 으로 계산해야 음수로 뒤집히지 않는다.
+        int from = (int) Math.min((long) page * size, sorted.size());
+        int to = (int) Math.min((long) from + size, sorted.size());
+        List<Live> pageContent = sorted.subList(from, to);
+
+        Map<Long, List<CategorySummary>> categoriesByLiveId =
+                liveProductService.getCategoriesByLiveIds(idsOf(pageContent));
+        List<LiveListItemResponse> items = pageContent.stream()
+                .map(live -> toListItem(live, categoriesByLiveId, viewerCounts))
+                .toList();
+
+        return PageResponse.from(new PageImpl<>(items, PageRequest.of(page, size), sorted.size()));
+    }
+
+    private LiveListItemResponse toListItem(
+            Live live,
+            Map<Long, List<CategorySummary>> categoriesByLiveId,
+            Map<Long, Integer> viewerCounts) {
+        return LiveListItemResponse.of(
+                live,
+                categoriesByLiveId.getOrDefault(live.getId(), List.of()).stream()
+                        .map(LiveCategoryResponse::from)
+                        .toList(),
+                viewerCounts.getOrDefault(live.getId(), 0));
+    }
+
+    private List<Long> idsOf(List<Live> lives) {
+        return lives.stream().map(Live::getId).toList();
     }
 
     /**

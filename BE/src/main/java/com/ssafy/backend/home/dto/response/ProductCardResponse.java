@@ -1,6 +1,7 @@
 package com.ssafy.backend.home.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.LocalDateTime;
 
 /**
  * 홈/팔로잉 화면의 상품 카드 공통 응답. (HOME-001 소유, HOME-002 재사용)
@@ -21,7 +22,7 @@ public record ProductCardResponse(
         @Schema(description = "브랜드", example = "Levi's")
         String brand,
 
-        @Schema(description = "썸네일 URL", example = "https://cdn.example.com/product/2001.jpg")
+        @Schema(description = "썸네일 URL", example = "https://picsum.photos/seed/product2001/480/480")
         String thumbnailUrl,
 
         @Schema(description = "판매 방식", example = "NORMAL", allowableValues = {"NORMAL", "AUCTION_SCHEDULED"})
@@ -34,6 +35,23 @@ public record ProductCardResponse(
         Long price,
 
         @Schema(description = "경매 예정 여부. true면 FE는 가격 대신 '경매 예정'으로 표시한다", example = "false")
-        boolean auctionScheduled
+        boolean auctionScheduled,
+
+        @Schema(description = "판매자 표시명", example = "빈티지장인")
+        String sellerName,
+
+        @Schema(description = "카테고리명. 미분류 상품은 null", example = "하의")
+        String categoryName,
+
+        @Schema(
+                description = "회원별 찜 여부. **비회원 요청이면 null**이며, FE는 이 경우 찜 아이콘을 비활성 상태로 둔다",
+                example = "false")
+        Boolean isWished,
+
+        @Schema(description = "경매 시작가(원). 경매 예정 상품만 값을 갖는다", example = "50000")
+        Long startingBid,
+
+        @Schema(description = "경매 시작 예정 시각. 경매 예정 상품만 값을 갖는다", example = "2026-08-01T20:00:00")
+        LocalDateTime auctionStartsAt
 ) {
 }

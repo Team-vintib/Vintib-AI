@@ -95,71 +95,8 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 > `data-dictionary.md`와 `docs/db/img/`는 **자동 생성물이다.** 직접 고치지 말고 `bash docs/db/regen.sh` / `bash docs/db/export-erd.sh`로 다시 뽑는다.
 
 경매 동시성 정책(`LIVE-004`, `AUCT-004/006/008/009`)은 애플리케이션 검증뿐 아니라 **DB 제약으로도 막혀 있다.** 입찰 로직을 손볼 때는 [`erd.md` §4](./docs/db/erd.md)를 먼저 읽을 것 — 특히 포인트 보류 해제 순서를 잘못 잡으면 제약이 무력화된다.
-### 1) 전부 컨테이너로 (권장 — EC2와 동일 구성)
 
-레포 루트에서:
-
-```bash
-cp .env.example .env && docker compose up -d
-```
-
-`docker-compose.override.yml`이 자동 병합되어 로컬 개발용 포트가 열린다.
-
-| 서비스 | 로컬 주소 |
-| --- | --- |
-| Spring Boot | http://localhost:8080 |
-| FastAPI | http://localhost:8000 |
-| PostgreSQL | localhost:5432 |
-| Redis | localhost:6379 |
-
-배선 확인:
-
-```bash
-curl -s http://localhost:8080/actuator/health && curl -s http://localhost:8080/api/health
-```
-
-`/actuator/health`는 PostgreSQL·Redis를, `/api/health`는 FastAPI 도달 여부를 보여준다.
-
-### 2) 인프라만 컨테이너 + Spring은 IDE에서
-
-```bash
-docker compose up -d postgres redis ai
-```
-
-이후 `BE/`에서 `./gradlew bootRun` (기본 프로파일 `local`).
-
-### 3) EC2 운영 기동
-
-override를 타지 않도록 `-f`를 반드시 명시한다.
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-```
-
-> [!WARNING]
-> 베이스 `docker-compose.yml`에는 호스트 포트를 절대 추가하지 않는다. Docker는 포트 publish 시 iptables를 직접 조작해 UFW를 우회하므로, PostgreSQL·Redis·FastAPI가 그대로 외부에 노출된다. 로컬용 포트는 `docker-compose.override.yml`에만 둔다.
-
-## 프로파일
-
-| 프로파일 | ddl-auto | actuator 노출 | 용도 |
-| --- | --- | --- | --- |
-| `local` | `update` | health, info, metrics, env, beans | 개발 |
-| `prod` | `validate` | health (상세 숨김) | EC2 |
-
-## DB 설계
-
-테이블 23개 기준. 상세는 [`docs/db/`](./docs/db)에 있다.
-
-| 문서 | 내용 |
-| --- | --- |
-| [ERD·상태 설계](./docs/db/erd.md) | ERD, 상태 전이, 정책을 DB 제약으로 옮긴 근거, 미확인 가정 |
-| [데이터 사전](./docs/db/data-dictionary.md) | 테이블별 컬럼·타입·제약·기본값·설명 (자동 생성) |
-| [`schema.sql`](./docs/db/schema.sql) | 스키마 원본 — 단일 기준 |
-
-> [!IMPORTANT]
-> `data-dictionary.md`와 `docs/db/img/`는 **자동 생성물이다.** 직접 고치지 말고 `bash docs/db/regen.sh` / `bash docs/db/export-erd.sh`로 다시 뽑는다.
-
-경매 동시성 정책(`LIVE-004`, `AUCT-004/006/008/009`)은 애플리케이션 검증뿐 아니라 **DB 제약으로도 막혀 있다.** 입찰 로직을 손볼 때는 [`erd.md` §4](./docs/db/erd.md)를 먼저 읽을 것 — 특히 포인트 보류 해제 순서를 잘못 잡으면 제약이 무력화된다.
+**`live` 테이블에는 카테고리 컬럼이 없다.** 라이브의 카테고리는 편성 상품(`live_product` → `product.category_id`)에서 유도해 대분류로 롤업한다. 같은 사실을 두 군데 저장하면 반드시 어긋나기 때문이다. 그 결과 **라이브 하나가 카테고리를 여러 개 가질 수 있고**(응답이 `categories[]`, 필터가 `categoryIds` 복수인 이유), 편성이 확정되는 시점 = 카테고리가 확정되는 시점이다. 그래서 개설 요청에 `productIds`가 필수이고 방송 시작 후에는 편성을 바꿀 수 없다.
 
 ## 디렉터리 구조
 
@@ -187,12 +124,19 @@ BE/
 │   │   ├── controller/
 │   │   ├── service/
 │   │   └── dto/response/        # 카드 DTO는 현재 Mock 응답용 (2주차 실데이터 연결)
-│   ├── live/                    # 라이브 방 개설/조회/상태 전이 (LIVE) — 정윤
-│   │   ├── controller/          # LiveController, LiveProductController
-│   │   ├── service/             # LiveService, LiveProductService
-│   │   ├── entity/              # Live, LiveStatus, LiveProduct
+│   ├── live/                    # 라이브 방 개설/조회/상태 전이, 시청자 수, 반응 (LIVE) — 정윤
+│   │   ├── controller/          # LiveController, LiveProductController, LiveReactionStompController(STOMP)
+│   │   ├── service/             # LiveService, LiveProductService, LiveViewerService, LiveReactionService
+│   │   ├── entity/              # Live, LiveStatus, LiveProduct, ReactionType(저장 안 함)
 │   │   ├── repository/
 │   │   ├── port/                # ProductQueryPort — 상품 도메인 참조를 한 곳으로 격리
+│   │   ├── websocket/           # LiveSessionEventListener — SUBSCRIBE/DISCONNECT를 시청자 수로
+│   │   └── dto/
+│   ├── chat/                    # 라이브 실시간 채팅 (CHAT) — 정윤
+│   │   ├── controller/          # ChatStompController(STOMP), ChatMessageController(이력 REST)
+│   │   ├── service/             # ChatMessageService
+│   │   ├── entity/              # ChatMessage, SenderType
+│   │   ├── repository/
 │   │   └── dto/
 │   ├── auction/                 # 경매 조건 설정/진행 (AUCT) — 정윤
 │   │   ├── entity/              # Auction, AuctionStatus
@@ -209,14 +153,21 @@ BE/
 │   │   ├── entity/               # Wish, WishId(복합키)
 │   │   ├── repository/
 │   │   └── dto/
+│   ├── notification/             # 알림함 읽음 처리 (NOTI, APIs.md "알림" 섹션 기준) — 서윤
+│   │   ├── controller/
+│   │   ├── service/
+│   │   ├── entity/               # Notification
+│   │   ├── repository/
+│   │   └── dto/response/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
 │       ├── client/              # AiClient — Spring → FastAPI
-│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config
+│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig
 │       ├── entity/              # BaseTimeEntity 등 공통 베이스 엔티티
 │       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
 │       ├── health/              # HealthController
-│       ├── response/            # ApiResponse, ErrorResponse
-│       └── storage/             # S3StorageService, S3BucketInitializer
+│       ├── response/            # ApiResponse, ErrorResponse, PageResponse, CursorPageResponse
+│       ├── storage/             # S3StorageService, S3BucketInitializer
+│       └── websocket/           # STOMP 인증(StompAuthChannelInterceptor)·공통 예외(StompExceptionAdvice)
 ├── src/main/resources/application.yml
 └── src/test/java/com/ssafy/backend/
 ```
@@ -226,7 +177,7 @@ BE/
 담당 분배:
 
 ```
-{auth,member,product,tryon,social,point,order}/   ← 서윤
+{auth,member,product,tryon,social,notification,point,order}/   ← 서윤
 {live,auction,chat,home,search}/     ← 정윤
 ```
 
