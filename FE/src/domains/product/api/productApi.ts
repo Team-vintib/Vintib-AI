@@ -16,7 +16,7 @@ import type {
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
 import { http } from '@/shared/api/http'
-import type { ApiResponse, PageResponse } from '@/shared/types/api.types'
+import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.types'
 
 type ProductSaleTypeDto = 'DIRECT_SALE' | 'AUCTION'
 type ProductSaleStatusDto =
@@ -65,6 +65,15 @@ interface ProductListDto {
   primaryImageUrl?: string | null
   isWished?: boolean
   createdAt: string
+}
+
+interface BackendPageResponse<T> {
+  content: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  hasNext: boolean
 }
 
 interface ProductDetailDto extends ProductListDto {
@@ -128,7 +137,7 @@ export const getProductList = async ({
   size = 20,
   sort = 'LATEST',
 }: ProductListParams = {}) => {
-  const response = await http.get<ApiResponse<PageResponse<ProductListDto>>>('/products', {
+  const response = await http.get<ApiResponse<PageResponse<ProductListDto> | BackendPageResponse<ProductListDto>>>('/products', {
     params: {
       page: Math.max(page - 1, 0),
       size,
@@ -141,7 +150,7 @@ export const getProductList = async ({
       saleType: saleType === 'ALL' ? undefined : saleType,
     },
   })
-  const pageResponse = unwrapApiData(response.data)
+  const pageResponse = normalizePageResponse(unwrapApiData(response.data))
 
   return {
     items: pageResponse.items.map(toProductListItem),
@@ -150,9 +159,7 @@ export const getProductList = async ({
 }
 
 export const getProductDetail = async (productId: number): Promise<ProductDetailViewData> => {
-  const response = await http.get<ApiResponse<ProductDetailDto>>(`/products/${productId}`, {
-    skipAuth: true,
-  })
+  const response = await http.get<ApiResponse<ProductDetailDto>>(`/products/${productId}`)
 
   return toProductDetailViewData(unwrapApiData(response.data))
 }
@@ -202,6 +209,10 @@ export const submitProduct = async (
     await http.patch<ApiResponse<ProductListDto>>(`/products/${createdProduct.id}/status`, {
       price: Number(draft.directSalePrice),
     })
+  }
+
+  if (draft.saleType === 'AUCTION') {
+    await http.patch<ApiResponse<ProductListDto>>(`/products/${createdProduct.id}/auction-schedule`)
   }
 
   return {
@@ -256,6 +267,24 @@ const unwrapApiData = <T>(response: ApiResponse<T>) => {
   }
 
   return response.data
+}
+
+const normalizePageResponse = <T>(
+  response: PageResponse<T> | BackendPageResponse<T>,
+): PageResponse<T> => {
+  if ('items' in response) {
+    return response
+  }
+
+  return {
+    items: response.content,
+    meta: {
+      page: response.page + 1,
+      size: response.size,
+      totalElements: response.totalElements,
+      totalPages: response.totalPages,
+    } satisfies PageMeta,
+  }
 }
 
 const toProductListItem = (product: ProductListDto): ProductListItem => {

@@ -38,6 +38,7 @@ const appliedMaximumPrice = ref<number | null>(null)
 const priceError = ref('')
 const products = ref(PRODUCT_LIST_MOCK_DATA)
 const totalProductCount = ref(PRODUCT_LIST_MOCK_DATA.length)
+const totalPageCount = ref(1)
 const isLoadingProducts = ref(false)
 const productLoadError = ref('')
 const likedProductIds = ref(new Set(PRODUCT_LIST_MOCK_DATA.filter((product) => product.isLiked).map((product) => product.id)))
@@ -52,6 +53,9 @@ const selectedFilterCount = computed(
 )
 
 const filteredProducts = computed(() => products.value)
+const visiblePageNumbers = computed(() =>
+  Array.from({ length: totalPageCount.value }, (_, index) => index + 1),
+)
 
 const parseOptionalPrice = (value: string) => {
   if (!value) {
@@ -127,6 +131,7 @@ const loadProducts = async () => {
 
     products.value = response.items
     totalProductCount.value = response.meta.totalElements
+    totalPageCount.value = Math.max(response.meta.totalPages, 1)
     likedProductIds.value = new Set(response.items.filter((product) => product.isLiked).map((product) => product.id))
     filterStatusMessage.value =
       selectedFilterCount.value > 0
@@ -135,6 +140,7 @@ const loadProducts = async () => {
   } catch {
     products.value = PRODUCT_LIST_MOCK_DATA
     totalProductCount.value = PRODUCT_LIST_MOCK_DATA.length
+    totalPageCount.value = 1
     likedProductIds.value = new Set(PRODUCT_LIST_MOCK_DATA.filter((product) => product.isLiked).map((product) => product.id))
     productLoadError.value = '상품 목록을 불러오지 못해 임시 데이터를 표시합니다.'
   } finally {
@@ -172,6 +178,15 @@ const handleToggleLike = async (productId: number) => {
         : [...nextLikedProductIds].filter((likedProductId) => likedProductId !== productId),
     )
   }
+}
+
+const moveToPage = (page: number) => {
+  if (page < 1 || page > totalPageCount.value || page === selectedPage.value) {
+    return
+  }
+
+  selectedPage.value = page
+  void loadProducts()
 }
 
 onMounted(() => {
@@ -282,12 +297,12 @@ onMounted(() => {
               </svg>
             </button>
             <button
-              v-for="page in 5"
+              v-for="page in visiblePageNumbers"
               :key="page"
               type="button"
               :class="{ 'product-list-page__page--active': selectedPage === page }"
               :aria-current="selectedPage === page ? 'page' : undefined"
-              @click="selectedPage = page; loadProducts()"
+              @click="moveToPage(page)"
             >
               {{ page }}
             </button>
