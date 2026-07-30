@@ -181,7 +181,6 @@ const getMeasurementError = (fieldId: string, value: string | number) => {
 const activeMeasurementFields = computed(
   () => PRODUCT_REGISTRATION_MEASUREMENT_FIELDS_BY_CATEGORY[draft.categoryId] ?? [],
 )
-const requiresMeasurements = computed(() => activeMeasurementFields.value.length > 0)
 const attributesStepErrors = computed(() => ({
   size:
     attributesStepTouched.size && !draft.size
