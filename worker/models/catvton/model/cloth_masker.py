@@ -8,6 +8,7 @@ import torch
 
 from model.SCHP import SCHP  # type: ignore
 from model.DensePose import DensePose  # type: ignore
+from model.adaptive_fit import compute_mask_adjustment
 
 DENSE_INDEX_MAP = {
     "background": [0],
@@ -199,6 +200,58 @@ def adjust_mask_for_fit(
     return mask_area
 
 
+# =========================================================
+# [신규] 체형-의류 스펙 차이 기반 적응형 마스킹
+#    body_measurements/garment_measurements가 둘 다 있을 때만 fit_type 고정 3단계를
+#    대체한다 — 하나라도 없으면 위 adjust_mask_for_fit()로 그대로 폴백한다.
+#    "어느 측정값 쌍을 쓸지" 고르는 로직(compute_mask_adjustment)은 cv2가 필요 없어서
+#    adaptive_fit.py에 있다(CI에서 바로 테스트됨). 여기는 계산된 값을 실제 마스크 배열에
+#    적용하는 부분(distance transform 등, cv2 필요)만 담당한다.
+# =========================================================
+
+
+def apply_adaptive_adjustment(
+    mask_area: np.ndarray,
+    densepose_mask: np.ndarray,
+    dilation_px: float,
+    cutoff_ratio: float,
+) -> np.ndarray:
+    """`compute_mask_adjustment()`가 계산한 연속값을 실제 마스크 배열에 적용한다.
+
+    `adjust_mask_for_fit()`의 고정 커널 dilate(오버사이즈)·70% 고정 컷오프(크롭)를 대체하는
+    연속 버전 — 고정 커널 반복 대신 distance transform을 재threshold해서 팽창/수축 폭을
+    픽셀 단위로 정밀하게 조절한다.
+    """
+    mask_area = mask_area.astype(np.uint8)
+
+    if dilation_px != 0.0:
+        mask_area = _resize_by_distance_transform(mask_area, dilation_px)
+
+    if cutoff_ratio < 1.0:
+        torso_area = part_mask_of(['torso'], densepose_mask, DENSE_INDEX_MAP)
+        torso_rows = np.where(torso_area.any(axis=1))[0]
+        if len(torso_rows) > 0:
+            torso_top, torso_bottom = torso_rows.min(), torso_rows.max()
+            cutoff = torso_top + int((torso_bottom - torso_top) * cutoff_ratio)
+            mask_area = mask_area.copy()
+            mask_area[cutoff:, :] = 0
+
+    return mask_area
+
+
+def _resize_by_distance_transform(mask_area: np.ndarray, dilation_px: float) -> np.ndarray:
+    """`dilation_px`만큼 마스크를 연속적으로 팽창(양수)하거나 수축(음수)한다."""
+    if dilation_px > 0:
+        # 배경 픽셀마다 "마스크까지 거리"를 구해서, 그 거리가 dilation_px 이내인 픽셀까지
+        # 새로 포함시킨다 — 고정 커널 dilate보다 부드럽고 연속적으로 조절 가능하다.
+        outside_distance = cv2.distanceTransform((1 - mask_area).astype(np.uint8), cv2.DIST_L2, 5)
+        return (outside_distance <= dilation_px).astype(np.uint8)
+
+    # 마스크 픽셀마다 "경계까지 거리"를 구해서, |dilation_px|보다 안쪽(먼) 픽셀만 남긴다.
+    inside_distance = cv2.distanceTransform(mask_area, cv2.DIST_L2, 5)
+    return (inside_distance > abs(dilation_px)).astype(np.uint8)
+
+
 class AutoMasker:
     def __init__(
         self, 
@@ -238,6 +291,8 @@ class AutoMasker:
         schp_atr_mask: Image.Image,
         part: str='overall',
         fit_type: str='regular',
+        body_measurements: dict | None = None,
+        garment_measurements: dict | None = None,
         **kwargs
     ):
         assert part in ['upper', 'lower', 'overall', 'inner', 'outer'], f"part should be one of ['upper', 'lower', 'overall', 'inner', 'outer'], but got {part}"
@@ -296,9 +351,15 @@ class AutoMasker:
         mask_area = (mask_area | strong_mask_area) & (~strong_protect_area) 
         mask_area = cv2.dilate(mask_area, dilate_kernel, iterations=1)
 
-        # [신규] fit_type에 따른 마스크 조정 (strong_protect_area는 이미 제외된 상태이므로
-        # 얼굴/손/발은 이 단계와 무관하게 항상 보존된다)
-        mask_area = adjust_mask_for_fit(mask_area, densepose_mask, fit_type)
+        # [신규] 체형-의류 스펙 차이 기반 적응형 조정 우선, 측정값이 없으면 fit_type 고정
+        # 3단계로 폴백한다(strong_protect_area는 이미 제외된 상태이므로 얼굴/손/발은 이
+        # 단계와 무관하게 항상 보존된다)
+        adjustment = compute_mask_adjustment(part, body_measurements, garment_measurements)
+        if adjustment is not None:
+            dilation_px, cutoff_ratio = adjustment
+            mask_area = apply_adaptive_adjustment(mask_area, densepose_mask, dilation_px, cutoff_ratio)
+        else:
+            mask_area = adjust_mask_for_fit(mask_area, densepose_mask, fit_type)
         mask_area = mask_area & (~strong_protect_area)  # 안전을 위해 재확인
 
         return Image.fromarray((mask_area * 255).astype(np.uint8))
@@ -308,16 +369,20 @@ class AutoMasker:
         image: Union[str, Image.Image],
         mask_type: str = "upper",
         fit_type: str = "regular",
+        body_measurements: dict | None = None,
+        garment_measurements: dict | None = None,
     ):
         assert mask_type in ['upper', 'lower', 'overall', 'inner', 'outer'], f"mask_type should be one of ['upper', 'lower', 'overall', 'inner', 'outer'], but got {mask_type}"
         assert fit_type in ['regular', 'oversized', 'cropped'], f"fit_type should be one of ['regular', 'oversized', 'cropped'], but got {fit_type}"
         preprocess_results = self.preprocess_image(image)
         mask = self.cloth_agnostic_mask(
-            preprocess_results['densepose'], 
-            preprocess_results['schp_lip'], 
-            preprocess_results['schp_atr'], 
+            preprocess_results['densepose'],
+            preprocess_results['schp_lip'],
+            preprocess_results['schp_atr'],
             part=mask_type,
             fit_type=fit_type,
+            body_measurements=body_measurements,
+            garment_measurements=garment_measurements,
         )
         return {
             'mask': mask,

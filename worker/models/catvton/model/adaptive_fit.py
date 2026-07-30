@@ -91,3 +91,52 @@ def ratio_to_cutoff_ratio(
     if ratio is None:
         return 1.0
     return _clamp(base + (ratio - 1.0) * scale, 0.3, 1.0)
+
+
+# "키 대비 적정 기장" 근사 상수 — 인구통계 데이터 없이 잡은 첫 버전 어림값이라, 알파 테스트
+# (`AI/docs/tryon-alpha-test-data-format.md`) 데이터가 쌓이면 보정 대상이다.
+_REFERENCE_LENGTH_RATIO = {
+    "upper": 0.38,  # 상의/원피스: 총장(TOTAL_LENGTH) / 키
+    "lower": 0.60,  # 바지: 겉단기장(OUTSEAM_LENGTH) / 키
+}
+_LENGTH_GARMENT_KEY = {"upper": "TOTAL_LENGTH", "lower": "OUTSEAM_LENGTH"}
+
+
+def compute_mask_adjustment(
+    part: str,
+    body_measurements: dict | None,
+    garment_measurements: dict | None,
+) -> tuple[float, float] | None:
+    """`part`(CatVTON `mask_type`, 'upper'/'lower'/'overall'/'inner'/'outer')에 맞는
+    신체/의류 측정값 쌍을 골라 (dilation_px, cutoff_ratio)를 계산한다.
+
+    `body_measurements`는 `{"height_cm": ..., "waist_cm": ...}` 형태(BE `member_body_profile`
+    필드명에서 `body_` 접두어만 뗀 키), `garment_measurements`는 `AI/app/measurement/schemas.py`
+    `MeasurementType` 값을 키로 쓰는 dict다.
+
+    둘 중 하나라도 `None`/빈 dict면 적응형 계산 자체를 스킵한다는 뜻으로 `None`을 반환한다
+    (호출부는 이때 기존 `adjust_mask_for_fit(fit_type)`으로 폴백해야 한다). `part`가 'lower'가
+    아니면(상의/원피스 계열) 길이 축만 계산한다 — 가슴 너비 축은 대응하는 의류 치수
+    (bust/가슴단면)가 아직 없어 범위 밖이다(`AI/app/measurement/schemas.py` 참고).
+    """
+    if not body_measurements or not garment_measurements:
+        return None
+
+    length_axis = "lower" if part == "lower" else "upper"
+    length_ratio = compute_length_adjustment(
+        body_measurements.get("height_cm"),
+        garment_measurements.get(_LENGTH_GARMENT_KEY[length_axis]),
+        reference_ratio=_REFERENCE_LENGTH_RATIO[length_axis],
+    )
+
+    width_ratio = None
+    if part == "lower":
+        width_ratio = compute_width_adjustment(
+            body_measurements.get("waist_cm"),
+            garment_measurements.get("WAIST_WIDTH"),
+        )
+
+    if length_ratio is None and width_ratio is None:
+        return None
+
+    return ratio_to_dilation_px(width_ratio), ratio_to_cutoff_ratio(length_ratio)
