@@ -160,6 +160,51 @@ class ProductServiceTest {
     }
 
     @Test
+    void DRAFT_상품을_경매_예정으로_등록한다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductResponse response = productService.scheduleAuction(SELLER_ID, 1L);
+
+        assertThat(response.saleStatus()).isEqualTo(SaleStatus.AUCTION_SCHEDULED);
+        assertThat(response.saleType()).isEqualTo(SaleType.AUCTION);
+        assertThat(response.price()).isNull();
+    }
+
+    @Test
+    void DRAFT_상태가_아니면_경매_등록시_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        product.registerDirectSale(50000L);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.scheduleAuction(SELLER_ID, 1L))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PRODUCT_STATE);
+    }
+
+    @Test
+    void 본인이_아니면_경매_등록시_예외를_던진다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.scheduleAuction(2L, 1L))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_PRODUCT_OWNER);
+    }
+
+    @Test
+    void 존재하지_않는_상품이면_경매_등록시_예외를_던진다() {
+        when(productRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> productService.scheduleAuction(SELLER_ID, 1L))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PRODUCT_NOT_FOUND);
+    }
+
+    @Test
     void 미낙찰_상품을_상시_판매로_전환한다() {
         when(seller.getId()).thenReturn(SELLER_ID);
         Product product = Product.builder().seller(seller).title("빈티지 자켓").build();

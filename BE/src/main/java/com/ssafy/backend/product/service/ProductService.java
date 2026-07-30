@@ -77,6 +77,25 @@ public class ProductService {
         return ProductResponse.from(product);
     }
 
+    // 경매 상품 등록(PROD-003) — 시작가/증액 단위/경매 시간은 여기서 다루지 않는다.
+    // "경매 시작 전에 설정한다"고 명시돼 있고, 그건 AUCT-001(경매 조건 설정) 영역이다.
+    @Transactional
+    public ProductResponse scheduleAuction(Long sellerId, Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        if (!product.isOwnedBy(sellerId)) {
+            throw new CustomException(ErrorCode.NOT_PRODUCT_OWNER);
+        }
+        if (product.getSaleStatus() != SaleStatus.DRAFT) {
+            throw new CustomException(ErrorCode.INVALID_PRODUCT_STATE);
+        }
+
+        product.scheduleAuction();
+
+        return ProductResponse.from(product);
+    }
+
     @Transactional
     public ProductResponse resolveAuctionFailure(Long sellerId, Long productId, ProductAuctionResultRequest request) {
         Product product = productRepository.findById(productId)
