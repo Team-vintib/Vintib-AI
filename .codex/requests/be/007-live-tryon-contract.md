@@ -260,3 +260,42 @@ Content-Type: application/json
 - `FE/src/domains/live/pages/LiveWatchPage.vue`
 - `FE/src/domains/tryon/components/LiveTryOnPanel.vue`
 - `FE/src/domains/tryon/types/liveTryOn.types.ts`
+
+## 2026-07-31 최신 BE 확인 결과
+
+라이브 기본 API와 일부 STOMP 계약은 구현되었다. FE는 목록/상세 adapter를 BE 응답에 맞추면 부분 연동할 수 있으나, 방송 영상 토큰, 경매 진행, AI 시착 생성은 아직 mock 유지가 필요하다.
+
+### 반영 확인
+
+| 항목 | 현재 BE 상태 |
+| --- | --- |
+| 예약 라이브 개설 | `POST /api/lives/schedule` 구현됨. `productIds` 필수 |
+| 즉시 라이브 개설 | `POST /api/lives` 구현됨. `productIds` 필수 |
+| 공개 라이브 목록 | `GET /api/lives` 구현됨. 비회원 조회 가능 |
+| 라이브 상세 | `GET /api/lives/{liveId}` 구현됨. 비회원 조회 가능 |
+| 상태 전환 | `PATCH /api/lives/{liveId}/status` 구현됨 |
+| 라이브 상품 연결 | `POST/DELETE/GET /api/lives/{liveId}/products` 구현됨 |
+| 경매 조건 설정 | `POST /api/lives/{liveId}/auctions` 구현됨 |
+| 채팅 이력 | `GET /api/lives/{liveId}/chat-messages` 구현됨 |
+| 채팅 STOMP | publish `/app/lives/{liveId}/chat`, subscribe `/topic/lives/{liveId}/chat` 구현됨 |
+| 반응 STOMP | publish `/app/lives/{liveId}/reactions`, subscribe `/topic/lives/{liveId}/reactions` 구현됨 |
+| 시청자 수 topic | `/topic/lives/{liveId}/viewers` 응답 DTO 존재 |
+| 시착 결과 조회/삭제 | `GET/DELETE /api/users/{userId}/tryons/**` 구현됨 |
+
+### FE 연동 시 주의
+
+- `GET /api/lives` query는 `categoryIds` 복수 파라미터다. 기존 FE의 `categoryId` 단일 query와 다르다.
+- 라이브 목록 응답은 `categoryId/categoryName` 단일 필드가 아니라 `categories[]`를 내려준다.
+- 라이브 목록도 BE `PageResponse(content/page/...)` 구조다. FE `items/meta` 변환이 필요하다.
+- 라이브 상세 `currentViewerCount`가 BE DTO에 있는데 현재 FE 타입/adapter는 이를 누락하고 `null`로 두고 있다.
+- 라이브 연결 상품 응답은 `productId`, `productTitle`, `sortOrder` 중심이다. FE 시청 화면 카드에 필요한 `brandName`, `price`, `thumbnailUrl`, `saleType`, `condition`, `material`, `measurements`, `defectSummary`는 아직 없다.
+- 채팅 REST endpoint는 `/messages`가 아니라 `/chat-messages`다.
+
+### 추가 요청
+
+- 라이브 생성 화면에서 판매자가 연결할 수 있는 상품 후보 조회 endpoint를 제공해 달라. 예: `GET /api/lives/create/products`.
+- 라이브 상세 연결 상품 응답에 카드 표시용 상품 필드를 보강해 달라.
+- 영상 세션/OpenVidu 토큰 발급 endpoint를 확정해 달라. 예: `POST /api/lives/{liveId}/video-token`.
+- 경매 시작, 입찰, 현재 경매 snapshot, 낙찰 결과 조회/구독 계약을 확정해 달라.
+- 라이브 AI 시착 생성 endpoint를 확정해 달라. 예: `POST /api/lives/{liveId}/products/{productId}/tryons`.
+- 현재 회원 시착 프로필 조회/수정 endpoint(`/api/me/tryon`)과 라이브 시착 생성의 관계를 확정해 달라.

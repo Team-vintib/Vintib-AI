@@ -317,3 +317,23 @@ FE가 매핑하기 쉬운 필드명은 `email`, `code`, `verificationToken`, `pa
 - `FE/src/domains/auth/types/auth.types.ts`
 - `FE/src/domains/auth/stores/authStore.ts`
 - `.codex/plans/fe/SY012-auth-api.md`
+
+## 2026-07-31 최신 BE 확인 결과
+
+### 반영 확인
+
+| 항목 | 현재 BE 상태 |
+| --- | --- |
+| 이메일 중복 확인 | `POST /api/auth/email/check-duplicate` 구현됨 |
+| 이메일 인증코드 발송 | `POST /api/auth/email/send-code` 구현됨 |
+| 이메일 인증코드 확인 | `POST /api/auth/email/verify-code` 구현됨. `verificationToken` 반환 |
+| 이메일 회원가입 | `POST /api/auth/signup` 구현됨. 토큰은 반환하지 않음 |
+| 이메일 로그인 | `POST /api/auth/signin` 구현됨. `accessToken`, `refreshToken` 반환 |
+| 토큰 재발급 | `POST /api/auth/reissue` 구현됨 |
+| 로그아웃 | `POST /api/auth/logout` 구현됨 |
+
+### 남은 요청
+
+- SSAFY SSO 시작/callback/account-link API는 아직 BE에 없다.
+- 로그인 또는 회원가입 직후 FE route guard에 필요한 `user`, `nextStep`이 없다. 로그인 응답 확장 또는 `GET /api/me` 제공이 필요하다.
+- access token 만료 시 자동 재발급 정책과 주요 오류 코드(`U010`, `U011`)를 Swagger에 고정해 달라.

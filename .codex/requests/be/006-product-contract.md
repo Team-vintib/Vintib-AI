@@ -366,3 +366,36 @@ FE는 우선 BE가 제공하는 기본 상세와 images만 붙이고, 위 항목
 - 경매 상품 등록 시 상품 상태를 `AUCTION_SCHEDULED`로 만드는 API 또는 플로우
 - `POST /api/lives/{liveId}/products`와 경매 생성 API를 상품 등록 완료 시점에 같이 호출해도 되는지
 - 이미지 업로드 중 일부 실패 시 FE가 이미 생성된 DRAFT 상품/이미지를 정리할 수 있는 삭제 API가 필요한지
+
+## 2026-07-31 최신 BE 확인 결과
+
+상품 기본 API는 일부 연동 가능하지만, FE 목록/상세 화면 전체를 mock 없이 대체하기에는 응답 필드와 query가 부족하다.
+
+### 반영 확인
+
+| 항목 | 현재 BE 상태 |
+| --- | --- |
+| 브랜드/카테고리 조회 | `GET /api/brands`, `GET /api/categories` 구현됨 |
+| 상품 생성 | `POST /api/products` 구현됨. 기본 필드만 저장 |
+| 직접 판매 전환 | `PATCH /api/products/{id}/status` 구현됨. `price` 필수 |
+| 경매 예정 전환 | `PATCH /api/products/{id}/auction-schedule` 추가 구현됨 |
+| 상품 목록 | `GET /api/products` 구현됨. Spring `Pageable`, 최신순 고정 |
+| 상품 상세 | `GET /api/products/{id}` 구현됨. 비회원 조회 가능 |
+| 상품 이미지 | presigned URL 발급, 등록, 수정, 삭제 구현됨 |
+| 찜 API | `POST/DELETE/GET /api/users/{userId}/wishes` 구현됨 |
+
+### FE 연동 시 주의
+
+- BE `PageResponse`는 `content/page/size/totalElements/totalPages/hasNext` 구조다. FE 공통 `items/meta` 구조와 다르므로 adapter 변환이 필요하다.
+- `GET /api/products`는 현재 검색어, 카테고리, 상태등급, 판매방식, 가격, 정렬 query를 실질적으로 처리하지 않는다. FE 필터 UI와 직접 연결하면 화면과 응답이 불일치한다.
+- 목록/상세 응답에는 `brandName`, `categoryName`, `primaryImageUrl`, `isWished`가 없다. FE는 브랜드/카테고리 master 매핑과 이미지 fallback을 유지해야 한다.
+- 상세 응답에는 `color`, `material`, `measurements`, `purchasedAt`, `purchasedCountry`, `linkedLive`, `sellerDisclosedDefects`, `aiQualityAnalysis`, `similarProducts`, `priceDistribution`이 없다.
+- `DELETE /api/users/{userId}/wishes/{id}`의 `{id}`는 찜 row ID가 아니라 `productId`다.
+
+### 추가 요청
+
+- `GET /api/products` query 계약을 확정하고 구현해 달라: `keyword`, `categoryIds`, `conditionGrades`, `saleType`, `minPrice`, `maxPrice`, `sort`, `page`, `size`.
+- 상품 목록 응답에 최소 `brandName`, `categoryName`, `primaryImageUrl`, 로그인 사용자 기준 `isWished`를 포함해 달라. 비회원은 `isWished=false` 또는 `null` 중 하나로 문서화한다.
+- 상품 상세 응답에 상세 UI 필드(`brandName`, `categoryName`, `color`, `material`, `measurements`, 판매자 요약, 연결 라이브, 가격분포/유사상품)를 단계적으로 보강해 달라.
+- 상품 이미지 `role`(`FRONT`, `BACK`, `ADDITIONAL`) 저장 여부를 확정해 달라.
+- AI 품질 분석과 가격 추천 API는 별도 endpoint로 구현 여부와 AI 파트 연동 주체를 확정해 달라.

@@ -150,3 +150,20 @@ FE가 현재 회원 ID를 보내지 않는 `/api/me/**` 형태가 필요한지�
 - `FE/src/domains/search/constants/searchMockData.ts`
 - `FE/src/domains/search/constants/searchFilterOptions.ts`
 - `FE/docs/frontend/api/api-index.md`
+
+## 2026-07-31 최신 BE 확인 결과
+
+현재 BE에는 통합 검색 API가 없다. 이 문서의 요청은 전체 유효하다.
+
+FE 검색 화면은 다음 결과를 한 화면에서 다룬다.
+
+- 상품
+- 라이브
+- 회원/판매자
+
+우선 구현 요청:
+
+- `GET /api/search` 단일 endpoint 또는 도메인별 endpoint 조합 방식을 확정해 달라.
+- query 이름과 enum을 확정해 달라: `keyword`, `type`, `categories`, `conditions`, `saleTypes`, `minPrice`, `maxPrice`, `sort`, `page`, `size`.
+- `type=all`일 때 섹션별 preview를 내려줄지, FE가 각 탭 endpoint를 조합할지 확정해 달라.
+- 검색 결과 상품에는 `isWished`, 회원에는 `isFollowing`을 포함해 달라.

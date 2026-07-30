@@ -168,3 +168,31 @@ BE 전체 페이지 응답을 바꾸지 않는다면 FE가 adapter에서 `conten
 - `FE/src/domains/home/api/homeViewApi.ts`
 - `FE/src/domains/home/types/homeView.types.ts`
 - `FE/docs/frontend/api/api-index.md`
+
+## 2026-07-31 최신 BE 확인 결과
+
+BE 홈 계약은 기존 요청 중 상당 부분이 반영되었다. FE는 기존 mock fallback을 줄이고 실제 응답을 우선 사용하도록 adapter를 갱신할 수 있다.
+
+### 반영 확인
+
+| 항목 | 현재 BE 상태 |
+| --- | --- |
+| `GET /api/home` | 구현됨. 비회원 조회 가능, 토큰이 있으면 상품 `isWished` 계산 |
+| `GET /api/home/following` | 구현됨. 인증 필요 |
+| `categoryProductSections` | `HomeContentResponse`에 추가됨 |
+| `followedSellers` | `FollowingContentResponse`에 추가됨 |
+| 라이브 `startedAt` | `LiveCardResponse`에 추가됨 |
+| 상품 `sellerName`, `categoryName`, `isWished`, `startingBid`, `auctionStartsAt` | `ProductCardResponse`에 추가됨 |
+
+### FE 연동 시 주의
+
+- FE axios baseURL이 `/api`이므로 FE 함수에서는 기존처럼 `/home`, `/home/following`을 호출하면 된다.
+- 비회원 홈 조회에서는 `isWished=null`이 올 수 있다. FE는 비회원이면 찜 버튼 비활성 또는 로그인 유도 상태로 처리한다.
+- `categoryProductSections[].id`는 문자열이며 실제 카테고리 ID를 문자열화한 값이다.
+- `following.products`는 추천 상품이 아니라 "팔로우한 판매자의 상품"이다. FE 섹션 문구도 이 기준으로 맞춘다.
+- 현재 BE 응답의 일부 데이터는 mock 기반이다. 이미지 URL 실패 fallback은 FE에서 유지한다.
+
+### 남은 요청
+
+- 공개 홈과 팔로잉 홈의 정렬 기준, 섹션별 최대 개수, 빈 섹션 노출 정책을 Swagger 설명에 고정해 달라.
+- 판매자 상세 이동을 위해 라이브 카드 `hostId` 제공 여부를 확정해 달라. 현재 `LiveCardResponse`에는 `hostId`가 없다.

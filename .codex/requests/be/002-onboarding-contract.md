@@ -216,3 +216,21 @@ Content-Type: application/json
 - `FE/src/domains/onboard/pages/OnboardingTryOnView.vue`
 - `FE/src/domains/onboard/pages/OnboardingMemberTypeView.vue`
 - `FE/docs/frontend/api/api-index.md`
+
+## 2026-07-31 최신 BE 확인 결과
+
+현재 BE에는 `/api/me/onboarding`, `/api/me/interests`, `/api/me/tryon`, `/api/me/onboarding/complete`가 없다. 이 문서의 요청은 전체 유효하다.
+
+추가로 확인된 사항:
+
+- `Member.completeOnboarding(...)`은 기본 정보 저장과 완료 처리를 동시에 수행하는 형태라, FE 온보딩 단계와 맞지 않는다.
+- FE는 기본 정보 저장, 관심사 저장, 시착 프로필 저장, 회원 유형 선택/완료를 분리해서 호출한다.
+- 브랜드/카테고리 master는 `GET /api/brands`, `GET /api/categories`가 구현되어 있으므로 관심사 저장은 number ID 기반으로 맞추는 것이 좋다.
+
+우선 구현 요청:
+
+1. `GET /api/me`
+2. `PATCH /api/me/onboarding`
+3. `PUT /api/me/interests`
+4. `PUT /api/me/tryon`
+5. `POST /api/me/onboarding/complete`

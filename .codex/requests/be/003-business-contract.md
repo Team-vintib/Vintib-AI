@@ -111,3 +111,20 @@ FE가 필드별 표시할 수 있도록 아래 필드명을 사용 요청한다.
 - `FE/src/domains/biz/constants/businessVerification.ts`
 - `FE/docs/frontend/api/api-index.md`
 - `FE/docs/frontend/screens/BIZ-001/requirements.md`
+
+## 2026-07-31 최신 BE 확인 결과
+
+현재 BE에는 사업자 인증 제출/조회 API가 없다. 이 문서의 요청은 전체 유효하다.
+
+우선 구현 요청:
+
+- `POST /api/business-verifications`
+- `GET /api/business-verifications/me`
+
+추가 확정 필요:
+
+- 사업자등록번호 체크섬 검증 주체
+- 사업자등록증 파일 MIME/확장자/용량/해상도 제한
+- 중복 제출, 승인 후 재제출, 반려 후 재제출 정책
+- 상태 enum: `NONE`, `PENDING`, `APPROVED`, `REJECTED`
+- 온보딩 완료와 사업자 인증 대기 상태의 관계
