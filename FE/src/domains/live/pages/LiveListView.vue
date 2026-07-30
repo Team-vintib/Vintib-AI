@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { getLiveListViewData, isLiveListApiEnabled } from '@/domains/live/api/liveListApi'
 import LiveListCard from '@/domains/live/components/LiveListCard.vue'
@@ -12,6 +12,8 @@ import {
   LIVE_STATUS_FILTER_OPTIONS,
 } from '@/domains/live/constants/liveListFilterOptions'
 import { normalizeApiError } from '@/shared/api/http'
+import AppSearchBar from '@/shared/components/AppSearchBar.vue'
+import { ROUTE_NAMES } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 import type {
@@ -26,9 +28,11 @@ import type {
 const LIVE_LIST_MOCK_SCENARIOS: LiveListMockScenario[] = ['default', 'loading', 'empty', 'error']
 
 const route = useRoute()
+const router = useRouter()
 const liveList = ref<LiveListItem[]>([])
 const loadState = ref<LiveListLoadState>('loading')
 const errorMessage = ref('')
+const searchKeyword = ref('')
 const selectedCategory = ref<LiveCategoryFilter>('ALL')
 const selectedStatus = ref<LiveStatusFilter>('ALL')
 const selectedSort = ref<LiveSortOption>('LATEST')
@@ -156,6 +160,13 @@ const resetFilters = () => {
   selectedSort.value = 'LATEST'
 }
 
+const handleSearch = async (keyword: string) => {
+  await router.push({
+    name: ROUTE_NAMES.SEARCH,
+    query: keyword ? { keyword, type: 'live' } : { type: 'live' },
+  })
+}
+
 watch(
   () => route.query.mock,
   () => {
@@ -182,6 +193,13 @@ onBeforeUnmount(() => {
         <h1 id="live-list-title">라이브</h1>
         <p>지금 진행 중인 방송과 곧 시작할 라이브를 만나보세요.</p>
       </header>
+
+      <AppSearchBar
+        v-model="searchKeyword"
+        search-label="라이브 검색"
+        placeholder="방송 제목, 판매자 또는 브랜드를 검색해 보세요"
+        @submit="handleSearch"
+      />
 
       <div class="live-list-page__content">
         <LiveListFilter

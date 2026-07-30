@@ -16,14 +16,14 @@
 | 인증 화면       | 부분   | AUTH-001 이메일 회원가입, 가입 방식 선택, AUTH-002 이메일 로그인, AUTH-003 SSAFY 로그인·가입 진입, SSO callback·계정 연결 안내 FE 완료, BE 메일/로그인/SSO 환경에서 E2E 재검증 필요 |
 | 온보딩 화면     | 부분   | ONBOARD-001~004 FE 구현 완료, ONBOARD-003 사진 선택·촬영·미리보기·삭제 완료, ONBOARD-003·004 저장은 BE API 대기                        |
 | 사업자 인증 화면 | 부분   | BIZ-001 필수값·숫자 10자리·이미지 MIME 검증, 제출 활성화·중복 방지와 BIZ-001-2 더미 인증 대기 및 HOME 이동 연결 완료, BE API 대기                    |
-| 홈 화면         | 부분   | HOME 공개 route, 로그인별 Guest/Member 홈 분기, 검색 패널·섹션·라이브 카드·상품 카드·empty·loading/error/retry 상태 구현, `/api/home`·로그인 시 `/api/home/following` 부분 연동. BE 미제공 필드와 콘텐츠 카드는 FE 보조값 유지 |
-| 상품 목록 화면   | 부분   | PROD-008 공개 route, 실사형 로컬 이미지·최소/최대 가격 검증과 mock 목록 필터링·빈 상태·상품 카드→상세 route 이동 완료, 실제 조회·찜 API 대기 |
+| 홈 화면         | 부분   | HOME 공개 route, 로그인별 Guest/Member 홈 분기, 공통 검색바 기반 검색 패널·섹션·라이브 카드·상품 카드·empty·loading/error/retry 상태 구현, `/api/home`·로그인 시 `/api/home/following` 부분 연동. BE 미제공 필드와 콘텐츠 카드는 FE 보조값 유지 |
+| 상품 목록 화면   | 부분   | PROD-008 공개 route, 홈과 같은 공통 검색바의 통합 검색 상품 탭 이동, 실사형 로컬 이미지·최소/최대 가격 검증과 mock 목록 필터링·빈 상태·상품 카드→상세 route 이동 완료, 실제 조회·찜 API 대기 |
 | 상품 상세 화면   | 부분   | S15P11A108-408 정적 UI, 410 상호작용, 412 로딩·오류·상품 없음·판매 완료 및 AI 분석 전·중·완료·결과 없음·실패 상태 화면과 유사 상품 가격대 분포·상품 상세 이동 구현, 실제 상세·추천 API 대기 |
 | 상품 등록 화면   | 부분   | S15P11A108-409·411·414 `/products/new` route, 사진 등록·기본 정보·사이즈/소재·상태/하자와 AI 품질 검증·가격·검토·완료 7단계 UI 구현. 필수값·이미지·가격·등록 실패 상태와 mock 등록 adapter 구현 완료, 실제 상품 등록·이미지 역할·AI 품질 검증·가격 추천·경매 등록 API 계약은 `014-product-registration-api-contract.md` 기준 BE 협의 대기 |
-| 라이브 목록 화면 | 부분   | S15P11A108-413·415·418 카드·필터·정렬과 상태 화면 구현. `origin/develop-BE@dd6a0b6`에 `GET /api/lives`가 구현됐으며, 최종 009 계약의 복수 `categories[]`·공통 `PageResponse.content`·nullable `viewerCount`·`VIEWERS_DESC` 미지원 정책을 418 adapter에 반영하기 전까지 기본값은 mock |
+| 라이브 목록 화면 | 부분   | S15P11A108-413·415·418 카드·필터·정렬과 상태 화면, 홈과 같은 공통 검색바의 통합 검색 라이브 탭 이동 구현. `origin/develop-BE@dd6a0b6`에 `GET /api/lives`가 구현됐으며, 최종 009 계약의 복수 `categories[]`·공통 `PageResponse.content`·nullable `viewerCount`·`VIEWERS_DESC` 미지원 정책을 418 adapter에 반영하기 전까지 기본값은 mock |
 | 라이브 개설 화면 | 부분   | LIVE-001/002 `/lives/new` route, 라이브 유형·방송 정보·판매 상품·예약 일정·장비 확인·완료 단계 UI, 필수값/과거 일정 검증, 상품 mock 검색/선택, `getUserMedia` 기반 카메라 미리보기와 마이크 순차 확인 구현. 실제 라이브 생성/예약 API와 방송 SDK 연동 대기 |
 | 라이브 시청 화면 | 부분   | 419 방송 헤더·상품 큐·영상 stage·선택 상품·상태 화면, 423 채팅·반응·경매 패널, 425 사진 중심 AI 시착 패널과 등록 전·생성·결과·실패 mock 상태 구현. 실제 스트리밍·채팅 STOMP·경매·AI API 연동 대기 |
-| 공통 컴포넌트   | 부분   | 온보딩 도메인에 BaseButton, BaseInput, BaseField, 단계 표시 구현                                                                       |
+| 공통 컴포넌트   | 부분   | 온보딩 도메인에 BaseButton, BaseInput, BaseField, 단계 표시 구현. shared에는 GlobalNavigation, RoutePlaceholder, 홈·상품·라이브가 재사용하는 AppSearchBar 구현 |
 | API 타입        | 부분   | 공통 응답/에러/pagination, 인증 회원가입·로그인 요청/응답 타입, 온보딩 필드 오류·회원 유형 타입 구현                                   |
 | Mock 데이터     | 부분   | 홈·상품 목록·상품 상세·유사 상품 가격 분포·상품 등록·라이브 채팅·경매·AI 시착 패널 확인용 mock 데이터 구현, 상품 목록은 로컬 WebP와 가격 필터 사용, 홈은 BE 미제공 회원 홈 보조 섹션·콘텐츠 카드·fallback 데이터에 mock 일부 유지 |
 | 테스트/검증     | 부분   | lint, type-check, build, AUTH-001·002·003·ONBOARD-001~004 검증 완료, 상품 목록→상세와 상세 408·410·412 상태 및 유사 상품 가격대 선택·이동 검증 완료, 상품 등록 409·411·414 type-check/build 완료, LIVE-001/002 type-check 완료, LIVE-005 목록→시청 이동·상품 선택·상태별 브라우저 검증 완료, HOME·BIZ-001·BIZ-001-2 일부 브라우저 수동 검증 대기 |
