@@ -1,5 +1,7 @@
 import { homeMockData } from '@/domains/home/constants/homeMockData'
 import type {
+  HomeCategoryProductSection,
+  HomeFollowedSellerItem,
   HomeLiveCardItem,
   HomeProductCardItem,
   HomeProductSaleStatus,
@@ -20,8 +22,11 @@ interface HomeLiveCardResponse {
   thumbnailUrl: string
   broadcastStatus: HomeLiveBroadcastStatus
   scheduledAt: string | null
+  startedAt?: string | null
   viewerCount: number | null
   productCount: number | null
+  reservationCount?: number | null
+  categoryName?: string | null
 }
 
 interface HomeProductCardResponse {
@@ -33,6 +38,18 @@ interface HomeProductCardResponse {
   sellStatus: HomeProductSellStatus
   price: number | null
   auctionScheduled: boolean
+  sellerName?: string | null
+  categoryName?: string | null
+  isWished?: boolean | null
+  startingBid?: number | null
+  auctionStartsAt?: string | null
+}
+
+interface HomeCategoryProductSectionResponse {
+  id: string
+  title: string
+  categoryName: string
+  products: HomeProductCardResponse[]
 }
 
 interface HomeContentResponse {
@@ -40,12 +57,27 @@ interface HomeContentResponse {
   scheduledLives: HomeLiveCardResponse[]
   onSaleProducts: HomeProductCardResponse[]
   upcomingAuctionProducts: HomeProductCardResponse[]
+  categoryProductSections?: HomeCategoryProductSectionResponse[]
+}
+
+interface HomeFollowedSellerResponse {
+  sellerId: number
+  sellerName: string
+  profileImageUrl: string
+  coverImageUrl: string
+  followerCount: number
+  productCount: number
+  liveId: number | null
+  liveStatus: HomeLiveBroadcastStatus | null
+  liveTitle: string | null
+  liveAt: string | null
 }
 
 interface FollowingContentResponse {
   empty: boolean
   lives: HomeLiveCardResponse[]
   products: HomeProductCardResponse[]
+  followedSellers?: HomeFollowedSellerResponse[]
 }
 
 interface GetHomeViewDataOptions {
@@ -97,18 +129,26 @@ const toHomeViewData = (
   followingContent: FollowingContentResponse | null,
 ): HomeViewData => {
   const followingProducts = followingContent?.empty ? [] : (followingContent?.products ?? [])
+  const categoryProductSections = homeContent.categoryProductSections?.length
+    ? homeContent.categoryProductSections.map(toHomeCategoryProductSection)
+    : homeMockData.categoryProductSections
+  const followedSellers = followingContent
+    ? followingContent.empty
+      ? []
+      : (followingContent.followedSellers ?? []).map(toHomeFollowedSellerItem)
+    : homeMockData.followedSellers
 
   return {
     liveNow: homeContent.liveNow.map(toHomeLiveCardItem),
     scheduledLives: homeContent.scheduledLives.map(toHomeLiveCardItem),
     directSaleProducts: homeContent.onSaleProducts.map(toHomeProductCardItem),
     upcomingAuctionProducts: homeContent.upcomingAuctionProducts.map(toHomeProductCardItem),
-    followedSellers: homeMockData.followedSellers,
+    followedSellers,
     recommendedProducts:
       followingProducts.length > 0
         ? followingProducts.map(toHomeRecommendedProductItem)
         : homeMockData.recommendedProducts,
-    categoryProductSections: homeMockData.categoryProductSections,
+    categoryProductSections,
   }
 }
 
@@ -119,8 +159,11 @@ const toHomeLiveCardItem = (live: HomeLiveCardResponse): HomeLiveCardItem => ({
   thumbnailUrl: live.thumbnailUrl,
   hostName: live.hostNickname,
   scheduledAt: live.scheduledAt ?? undefined,
+  startedAt: live.startedAt ?? undefined,
   scheduledProductCount: live.productCount ?? undefined,
   viewerCount: live.viewerCount ?? undefined,
+  reservationCount: live.reservationCount ?? undefined,
+  categoryName: live.categoryName ?? undefined,
 })
 
 const toHomeProductCardItem = (product: HomeProductCardResponse): HomeProductCardItem => {
@@ -132,12 +175,40 @@ const toHomeProductCardItem = (product: HomeProductCardResponse): HomeProductCar
     saleType: isAuction ? 'AUCTION' : 'DIRECT_SALE',
     saleStatus: toHomeProductSaleStatus(product),
     primaryImageUrl: product.thumbnailUrl,
-    sellerName: FALLBACK_SELLER_NAME,
+    sellerName: product.sellerName ?? FALLBACK_SELLER_NAME,
     price: product.price ?? undefined,
+    startingBid: product.startingBid ?? undefined,
+    auctionStartsAt: product.auctionStartsAt ?? undefined,
     brandName: product.brand,
-    isWished: false,
+    categoryName: product.categoryName ?? undefined,
+    isWished: product.isWished ?? false,
   }
 }
+
+const toHomeFollowedSellerItem = (
+  seller: HomeFollowedSellerResponse,
+): HomeFollowedSellerItem => ({
+  id: seller.sellerId,
+  liveId: seller.liveId ?? undefined,
+  name: seller.sellerName,
+  profileImageUrl: seller.profileImageUrl,
+  coverImageUrl: seller.coverImageUrl,
+  specialty: '',
+  followerCount: seller.followerCount,
+  newProductCount: seller.productCount,
+  liveStatus: seller.liveStatus ?? undefined,
+  liveTitle: seller.liveTitle ?? undefined,
+  liveAt: seller.liveAt ?? undefined,
+})
+
+const toHomeCategoryProductSection = (
+  section: HomeCategoryProductSectionResponse,
+): HomeCategoryProductSection => ({
+  id: section.id,
+  title: section.title,
+  categoryName: section.categoryName,
+  products: section.products.map(toHomeProductCardItem),
+})
 
 const toHomeRecommendedProductItem = (
   product: HomeProductCardResponse,
