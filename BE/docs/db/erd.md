@@ -131,10 +131,9 @@ stateDiagram-v2
     AUCTION_SCHEDULED --> AUCTION_IN_PROGRESS : 경매 시작 (AUCT-002)
     ON_SALE --> SOLD : 상시 구매
     AUCTION_IN_PROGRESS --> SOLD : 낙찰 (AUCT-012)
-    AUCTION_IN_PROGRESS --> AUCTION_FAILED : 입찰자 없이 종료
-    AUCTION_FAILED --> ON_SALE : 판매자가 상시 판매 선택
-    AUCTION_FAILED --> AUCTION_SCHEDULED : 경매 예정 유지
-    AUCTION_FAILED --> PRIVATE : 비공개 선택
+    AUCTION_IN_PROGRESS --> AUCTION_SCHEDULED : 유찰 (AUCT-014)
+    AUCTION_SCHEDULED --> ON_SALE : 판매자가 상시 판매 선택 (PROD-005)
+    AUCTION_SCHEDULED --> PRIVATE : 비공개 선택
     SOLD --> [*]
 ```
 
@@ -144,11 +143,14 @@ stateDiagram-v2
 | `ON_SALE` | 상시 판매 중 |
 | `AUCTION_SCHEDULED` | 경매 예정 — 가격 없음, 홈에서 '경매 예정'으로 표시 |
 | `AUCTION_IN_PROGRESS` | 경매 진행 중 — 상시 구매 즉시 중단 (LIVE-006) |
-| `AUCTION_FAILED` | 미낙찰 — **판매자 재설정 대기** |
 | `SOLD` | 판매 완료(낙찰 포함) |
 | `PRIVATE` | 비공개 |
 
-> **`AUCTION_FAILED`를 별도 상태로 둔 이유.** `AUCT-014`는 "자동 상시 판매 전환 금지"이고 `PROD-005`는 판매자가 상시 판매 / 경매 예정 유지 / 비공개 중 고르게 되어 있다. 자동 전이가 금지된 이상 **선택을 기다리는 중간 상태가 반드시 필요**하다. 이 상태가 없으면 미낙찰 상품이 갈 곳이 없다.
+> **유찰은 `AUCTION_SCHEDULED`로 되돌린다 (2026-07-30 결정).** 이전 설계에는 `AUCTION_FAILED`라는 선택 대기 상태가 있었으나 **없앴다.**
+>
+> 없애도 되는 이유는 **유찰 사실이 이미 `auction` 테이블에 있기 때문이다.** "이 방송에서 유찰된 상품"은 `auction`에서 `live_id`와 `status = 'FAILED'`로 뽑으면 된다 — 같은 사실을 `product.sale_status`에 한 번 더 담을 필요가 없다. 두 군데 저장하면 반드시 어긋난다.
+>
+> `AUCT-014`의 "자동 상시 판매 전환 금지"는 그대로 지켜진다. 유찰 상품은 가격 없는 `AUCTION_SCHEDULED`로 남아 다시 경매할 수 있고, 판매자가 명시적으로 고를 때만 `ON_SALE`(가격 설정)이나 `PRIVATE`로 넘어간다. 자동으로 상시 판매가 되는 경로는 없다.
 
 ### 3-2. 방송 상태 `live.status`
 
