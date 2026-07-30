@@ -119,7 +119,7 @@ BENIGN_PROMPTS: dict[str, str] = {**STRUCTURAL_BENIGN_PROMPTS, **TEXTURE_BENIGN_
 # 의류 영역 게이트 — 배경(바닥·소품) 탐지를 구조적으로 걷어낸다.
 # 005 계획 §고도화 경로 3(의류 영역 마스크로 배경 제외)에 해당한다.
 GARMENT_PROMPT = "clothing"
-GARMENT_OVERLAP_MIN = 0.6  # 하자 마스크의 이 비율 이상이 의류 안에 있어야 채택
+GARMENT_OVERLAP_MIN = 0.7  # 하자 마스크의 이 비율 이상이 의류 안에 있어야 채택
 RESTRICT_TO_GARMENT = True
 
 # ⚠️ 크롭(crop-then-detect) 여부 토글과 그 여유 비율(`GARMENT_CROP_PAD_RATIO`)은 **여기 없다.**
