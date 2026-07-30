@@ -677,21 +677,20 @@ onBeforeUnmount(() => {
 }
 
 .live-try-on-panel__state--result {
-  display: grid;
+  display: flex;
   min-height: 100%;
   gap: var(--space-3);
-  grid-template-columns: minmax(0, 1.16fr) minmax(150px, 0.84fr);
-  grid-template-rows: minmax(0, 1fr) auto;
+  flex-direction: column;
 }
 
 .live-try-on-panel__result-media {
   min-height: 288px;
-  grid-row: 1;
+  flex: 1;
 }
 
 .live-try-on-panel__result-copy {
   min-width: 0;
-  grid-row: 1;
+  flex: 0 0 auto;
 }
 
 .live-try-on-panel__result-copy h3 {
@@ -722,8 +721,6 @@ onBeforeUnmount(() => {
 
 .live-try-on-panel__state--result .live-try-on-panel__actions {
   margin-top: 0;
-  grid-column: 1 / -1;
-  grid-row: 2;
 }
 
 .live-try-on-panel__failure-media {
@@ -769,16 +766,8 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1100px) {
-  .live-try-on-panel__state--result {
-    display: flex;
-  }
-
   .live-try-on-panel__result-media {
     min-height: 230px;
-  }
-
-  .live-try-on-panel__result-copy {
-    margin-top: var(--space-3);
   }
 }
 
