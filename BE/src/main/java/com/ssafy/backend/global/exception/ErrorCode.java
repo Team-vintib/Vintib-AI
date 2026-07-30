@@ -63,7 +63,11 @@ public enum ErrorCode {
     // [소셜(팔로우/찜)]
     WISH_ALREADY_EXISTS(HttpStatus.CONFLICT, "S001", "이미 찜한 상품입니다."),
     WISH_NOT_FOUND(HttpStatus.NOT_FOUND, "S002", "찜하지 않은 상품입니다."),
-    WISH_FORBIDDEN(HttpStatus.FORBIDDEN, "S003", "본인의 찜만 처리할 수 있습니다.");
+    WISH_FORBIDDEN(HttpStatus.FORBIDDEN, "S003", "본인의 찜만 처리할 수 있습니다."),
+
+    // [알림]
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "존재하지 않는 알림입니다."),
+    NOTIFICATION_FORBIDDEN(HttpStatus.FORBIDDEN, "N002", "본인의 알림만 처리할 수 있습니다.");
 
     private final HttpStatus status;
     private final String code;
