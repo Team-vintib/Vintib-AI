@@ -30,6 +30,9 @@ class HomeControllerTest {
     @Autowired
     private FilterChainProxy springSecurityFilterChain;
 
+    @Autowired
+    private com.ssafy.backend.auth.jwt.JwtTokenProvider jwtTokenProvider;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -72,5 +75,60 @@ class HomeControllerTest {
         // Authorization 헤더 없이도 200 — /api/home 은 SecurityConfig PUBLIC_ENDPOINTS.
         mockMvc.perform(get("/api/home"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void 상품_카드에_판매자명과_카테고리명이_담긴다() throws Exception {
+        // FE 가 "판매자 정보 확인 중" 으로 때우던 자리(FE 요청 009-home-card-response-fields).
+        mockMvc.perform(get("/api/home"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.onSaleProducts[0].sellerName").isNotEmpty())
+                .andExpect(jsonPath("$.data.onSaleProducts[0].categoryName").isNotEmpty());
+    }
+
+    @Test
+    void 경매_예정_상품에_시작가와_경매_시작_시각이_담긴다() throws Exception {
+        mockMvc.perform(get("/api/home"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.upcomingAuctionProducts[0].startingBid").isNumber())
+                .andExpect(jsonPath("$.data.upcomingAuctionProducts[0].auctionStartsAt").isNotEmpty());
+    }
+
+    @Test
+    void 진행_중_라이브에는_시작_시각이_예약_라이브에는_예정_시각이_담긴다() throws Exception {
+        mockMvc.perform(get("/api/home"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.liveNow[0].startedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.liveNow[0].scheduledAt").doesNotExist())
+                .andExpect(jsonPath("$.data.scheduledLives[0].scheduledAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.scheduledLives[0].startedAt").doesNotExist());
+    }
+
+    @Test
+    void 비회원_요청이면_찜_여부가_null로_내려간다() throws Exception {
+        // false 로 내리면 FE 가 "찜 해제 가능" 으로 오해한다. 모른다는 뜻은 null 로 구분한다.
+        mockMvc.perform(get("/api/home"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.onSaleProducts[0].isWished").doesNotExist());
+    }
+
+    @Test
+    void 로그인_요청이면_찜_여부가_채워진다() throws Exception {
+        String token = jwtTokenProvider.createAccessToken(1L, "user@example.com");
+
+        mockMvc.perform(get("/api/home").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.onSaleProducts[0].isWished").isBoolean());
+    }
+
+    @Test
+    void 카테고리별_상품_탭_섹션이_카테고리_마스터를_따른다() throws Exception {
+        // 탭 구성은 카테고리 마스터(SY007) 최상위 6개. FE 요청서의 '원피스'는 시드에 없어 '가방'으로 대체.
+        mockMvc.perform(get("/api/home"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.categoryProductSections").isArray())
+                .andExpect(jsonPath("$.data.categoryProductSections.length()").value(6))
+                .andExpect(jsonPath("$.data.categoryProductSections[0].title").value("아우터"))
+                .andExpect(jsonPath("$.data.categoryProductSections[0].products.length()").value(3));
     }
 }

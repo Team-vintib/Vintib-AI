@@ -107,7 +107,9 @@ CREATE TABLE member_interest_category (
 CREATE TABLE product (
     id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     seller_id       BIGINT       NOT NULL REFERENCES member (id),
-    category_id     BIGINT       REFERENCES category (id),
+    -- 카테고리는 필수다. 상품이 어느 카테고리에도 속하지 않으면 검색·필터는 물론
+    -- 라이브 카테고리(편성 상품에서 유도)에서도 통째로 누락된다.
+    category_id     BIGINT       NOT NULL REFERENCES category (id),
     brand_id        BIGINT       REFERENCES brand (id),
     title           VARCHAR(200) NOT NULL,
     description     TEXT,
@@ -128,13 +130,11 @@ CREATE TABLE product (
         'ON_SALE',            -- 상시 판매 중
         'AUCTION_SCHEDULED',  -- 경매 예정
         'AUCTION_IN_PROGRESS',-- 경매 진행 중 (상시 구매 즉시 중단, LIVE-006)
-        'AUCTION_FAILED',     -- 미낙찰 — 판매자 재설정 대기 (AUCT-014 / PROD-005)
-        'SOLD',               -- 판매 완료(낙찰 포함)
-        'PRIVATE'             -- 비공개
+        'SOLD'                -- 판매 완료(낙찰 포함)
     )),
     -- 상시 판매 상품은 가격이 반드시 있어야 한다.
-    -- 경매 상품의 가격은 강제하지 않는다 — 미낙찰 후 상시 판매로 전환(PROD-005)하는
-    -- 과도기에 sale_type 과 price 갱신 순서를 애플리케이션이 자유롭게 잡을 수 있어야 한다.
+    -- 경매 상품의 가격은 강제하지 않는다 — 미낙찰 후 상시 판매로 전환(PROD-005)할 때
+    -- sale_type 과 price 갱신 순서를 애플리케이션이 자유롭게 잡을 수 있어야 한다.
     CONSTRAINT ck_product_price_by_type CHECK (
         sale_type <> 'DIRECT_SALE' OR price IS NOT NULL
     )
@@ -205,7 +205,10 @@ CREATE TABLE live (
     ))
 );
 
--- 라이브 ↔ 상품 연결 (LIVE-003). 방송 전·중 모두 추가·제외 가능, 개수 제한 없음.
+-- 라이브 ↔ 상품 연결 (LIVE-003). 개수 제한은 없으나 최소 1개는 있어야 한다.
+-- 편성은 라이브 개설 시점에 정하고, 방송이 시작되면(status='LIVE') 더 이상 바꿀 수 없다 —
+-- 시청자가 보고 있는 판매 목록이 도중에 바뀌면 안 되고, 라이브 카테고리를 이 편성에서
+-- 유도하므로 함께 흔들린다. 예약(SCHEDULED) 상태에서는 방송 시작 전까지 변경 가능.
 -- 제외는 물리 삭제 대신 removed_at 으로 남긴다 — 다시보기 타임라인(LIVE-008)의 근거가 된다.
 CREATE TABLE live_product (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

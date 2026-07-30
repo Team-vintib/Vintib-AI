@@ -12,6 +12,7 @@ import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -53,6 +54,9 @@ class AuctionControllerTest {
     private ProductRepository productRepository;
 
     @Autowired
+    private CategoryRepository categoryRepository;
+
+    @Autowired
     private LiveRepository liveRepository;
 
     @Autowired
@@ -77,8 +81,11 @@ class AuctionControllerTest {
                 .build());
         hostToken = jwtTokenProvider.createAccessToken(host.getId(), email);
 
+        // 카테고리는 필수다(PROD-001). 시드된 마스터에서 아무거나 하나 집는다 — 경매 검증에
+        // 카테고리 값 자체는 무관하고, NOT NULL 제약만 만족시키면 된다.
         Product product = productRepository.save(Product.builder()
                 .seller(host)
+                .categoryId(categoryRepository.findAll().get(0).getId())
                 .title("리바이스 501 빈티지")
                 .build());
         linkedProductId = product.getId();

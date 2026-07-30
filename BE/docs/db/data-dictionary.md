@@ -480,14 +480,14 @@
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `seller_id` | `bigint` | NOT NULL |  | FK→member | 판매자. |
-| `category_id` | `bigint` |  |  | FK→category | 카테고리. |
+| `category_id` | `bigint` | NOT NULL |  | FK→category | 카테고리. |
 | `brand_id` | `bigint` |  |  | FK→brand | 브랜드. |
 | `title` | `varchar(200)` | NOT NULL |  |  | 상품명. 통합 검색 대상이며 pg_trgm GIN 인덱스가 걸려 있다 (SEARCH-001). |
 | `description` | `text` |  |  |  | 상품 상세 설명. |
 | `condition_grade` | `varchar(20)` |  |  |  | 중고 상태 등급. ⚠️ 등급 체계 미확정이라 자유 문자열. |
 | `size_label` | `varchar(50)` |  |  |  | 사이즈 표기(S/M/L, 95/100 등). 브랜드마다 달라 문자열로 둔다. |
 | `sale_type` | `varchar(20)` |  |  |  | DIRECT_SALE(상시 판매) \| AUCTION(경매) |
-| `sale_status` | `varchar(30)` | NOT NULL | `'DRAFT'` |  | DRAFT \| ON_SALE \| AUCTION_SCHEDULED \| AUCTION_IN_PROGRESS \| AUCTION_FAILED \| SOLD \| PRIVATE |
+| `sale_status` | `varchar(30)` | NOT NULL | `'DRAFT'` |  | DRAFT \| ON_SALE \| AUCTION_SCHEDULED \| AUCTION_IN_PROGRESS \| SOLD |
 | `price` | `bigint` |  |  |  | 상시 판매가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002). |
 | `view_count` | `integer` | NOT NULL | `0` |  | 누적 조회수(집계값). ⚠️ 회원별 조회 이력은 남지 않는다 — REC-001 착수 시 재검토 필요. |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
@@ -497,7 +497,7 @@
 **CHECK 제약**
 
 - `ck_product_price_by_type` — `CHECK ((((sale_type)::text <> 'DIRECT_SALE'::text) OR (price IS NOT NULL)))`
-- `ck_product_sale_status` — `CHECK (((sale_status)::text = ANY ((ARRAY['DRAFT'::character varying, 'ON_SALE'::character varying, 'AUCTION_SCHEDULED'::character varying, 'AUCTION_IN_PROGRESS'::character varying, 'AUCTION_FAILED'::character varying, 'SOLD'::character varying, 'PRIVATE'::character varying])::text[])))`
+- `ck_product_sale_status` — `CHECK (((sale_status)::text = ANY ((ARRAY['DRAFT'::character varying, 'ON_SALE'::character varying, 'AUCTION_SCHEDULED'::character varying, 'AUCTION_IN_PROGRESS'::character varying, 'SOLD'::character varying])::text[])))`
 - `ck_product_sale_type` — `CHECK (((sale_type)::text = ANY ((ARRAY['DIRECT_SALE'::character varying, 'AUCTION'::character varying])::text[])))`
 
 **인덱스**

@@ -1,5 +1,6 @@
 package com.ssafy.backend.live.controller;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -8,9 +9,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.ssafy.backend.auth.jwt.JwtTokenProvider;
 import com.ssafy.backend.live.entity.Live;
+import com.ssafy.backend.live.entity.LiveProduct;
+import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.product.entity.Category;
+import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.repository.CategoryRepository;
+import com.ssafy.backend.product.repository.ProductRepository;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,9 +58,19 @@ class LiveControllerTest {
     @Autowired
     private LiveRepository liveRepository;
 
+    @Autowired
+    private LiveProductRepository liveProductRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private MockMvc mockMvc;
     private String hostToken;
     private Member hostMember;
+    private Long productId;
 
     @BeforeEach
     void setUp() {
@@ -68,6 +85,14 @@ class LiveControllerTest {
                 .name("호스트")
                 .build());
         hostToken = jwtTokenProvider.createAccessToken(hostMember.getId(), email);
+
+        // 개설 요청에는 판매할 상품이 최소 1개 필요하다(운영 정책 — 편성은 개설 시점에 확정된다).
+        productId = productRepository.save(Product.builder()
+                        .seller(hostMember)
+                        .categoryId(categoryRepository.findAll().get(0).getId())
+                        .title("리바이스 501 빈티지")
+                        .build())
+                .getId();
     }
 
     /** 상태 전이·시청 조회 검증에 쓸 진행 중 라이브를 하나 만들어 ID를 돌려준다. */
@@ -80,8 +105,14 @@ class LiveControllerTest {
     private String scheduleRequestBody(String title, String thumbnailUrl, LocalDateTime scheduledAt) {
         String thumbnail = thumbnailUrl == null ? "null" : "\"" + thumbnailUrl + "\"";
         return """
-                {"title":"%s","thumbnailUrl":%s,"scheduledAt":"%s"}
-                """.formatted(title, thumbnail, scheduledAt);
+                {"title":"%s","thumbnailUrl":%s,"scheduledAt":"%s","productIds":[%d]}
+                """.formatted(title, thumbnail, scheduledAt, productId);
+    }
+
+    private String instantRequestBody(String title) {
+        return """
+                {"title":"%s","thumbnailUrl":null,"productIds":[%d]}
+                """.formatted(title, productId);
     }
 
     @Test
@@ -136,9 +167,7 @@ class LiveControllerTest {
 
     @Test
     void 즉시_개설하면_201과_LIVE_상태를_반환한다() throws Exception {
-        String body = """
-                {"title":"지금 바로 여는 빈티지 라이브","thumbnailUrl":null}
-                """;
+        String body = instantRequestBody("지금 바로 여는 빈티지 라이브");
 
         mockMvc.perform(post("/api/lives")
                         .header("Authorization", "Bearer " + hostToken)
@@ -153,8 +182,33 @@ class LiveControllerTest {
 
     @Test
     void 즉시_개설도_방송명이_비어_있으면_400을_반환한다() throws Exception {
+        String body = instantRequestBody("   ");
+
+        mockMvc.perform(post("/api/lives")
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 판매할_상품_없이_개설하면_400을_반환한다() throws Exception {
+        // 편성은 개설 시점에 확정된다 — 상품 없는 빈 방송이 만들어지면 안 된다.
         String body = """
-                {"title":"   ","thumbnailUrl":null}
+                {"title":"빈 방송","thumbnailUrl":null,"scheduledAt":"%s","productIds":[]}
+                """.formatted(LocalDateTime.now().plusDays(1));
+
+        mockMvc.perform(post("/api/lives/schedule")
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 즉시_개설도_상품_없이는_400을_반환한다() throws Exception {
+        String body = """
+                {"title":"빈 방송","thumbnailUrl":null,"productIds":[]}
                 """;
 
         mockMvc.perform(post("/api/lives")
@@ -162,6 +216,127 @@ class LiveControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
+    }
+
+    /** 특정 카테고리 상품을 편성한 진행 중 라이브를 만들어 ID를 돌려준다. 목록 카테고리 필터 검증용. */
+    private Long 상품이_편성된_라이브_ID(Long linkedProductId) {
+        Live live = liveRepository.save(
+                Live.openNow(hostMember, "카테고리 필터 검증용 라이브", null, LocalDateTime.now()));
+        liveProductRepository.save(LiveProduct.link(live, linkedProductId, (short) 0, LocalDateTime.now()));
+        return live.getId();
+    }
+
+    private Long 상품_ID(Long categoryId) {
+        return productRepository.save(Product.builder()
+                        .seller(hostMember)
+                        .categoryId(categoryId)
+                        .title("카테고리 " + categoryId + " 상품")
+                        .build())
+                .getId();
+    }
+
+    /** 목록에 해당 라이브가 들어 있는지 보는 JsonPath. 다른 테스트가 만든 라이브에 영향받지 않는다. */
+    private String 목록에서(Long liveId) {
+        return "$.data.content[?(@.liveId == %d)]".formatted(liveId);
+    }
+
+    @Test
+    void 비회원도_공개_목록을_조회할_수_있다() throws Exception {
+        // Authorization 헤더 없이 200 — GET /api/lives 는 비회원 공개(LIVE-005).
+        Long liveId = 개설된_라이브_ID();
+
+        mockMvc.perform(get("/api/lives").param("size", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content").isArray())
+                .andExpect(jsonPath("$.data.totalElements").isNumber())
+                .andExpect(jsonPath(목록에서(liveId)).isNotEmpty())
+                .andExpect(jsonPath(목록에서(liveId) + ".categories").isArray())
+                .andExpect(jsonPath("$.error").doesNotExist());
+    }
+
+    @Test
+    void 종료된_방송은_목록에서_빠진다() throws Exception {
+        Long liveId = 개설된_라이브_ID();
+        mockMvc.perform(patch("/api/lives/{liveId}/status", liveId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"ENDED\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/lives").param("size", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(목록에서(liveId)).isEmpty());
+    }
+
+    @Test
+    void 종료_상태로_필터하면_400을_반환한다() throws Exception {
+        // 빈 목록으로 조용히 넘기면 FE 가 "그런 방송이 없다"로 오해한다 — 값 자체를 거부한다.
+        mockMvc.perform(get("/api/lives").param("status", "ENDED"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("L007"));
+    }
+
+    @Test
+    void 시청자_수_정렬을_지원한다() throws Exception {
+        // 실시간 집계(-450)가 들어와 정렬 기준이 생겼다. Redis 값이라 DB 로 정렬할 수 없어
+        // 서비스가 메모리에서 세우지만, 계약상으로는 다른 정렬과 똑같이 동작해야 한다.
+        mockMvc.perform(get("/api/lives").param("sort", "VIEWERS_DESC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isArray());
+    }
+
+    @Test
+    void 시청자가_없으면_viewerCount는_0으로_나온다() throws Exception {
+        // 이전에는 항상 null 이었다. 0 과 null 을 FE 가 구분해야 했던 이유가 없어졌다.
+        mockMvc.perform(get("/api/lives"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].viewerCount").value(0));
+    }
+
+    @Test
+    void 페이지_크기가_허용_범위를_벗어나면_400을_반환한다() throws Exception {
+        mockMvc.perform(get("/api/lives").param("size", "0"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 대분류로_필터하면_하위_소분류_상품을_건_방송도_나온다() throws Exception {
+        Category 소분류 = categoryRepository.findAll().stream()
+                .filter(category -> category.getParentId() != null)
+                .findFirst()
+                .orElseThrow();
+        Long liveId = 상품이_편성된_라이브_ID(상품_ID(소분류.getId()));
+
+        mockMvc.perform(get("/api/lives")
+                        .param("categoryIds", String.valueOf(소분류.getParentId()))
+                        .param("size", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(목록에서(liveId)).isNotEmpty())
+                // 응답 카테고리는 소분류가 아니라 대분류로 롤업된다.
+                .andExpect(jsonPath(목록에서(liveId) + ".categories[*].id")
+                        .value(hasItem(소분류.getParentId().intValue())));
+    }
+
+    @Test
+    void 편성_상품과_무관한_카테고리로_필터하면_그_방송은_빠진다() throws Exception {
+        Category 소분류 = categoryRepository.findAll().stream()
+                .filter(category -> category.getParentId() != null)
+                .findFirst()
+                .orElseThrow();
+        Long 다른_대분류 = categoryRepository.findAll().stream()
+                .filter(category -> category.getParentId() == null)
+                .map(Category::getId)
+                .filter(id -> !id.equals(소분류.getParentId()))
+                .findFirst()
+                .orElseThrow();
+        Long liveId = 상품이_편성된_라이브_ID(상품_ID(소분류.getId()));
+
+        mockMvc.perform(get("/api/lives")
+                        .param("categoryIds", String.valueOf(다른_대분류))
+                        .param("size", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(목록에서(liveId)).isEmpty());
     }
 
     @Test
@@ -221,9 +396,7 @@ class LiveControllerTest {
 
     @Test
     void 즉시_개설도_미인증이면_401을_반환한다() throws Exception {
-        String body = """
-                {"title":"지금 바로 여는 빈티지 라이브","thumbnailUrl":null}
-                """;
+        String body = instantRequestBody("지금 바로 여는 빈티지 라이브");
 
         mockMvc.perform(post("/api/lives")
                         .contentType(MediaType.APPLICATION_JSON)

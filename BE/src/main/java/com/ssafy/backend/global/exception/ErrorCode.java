@@ -32,6 +32,10 @@ public enum ErrorCode {
     PRODUCT_ALREADY_LINKED(HttpStatus.CONFLICT, "L005", "이미 라이브에 연결된 상품입니다."),
     LIVE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "L006", "라이브에 연결되지 않은 상품입니다."),
     INVALID_LIVE_STATE(HttpStatus.BAD_REQUEST, "L007", "현재 방송 상태에서는 해당 처리를 할 수 없습니다."),
+    CHAT_GUEST_NOT_ALLOWED(HttpStatus.UNAUTHORIZED, "L008", "채팅은 로그인 후 이용할 수 있습니다."),
+    CHAT_CONTENT_INVALID(HttpStatus.BAD_REQUEST, "L009", "메시지는 1자 이상 500자 이하여야 합니다."),
+    REACTION_GUEST_NOT_ALLOWED(HttpStatus.UNAUTHORIZED, "L010", "반응 보내기는 로그인 후 이용할 수 있습니다."),
+    REACTION_TOO_FREQUENT(HttpStatus.TOO_MANY_REQUESTS, "L011", "반응을 너무 빠르게 보내고 있습니다. 잠시 후 다시 시도해주세요."),
 
     // [경매/입찰]
     AUCTION_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "A001", "현재 진행 중인 경매가 아닙니다."),
@@ -58,11 +62,16 @@ public enum ErrorCode {
     PRODUCT_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "P005", "상품 이미지는 최대 10장까지 등록할 수 있습니다."),
     INVALID_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "P006", "지원하지 않는 이미지 형식입니다."),
     PRODUCT_IMAGE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "P007", "업로드가 확인되지 않았습니다. 먼저 파일을 업로드해주세요."),
+    CATEGORY_NOT_FOUND(HttpStatus.BAD_REQUEST, "P008", "존재하지 않는 카테고리입니다."),
 
     // [소셜(팔로우/찜)]
     WISH_ALREADY_EXISTS(HttpStatus.CONFLICT, "S001", "이미 찜한 상품입니다."),
     WISH_NOT_FOUND(HttpStatus.NOT_FOUND, "S002", "찜하지 않은 상품입니다."),
-    WISH_FORBIDDEN(HttpStatus.FORBIDDEN, "S003", "본인의 찜만 처리할 수 있습니다.");
+    WISH_FORBIDDEN(HttpStatus.FORBIDDEN, "S003", "본인의 찜만 처리할 수 있습니다."),
+
+    // [알림]
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "존재하지 않는 알림입니다."),
+    NOTIFICATION_FORBIDDEN(HttpStatus.FORBIDDEN, "N002", "본인의 알림만 처리할 수 있습니다.");
 
     private final HttpStatus status;
     private final String code;
