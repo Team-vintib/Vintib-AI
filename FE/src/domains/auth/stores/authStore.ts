@@ -17,6 +17,10 @@ import {
 } from '@/shared/api/authTokenStorage'
 
 type AuthSession = LoginResponse | SsafySsoCallbackResponse | LinkAccountResponse
+type JwtPayload = {
+  email?: unknown
+  sub?: unknown
+}
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref('')
@@ -34,7 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
   const setSession = (session: AuthSession, rememberMe = true) => {
     accessToken.value = session.accessToken || ''
     refreshToken.value = session.refreshToken || ''
-    user.value = session.user || user.value
+    user.value = resolveSessionUser(session, accessToken.value, user.value)
     storageType.value = rememberMe ? 'local' : 'session'
     isSessionValidated.value = true
 
@@ -145,3 +149,73 @@ export const useAuthStore = defineStore('auth', () => {
     validateStoredSession,
   }
 })
+
+function resolveSessionUser(
+  session: AuthSession,
+  token: string,
+  currentUser: AuthUser | null,
+): AuthUser | null {
+  const tokenUser = getTokenUser(token)
+  const existingUser = tokenUser?.id === currentUser?.id ? currentUser : null
+  const resolvedUser = {
+    ...existingUser,
+    ...tokenUser,
+    ...session.user,
+  }
+
+  if (typeof resolvedUser.id !== 'number') {
+    return null
+  }
+
+  return {
+    id: resolvedUser.id,
+    email: resolvedUser.email ?? '',
+    name: resolvedUser.name,
+    onboardingCompleted: resolvedUser.onboardingCompleted,
+  }
+}
+
+function getTokenUser(token: string): Partial<AuthUser> | null {
+  const payload = parseJwtPayload(token)
+  const id = getNumericSubject(payload?.sub)
+
+  if (!id) {
+    return null
+  }
+
+  return {
+    id,
+    email: typeof payload?.email === 'string' ? payload.email : '',
+  }
+}
+
+function parseJwtPayload(token: string): JwtPayload | null {
+  const payload = token.split('.')[1]
+
+  if (!payload) {
+    return null
+  }
+
+  try {
+    return JSON.parse(window.atob(toBase64(payload))) as JwtPayload
+  } catch {
+    return null
+  }
+}
+
+function toBase64(base64Url: string) {
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+  const paddingLength = (4 - (base64.length % 4)) % 4
+
+  return `${base64}${'='.repeat(paddingLength)}`
+}
+
+function getNumericSubject(subject: unknown) {
+  if (typeof subject !== 'string') {
+    return null
+  }
+
+  const id = Number(subject)
+
+  return Number.isInteger(id) && id > 0 ? id : null
+}
