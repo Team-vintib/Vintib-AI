@@ -906,6 +906,7 @@ onBeforeUnmount(() => {
                 <span>색상</span>
                 <select
                   id="product-registration-color"
+                  class="product-registration__select"
                   v-model="draft.color"
                   :aria-invalid="basicStepErrors.color ? 'true' : 'false'"
                   aria-describedby="product-registration-color-error"
@@ -934,6 +935,7 @@ onBeforeUnmount(() => {
                 <span>카테고리</span>
                 <select
                   id="product-registration-category"
+                  class="product-registration__select"
                   v-model="draft.categoryId"
                   :aria-invalid="basicStepErrors.categoryId ? 'true' : 'false'"
                   aria-describedby="product-registration-category-error"
@@ -1023,6 +1025,7 @@ onBeforeUnmount(() => {
                 <span>사이즈</span>
                 <select
                   id="product-registration-size"
+                  class="product-registration__select"
                   v-model="draft.size"
                   :aria-invalid="attributesStepErrors.size ? 'true' : 'false'"
                   aria-describedby="product-registration-size-error"
@@ -1471,7 +1474,7 @@ onBeforeUnmount(() => {
                     @input="updateDirectSalePrice"
                     @blur="pricingStepTouched.directSalePrice = true"
                   />
-                  <span>원</span>
+                  <span>P</span>
                 </span>
                 <span
                   v-if="pricingStepErrors.directSalePrice"
@@ -1494,7 +1497,7 @@ onBeforeUnmount(() => {
                       @input="updateAuctionStartPrice"
                       @blur="pricingStepTouched.auctionStartPrice = true"
                     />
-                    <span>원</span>
+                    <span>P</span>
                   </span>
                   <span
                     v-if="pricingStepErrors.auctionStartPrice"
@@ -1507,7 +1510,7 @@ onBeforeUnmount(() => {
 
                 <label class="product-registration__field">
                   <span>경매 라이브</span>
-                  <select v-model="draft.linkedLiveId">
+                  <select class="product-registration__select" v-model="draft.linkedLiveId">
                     <option value="">선택 안 함</option>
                     <option
                       v-for="live in auctionLiveOptions"
@@ -1976,6 +1979,15 @@ onBeforeUnmount(() => {
 .product-registration__field select {
   height: var(--button-height-standard);
   padding: 0 var(--space-4);
+}
+
+.product-registration__field .product-registration__select {
+  appearance: none;
+  padding-right: 52px;
+  background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke='%23686A64' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: right 16px center;
+  background-repeat: no-repeat;
+  background-size: 20px 20px;
 }
 
 .product-registration__field textarea {
