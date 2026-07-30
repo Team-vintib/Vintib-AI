@@ -101,3 +101,8 @@ export interface ProductRegistrationDraft {
   auctionStartPrice: string
   linkedLiveId: string
 }
+
+export interface ProductRegistrationSubmitResult {
+  productId: string
+  submittedAt: string
+}

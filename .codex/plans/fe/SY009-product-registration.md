@@ -52,12 +52,12 @@
   - 상품 상세 이동
   - 계속 등록
   - 등록 상품 상세 이동은 mock id 처리 여부를 확인 후 적용
-- [ ] 필수값 누락, 가격/수량 오류, 이미지 오류, 등록 실패 상태를 화면에서 표시한다.
-- [ ] mock 등록 adapter를 `domains/product/api/`에 추가하고, 실제 API 전환 지점을 주석이 아닌 타입/함수 경계로 남긴다.
-- [ ] 새 화면이 기존 상품 목록/상세와 시각적으로 어긋나지 않도록 SCSS를 구성한다.
+- [x] 필수값 누락, 가격 오류, 이미지 오류, 등록 실패 상태를 화면에서 표시한다.
+- [x] mock 등록 adapter를 `domains/product/api/`에 추가하고, 실제 API 전환 지점을 주석이 아닌 타입/함수 경계로 남긴다.
+- [x] 새 화면이 기존 상품 목록/상세와 시각적으로 어긋나지 않도록 SCSS를 구성한다.
 - [x] `FE/docs/frontend/flows/route-map.md`의 `/products/new` 비고를 placeholder에서 실제 화면으로 갱신한다.
 - [ ] `FE/docs/frontend/implementation/current-structure.md`와 `status.md`에 구현 상태를 갱신한다.
-- [ ] `npm run type-check`를 실행하고 가능하면 `npm run build`까지 검증한다.
+- [x] `npm run type-check`를 실행하고 가능하면 `npm run build`까지 검증한다.
 
 ## 미결정 사항
 
