@@ -1,7 +1,8 @@
-"""품질검수 스파이크 두 개(SAM3 / CLIPSeg)가 공유하는 프롬프트·임계치·필터 로직.
+"""품질검수 스파이크 세 개(SAM3 / CLIPSeg / 하이브리드)가 공유하는 프롬프트·임계치·필터 로직.
 
-`sam3-condition-check/sam3_qc_test.ipynb` 와 `clipseg-condition-check/clipseg_qc_test.ipynb`
-가 **같은 이미지 · 같은 프롬프트 · 같은 후처리**로 돌아야 두 모델 비교가 성립한다.
+`sam3-condition-check/sam3_qc_test.ipynb`, `clipseg-condition-check/clipseg_qc_test.ipynb`,
+`clipseg-sam3tracker-hybrid-check/hybrid_qc_test.ipynb` 가 **같은 이미지 · 같은 프롬프트 ·
+같은 후처리**로 돌아야 아키텍처 비교가 성립한다.
 각 노트북에 상수를 복사해 두면 한쪽만 고쳐져 조용히 어긋나므로 여기 한 곳에만 둔다.
 
 노트북에서 쓰는 법(노트북 CWD 가 자기 폴더라 상위를 경로에 넣는다):
@@ -240,6 +241,66 @@ def containment(a: np.ndarray, b: np.ndarray) -> float:
     if area == 0:
         return 0.0
     return float(np.logical_and(a_bool, b.astype(bool)).sum() / area)
+
+
+def mask_iou(a: np.ndarray, b: np.ndarray) -> float:
+    """|a ∩ b| / |a ∪ b| — 대칭 겹침 비율. 둘 다 비면 0.
+
+    `containment` 와 달리 방향이 없다. 마스크 **정제 전/후 비교**에 쓴다 — 정제는 같은 대상의
+    경계만 다듬는 것이라 IoU 가 높아야 정상이고, 낮으면 "정제"가 아니라 "대상이 바뀐" 것이다
+    (SAM3Tracker 는 class-agnostic 이라 실제로 이 일이 일어난다).
+    """
+    a_bool, b_bool = a.astype(bool), b.astype(bool)
+    union = int(np.logical_or(a_bool, b_bool).sum())
+    if union == 0:
+        return 0.0
+    return float(np.logical_and(a_bool, b_bool).sum() / union)
+
+
+def probs_to_instances(prob_map, tag, prompt, threshold, min_area_ratio=MIN_AREA_RATIO):
+    """확률 히트맵 1장 -> 인스턴스 리스트. SAM3 PCS 출력과 같은 dict 스키마로 맞춘다.
+
+    CLIPSeg 에는 인스턴스 개념이 없다(프롬프트당 확률맵 1장이 전부). 임계치로 이진화하고
+    연결요소를 뽑아 `{type, prompt, bbox, confidence, mask}` 형태로 만들어야
+    `filter_by_garment`/`suppress_benign`/`decide_verdict` 를 SAM3 와 똑같이 태울 수 있다.
+
+    - `confidence` 는 blob 내부 확률의 **최댓값**(peak) — 프로덕션 `findings.py` 와 같다.
+    - `min_area_ratio` 미만 blob 은 노이즈로 버린다 — `registry.py` 와 같은 값이 기본이다.
+    - `threshold` 에 기본값을 두지 않는다. 백엔드마다 확률 스케일이 달라(`BACKEND_THRESHOLDS`)
+      호출부가 어떤 임계치를 쓰는지 항상 명시해야 한다.
+
+    ⚠️ 프로덕션(`worker/models/clipseg/findings.py`)은 scipy 없이 돌리려고 순수 numpy
+    flood-fill 을 쓰고 여기는 `cv2.connectedComponentsWithStats` 를 쓴다. 결과는 같지만
+    프로덕션 수치와 1:1 로 대조할 때는 확인이 필요하다.
+    """
+    import cv2
+
+    binary = (prob_map > threshold).astype(np.uint8)
+    total = prob_map.size
+    if binary.sum() == 0:
+        return []
+
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(binary, connectivity=4)
+    found = []
+    for label in range(1, count):  # 0 은 배경
+        area = int(stats[label, cv2.CC_STAT_AREA])
+        if area / total < min_area_ratio:
+            continue
+        mask = (labels == label).astype(np.uint8)
+        x = int(stats[label, cv2.CC_STAT_LEFT])
+        y = int(stats[label, cv2.CC_STAT_TOP])
+        w = int(stats[label, cv2.CC_STAT_WIDTH])
+        h = int(stats[label, cv2.CC_STAT_HEIGHT])
+        found.append(
+            {
+                "type": tag,
+                "prompt": prompt,
+                "bbox": [x, y, x + w, y + h],
+                "confidence": round(float(prob_map[mask.astype(bool)].max()), 4),
+                "mask": mask,
+            }
+        )
+    return found
 
 
 # --------------------------------------------------------------------------
