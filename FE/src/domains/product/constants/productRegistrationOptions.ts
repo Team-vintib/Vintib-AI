@@ -65,7 +65,7 @@ export const PRODUCT_REGISTRATION_CONDITION_OPTIONS: ProductRegistrationOption[]
 
 export const PRODUCT_REGISTRATION_SALE_TYPE_OPTIONS: ProductRegistrationOption[] = [
   { id: 'DIRECT', label: '상시 판매' },
-  { id: 'AUCTION', label: '경매 예정' },
+  { id: 'AUCTION', label: '경매' },
 ]
 
 export const PRODUCT_REGISTRATION_COLOR_OPTIONS: ProductRegistrationOption[] = [

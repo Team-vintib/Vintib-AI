@@ -8,6 +8,7 @@ import {
   PRODUCT_REGISTRATION_COLOR_OPTIONS,
   PRODUCT_REGISTRATION_CONDITION_OPTIONS,
   PRODUCT_REGISTRATION_MEASUREMENT_FIELDS_BY_CATEGORY,
+  PRODUCT_REGISTRATION_SALE_TYPE_OPTIONS,
   PRODUCT_REGISTRATION_SIZE_OPTIONS,
   PRODUCT_REGISTRATION_STEPS,
   PRODUCT_REGISTRATION_VALIDATION_MESSAGES,
@@ -16,8 +17,11 @@ import type {
   ProductRegistrationDraft,
   ProductRegistrationAiDefectCandidate,
   ProductRegistrationAiPhotoResult,
+  ProductRegistrationPriceBucket,
   ProductRegistrationPhotoDraft,
   ProductRegistrationPhotoRole,
+  ProductRegistrationRecommendedPrice,
+  ProductRegistrationSaleType,
 } from '@/domains/product/types/productRegistration.types'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
@@ -46,8 +50,35 @@ const conditionStepTouched = reactive({
   aiPhotos: false,
   aiConfirmation: false,
 })
+const pricingStepTouched = reactive({
+  saleType: false,
+  directSalePrice: false,
+  auctionStartPrice: false,
+})
 const currentAiResultIndex = ref(0)
 const isAdditionalAiPhotoPickerOpen = ref(false)
+
+const priceRecommendationBuckets: ProductRegistrationPriceBucket[] = [
+  { id: 'under-30', label: '~3만', productCount: 6 },
+  { id: '30-50', label: '3~5만', productCount: 14 },
+  { id: '50-70', label: '5~7만', productCount: 24 },
+  { id: '70-90', label: '7~9만', productCount: 18 },
+  { id: '90-120', label: '9~12만', productCount: 11 },
+  { id: 'over-120', label: '12만~', productCount: 5 },
+]
+
+const recommendedPrices: ProductRegistrationRecommendedPrice[] = [
+  { grade: 'S', label: 'S급', price: 108000 },
+  { grade: 'A', label: 'A급', price: 92000 },
+  { grade: 'B', label: 'B급', price: 74000 },
+  { grade: 'C', label: 'C급', price: 56000 },
+]
+
+const auctionLiveOptions = [
+  { id: 'live-20260730-1', label: '7월 30일 21:00 빈티지 아우터 라이브' },
+  { id: 'live-20260731-1', label: '7월 31일 20:00 데일리 셀렉션 라이브' },
+  { id: 'live-20260801-1', label: '8월 1일 19:30 주말 경매 라이브' },
+]
 
 const draft = reactive<ProductRegistrationDraft>({
   photos: [],
@@ -147,11 +178,10 @@ const getMeasurementError = (fieldId: string, value: string | number) => {
 const activeMeasurementFields = computed(
   () => PRODUCT_REGISTRATION_MEASUREMENT_FIELDS_BY_CATEGORY[draft.categoryId] ?? [],
 )
-const requiresSizeSelection = computed(() => draft.categoryId !== 'accessory' && draft.categoryId !== 'etc')
 const requiresMeasurements = computed(() => activeMeasurementFields.value.length > 0)
 const attributesStepErrors = computed(() => ({
   size:
-    attributesStepTouched.size && requiresSizeSelection.value && !draft.size
+    attributesStepTouched.size && !draft.size
       ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.sizeRequired
       : '',
   measurements: Object.fromEntries(
@@ -177,7 +207,7 @@ const isBasicStepValid = computed(
 )
 const isAttributesStepValid = computed(
   () =>
-    (!requiresSizeSelection.value || Boolean(draft.size)) &&
+    Boolean(draft.size) &&
     activeMeasurementFields.value.every((field) =>
       isPositiveMeasurement(draft.measurements[field.id] ?? ''),
     ),
@@ -197,10 +227,8 @@ const selectedCategoryLabel = computed(
 )
 const selectedSizeLabel = computed(
   () =>
-    requiresSizeSelection.value
-      ? PRODUCT_REGISTRATION_SIZE_OPTIONS.find((option) => option.id === draft.size)?.label ||
-        ''
-      : '',
+    PRODUCT_REGISTRATION_SIZE_OPTIONS.find((option) => option.id === draft.size)?.label ||
+    '',
 )
 const measurementSummaryLabel = computed(() => {
   if (!requiresMeasurements.value) {
@@ -282,6 +310,60 @@ const isConditionStepValid = computed(
     hasRequiredAiPhotos.value &&
     areAllAiPhotosConfirmed.value,
 )
+const isPositivePrice = (value: string) => {
+  const normalizedValue = value.trim().replaceAll(',', '')
+  const parsedValue = Number(normalizedValue)
+
+  return normalizedValue !== '' && Number.isFinite(parsedValue) && parsedValue > 0
+}
+const formatPrice = (price: number) => `${price.toLocaleString('ko-KR')}원`
+const selectedSaleTypeLabel = computed(
+  () =>
+    PRODUCT_REGISTRATION_SALE_TYPE_OPTIONS.find((option) => option.id === draft.saleType)?.label ||
+    '',
+)
+const selectedPriceLabel = computed(() => {
+  if (draft.saleType === 'DIRECT' && isPositivePrice(draft.directSalePrice)) {
+    return formatPrice(Number(draft.directSalePrice.trim().replaceAll(',', '')))
+  }
+
+  if (draft.saleType === 'AUCTION' && isPositivePrice(draft.auctionStartPrice)) {
+    return formatPrice(Number(draft.auctionStartPrice.trim().replaceAll(',', '')))
+  }
+
+  return ''
+})
+const maxPriceBucketCount = computed(() =>
+  Math.max(...priceRecommendationBuckets.map((bucket) => bucket.productCount)),
+)
+const pricingStepErrors = computed(() => ({
+  saleType:
+    pricingStepTouched.saleType && !draft.saleType
+      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.saleTypeRequired
+      : '',
+  directSalePrice:
+    pricingStepTouched.directSalePrice && draft.saleType === 'DIRECT'
+      ? !draft.directSalePrice.trim()
+        ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.directSalePriceRequired
+        : isPositivePrice(draft.directSalePrice)
+          ? ''
+          : PRODUCT_REGISTRATION_VALIDATION_MESSAGES.priceInvalid
+      : '',
+  auctionStartPrice:
+    pricingStepTouched.auctionStartPrice && draft.saleType === 'AUCTION'
+      ? !draft.auctionStartPrice.trim()
+        ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.auctionStartPriceRequired
+        : isPositivePrice(draft.auctionStartPrice)
+          ? ''
+          : PRODUCT_REGISTRATION_VALIDATION_MESSAGES.priceInvalid
+      : '',
+}))
+const isPricingStepValid = computed(
+  () =>
+    Boolean(draft.saleType) &&
+    (draft.saleType !== 'DIRECT' || isPositivePrice(draft.directSalePrice)) &&
+    (draft.saleType !== 'AUCTION' || isPositivePrice(draft.auctionStartPrice)),
+)
 
 const canMoveCurrentStepNext = computed(() => {
   if (currentStep.value.id === 'photos') {
@@ -298,6 +380,10 @@ const canMoveCurrentStepNext = computed(() => {
 
   if (currentStep.value.id === 'condition') {
     return isConditionStepValid.value
+  }
+
+  if (currentStep.value.id === 'pricing') {
+    return isPricingStepValid.value
   }
 
   return true
@@ -411,6 +497,11 @@ const selectHasDefect = (hasDefect: boolean) => {
   conditionStepTouched.hasDefect = true
 }
 
+const selectSaleType = (saleType: string) => {
+  draft.saleType = saleType as ProductRegistrationSaleType
+  pricingStepTouched.saleType = true
+}
+
 const toggleAiCheckPhoto = (photoId: string) => {
   conditionStepTouched.aiPhotos = true
 
@@ -476,7 +567,7 @@ const moveAiResult = (direction: -1 | 1) => {
 }
 
 const toggleAiDefectCandidate = (candidateId: string) => {
-  if (!currentAiResult.value) {
+  if (!currentAiResult.value || currentAiResult.value.confirmed) {
     return
   }
 
@@ -496,6 +587,16 @@ const confirmCurrentAiPhoto = () => {
   currentAiResult.value.status = 'confirmed'
   currentAiResult.value.regeneratedImageUrl = currentAiPhoto.value.previewUrl
   currentAiResult.value.confirmed = true
+  conditionStepTouched.aiConfirmation = true
+}
+
+const editCurrentAiPhotoResult = () => {
+  if (!currentAiResult.value) {
+    return
+  }
+
+  currentAiResult.value.status = 'completed'
+  currentAiResult.value.confirmed = false
   conditionStepTouched.aiConfirmation = true
 }
 
@@ -527,7 +628,18 @@ const markCurrentStepTouched = () => {
     conditionStepTouched.sellerDefectDescription = true
     conditionStepTouched.aiPhotos = true
     conditionStepTouched.aiConfirmation = true
+    return
   }
+
+  if (currentStep.value.id === 'pricing') {
+    pricingStepTouched.saleType = true
+    pricingStepTouched.directSalePrice = true
+    pricingStepTouched.auctionStartPrice = true
+  }
+}
+
+const scrollToPageTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 const moveToPreviousStep = () => {
@@ -536,6 +648,7 @@ const moveToPreviousStep = () => {
   }
 
   currentStepIndex.value -= 1
+  scrollToPageTop()
 }
 
 const moveToNextStep = () => {
@@ -550,6 +663,7 @@ const moveToNextStep = () => {
   }
 
   currentStepIndex.value += 1
+  scrollToPageTop()
 }
 
 const saveDraft = () => {
@@ -563,6 +677,7 @@ const cancelRegistration = () => {
 const continueRegistration = () => {
   currentStepIndex.value = 0
   draftSaveMessage.value = ''
+  scrollToPageTop()
 }
 
 const moveToRegisteredProduct = () => {
@@ -830,14 +945,11 @@ onBeforeUnmount(() => {
                 <select
                   id="product-registration-size"
                   v-model="draft.size"
-                  :disabled="!requiresSizeSelection"
                   :aria-invalid="attributesStepErrors.size ? 'true' : 'false'"
                   aria-describedby="product-registration-size-error"
                   @blur="attributesStepTouched.size = true"
                 >
-                  <option value="">
-                    {{ requiresSizeSelection ? '사이즈 선택' : '해당 없음' }}
-                  </option>
+                  <option value="">사이즈 선택</option>
                   <option
                     v-for="option in PRODUCT_REGISTRATION_SIZE_OPTIONS"
                     :key="option.id"
@@ -1131,19 +1243,35 @@ onBeforeUnmount(() => {
                       <strong>{{ candidate.labelNumber }}번</strong>
                       <p>{{ candidate.description }}</p>
                     </div>
-                    <button type="button" @click="toggleAiDefectCandidate(candidate.id)">
+                    <button
+                      type="button"
+                      :disabled="currentAiResult.confirmed"
+                      @click="toggleAiDefectCandidate(candidate.id)"
+                    >
                       {{ candidate.isActualDefect ? '하자 제외' : '하자로 표시' }}
                     </button>
                   </article>
                 </div>
 
-                <button
-                  class="product-registration__button product-registration__button--primary"
-                  type="button"
-                  @click="confirmCurrentAiPhoto"
-                >
-                  {{ currentAiResult.confirmed ? '저장 완료' : '결과 저장' }}
-                </button>
+                <div class="product-registration__ai-result-actions">
+                  <span v-if="currentAiResult.confirmed">저장 완료</span>
+                  <button
+                    v-if="currentAiResult.confirmed"
+                    class="product-registration__button product-registration__button--secondary"
+                    type="button"
+                    @click="editCurrentAiPhotoResult"
+                  >
+                    수정하기
+                  </button>
+                  <button
+                    v-else
+                    class="product-registration__button product-registration__button--primary"
+                    type="button"
+                    @click="confirmCurrentAiPhoto"
+                  >
+                    결과 저장
+                  </button>
+                </div>
               </div>
 
               <div v-else class="product-registration__ai-empty" role="status">
@@ -1158,6 +1286,156 @@ onBeforeUnmount(() => {
               >
                 {{ conditionStepErrors.aiConfirmation }}
               </p>
+            </section>
+          </form>
+
+          <form
+            v-else-if="currentStep.id === 'pricing'"
+            class="product-registration__form"
+            aria-label="상품 가격 입력"
+          >
+            <section class="product-registration__section" aria-labelledby="price-recommendation-title">
+              <div class="product-registration__section-header">
+                <div>
+                  <h3 id="price-recommendation-title">AI 가격 추천</h3>
+                  <p>동일 상품 데이터를 기준으로 가격대별 등록 상품 수와 등급별 추천가를 확인합니다.</p>
+                </div>
+              </div>
+
+              <div class="product-registration__price-chart" aria-label="가격 추천 그래프">
+                <div class="product-registration__price-chart-plot">
+                  <div class="product-registration__price-axis product-registration__price-axis--y">
+                    <span>상품 수</span>
+                  </div>
+                  <div class="product-registration__price-chart-body">
+                    <div class="product-registration__price-y-scale" aria-hidden="true">
+                      <span>{{ maxPriceBucketCount }}</span>
+                      <span>{{ Math.round(maxPriceBucketCount / 2) }}</span>
+                      <span>0</span>
+                    </div>
+                    <div class="product-registration__price-bars">
+                      <div
+                        v-for="bucket in priceRecommendationBuckets"
+                        :key="bucket.id"
+                        class="product-registration__price-bar"
+                      >
+                        <strong>{{ bucket.productCount }}</strong>
+                        <span
+                          class="product-registration__price-bar-fill"
+                          :style="{ height: `${(bucket.productCount / maxPriceBucketCount) * 100}%` }"
+                        />
+                      </div>
+                      <div
+                        v-for="(recommendation, index) in recommendedPrices"
+                        :key="recommendation.grade"
+                        class="product-registration__price-marker"
+                        :style="{ left: `${18 + index * 16}%` }"
+                      >
+                        <span>{{ recommendation.label }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="product-registration__price-axis product-registration__price-axis--x">
+                    <span
+                      v-for="bucket in priceRecommendationBuckets"
+                      :key="bucket.id"
+                    >
+                      {{ bucket.label }}
+                    </span>
+                  </div>
+                </div>
+
+                <dl class="product-registration__price-recommendations">
+                  <div
+                    v-for="recommendation in recommendedPrices"
+                    :key="recommendation.grade"
+                  >
+                    <dt>{{ recommendation.label }}</dt>
+                    <dd>{{ formatPrice(recommendation.price) }}</dd>
+                  </div>
+                </dl>
+              </div>
+            </section>
+
+            <section class="product-registration__section" aria-labelledby="sale-type-title">
+              <div class="product-registration__section-header">
+                <div>
+                  <h3 id="sale-type-title">판매 방식 / 가격</h3>
+                </div>
+              </div>
+
+              <div class="product-registration__option-grid" role="radiogroup" aria-label="판매 방식 선택">
+                <button
+                  v-for="option in PRODUCT_REGISTRATION_SALE_TYPE_OPTIONS"
+                  :key="option.id"
+                  class="product-registration__option"
+                  :class="{ 'product-registration__option--selected': draft.saleType === option.id }"
+                  type="button"
+                  :aria-pressed="draft.saleType === option.id"
+                  @click="selectSaleType(option.id)"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+              <p v-if="pricingStepErrors.saleType" class="product-registration__field-error" role="alert">
+                {{ pricingStepErrors.saleType }}
+              </p>
+
+              <label v-if="draft.saleType === 'DIRECT'" class="product-registration__field">
+                <span>판매가</span>
+                <span class="product-registration__price-input">
+                  <input
+                    v-model="draft.directSalePrice"
+                    inputmode="numeric"
+                    placeholder="판매가를 입력해 주세요"
+                    @blur="pricingStepTouched.directSalePrice = true"
+                  />
+                  <span>P</span>
+                </span>
+                <span
+                  v-if="pricingStepErrors.directSalePrice"
+                  class="product-registration__field-error"
+                  role="alert"
+                >
+                  {{ pricingStepErrors.directSalePrice }}
+                </span>
+              </label>
+
+              <div v-if="draft.saleType === 'AUCTION'" class="product-registration__form-grid">
+                <label class="product-registration__field">
+                  <span>시작가</span>
+                  <span class="product-registration__price-input">
+                    <input
+                      v-model="draft.auctionStartPrice"
+                      inputmode="numeric"
+                      placeholder="시작가를 입력해 주세요"
+                      @blur="pricingStepTouched.auctionStartPrice = true"
+                    />
+                    <span>원</span>
+                  </span>
+                  <span
+                    v-if="pricingStepErrors.auctionStartPrice"
+                    class="product-registration__field-error"
+                    role="alert"
+                  >
+                    {{ pricingStepErrors.auctionStartPrice }}
+                  </span>
+                </label>
+
+                <label class="product-registration__field">
+                  <span>경매 라이브</span>
+                  <select v-model="draft.linkedLiveId">
+                    <option value="">선택 안 함</option>
+                    <option
+                      v-for="live in auctionLiveOptions"
+                      :key="live.id"
+                      :value="live.id"
+                    >
+                      {{ live.label }}
+                    </option>
+                  </select>
+                </label>
+              </div>
             </section>
           </form>
 
@@ -1258,6 +1536,14 @@ onBeforeUnmount(() => {
             <div>
               <dt>상태</dt>
               <dd>{{ selectedConditionLabel }}</dd>
+            </div>
+            <div>
+              <dt>판매 유형</dt>
+              <dd>{{ selectedSaleTypeLabel }}</dd>
+            </div>
+            <div>
+              <dt>가격</dt>
+              <dd>{{ selectedPriceLabel }}</dd>
             </div>
           </dl>
         </aside>
@@ -1467,6 +1753,26 @@ onBeforeUnmount(() => {
   min-height: 112px;
   padding: var(--space-3) var(--space-4);
   resize: vertical;
+}
+
+.product-registration__price-input {
+  position: relative;
+  display: block;
+}
+
+.product-registration__price-input input {
+  padding-right: 48px;
+}
+
+.product-registration__price-input span {
+  position: absolute;
+  top: 50%;
+  right: var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 20px;
+  transform: translateY(-50%);
 }
 
 .product-registration__field input::placeholder,
@@ -1738,11 +2044,13 @@ onBeforeUnmount(() => {
 .product-registration__ai-box {
   position: absolute;
   display: grid;
+  padding: 4px 0 0 6px;
   border: 2px solid #2563eb;
   background: rgb(37 99 235 / 12%);
   color: #2563eb;
   font-size: 12px;
   font-weight: var(--font-weight-bold);
+  line-height: 1;
   place-items: start;
 }
 
@@ -1806,6 +2114,26 @@ onBeforeUnmount(() => {
   color: var(--color-error);
 }
 
+.product-registration__ai-card button:disabled {
+  border-color: var(--color-border);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.product-registration__ai-result-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.product-registration__ai-result-actions > span {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+}
+
 .product-registration__ai-empty {
   display: grid;
   gap: var(--space-1);
@@ -1821,6 +2149,143 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-empty strong {
   color: var(--color-text-primary);
+}
+
+.product-registration__price-chart {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.product-registration__price-chart-plot {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+}
+
+.product-registration__price-axis {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.product-registration__price-axis--y {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.product-registration__price-axis--x {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin-left: 36px;
+  text-align: center;
+}
+
+.product-registration__price-chart-body {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 24px minmax(0, 1fr);
+}
+
+.product-registration__price-y-scale {
+  display: flex;
+  align-items: stretch;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 220px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  text-align: right;
+}
+
+.product-registration__price-bars {
+  position: relative;
+  display: grid;
+  align-items: end;
+  height: 220px;
+  gap: var(--space-3);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  padding: var(--space-4) var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
+.product-registration__price-bar {
+  position: relative;
+  display: flex;
+  align-items: end;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+  min-width: 0;
+}
+
+.product-registration__price-bar-fill {
+  display: block;
+  width: 100%;
+  min-height: 12px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: color-mix(in srgb, var(--color-live) 18%, var(--color-surface));
+}
+
+.product-registration__price-bar strong {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.product-registration__price-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-error);
+}
+
+.product-registration__price-marker span {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-error);
+  color: var(--color-text-inverse);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.product-registration__price-recommendations {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.product-registration__price-recommendations div {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.product-registration__price-recommendations dt {
+  color: var(--color-error);
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+}
+
+.product-registration__price-recommendations dd {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
 }
 
 .product-registration__complete {
