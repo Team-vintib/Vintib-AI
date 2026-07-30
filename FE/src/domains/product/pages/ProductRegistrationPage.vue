@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { PRODUCT_REGISTRATION_STEPS } from '@/domains/product/constants/productRegistrationOptions'
 import type { ProductRegistrationDraft } from '@/domains/product/types/productRegistration.types'
+import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
+const router = useRouter()
 const currentStepIndex = ref(0)
+const draftSaveMessage = ref('')
 
 const draft = reactive<ProductRegistrationDraft>({
   photos: [],
@@ -37,6 +41,44 @@ const draft = reactive<ProductRegistrationDraft>({
 })
 
 const currentStep = computed(() => PRODUCT_REGISTRATION_STEPS[currentStepIndex.value])
+const isFirstStep = computed(() => currentStepIndex.value === 0)
+const isReviewStep = computed(() => currentStep.value.id === 'review')
+const isCompleteStep = computed(() => currentStep.value.id === 'complete')
+const nextActionLabel = computed(() => (isReviewStep.value ? '등록 완료' : '다음'))
+const selectedStepLabel = computed(() => `${currentStepIndex.value + 1}. ${currentStep.value.label}`)
+
+const moveToPreviousStep = () => {
+  if (isFirstStep.value || isCompleteStep.value) {
+    return
+  }
+
+  currentStepIndex.value -= 1
+}
+
+const moveToNextStep = () => {
+  if (isCompleteStep.value) {
+    return
+  }
+
+  currentStepIndex.value += 1
+}
+
+const saveDraft = () => {
+  draftSaveMessage.value = '임시저장은 실제 API 확정 전까지 화면 상태로만 표시합니다.'
+}
+
+const cancelRegistration = () => {
+  router.push(ROUTE_PATHS.PRODUCT_LIST)
+}
+
+const continueRegistration = () => {
+  currentStepIndex.value = 0
+  draftSaveMessage.value = ''
+}
+
+const moveToRegisteredProduct = () => {
+  router.push({ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId: 'preview' } })
+}
 </script>
 
 <template>
@@ -69,9 +111,72 @@ const currentStep = computed(() => PRODUCT_REGISTRATION_STEPS[currentStepIndex.v
         <section class="product-registration__panel" :aria-labelledby="`${currentStep.id}-title`">
           <h2 :id="`${currentStep.id}-title`">{{ currentStep.label }}</h2>
           <p>{{ currentStep.description }}</p>
-          <div class="product-registration__placeholder" role="status">
-            <strong>다음 단계에서 입력 UI를 연결합니다.</strong>
-            <p>현재 작업은 라우트, 타입, 옵션 상수와 화면 골격 연결 범위입니다.</p>
+
+          <div
+            v-if="!isCompleteStep"
+            class="product-registration__placeholder"
+            role="status"
+          >
+            <strong>{{ selectedStepLabel }} 입력 UI를 연결할 영역입니다.</strong>
+            <p>현재 작업은 단계 이동, 공통 액션과 화면 골격 연결 범위입니다.</p>
+          </div>
+
+          <div v-else class="product-registration__complete" role="status">
+            <span class="product-registration__complete-icon" aria-hidden="true">✓</span>
+            <h3>상품 등록이 완료되었습니다.</h3>
+            <p>실제 등록 API가 확정되면 등록된 상품 ID로 상세 화면에 이동합니다.</p>
+            <div class="product-registration__complete-actions">
+              <button
+                class="product-registration__button product-registration__button--primary"
+                type="button"
+                @click="moveToRegisteredProduct"
+              >
+                상품 보기
+              </button>
+              <button
+                class="product-registration__button product-registration__button--secondary"
+                type="button"
+                @click="continueRegistration"
+              >
+                계속 등록
+              </button>
+            </div>
+          </div>
+
+          <p v-if="draftSaveMessage" class="product-registration__notice" role="status">
+            {{ draftSaveMessage }}
+          </p>
+
+          <div v-if="!isCompleteStep" class="product-registration__actions">
+            <button
+              class="product-registration__button product-registration__button--ghost"
+              type="button"
+              @click="cancelRegistration"
+            >
+              취소
+            </button>
+            <button
+              class="product-registration__button product-registration__button--secondary"
+              type="button"
+              @click="saveDraft"
+            >
+              임시저장
+            </button>
+            <button
+              class="product-registration__button product-registration__button--secondary"
+              type="button"
+              :disabled="isFirstStep"
+              @click="moveToPreviousStep"
+            >
+              이전
+            </button>
+            <button
+              class="product-registration__button product-registration__button--primary"
+              type="button"
+              @click="moveToNextStep"
+            >
+              {{ nextActionLabel }}
+            </button>
           </div>
         </section>
 
@@ -245,6 +350,91 @@ const currentStep = computed(() => PRODUCT_REGISTRATION_STEPS[currentStepIndex.v
   color: var(--color-text-primary);
 }
 
+.product-registration__complete {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+  padding: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+  text-align: center;
+}
+
+.product-registration__complete-icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 24px;
+  font-weight: var(--font-weight-bold);
+  place-items: center;
+}
+
+.product-registration__complete h3 {
+  color: var(--color-text-primary);
+  font-size: 22px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 30px;
+}
+
+.product-registration__complete p {
+  max-width: 520px;
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-body);
+}
+
+.product-registration__complete-actions,
+.product-registration__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.product-registration__complete-actions {
+  justify-content: center;
+}
+
+.product-registration__notice {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 20px;
+}
+
+.product-registration__button {
+  min-width: 104px;
+  height: var(--button-height-standard);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-control);
+  font-weight: var(--font-weight-bold);
+}
+
+.product-registration__button--ghost,
+.product-registration__button--secondary {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.product-registration__button--primary {
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.product-registration__button:disabled {
+  border-color: var(--color-border);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-muted);
+}
+
 .product-registration__summary {
   display: grid;
   gap: var(--space-6);
@@ -278,6 +468,20 @@ const currentStep = computed(() => PRODUCT_REGISTRATION_STEPS[currentStepIndex.v
   .product-registration__body {
     grid-template-columns: 1fr;
   }
+
+  .product-registration__actions {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .product-registration__button {
+    width: 100%;
+  }
+
+  .product-registration__complete-actions,
+  .product-registration__actions {
+    flex-direction: column;
+  }
 }
 </style>
-
