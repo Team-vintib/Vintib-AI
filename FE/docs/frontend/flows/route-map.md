@@ -119,7 +119,7 @@ flowchart TD
 | `/lives`                  | LIVE        | false        | false     | 413·415·418 카드·필터·정렬·목록 상태 구현. BE 최종 009의 복수 카테고리·공통 PageResponse·nullable 시청자 정책을 adapter에 반영하기 전까지 mock 사용 |
 | `/products`               | PROD-008    | false        | false     | 공개 상품 목록 껍데기, 실제 조회 API 연동 대기   |
 | `/products/:productId`    | PROD-006    | false        | false     | 상품 상세 408·410·412 UI, 실제 API 대기           |
-| `/products/new`           | PROD 신규   | true         | false     | 상품 등록 placeholder                            |
+| `/products/new`           | PROD-001~003 | true        | false     | 상품 등록 단계형 화면, 실제 등록 API 확정 전 mock adapter 사용 |
 | `/lives/new`              | LIVE 신규   | true         | false     | 라이브 시작 placeholder                          |
 | `/lives/:liveId`          | LIVE-005    | false        | false     | 419 전체 구조, 423 채팅·경매와 425 AI 시착 패널 mock UI 구현. 실제 스트리밍·채팅 STOMP·경매·AI API 연동 대기 |
 | `/notifications`          | NOTI        | true         | false     | 알림센터 placeholder                             |

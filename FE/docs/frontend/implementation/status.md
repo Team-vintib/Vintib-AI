@@ -35,3 +35,9 @@
 | 검색 상태 화면 | 부분 | 초기 검색어 없음, loading, error, 검색 결과 없음, 필터 결과 없음, 가격 범위 오류 상태 구현. loading/error/empty는 `status` query로 mock 확인 가능 |
 | 검색 액션 | 부분 | 상품 카드는 상세 route 이동, 라이브 카드는 시청 route 이동, 찜/팔로우는 로그인 필요 시 login redirect 처리. 실제 찜/팔로우 API와 회원 프로필 route 대기 |
 | 스타일 토큰 | 부분 | 상품 목록/검색 필터가 공유하는 필터 패널 폭, 본문/캡션/버튼 글자 크기, font-weight, line-height CSS 변수 추가 |
+
+## 2026-07-30 초기 진입 스플래시 상태
+
+| 영역 | 상태 | 비고 |
+| --- | --- | --- |
+| 앱 초기 스플래시 | 완료 | 새 탭 최초 진입 시 `vintib_moving_logo.gif`를 1회 재생한 뒤 요청된 라우트 화면으로 전환. 같은 탭 내 이동에서는 재생하지 않도록 `sessionStorage` 기준 적용. |
