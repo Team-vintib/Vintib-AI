@@ -62,6 +62,27 @@ export const useAuthStore = defineStore('auth', () => {
     clearStoredAuthSession()
   }
 
+  const updateUser = (nextUser: Partial<AuthUser>) => {
+    if (!user.value) {
+      return
+    }
+
+    user.value = {
+      ...user.value,
+      ...nextUser,
+    }
+
+    writeStoredAuthSession(
+      {
+        accessToken: accessToken.value || undefined,
+        refreshToken: refreshToken.value || undefined,
+        storageType: storageType.value,
+        user: user.value,
+      },
+      storageType.value,
+    )
+  }
+
   const logoutSession = async () => {
     try {
       await logout()
@@ -144,6 +165,7 @@ export const useAuthStore = defineStore('auth', () => {
     isOnboardingCompleted,
     setSession,
     clearSession,
+    updateUser,
     logoutSession,
     hydrateSession,
     validateStoredSession,
