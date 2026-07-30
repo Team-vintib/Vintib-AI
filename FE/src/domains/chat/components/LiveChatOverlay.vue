@@ -16,12 +16,21 @@ const props = defineProps<{
   status: LiveWatchStatus
 }>()
 
+interface LiveReactionParticle {
+  id: number
+  emoji: LiveReactionEmoji
+  offset: number
+}
+
 const messages = ref<LiveChatMessage[]>([...LIVE_CHAT_MOCK_MESSAGES])
 const draft = ref('')
 const activeReaction = ref<LiveReactionEmoji | null>(null)
+const reactionParticles = ref<LiveReactionParticle[]>([])
 const messageList = ref<HTMLElement | null>(null)
 let mockMessageSequence = 0
+let reactionSequence = 0
 let reactionTimer: number | null = null
+const reactionParticleTimers = new Map<number, number>()
 
 const scrollToLatestMessage = async () => {
   await nextTick()
@@ -51,6 +60,24 @@ const react = (emoji: LiveReactionEmoji) => {
   if (props.status !== 'LIVE') return
 
   activeReaction.value = emoji
+  reactionSequence += 1
+
+  const particleId = reactionSequence
+
+  reactionParticles.value.push({
+    id: particleId,
+    emoji,
+    offset: ((particleId - 1) % 3) * 18,
+  })
+
+  const particleTimer = window.setTimeout(() => {
+    reactionParticles.value = reactionParticles.value.filter(
+      (particle) => particle.id !== particleId,
+    )
+    reactionParticleTimers.delete(particleId)
+  }, 950)
+
+  reactionParticleTimers.set(particleId, particleTimer)
 
   if (reactionTimer !== null) {
     window.clearTimeout(reactionTimer)
@@ -66,6 +93,11 @@ onBeforeUnmount(() => {
   if (reactionTimer !== null) {
     window.clearTimeout(reactionTimer)
   }
+
+  reactionParticleTimers.forEach((timer) => {
+    window.clearTimeout(timer)
+  })
+  reactionParticleTimers.clear()
 })
 </script>
 
@@ -83,6 +115,16 @@ onBeforeUnmount(() => {
       >
         {{ emoji }}
       </button>
+    </div>
+
+    <div class="live-chat-overlay__reaction-burst" aria-hidden="true">
+      <span
+        v-for="particle in reactionParticles"
+        :key="particle.id"
+        :style="{ left: `${particle.offset}px` }"
+      >
+        {{ particle.emoji }}
+      </span>
     </div>
 
     <section class="live-chat-overlay__panel" aria-label="라이브 채팅">
@@ -133,12 +175,11 @@ onBeforeUnmount(() => {
 .live-chat-overlay__reactions {
   display: flex;
   position: absolute;
-  top: 50%;
+  bottom: calc(15px + 204px + var(--space-3));
   left: 12px;
   flex-direction: column;
   gap: var(--space-2);
   pointer-events: auto;
-  transform: translateY(-50%);
 }
 
 .live-chat-overlay__reactions button {
@@ -151,13 +192,23 @@ onBeforeUnmount(() => {
   font-size: 18px;
   line-height: 26px;
   transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease,
     opacity 150ms ease,
     transform 150ms ease;
 }
 
-.live-chat-overlay__reactions button:hover:not(:disabled),
-.live-chat-overlay__reaction--active {
+.live-chat-overlay__reactions button:hover:not(:disabled) {
   transform: scale(1.16);
+}
+
+.live-chat-overlay__reaction--active {
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2) !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.1),
+    0 5px 14px rgba(0, 0, 0, 0.35);
+  transform: scale(0.84) !important;
 }
 
 .live-chat-overlay__reactions button:disabled {
@@ -170,6 +221,26 @@ onBeforeUnmount(() => {
 .live-chat-overlay__composer input:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
+}
+
+.live-chat-overlay__reaction-burst {
+  position: absolute;
+  bottom: calc(15px + 204px + var(--space-3));
+  left: 46px;
+  width: 76px;
+  height: 156px;
+  pointer-events: none;
+}
+
+.live-chat-overlay__reaction-burst span {
+  position: absolute;
+  bottom: 0;
+  font-size: 24px;
+  line-height: 28px;
+  opacity: 0;
+  filter: drop-shadow(0 5px 7px rgba(0, 0, 0, 0.45));
+  animation: live-reaction-float 900ms ease-out forwards;
+  will-change: opacity, transform;
 }
 
 .live-chat-overlay__panel {
@@ -294,8 +365,29 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 720px) {
+  .live-chat-overlay__reactions {
+    top: 12px;
+    bottom: auto;
+    left: 15px;
+    flex-direction: row;
+  }
+
   .live-chat-overlay__panel {
     width: min(288px, calc(100% - 96px));
+  }
+
+  .live-chat-overlay__reaction-burst {
+    top: 45px;
+    bottom: auto;
+    left: 15px;
+    width: 180px;
+    height: 42px;
+  }
+
+  .live-chat-overlay__reaction-burst span {
+    top: 0;
+    bottom: auto;
+    animation-name: live-reaction-float-side;
   }
 
   .live-chat-overlay__composer {
@@ -303,9 +395,47 @@ onBeforeUnmount(() => {
   }
 }
 
+@keyframes live-reaction-float {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.7) rotate(-8deg);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translateY(0) scale(1.08) rotate(4deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-132px) scale(1.34) rotate(12deg);
+  }
+}
+
+@keyframes live-reaction-float-side {
+  0% {
+    opacity: 0;
+    transform: translate(0, 4px) scale(0.7);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translate(8px, 0) scale(1.05);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(128px, -6px) scale(1.2);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .live-chat-overlay__reactions button {
     transition: none;
+  }
+
+  .live-chat-overlay__reaction-burst span {
+    animation-duration: 1ms;
   }
 }
 </style>

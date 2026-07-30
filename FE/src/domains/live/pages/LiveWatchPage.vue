@@ -15,6 +15,8 @@ import LiveSelectedProduct from '@/domains/live/components/LiveSelectedProduct.v
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchHeader from '@/domains/live/components/LiveWatchHeader.vue'
 import LiveWatchState from '@/domains/live/components/LiveWatchState.vue'
+import LiveTryOnPanel from '@/domains/tryon/components/LiveTryOnPanel.vue'
+import { LIVE_TRY_ON_MOCK_SCENARIOS } from '@/domains/tryon/types/liveTryOn.types'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import LiveLayout from '@/shared/layouts/LiveLayout.vue'
@@ -25,6 +27,7 @@ import type {
   LiveWatchMockScenario,
   LiveWatchViewData,
 } from '@/domains/live/types/liveWatch.types'
+import type { LiveTryOnMockScenario } from '@/domains/tryon/types/liveTryOn.types'
 
 const LIVE_WATCH_MOCK_SCENARIOS: LiveWatchMockScenario[] = [
   'default',
@@ -44,6 +47,7 @@ const errorMessage = ref('')
 const selectedProductId = ref<number | null>(null)
 const isFollowing = ref(false)
 const wishedProductIds = ref<number[]>([])
+const isTryOnOpen = ref(false)
 const now = ref(Date.now())
 const apiEnabled = isLiveWatchApiEnabled()
 let loadRequestId = 0
@@ -73,8 +77,22 @@ const auctionMockState = computed<LiveAuctionMockState>(() => {
     : 'BIDDABLE'
 })
 
+const tryOnMockScenario = computed<LiveTryOnMockScenario>(() => {
+  const queryValue = Array.isArray(route.query.tryon)
+    ? route.query.tryon[0]
+    : route.query.tryon
+
+  return LIVE_TRY_ON_MOCK_SCENARIOS.includes(queryValue as LiveTryOnMockScenario)
+    ? (queryValue as LiveTryOnMockScenario)
+    : 'ready'
+})
+
 const selectedProduct = computed(
   () => live.value?.products.find((product) => product.id === selectedProductId.value) ?? null,
+)
+
+const isTryOnAvailable = computed(
+  () => live.value?.status === 'LIVE' && selectedProduct.value !== null,
 )
 
 const isSelectedProductWished = computed(
@@ -114,6 +132,7 @@ const loadLiveWatch = async () => {
 
   live.value = null
   selectedProductId.value = null
+  isTryOnOpen.value = false
   loadState.value = 'loading'
   errorMessage.value = ''
 
@@ -180,6 +199,12 @@ const toggleWish = () => {
     : [...wishedProductIds.value, productId]
 }
 
+const openTryOn = () => {
+  if (!isTryOnAvailable.value) return
+
+  isTryOnOpen.value = true
+}
+
 watch(
   () => [route.params.liveId, route.query.mock],
   () => {
@@ -187,6 +212,12 @@ watch(
   },
   { immediate: true },
 )
+
+watch(isTryOnAvailable, (isAvailable) => {
+  if (!isAvailable) {
+    isTryOnOpen.value = false
+  }
+})
 
 const elapsedTimer = window.setInterval(() => {
   now.value = Date.now()
@@ -251,11 +282,32 @@ onBeforeUnmount(() => {
         />
 
         <main class="live-watch-page__content">
-          <LiveVideoStage :title="live.title" :poster-url="live.posterUrl" :status="live.status">
-            <template #overlay>
-              <LiveChatOverlay :status="live.status" />
-            </template>
-          </LiveVideoStage>
+          <div
+            class="live-watch-page__stage"
+            :class="{ 'live-watch-page__stage--try-on': isTryOnOpen }"
+          >
+            <LiveVideoStage
+              :title="live.title"
+              :poster-url="live.posterUrl"
+              :status="live.status"
+              :try-on-disabled="!isTryOnAvailable"
+              :try-on-open="isTryOnOpen"
+              @open-try-on="openTryOn"
+            >
+              <template #overlay>
+                <LiveChatOverlay :status="live.status" />
+              </template>
+            </LiveVideoStage>
+
+            <LiveTryOnPanel
+              v-if="selectedProduct"
+              v-show="isTryOnOpen"
+              class="live-watch-page__try-on"
+              :product="selectedProduct"
+              :mock-scenario="tryOnMockScenario"
+              @close="isTryOnOpen = false"
+            />
+          </div>
 
           <div class="live-watch-page__details">
             <LiveSelectedProduct
@@ -292,7 +344,21 @@ onBeforeUnmount(() => {
   display: grid;
   min-width: 0;
   min-height: 0;
+  height: calc(100vh - 52px);
   grid-template-rows: minmax(420px, 1fr) 164px;
+}
+
+.live-watch-page__stage {
+  display: grid;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.live-watch-page__stage--try-on {
+  grid-template-columns: minmax(0, 1fr) 530px;
 }
 
 .live-watch-page__details {
@@ -363,6 +429,10 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1100px) {
+  .live-watch-page__stage--try-on {
+    grid-template-columns: minmax(0, 1fr) minmax(400px, 50%);
+  }
+
   .live-watch-page__details {
     grid-template-columns: minmax(0, 1fr) 320px;
   }
@@ -375,7 +445,23 @@ onBeforeUnmount(() => {
   }
 
   .live-watch-page__content {
+    height: auto;
     grid-template-rows: 320px auto;
+  }
+
+  .live-watch-page__stage,
+  .live-watch-page__stage--try-on {
+    display: block;
+  }
+
+  .live-watch-page__stage > :first-child {
+    height: 100%;
+  }
+
+  .live-watch-page__try-on {
+    position: absolute;
+    z-index: 4;
+    inset: 0;
   }
 
   .live-watch-page__details {

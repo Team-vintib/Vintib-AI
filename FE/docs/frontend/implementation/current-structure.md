@@ -214,9 +214,12 @@ src/
     tryon/
       api/
       components/
+        LiveTryOnPanel.vue
       constants/
+        liveTryOnMockData.ts
       pages/
       types/
+        liveTryOn.types.ts
     point/
       api/
       components/
@@ -384,7 +387,7 @@ docs/
   영역을 dark live layout으로 제공합니다. loading·오류·방송 없음·상품 없음·예정·종료
   상태를 mock query로 확인할 수 있고 `GET /api/lives/{liveId}` DTO adapter를 분리했습니다.
   현재 동시 시청자, 현재 상품과 상세 상품 정보는 Swagger 계약에 없으므로 기본값은 mock이며
-  실제 스트리밍과 AI 시착 연동은 후속 작업 대기 중입니다.
+  실제 스트리밍과 상세 API 연동은 후속 작업 대기 중입니다.
 - `domains/chat`에는 S15P11A108-423 라이브 채팅 overlay가 구현되어 있습니다. Figma 더미
   메시지 목록, 판매자 메시지 구분, 하트·불·박수·놀람 반응과 로컬 입력을 제공하며 실제
   WebSocket/STOMP·과거 메시지·AI 답변 연동은 대기 중입니다.
@@ -392,6 +395,10 @@ docs/
   입찰가·타이머·최고 입찰자·사용 가능 포인트와 입찰 CTA를 표시하고, mock 처리 중·최근
   입찰자·포인트 부족·예정·종료·상품 없음 상태를 제공합니다. 실제 snapshot·입찰·event와
   포인트 처리는 `012-live-watch-detail-contract-gaps.md` 계약 확정 후 연결합니다.
+- `domains/tryon`에는 S15P11A108-425 라이브 AI 시착 패널이 구현되어 있습니다. 등록 사진
+  있음·없음, 로컬 이미지 변경, 생성 중·결과·실패·재시도와 결과 저장 피드백을 mock으로
+  제공하며, 상품 변경 시 이전 결과를 초기화합니다. 실제 사진·생성·저장 계약은
+  `013-live-tryon-contract.md` 확정 후 연결합니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.
