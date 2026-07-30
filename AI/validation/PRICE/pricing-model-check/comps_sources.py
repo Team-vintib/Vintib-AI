@@ -13,9 +13,9 @@
     mock        키 없이 전 경로를 돌리기 위한 고정 응답
 
 실행:
-    python validation/pricing-model-check/comps_sources.py              # 기본 쿼리셋 전체
-    python validation/pricing-model-check/comps_sources.py --source naver
-    python validation/pricing-model-check/comps_sources.py --limit 3
+    python validation/PRICE/pricing-model-check/comps_sources.py              # 기본 쿼리셋 전체
+    python validation/PRICE/pricing-model-check/comps_sources.py --source naver
+    python validation/PRICE/pricing-model-check/comps_sources.py --limit 3
 
 **주의 — 중고 판별은 실측으로 확인한다.** 네이버 쇼핑 API의 `productType` 이 중고 여부를
 구분한다고 알려져 있으나(4·5·6=중고), 문서 기준이지 우리 쿼리에서 실제로 그렇게 나오는지는

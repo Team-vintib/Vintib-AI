@@ -11,7 +11,7 @@
 - 금지 대상: GMS 게이트웨이(`gms.ssafy.io`)를 경유하는 **모든** 스크립트·스모크 테스트·노트북 셀·
   프로덕션 코드 경로. 모델 종류(haiku/sonnet/gemini)나 호출 횟수와 무관하게 **한 번도
   실행하지 않는다.** 구체적으로:
-  - `validation/pricing-model-check/*.py`
+  - `validation/PRICE/pricing-model-check/*.py`
   - **`app/pricing/`의 `llm_web_search` comps 백엔드** — 프로덕션 경로에도 GMS 호출이 있다.
     `registry.ACTIVE_COMPS_SOURCE`의 기본값은 항상 `"mock"`이어야 하고, Claude가 이 값을
     `"llm_web_search"`로 바꾸거나 그 상태로 서버·pytest를 실행하는 것을 금지한다.
@@ -48,7 +48,7 @@
   sentence-transformers, FlagEmbedding, datasets 등)이 모여 있는데, **CI에는 설치되지 않는다**
   (아래 CI 섹션 참고) — 로컬에서 별도로 `pip install -r validation/requirements-test.txt`가 필요하다.
 - `pyproject.toml` — `ruff`/`black`(`line-length=100`, `target-version=py312`) 설정과
-  `pytest` 설정. `validation/AI_tryon/{tryondiffusion,catvton}`, `validation/**/*.ipynb`는
+  `pytest` 설정. `validation/TRYON/AI_tryon/{tryondiffusion,catvton}`, `validation/**/*.ipynb`는
   외부/서드파티 코드·노트북이라 lint/format 대상에서 제외되어 있다.
   `per-file-ignores`(`E402`/`BLE001`/`F401` 완화)는 **`validation/**` 에만** 걸려 있다 —
   `test/`에 같이 걸면 테스트 코드의 미사용 import가 그냥 통과한다.
@@ -145,7 +145,7 @@ from my_module import Something  # noqa: E402 — importorskip 이후 import
 필요 없다 — CI에서 그대로 실행된다.
 
 - 가드 적용 예: `validation/model_selection/test_recommendation_benchmark.py`(torch 필요)
-- 가드 불필요 예: `validation/recommendation-embedding-finetune/test_dataset.py`(순수 로직만,
+- 가드 불필요 예: `validation/REC/recommendation-embedding-finetune/test_dataset.py`(순수 로직만,
   무거운 의존성은 함수 내부에서 지연 import)
 
 ## `AI/validation/` 코드 관례 (PoC/스파이크)

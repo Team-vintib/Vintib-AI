@@ -102,8 +102,8 @@ S15P11A108-195 · 1차 구현(CatVTON 워커 연결, S15P11A108-210) 이후 개�
 
 ## 7. 로컬 검증 실측 결과 (`S15P11A108-367`)
 
-`AI/validation/AI_tryon/CatVTON/`(`worker/models/catvton`을 그대로 복제한 실험용 스냅샷,
-[`NOTE.md`](../validation/AI_tryon/CatVTON/NOTE.md) 참고)에서 진행한 검증 결과다.
+`AI/validation/TRYON/AI_tryon/CatVTON/`(`worker/models/catvton`을 그대로 복제한 실험용 스냅샷,
+[`NOTE.md`](../validation/TRYON/AI_tryon/CatVTON/NOTE.md) 참고)에서 진행한 검증 결과다.
 **아직 프로덕션(`worker/models/catvton`, `worker/tryon_worker_example.py`)에는 반영 안 됨** —
 검증 폴더에서만 확인된 내용이고, 실제 적용 여부는 별도 결정.
 

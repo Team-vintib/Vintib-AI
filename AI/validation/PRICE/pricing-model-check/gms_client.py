@@ -25,8 +25,8 @@ GMS_OPENAI_BASE = "https://gms.ssafy.io/gmsapi/api.openai.com/v1"
 
 NAVER_SHOP_URL = "https://openapi.naver.com/v1/search/shop.json"
 
-# AI/.env — 이 파일 기준 두 단계 위(validation/pricing-model-check/ → validation/ → AI/)
-_ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+# AI/.env — 이 파일 기준 세 단계 위(validation/PRICE/pricing-model-check/ → PRICE/ → validation/ → AI/)
+_ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
 
 _env_loaded = False
 
