@@ -62,14 +62,15 @@
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 알림 목록 조회 | GET | `/users/{id}/alerts` |  | NOTI-001~005 |  |
-| 알림 읽음 처리 | PATCH | `/users/{userId}/alerts/{id}` |  | NOTI-001 |  |
+| 알림 목록 조회 | GET | `/users/{id}/alerts` | ✓ | NOTI-001~005 | ✓ |
+| 알림 전체 읽음 처리 | PATCH | `/users/{userId}/alerts/read-all` | ✓ | NOTI-001 | ✓ |
+| 알림 읽음 처리 | PATCH | `/users/{userId}/alerts/{id}` | ✓ | NOTI-001 | ✓ |
 
 ## 상품 (Products)
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 상품 목록 조회 | GET | `/products` |  | PROD-008, SEARCH-002 |  |
+| 상품 목록 조회 | GET | `/products` |  | PROD-008, SEARCH-002 | ✓ |
 | 상품 기본 정보 저장 | POST | `/products` | ✓ | PROD-001 | ✓ |
 | 상품 이미지 등록 | POST | `/products/{id}/images` | ✓ | PROD-001 | ✓ |
 | 상품 이미지 업로드 URL 발급 | POST | `/products/{id}/images/upload-url` | ✓ | PROD-001 | ✓ |
@@ -86,13 +87,14 @@
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 라이브 목록 조회 | GET | `/lives` |  | HOME-001, MY-005 |  |
-| 라이브 예약, 개설 | POST | `/lives` |  | LIVE-001, LIVE-002 |  |
+| 라이브 목록 조회 | GET | `/lives` |  | MY-005 |  |
+| 라이브 예약 개설 | POST | `/lives/schedule` | ✓ | LIVE-001 | ✓ |
+| 라이브 즉시 개설 | POST | `/lives` | ✓ | LIVE-002 | ✓ |
 | 라이브 상세 조회 | GET | `/lives/{id}` |  | LIVE-005 |  |
 | 라이브 정보 수정 | PATCH | `/lives/{id}` |  | LIVE-001 |  |
-| 라이브 상품 목록 조회 | GET | `/lives/{id}/products` |  | LIVE-003 |  |
-| 라이브 상품 등록 | POST | `/lives/{id}/products` |  | LIVE-003, LIVE-006 |  |
-| 라이브 상품 해제 | DELETE | `/lives/{liveId}/products/{id}` |  | LIVE-003 |  |
+| 라이브 상품 목록 조회 | GET | `/lives/{id}/products` |  | LIVE-003 | ✓ |
+| 라이브 상품 등록 | POST | `/lives/{id}/products` | ✓ | LIVE-003, LIVE-006 | ✓ |
+| 라이브 상품 해제 | DELETE | `/lives/{liveId}/products/{id}` | ✓ | LIVE-003 | ✓ |
 | 채팅 메시지 목록 조회 | GET | `/lives/{id}/messages` |  | CHAT-001 |  |
 | 채팅 메시지 전송 | POST | `/lives/{id}/messages` |  | CHAT-001, CHAT-002, CHAT-003 |  |
 | 채팅 메시지 숨김, 차단 처리 | PATCH | `/lives/{liveId}/messages/{id}` |  | CHAT-004 |  |
@@ -102,7 +104,7 @@
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 경매 조건 설정 | POST | `/lives/{liveId}/auctions` | ✓ | AUCT-001 |  |
+| 경매 조건 설정 | POST | `/lives/{liveId}/auctions` | ✓ | AUCT-001 | ✓ |
 | 경매 조건 조회 | GET | `/products/{id}/auction` |  | AUCT-001 |  |
 | 경매 시작 | POST | `/lives/{id}/auctions` |  | AUCT-002 |  |
 | 경매 상세 조회 | GET | `/auctions/{id}` |  | AUCT-011 |  |

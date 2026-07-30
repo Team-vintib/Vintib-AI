@@ -212,6 +212,12 @@ BE/
 │   │   ├── entity/               # Wish, WishId(복합키)
 │   │   ├── repository/
 │   │   └── dto/
+│   ├── notification/             # 알림함 읽음 처리 (NOTI, APIs.md "알림" 섹션 기준) — 서윤
+│   │   ├── controller/
+│   │   ├── service/
+│   │   ├── entity/               # Notification
+│   │   ├── repository/
+│   │   └── dto/response/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
 │       ├── client/              # AiClient — Spring → FastAPI
 │       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config
@@ -229,7 +235,7 @@ BE/
 담당 분배:
 
 ```
-{auth,member,product,tryon,social,point,order}/   ← 서윤
+{auth,member,product,tryon,social,notification,point,order}/   ← 서윤
 {live,auction,chat,home,search}/     ← 정윤
 ```
 
