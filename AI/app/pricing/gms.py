@@ -4,7 +4,7 @@
 그 함수들은 네트워크 없이 CI에서 그대로 테스트된다.
 
 GMS는 `api.anthropic.com`으로 넘기는 얇은 프록시라 요청 본문이 Anthropic 규격 그대로다.
-따라서 base URL만 갈아끼우고 공식 SDK를 쓴다. `validation/pricing-model-check/gms_client.py`와
+따라서 base URL만 갈아끼우고 공식 SDK를 쓴다. `validation/PRICE/pricing-model-check/gms_client.py`와
 같은 값이지만 **import하지 않고 복사한다** — `validation/`을 프로덕션에서 참조하지 않는 규약.
 
 ⚠️ **timeout·max_retries를 반드시 명시한다.** SDK 기본값이 timeout 10분 / max_retries 2라,

@@ -1,6 +1,6 @@
 """슬롯 B — 비교 매물(comps) 수집.
 
-`validation/pricing-model-check/comps_sources.py`의 프로덕션판. 백엔드가 달라도 결과가 같은
+`validation/PRICE/pricing-model-check/comps_sources.py`의 프로덕션판. 백엔드가 달라도 결과가 같은
 `CompItem` 목록으로 정규화되므로, 가격 산정기는 출처를 몰라도 된다.
 
 **"시세를 못 찾았다"는 예외가 아니다.** comps 0건·파싱 실패·검색 미호출은 전부 빈 목록 +

@@ -29,9 +29,9 @@ provider마다 인증 헤더가 다르므로(Anthropic `x-api-key` / Gemini `x-g
 
 실행:
     # 키는 AI/.env 의 GMS_API_KEY 를 자동으로 읽는다
-    python validation/pricing-model-check/smoke_gms.py --quick   # 0층만 (연결 확인)
-    python validation/pricing-model-check/smoke_gms.py           # 전체
-    python validation/pricing-model-check/smoke_gms.py --model claude-haiku-4-5-20251001
+    python validation/PRICE/pricing-model-check/smoke_gms.py --quick   # 0층만 (연결 확인)
+    python validation/PRICE/pricing-model-check/smoke_gms.py           # 전체
+    python validation/PRICE/pricing-model-check/smoke_gms.py --model claude-haiku-4-5-20251001
 """
 
 from __future__ import annotations
