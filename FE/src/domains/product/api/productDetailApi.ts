@@ -24,6 +24,9 @@ const cloneProductDetailMockData = (): ProductDetailViewData => ({
   linkedLive: PRODUCT_DETAIL_MOCK_DATA.linkedLive
     ? { ...PRODUCT_DETAIL_MOCK_DATA.linkedLive }
     : null,
+  similarProducts: PRODUCT_DETAIL_MOCK_DATA.similarProducts.map((product) => ({
+    ...product,
+  })),
   sellerDisclosedDefects: PRODUCT_DETAIL_MOCK_DATA.sellerDisclosedDefects.map((defect) => ({
     ...defect,
   })),
@@ -59,7 +62,25 @@ export const getProductDetailViewData = async (
   }
 
   const product = cloneProductDetailMockData()
+  const baseProduct = {
+    id: PRODUCT_DETAIL_MOCK_DATA.id,
+    title: PRODUCT_DETAIL_MOCK_DATA.title,
+    price: PRODUCT_DETAIL_MOCK_DATA.price,
+  }
+  const selectedSimilarProduct = PRODUCT_DETAIL_MOCK_DATA.similarProducts.find(
+    (similarProduct) => similarProduct.id === productId,
+  )
+
   product.id = productId
+
+  if (selectedSimilarProduct) {
+    product.title = selectedSimilarProduct.title
+    product.price = selectedSimilarProduct.price
+    product.similarProducts = [
+      baseProduct,
+      ...product.similarProducts.filter((similarProduct) => similarProduct.id !== productId),
+    ]
+  }
 
   if (scenario === 'sold') {
     product.saleStatus = 'SOLD'
