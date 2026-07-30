@@ -24,7 +24,7 @@ export interface LiveListItem {
   thumbnailUrl: string
   status: LiveBroadcastStatus
   viewerCount: number
-  category: LiveCategory
+  category: LiveCategory | null
   broadcastAt: string
 }
 

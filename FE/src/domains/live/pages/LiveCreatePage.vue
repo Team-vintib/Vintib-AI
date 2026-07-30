@@ -1,20 +1,25 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 
-import { createLiveNow, scheduleLive } from '@/domains/live/api/liveCreateApi'
+import {
+  createLiveNow,
+  getLiveCreateProducts,
+  scheduleLive,
+} from '@/domains/live/api/liveCreateApi'
 import {
   LIVE_CREATE_BASE_STEPS,
   LIVE_CREATE_COMPLETE_STEP,
   LIVE_CREATE_DEVICE_STEP,
   LIVE_CREATE_METHOD_OPTIONS,
-  LIVE_CREATE_MOCK_PRODUCTS,
   LIVE_CREATE_SCHEDULE_STEP,
   LIVE_CREATE_VALIDATION_MESSAGES,
 } from '@/domains/live/constants/liveCreateMockData'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type {
   LiveDeviceState,
   LiveCreateFormState,
   LiveCreateMode,
+  LiveCreateProduct,
   LiveCreateStep,
 } from '@/domains/live/types/liveCreate.types'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
@@ -22,6 +27,7 @@ import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 type LiveCreateField = 'mode' | 'title' | 'description' | 'mainBrand' | 'products' | 'scheduledDate' | 'scheduledTime'
 
+const authStore = useAuthStore()
 const form = reactive<LiveCreateFormState>({
   mode: '',
   title: '',
@@ -36,7 +42,10 @@ const form = reactive<LiveCreateFormState>({
 const currentStepIndex = ref(0)
 const createdLiveId = ref<number | null>(null)
 const isSubmittingLive = ref(false)
+const isLoadingProducts = ref(false)
 const submitError = ref('')
+const productLoadError = ref('')
+const liveCreateProducts = ref<LiveCreateProduct[]>([])
 const cameraPreviewElement = ref<HTMLVideoElement | null>(null)
 const cameraPreviewStream = ref<MediaStream | null>(null)
 const microphonePreviewStream = ref<MediaStream | null>(null)
@@ -152,17 +161,17 @@ const filteredProducts = computed(() => {
   const keyword = form.productKeyword.trim().toLowerCase()
 
   if (!keyword) {
-    return LIVE_CREATE_MOCK_PRODUCTS
+    return liveCreateProducts.value
   }
 
-  return LIVE_CREATE_MOCK_PRODUCTS.filter((product) =>
+  return liveCreateProducts.value.filter((product) =>
     [product.name, product.brand, product.category, product.condition].some((value) =>
       value.toLowerCase().includes(keyword),
     ),
   )
 })
 const selectedProducts = computed(() =>
-  LIVE_CREATE_MOCK_PRODUCTS.filter((product) => form.selectedProductIds.includes(product.id)),
+  liveCreateProducts.value.filter((product) => form.selectedProductIds.includes(product.id)),
 )
 const fieldErrors = computed<Record<LiveCreateField, string>>(() => ({
   mode: touched.mode && !form.mode ? LIVE_CREATE_VALIDATION_MESSAGES.modeRequired : '',
@@ -329,6 +338,32 @@ const resetDeviceTest = () => {
   deviceState.microphone = 'idle'
 }
 
+const loadLiveCreateProducts = async () => {
+  authStore.hydrateSession()
+
+  if (!authStore.user?.id) {
+    productLoadError.value = '로그인 사용자 정보를 확인하지 못했습니다. 다시 로그인해 주세요.'
+    return
+  }
+
+  isLoadingProducts.value = true
+  productLoadError.value = ''
+
+  try {
+    liveCreateProducts.value = await getLiveCreateProducts(authStore.user.id)
+    form.selectedProductIds = form.selectedProductIds.filter((productId) =>
+      liveCreateProducts.value.some((product) => product.id === productId),
+    )
+  } catch (error) {
+    productLoadError.value =
+      error instanceof Error ? error.message : '라이브에 연결할 상품을 불러오지 못했습니다.'
+    liveCreateProducts.value = []
+    form.selectedProductIds = []
+  } finally {
+    isLoadingProducts.value = false
+  }
+}
+
 const getScheduledAt = () => {
   if (!form.scheduledDate || !form.scheduledTime) {
     return ''
@@ -402,6 +437,10 @@ const moveToNextStep = async () => {
 
 onBeforeUnmount(() => {
   stopCameraPreview()
+})
+
+onMounted(() => {
+  void loadLiveCreateProducts()
 })
 </script>
 
@@ -546,7 +585,18 @@ onBeforeUnmount(() => {
               />
             </label>
 
-            <div v-if="filteredProducts.length" class="live-create__product-list">
+            <div v-if="isLoadingProducts" class="live-create__empty" role="status">
+              <strong>상품을 불러오는 중입니다.</strong>
+              <p>라이브에 연결할 수 있는 내 판매 상품을 확인하고 있습니다.</p>
+            </div>
+
+            <div v-else-if="productLoadError" class="live-create__empty" role="alert">
+              <strong>상품을 불러오지 못했습니다.</strong>
+              <p>{{ productLoadError }}</p>
+              <button type="button" @click="loadLiveCreateProducts">다시 시도</button>
+            </div>
+
+            <div v-else-if="filteredProducts.length" class="live-create__product-list">
               <article
                 v-for="product in filteredProducts"
                 :key="product.id"
@@ -576,7 +626,13 @@ onBeforeUnmount(() => {
 
             <div v-else class="live-create__empty" role="status">
               <strong>검색 결과가 없습니다.</strong>
-              <p>다른 상품명이나 브랜드로 다시 검색해 주세요.</p>
+              <p>
+                {{
+                  liveCreateProducts.length
+                    ? '다른 상품명이나 브랜드로 다시 검색해 주세요.'
+                    : '먼저 판매 상품을 등록하고 판매 상태로 전환해 주세요.'
+                }}
+              </p>
             </div>
 
             <p v-if="fieldErrors.products" class="live-create__field-error" role="alert">

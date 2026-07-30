@@ -57,7 +57,7 @@
 - 필터 결과 없음과 필터 초기화
 - desktop 3열·tablet 2열·mobile 1열 grid 최종 보강
 - `/lives?mock=loading|empty|error` 상태 확인 query
-- 공개 API 계약은 `.codex/requests/be/009-live-list-api-contract.md`에서 요청
-- `origin/develop-BE` `7962ec7`에는 목록 endpoint와 category/current viewer 계약이 없어
-  `VITE_LIVE_LIST_API_ENABLED=false`로 유지
-- BE 계약 반영 후 환경 플래그를 켜 실제 응답 E2E를 추가 확인
+- 공개 API 계약은 `.codex/requests/be/007-live-tryon-contract.md`에서 추적
+- `GET /api/lives` 목록 endpoint와 category/current viewer 계약이 반영되어
+  `VITE_LIVE_LIST_API_ENABLED=true`를 기본값으로 사용
+- mock 상태 확인이 필요하면 환경 플래그를 `false`로 명시
