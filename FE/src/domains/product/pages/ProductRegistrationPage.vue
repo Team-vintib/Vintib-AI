@@ -6,6 +6,7 @@ import ProductPhotoUploader from '@/domains/product/components/ProductPhotoUploa
 import {
   PRODUCT_REGISTRATION_CATEGORY_OPTIONS,
   PRODUCT_REGISTRATION_COLOR_OPTIONS,
+  PRODUCT_REGISTRATION_SIZE_OPTIONS,
   PRODUCT_REGISTRATION_STEPS,
   PRODUCT_REGISTRATION_VALIDATION_MESSAGES,
 } from '@/domains/product/constants/productRegistrationOptions'
@@ -29,6 +30,13 @@ const basicStepTouched = reactive({
   brand: false,
   color: false,
   categoryId: false,
+})
+const attributesStepTouched = reactive({
+  size: false,
+  shoulder: false,
+  chest: false,
+  sleeve: false,
+  length: false,
 })
 
 const draft = reactive<ProductRegistrationDraft>({
@@ -108,6 +116,39 @@ const basicStepErrors = computed(() => ({
       ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.categoryRequired
       : '',
 }))
+const normalizeMeasurementValue = (value: string | number) => String(value ?? '').trim()
+
+const isPositiveMeasurement = (value: string | number) => {
+  const normalizedValue = normalizeMeasurementValue(value)
+  const parsedValue = Number(normalizedValue)
+
+  return normalizedValue !== '' && Number.isFinite(parsedValue) && parsedValue > 0
+}
+
+const getMeasurementError = (field: keyof typeof attributesStepTouched, value: string | number) => {
+  if (!attributesStepTouched[field]) {
+    return ''
+  }
+
+  if (!normalizeMeasurementValue(value)) {
+    return PRODUCT_REGISTRATION_VALIDATION_MESSAGES.measurementRequired
+  }
+
+  return isPositiveMeasurement(value)
+    ? ''
+    : PRODUCT_REGISTRATION_VALIDATION_MESSAGES.measurementInvalid
+}
+
+const attributesStepErrors = computed(() => ({
+  size:
+    attributesStepTouched.size && !draft.size
+      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.sizeRequired
+      : '',
+  shoulder: getMeasurementError('shoulder', draft.measurements.shoulder),
+  chest: getMeasurementError('chest', draft.measurements.chest),
+  sleeve: getMeasurementError('sleeve', draft.measurements.sleeve),
+  length: getMeasurementError('length', draft.measurements.length),
+}))
 const isPhotoStepValid = computed(
   () =>
     frontPhotos.value.length > 0 &&
@@ -121,6 +162,14 @@ const isBasicStepValid = computed(
     Boolean(draft.color) &&
     (draft.color !== 'etc' || Boolean(draft.customColor.trim())) &&
     Boolean(draft.categoryId),
+)
+const isAttributesStepValid = computed(
+  () =>
+    Boolean(draft.size) &&
+    isPositiveMeasurement(draft.measurements.shoulder) &&
+    isPositiveMeasurement(draft.measurements.chest) &&
+    isPositiveMeasurement(draft.measurements.sleeve) &&
+    isPositiveMeasurement(draft.measurements.length),
 )
 const selectedColorLabel = computed(
   () =>
@@ -136,6 +185,11 @@ const selectedCategoryLabel = computed(
     PRODUCT_REGISTRATION_CATEGORY_OPTIONS.find((option) => option.id === draft.categoryId)?.label ||
     '미선택',
 )
+const selectedSizeLabel = computed(
+  () =>
+    PRODUCT_REGISTRATION_SIZE_OPTIONS.find((option) => option.id === draft.size)?.label ||
+    '미선택',
+)
 
 const canMoveCurrentStepNext = computed(() => {
   if (currentStep.value.id === 'photos') {
@@ -144,6 +198,10 @@ const canMoveCurrentStepNext = computed(() => {
 
   if (currentStep.value.id === 'basic') {
     return isBasicStepValid.value
+  }
+
+  if (currentStep.value.id === 'attributes') {
+    return isAttributesStepValid.value
   }
 
   return true
@@ -254,6 +312,15 @@ const markCurrentStepTouched = () => {
     basicStepTouched.brand = true
     basicStepTouched.color = true
     basicStepTouched.categoryId = true
+    return
+  }
+
+  if (currentStep.value.id === 'attributes') {
+    attributesStepTouched.size = true
+    attributesStepTouched.shoulder = true
+    attributesStepTouched.chest = true
+    attributesStepTouched.sleeve = true
+    attributesStepTouched.length = true
   }
 }
 
@@ -551,6 +618,156 @@ onBeforeUnmount(() => {
             </div>
           </form>
 
+          <form
+            v-else-if="currentStep.id === 'attributes'"
+            class="product-registration__form"
+            aria-label="상품 사이즈와 소재 입력"
+          >
+            <div class="product-registration__form-grid">
+              <label class="product-registration__field" for="product-registration-size">
+                <span>사이즈</span>
+                <select
+                  id="product-registration-size"
+                  v-model="draft.size"
+                  :aria-invalid="attributesStepErrors.size ? 'true' : 'false'"
+                  aria-describedby="product-registration-size-error"
+                  @blur="attributesStepTouched.size = true"
+                >
+                  <option value="">사이즈 선택</option>
+                  <option
+                    v-for="option in PRODUCT_REGISTRATION_SIZE_OPTIONS"
+                    :key="option.id"
+                    :value="option.id"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+                <span
+                  v-if="attributesStepErrors.size"
+                  id="product-registration-size-error"
+                  class="product-registration__field-error"
+                  role="alert"
+                >
+                  {{ attributesStepErrors.size }}
+                </span>
+              </label>
+
+              <label class="product-registration__field" for="product-registration-material">
+                <span>소재</span>
+                <input
+                  id="product-registration-material"
+                  v-model="draft.material"
+                  type="text"
+                  maxlength="60"
+                  placeholder="예: 면 100%, 울 80%"
+                />
+              </label>
+            </div>
+
+            <fieldset class="product-registration__fieldset">
+              <legend>실측 정보</legend>
+              <p>cm 기준으로 0보다 큰 숫자를 입력해 주세요.</p>
+
+              <div class="product-registration__form-grid">
+                <label class="product-registration__field" for="product-registration-shoulder">
+                  <span>어깨</span>
+                  <input
+                    id="product-registration-shoulder"
+                    v-model="draft.measurements.shoulder"
+                    type="number"
+                    inputmode="decimal"
+                    min="0"
+                    step="0.1"
+                    placeholder="예: 45"
+                    :aria-invalid="attributesStepErrors.shoulder ? 'true' : 'false'"
+                    aria-describedby="product-registration-shoulder-error"
+                    @blur="attributesStepTouched.shoulder = true"
+                  />
+                  <span
+                    v-if="attributesStepErrors.shoulder"
+                    id="product-registration-shoulder-error"
+                    class="product-registration__field-error"
+                    role="alert"
+                  >
+                    {{ attributesStepErrors.shoulder }}
+                  </span>
+                </label>
+
+                <label class="product-registration__field" for="product-registration-chest">
+                  <span>가슴</span>
+                  <input
+                    id="product-registration-chest"
+                    v-model="draft.measurements.chest"
+                    type="number"
+                    inputmode="decimal"
+                    min="0"
+                    step="0.1"
+                    placeholder="예: 52"
+                    :aria-invalid="attributesStepErrors.chest ? 'true' : 'false'"
+                    aria-describedby="product-registration-chest-error"
+                    @blur="attributesStepTouched.chest = true"
+                  />
+                  <span
+                    v-if="attributesStepErrors.chest"
+                    id="product-registration-chest-error"
+                    class="product-registration__field-error"
+                    role="alert"
+                  >
+                    {{ attributesStepErrors.chest }}
+                  </span>
+                </label>
+
+                <label class="product-registration__field" for="product-registration-sleeve">
+                  <span>소매</span>
+                  <input
+                    id="product-registration-sleeve"
+                    v-model="draft.measurements.sleeve"
+                    type="number"
+                    inputmode="decimal"
+                    min="0"
+                    step="0.1"
+                    placeholder="예: 61"
+                    :aria-invalid="attributesStepErrors.sleeve ? 'true' : 'false'"
+                    aria-describedby="product-registration-sleeve-error"
+                    @blur="attributesStepTouched.sleeve = true"
+                  />
+                  <span
+                    v-if="attributesStepErrors.sleeve"
+                    id="product-registration-sleeve-error"
+                    class="product-registration__field-error"
+                    role="alert"
+                  >
+                    {{ attributesStepErrors.sleeve }}
+                  </span>
+                </label>
+
+                <label class="product-registration__field" for="product-registration-length">
+                  <span>총장</span>
+                  <input
+                    id="product-registration-length"
+                    v-model="draft.measurements.length"
+                    type="number"
+                    inputmode="decimal"
+                    min="0"
+                    step="0.1"
+                    placeholder="예: 68"
+                    :aria-invalid="attributesStepErrors.length ? 'true' : 'false'"
+                    aria-describedby="product-registration-length-error"
+                    @blur="attributesStepTouched.length = true"
+                  />
+                  <span
+                    v-if="attributesStepErrors.length"
+                    id="product-registration-length-error"
+                    class="product-registration__field-error"
+                    role="alert"
+                  >
+                    {{ attributesStepErrors.length }}
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+          </form>
+
           <div
             v-else-if="!isCompleteStep"
             class="product-registration__placeholder"
@@ -620,7 +837,7 @@ onBeforeUnmount(() => {
         </section>
 
         <aside class="product-registration__summary" aria-labelledby="registration-summary-title">
-          <h2 id="registration-summary-title">등록 요약</h2>
+          <h2 id="registration-summary-title">상품 정보</h2>
           <dl>
             <div>
               <dt>대표 이미지</dt>
@@ -645,6 +862,14 @@ onBeforeUnmount(() => {
             <div>
               <dt>카테고리</dt>
               <dd>{{ selectedCategoryLabel }}</dd>
+            </div>
+            <div>
+              <dt>사이즈</dt>
+              <dd>{{ selectedSizeLabel }}</dd>
+            </div>
+            <div>
+              <dt>소재</dt>
+              <dd>{{ draft.material || '미입력' }}</dd>
             </div>
             <div>
               <dt>판매 방식</dt>
@@ -890,6 +1115,28 @@ onBeforeUnmount(() => {
   border-color: var(--color-error);
 }
 
+.product-registration__fieldset {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.product-registration__fieldset legend {
+  padding: 0 var(--space-1);
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: var(--font-weight-bold);
+  line-height: 24px;
+}
+
+.product-registration__fieldset > p {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
 .product-registration__complete {
   display: grid;
   justify-items: center;
@@ -993,14 +1240,18 @@ onBeforeUnmount(() => {
 }
 
 .product-registration__summary dt {
+  flex: 0 0 auto;
   color: var(--color-text-muted);
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .product-registration__summary dd {
+  min-width: 0;
   color: var(--color-text-primary);
   font-weight: var(--font-weight-bold);
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 960px) {
