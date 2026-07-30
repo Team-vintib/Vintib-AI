@@ -32,7 +32,7 @@ import org.hibernate.annotations.SQLRestriction;
                         name = "ck_product_sale_status",
                         constraint = "sale_status IN ("
                                 + "'DRAFT', 'ON_SALE', 'AUCTION_SCHEDULED', 'AUCTION_IN_PROGRESS', "
-                                + "'SOLD', 'PRIVATE')"),
+                                + "'AUCTION_FAILED', 'SOLD', 'PRIVATE')"),
                 @CheckConstraint(
                         name = "ck_product_price_by_type",
                         constraint = "sale_type <> 'DIRECT_SALE' OR price IS NOT NULL")

@@ -130,6 +130,7 @@ CREATE TABLE product (
         'ON_SALE',            -- 상시 판매 중
         'AUCTION_SCHEDULED',  -- 경매 예정
         'AUCTION_IN_PROGRESS',-- 경매 진행 중 (상시 구매 즉시 중단, LIVE-006)
+        'AUCTION_FAILED',     -- 미낙찰 — 판매자 재설정 대기 (AUCT-014 / PROD-005)
         'SOLD',               -- 판매 완료(낙찰 포함)
         'PRIVATE'             -- 비공개
     )),

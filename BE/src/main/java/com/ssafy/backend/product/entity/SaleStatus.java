@@ -5,6 +5,7 @@ public enum SaleStatus {
     ON_SALE,
     AUCTION_SCHEDULED,
     AUCTION_IN_PROGRESS,
+    AUCTION_FAILED,
     SOLD,
     PRIVATE
 }
