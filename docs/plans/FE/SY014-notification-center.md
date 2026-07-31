@@ -72,7 +72,8 @@ FE/src/domains/notification/
 - [x] 알림 팝업 컴포넌트 구현
 - [x] `GlobalNavigation` 알림 버튼, unread badge, 팝업 연동
 - [x] 알림 클릭 시 단건 읽음 처리와 연결 route 이동 구현
-- [x] 수동 화면 확인은 BE DB 더미 알림 기준으로 전환하고 `mock=default|empty|error|loading` query 지원 제거
+- [x] 알림 도메인 mock query 지원 제거 및 실제 BE API 조회 기준으로 전환
+- [x] 알림센터 현재 탭 표시와 탭별 읽음 처리 UI 문구 정리
 - [x] `api-index.md`, `route-map.md`, `screen-inventory.md`, `current-structure.md`, `status.md` 갱신
 - [x] `npm run type-check` 검증
 
@@ -84,6 +85,8 @@ FE/src/domains/notification/
   `POINT`, `MY` 중심으로 연결하고 주문/배송/경매 상세 route는 준비 상태 안내 또는 추후 매핑으로 둔다.
 - 서버 페이지네이션과 FE 탭 필터를 함께 사용할 때 전체 탭별 개수가 정확하지 않을 수 있다.
   MVP에서는 첫 페이지 기반 필터로 시작하고, 정확한 탭별 count가 필요하면 BE에 필터/count API를 요청한다.
+- 예약 라이브 알림 신청은 신청/해제 API, 라이브 목록·상세의 `isReminderSet`, 스케줄러 기반 `LIVE_REMINDER`
+  알림 생성이 필요하다. 현재 FE에서는 mock/localStorage로 대체하지 않고 BE 계약 확정 후 연결한다.
 
 ## Git 및 MR 작업 단위
 

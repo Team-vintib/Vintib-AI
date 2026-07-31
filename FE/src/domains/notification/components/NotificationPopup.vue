@@ -40,7 +40,7 @@ const handleMarkAllAsRead = async () => {
         "
         @click="handleMarkAllAsRead"
       >
-        모두 읽음
+        {{ notificationStore.isMarkingAllAsRead ? '처리 중' : '모두 읽음' }}
       </button>
     </header>
 
@@ -56,7 +56,7 @@ const handleMarkAllAsRead = async () => {
     </div>
 
     <div v-else-if="notificationStore.recentItems.length === 0" class="notification-popup__message">
-      도착한 알림이 없습니다.
+      읽지 않은 알림이 없습니다.
     </div>
 
     <div v-else class="notification-popup__list">

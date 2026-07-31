@@ -46,6 +46,13 @@ const canLoadMore = computed(
 const currentFilterUnreadCount = computed(() =>
   selectedCategory.value === 'ALL' ? notificationStore.unreadCount : filteredNotifications.value.length,
 )
+const readAllButtonLabel = computed(() => {
+  if (notificationStore.isMarkingAllAsRead || isMarkingCurrentFilterAsRead.value) {
+    return '처리 중'
+  }
+
+  return selectedCategory.value === 'ALL' ? '전체 읽음' : '전체 읽음'
+})
 
 const resultStatusMessage = computed(() => {
   if (isLoading.value) return '알림 목록을 불러오는 중입니다.'
@@ -64,7 +71,7 @@ const handleRetry = () => {
 }
 
 const handleMarkAllAsRead = async () => {
-  if (isMarkingCurrentFilterAsRead.value) {
+  if (currentFilterUnreadCount.value === 0 || isMarkingCurrentFilterAsRead.value) {
     return
   }
 
@@ -78,7 +85,9 @@ const handleMarkAllAsRead = async () => {
     }
 
     const currentFilterItems = [...filteredNotifications.value]
-    await Promise.all(currentFilterItems.map((notification) => notificationStore.markAsRead(notification.id)))
+    await Promise.all(
+      currentFilterItems.map((notification) => notificationStore.markAsRead(notification.id)),
+    )
   } catch (error) {
     actionErrorMessage.value = normalizeApiError(error).message
   } finally {
@@ -138,7 +147,7 @@ onMounted(() => {
           "
           @click="handleMarkAllAsRead"
         >
-          모두 읽음
+          {{ readAllButtonLabel }}
         </button>
       </header>
 
