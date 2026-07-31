@@ -3,15 +3,27 @@ package com.ssafy.backend.member.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import com.ssafy.backend.member.dto.request.UpdateInterestsRequest;
 import com.ssafy.backend.member.dto.request.UpdateMemberRequest;
+import com.ssafy.backend.member.dto.response.InterestsResponse;
 import com.ssafy.backend.member.dto.response.MemberProfileResponse;
 import com.ssafy.backend.member.entity.Gender;
 import com.ssafy.backend.member.entity.Member;
+import com.ssafy.backend.member.entity.MemberInterestBrand;
+import com.ssafy.backend.member.entity.MemberInterestCategory;
+import com.ssafy.backend.member.repository.MemberInterestBrandRepository;
+import com.ssafy.backend.member.repository.MemberInterestCategoryRepository;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.product.entity.Brand;
+import com.ssafy.backend.product.entity.Category;
+import com.ssafy.backend.product.repository.BrandRepository;
+import com.ssafy.backend.product.repository.CategoryRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,11 +41,34 @@ class UserServiceTest {
     @Mock
     private MemberRepository memberRepository;
 
+    @Mock
+    private MemberInterestBrandRepository memberInterestBrandRepository;
+
+    @Mock
+    private MemberInterestCategoryRepository memberInterestCategoryRepository;
+
+    @Mock
+    private BrandRepository brandRepository;
+
+    @Mock
+    private CategoryRepository categoryRepository;
+
+    @Mock
+    private Brand nike;
+
+    @Mock
+    private Category outer;
+
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(memberRepository);
+        userService = new UserService(
+                memberRepository,
+                memberInterestBrandRepository,
+                memberInterestCategoryRepository,
+                brandRepository,
+                categoryRepository);
     }
 
     private Member createMember() {
@@ -119,5 +154,96 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.updateBasicInfo(MEMBER_ID, MEMBER_ID, createRequest()))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NICKNAME_ALREADY_TAKEN);
+    }
+
+    @Test
+    void 관심_브랜드_카테고리를_정상_조회한다() {
+        // given
+        when(memberRepository.existsById(MEMBER_ID)).thenReturn(true);
+        when(nike.getId()).thenReturn(1L);
+        when(nike.getName()).thenReturn("나이키");
+        when(nike.getNameEn()).thenReturn("Nike");
+        when(outer.getId()).thenReturn(1L);
+        when(outer.getParentId()).thenReturn(null);
+        when(outer.getName()).thenReturn("아우터");
+        when(outer.getDepth()).thenReturn((short) 1);
+
+        MemberInterestBrand interestBrand =
+                MemberInterestBrand.builder().member(createMember()).brand(nike).build();
+        MemberInterestCategory interestCategory =
+                MemberInterestCategory.builder().member(createMember()).category(outer).build();
+        when(memberInterestBrandRepository.findByMember_Id(MEMBER_ID)).thenReturn(List.of(interestBrand));
+        when(memberInterestCategoryRepository.findByMember_Id(MEMBER_ID)).thenReturn(List.of(interestCategory));
+
+        // when
+        InterestsResponse response = userService.getInterests(MEMBER_ID, MEMBER_ID);
+
+        // then
+        assertThat(response.brands()).hasSize(1);
+        assertThat(response.brands().get(0).name()).isEqualTo("나이키");
+        assertThat(response.categories()).hasSize(1);
+        assertThat(response.categories().get(0).name()).isEqualTo("아우터");
+    }
+
+    @Test
+    void 본인이_아닌_타인의_관심_정보를_조회하면_FORBIDDEN_예외가_발생한다() {
+        Long otherMemberId = 999L;
+
+        assertThatThrownBy(() -> userService.getInterests(MEMBER_ID, otherMemberId))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MEMBER_FORBIDDEN);
+    }
+
+    @Test
+    void 관심_정보_수정시_존재하지_않는_브랜드가_섞여있으면_BRAND_NOT_FOUND_예외가_발생한다() {
+        // given
+        Member member = createMember();
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(brandRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(nike));
+
+        UpdateInterestsRequest request = new UpdateInterestsRequest(List.of(1L, 2L), List.of());
+
+        // when / then
+        assertThatThrownBy(() -> userService.updateInterests(MEMBER_ID, MEMBER_ID, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.BRAND_NOT_FOUND);
+    }
+
+    @Test
+    void 같은_브랜드_ID를_중복으로_요청해도_정상_처리된다() {
+        // given: findAllById는 중복 ID를 한 번만 반환하므로, 단순 size() 비교로는 오탐할 수 있다.
+        Member member = createMember();
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(nike.getId()).thenReturn(1L);
+        when(nike.getName()).thenReturn("나이키");
+        when(nike.getNameEn()).thenReturn("Nike");
+        when(brandRepository.findAllById(List.of(1L, 1L))).thenReturn(List.of(nike));
+
+        UpdateInterestsRequest request = new UpdateInterestsRequest(List.of(1L, 1L), List.of());
+
+        // when
+        InterestsResponse response = userService.updateInterests(MEMBER_ID, MEMBER_ID, request);
+
+        // then
+        assertThat(response.brands()).hasSize(1);
+        assertThat(response.brands().get(0).name()).isEqualTo("나이키");
+    }
+
+    @Test
+    void 빈_배열로_수정하면_기존_관심_정보가_전부_삭제된다() {
+        // given: 관심 브랜드/카테고리는 선택 입력이라 건너뛸 수 있다.
+        Member member = createMember();
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+
+        UpdateInterestsRequest request = new UpdateInterestsRequest(List.of(), List.of());
+
+        // when
+        InterestsResponse response = userService.updateInterests(MEMBER_ID, MEMBER_ID, request);
+
+        // then
+        assertThat(response.brands()).isEmpty();
+        assertThat(response.categories()).isEmpty();
+        verify(memberInterestBrandRepository).deleteAllByMemberId(MEMBER_ID);
+        verify(memberInterestCategoryRepository).deleteAllByMemberId(MEMBER_ID);
     }
 }
