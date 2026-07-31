@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import logoImage from '@/assets/images/logo.png'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import NotificationPopup from '@/domains/notification/components/NotificationPopup.vue'
+import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import { ROUTE_NAMES, ROUTE_PATHS, type RoutePath } from '@/shared/constants/routes'
+
+import type { NotificationItem } from '@/domains/notification/types/notification.types'
 
 interface UserActionItem {
   label: string
@@ -21,17 +25,19 @@ interface ProfileMenuItem {
 }
 
 const authStore = useAuthStore()
+const notificationStore = useNotificationStore()
 const route = useRoute()
 const router = useRouter()
 
 authStore.hydrateSession()
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
+const canShowNotificationAction = computed(() => isAuthenticated.value)
 const displayName = computed(() => authStore.user?.name || '회원')
 const profileInitial = computed(() => displayName.value.slice(0, 1).toUpperCase())
 const cartItemCount = computed<number | null>(() => null)
-const unreadNotificationCount = computed<number | null>(() => null)
 const isLoggingOut = ref(false)
+const isNotificationPopupOpen = ref(false)
 
 const primaryMenuItems = [
   { label: '라이브', path: ROUTE_PATHS.LIVE_LIST, authRequired: false },
@@ -52,13 +58,6 @@ const userActionItems = computed<UserActionItem[]>(() => [
     path: ROUTE_PATHS.MY,
     query: { section: 'cart' },
     badge: cartItemCount.value ?? '',
-  },
-  {
-    label: '알림',
-    icon: 'bell',
-    path: ROUTE_PATHS.NOTIFICATIONS,
-    query: undefined,
-    badge: unreadNotificationCount.value ?? '',
   },
 ])
 
@@ -116,6 +115,49 @@ const handleLogout = async () => {
     isLoggingOut.value = false
   }
 }
+
+const handleNotificationButtonClick = async () => {
+  isNotificationPopupOpen.value = !isNotificationPopupOpen.value
+
+  if (isNotificationPopupOpen.value) {
+    await notificationStore.loadNotifications({ page: 1, size: 20 })
+  }
+}
+
+const handleOpenNotificationCenter = async () => {
+  isNotificationPopupOpen.value = false
+  await router.push({ name: ROUTE_NAMES.NOTIFICATIONS })
+}
+
+const handleSelectNotification = async (notification: NotificationItem) => {
+  try {
+    await notificationStore.markAsRead(notification.id)
+    isNotificationPopupOpen.value = false
+
+    if (notification.route) {
+      await router.push(notification.route)
+      return
+    }
+
+    await router.push({ name: ROUTE_NAMES.NOTIFICATIONS })
+  } catch {
+    await router.push({ name: ROUTE_NAMES.NOTIFICATIONS })
+  }
+}
+
+watch(
+  isAuthenticated,
+  (authenticated) => {
+    if (authenticated && notificationStore.loadState === 'idle') {
+      void notificationStore.loadNotifications({ page: 1, size: 20 })
+    }
+
+    if (!authenticated) {
+      isNotificationPopupOpen.value = false
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -152,86 +194,112 @@ const handleLogout = async () => {
         </button>
       </nav>
 
-      <div v-if="isAuthenticated" class="global-nav__actions" aria-label="사용자 메뉴">
-        <button
-          v-for="item in userActionItems"
-          :key="item.label"
-          class="global-nav__action global-nav__action--badge"
-          :class="{ 'global-nav__action--active': isActivePath(item.path) }"
-          type="button"
-          @click="goToPath(item.path, { authRequired: true, query: item.query })"
-        >
-          <span class="global-nav__icon" aria-hidden="true">
-            <svg
-              v-if="item.icon === 'heart'"
-              class="global-nav__icon-svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M20.3 5.7a5.1 5.1 0 0 0-7.2 0L12 6.8l-1.1-1.1a5.1 5.1 0 0 0-7.2 7.2L12 21l8.3-8.1a5.1 5.1 0 0 0 0-7.2Z"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            <svg
-              v-else-if="item.icon === 'cart'"
-              class="global-nav__icon-svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M6.2 6.4h15.1l-1.7 8.1H8L6.2 6.4Z"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M3 4.5h2.3l.9 1.9"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M9.2 18.8h.1M18.2 18.8h.1"
-                stroke="currentColor"
-                stroke-width="2.8"
-                stroke-linecap="round"
-              />
-            </svg>
-            <svg
-              v-else-if="item.icon === 'bell'"
-              class="global-nav__icon-svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M18 9.8a6 6 0 1 0-12 0c0 5.7-2.2 6.7-2.2 6.7h16.4S18 15.5 18 9.8Z"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M14.1 19a2.3 2.3 0 0 1-4.2 0"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-              />
-            </svg>
-            <template v-else>{{ item.icon }}</template>
-          </span>
-          {{ item.label }}
-          <span v-if="Number(item.badge) > 0" class="global-nav__badge">{{ item.badge }}</span>
-        </button>
+      <div v-if="canShowNotificationAction" class="global-nav__actions" aria-label="사용자 메뉴">
+        <template v-if="isAuthenticated">
+          <button
+            v-for="item in userActionItems"
+            :key="item.label"
+            class="global-nav__action global-nav__action--badge"
+            :class="{ 'global-nav__action--active': isActivePath(item.path) }"
+            type="button"
+            @click="goToPath(item.path, { authRequired: true, query: item.query })"
+          >
+            <span class="global-nav__icon" aria-hidden="true">
+              <svg
+                v-if="item.icon === 'heart'"
+                class="global-nav__icon-svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20.3 5.7a5.1 5.1 0 0 0-7.2 0L12 6.8l-1.1-1.1a5.1 5.1 0 0 0-7.2 7.2L12 21l8.3-8.1a5.1 5.1 0 0 0 0-7.2Z"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <svg
+                v-else-if="item.icon === 'cart'"
+                class="global-nav__icon-svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M6.2 6.4h15.1l-1.7 8.1H8L6.2 6.4Z"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M3 4.5h2.3l.9 1.9"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M9.2 18.8h.1M18.2 18.8h.1"
+                  stroke="currentColor"
+                  stroke-width="2.8"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <template v-else>{{ item.icon }}</template>
+            </span>
+            {{ item.label }}
+            <span v-if="Number(item.badge) > 0" class="global-nav__badge">{{ item.badge }}</span>
+          </button>
+        </template>
 
-        <div class="global-nav__profile-menu">
+        <div class="global-nav__notification-menu">
+          <button
+            class="global-nav__action global-nav__action--badge"
+            :class="{ 'global-nav__action--active': isActivePath(ROUTE_PATHS.NOTIFICATIONS) }"
+            type="button"
+            aria-haspopup="dialog"
+            :aria-expanded="isNotificationPopupOpen"
+            @click="handleNotificationButtonClick"
+          >
+            <span class="global-nav__icon" aria-hidden="true">
+              <svg
+                class="global-nav__icon-svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M18 9.8a6 6 0 1 0-12 0c0 5.7-2.2 6.7-2.2 6.7h16.4S18 15.5 18 9.8Z"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M14.1 19a2.3 2.3 0 0 1-4.2 0"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </span>
+            알림
+            <span v-if="notificationStore.unreadCount > 0" class="global-nav__badge">
+              {{ notificationStore.unreadCount }}
+            </span>
+          </button>
+
+          <NotificationPopup
+            :is-open="isNotificationPopupOpen"
+            @close="isNotificationPopupOpen = false"
+            @open-center="handleOpenNotificationCenter"
+            @select="handleSelectNotification"
+          />
+        </div>
+
+        <div v-if="isAuthenticated" class="global-nav__profile-menu">
           <button
             class="global-nav__profile"
             :class="{ 'global-nav__profile--active': isActivePath(ROUTE_PATHS.MY) }"
@@ -477,6 +545,12 @@ const handleLogout = async () => {
 }
 
 .global-nav__profile-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.global-nav__notification-menu {
   position: relative;
   display: inline-flex;
   align-items: center;

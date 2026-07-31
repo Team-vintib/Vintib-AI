@@ -146,10 +146,19 @@ src/
       types/
     notification/
       api/
+        notificationApi.ts
       components/
+        NotificationCard.vue
+        NotificationCenterState.vue
+        NotificationPopup.vue
       constants/
+        notificationOptions.ts
       pages/
+        NotificationCenterPage.vue
+      stores/
+        notificationStore.ts
       types/
+        notification.types.ts
     product/
       api/
         productDetailApi.ts
@@ -413,6 +422,15 @@ docs/
   있음·없음, 로컬 이미지 변경, 생성 중·결과·실패·재시도와 결과 저장 피드백을 mock으로
   제공하며, 상품 변경 시 이전 결과를 초기화합니다. 실제 사진·생성·저장 계약은
   `.codex/requests/be/007-live-tryon-contract.md` 확정 후 연결합니다.
+- `domains/notification`에는 S15P11A108-420·421 알림센터와 공통 헤더 알림 팝업이
+  구현되어 있습니다. `/notifications`에서 읽지 않은 알림을 전체/라이브/경매/거래/배송/포인트 탭으로
+  분류하고, 알림 카드, 전체 탭 더보기, 로딩·빈 목록·오류·필터 결과 없음 상태와 단건/전체 읽음 처리를 제공합니다.
+  `GlobalNavigation`은 같은 notification store로 최근 알림 팝업과 안 읽은 알림 배지를
+  표시합니다. 실제 BE 계약은 `/api/users/{userId}/alerts`이며, unread badge는
+  `unreadOnly=true` 조회의 `totalElements` 기준으로 계산합니다. 읽음 처리된 알림은 즉시 목록에서
+  제거합니다. 알림 도메인의 mock data와
+  `mock` query 진입점은 제거했으며, 수동 화면 확인은 로그인 계정에 실제 `notification`
+  DB row를 넣어 진행합니다. 서버 카테고리 필터와 `type/refType/refId` enum 문서화는 대기 중입니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.
