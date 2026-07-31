@@ -246,6 +246,13 @@ class AutoMasker:
 
         DensePose엔 머리 인덱스가 없어서(SMPL 몸 표면 모델에 두피/모발이 없음) 못 쓰고,
         SCHP 'Hair'/'Hat' 라벨 + 기하학적 확장으로 대체한다. 얼굴은 무조건 보존한다.
+
+        **얼굴 보호 방식**: 처음엔 모자 영역을 먼저 통째로 잡고 거기서 얼굴 모양 구멍을
+        빼는 방식(`& ~face_protect_area`)이었는데, 그러면 마스크 경계가 얼굴 윤곽을 피해
+        울퉁불퉁하게 파여서 diffusion이 그 경계를 따라 모자를 어색하게 뭉개 그리는 문제가
+        실측으로 확인됐다. 대신 **얼굴 영역이 시작되는 행(row) 위쪽만 깨끗하게 잘라서** 쓴다
+        — 얼굴을 "피해서" 그리는 게 아니라 애초에 얼굴 자리까지 마스크가 내려가지 않으니,
+        경계가 항상 수평선 하나뿐이라 자연스럽게 이어진다.
         """
         hair_area = part_mask_of(['Hair'], schp_lip_mask, LIP_MAPPING) | \
             part_mask_of(['Hair'], schp_atr_mask, ATR_MAPPING)
@@ -255,6 +262,7 @@ class AutoMasker:
 
         head_area = (hair_area | existing_hat_area).astype(np.uint8)
         rows, cols = np.where(head_area > 0)
+        face_rows = np.where(face_protect_area.any(axis=1))[0]
 
         if len(rows) == 0:
             # 머리카락조차 인식하지 못하면(대머리, 인식 실패 등) 무리하게 추정하지 않고 빈 마스크를 돌려준다.
@@ -273,9 +281,12 @@ class AutoMasker:
             extend_left = max(0, left - width_margin)
             extend_right = min(head_area.shape[1] - 1, right + width_margin)
 
-            mask_area = head_area.copy()
-            mask_area[extend_top:bottom + 1, extend_left:extend_right + 1] = 1
-            mask_area = mask_area & (~face_protect_area)
+            # 얼굴이 시작되는 행(윗눈썹~이마 경계쯤) 바로 위까지만 채운다 — 얼굴 라벨을 못
+            # 찾으면(선글라스로 가려짐 등) 기존처럼 머리카락 bbox 하단까지로 폴백한다.
+            cutoff_row = int(face_rows.min()) if len(face_rows) > 0 else bottom + 1
+
+            mask_area = np.zeros_like(head_area)
+            mask_area[extend_top:cutoff_row, extend_left:extend_right + 1] = 1
 
             mask_area = cv2.dilate(mask_area.astype(np.uint8), dilate_kernel, iterations=1)
 
@@ -293,6 +304,12 @@ class AutoMasker:
         'hat'과 같은 이유로 upper/lower 등 일반 로직을 못 탄다 — 'shoes'는 다른 옷(상의/바지)을
         보호할 PROTECT_CLOTH_PARTS 정의가 없어서, 일반 로직을 타면 몸통까지 통째로 마스크에
         잡혀버리는 문제가 실측으로 확인됐다(S15P11A108-367).
+
+        **확장 방식**: 처음엔 bbox 전체를 사각형으로 채우는 방식이었는데, 사진 프레임 하단에
+        발이 살짝 걸쳐서 잘린 경우(발 실루엣 자체가 작게 잡힘) 뻣뻣한 직사각형 블록이 되고,
+        결과물도 신발이 아니라 각진 덩어리로 나오는 문제가 실측으로 확인됐다. 대신 실제 발/신발
+        모양(`shoe_area`)을 세로로 긴 커널로 dilate해서 위쪽(발목 방향)으로만 자연스럽게 늘린다
+        — 사각형으로 뭉개지 않고 발 윤곽을 그대로 살린 채로 범위만 넓힌다.
         """
         feet_area = part_mask_of(['feet'], densepose_mask, DENSE_INDEX_MAP)
         existing_shoes_area = part_mask_of(['Left-shoe', 'Right-shoe'], schp_lip_mask, LIP_MAPPING) | \
@@ -306,19 +323,21 @@ class AutoMasker:
         else:
             top, bottom = int(rows.min()), int(rows.max())
             left, right = int(cols.min()), int(cols.max())
-            foot_height = bottom - top
+            foot_height = max(1, bottom - top)
+            foot_width = max(1, right - left)
 
             # 발목 위쪽(바지 밑단과 겹치는 지점)까지 확장 — 부츠처럼 발목을 덮는 신발 대응.
-            extend_top = max(0, top - int(foot_height * 0.8))
-            # 신발이 맨발 실루엣보다 옆으로 살짝 튀어나오는 경우 대응.
-            width_margin = max(1, int((right - left) * 0.15))
-            extend_left = max(0, left - width_margin)
-            extend_right = min(shoe_area.shape[1] - 1, right + width_margin)
+            # 세로로 긴 커널(가로는 좁게)로 dilate해서, 실제 발 윤곽을 유지한 채 위쪽으로만
+            # 자연스럽게 늘어나게 한다(사각형 bbox 채우기 대신). cv2.dilate는 커널 중심 기준
+            # 대칭으로 늘어나므로(위/아래 둘 다) 아래쪽 성장분은 원래 발 하단(bottom) 아래로
+            # 잘라내 위쪽으로만 늘어난 것처럼 만든다 — 발바닥 너머 바닥까지 마스크가 안 내려간다.
+            extend_up_px = int(foot_height * 0.8)
+            side_margin_px = max(1, int(foot_width * 0.15))
+            vertical_kernel = np.ones((extend_up_px * 2 + 1, side_margin_px * 2 + 1), np.uint8)
 
-            mask_area = shoe_area.copy()
-            mask_area[extend_top:bottom + 1, extend_left:extend_right + 1] = 1
-
-            mask_area = cv2.dilate(mask_area.astype(np.uint8), dilate_kernel, iterations=1)
+            mask_area = cv2.dilate(shoe_area, vertical_kernel, iterations=1)
+            mask_area[bottom + 1 :, :] = 0
+            mask_area = cv2.dilate(mask_area, dilate_kernel, iterations=1)
 
         return Image.fromarray((mask_area * 255).astype(np.uint8))
 
