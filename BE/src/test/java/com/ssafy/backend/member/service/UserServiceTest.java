@@ -45,7 +45,8 @@ class UserServiceTest {
     }
 
     private UpdateMemberRequest createRequest() {
-        return new UpdateMemberRequest("빈티지헌터", "01012345678", "서울시 강남구", Gender.MALE);
+        return new UpdateMemberRequest(
+                "빈티지헌터", "01012345678", "서울시 강남구", "3층", "06236", Gender.MALE);
     }
 
     @Test
@@ -63,25 +64,26 @@ class UserServiceTest {
         assertThat(response.nickname()).isEqualTo("빈티지헌터");
         assertThat(response.phoneNumber()).isEqualTo("01012345678");
         assertThat(response.address()).isEqualTo("서울시 강남구");
+        assertThat(response.detailAddress()).isEqualTo("3층");
+        assertThat(response.postalCode()).isEqualTo("06236");
         assertThat(response.gender()).isEqualTo(Gender.MALE);
         assertThat(response.onboardingCompleted()).isTrue();
     }
 
     @Test
-    void 성별을_보내지_않으면_기존_값을_유지한다() {
-        // given
+    void 우편번호는_없어도_저장된다() {
+        // given: 주소 검색을 안 쓰고 직접 입력하면 우편번호가 없을 수 있다.
         Member member = createMember();
-        member.updateBasicInfo("빈티지헌터", "01012345678", "서울시 강남구", Gender.MALE);
         when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
 
-        UpdateMemberRequest request = new UpdateMemberRequest("빈티지헌터2", "01099998888", "부산시 해운대구", null);
+        UpdateMemberRequest request =
+                new UpdateMemberRequest("빈티지헌터", "01012345678", "서울시 강남구", "3층", null, Gender.MALE);
 
         // when
         MemberProfileResponse response = userService.updateBasicInfo(MEMBER_ID, MEMBER_ID, request);
 
         // then
-        assertThat(response.nickname()).isEqualTo("빈티지헌터2");
-        assertThat(response.gender()).isEqualTo(Gender.MALE);
+        assertThat(response.postalCode()).isNull();
     }
 
     @Test

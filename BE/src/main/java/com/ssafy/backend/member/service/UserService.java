@@ -22,7 +22,7 @@ public class UserService {
     private final MemberRepository memberRepository;
 
     /**
-     * ONBOARD-001 / MY-001: 닉네임·전화번호·주소·성별을 저장하고 회원 프로필을 반환한다.
+     * ONBOARD-001 / MY-001: 닉네임·전화번호·주소·상세주소·우편번호·성별을 저장하고 회원 프로필을 반환한다.
      *
      * <p>온보딩 최초 완료 시에도, 이후 마이페이지 수정 시에도 같은 엔드포인트를 사용한다.
      * 닉네임 중복은 DB unique 제약으로 최종 방어하고 DataIntegrityViolationException 을
@@ -50,6 +50,8 @@ public class UserService {
                 request.nickname(),
                 request.phoneNumber(),
                 request.address(),
+                request.detailAddress(),
+                request.postalCode(),
                 request.gender()
         );
 

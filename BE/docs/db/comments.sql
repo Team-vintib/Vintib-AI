@@ -19,6 +19,10 @@ COMMENT ON COLUMN member.member_type       IS 'GENERAL(일반) | BUSINESS(사업
 COMMENT ON COLUMN member.status            IS 'ACTIVE | SUSPENDED(정지) | WITHDRAWN(탈퇴)';
 COMMENT ON COLUMN member.onboarding_done   IS '온보딩(관심 브랜드·카테고리·신체 정보) 완료 여부.';
 COMMENT ON COLUMN member.deleted_at        IS '탈퇴 시각. 입찰·주문 이력이 FK 로 남아 물리 삭제하지 않는다.';
+COMMENT ON COLUMN member.address           IS '기본 주소(도로명/지번). 온보딩(ONBOARD-001)에서 입력.';
+COMMENT ON COLUMN member.detail_address    IS '상세 주소(동/호수 등).';
+COMMENT ON COLUMN member.postal_code       IS '우편번호. 주소 검색을 안 쓰고 직접 입력하면 NULL 허용.';
+COMMENT ON COLUMN member.gender            IS 'MALE | FEMALE | OTHER';
 
 COMMENT ON TABLE member_social_account IS '외부 계정 연결 (AUTH-003, AUTH-004). 한 회원이 여러 provider 를 가질 수 있다.';
 COMMENT ON COLUMN member_social_account.provider         IS 'SSO 공급자. 현재 SSAFY 만 허용.';

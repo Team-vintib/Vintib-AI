@@ -46,6 +46,12 @@ public class Member extends BaseTimeEntity {
 
     private String address;
 
+    @Column(name = "detail_address")
+    private String detailAddress;
+
+    @Column(name = "postal_code", length = 10)
+    private String postalCode;
+
     @Enumerated(EnumType.STRING)
     private Gender gender;
 
@@ -80,22 +86,24 @@ public class Member extends BaseTimeEntity {
     }
 
     /**
-     * ONBOARD-001: 닉네임·전화번호·주소·성별을 등록하고 온보딩 완료 처리한다.
-     * MY-001 에서 이후에도 동일 메서드로 수정할 수 있다.
+     * ONBOARD-001: 닉네임·전화번호·주소·상세주소·우편번호·성별을 등록하고 온보딩 완료 처리한다.
+     * MY-001 에서 이후에도 동일 메서드로 수정할 수 있다. 우편번호를 제외한 나머지는 전부 필수 입력이다
+     * (컨트롤러의 Bean Validation에서 이미 걸러진다). 우편번호는 주소 검색을 안 쓰고 직접 입력하면
+     * null일 수 있다.
      */
-    public void updateBasicInfo(String nickname, String phoneNumber, String address, Gender gender) {
+    public void updateBasicInfo(
+            String nickname,
+            String phoneNumber,
+            String address,
+            String detailAddress,
+            String postalCode,
+            Gender gender) {
         this.nickname = nickname;
         this.phoneNumber = phoneNumber;
         this.address = address;
-        // 성별은 선택 입력이다 — null로 보내면 마이페이지 수정(MY-001)에서 기존 값을 지우지 않고 유지한다.
-        if (gender != null) {
-            this.gender = gender;
-        }
+        this.detailAddress = detailAddress;
+        this.postalCode = postalCode;
+        this.gender = gender;
         this.onboardingCompleted = true;
-    }
-
-    /** @deprecated onboardingCompleted 플래그를 직접 쓰는 코드가 없도록 이 메서드만 남긴다. */
-    public void completeOnboarding(String nickname, String phoneNumber, String address, Gender gender) {
-        updateBasicInfo(nickname, phoneNumber, address, gender);
     }
 }

@@ -42,10 +42,25 @@
 - **잘못된 에러코드**: 본인 아닌 타인의 정보를 수정하려 할 때 `ONBOARDING_REQUIRED`("온보딩을
   완료해야 이용할 수 있습니다")를 반환하고 있었다 — 상황과 메시지가 안 맞는다. 전용
   `MEMBER_FORBIDDEN(U013, 403, "본인의 정보만 수정할 수 있습니다.")`으로 교체.
-- **성별 null-safe 처리 누락**: `Member.updateBasicInfo()`가 `gender`를 무조건 덮어써서, 마이페이지
-  수정(MY-001) 때 성별을 안 보내면 기존 값이 조용히 지워지는 버그였다. DTO 주석은 "null이면 유지"라고
-  써 있었는데 실제로는 그렇게 동작하지 않았다 — `if (gender != null)` 가드 추가, 테스트 추가.
 - **요청 문서 조기 삭제**: `.claude/requests/be/001` 전체를 삭제했는데 실제로는 일부(프로필
   이미지/회원구분/상태/탈퇴)만 반영됐고 나머지(닉네임 nullable 여부의 schema.sql 미반영,
   비밀번호/전화번호 컬럼명 불일치, 성별·주소가 schema.sql에 없음)는 그대로다. `.claude/requests/README.md`
   규칙대로 삭제 대신 반영된 항목만 덜어내고 남은 항목만 남기는 식으로 되돌렸다.
+
+## 2차 수정 — 필드 재확인(사용자 지적)
+
+리뷰 커밋 이후 실제 FE 구현을 확인해보니 필수 필드 구성이 달랐다:
+
+- **성별은 선택이 아니라 필수였다.** FE 폼은 닉네임·주소·상세주소·전화번호·성별 5개를 전부 필수로
+  받고 있었다. 그래서 위에서 넣었던 "성별 null-safe(기존 값 유지)" 처리를 걷어내고, `UpdateMemberRequest.gender`에
+  `@NotNull`을 달았다 — 이 엔드포인트는 부분 수정이 아니라 매번 전체 값을 새로 받는 게 맞는 설계였다.
+- **`detailAddress`(상세주소), `postalCode`(우편번호) 필드가 통째로 빠져 있었다.** FE
+  `SaveBasicInfoRequest`엔 있는데 BE 요청/응답/엔티티/스키마 어디에도 없었다. 전부 추가:
+  - `Member`에 `detailAddress`, `postalCode` 컬럼
+  - `UpdateMemberRequest`/`MemberProfileResponse`에 필드 추가 (`postalCode`만 선택, 나머지는 필수)
+  - `schema.sql`/`comments.sql`에 `detail_address`, `postal_code` 반영 — 겸사겸사 그동안
+    `schema.sql`에 아예 없었던 `address`, `gender` 컬럼도 추가해서 `.claude/requests/be/001`의
+    남은 항목을 하나 더 줄였다.
+- **엔드포인트 경로**: FE가 `api-index.md`에 `PATCH /api/me/onboarding`으로 임시 계약을 적어뒀지만,
+  `APIs.md`(공식 스펙)에 이미 `/users/{id}`로 명시돼 있어 그대로 유지하기로 사용자와 확인. FE에
+  실제 계약(`.claude/requests/fe/004-onboarding-basic-info-contract.md`)을 알리는 문서 작성.

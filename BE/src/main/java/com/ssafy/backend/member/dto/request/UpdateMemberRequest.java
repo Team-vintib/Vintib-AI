@@ -3,13 +3,14 @@ package com.ssafy.backend.member.dto.request;
 import com.ssafy.backend.member.entity.Gender;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
- * ONBOARD-001 / MY-001: 닉네임·전화번호·주소·성별 등록·수정 요청 DTO.
- * 닉네임·전화번호·주소는 항상 새 값 전체를 받아 덮어쓴다(필수 입력). 성별만 선택 입력이며,
- * 보내지 않으면(null) 기존 값을 유지한다.
+ * ONBOARD-001 / MY-001: 닉네임·전화번호·주소·상세주소·성별 등록·수정 요청 DTO.
+ * 우편번호(postalCode)를 제외한 전부 필수 입력이다 — 이 엔드포인트는 부분 수정이 아니라
+ * 온보딩 기본 정보 전체를 매번 새로 받는다.
  */
 public record UpdateMemberRequest(
 
@@ -31,7 +32,17 @@ public record UpdateMemberRequest(
         @Size(max = 200, message = "주소는 200자 이하로 입력해주세요.")
         String address,
 
+        @Schema(description = "상세주소", example = "3층")
+        @NotBlank(message = "상세주소는 필수입니다.")
+        @Size(max = 100, message = "상세주소는 100자 이하로 입력해주세요.")
+        String detailAddress,
+
+        @Schema(description = "우편번호. 주소 검색을 쓰면 채워지고, 직접 입력이면 없을 수 있다(선택)", example = "06236")
+        @Size(max = 10, message = "우편번호는 10자 이하로 입력해주세요.")
+        String postalCode,
+
         @Schema(description = "성별 (MALE/FEMALE/OTHER)", example = "MALE")
+        @NotNull(message = "성별은 필수입니다.")
         Gender gender
 ) {
 }

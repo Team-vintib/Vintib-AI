@@ -25,6 +25,11 @@ CREATE TABLE member (
     nickname          VARCHAR(30)  NOT NULL UNIQUE,    -- 경매 최고 입찰자 표시에 사용(AUCT-011)
     name              VARCHAR(50),
     phone             VARCHAR(20),
+    -- 온보딩(ONBOARD-001)에서 채워지는 정보. 가입 시점에는 전부 NULL이다.
+    address           VARCHAR(200),
+    detail_address    VARCHAR(100),
+    postal_code       VARCHAR(10),                     -- 주소 검색을 안 쓰고 직접 입력하면 NULL 허용
+    gender            VARCHAR(10),
     member_type       VARCHAR(20)  NOT NULL DEFAULT 'GENERAL',
     status            VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
     profile_image_url VARCHAR(500),
@@ -33,7 +38,8 @@ CREATE TABLE member (
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     deleted_at        TIMESTAMPTZ,
     CONSTRAINT ck_member_type   CHECK (member_type IN ('GENERAL', 'BUSINESS')),
-    CONSTRAINT ck_member_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'WITHDRAWN'))
+    CONSTRAINT ck_member_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'WITHDRAWN')),
+    CONSTRAINT ck_member_gender CHECK (gender IN ('MALE', 'FEMALE', 'OTHER'))
 );
 
 -- 싸피어스 SSO 등 외부 계정 연결 (AUTH-003, AUTH-004)

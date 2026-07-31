@@ -29,6 +29,12 @@ public record MemberProfileResponse(
         @Schema(example = "서울시 강남구 테헤란로 123")
         String address,
 
+        @Schema(example = "3층")
+        String detailAddress,
+
+        @Schema(example = "06236")
+        String postalCode,
+
         @Schema(example = "MALE")
         Gender gender,
 
@@ -50,6 +56,8 @@ public record MemberProfileResponse(
                 member.getNickname(),
                 member.getPhoneNumber(),
                 member.getAddress(),
+                member.getDetailAddress(),
+                member.getPostalCode(),
                 member.getGender(),
                 member.getMemberType(),
                 member.getStatus(),
