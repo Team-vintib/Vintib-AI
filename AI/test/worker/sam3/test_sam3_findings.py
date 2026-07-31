@@ -1,8 +1,9 @@
 """SAM3 네이티브 findings 추출 로직 검증 — 인스턴스 레벨 필터들.
 
 `filter_by_garment`(의류 겹침 안전망)·`suppress_benign`(구조적/질감형 양성 억제)·
-`_section_no_of`(마스크 무게중심 기반 3×3 섹션 매핑)를 지킨다. `extract_findings`가 필터
-통과분만 `kept_instances_by_image`에 담는지(overlay.py가 의존하는 불변식)도 여기서 지킨다.
+`dedupe_cross_type_overlap`(서로 다른 defect_type의 중복 검출 병합)·`_section_no_of`
+(마스크 무게중심 기반 3×3 섹션 매핑)를 지킨다. `extract_findings`가 필터 통과분만
+`kept_instances_by_image`에 담는지(overlay.py가 의존하는 불변식)도 여기서 지킨다.
 """
 
 import numpy as np
@@ -12,6 +13,7 @@ from PIL import Image
 from sam3.contracts import DefectType
 from sam3.findings import (
     _section_no_of,
+    dedupe_cross_type_overlap,
     extract_findings,
     filter_by_garment,
     suppress_benign,
@@ -33,6 +35,12 @@ def _mask_at(row: int, col: int, size: tuple[int, int] = _SIZE) -> np.ndarray:
 
 def _full_mask(size: tuple[int, int] = _SIZE) -> np.ndarray:
     return np.ones(size, dtype=np.uint8)
+
+
+def _mask_block(r0: int, r1: int, c0: int, c1: int, size: tuple[int, int] = _SIZE) -> np.ndarray:
+    mask = np.zeros(size, dtype=np.uint8)
+    mask[r0:r1, c0:c1] = 1
+    return mask
 
 
 def _instance(
@@ -153,6 +161,48 @@ def test_suppress_benign_passes_through_when_no_benign_instances():
     assert dropped == []
 
 
+# --- dedupe_cross_type_overlap ------------------------------------------------
+# scratch.jpg 실측: DIRT_MARK/HOLE_TEAR가 거의 동일한 bbox/mask로 같은 자리를 중복
+# 검출한 사례(bbox 1px 이내로 겹침, IoU 0.9대)에 대한 회귀 방지.
+
+
+def test_dedupe_cross_type_overlap_drops_lower_confidence_duplicate():
+    # 같은 자리, 다른 타입, IoU=1.0(완전 동일 마스크) — confidence 높은 쪽만 남는다.
+    higher = _instance(DefectType.dirt_mark, _mask_at(4, 4), confidence=0.91)
+    lower = _instance(DefectType.hole_tear, _mask_at(4, 4), confidence=0.79)
+    kept, dropped = dedupe_cross_type_overlap([lower, higher], min_iou=0.7)
+    assert kept == [higher]
+    assert dropped == [lower]
+
+
+def test_dedupe_cross_type_overlap_uses_defect_type_value_as_tiebreak():
+    # confidence가 동률이면 defect_type.value 알파벳 순으로 결정적으로 정한다
+    # ("DIRT_MARK" < "HOLE_TEAR").
+    dirt_mark = _instance(DefectType.dirt_mark, _mask_at(4, 4), confidence=0.80)
+    hole_tear = _instance(DefectType.hole_tear, _mask_at(4, 4), confidence=0.80)
+    kept, dropped = dedupe_cross_type_overlap([hole_tear, dirt_mark], min_iou=0.7)
+    assert kept == [dirt_mark]
+    assert dropped == [hole_tear]
+
+
+def test_dedupe_cross_type_overlap_keeps_both_when_overlap_is_below_threshold():
+    # 부분 겹침(IoU=0.2, 3x3 블록 두 개가 한 열만 공유)은 임계치(0.7) 미만이라 둘 다 생존.
+    a = _instance(DefectType.dirt_mark, _mask_block(3, 6, 3, 6), confidence=0.90)
+    b = _instance(DefectType.hole_tear, _mask_block(3, 6, 5, 8), confidence=0.80)
+    kept, dropped = dedupe_cross_type_overlap([a, b], min_iou=0.7)
+    assert len(kept) == 2 and a in kept and b in kept
+    assert dropped == []
+
+
+def test_dedupe_cross_type_overlap_ignores_same_type_overlap():
+    # 같은 타입끼리는 비교 대상이 아니다(같은 프롬프트 내부 중복은 SAM3 자체가 처리한다고 가정).
+    a = _instance(DefectType.stain, _mask_at(4, 4), confidence=0.90)
+    b = _instance(DefectType.stain, _mask_at(4, 4), confidence=0.80)
+    kept, dropped = dedupe_cross_type_overlap([a, b], min_iou=0.7)
+    assert len(kept) == 2 and a in kept and b in kept
+    assert dropped == []
+
+
 # --- extract_findings: kept_instances_by_image 불변식 -------------------------
 
 
@@ -186,6 +236,38 @@ def test_extract_findings_keeps_only_post_filter_instances_for_overlay():
     assert survivor in kept
     assert suppressed not in kept
     assert {f.defect_type for f in extracted.findings} == {DefectType.stain}
+
+
+def test_extract_findings_dedupes_cross_type_duplicates_before_numbering():
+    # scratch.jpg 실측 재현: 같은 자리를 DIRT_MARK/HOLE_TEAR 두 프롬프트가 동시에 잡은 경우,
+    # 낮은 confidence 쪽은 findings에도 kept_instances_by_image에도 남으면 안 된다.
+    higher = _instance(DefectType.dirt_mark, _mask_at(4, 4), confidence=0.91)
+    lower = _instance(DefectType.hole_tear, _mask_at(4, 4), confidence=0.79)
+    result = _segmentation_result(0, [lower, higher], garment_mask=_full_mask())
+    prompt_set = select_prompt_set(GarmentCategory.top_knit, BaseColor.light)
+
+    extracted = extract_findings([result], prompt_set, segmenter_config("mock"))
+
+    assert len(extracted.findings) == 1
+    assert extracted.findings[0].defect_type == DefectType.dirt_mark
+    assert extracted.findings[0].no == 1
+    kept = extracted.kept_instances_by_image[0]
+    assert higher in kept
+    assert lower not in kept
+
+
+def test_extract_findings_skips_cross_type_dedup_when_disabled():
+    higher = _instance(DefectType.dirt_mark, _mask_at(4, 4), confidence=0.91)
+    lower = _instance(DefectType.hole_tear, _mask_at(4, 4), confidence=0.79)
+    result = _segmentation_result(0, [lower, higher], garment_mask=_full_mask())
+    prompt_set = select_prompt_set(GarmentCategory.top_knit, BaseColor.light)
+    config = dict(segmenter_config("mock"))
+    config["dedupe_cross_type"] = False
+
+    extracted = extract_findings([result], prompt_set, config)
+
+    assert len(extracted.findings) == 2
+    assert lower in extracted.kept_instances_by_image[0]
 
 
 def test_extract_findings_skips_benign_suppression_when_disabled():

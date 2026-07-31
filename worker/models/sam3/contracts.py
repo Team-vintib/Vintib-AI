@@ -105,7 +105,8 @@ class Finding:
     statement_required: bool
     needs_seller_review: bool
     # CH007(넘버링 bbox 이미지 + 불릿 리스트). no/label은 findings.py가 채운다. description은
-    # sVLM이 나중에 채울 자리라 항상 None(이 계획 범위 밖).
+    # CH011(quality_vlm)이 채운다 — 요청의 include_descriptions가 True이고 status가
+    # DETECTED일 때만(그 외에는 None).
     no: int | None = None
     label: str | None = None
     description: str | None = None

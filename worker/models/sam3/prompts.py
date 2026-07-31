@@ -55,6 +55,29 @@ SECTION_LABELS: dict[GarmentCategory, tuple[GarmentSection, ...]] = {
     GarmentCategory.bottom_skirt: _BOTTOM_SECTIONS,
 }
 
+# 부위 한글 라벨 — CH011(하자 설명 sVLM)이 최종 문장을 조립할 때 쓴다("왼쪽 허리 부분 —
+# 작은 흰색 얼룩이 있습니다" 형태). VLM에게 위치를 직접 묻지 않고(hallucination 유발이
+# 검증에서 확인됨, AI/validation/QUAL/vlm-description-check/) 이미 카테고리별로 정확히
+# 계산된 `Finding.section` 값을 그대로 한글로만 바꾼다.
+SECTION_LABELS_KO: dict[GarmentSection, str] = {
+    GarmentSection.shoulder_left: "왼쪽 어깨",
+    GarmentSection.collar: "목깃",
+    GarmentSection.shoulder_right: "오른쪽 어깨",
+    GarmentSection.sleeve_left: "왼쪽 소매",
+    GarmentSection.chest_center: "가슴 중앙",
+    GarmentSection.sleeve_right: "오른쪽 소매",
+    GarmentSection.hem_left: "왼쪽 밑단",
+    GarmentSection.hem_center: "밑단 중앙",
+    GarmentSection.hem_right: "오른쪽 밑단",
+    GarmentSection.waist_left: "왼쪽 허리",
+    GarmentSection.waist_center: "허리 중앙",
+    GarmentSection.waist_right: "오른쪽 허리",
+    GarmentSection.thigh_left: "왼쪽 허벅지",
+    GarmentSection.crotch: "사타구니",
+    GarmentSection.thigh_right: "오른쪽 허벅지",
+    GarmentSection.shin_center: "정강이 중앙",
+}
+
 # 의류 존재 확인 프롬프트 — 마스킹 전처리(크롭 + 배경 검정)의 1단계가 쓴다.
 # `segmenter.py`의 크롭 로직이 이 상수를 참조한다.
 GARMENT_PROMPT = "clothing"
