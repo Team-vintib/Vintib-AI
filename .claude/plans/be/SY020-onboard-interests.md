@@ -84,16 +84,16 @@ DB 테이블은 `docs/db/schema.sql`에 이미 정의돼 있다(`member_interest
 
 ## 구현 목록
 
-- [ ] `ErrorCode`: `BRAND_NOT_FOUND`(P009) 추가
-- [ ] `MemberInterestBrandId`/`MemberInterestCategoryId` (`member/entity`, `WishId` 패턴)
-- [ ] `MemberInterestBrand`/`MemberInterestCategory` 엔티티 (`member/entity`)
-- [ ] `MemberInterestBrandRepository`/`MemberInterestCategoryRepository` (`member/repository`)
-- [ ] `UpdateInterestsRequest` (`member/dto/request`)
-- [ ] `InterestsResponse` (`member/dto/response`, 기존 `BrandResponse`/`CategoryResponse` 재사용)
-- [ ] `UserService.getInterests`/`updateInterests`
-- [ ] `UserController`: `GET`/`PUT /api/users/{id}/interests` + Swagger
-- [ ] `UserServiceTest` 케이스 4건 추가
-- [ ] `.claude/skills/verify` 기준 빌드/테스트 통과 확인
+- [x] `ErrorCode`: `BRAND_NOT_FOUND`(P009) 추가
+- [x] `MemberInterestBrandId`/`MemberInterestCategoryId` (`member/entity`, `WishId` 패턴)
+- [x] `MemberInterestBrand`/`MemberInterestCategory` 엔티티 (`member/entity`)
+- [x] `MemberInterestBrandRepository`/`MemberInterestCategoryRepository` (`member/repository`)
+- [x] `UpdateInterestsRequest` (`member/dto/request`)
+- [x] `InterestsResponse` (`member/dto/response`, 기존 `BrandResponse`/`CategoryResponse` 재사용)
+- [x] `UserService.getInterests`/`updateInterests`
+- [x] `UserController`: `GET`/`PUT /api/users/{id}/interests` + Swagger
+- [x] `UserServiceTest` 케이스 추가
+- [x] `APIs.md` — ONBOARD-002 두 엔드포인트 인증 필요 여부·구현 완료 여부 ✓ 표시
 
 ## 확인이 필요한 미결정 사항
 
