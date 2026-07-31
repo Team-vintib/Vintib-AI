@@ -118,6 +118,7 @@
 - 응답 데이터
   - `type`: `AUCTION_STARTED` | `BID_PLACED` | `AUCTION_CLOSED`
   - `auction`: snapshot
+  - **낙찰 축하 연출(AUCT-013)**: `AUCTION_CLOSED` 이벤트(및 `GET /api/auctions/{auctionId}/winner`)로 FE가 라이브 화면 위에 낙찰자 닉네임(전체)·낙찰가를 강조 연출한다. → snapshot에 `highestBidderNickname`(낙찰자)·`currentPrice`(낙찰가)가 반드시 포함돼야 한다. (현재 FE는 이 이벤트가 없어 mock 트리거로 연출)
 - 응답 예시
 
 ```json
