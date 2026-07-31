@@ -35,6 +35,7 @@ from . import registry
 from .contracts import Finding, FindingStatus, SectionScore, Severity
 from .prompts import SECTION_COUNT, SECTION_GRID, STRUCTURAL_BENIGN_PROMPTS, PromptSet, section_label
 from .registry import SegmenterConfig
+from .scoring import DEFECT_LABELS
 from .segmenter import Instance, SegmentationResult
 
 
@@ -173,10 +174,14 @@ def _to_findings(
     prompt_set: PromptSet,
     confident: float,
 ) -> list[Finding]:
-    """(image_index, Instance) 쌍을 `Finding`으로 승격하고 **안정 키**를 매긴다.
+    """(image_index, Instance) 쌍을 `Finding`으로 승격하고 **안정 키 + 표시 번호**를 매긴다.
 
     키는 BE가 판매자 소명을 매다는 앵커라서 결정적이어야 한다 — 정렬을 먼저 고정하고
     `{유형}_{이미지}_{섹션}_{순번}`으로 번호를 매긴다(clipseg와 같은 키 형식).
+
+    `no`(CH007)는 별개다 — 같은 image_index 안에서 정렬 순서 그대로 1부터 매기는 **표시용**
+    번호로, `overlay.py`의 넘버링 bbox 이미지가 그리는 숫자와 정확히 같은 값이어야 한다(같은
+    정렬 기준을 재사용하는 이유). BE 소명 앵커(`key`)와 섞어 쓰지 않는다.
     """
     enriched = [
         (image_index, inst, _section_no_of(inst.mask), float(inst.mask.mean()))
@@ -189,9 +194,11 @@ def _to_findings(
 
     findings: list[Finding] = []
     ordinals: dict[tuple, int] = {}
+    display_no_by_image: dict[int, int] = {}
     for image_index, inst, section_no, area_ratio in ordered:
         slot = (inst.defect_type, image_index, section_no)
         ordinals[slot] = ordinals.get(slot, 0) + 1
+        display_no_by_image[image_index] = display_no_by_image.get(image_index, 0) + 1
 
         severity = _severity_of(area_ratio, inst.confidence)
         status = _status_of(inst.defect_type, inst.confidence, confident)
@@ -210,6 +217,8 @@ def _to_findings(
                 matched_prompt=inst.prompt,
                 statement_required=_statement_required(inst.defect_type, status, severity),
                 needs_seller_review=registry.defect_policy(inst.defect_type)["needs_seller_review"],
+                no=display_no_by_image[image_index],
+                label=DEFECT_LABELS.get(inst.defect_type, inst.defect_type.value),
             )
         )
     return findings
