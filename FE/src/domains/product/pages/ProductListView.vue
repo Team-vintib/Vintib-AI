@@ -19,8 +19,9 @@ import type {
   ProductSaleTypeTab,
   ProductSortOption,
 } from '@/domains/product/types/productList.types'
+import { normalizeApiError } from '@/shared/api/http'
 import AppSearchBar from '@/shared/components/AppSearchBar.vue'
-import { ROUTE_NAMES } from '@/shared/constants/routes'
+import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const router = useRouter()
@@ -119,6 +120,21 @@ const loadProducts = async () => {
   productLoadError.value = ''
 
   try {
+    await authStore.validateStoredSession()
+
+    if (!authStore.isAuthenticated) {
+      products.value = []
+      totalProductCount.value = 0
+      totalPageCount.value = 1
+      likedProductIds.value = new Set()
+      productLoadError.value = '상품 목록을 보려면 로그인이 필요합니다.'
+      await router.push({
+        name: ROUTE_NAMES.AUTH_LOGIN,
+        query: { redirect: ROUTE_PATHS.PRODUCT_LIST },
+      })
+      return
+    }
+
     const response = await getProductList({
       categoryIds: selectedCategoryIds.value,
       conditionGrades: selectedConditionIds.value,
@@ -137,12 +153,18 @@ const loadProducts = async () => {
       selectedFilterCount.value > 0
         ? `선택한 필터를 적용해 상품 ${response.meta.totalElements}개를 찾았습니다.`
         : '전체 상품 조건을 선택했습니다.'
-  } catch {
-    products.value = PRODUCT_LIST_MOCK_DATA
-    totalProductCount.value = PRODUCT_LIST_MOCK_DATA.length
+  } catch (error) {
+    const apiError = normalizeApiError(error)
+
+    products.value = []
+    totalProductCount.value = 0
     totalPageCount.value = 1
-    likedProductIds.value = new Set(PRODUCT_LIST_MOCK_DATA.filter((product) => product.isLiked).map((product) => product.id))
-    productLoadError.value = '상품 목록을 불러오지 못해 임시 데이터를 표시합니다.'
+    likedProductIds.value = new Set()
+    productLoadError.value =
+      apiError.code === 'U010'
+        ? '로그인이 만료되었습니다. 다시 로그인한 뒤 상품 목록을 확인해 주세요.'
+        : '상품 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+
   } finally {
     isLoadingProducts.value = false
   }

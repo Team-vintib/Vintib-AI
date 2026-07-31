@@ -37,14 +37,17 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <RouterView />
   <main v-if="isSplashVisible" class="app-splash" aria-label="VinTib 로딩 화면">
     <img class="app-splash__logo" :src="movingLogoImage" alt="VinTib" />
   </main>
-  <RouterView v-else />
 </template>
 
 <style scoped lang="scss">
 .app-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;

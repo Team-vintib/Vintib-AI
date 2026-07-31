@@ -77,7 +77,7 @@ interface BackendPageResponse<T> {
 }
 
 interface ProductDetailDto extends ProductListDto {
-  sellerNickname: string
+  sellerNickname?: string | null
   images: ProductImageDto[]
   color?: string | null
   material?: string | null
@@ -91,6 +91,10 @@ interface ProductCreateRequest {
   brandId: number | null
   conditionGrade: ProductConditionGrade | ''
   sizeLabel: string
+}
+
+interface ProductCreateResponse extends Partial<ProductListDto> {
+  productId?: number | string | null
 }
 
 interface ProductImageUploadUrlResponse {
@@ -193,7 +197,7 @@ export const submitProduct = async (
   draft: ProductRegistrationDraft,
   { brands = [], categories = [] }: ProductSubmitOptions = {},
 ): Promise<ProductRegistrationSubmitResult> => {
-  const createResponse = await http.post<ApiResponse<ProductListDto>>('/products', {
+  const createResponse = await http.post<ApiResponse<ProductCreateResponse>>('/products', {
     title: draft.name.trim(),
     description: draft.description.trim(),
     categoryId: findCategoryId(draft, categories),
@@ -202,23 +206,40 @@ export const submitProduct = async (
     sizeLabel: draft.size,
   } satisfies ProductCreateRequest)
   const createdProduct = unwrapApiData(createResponse.data)
+  const createdProductId = getCreatedProductId(createdProduct)
 
-  await uploadProductImages(createdProduct.id, draft.photos)
+  await publishProduct(createdProductId, draft)
+  await uploadProductImages(createdProductId, draft.photos)
 
+  return {
+    productId: String(createdProductId),
+    submittedAt: new Date().toISOString(),
+  }
+}
+
+const publishProduct = async (productId: number, draft: ProductRegistrationDraft) => {
   if (draft.saleType === 'DIRECT') {
-    await http.patch<ApiResponse<ProductListDto>>(`/products/${createdProduct.id}/status`, {
+    await http.patch<ApiResponse<ProductListDto>>(`/products/${productId}/status`, {
       price: Number(draft.directSalePrice),
     })
+    return
   }
 
   if (draft.saleType === 'AUCTION') {
-    await http.patch<ApiResponse<ProductListDto>>(`/products/${createdProduct.id}/auction-schedule`)
+    await http.patch<ApiResponse<ProductListDto>>(`/products/${productId}/auction-schedule`)
+    return
+  }
+}
+
+const getCreatedProductId = (product: ProductCreateResponse) => {
+  const rawProductId = product.id ?? product.productId
+  const productId = Number(rawProductId)
+
+  if (!Number.isInteger(productId) || productId < 1) {
+    throw new Error('Product create response does not include a valid product id.')
   }
 
-  return {
-    productId: String(createdProduct.id),
-    submittedAt: new Date().toISOString(),
-  }
+  return productId
 }
 
 const uploadProductImages = async (productId: number, photos: ProductRegistrationPhotoDraft[]) => {
@@ -328,6 +349,17 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
 
     return left.sortOrder - right.sortOrder
   })
+  const images = sortedImages.length
+    ? sortedImages.map((image, index) => ({
+        id: String(image.id),
+        url: image.url,
+        alt: `${product.title} 상품 이미지 ${index + 1}`,
+        label: image.isPrimary ? '대표' : `${index + 1}번`,
+      }))
+    : mockFallback.images.map((image) => ({
+        ...image,
+        alt: `${product.title} 상품 이미지`,
+      }))
 
   return {
     ...mockFallback,
@@ -344,15 +376,10 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
     saleType: product.saleType,
     saleStatus: product.saleStatus,
     isLiked: product.isWished ?? false,
-    images: sortedImages.map((image, index) => ({
-      id: String(image.id),
-      url: image.url,
-      alt: `${product.title} 상품 이미지 ${index + 1}`,
-      label: image.isPrimary ? '대표' : `${index + 1}번`,
-    })),
+    images,
     seller: {
       id: product.sellerId,
-      nickname: product.sellerNickname,
+      nickname: product.sellerNickname?.trim() || mockFallback.seller.nickname,
       followerCount: FALLBACK_SELLER_FOLLOWER_COUNT,
       productCount: FALLBACK_SELLER_PRODUCT_COUNT,
     },
