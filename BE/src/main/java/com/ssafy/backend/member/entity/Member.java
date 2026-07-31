@@ -86,10 +86,11 @@ public class Member extends BaseTimeEntity {
     }
 
     /**
-     * ONBOARD-001: 닉네임·전화번호·주소·상세주소·우편번호·성별을 등록하고 온보딩 완료 처리한다.
+     * ONBOARD-001: 닉네임·전화번호·주소·상세주소·우편번호·성별을 등록한다.
      * MY-001 에서 이후에도 동일 메서드로 수정할 수 있다. 우편번호를 제외한 나머지는 전부 필수 입력이다
      * (컨트롤러의 Bean Validation에서 이미 걸러진다). 우편번호는 주소 검색을 안 쓰고 직접 입력하면
-     * null일 수 있다.
+     * null일 수 있다. 온보딩 최종 완료 처리는 이 메서드가 아니라 ONBOARD-004({@link #completeOnboarding})
+     * 시점에 이뤄진다(SY021).
      */
     public void updateBasicInfo(
             String nickname,
@@ -104,7 +105,6 @@ public class Member extends BaseTimeEntity {
         this.detailAddress = detailAddress;
         this.postalCode = postalCode;
         this.gender = gender;
-        this.onboardingCompleted = true;
     }
 
     /**

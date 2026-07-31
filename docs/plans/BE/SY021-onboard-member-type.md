@@ -67,17 +67,17 @@ ONBOARD-002(`PUT /users/{id}/interests`)가 이미 `/users/{id}` + `requesterId 
 
 ## 구현 목록
 
-- [ ] `Member.updateBasicInfo`에서 `onboardingCompleted = true` 제거, `completeOnboarding(MemberType)` 추가
-- [ ] `UpdateMemberTypeRequest` (`member/dto/request`)
-- [ ] `UserService.completeOnboarding`
-- [ ] `UserController`: `PATCH /api/users/{id}/member-type` + Swagger
-- [ ] `UserServiceTest`: 기존 온보딩완료 단언 수정 + 신규 케이스 추가
-- [ ] `APIs.md`에 ONBOARD-004 행 추가(인증 필요 ✓, 구현 완료 ✓)
-- [ ] `docs/requests/FE/`에 확정 계약 문서 작성 (엔드포인트 경로가 FE 초안과 다름을 안내)
-- [ ] `docs/requests/BE/002-onboarding-contract.md`의 3.4절(온보딩 완료) 반영 후 정리 — 다른 절(3.1~3.3)이
-      아직 남아 있으면 전체 삭제하지 않고 3.4절만 덜어낸다
-- [ ] `docs/plans/BE/SY019-onboarding-enforcement.md`에 "완료 시점은 SY021로 확정"으로 갱신,
+- [x] `Member.updateBasicInfo`에서 `onboardingCompleted = true` 제거, `completeOnboarding(MemberType)` 추가
+- [x] `UpdateMemberTypeRequest` (`member/dto/request`)
+- [x] `UserService.completeOnboarding`
+- [x] `UserController`: `PATCH /api/users/{id}/member-type` + Swagger
+- [x] `UserServiceTest`: 기존 온보딩완료 단언 수정 + 신규 케이스 추가
+- [x] `APIs.md`에 ONBOARD-004 행 추가(인증 필요 ✓, 구현 완료 ✓)
+- [x] `docs/requests/FE/006-onboarding-member-type-contract.md` 작성 (엔드포인트 경로가 FE 초안과 다름을 안내)
+- [x] `docs/requests/BE/002-onboarding-contract.md`의 3.1/3.2/3.4절 반영 정리 — 3.3(AI 시착)만 남김
+- [x] `docs/plans/BE/SY019-onboarding-enforcement.md`에 "완료 시점은 SY021로 확정"으로 갱신,
       남은 인터셉터/화이트리스트 이슈만 남기기
+- [ ] BE:verify로 최종 검증
 
 ## 확인이 필요한 미결정 사항
 

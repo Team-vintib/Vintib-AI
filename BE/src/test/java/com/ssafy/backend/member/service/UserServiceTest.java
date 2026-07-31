@@ -87,7 +87,7 @@ class UserServiceTest {
     }
 
     @Test
-    void 기본_정보를_정상_저장하면_온보딩완료_응답을_반환한다() {
+    void 기본_정보를_정상_저장한다() {
         // given
         Member member = createMember();
         when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
@@ -104,7 +104,8 @@ class UserServiceTest {
         assertThat(response.detailAddress()).isEqualTo("3층");
         assertThat(response.postalCode()).isEqualTo("06236");
         assertThat(response.gender()).isEqualTo(Gender.MALE);
-        assertThat(response.onboardingCompleted()).isTrue();
+        // 온보딩 최종 완료는 ONBOARD-004(회원 유형 저장) 시점으로 옮겨졌다 (SY021).
+        assertThat(response.onboardingCompleted()).isFalse();
     }
 
     @Test

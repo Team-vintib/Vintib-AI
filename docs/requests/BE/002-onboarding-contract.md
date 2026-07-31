@@ -10,7 +10,8 @@
 
 ## 2. 현재 연동 상태
 
-- 연동 완료 API: 없음
+- 연동 완료 API: 기본 정보(3.1), 관심 정보(3.2), 온보딩 완료/회원 유형(3.4) — 확정 계약은 각 절 참고
+- 미연동: AI 시착 프로필 저장(3.3)
 - FE 구현 완료 범위
   - `OnboardingBasicInfoView.vue`: 닉네임, 성별, 연락처, 주소 입력 화면
   - `OnboardingInterestsView.vue`: 관심 브랜드/카테고리 선택 화면
@@ -22,58 +23,15 @@
 
 ## 3. 추가 구현 요청
 
-### 3.1 기본 정보 저장
+### 3.1 기본 정보 저장 — 구현 완료, 계약은 다르게 확정됨
 
-- Method / Endpoint: `PATCH /api/me/onboarding`
-- 요청 목적: 온보딩 1단계에서 입력한 사용자 기본 정보를 저장한다.
-- FE 사용처: `OnboardingBasicInfoView.vue`
-- 요청 데이터
-  - Header: `Authorization: Bearer {accessToken}`
-  - Body
-    - `nickname`: string, 필수
-    - `gender`: `MALE` | `FEMALE`, 필수
-    - `phoneNumber`: string, 필수
-    - `postalCode`: string | null
-    - `address`: string, 필수
-    - `detailAddress`: string, 필수
-- 응답 데이터
-  - `id`: number
-  - `nickname`: string
-  - `onboardingCompleted`: boolean
-- 응답 예시
+실제 엔드포인트는 `PATCH /api/me/onboarding`이 아니라 `PATCH /api/users/{id}`다. 확정 계약은
+`docs/requests/FE/004-onboarding-basic-info-contract.md` 참고.
 
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "nickname": "vintagelover",
-    "onboardingCompleted": false
-  },
-  "error": null
-}
-```
+### 3.2 관심 정보 저장 — 구현 완료, 계약은 다르게 확정됨
 
-### 3.2 관심 정보 저장
-
-- Method / Endpoint: `PUT /api/me/interests`
-- 요청 목적: 홈 개인화와 추천에 사용할 관심 브랜드/카테고리를 저장한다.
-- FE 사용처: `OnboardingInterestsView.vue`
-- 요청 데이터
-  - Header: `Authorization: Bearer {accessToken}`
-  - Body
-    - `brandIds`: number[], 필수, 빈 배열 허용
-    - `categoryIds`: number[], 필수, 빈 배열 허용
-- 응답 데이터: `null` 또는 저장된 관심사 요약
-- 응답 예시
-
-```json
-{
-  "success": true,
-  "data": null,
-  "error": null
-}
-```
+실제 엔드포인트는 `PUT /api/me/interests`가 아니라 `GET`/`PUT /api/users/{id}/interests`다.
+확정 계약은 `docs/requests/FE/005-onboarding-interests-contract.md` 참고.
 
 ### 3.3 AI 시착 프로필 저장
 
@@ -105,34 +63,11 @@
 }
 ```
 
-### 3.4 온보딩 완료
+### 3.4 온보딩 완료 — 구현 완료, 계약은 다르게 확정됨
 
-- Method / Endpoint: `POST /api/me/onboarding/complete`
-- 요청 목적: 회원 유형을 저장하고 온보딩 완료 상태로 전환한다.
-- FE 사용처: `OnboardingMemberTypeView.vue`
-- 요청 데이터
-  - Header: `Authorization: Bearer {accessToken}`
-  - Body
-    - `memberType`: `GENERAL` | `BUSINESS`
-- 응답 데이터
-  - `id`: number
-  - `memberType`: `GENERAL` | `BUSINESS`
-  - `onboardingCompleted`: boolean
-  - `nextStep`: `HOME` | `BUSINESS_VERIFICATION`
-- 응답 예시
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "memberType": "BUSINESS",
-    "onboardingCompleted": true,
-    "nextStep": "BUSINESS_VERIFICATION"
-  },
-  "error": null
-}
-```
+실제 엔드포인트는 `POST /api/me/onboarding/complete`가 아니라 `PATCH /api/users/{id}/member-type`다.
+응답에 `nextStep`은 내려주지 않는다 — `memberType` 값으로 FE가 직접 분기한다. 확정 계약은
+`docs/requests/FE/006-onboarding-member-type-contract.md` 참고.
 
 ## 4. 기존 API 변경 요청
 
@@ -152,15 +87,14 @@
 
 ## 6. 협의 필요 사항
 
+3.1/3.2/3.4(기본 정보 분리 여부, 관심 브랜드·카테고리 numeric id, `memberType` 저장 시점,
+응답을 `null` 대신 저장 결과로 내려줄지, `postalCode` 필수 여부)는 모두 확정·구현됐다 —
+각 확정 계약 문서 참고. 3.3(AI 시착)만 아직 남았다.
+
 - FE·BE 간 결정이 필요한 내용
-  - 기본 정보 저장과 온보딩 완료 처리를 분리할지 여부
-  - 관심 브랜드/카테고리를 numeric id 기준으로 확정할지 여부
   - 전신 사진 multipart 필드명과 저장 URL 반환 여부
-  - `memberType` 저장 시점과 기본값
 - 아직 확정되지 않은 응답 구조나 정책
-  - 각 단계 저장 응답을 `null`로 할지 저장된 요약 객체로 할지
   - 신체 치수 단위와 허용 범위
-  - 주소 필드 중 `postalCode` 필수 여부
 
 ## 7. 추가 요청 없음
 
