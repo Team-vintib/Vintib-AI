@@ -13,7 +13,9 @@ public record ProductDetailResponse(
         @Schema(example = "1") Long sellerId,
         @Schema(example = "vintagelover") String sellerNickname,
         @Schema(example = "1") Long categoryId,
+        @Schema(example = "자켓") String categoryName,
         @Schema(example = "1") Long brandId,
+        @Schema(example = "리바이스") String brandName,
         @Schema(example = "빈티지 리바이스 데님 자켓") String title,
         @Schema(example = "1990년대 리바이스 데님 자켓, 상태 양호") String description,
         @Schema(example = "A") String conditionGrade,
@@ -26,17 +28,31 @@ public record ProductDetailResponse(
         @Schema(example = "ON_SALE") SaleStatus saleStatus,
         @Schema(example = "50000") Long price,
         List<ProductImageResponse> images,
+        Boolean isWished,
+        Long sellerFollowerCount,
+        Long sellerProductCount,
+        LinkedLiveSummaryResponse linkedLive,
         @Schema(example = "2026-07-29T12:00:00") LocalDateTime createdAt,
         @Schema(example = "2026-07-29T12:00:00") LocalDateTime updatedAt) {
 
     public static ProductDetailResponse from(
-            Product product, List<ProductImageResponse> images, List<String> defects) {
+            Product product,
+            String categoryName,
+            String brandName,
+            List<ProductImageResponse> images,
+            List<String> defects,
+            Boolean isWished,
+            Long sellerFollowerCount,
+            Long sellerProductCount,
+            LinkedLiveSummaryResponse linkedLive) {
         return new ProductDetailResponse(
                 product.getId(),
                 product.getSeller().getId(),
                 product.getSeller().getNickname(),
                 product.getCategoryId(),
+                categoryName,
                 product.getBrandId(),
+                brandName,
                 product.getTitle(),
                 product.getDescription(),
                 product.getConditionGrade(),
@@ -49,6 +65,10 @@ public record ProductDetailResponse(
                 product.getSaleStatus(),
                 product.getPrice(),
                 images,
+                isWished,
+                sellerFollowerCount,
+                sellerProductCount,
+                linkedLive,
                 product.getCreatedAt(),
                 product.getUpdatedAt());
     }
