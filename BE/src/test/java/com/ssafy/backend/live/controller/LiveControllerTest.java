@@ -181,6 +181,41 @@ class LiveControllerTest {
     }
 
     @Test
+    void 즉시_개설하면_영상_room이_배정된다() throws Exception {
+        // 즉시 개설은 생성 시점에 이미 LIVE 라 room 이 함께 정해져야 한다.
+        // 배정이 없으면 호스트가 방송을 시작하고도 영상 토큰을 못 받는다.
+        mockMvc.perform(post("/api/lives")
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(instantRequestBody("영상 room 확인용 라이브")))
+                .andExpect(status().isCreated());
+
+        Live created = liveRepository.findAll().stream()
+                .filter(live -> "영상 room 확인용 라이브".equals(live.getTitle()))
+                .findFirst()
+                .orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(created.getOpenviduRoom())
+                .startsWith("live-" + created.getId() + "-");
+    }
+
+    @Test
+    void 예정_방송을_시작하면_영상_room이_배정된다() throws Exception {
+        Long liveId = liveRepository.save(
+                        Live.schedule(hostMember, "예약 라이브", null, LocalDateTime.now().plusDays(1)))
+                .getId();
+
+        mockMvc.perform(patch("/api/lives/{liveId}/status", liveId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"LIVE\"}"))
+                .andExpect(status().isOk());
+
+        org.assertj.core.api.Assertions.assertThat(
+                        liveRepository.findById(liveId).orElseThrow().getOpenviduRoom())
+                .startsWith("live-" + liveId + "-");
+    }
+
+    @Test
     void 즉시_개설도_방송명이_비어_있으면_400을_반환한다() throws Exception {
         String body = instantRequestBody("   ");
 
