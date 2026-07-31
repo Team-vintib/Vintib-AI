@@ -58,6 +58,43 @@ export const PRODUCT_DETAIL_MOCK_DATA: ProductDetailViewData = {
     status: 'SCHEDULED',
     thumbnailUrl: denimJacketImage,
   },
+  similarProducts: [
+    {
+      id: 12,
+      title: '90s 오버핏 워싱 데님 재킷',
+      price: 29000,
+    },
+    {
+      id: 19,
+      title: 'Lee 101J 빈티지 데님 재킷',
+      price: 34000,
+    },
+    {
+      id: 27,
+      title: 'Wrangler 124MJ 데님 재킷',
+      price: 39000,
+    },
+    {
+      id: 33,
+      title: "Levi's Type III 트러커 재킷",
+      price: 43000,
+    },
+    {
+      id: 41,
+      title: '스톤 워시 오버핏 데님 재킷',
+      price: 52000,
+    },
+    {
+      id: 52,
+      title: '셀비지 인디고 데님 재킷',
+      price: 58000,
+    },
+    {
+      id: 63,
+      title: '70s 레플리카 셀비지 데님 재킷',
+      price: 67000,
+    },
+  ],
   sellerDisclosedDefects: [
     {
       title: '왼쪽 소매 끝단 마모',

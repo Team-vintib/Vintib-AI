@@ -496,7 +496,7 @@ const handleSubmit = async () => {
       return
     }
 
-    await router.push({ name: ROUTE_NAMES.ONBOARD_PROFILE })
+    await router.push({ name: ROUTE_NAMES.AUTH_LOGIN })
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -559,8 +559,7 @@ const applySignUpFieldErrors = (apiError?: ApiErrorBody | null) => {
   })
 
   if (mappedFields.length === 0) {
-    submitError.value =
-      unmappedReasons[0] || apiError?.message || '입력값을 다시 확인해 주세요.'
+    submitError.value = unmappedReasons[0] || apiError?.message || '입력값을 다시 확인해 주세요.'
     return
   }
 

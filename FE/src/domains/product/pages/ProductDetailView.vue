@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { addWish, removeWish } from '@/domains/product/api/productApi'
 import {
   getProductDetailViewData,
   ProductDetailNotFoundError,
@@ -11,6 +13,7 @@ import ProductDetailInformation from '@/domains/product/components/ProductDetail
 import ProductDetailSkeleton from '@/domains/product/components/ProductDetailSkeleton.vue'
 import ProductDetailStatePanel from '@/domains/product/components/ProductDetailStatePanel.vue'
 import ProductImageGallery from '@/domains/product/components/ProductImageGallery.vue'
+import ProductPriceDistribution from '@/domains/product/components/ProductPriceDistribution.vue'
 import ProductPurchaseSummary from '@/domains/product/components/ProductPurchaseSummary.vue'
 import ProductSellerLivePanel from '@/domains/product/components/ProductSellerLivePanel.vue'
 import type {
@@ -36,6 +39,7 @@ const PRODUCT_DETAIL_MOCK_SCENARIOS: ProductDetailMockScenario[] = [
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const product = ref<ProductDetailViewData | null>(null)
 const loadState = ref<ProductDetailLoadState>('loading')
@@ -96,8 +100,29 @@ const loadProductDetail = async () => {
   }
 }
 
-const handleToggleLike = () => {
-  isLiked.value = !isLiked.value
+const handleToggleLike = async () => {
+  if (!product.value) {
+    return
+  }
+
+  if (!authStore.isAuthenticated || !authStore.user?.id) {
+    await router.push({ name: ROUTE_NAMES.AUTH_LOGIN })
+    return
+  }
+
+  const wasLiked = isLiked.value
+  isLiked.value = !wasLiked
+
+  try {
+    if (wasLiked) {
+      await removeWish(authStore.user.id, product.value.id)
+    } else {
+      await addWish(authStore.user.id, product.value.id)
+    }
+  } catch {
+    isLiked.value = wasLiked
+    showTemporaryMessage('찜 상태를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+  }
 }
 
 const handleToggleCart = () => {
@@ -118,6 +143,10 @@ const handlePurchase = () =>
   showTemporaryMessage('구매 확인 화면은 후속 스토리에서 연결됩니다.')
 
 const handleViewSeller = () => showTemporaryMessage('판매자 프로필 화면은 준비 중입니다.')
+
+const handleViewSimilarProduct = (productId: number) => {
+  void router.push({ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId } })
+}
 
 const handleToggleReminder = () => {
   isReminderSet.value = !isReminderSet.value
@@ -201,6 +230,13 @@ onBeforeUnmount(() => {
           @view-seller="handleViewSeller"
         />
       </div>
+
+      <ProductPriceDistribution
+        :current-product-id="product.id"
+        :current-price="product.price"
+        :products="product.similarProducts"
+        @view-product="handleViewSimilarProduct"
+      />
 
       <p v-if="actionMessage" class="product-detail__action-message" role="status">
         {{ actionMessage }}

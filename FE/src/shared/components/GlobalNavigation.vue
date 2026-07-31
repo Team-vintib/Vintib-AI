@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import logoImage from '@/assets/images/logo.png'
@@ -14,6 +14,12 @@ interface UserActionItem {
   badge: string | number
 }
 
+interface ProfileMenuItem {
+  label: string
+  path: RoutePath
+  query?: Record<string, string>
+}
+
 const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
@@ -23,8 +29,9 @@ authStore.hydrateSession()
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const displayName = computed(() => authStore.user?.name || '회원')
 const profileInitial = computed(() => displayName.value.slice(0, 1).toUpperCase())
-const cartItemCount = computed(() => 2)
-const unreadNotificationCount = computed(() => 3)
+const cartItemCount = computed<number | null>(() => null)
+const unreadNotificationCount = computed<number | null>(() => null)
+const isLoggingOut = ref(false)
 
 const primaryMenuItems = [
   { label: '라이브', path: ROUTE_PATHS.LIVE_LIST, authRequired: false },
@@ -44,20 +51,37 @@ const userActionItems = computed<UserActionItem[]>(() => [
     icon: 'cart',
     path: ROUTE_PATHS.MY,
     query: { section: 'cart' },
-    badge: cartItemCount.value,
+    badge: cartItemCount.value ?? '',
   },
   {
     label: '알림',
     icon: 'bell',
     path: ROUTE_PATHS.NOTIFICATIONS,
     query: undefined,
-    badge: unreadNotificationCount.value,
+    badge: unreadNotificationCount.value ?? '',
   },
+])
+
+const profileMenuItems = computed<ProfileMenuItem[]>(() => [
+  { label: '마이페이지', path: ROUTE_PATHS.MY },
+  { label: '구매 내역', path: ROUTE_PATHS.MY, query: { section: 'orders' } },
+  { label: '판매 내역', path: ROUTE_PATHS.MY, query: { section: 'sales' } },
+  { label: '찜한 상품', path: ROUTE_PATHS.MY, query: { section: 'wishlist' } },
+  { label: '장바구니', path: ROUTE_PATHS.MY, query: { section: 'cart' } },
+  { label: '포인트', path: ROUTE_PATHS.POINT },
 ])
 
 const isActivePath = (path: RoutePath) => {
   if (path === ROUTE_PATHS.HOME) {
     return route.path === ROUTE_PATHS.HOME
+  }
+
+  if (path === ROUTE_PATHS.LIVE_LIST && route.path === ROUTE_PATHS.LIVE_CREATE) {
+    return false
+  }
+
+  if (path === ROUTE_PATHS.PRODUCT_LIST && route.path === ROUTE_PATHS.PRODUCT_CREATE) {
+    return false
   }
 
   return route.path === path || route.path.startsWith(`${path}/`)
@@ -76,6 +100,21 @@ const goToPath = async (
   }
 
   await router.push({ path, query: options.query })
+}
+
+const handleLogout = async () => {
+  if (isLoggingOut.value) {
+    return
+  }
+
+  isLoggingOut.value = true
+
+  try {
+    await authStore.logoutSession()
+    await router.replace({ name: ROUTE_NAMES.HOME })
+  } finally {
+    isLoggingOut.value = false
+  }
 }
 </script>
 
@@ -106,11 +145,10 @@ const goToPath = async (
           class="global-nav__points"
           :class="{ 'global-nav__points--active': isActivePath(ROUTE_PATHS.POINT) }"
           type="button"
-          aria-label="사용 가능 포인트 125,000P"
+          aria-label="포인트"
           @click="goToPath(ROUTE_PATHS.POINT, { authRequired: true })"
         >
-          <span class="global-nav__icon" aria-hidden="true">₩</span>
-          125,000P
+          포인트
         </button>
       </nav>
 
@@ -193,31 +231,57 @@ const goToPath = async (
           <span v-if="Number(item.badge) > 0" class="global-nav__badge">{{ item.badge }}</span>
         </button>
 
-        <button
-          class="global-nav__profile"
-          :class="{ 'global-nav__profile--active': isActivePath(ROUTE_PATHS.MY) }"
-          type="button"
-          @click="goToPath(ROUTE_PATHS.MY, { authRequired: true })"
-        >
-          <span class="global-nav__avatar" aria-hidden="true">{{ profileInitial }}</span>
-          <span class="global-nav__profile-name">{{ displayName }}</span>
-          <span class="global-nav__chevron" aria-hidden="true">
-            <svg
-              class="global-nav__chevron-svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
+        <div class="global-nav__profile-menu">
+          <button
+            class="global-nav__profile"
+            :class="{ 'global-nav__profile--active': isActivePath(ROUTE_PATHS.MY) }"
+            type="button"
+            aria-haspopup="menu"
+            :aria-expanded="isLoggingOut ? 'true' : undefined"
+          >
+            <span class="global-nav__avatar" aria-hidden="true">{{ profileInitial }}</span>
+            <span class="global-nav__profile-name">{{ displayName }}</span>
+            <span class="global-nav__chevron" aria-hidden="true">
+              <svg
+                class="global-nav__chevron-svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="m6 9 6 6 6-6"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </span>
+          </button>
+
+          <div class="global-nav__profile-panel" role="menu">
+            <button
+              v-for="item in profileMenuItems"
+              :key="`${item.path}-${item.query?.section ?? 'root'}`"
+              class="global-nav__profile-menu-item"
+              type="button"
+              role="menuitem"
+              @click="goToPath(item.path, { authRequired: true, query: item.query })"
             >
-              <path
-                d="m6 9 6 6 6-6"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </span>
-        </button>
+              {{ item.label }}
+            </button>
+
+            <button
+              class="global-nav__logout"
+              type="button"
+              role="menuitem"
+              :disabled="isLoggingOut"
+              @click="handleLogout"
+            >
+              로그아웃
+            </button>
+          </div>
+        </div>
       </div>
 
       <div v-else class="global-nav__guest-actions">
@@ -230,6 +294,7 @@ const goToPath = async (
       </div>
     </div>
   </header>
+
 </template>
 
 <style scoped lang="scss">
@@ -411,6 +476,96 @@ const goToPath = async (
   font-weight: 600;
 }
 
+.global-nav__profile-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.global-nav__profile-menu::after {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 100%;
+  min-width: 180px;
+  height: 10px;
+  content: '';
+}
+
+.global-nav__profile-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  width: 184px;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  box-shadow: 0 18px 48px rgb(23 24 21 / 14%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.global-nav__profile-menu:hover .global-nav__profile-panel,
+.global-nav__profile-menu:focus-within .global-nav__profile-panel {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.global-nav__profile-menu:hover .global-nav__chevron-svg,
+.global-nav__profile-menu:focus-within .global-nav__chevron-svg {
+  transform: rotate(180deg);
+}
+
+.global-nav__profile-menu-item,
+.global-nav__logout {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: left;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.global-nav__profile-menu-item:hover,
+.global-nav__profile-menu-item:focus-visible {
+  background: var(--color-surface-secondary);
+  color: var(--color-primary);
+}
+
+.global-nav__logout {
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 var(--radius-control) var(--radius-control);
+  color: var(--color-error);
+}
+
+.global-nav__logout:hover,
+.global-nav__logout:focus-visible {
+  background: var(--color-error-soft);
+}
+
+.global-nav__logout:disabled {
+  color: var(--color-text-muted);
+  cursor: wait;
+}
+
 .global-nav__avatar {
   display: inline-flex;
   align-items: center;
@@ -436,6 +591,7 @@ const goToPath = async (
 .global-nav__chevron-svg {
   width: 16px;
   height: 16px;
+  transition: transform 140ms ease;
 }
 
 .global-nav__guest-link {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
@@ -73,12 +73,19 @@ const loadHomeData = async () => {
 onMounted(() => {
   void loadHomeData()
 })
+
+watch(
+  () => authStore.isAuthenticated,
+  () => {
+    void loadHomeData()
+  },
+)
 </script>
 
 <template>
   <DefaultLayout content-max-width="1200px">
     <section v-if="isLoading" class="home-state" aria-live="polite">
-      <p class="home-state__title">홈 데이터를 불러오는 중입니다.</p>
+      <p class="home-state__title">홈 페이지 연결 중입니다.</p>
     </section>
 
     <section v-else-if="errorMessage" class="home-state" aria-live="polite">

@@ -49,6 +49,12 @@ export interface ProductLinkedLive {
   thumbnailUrl: string
 }
 
+export interface SimilarProductPricePoint {
+  id: number
+  title: string
+  price: number
+}
+
 export interface SellerDisclosedDefect {
   title: string
   description: string
@@ -89,6 +95,7 @@ export interface ProductDetailViewData {
   images: ProductDetailImage[]
   seller: ProductSellerSummary
   linkedLive: ProductLinkedLive | null
+  similarProducts: SimilarProductPricePoint[]
   sellerDisclosedDefects: SellerDisclosedDefect[]
   aiQualityAnalysis: AiQualityAnalysis
 }

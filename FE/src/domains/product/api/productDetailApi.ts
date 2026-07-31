@@ -1,4 +1,5 @@
 import { PRODUCT_DETAIL_MOCK_DATA } from '@/domains/product/constants/productDetailMockData'
+import { getProductDetail } from '@/domains/product/api/productApi'
 import type {
   AiQualityAnalysisStatus,
   ProductDetailMockScenario,
@@ -24,6 +25,9 @@ const cloneProductDetailMockData = (): ProductDetailViewData => ({
   linkedLive: PRODUCT_DETAIL_MOCK_DATA.linkedLive
     ? { ...PRODUCT_DETAIL_MOCK_DATA.linkedLive }
     : null,
+  similarProducts: PRODUCT_DETAIL_MOCK_DATA.similarProducts.map((product) => ({
+    ...product,
+  })),
   sellerDisclosedDefects: PRODUCT_DETAIL_MOCK_DATA.sellerDisclosedDefects.map((defect) => ({
     ...defect,
   })),
@@ -46,8 +50,10 @@ export const getProductDetailViewData = async (
   productId: number,
   scenario: ProductDetailMockScenario = 'default',
 ): Promise<ProductDetailViewData> => {
-  // 최신 Swagger의 GET /api/products/{id}는 기본 정보만 반환합니다.
-  // 이미지·연결 라이브·찜·AI 품질 분석 계약이 합쳐지면 이 함수 안에서 응답을 ViewData로 매핑합니다.
+  if (scenario === 'default') {
+    return getProductDetail(productId)
+  }
+
   await waitForMockResponse()
 
   if (scenario === 'error') {
@@ -59,7 +65,25 @@ export const getProductDetailViewData = async (
   }
 
   const product = cloneProductDetailMockData()
+  const baseProduct = {
+    id: PRODUCT_DETAIL_MOCK_DATA.id,
+    title: PRODUCT_DETAIL_MOCK_DATA.title,
+    price: PRODUCT_DETAIL_MOCK_DATA.price,
+  }
+  const selectedSimilarProduct = PRODUCT_DETAIL_MOCK_DATA.similarProducts.find(
+    (similarProduct) => similarProduct.id === productId,
+  )
+
   product.id = productId
+
+  if (selectedSimilarProduct) {
+    product.title = selectedSimilarProduct.title
+    product.price = selectedSimilarProduct.price
+    product.similarProducts = [
+      baseProduct,
+      ...product.similarProducts.filter((similarProduct) => similarProduct.id !== productId),
+    ]
+  }
 
   if (scenario === 'sold') {
     product.saleStatus = 'SOLD'

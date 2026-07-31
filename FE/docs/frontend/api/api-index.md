@@ -10,9 +10,9 @@ Swagger 제공 전까지는 임시 후보를 사용합니다. 실제 구현 시 
 | 이메일 인증코드 발송 | POST   | `/api/auth/email/send-code`   | `email`                                          | `null`                                            | AUTH-001 연동 |
 | 이메일 인증코드 확인 | POST   | `/api/auth/email/verify-code` | `email`, `code`                                  | `verificationToken`                               | AUTH-001 연동 |
 | 이메일 회원가입      | POST   | `/api/auth/signup`            | `name`, `email`, `password`, `verificationToken` | `id`, `email`, `name`, `onboardingCompleted`      | AUTH-001 연동 |
-| 이메일 로그인        | POST   | `/api/auth/login`             | `email`, `password`, `rememberMe`                | `accessToken`, `refreshToken`, `user`, `nextStep` | AUTH-002 연동 |
-| 토큰 갱신            | POST   | `/api/auth/refresh`           | `refreshToken`                                   | `accessToken`                                     | 후보          |
-| 로그아웃             | POST   | `/api/auth/logout`            | 없음 또는 `refreshToken`                         | 성공 여부                                         | 후보          |
+| 이메일 로그인        | POST   | `/api/auth/signin`            | `email`, `password`                              | `accessToken`, `refreshToken`                     | AUTH-002 연동 |
+| 토큰 재발급          | POST   | `/api/auth/reissue`           | `refreshToken`                                   | `accessToken`, `refreshToken`                     | BE 구현 확인  |
+| 로그아웃             | POST   | `/api/auth/logout`            | 없음                                             | `null`                                            | BE 구현 확인  |
 | 싸피어스 callback    | POST   | `/api/auth/ssafy/callback`    | `authorizationCode`, `redirectUri`               | `linked`, `nextStep`, `user`                      | 후보          |
 
 ### 이메일 로그인
@@ -20,43 +20,66 @@ Swagger 제공 전까지는 임시 후보를 사용합니다. 실제 구현 시 
 AUTH-002에서 FE가 연동한 후보 계약입니다. 공통 응답은 `ApiResponse<T>` envelope를 사용합니다.
 
 ```http
-POST /api/auth/login
+POST /api/auth/signin
 Content-Type: application/json
 ```
 
 ```json
 {
   "email": "user@example.com",
-  "password": "password123",
-  "rememberMe": true
+  "password": "password123"
 }
 ```
 
-성공 응답 후보:
+현재 BE 성공 응답:
 
 ```json
 {
   "success": true,
   "data": {
     "accessToken": "access-token",
-    "refreshToken": "refresh-token",
-    "user": {
-      "id": 1,
-      "email": "user@example.com",
-      "name": "홍길동",
-      "onboardingCompleted": false
-    },
-    "nextStep": "ONBOARD_PROFILE"
+    "refreshToken": "refresh-token"
   },
   "error": null
 }
 ```
 
 - `accessToken`은 필수로 처리한다.
-- `refreshToken`, `user`, `nextStep`은 서버 구현 차이에 대비해 optional로 처리한다.
+- `refreshToken`은 현재 BE 응답에 포함된다.
+- `rememberMe`는 BE로 보내지 않고 FE localStorage/sessionStorage 선택에만 사용한다.
+- `user`, `nextStep`은 현재 BE 로그인 응답에 없다. BE 반영 전까지 로그인 성공 후 기본 홈으로 이동한다.
 - 로그인 성공 후 `redirect` query가 내부 경로이면 우선 이동한다.
-- `nextStep` 또는 `user.onboardingCompleted` 기준으로 홈 또는 온보딩 기본정보 화면으로 이동한다.
-- 로그인 실패 코드는 Swagger 확정 전까지 `C001`, 네트워크/타임아웃, 그 외 인증 실패로만 구분한다.
+- `nextStep` 또는 `user.onboardingCompleted` 기준 온보딩 분기는 BE가 로그인 응답 확장 또는 내 정보 조회 API를 제공하면 적용한다.
+- 로그인 실패는 `U009`, 입력 검증은 `C001`, 토큰 오류는 `U010`/`U011` 기준으로 처리한다.
+
+### 토큰 재발급/로그아웃
+
+BE 구현 기준 계약입니다.
+
+```http
+POST /api/auth/reissue
+Content-Type: application/json
+```
+
+```json
+{
+  "refreshToken": "refresh-token"
+}
+```
+
+성공 응답의 `data`는 `accessToken`, `refreshToken`을 포함합니다.
+
+```http
+POST /api/auth/logout
+Authorization: Bearer {accessToken}
+```
+
+요청 body는 없습니다. 성공 응답은 `ApiResponse<null>`입니다.
+
+- refresh token은 Redis에 회원당 1개만 저장된다.
+- 새 로그인 또는 재발급 시 기존 refresh token은 새 값으로 대체된다.
+- `U011`은 refresh 재시도 후보, `U010`은 세션 정리/재로그인 후보로 처리한다.
+- 시연 전 자동 refresh interceptor는 적용하지 않고 명시 API 함수만 준비한다.
 
 ### 이메일 회원가입
 
@@ -360,7 +383,7 @@ Authorization: Bearer {accessToken}
 | 영역   | 후보 endpoint                                                        |
 | ------ | -------------------------------------------------------------------- |
 | 상품   | `/api/products`, `/api/products/{id}`                                |
-| 찜     | `/api/products/{id}/wish`                                            |
+| 찜     | `/api/users/{userId}/wishes`, `/api/users/{userId}/wishes/{productId}` |
 | 라이브 | `/api/lives`, `/api/lives/{id}`                                      |
 | 경매   | `/api/auctions`, `/api/auctions/{id}`                                |
 | 주문   | `/api/orders`, `/api/orders/{id}`                                    |
@@ -381,9 +404,215 @@ PROD-008 껍데기 화면은 실제 API를 호출하지 않는다. 목록 연동
 - 상시 판매와 경매 상품의 가격 필드 구분
 - 찜 여부를 공개 목록 응답에 포함할지 여부
 
+### 상품 이미지 presigned 업로드
+
+BE 구현 기준 계약입니다. 상품 등록/수정 화면에서 상품 이미지를 저장할 때 파일 1개마다 업로드 URL 발급, S3 직접 업로드, 이미지 등록 확인 3단계를 수행합니다.
+
+#### 1. 업로드 URL 발급
+
+```http
+POST /api/products/{productId}/images/upload-url
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+```json
+{
+  "fileName": "front.webp",
+  "contentType": "image/webp"
+}
+```
+
+응답:
+
+```json
+{
+  "success": true,
+  "data": {
+    "key": "product-images/1/abc123.webp",
+    "uploadUrl": "https://...",
+    "expiresInSeconds": 300
+  },
+  "error": null
+}
+```
+
+- `contentType` 허용값은 `image/jpeg`, `image/png`, `image/webp`다.
+- `expiresInSeconds`는 300초다.
+- 상품 이미지는 BE 정책에 따라 상품당 최대 10장까지 등록할 수 있다.
+- PROD-001 등록 화면에서는 Front View 1장, Back View 1장을 포함해 전체 10장으로 제한하고, 추가 사진은 최대 8장까지 허용한다.
+
+#### 2. S3 직접 업로드
+
+1번 응답의 `uploadUrl`로 파일 바이트를 직접 `PUT`한다. 백엔드를 거치지 않으며, `Content-Type` 헤더는 1번 요청의 `contentType`과 동일하게 지정한다.
+
+#### 3. 이미지 등록 확인
+
+```http
+POST /api/products/{productId}/images
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+```json
+{
+  "key": "product-images/1/abc123.webp",
+  "sortOrder": 0,
+  "isPrimary": true
+}
+```
+
+성공 응답:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 10,
+    "url": "https://...",
+    "sortOrder": 0,
+    "isPrimary": true
+  },
+  "error": null
+}
+```
+
+이미지 순서/대표 여부 변경:
+
+```http
+PATCH /api/products/{productId}/images/{imageId}
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+```json
+{
+  "sortOrder": 1,
+  "isPrimary": true
+}
+```
+
+- 두 필드는 모두 선택이다.
+- `isPrimary: true`를 보내면 같은 상품의 다른 이미지는 BE가 자동으로 대표에서 해제한다.
+
+이미지 삭제:
+
+```http
+DELETE /api/products/{productId}/images/{imageId}
+Authorization: Bearer {accessToken}
+```
+
+성공은 `204 No Content`다.
+
+상품 상세 조회 응답에는 `images: [{ id, url, sortOrder, isPrimary }]`가 포함된다.
+
+오류 코드:
+
+| 코드 | 의미 |
+| --- | --- |
+| `P006` | 지원하지 않는 이미지 형식 |
+| `P007` | S3 업로드 확인 전 이미지 등록 시도 |
+| `P005` | 이미지 10장 초과 |
+| `P004` | 이미지 없음 또는 다른 상품 이미지 |
+
+### 상품 찜/해제/목록
+
+BE 구현 기준 계약입니다. 기존 후보였던 `/api/products/{id}/wish`는 사용하지 않습니다.
+
+#### 찜 등록
+
+```http
+POST /api/users/{userId}/wishes
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+```json
+{
+  "productId": 2001
+}
+```
+
+성공 응답:
+
+```json
+{
+  "success": true,
+  "data": {
+    "productId": 2001,
+    "createdAt": "2026-07-30T12:00:00"
+  },
+  "error": null
+}
+```
+
+#### 찜 해제
+
+```http
+DELETE /api/users/{userId}/wishes/{productId}
+Authorization: Bearer {accessToken}
+```
+
+성공은 `204 No Content`다. path의 `{productId}`는 찜 row ID가 아니라 상품 ID다.
+
+#### 찜 목록 조회
+
+```http
+GET /api/users/{userId}/wishes?page=0&size=20
+Authorization: Bearer {accessToken}
+```
+
+- `page`는 0-base다.
+- 기본 `size`는 20이다.
+- 정렬은 찜한 시각 최신순 고정이며 `sort` 파라미터는 무시된다.
+- 응답은 BE 공용 `PageResponse` 구조를 사용한다.
+
+응답 `data` 후보:
+
+```json
+{
+  "content": [
+    {
+      "product": {
+        "id": 2001,
+        "title": "리바이스 501 빈티지",
+        "saleStatus": "ON_SALE"
+      },
+      "wishedAt": "2026-07-30T12:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1,
+  "hasNext": false
+}
+```
+
+- 찜한 뒤 상품이 `SOLD` 또는 `PRIVATE`로 바뀌어도 목록에서 빠지지 않는다.
+- 화면은 `product.saleStatus`를 보고 상태 배지를 표시한다.
+- `{userId}`는 로그인한 본인 ID와 같아야 하며 다르면 `S003`이다.
+
+오류 코드:
+
+| 코드 | 의미 |
+| --- | --- |
+| `P001` | 상품 없음 또는 비공개 상품 찜 시도 |
+| `S001` | 이미 찜한 상품 |
+| `S002` | 찜하지 않은 상품 해제 시도 |
+| `S003` | 본인 외 사용자의 찜 조작 |
+
 ## 공통 오류 코드
 
 - `C001`
+- `P001`
+- `P004`
+- `P005`
+- `P006`
+- `P007`
+- `S001`
+- `S002`
+- `S003`
 - `U003`
 - `U005`
 - `U006`
