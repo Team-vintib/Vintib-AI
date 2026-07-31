@@ -3,6 +3,8 @@ package com.ssafy.backend.product.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
+import java.util.Map;
 
 public record ProductCreateRequest(
 
@@ -24,5 +26,17 @@ public record ProductCreateRequest(
         String conditionGrade,
 
         @Schema(example = "M")
-        String sizeLabel) {
+        String sizeLabel,
+
+        @Schema(example = "블랙")
+        String color,
+
+        @Schema(example = "데님")
+        String material,
+
+        @Schema(description = "실측 치수(cm). 선택 입력", example = "{\"총장\": 70, \"어깨너비\": 45}")
+        Map<String, Integer> measurements,
+
+        @Schema(description = "판매자가 직접 입력한 하자 목록. 선택 입력", example = "[\"소매 끝 실밥 풀림\"]")
+        List<String> defects) {
 }

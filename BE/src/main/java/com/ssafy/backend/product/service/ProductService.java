@@ -11,9 +11,12 @@ import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.entity.ProductDefect;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.repository.CategoryRepository;
+import com.ssafy.backend.product.repository.ProductDefectRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -34,6 +37,7 @@ public class ProductService {
     private final MemberRepository memberRepository;
     private final ProductImageService productImageService;
     private final CategoryRepository categoryRepository;
+    private final ProductDefectRepository productDefectRepository;
 
     @Transactional
     public ProductResponse createProduct(Long sellerId, ProductCreateRequest request) {
@@ -54,9 +58,31 @@ public class ProductService {
                 .description(request.description())
                 .conditionGrade(request.conditionGrade())
                 .sizeLabel(request.sizeLabel())
+                .color(request.color())
+                .material(request.material())
+                .measurements(request.measurements())
                 .build();
 
-        return ProductResponse.from(productRepository.save(product));
+        Product saved = productRepository.save(product);
+        saveDefects(saved, request.defects());
+
+        return ProductResponse.from(saved);
+    }
+
+    // 등록 시점에 판매자가 입력한 하자 목록을 순서대로 저장한다.
+    private void saveDefects(Product product, List<String> defects) {
+        if (defects == null || defects.isEmpty()) {
+            return;
+        }
+        List<ProductDefect> entities = new ArrayList<>();
+        for (int i = 0; i < defects.size(); i++) {
+            entities.add(ProductDefect.builder()
+                    .product(product)
+                    .content(defects.get(i))
+                    .sortOrder((short) i)
+                    .build());
+        }
+        productDefectRepository.saveAll(entities);
     }
 
     // DRAFT(최초 등록) 또는 AUCTION_SCHEDULED(경매 예정 상품의 상시 판매 전환, PROD-004/PROD-005/AUCT-014)에서 호출된다.
@@ -115,7 +141,10 @@ public class ProductService {
         if (product.isDraft() && !product.isOwnedBy(viewerId)) {
             throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
         }
-        return ProductDetailResponse.from(product, productImageService.getImages(productId));
+        List<String> defects = productDefectRepository.findAllByProductIdOrderBySortOrderAsc(productId).stream()
+                .map(ProductDefect::getContent)
+                .toList();
+        return ProductDetailResponse.from(product, productImageService.getImages(productId), defects);
     }
 
     @Transactional

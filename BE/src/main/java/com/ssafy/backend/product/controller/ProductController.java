@@ -45,7 +45,8 @@ public class ProductController {
 
     @Operation(
             summary = "상품 기본 정보 저장",
-            description = "카테고리/브랜드/제목/설명/상태등급/사이즈를 입력해 DRAFT 상태의 상품을 생성한다. "
+            description = "카테고리/브랜드/제목/설명/상태등급/사이즈/색상/소재/실측/하자를 입력해 DRAFT 상태의 상품을 생성한다. "
+                    + "실측(measurements)과 하자(defects)는 선택 입력이다. "
                     + "판매 방식(상시 판매/경매)과 가격은 이 API에서 다루지 않고 이후 별도 API에서 설정한다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "등록 성공"),

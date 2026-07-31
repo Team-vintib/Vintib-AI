@@ -486,6 +486,9 @@
 | `description` | `text` |  |  |  | 상품 상세 설명. |
 | `condition_grade` | `varchar(20)` |  |  |  | 중고 상태 등급. ⚠️ 등급 체계 미확정이라 자유 문자열. |
 | `size_label` | `varchar(50)` |  |  |  | 사이즈 표기(S/M/L, 95/100 등). 브랜드마다 달라 문자열로 둔다. |
+| `color` | `varchar(50)` |  |  |  | 색상(자유 문자열). |
+| `material` | `varchar(50)` |  |  |  | 소재(자유 문자열). |
+| `measurements` | `jsonb` |  |  |  | 실측 치수(cm). 항목(총장/어깨너비 등)이 상품마다 달라 JSONB로 저장. |
 | `sale_type` | `varchar(20)` |  |  |  | DIRECT_SALE(상시 판매) \| AUCTION(경매) |
 | `sale_status` | `varchar(30)` | NOT NULL | `'DRAFT'` |  | DRAFT \| ON_SALE \| AUCTION_SCHEDULED \| AUCTION_IN_PROGRESS \| SOLD |
 | `price` | `bigint` |  |  |  | 상시 판매가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002). |
@@ -508,6 +511,19 @@
 - `ix_product_seller` — `CREATE INDEX ix_product_seller ON public.product USING btree (seller_id, created_at DESC)`
 - `ix_product_status_created` — `CREATE INDEX ix_product_status_created ON public.product USING btree (sale_status, created_at DESC) WHERE (deleted_at IS NULL)`
 - `ix_product_title_trgm` — `CREATE INDEX ix_product_title_trgm ON public.product USING gin (title gin_trgm_ops)`
+
+---
+
+### `product_defect`
+
+판매자가 직접 입력한 하자 목록 (PROD-001).
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `product_id` | `bigint` | NOT NULL |  | FK→product | 대상 상품. |
+| `content` | `text` | NOT NULL |  |  | 하자 내용(자유 문자열). |
+| `sort_order` | `smallint` | NOT NULL | `0` |  | 노출 순서. |
 
 ---
 

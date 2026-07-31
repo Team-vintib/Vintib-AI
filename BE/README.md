@@ -83,7 +83,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 ## DB 설계
 
-테이블 23개 기준. 상세는 [`docs/db/`](./docs/db)에 있다.
+테이블 25개 기준. 상세는 [`docs/db/`](./docs/db)에 있다.
 
 | 문서 | 내용 |
 | --- | --- |

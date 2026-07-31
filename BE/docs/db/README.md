@@ -7,7 +7,7 @@
 | 목적 | 문서 |
 | --- | --- |
 | 구조와 **설계 이유**를 알고 싶다 | [`erd.md`](./erd.md) — ERD, 상태 전이, 정책→제약 매핑, 미확인 가정 |
-| 컬럼 하나의 타입·제약을 찾고 싶다 | [`data-dictionary.md`](./data-dictionary.md) — 테이블 23개 전체 |
+| 컬럼 하나의 타입·제약을 찾고 싶다 | [`data-dictionary.md`](./data-dictionary.md) — 테이블 25개 전체 |
 | 테이블을 직접 만들어 보고 싶다 | [`schema.sql`](./schema.sql) |
 
 ## 파일 구성
