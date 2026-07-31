@@ -47,9 +47,14 @@ volumes = [
 | `CORS_ALLOWED_ORIGINS` | API 호출을 허용할 FE 출처. 콤마로 여러 개 | |
 | `PROD_MINIO_ROOT_USER` | 운영 MinIO root 계정명 | |
 | `PROD_MINIO_ROOT_PASSWORD` | 운영 MinIO root 비밀번호 | **Masked** (8자 이상) |
+| `PROD_MAIL_USERNAME` | 인증코드 발송용 Gmail 계정 | |
+| `PROD_MAIL_PASSWORD` | 위 계정의 앱 비밀번호 | **Masked** 권장 |
 
 `DB_NAME`·`DB_USERNAME`·`SPRING_PROFILES_ACTIVE`·`IMAGE_TAG` 는 `.gitlab-ci.yml` 에서 넣으므로 등록하지 않아도 된다.
 리전·버킷명·S3 엔드포인트도 등록하지 않는다 — `deploy.sh` 와 compose 기본값이 정한다(아래 "오브젝트 스토리지" 참고).
+
+> [!WARNING]
+> **2026-07-31 발견**: `PROD_MAIL_USERNAME`/`PROD_MAIL_PASSWORD`가 지금까지 CI/CD Variables에도, `deploy.sh`의 `.env` 생성 로직에도 없었다. `application.yml`의 `MAIL_USERNAME`/`MAIL_PASSWORD` 기본값은 빈 문자열이고, mail actuator 헬스체크는 "자격증명 미설정 시 배포가 막히는 걸 방지"하려고 의도적으로 꺼둔 상태(아래 참고)라 배포는 계속 성공해 왔지만, 실제로는 **운영에서 이메일 인증코드가 발송되지 않고 있었다**(SMTP 인증 실패). 위 두 변수를 GitLab에 등록하고 재배포해야 정상화된다 — 등록 전까지는 `deploy.sh`가 필수 변수 누락으로 배포 자체를 막는다(2026-07-31 `deploy.sh` 변경).
 
 `deploy.sh` 는 `.env` 를 만들기 **전에** 위 변수가 전부 채워졌는지 검사하고, 하나라도 비면 빠진 이름을 한 번에 출력하고 멈춘다. `.env` 도 임시 파일에 쓴 뒤 교체하므로, 실패해도 운영 `.env` 가 손상되지 않는다(= 롤백용 직전 태그가 보존된다).
 
