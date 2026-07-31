@@ -429,7 +429,8 @@ docs/
   `GlobalNavigation`은 같은 notification store로 최근 알림 팝업과 안 읽은 알림 배지를
   표시합니다. 실제 BE 계약은 `/api/users/{userId}/alerts`이며, 서버 카테고리 필터와
   unread count 전용 API가 없어 FE 조회 결과 기준으로 탭과 배지를 계산합니다.
-  수동 화면 확인은 `/notifications?mock=default|empty|error|loading` query로 재현할 수 있습니다.
+  수동 화면 확인은 `/notifications?mock=default|empty|error|loading` query로 재현할 수 있으며,
+  mock 모드에서는 로그인 없이도 헤더 알림 팝업을 확인할 수 있습니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.
