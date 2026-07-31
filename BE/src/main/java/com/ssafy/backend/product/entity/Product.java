@@ -15,11 +15,14 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.Map;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.SQLRestriction;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -70,6 +73,17 @@ public class Product extends BaseTimeEntity {
     @Column(name = "size_label", length = 50)
     private String sizeLabel;
 
+    @Column(length = 50)
+    private String color;
+
+    @Column(length = 50)
+    private String material;
+
+    // 치수 항목(총장/어깨너비/가슴단면/소매길이 등)이 상품마다 달라 고정 컬럼 대신 JSONB로 담는다.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Integer> measurements;
+
     // 판매 채널(상시 판매/경매)은 이번 단계에서 정하지 않는다 — 판매 가격 설정 또는
     // 경매 조건 설정 API를 호출하는 시점에 비로소 결정된다.
     @Enumerated(EnumType.STRING)
@@ -93,7 +107,10 @@ public class Product extends BaseTimeEntity {
             String title,
             String description,
             String conditionGrade,
-            String sizeLabel) {
+            String sizeLabel,
+            String color,
+            String material,
+            Map<String, Integer> measurements) {
         this.seller = seller;
         this.categoryId = categoryId;
         this.brandId = brandId;
@@ -101,6 +118,9 @@ public class Product extends BaseTimeEntity {
         this.description = description;
         this.conditionGrade = conditionGrade;
         this.sizeLabel = sizeLabel;
+        this.color = color;
+        this.material = material;
+        this.measurements = measurements;
         this.saleStatus = SaleStatus.DRAFT;
     }
 
@@ -122,7 +142,10 @@ public class Product extends BaseTimeEntity {
             Long categoryId,
             Long brandId,
             String conditionGrade,
-            String sizeLabel) {
+            String sizeLabel,
+            String color,
+            String material,
+            Map<String, Integer> measurements) {
         if (title != null) {
             this.title = title;
         }
@@ -140,6 +163,15 @@ public class Product extends BaseTimeEntity {
         }
         if (sizeLabel != null) {
             this.sizeLabel = sizeLabel;
+        }
+        if (color != null) {
+            this.color = color;
+        }
+        if (material != null) {
+            this.material = material;
+        }
+        if (measurements != null) {
+            this.measurements = measurements;
         }
     }
 

@@ -115,6 +115,9 @@ CREATE TABLE product (
     description     TEXT,
     condition_grade VARCHAR(20),                     -- 중고 상태 등급 (체계 미확정)
     size_label      VARCHAR(50),
+    color           VARCHAR(50),
+    material        VARCHAR(50),
+    measurements    JSONB,                           -- 실측 치수(cm). 항목이 상품마다 달라 고정 컬럼 대신 JSONB
     sale_type       VARCHAR(20),                     -- 상시 판매 / 경매. 기본 정보 저장 시점에는 NULL,
                                                        -- 판매 채널을 정하는 API(판매 가격 설정/경매 조건 설정)
                                                        -- 호출 시 확정된다
@@ -146,6 +149,14 @@ CREATE TABLE product_image (
     image_key  VARCHAR(500) NOT NULL,
     sort_order SMALLINT     NOT NULL DEFAULT 0,
     is_primary BOOLEAN      NOT NULL DEFAULT FALSE
+);
+
+-- 판매자가 직접 입력한 하자 목록 (PROD-001)
+CREATE TABLE product_defect (
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    product_id BIGINT      NOT NULL REFERENCES product (id),
+    content    TEXT        NOT NULL,
+    sort_order SMALLINT    NOT NULL DEFAULT 0
 );
 
 -- 찜 (MY-009)

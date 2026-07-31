@@ -19,15 +19,19 @@ import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.entity.ProductDefect;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.entity.SaleType;
 import com.ssafy.backend.product.repository.CategoryRepository;
+import com.ssafy.backend.product.repository.ProductDefectRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -55,14 +59,17 @@ class ProductServiceTest {
     private CategoryRepository categoryRepository;
 
     @Mock
+    private ProductDefectRepository productDefectRepository;
+
+    @Mock
     private Member seller;
 
     private ProductService productService;
 
     @BeforeEach
     void setUp() {
-        productService =
-                new ProductService(productRepository, memberRepository, productImageService, categoryRepository);
+        productService = new ProductService(
+                productRepository, memberRepository, productImageService, categoryRepository, productDefectRepository);
     }
 
     @Test
@@ -72,8 +79,8 @@ class ProductServiceTest {
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ProductCreateRequest request =
-                new ProductCreateRequest("빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M");
+        ProductCreateRequest request = new ProductCreateRequest(
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null);
 
         ProductResponse response = productService.createProduct(SELLER_ID, request);
 
@@ -85,11 +92,60 @@ class ProductServiceTest {
     }
 
     @Test
+    void 색상_소재_실측_하자를_포함해_상품을_등록할_수_있다() {
+        when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.of(seller));
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ProductCreateRequest request = new ProductCreateRequest(
+                "빈티지 자켓",
+                "설명",
+                CATEGORY_ID,
+                2L,
+                "A급",
+                "M",
+                "블랙",
+                "데님",
+                Map.of("총장", 70),
+                List.of("소매 끝 실밥 풀림", "안감 얼룩"));
+
+        ProductResponse response = productService.createProduct(SELLER_ID, request);
+
+        assertThat(response.title()).isEqualTo("빈티지 자켓");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ProductDefect>> captor = ArgumentCaptor.forClass(List.class);
+        verify(productDefectRepository).saveAll(captor.capture());
+        List<ProductDefect> saved = captor.getValue();
+        assertThat(saved).hasSize(2);
+        assertThat(saved.get(0).getContent()).isEqualTo("소매 끝 실밥 풀림");
+        assertThat(saved.get(0).getSortOrder()).isEqualTo((short) 0);
+        assertThat(saved.get(1).getContent()).isEqualTo("안감 얼룩");
+        assertThat(saved.get(1).getSortOrder()).isEqualTo((short) 1);
+    }
+
+    @Test
+    void 하자_목록이_없으면_defect_저장을_호출하지_않는다() {
+        when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.of(seller));
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ProductCreateRequest request = new ProductCreateRequest(
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null);
+
+        productService.createProduct(SELLER_ID, request);
+
+        verify(productDefectRepository, never()).saveAll(any());
+    }
+
+    @Test
     void 존재하지_않는_판매자면_예외를_던진다() {
         when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.empty());
 
-        ProductCreateRequest request =
-                new ProductCreateRequest("빈티지 자켓", null, CATEGORY_ID, null, null, null);
+        ProductCreateRequest request = new ProductCreateRequest(
+                "빈티지 자켓", null, CATEGORY_ID, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class);
@@ -102,8 +158,8 @@ class ProductServiceTest {
         when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.of(seller));
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(false);
 
-        ProductCreateRequest request =
-                new ProductCreateRequest("빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M");
+        ProductCreateRequest request = new ProductCreateRequest(
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class)
@@ -329,7 +385,8 @@ class ProductServiceTest {
                 .build();
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
-        ProductUpdateRequest request = new ProductUpdateRequest("수정된 제목", null, null, null, null, null);
+        ProductUpdateRequest request =
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null);
         ProductResponse response = productService.updateProduct(SELLER_ID, 1L, request);
 
         assertThat(response.title()).isEqualTo("수정된 제목");
@@ -338,12 +395,75 @@ class ProductServiceTest {
     }
 
     @Test
+    void 본인_상품을_수정하면_색상_소재_실측이_반영된다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductUpdateRequest request = new ProductUpdateRequest(
+                null, null, null, null, null, null, "블랙", "데님", Map.of("총장", 70), null);
+        productService.updateProduct(SELLER_ID, 1L, request);
+
+        assertThat(product.getColor()).isEqualTo("블랙");
+        assertThat(product.getMaterial()).isEqualTo("데님");
+        assertThat(product.getMeasurements()).isEqualTo(Map.of("총장", 70));
+    }
+
+    @Test
+    void 하자_목록을_보내면_기존_것을_지우고_새로_저장한다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductUpdateRequest request = new ProductUpdateRequest(
+                null, null, null, null, null, null, null, null, null, List.of("얼룩"));
+        productService.updateProduct(SELLER_ID, 1L, request);
+
+        verify(productDefectRepository).deleteAllByProductId(1L);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ProductDefect>> captor = ArgumentCaptor.forClass(List.class);
+        verify(productDefectRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(1);
+        assertThat(captor.getValue().get(0).getContent()).isEqualTo("얼룩");
+    }
+
+    @Test
+    void 하자를_빈_배열로_보내면_기존_하자를_전부_삭제하고_새로_저장하지_않는다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductUpdateRequest request =
+                new ProductUpdateRequest(null, null, null, null, null, null, null, null, null, List.of());
+        productService.updateProduct(SELLER_ID, 1L, request);
+
+        verify(productDefectRepository).deleteAllByProductId(1L);
+        verify(productDefectRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void 하자가_null이면_기존_하자를_건드리지_않는다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductUpdateRequest request =
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null);
+        productService.updateProduct(SELLER_ID, 1L, request);
+
+        verify(productDefectRepository, never()).deleteAllByProductId(any());
+        verify(productDefectRepository, never()).saveAll(any());
+    }
+
+    @Test
     void 본인이_아니면_수정시_예외를_던진다() {
         when(seller.getId()).thenReturn(SELLER_ID);
         Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
-        ProductUpdateRequest request = new ProductUpdateRequest("수정된 제목", null, null, null, null, null);
+        ProductUpdateRequest request =
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.updateProduct(2L, 1L, request))
                 .isInstanceOf(CustomException.class);
@@ -356,7 +476,8 @@ class ProductServiceTest {
         ReflectionTestUtils.setField(product, "saleStatus", SaleStatus.SOLD);
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
-        ProductUpdateRequest request = new ProductUpdateRequest("수정된 제목", null, null, null, null, null);
+        ProductUpdateRequest request =
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.updateProduct(SELLER_ID, 1L, request))
                 .isInstanceOf(CustomException.class);
@@ -404,7 +525,8 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(false);
 
-        ProductUpdateRequest request = new ProductUpdateRequest(null, null, CATEGORY_ID, null, null, null);
+        ProductUpdateRequest request =
+                new ProductUpdateRequest(null, null, CATEGORY_ID, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.updateProduct(SELLER_ID, 1L, request))
                 .isInstanceOf(CustomException.class)
