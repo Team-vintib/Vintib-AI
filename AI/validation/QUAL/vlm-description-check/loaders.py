@@ -95,29 +95,63 @@ def generate_from_image(
     return bundle.processor.decode(trimmed, skip_special_tokens=True).strip()
 
 
-def build_defect_prompt(defect_label: str, section_label: str | None = None) -> str:
-    """CH009 기본 프롬프트 문구. `describe_defect()`와 노트북 실험 셀이 공유한다."""
-    context = f"'{defect_label}' 하자가 있는 부분"
-    if section_label:
-        context += f"({section_label} 부위)"
+def build_defect_prompt(defect_label: str) -> str:
+    """CH009 기본 프롬프트 문구. **위치는 절대 묻지 않는다.**
+
+    크롭 이미지만으로는 옷 전체에서 어디인지 알 방법이 없는데, 1차 검증(2026-07-31)에서
+    모델이 그걸 "청바지의 허리 부분" 식으로 그럴듯하게 지어내는 게 반복 확인됐다 — 크롭
+    범위 밖 정보를 요구해서 생기는 hallucination이었다. 위치는 SAM3 bbox로 기하학적으로
+    계산하는 `bbox_grid_position()`에 맡기고, VLM에게는 시각적 특징만 맡긴다.
+    """
     return (
-        f"이 이미지는 중고 의류의 {context}을 확대한 사진입니다. "
-        "실제로 보이는 상태를 한국어 한 문장으로 짧게 설명해 주세요. "
-        "보이지 않는 내용은 지어내지 말고, 사진에서 확인되는 것만 말하세요."
+        f"이 이미지는 중고 의류의 '{defect_label}' 하자 부분을 확대한 사진입니다. "
+        "옷의 어느 부위인지는 추측하거나 언급하지 마세요. "
+        "색상, 모양, 크기, 질감 등 사진에서 실제로 보이는 시각적 특징만 한국어 한 문장으로 "
+        "설명해 주세요. 보이지 않는 내용은 지어내지 마세요."
     )
 
 
 def describe_defect(
-    bundle: VLMBundle,
-    crop_image,
-    defect_label: str,
-    section_label: str | None = None,
-    max_new_tokens: int = 80,
+    bundle: VLMBundle, crop_image, defect_label: str, max_new_tokens: int = 80
 ) -> str:
-    """크롭 이미지 1장 + 하자 태그(한글)로 한 줄 설명 생성.
+    """크롭 이미지 1장 + 하자 태그(한글)로 시각적 특징 설명 생성(위치는 다루지 않음).
 
-    CH009 "검증 축 — 입력 단위"의 "bbox 크롭 이미지 1장 + defect_type/section 컨텍스트"
-    조합에 대응한다. section_label이 없으면 그 부분 문구를 프롬프트에서 뺀다.
+    CH009 "검증 축 — 입력 단위"의 "bbox 크롭 이미지 1장 + defect_type 컨텍스트" 조합에
+    대응한다. 위치는 이 함수가 담당하지 않는다 — `bbox_grid_position()` +
+    `compose_finding_bullet()`로 별도 계산해서 합친다.
     """
-    prompt_text = build_defect_prompt(defect_label, section_label)
+    prompt_text = build_defect_prompt(defect_label)
     return generate_from_image(bundle, crop_image, prompt_text, max_new_tokens)
+
+
+_ROW_LABELS = ("위쪽", "가운데", "아래쪽")
+_COL_LABELS = ("왼쪽", "가운데", "오른쪽")
+
+
+def bbox_grid_position(bbox, image_size: tuple[int, int]) -> str:
+    """bbox 중심의 3x3 격자 위치를 일반적인 한국어 표현으로 반환한다.
+
+    프로덕션(`worker/models/sam3/prompts.py`의 `section_label()`)은 상의/하의 카테고리별
+    부위 명칭(WAIST_LEFT, HEM_CENTER 등)을 쓰는데, 이 스파이크의 SAM3 산출물(`<stem>_qc.json`)
+    에는 카테고리 정보가 없어 그 taxonomy를 그대로 못 쓴다. 그래서 카테고리 무관하게 순수
+    기하학적 위치(위쪽/가운데/아래쪽 × 왼쪽/가운데/오른쪽)만 계산한다 — bbox는 SAM3가 이미
+    확정한 값이라 VLM이 크롭만 보고 추측하는 것보다 훨씬 신뢰할 수 있다.
+    """
+    x1, y1, x2, y2 = bbox
+    img_w, img_h = image_size
+    cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+    col = min(int(cx / img_w * 3), 2)
+    row = min(int(cy / img_h * 3), 2)
+
+    if row == 1 and col == 1:
+        return "중앙"
+    if row == 1:
+        return f"{_COL_LABELS[col]} 중앙"
+    if col == 1:
+        return f"{_ROW_LABELS[row]} 가운데"
+    return f"{_ROW_LABELS[row]} {_COL_LABELS[col]}"
+
+
+def compose_finding_bullet(position_label: str, description: str) -> str:
+    """SAM3 bbox 기반 위치(신뢰 가능) + VLM 크롭 설명(시각 디테일)을 한 줄로 합친다."""
+    return f"{position_label} 부분 — {description}"
