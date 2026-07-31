@@ -60,8 +60,8 @@ def _hex_to_rgb(hex_code: str) -> tuple[int, int, int]:
     return tuple(int(hex_code[i : i + 2], 16) for i in (0, 2, 4))  # type: ignore[return-value]
 
 
-def nearest_palette_color(rgb: tuple[float, float, float]) -> str:
-    """RGB 값에 가장 가까운 팔레트 색 코드를 유클리드 거리로 스냅한다."""
+def nearest_palette_color_with_distance(rgb: tuple[float, float, float]) -> tuple[str, float]:
+    """가장 가까운 팔레트 색 코드 + 정규화된 거리(0~1, 0이면 정확히 일치)."""
     best_code, best_dist = None, float("inf")
     for code, hex_code in PALETTE.items():
         pr, pg, pb = _hex_to_rgb(hex_code)
@@ -69,7 +69,14 @@ def nearest_palette_color(rgb: tuple[float, float, float]) -> str:
         if dist < best_dist:
             best_code, best_dist = code, dist
     assert best_code is not None
-    return best_code
+    # RGB 채널당 최대 편차는 255 -> 최대 가능 거리는 3*255^2. 그 값으로 나눠 0~1로 정규화.
+    max_dist = 3 * 255**2
+    return best_code, (best_dist / max_dist) ** 0.5
+
+
+def nearest_palette_color(rgb: tuple[float, float, float]) -> str:
+    """RGB 값에 가장 가까운 팔레트 색 코드를 유클리드 거리로 스냅한다."""
+    return nearest_palette_color_with_distance(rgb)[0]
 
 
 @dataclass
@@ -78,6 +85,12 @@ class ColorResult:
     secondary: str | None = None
     is_multicolor: bool = False
     backend: str = ""
+    # 필드 의미가 백엔드마다 다르다(V4는 반드시 백엔드별로 따로 봐야 한다):
+    #   mean_color      — 1 - 팔레트까지의 정규화 거리(가까울수록 확신)
+    #   kmeans_palette  — 1등 클러스터의 픽셀 비중(지배적일수록 확신)
+    #   vlm             — 파싱/매칭 성공 여부(1.0 성공 / 0.0 실패, 진짜 확률 아님)
+    #   mock            — 의미 없는 난수
+    confidence: float = 0.0
     raw: dict = field(default_factory=dict)  # 백엔드별 부가정보(클러스터 비율 등, 리포트용)
 
 
@@ -104,7 +117,10 @@ class MockColorExtractor(ColorExtractor):
         secondary = codes[int(digest[8:16], 16) % len(codes)]
         if secondary == primary:
             secondary = codes[(codes.index(secondary) + 1) % len(codes)]
-        return ColorResult(primary=primary, secondary=secondary, backend=self.name)
+        confidence = int(digest[16:24], 16) / 0xFFFFFFFF
+        return ColorResult(
+            primary=primary, secondary=secondary, confidence=confidence, backend=self.name
+        )
 
 
 # --------------------------------------------------------------------------
@@ -120,10 +136,11 @@ class MeanColorExtractor(ColorExtractor):
         with Image.open(image_path) as img:
             arr = np.asarray(img.convert("RGB"), dtype=np.float64)
         mean_rgb = tuple(arr.reshape(-1, 3).mean(axis=0))
-        primary = nearest_palette_color(mean_rgb)
+        primary, distance = nearest_palette_color_with_distance(mean_rgb)
         return ColorResult(
             primary=primary,
             secondary=None,
+            confidence=1.0 - distance,
             backend=self.name,
             raw={"mean_rgb": [round(c, 1) for c in mean_rgb]},
         )
@@ -223,6 +240,7 @@ class KMeansPaletteColorExtractor(ColorExtractor):
             primary=primary,
             secondary=secondary,
             is_multicolor=is_multicolor,
+            confidence=float(shares[0]),  # 1등 클러스터 픽셀 비중 — 지배적일수록 확신
             backend=self.name,
             raw={
                 "cluster_shares": [round(float(s), 3) for s in shares],
@@ -243,7 +261,10 @@ class VLMColorExtractor(ColorExtractor):
         from vlm_control import query_color  # 지연 import — 무거운 의존성
 
         primary, secondary, raw = query_color(image_path)
-        return ColorResult(primary=primary, secondary=secondary, backend=self.name, raw=raw)
+        confidence = 0.0 if primary == "UNKNOWN" else 1.0  # VLM은 네이티브 확률을 안 준다
+        return ColorResult(
+            primary=primary, secondary=secondary, confidence=confidence, backend=self.name, raw=raw
+        )
 
 
 COLOR_BACKENDS: dict[str, type[ColorExtractor]] = {
