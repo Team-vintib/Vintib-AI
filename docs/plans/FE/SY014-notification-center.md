@@ -31,7 +31,7 @@
 
 - 실제 구현 API는 `APIs.md` 후보의 `/api/notifications`가 아니라
   `/api/users/{userId}/alerts` 계열이다.
-- 목록 조회: `GET /api/users/{userId}/alerts?unreadOnly=false&page=0&size=20`
+- 목록 조회: `GET /api/users/{userId}/alerts?unreadOnly=true&page=0&size=20`
 - 단건 읽음 처리: `PATCH /api/users/{userId}/alerts/{id}`
 - 전체 읽음 처리: `PATCH /api/users/{userId}/alerts/read-all`
 - 목록 응답은 BE 공통 `PageResponse` 구조인
@@ -72,14 +72,14 @@ FE/src/domains/notification/
 - [x] 알림 팝업 컴포넌트 구현
 - [x] `GlobalNavigation` 알림 버튼, unread badge, 팝업 연동
 - [x] 알림 클릭 시 단건 읽음 처리와 연결 route 이동 구현
-- [x] 수동 화면 확인용 `mock=default|empty|error|loading` query 지원
+- [x] 수동 화면 확인은 BE DB 더미 알림 기준으로 전환하고 `mock=default|empty|error|loading` query 지원 제거
 - [x] `api-index.md`, `route-map.md`, `screen-inventory.md`, `current-structure.md`, `status.md` 갱신
 - [x] `npm run type-check` 검증
 
 ## 확인이 필요한 미결정 사항
 
 - `type` 값 전체 목록과 각 값의 탭 분류 기준이 BE에서 고정되어 있는지 확인이 필요하다.
-- 안 읽은 알림 개수 전용 API가 없어 팝업/헤더 배지 계산 방식은 FE 조회 결과 기준으로 시작한다.
+- 안 읽은 알림 개수 전용 API가 없어 팝업/헤더 배지는 `unreadOnly=true` 조회의 `totalElements` 기준으로 계산한다.
 - `refType`별 최종 이동 route가 아직 모두 구현되지 않았다. 우선 존재하는 `LIVE`, `PRODUCT`,
   `POINT`, `MY` 중심으로 연결하고 주문/배송/경매 상세 route는 준비 상태 안내 또는 추후 매핑으로 둔다.
 - 서버 페이지네이션과 FE 탭 필터를 함께 사용할 때 전체 탭별 개수가 정확하지 않을 수 있다.

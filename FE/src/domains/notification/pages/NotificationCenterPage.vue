@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import NotificationCard from '@/domains/notification/components/NotificationCard.vue'
 import NotificationCenterState from '@/domains/notification/components/NotificationCenterState.vue'
@@ -12,20 +12,13 @@ import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 import type {
   NotificationCategory,
   NotificationItem,
-  NotificationMockScenario,
 } from '@/domains/notification/types/notification.types'
 
 const notificationStore = useNotificationStore()
-const route = useRoute()
 const router = useRouter()
 const selectedCategory = ref<NotificationCategory>('ALL')
 const actionErrorMessage = ref('')
-const NOTIFICATION_MOCK_SCENARIOS: NotificationMockScenario[] = [
-  'default',
-  'loading',
-  'empty',
-  'error',
-]
+const isMarkingCurrentFilterAsRead = ref(false)
 
 const filteredNotifications = computed(() =>
   selectedCategory.value === 'ALL'
@@ -50,12 +43,15 @@ const canLoadMore = computed(
     notificationStore.loadState === 'success' &&
     notificationStore.hasNext,
 )
+const currentFilterUnreadCount = computed(() =>
+  selectedCategory.value === 'ALL' ? notificationStore.unreadCount : filteredNotifications.value.length,
+)
 
 const resultStatusMessage = computed(() => {
   if (isLoading.value) return '알림 목록을 불러오는 중입니다.'
   if (hasLoadError.value) return notificationStore.errorMessage
 
-  return `${filteredNotifications.value.length}개의 알림을 표시합니다. 읽지 않은 알림은 ${notificationStore.unreadCount}개입니다.`
+  return `${filteredNotifications.value.length}개의 읽지 않은 알림을 표시합니다.`
 })
 
 const selectCategory = (category: NotificationCategory) => {
@@ -68,12 +64,25 @@ const handleRetry = () => {
 }
 
 const handleMarkAllAsRead = async () => {
+  if (isMarkingCurrentFilterAsRead.value) {
+    return
+  }
+
   actionErrorMessage.value = ''
+  isMarkingCurrentFilterAsRead.value = true
 
   try {
-    await notificationStore.markAllAsRead()
+    if (selectedCategory.value === 'ALL') {
+      await notificationStore.markAllAsRead()
+      return
+    }
+
+    const currentFilterItems = [...filteredNotifications.value]
+    await Promise.all(currentFilterItems.map((notification) => notificationStore.markAsRead(notification.id)))
   } catch (error) {
     actionErrorMessage.value = normalizeApiError(error).message
+  } finally {
+    isMarkingCurrentFilterAsRead.value = false
   }
 }
 
@@ -104,32 +113,9 @@ const handleSelectNotification = async (notification: NotificationItem) => {
   }
 }
 
-const getMockScenario = (): NotificationMockScenario | null => {
-  const queryValue = Array.isArray(route.query.mock) ? route.query.mock[0] : route.query.mock
-
-  return NOTIFICATION_MOCK_SCENARIOS.includes(queryValue as NotificationMockScenario)
-    ? (queryValue as NotificationMockScenario)
-    : null
-}
-
-watch(
-  () => route.query.mock,
-  () => {
-    selectedCategory.value = 'ALL'
-    actionErrorMessage.value = ''
-
-    const scenario = getMockScenario()
-
-    if (scenario) {
-      notificationStore.loadMockNotifications(scenario, { page: 1, size: 20 })
-      return
-    }
-
-    notificationStore.clearMockMode()
-    void notificationStore.loadNotifications({ page: 1 })
-  },
-  { immediate: true },
-)
+onMounted(() => {
+  void notificationStore.loadNotifications({ page: 1 })
+})
 </script>
 
 <template>
@@ -145,18 +131,16 @@ watch(
           class="notification-page__read-all"
           type="button"
           :disabled="
-            isLoading || notificationStore.unreadCount === 0 || notificationStore.isMarkingAllAsRead
+            isLoading ||
+            currentFilterUnreadCount === 0 ||
+            notificationStore.isMarkingAllAsRead ||
+            isMarkingCurrentFilterAsRead
           "
           @click="handleMarkAllAsRead"
         >
           모두 읽음
         </button>
       </header>
-
-      <div class="notification-page__summary" aria-label="알림 요약">
-        <span>전체 {{ notificationStore.totalElements }}개</span>
-        <strong>안 읽음 {{ notificationStore.unreadCount }}개</strong>
-      </div>
 
       <div class="notification-page__tabs" role="tablist" aria-label="알림 카테고리">
         <button
@@ -166,10 +150,11 @@ watch(
           role="tab"
           :class="{ 'notification-page__tab--active': selectedCategory === tab.id }"
           :aria-selected="selectedCategory === tab.id"
+          :aria-current="selectedCategory === tab.id ? 'page' : undefined"
           :disabled="isLoading"
           @click="selectCategory(tab.id)"
         >
-          {{ tab.label }}
+          <span>{{ tab.label }}</span>
         </button>
       </div>
 
@@ -192,7 +177,7 @@ watch(
       <NotificationCenterState
         v-else-if="isEmpty"
         variant="empty"
-        title="도착한 알림이 없습니다"
+        title="읽지 않은 알림이 없습니다"
         description="새로운 소식이 생기면 이곳에 알림이 표시됩니다."
       />
 
@@ -283,55 +268,58 @@ watch(
   color: var(--color-text-muted);
 }
 
-.notification-page__summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  font-weight: var(--font-weight-semibold);
-}
-
-.notification-page__summary strong {
-  color: var(--color-primary);
-}
-
 .notification-page__tabs {
   display: flex;
   align-items: end;
-  gap: var(--space-5);
+  gap: var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
 
 .notification-page__tabs button {
   position: relative;
-  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
   padding: 0 2px;
   border: 0;
   background: transparent;
-  color: var(--color-text-secondary);
-  font-size: 15px;
+  color: var(--color-text-muted);
+  font-size: 14px;
   font-weight: var(--font-weight-semibold);
+  transition:
+    color 160ms ease;
 }
 
 .notification-page__tabs button::after {
   position: absolute;
-  right: 0;
   bottom: -1px;
+  right: 0;
   left: 0;
-  height: 2px;
+  height: 3px;
+  border-radius: 999px 999px 0 0;
   background: transparent;
   content: '';
+  transform: scaleX(0);
+  transform-origin: center;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
 }
 
 .notification-page__tabs button:hover:not(:disabled),
-.notification-page__tabs button:focus-visible,
-.notification-page__tab--active {
+.notification-page__tabs button:focus-visible {
   color: var(--color-primary);
 }
 
-.notification-page__tab--active::after {
+button.notification-page__tab--active {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-extrabold);
+}
+
+button.notification-page__tab--active::after {
   background: var(--color-primary);
+  transform: scaleX(1);
 }
 
 .notification-page__tabs button:focus-visible,
@@ -413,6 +401,8 @@ watch(
 
   .notification-page__tabs button {
     flex: 0 0 auto;
+    min-height: 40px;
+    font-size: 14px;
   }
 }
 </style>

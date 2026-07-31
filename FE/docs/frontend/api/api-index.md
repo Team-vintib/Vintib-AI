@@ -400,13 +400,14 @@ BE 구현 기준 계약입니다. 기존 후보였던 `/api/notifications`는 �
 #### 알림 목록 조회
 
 ```http
-GET /api/users/{userId}/alerts?unreadOnly=false&page=0&size=20
+GET /api/users/{userId}/alerts?unreadOnly=true&page=0&size=20
 Authorization: Bearer {accessToken}
 ```
 
 - `{userId}`는 로그인한 본인 ID와 같아야 하며 다르면 `N002`입니다.
 - `page`는 0-base입니다.
 - 정렬은 BE에서 안 읽은 알림 우선, 최신순으로 고정합니다.
+- FE 알림센터와 헤더 팝업은 읽음 처리된 알림을 목록에서 제거하므로 `unreadOnly=true`로 조회합니다.
 - 서버 카테고리 필터는 없으므로 FE 탭은 `type` 또는 `refType` 기준으로 분류합니다.
 
 성공 응답의 `data`는 BE 공통 `PageResponse` 구조입니다.

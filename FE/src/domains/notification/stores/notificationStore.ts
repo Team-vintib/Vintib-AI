@@ -3,23 +3,17 @@ import { defineStore } from 'pinia'
 
 import {
   getNotifications,
+  getUnreadNotificationCount,
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from '@/domains/notification/api/notificationApi'
-import { NOTIFICATION_MOCK_DATA } from '@/domains/notification/constants/notificationMockData'
-import {
-  getNotificationCategory,
-  getNotificationRoute,
-} from '@/domains/notification/constants/notificationOptions'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { normalizeApiError } from '@/shared/api/http'
 
 import type {
-  NotificationItemDto,
   NotificationItem,
   NotificationListResult,
   NotificationLoadState,
-  NotificationMockScenario,
 } from '@/domains/notification/types/notification.types'
 
 const DEFAULT_PAGE_SIZE = 20
@@ -35,13 +29,12 @@ export const useNotificationStore = defineStore('notification', () => {
   const totalElements = ref(0)
   const totalPages = ref(0)
   const hasNext = ref(false)
+  const unreadCount = ref(0)
   const isMarkingAllAsRead = ref(false)
   const isLoadingMore = ref(false)
-  const activeMockScenario = ref<NotificationMockScenario | null>(null)
   const readingIds = ref<Set<number>>(new Set())
   let loadRequestId = 0
 
-  const unreadCount = computed(() => items.value.filter((item) => !item.isRead).length)
   const recentItems = computed(() => items.value.slice(0, POPUP_PAGE_SIZE))
   const isLoading = computed(() => loadState.value === 'loading')
   const hasLoadError = computed(() => loadState.value === 'error')
@@ -49,16 +42,12 @@ export const useNotificationStore = defineStore('notification', () => {
   const loadNotifications = async (
     options: { append?: boolean; page?: number; size?: number } = {},
   ) => {
-    if (activeMockScenario.value) {
-      loadMockNotifications(activeMockScenario.value, options)
-      return
-    }
-
     authStore.hydrateSession()
 
     const userId = authStore.user?.id
     if (!userId) {
       items.value = []
+      unreadCount.value = 0
       loadState.value = 'error'
       errorMessage.value = '로그인 정보를 확인하지 못했습니다. 다시 로그인해 주세요.'
       return
@@ -77,14 +66,19 @@ export const useNotificationStore = defineStore('notification', () => {
     errorMessage.value = ''
 
     try {
-      const result = await getNotifications(userId, {
-        page: nextPage,
-        size: nextSize,
-      })
+      const [result, nextUnreadCount] = await Promise.all([
+        getNotifications(userId, {
+          page: nextPage,
+          size: nextSize,
+          unreadOnly: true,
+        }),
+        getUnreadNotificationCount(userId),
+      ])
 
       if (requestId !== loadRequestId) return
 
       applyListResult(result, shouldAppend)
+      unreadCount.value = nextUnreadCount
       loadState.value = 'success'
     } catch (error) {
       if (requestId !== loadRequestId) return
@@ -111,53 +105,6 @@ export const useNotificationStore = defineStore('notification', () => {
     })
   }
 
-  const loadMockNotifications = (
-    scenario: NotificationMockScenario,
-    options: { append?: boolean; page?: number; size?: number } = {},
-  ) => {
-    activeMockScenario.value = scenario
-    errorMessage.value = ''
-
-    if (scenario === 'loading') {
-      items.value = []
-      loadState.value = 'loading'
-      return
-    }
-
-    if (scenario === 'error') {
-      items.value = []
-      loadState.value = 'error'
-      errorMessage.value = '수동 확인용 알림 오류 상태입니다.'
-      return
-    }
-
-    const nextPage = options.page ?? 1
-    const nextSize = options.size ?? size.value
-    const shouldAppend = options.append === true
-    const sourceItems = scenario === 'empty' ? [] : NOTIFICATION_MOCK_DATA
-    const pageStartIndex = (nextPage - 1) * nextSize
-    const pageItems = sourceItems.slice(pageStartIndex, pageStartIndex + nextSize)
-
-    applyListResult(
-      {
-        items: pageItems.map(toMockNotificationItem),
-        meta: {
-          page: nextPage,
-          size: nextSize,
-          totalElements: sourceItems.length,
-          totalPages: Math.ceil(sourceItems.length / nextSize),
-        },
-        hasNext: pageStartIndex + nextSize < sourceItems.length,
-      },
-      shouldAppend,
-    )
-    loadState.value = 'success'
-  }
-
-  const clearMockMode = () => {
-    activeMockScenario.value = null
-  }
-
   const markAsRead = async (notificationId: number) => {
     authStore.hydrateSession()
 
@@ -169,8 +116,13 @@ export const useNotificationStore = defineStore('notification', () => {
     readingIds.value = new Set(readingIds.value).add(notificationId)
 
     try {
+      const previousItem = items.value.find((item) => item.id === notificationId)
       const response = await markNotificationAsRead(userId, notificationId)
-      updateItemReadState(response.id, response.isRead)
+      removeItemIfRead(response.id, response.isRead)
+      if (previousItem && !previousItem.isRead && response.isRead) {
+        unreadCount.value = Math.max(unreadCount.value - 1, 0)
+        totalElements.value = Math.max(totalElements.value - 1, 0)
+      }
     } finally {
       const nextReadingIds = new Set(readingIds.value)
       nextReadingIds.delete(notificationId)
@@ -190,17 +142,23 @@ export const useNotificationStore = defineStore('notification', () => {
 
     try {
       const response = await markAllNotificationsAsRead(userId)
-      items.value = items.value.map((item) => ({ ...item, isRead: true }))
+      items.value = []
+      unreadCount.value = 0
+      totalElements.value = 0
+      totalPages.value = 0
+      hasNext.value = false
       return response.updatedCount
     } finally {
       isMarkingAllAsRead.value = false
     }
   }
 
-  const updateItemReadState = (notificationId: number, isRead: boolean) => {
-    items.value = items.value.map((item) =>
-      item.id === notificationId ? { ...item, isRead } : item,
-    )
+  const removeItemIfRead = (notificationId: number, isRead: boolean) => {
+    if (!isRead) {
+      return
+    }
+
+    items.value = items.value.filter((item) => item.id !== notificationId)
   }
 
   const applyListResult = (result: NotificationListResult, append = false) => {
@@ -244,26 +202,10 @@ export const useNotificationStore = defineStore('notification', () => {
     hasLoadError,
     isMarkingAllAsRead,
     isLoadingMore,
-    activeMockScenario,
     readingIds,
     loadNotifications,
-    loadMockNotifications,
-    clearMockMode,
     loadNextPage,
     markAsRead,
     markAllAsRead,
   }
-})
-
-const toMockNotificationItem = (notification: NotificationItemDto): NotificationItem => ({
-  id: notification.id,
-  type: notification.type,
-  title: notification.title,
-  body: notification.body ?? '',
-  refType: notification.refType,
-  refId: notification.refId,
-  isRead: notification.isRead,
-  createdAt: notification.createdAt,
-  category: getNotificationCategory(notification.type, notification.refType),
-  route: getNotificationRoute(notification),
 })
