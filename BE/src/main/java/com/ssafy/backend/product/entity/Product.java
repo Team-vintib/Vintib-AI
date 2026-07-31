@@ -142,7 +142,10 @@ public class Product extends BaseTimeEntity {
             Long categoryId,
             Long brandId,
             String conditionGrade,
-            String sizeLabel) {
+            String sizeLabel,
+            String color,
+            String material,
+            Map<String, Integer> measurements) {
         if (title != null) {
             this.title = title;
         }
@@ -160,6 +163,15 @@ public class Product extends BaseTimeEntity {
         }
         if (sizeLabel != null) {
             this.sizeLabel = sizeLabel;
+        }
+        if (color != null) {
+            this.color = color;
+        }
+        if (material != null) {
+            this.material = material;
+        }
+        if (measurements != null) {
+            this.measurements = measurements;
         }
     }
 

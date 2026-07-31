@@ -163,7 +163,16 @@ public class ProductService {
                 request.categoryId(),
                 request.brandId(),
                 request.conditionGrade(),
-                request.sizeLabel());
+                request.sizeLabel(),
+                request.color(),
+                request.material(),
+                request.measurements());
+
+        // defects는 null이면 미반영, non-null이면 전체 교체(빈 리스트면 전부 삭제).
+        if (request.defects() != null) {
+            productDefectRepository.deleteAllByProductId(productId);
+            saveDefects(product, request.defects());
+        }
 
         return ProductResponse.from(product);
     }

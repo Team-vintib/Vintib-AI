@@ -27,10 +27,10 @@ Jira: `S15P11A108-179`(등록), `S15P11A108-233`(수정). 에픽 `S15P11A108-211
 - [x] `product/entity/Product.java` — `color`, `material`, `measurements`(JSONB) 필드 추가
 - [x] `product/entity/ProductDefect.java` 신규, `product/repository/ProductDefectRepository.java` 신규
 - [x] `product/dto/request/ProductCreateRequest.java` — 4개 필드 추가
-- [ ] ~~`product/dto/request/ProductUpdateRequest.java` — 4개 필드 추가~~ (별도 브랜치, PROD-007)
+- [x] `product/dto/request/ProductUpdateRequest.java` — 4개 필드 추가 (`feat/211-update-product-info` 브랜치)
 - [x] `product/service/ProductService.java` — 생성 로직에 반영(defects 저장), `getProductDetail`에서
-      defects 조회 반영
-- [ ] ~~수정 로직(defects 교체)~~ (별도 브랜치, PROD-007)
+      defects 조회 반영, 수정 로직에 반영(defects 전체 교체: null=미반영, 빈 배열=전부 삭제)
+- [x] `product/repository/ProductDefectRepository.java`에 `deleteAllByProductId` 벌크 삭제 추가
 - [x] `product/dto/response/ProductDetailResponse.java` — 필드 반영(`ProductResponse`는 목록·최소
       응답 유지 — 아래 미결정 사항 참고)
 - [x] `BE/docs/db/schema.sql`, `comments.sql` 수정 → `regen.sh`
@@ -42,11 +42,13 @@ Jira: `S15P11A108-179`(등록), `S15P11A108-233`(수정). 에픽 `S15P11A108-211
 - [x] `BE:verify` 통과 확인 (`BUILD SUCCESSFUL`, ProductServiceTest 28개 전부 통과,
       `constraint-test.sql` 11/0)
 
-## 완료 (등록만)
+## 완료
 
-구현 완료. 수정(PROD-007, `S15P11A108-233`)은 이어서 별도 브랜치에서 진행한다 — `ProductUpdateRequest`에
-4개 필드 추가, `Product.update()` 시그니처 확장, `defects` 전체 교체 로직(빈 리스트 `[]`면 전부 삭제)이
-남은 작업이다.
+등록(`S15P11A108-179`, `feat/179-register-product-info`)에 이어 수정(`S15P11A108-233`,
+`feat/211-update-product-info`)까지 구현 완료. `ProductServiceTest` 32개 전부 통과. 전체
+`BE:verify`는 이번 작업과 무관한 사전 이슈(`.claude/requests/be/001-member-entity-schema-drift.md` —
+`Member` 엔티티와 `schema.sql`이 어긋나 있어 실제 DB에 `member_type` 등 컬럼이 없음) 때문에
+auction/chat/live/websocket 통합 테스트 73개가 실패한다 — product 도메인과 무관해서 손대지 않았다.
 
 ## 확인 필요한 미결정 사항
 

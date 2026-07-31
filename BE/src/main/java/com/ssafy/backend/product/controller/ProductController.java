@@ -143,7 +143,8 @@ public class ProductController {
 
     @Operation(
             summary = "상품 정보 수정",
-            description = "제목/설명/카테고리/브랜드/상태등급/사이즈를 부분 수정한다. 요청에 포함된 필드만 반영한다. "
+            description = "제목/설명/카테고리/브랜드/상태등급/사이즈/색상/소재/실측을 부분 수정한다. 요청에 포함된 필드만 반영한다. "
+                    + "하자(defects)는 null이면 미반영, 값을 보내면 기존 목록을 전체 교체한다(빈 배열이면 전부 삭제). "
                     + "DRAFT/ON_SALE 상태의 상품만 수정할 수 있다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
