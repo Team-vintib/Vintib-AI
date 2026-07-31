@@ -62,33 +62,21 @@ def load_qwen_vl(model_id: str, quantization: str = "4bit") -> VLMBundle:
     return VLMBundle(name=model_id, model=model, processor=processor, device=device)
 
 
-def describe_defect(
-    bundle: VLMBundle,
-    crop_image,
-    defect_label: str,
-    section_label: str | None = None,
-    max_new_tokens: int = 80,
+def generate_from_image(
+    bundle: VLMBundle, image, prompt_text: str, max_new_tokens: int = 80
 ) -> str:
-    """크롭 이미지 1장 + 하자 태그(한글)로 한 줄 설명 생성.
+    """이미지 1장 + 임의 프롬프트 텍스트로 생성. 프롬프트 실험(노트북 §4~§5)의 기반 함수.
 
-    CH009 "검증 축 — 입력 단위"의 "bbox 크롭 이미지 1장 + defect_type/section 컨텍스트"
-    조합에 대응한다. section_label이 없으면 그 부분 문구를 프롬프트에서 뺀다.
+    `describe_defect()`는 이 함수 위에 CH009 기본 프롬프트를 얹은 얇은 래퍼다 — 노트북에서
+    프롬프트 문구 자체를 바꿔보고 싶으면 이 함수를 직접 호출한다.
     """
     import torch
 
-    context = f"'{defect_label}' 하자가 있는 부분"
-    if section_label:
-        context += f"({section_label} 부위)"
-    prompt_text = (
-        f"이 이미지는 중고 의류의 {context}을 확대한 사진입니다. "
-        "실제로 보이는 상태를 한국어 한 문장으로 짧게 설명해 주세요. "
-        "보이지 않는 내용은 지어내지 말고, 사진에서 확인되는 것만 말하세요."
-    )
     messages = [
         {
             "role": "user",
             "content": [
-                {"type": "image", "image": crop_image},
+                {"type": "image", "image": image},
                 {"type": "text", "text": prompt_text},
             ],
         }
@@ -105,3 +93,31 @@ def describe_defect(
         generated_ids = bundle.model.generate(**inputs, max_new_tokens=max_new_tokens)
     trimmed = generated_ids[0][inputs["input_ids"].shape[-1] :]
     return bundle.processor.decode(trimmed, skip_special_tokens=True).strip()
+
+
+def build_defect_prompt(defect_label: str, section_label: str | None = None) -> str:
+    """CH009 기본 프롬프트 문구. `describe_defect()`와 노트북 실험 셀이 공유한다."""
+    context = f"'{defect_label}' 하자가 있는 부분"
+    if section_label:
+        context += f"({section_label} 부위)"
+    return (
+        f"이 이미지는 중고 의류의 {context}을 확대한 사진입니다. "
+        "실제로 보이는 상태를 한국어 한 문장으로 짧게 설명해 주세요. "
+        "보이지 않는 내용은 지어내지 말고, 사진에서 확인되는 것만 말하세요."
+    )
+
+
+def describe_defect(
+    bundle: VLMBundle,
+    crop_image,
+    defect_label: str,
+    section_label: str | None = None,
+    max_new_tokens: int = 80,
+) -> str:
+    """크롭 이미지 1장 + 하자 태그(한글)로 한 줄 설명 생성.
+
+    CH009 "검증 축 — 입력 단위"의 "bbox 크롭 이미지 1장 + defect_type/section 컨텍스트"
+    조합에 대응한다. section_label이 없으면 그 부분 문구를 프롬프트에서 뺀다.
+    """
+    prompt_text = build_defect_prompt(defect_label, section_label)
+    return generate_from_image(bundle, crop_image, prompt_text, max_new_tokens)
