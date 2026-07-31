@@ -95,6 +95,7 @@ def test_payload_carries_everything_the_worker_needs(client, fake_redis):
         "category",
         "base_color",
         "include_attention_maps",
+        "include_descriptions",
     }
     # enum이 객체가 아니라 문자열로 직렬화돼야 워커가 그대로 파싱한다.
     assert payload["category"] == "TOP_KNIT"
@@ -109,6 +110,7 @@ def test_defaults_are_filled_before_enqueue(client, fake_redis):
     payload = json.loads(fake_redis.pushed[0][1])["payload"]
     assert payload["base_color"] == "LIGHT"
     assert payload["include_attention_maps"] is False
+    assert payload["include_descriptions"] is False
 
 
 def test_job_status_is_seeded_as_queued(client, fake_redis):

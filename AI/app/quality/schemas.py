@@ -126,6 +126,14 @@ class InspectionRequest(BaseModel):
             "켜면 이미지·하자유형마다 PNG를 만들어 응답이 느려진다"
         ),
     )
+    include_descriptions: bool = Field(
+        default=False,
+        description=(
+            "하자 한 줄 설명(sVLM, finding.description) 생성 여부. 기본 off — finding당 "
+            "수 초가 걸려 이미지당 수십 초~수 분까지 늘어날 수 있다(CH011). 켜지 않으면 "
+            "description은 계속 None"
+        ),
+    )
 
 
 # --- 접수 응답 --------------------------------------------------------------
@@ -188,7 +196,11 @@ class Finding(BaseModel):
     )
     description: str | None = Field(
         default=None,
-        description="하자에 대한 짧은 설명(sVLM 생성 예정, CH007 범위 밖). 지금은 항상 None",
+        description=(
+            "하자에 대한 sVLM 생성 한 줄 설명(CH011). 요청의 include_descriptions가 "
+            "True이고 status가 DETECTED일 때만 채워진다 — 그 외(옵트인 안 함, SUSPECTED, "
+            "개별 생성 실패)에는 None"
+        ),
     )
 
 
