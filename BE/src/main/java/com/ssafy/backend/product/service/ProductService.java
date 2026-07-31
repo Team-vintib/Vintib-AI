@@ -5,15 +5,20 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
+import com.ssafy.backend.product.dto.request.ProductListFilterParams;
+import com.ssafy.backend.product.dto.request.ProductSortType;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.entity.ProductDefect;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.repository.CategoryRepository;
+import com.ssafy.backend.product.repository.ProductDefectRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -28,12 +33,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ProductService {
 
-    private static final List<SaleStatus> HIDDEN_FROM_LIST = List.of(SaleStatus.DRAFT);
 
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
     private final ProductImageService productImageService;
     private final CategoryRepository categoryRepository;
+    private final ProductDefectRepository productDefectRepository;
 
     @Transactional
     public ProductResponse createProduct(Long sellerId, ProductCreateRequest request) {
@@ -54,9 +59,31 @@ public class ProductService {
                 .description(request.description())
                 .conditionGrade(request.conditionGrade())
                 .sizeLabel(request.sizeLabel())
+                .color(request.color())
+                .material(request.material())
+                .measurements(request.measurements())
                 .build();
 
-        return ProductResponse.from(productRepository.save(product));
+        Product saved = productRepository.save(product);
+        saveDefects(saved, request.defects());
+
+        return ProductResponse.from(saved);
+    }
+
+    // 등록 시점에 판매자가 입력한 하자 목록을 순서대로 저장한다.
+    private void saveDefects(Product product, List<String> defects) {
+        if (defects == null || defects.isEmpty()) {
+            return;
+        }
+        List<ProductDefect> entities = new ArrayList<>();
+        for (int i = 0; i < defects.size(); i++) {
+            entities.add(ProductDefect.builder()
+                    .product(product)
+                    .content(defects.get(i))
+                    .sortOrder((short) i)
+                    .build());
+        }
+        productDefectRepository.saveAll(entities);
     }
 
     // DRAFT(최초 등록) 또는 AUCTION_SCHEDULED(경매 예정 상품의 상시 판매 전환, PROD-004/PROD-005/AUCT-014)에서 호출된다.
@@ -97,12 +124,32 @@ public class ProductService {
         return ProductResponse.from(product);
     }
 
-    public PageResponse<ProductResponse> getProductList(Pageable pageable) {
-        // 정렬은 최신순 고정(PROD-008 범위 밖) — 클라이언트가 Pageable에 다른 sort를 실어 보내도 무시하고 createdAt DESC로 강제한다.
-        Pageable sortedByLatest = PageRequest.of(
-                pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<Product> products = productRepository.findBySaleStatusNotIn(HIDDEN_FROM_LIST, sortedByLatest);
+    public PageResponse<ProductResponse> getProductList(ProductListFilterParams filter, Pageable pageable) {
+        Sort sort = buildSort(filter.resolvedSort());
+        Pageable sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
+
+        // 카테고리 필터가 없으면 JPQL에 빈 리스트를 넘기면 안 된다(IN 절 오류).
+        // 플래그가 false일 때는 쿼리에서 조건을 건너뛰므로 더미값을 넣어도 무방하다.
+        List<Long> categoryIds = filter.hasCategoryFilter() ? filter.categoryIds() : List.of(-1L);
+        List<String> conditionGrades = filter.hasConditionFilter() ? filter.conditionGrades() : List.of("");
+
+        Page<Product> products = productRepository.findWithFilter(
+                filter.hasCategoryFilter(), categoryIds,
+                filter.hasConditionFilter(), conditionGrades,
+                filter.hasSaleTypeFilter(), filter.saleType(),
+                filter.hasMinPriceFilter(), filter.minPrice(),
+                filter.hasMaxPriceFilter(), filter.maxPrice(),
+                sortedPageable);
+
         return PageResponse.from(products.map(ProductResponse::from));
+    }
+
+    private Sort buildSort(ProductSortType sortType) {
+        return switch (sortType) {
+            case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price");
+            case PRICE_DESC -> Sort.by(Sort.Direction.DESC, "price");
+            default -> Sort.by(Sort.Direction.DESC, "createdAt");
+        };
     }
 
     public ProductDetailResponse getProductDetail(Long viewerId, Long productId) {
@@ -115,7 +162,10 @@ public class ProductService {
         if (product.isDraft() && !product.isOwnedBy(viewerId)) {
             throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
         }
-        return ProductDetailResponse.from(product, productImageService.getImages(productId));
+        List<String> defects = productDefectRepository.findAllByProductIdOrderBySortOrderAsc(productId).stream()
+                .map(ProductDefect::getContent)
+                .toList();
+        return ProductDetailResponse.from(product, productImageService.getImages(productId), defects);
     }
 
     @Transactional
@@ -134,7 +184,16 @@ public class ProductService {
                 request.categoryId(),
                 request.brandId(),
                 request.conditionGrade(),
-                request.sizeLabel());
+                request.sizeLabel(),
+                request.color(),
+                request.material(),
+                request.measurements());
+
+        // defects는 null이면 미반영, non-null이면 전체 교체(빈 리스트면 전부 삭제).
+        if (request.defects() != null) {
+            productDefectRepository.deleteAllByProductId(productId);
+            saveDefects(product, request.defects());
+        }
 
         return ProductResponse.from(product);
     }

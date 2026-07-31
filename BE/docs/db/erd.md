@@ -1,6 +1,6 @@
 # ERD 및 상태 설계 (S15P11A108-296)
 
-> 대상 DB: PostgreSQL 18 · 테이블 24개
+> 대상 DB: PostgreSQL 18 · 테이블 25개
 > DDL: [`schema.sql`](./schema.sql) — 실제 PostgreSQL 18에 적용 검증 완료
 > 데이터 사전: [`data-dictionary.md`](./data-dictionary.md) — 이 스키마에서 자동 생성
 >
@@ -39,6 +39,7 @@ erDiagram
     category ||--o{ product : classifies
     brand ||--o{ product : brands
     product ||--o{ product_image : has
+    product ||--o{ product_defect : has
     product ||--o{ wish : wished
 
     member ||--o{ tryon_result : owns

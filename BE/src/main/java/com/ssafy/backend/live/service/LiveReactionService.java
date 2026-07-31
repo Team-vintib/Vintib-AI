@@ -70,7 +70,12 @@ public class LiveReactionService {
         Member sender = memberRepository.findById(senderId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        return ReactionResponse.of(liveId, type, sender.getId(), sender.getNickname(), LocalDateTime.now());
+        // 닉네임은 온보딩을 마쳐야 채워진다. 채팅과 같은 규칙으로 이름을 대체값으로 쓴다 —
+        // 같은 사람이 채팅에서는 이름으로, 반응에서는 null 로 보이면 안 된다.
+        String senderNickname =
+                sender.getNickname() != null ? sender.getNickname() : sender.getName();
+
+        return ReactionResponse.of(liveId, type, sender.getId(), senderNickname, LocalDateTime.now());
     }
 
     /**
