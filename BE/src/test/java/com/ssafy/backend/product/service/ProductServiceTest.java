@@ -3,6 +3,7 @@ package com.ssafy.backend.product.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -14,6 +15,8 @@ import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
+import com.ssafy.backend.product.dto.request.ProductListFilterParams;
+import com.ssafy.backend.product.dto.request.ProductSortType;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
@@ -45,6 +48,8 @@ class ProductServiceTest {
 
     private static final Long SELLER_ID = 1L;
     private static final Long CATEGORY_ID = 10L;
+    private static final ProductListFilterParams NO_FILTER =
+            new ProductListFilterParams(null, null, null, null, null, null);
 
     @Mock
     private ProductRepository productRepository;
@@ -291,16 +296,17 @@ class ProductServiceTest {
     }
 
     @Test
-    void 상품_목록_조회시_DRAFT_상태는_제외하고_조회한다() {
+    void 상품_목록_조회시_공개_상태_상품이_매핑된다() {
         Product onSale = Product.builder().seller(seller).title("상시 판매 상품").build();
         onSale.registerDirectSale(10000L);
         Pageable pageable = PageRequest.of(0, 20);
-        when(productRepository.findBySaleStatusNotIn(any(), any()))
+        when(productRepository.findWithFilter(
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
+                anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(onSale), pageable, 1));
 
-        PageResponse<ProductResponse> response = productService.getProductList(pageable);
+        PageResponse<ProductResponse> response = productService.getProductList(NO_FILTER, pageable);
 
-        verify(productRepository).findBySaleStatusNotIn(eq(List.of(SaleStatus.DRAFT)), any(Pageable.class));
         assertThat(response.content()).hasSize(1);
         assertThat(response.content().get(0).saleStatus()).isEqualTo(SaleStatus.ON_SALE);
     }
@@ -309,10 +315,12 @@ class ProductServiceTest {
     void 상품_목록_조회시_페이지네이션_정보를_반환한다() {
         Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
         Pageable pageable = PageRequest.of(0, 2);
-        when(productRepository.findBySaleStatusNotIn(any(), any()))
+        when(productRepository.findWithFilter(
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
+                anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(product, product), pageable, 5));
 
-        PageResponse<ProductResponse> response = productService.getProductList(pageable);
+        PageResponse<ProductResponse> response = productService.getProductList(NO_FILTER, pageable);
 
         assertThat(response.page()).isEqualTo(0);
         assertThat(response.size()).isEqualTo(2);
@@ -324,10 +332,12 @@ class ProductServiceTest {
     @Test
     void 상품_목록이_비어있으면_빈_배열을_반환한다() {
         Pageable pageable = PageRequest.of(0, 20);
-        when(productRepository.findBySaleStatusNotIn(any(), any()))
+        when(productRepository.findWithFilter(
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
+                anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
-        PageResponse<ProductResponse> response = productService.getProductList(pageable);
+        PageResponse<ProductResponse> response = productService.getProductList(NO_FILTER, pageable);
 
         assertThat(response.content()).isEmpty();
         assertThat(response.totalElements()).isZero();
@@ -532,4 +542,116 @@ class ProductServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CATEGORY_NOT_FOUND);
     }
-}
+
+    // -----------------------------------------------------------------------
+    // 상품 목록 필터·정렬 (PROD-008)
+    // -----------------------------------------------------------------------
+
+    @Test
+    void 필터_없이_조회하면_findWithFilter에_모든_플래그가_false로_전달된다() {
+        // given
+        Page<Product> emptyPage = new PageImpl<>(List.of());
+        when(productRepository.findWithFilter(
+                eq(false), any(), eq(false), any(), eq(false), any(),
+                eq(false), any(), eq(false), any(), any(Pageable.class)))
+                .thenReturn(emptyPage);
+
+        ProductListFilterParams filter =
+                new ProductListFilterParams(null, null, null, null, null, null);
+
+        // when
+        PageResponse<ProductResponse> response =
+                productService.getProductList(filter, PageRequest.of(0, 20));
+
+        // then
+        assertThat(response.content()).isEmpty();
+    }
+
+    @Test
+    void 카테고리_필터를_주면_hasCategoryFilter_true로_전달된다() {
+        // given
+        Page<Product> emptyPage = new PageImpl<>(List.of());
+        ArgumentCaptor<Boolean> flagCaptor = ArgumentCaptor.forClass(Boolean.class);
+        when(productRepository.findWithFilter(
+                flagCaptor.capture(), any(), anyBoolean(), any(), anyBoolean(), any(),
+                anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
+                .thenReturn(emptyPage);
+
+        ProductListFilterParams filter =
+                new ProductListFilterParams(List.of(1L, 2L), null, null, null, null, null);
+
+        // when
+        productService.getProductList(filter, PageRequest.of(0, 20));
+
+        // then: 첫 번째 캡처 = hasCategoryFilter
+        assertThat(flagCaptor.getValue()).isTrue();
+    }
+
+    @Test
+    void 가격_범위_필터를_주면_hasMinPrice와_hasMaxPrice가_true로_전달된다() {
+        // given
+        Page<Product> emptyPage = new PageImpl<>(List.of());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Boolean> captors = ArgumentCaptor.forClass(Boolean.class);
+        when(productRepository.findWithFilter(
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
+                captors.capture(), any(), captors.capture(), any(), any(Pageable.class)))
+                .thenReturn(emptyPage);
+
+        ProductListFilterParams filter =
+                new ProductListFilterParams(null, null, null, 10_000L, 50_000L, null);
+
+        // when
+        productService.getProductList(filter, PageRequest.of(0, 20));
+
+        // then: hasMinPrice, hasMaxPrice 모두 true
+        assertThat(captors.getAllValues()).containsOnly(true);
+    }
+
+    @Test
+    void PRICE_ASC_정렬이면_pageable에_price_오름차순이_담긴다() {
+        // given
+        Page<Product> emptyPage = new PageImpl<>(List.of());
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        when(productRepository.findWithFilter(
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
+                anyBoolean(), any(), anyBoolean(), any(), pageableCaptor.capture()))
+                .thenReturn(emptyPage);
+
+        ProductListFilterParams filter =
+                new ProductListFilterParams(null, null, null, null, null, ProductSortType.PRICE_ASC);
+
+        // when
+        productService.getProductList(filter, PageRequest.of(0, 20));
+
+        // then
+        Pageable captured = pageableCaptor.getValue();
+        assertThat(captured.getSort().getOrderFor("price")).isNotNull();
+        assertThat(captured.getSort().getOrderFor("price").getDirection())
+                .isEqualTo(org.springframework.data.domain.Sort.Direction.ASC);
+    }
+
+    @Test
+    void sort_미입력이면_기본값_LATEST로_createdAt_DESC_정렬이_적용된다() {
+        // given
+        Page<Product> emptyPage = new PageImpl<>(List.of());
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        when(productRepository.findWithFilter(
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
+                anyBoolean(), any(), anyBoolean(), any(), pageableCaptor.capture()))
+                .thenReturn(emptyPage);
+
+        // sort=null → resolvedSort()=LATEST
+        ProductListFilterParams filter =
+                new ProductListFilterParams(null, null, null, null, null, null);
+
+        // when
+        productService.getProductList(filter, PageRequest.of(0, 20));
+
+        // then
+        Pageable captured = pageableCaptor.getValue();
+        assertThat(captured.getSort().getOrderFor("createdAt")).isNotNull();
+        assertThat(captured.getSort().getOrderFor("createdAt").getDirection())
+                .isEqualTo(org.springframework.data.domain.Sort.Direction.DESC);
+    }
+}

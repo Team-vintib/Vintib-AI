@@ -6,6 +6,8 @@ import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductImageRegisterRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUploadUrlRequest;
+import com.ssafy.backend.product.dto.request.ProductListFilterParams;
+import com.ssafy.backend.product.dto.request.ProductSortType;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
@@ -32,7 +34,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
 
 @Tag(name = "상품(Products)", description = "상품 등록/조회, 브랜드/카테고리 마스터 조회 API")
 @RestController
@@ -110,9 +114,12 @@ public class ProductController {
 
     @Operation(
             summary = "상품 목록 조회",
-            description = "상시 판매/경매 여부와 관계없이 공개된 상품 목록을 최신순으로 조회한다. "
-                    + "DRAFT 상태 상품은 목록에서 제외한다. "
-                    + "정렬은 항상 최신순(createdAt DESC)으로 고정되며, sort 파라미터를 보내도 무시된다.")
+            description = """
+                    공개된 상품 목록을 조회한다. DRAFT 상태 상품은 제외한다.
+                    카테고리·상태등급·판매방식·가격 범위 필터를 조합할 수 있으며,
+                    각 파라미터를 생략하면 해당 조건을 건너뛴다.
+                    정렬: LATEST(기본값, 최신순) / PRICE_ASC(가격 낮은 순) / PRICE_DESC(가격 높은 순).
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요")
@@ -120,8 +127,16 @@ public class ProductController {
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getProductList(
+            @RequestParam(required = false) List<Long> categoryIds,
+            @RequestParam(required = false) List<String> conditionGrades,
+            @RequestParam(required = false) com.ssafy.backend.product.entity.SaleType saleType,
+            @RequestParam(required = false) Long minPrice,
+            @RequestParam(required = false) Long maxPrice,
+            @RequestParam(required = false) ProductSortType sort,
             @PageableDefault(size = 20) Pageable pageable) {
-        PageResponse<ProductResponse> response = productService.getProductList(pageable);
+        ProductListFilterParams filter =
+                new ProductListFilterParams(categoryIds, conditionGrades, saleType, minPrice, maxPrice, sort);
+        PageResponse<ProductResponse> response = productService.getProductList(filter, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
