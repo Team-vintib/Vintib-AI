@@ -45,6 +45,9 @@ const isPurchaseDisabled = computed(() =>
 const isCartDisabled = computed(() =>
   ['DRAFT', 'SOLD', 'PRIVATE'].includes(props.product.saleStatus),
 )
+
+const sellerNickname = computed(() => props.seller.nickname?.trim() || '판매자')
+const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCase())
 </script>
 
 <template>
@@ -55,10 +58,10 @@ const isCartDisabled = computed(() =>
 
     <article class="purchase-summary__seller">
       <div class="purchase-summary__avatar" aria-hidden="true">
-        {{ seller.nickname.slice(0, 1).toUpperCase() }}
+        {{ sellerInitial }}
       </div>
       <div>
-        <strong>{{ seller.nickname }}</strong>
+        <strong>{{ sellerNickname }}</strong>
         <p>
           팔로워 {{ seller.followerCount.toLocaleString('ko-KR') }}명 · 판매 상품
           {{ seller.productCount }}개
