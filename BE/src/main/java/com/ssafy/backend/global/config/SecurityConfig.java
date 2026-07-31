@@ -2,6 +2,7 @@ package com.ssafy.backend.global.config;
 
 import com.ssafy.backend.auth.jwt.JwtAuthenticationEntryPoint;
 import com.ssafy.backend.auth.jwt.JwtAuthenticationFilter;
+import com.ssafy.backend.auth.jwt.OnboardingRequiredFilter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,6 +50,7 @@ public class SecurityConfig {
     };
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final OnboardingRequiredFilter onboardingRequiredFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
     @Value("${cors.allowed-origins}")
@@ -95,6 +97,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(onboardingRequiredFilter, JwtAuthenticationFilter.class)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .build();
     }

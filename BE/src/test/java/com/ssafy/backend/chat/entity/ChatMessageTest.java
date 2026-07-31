@@ -59,11 +59,13 @@ class ChatMessageTest {
     }
 
     @Test
-    void 닉네임이_없으면_이름으로_표시한다() {
-        // 닉네임은 온보딩 단계에서 채워진다. 가입 직후 회원이 발언하면 작성자 없는 말풍선이 된다.
+    void 닉네임이_없으면_표시명도_없다() {
+        // SY019: 온보딩(닉네임 저장 포함)을 완료해야 채팅 자체를 쓸 수 있는 게이트가 있어
+        // 실제로는 도달하지 않는 상태지만, 엔티티 메서드 자체는 있는 그대로 null을 돌려준다
+        // (이름으로 대체하던 우회는 게이트 도입으로 제거함).
         ChatMessage message = ChatMessage.userMessage(라이브(), 회원("김정윤", null), "내용", NOW);
 
-        assertThat(message.senderDisplayName()).isEqualTo("김정윤");
+        assertThat(message.senderDisplayName()).isNull();
     }
 
     @Test

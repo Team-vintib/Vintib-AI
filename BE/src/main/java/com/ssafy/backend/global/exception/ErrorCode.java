@@ -25,6 +25,7 @@ public enum ErrorCode {
     EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "U011", "만료된 토큰입니다."),
     NICKNAME_ALREADY_TAKEN(HttpStatus.CONFLICT, "U012", "이미 사용 중인 닉네임입니다."),
     MEMBER_FORBIDDEN(HttpStatus.FORBIDDEN, "U013", "본인의 정보만 수정할 수 있습니다."),
+    ONBOARDING_BASIC_INFO_REQUIRED(HttpStatus.BAD_REQUEST, "U014", "기본 정보를 먼저 등록해주세요."),
 
     // [라이브/채팅]
     LIVE_NOT_FOUND(HttpStatus.NOT_FOUND, "L001", "진행 중이거나 예약된 라이브가 없습니다."),
