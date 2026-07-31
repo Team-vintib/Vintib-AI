@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+
+# 판단 근거 로컬 로그(CH008, inspection_logger.py). 워커 로컬 산출물이라 커밋 대상 아님.
+logs/
