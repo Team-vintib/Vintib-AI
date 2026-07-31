@@ -162,6 +162,54 @@ PROMPT_TEMPLATES: dict[str, "callable[[str], str]"] = {
     "kr_secondhand_flat": _kr_secondhand_flat,
 }
 
+# --------------------------------------------------------------------------
+# 대분류(depth 2) 라벨/템플릿 — 2단계 분류(대분류 6-way -> 소분류)의 1차 질의에 쓴다.
+# 소분류용 _KR_LABELS/_EN_LABELS와 키 집합이 다르므로(대분류 코드 vs 소분류 코드) 별도로
+# 둔다 — 같은 dict에 섞으면 우연히 겹치는 코드가 생겼을 때 조용히 잘못된 라벨을 반환한다.
+# --------------------------------------------------------------------------
+_KR_MAJOR_LABELS: dict[str, str] = {
+    "OUTER": "아우터",
+    "TOP": "상의",
+    "BOTTOM": "하의",
+    "SHOES": "신발",
+    "BAG": "가방",
+    "ACCESSORY": "액세서리",
+}
+
+_EN_MAJOR_LABELS: dict[str, str] = {
+    "OUTER": "outerwear",
+    "TOP": "top",
+    "BOTTOM": "bottom",
+    "SHOES": "shoes",
+    "BAG": "bag",
+    "ACCESSORY": "accessory",
+}
+
+assert set(_KR_MAJOR_LABELS) == set(MAJOR_CATEGORIES)
+assert set(_EN_MAJOR_LABELS) == set(MAJOR_CATEGORIES)
+
+
+def _kr_plain_major(code: str) -> str:
+    return _KR_MAJOR_LABELS[code]
+
+
+def _en_clip_style_major(code: str) -> str:
+    return f"a photo of {_EN_MAJOR_LABELS[code]}"
+
+
+def _kr_secondhand_flat_major(code: str) -> str:
+    return f"바닥에 펼쳐놓고 찍은 중고 {_KR_MAJOR_LABELS[code]} 사진"
+
+
+# PROMPT_TEMPLATES와 같은 키 집합 — classify.py의 2단계 오케스트레이션이 같은 template_key로
+# 대분류/소분류 양쪽을 다 조회할 수 있게 한다.
+MAJOR_PROMPT_TEMPLATES: dict[str, "callable[[str], str]"] = {
+    "kr_plain": _kr_plain_major,
+    "en_clip_style": _en_clip_style_major,
+    "kr_secondhand_flat": _kr_secondhand_flat_major,
+}
+assert set(MAJOR_PROMPT_TEMPLATES) == set(PROMPT_TEMPLATES)
+
 
 def _build_category_id_map() -> dict[tuple[str, str], int]:
     """(gender_code, subcategory_code) -> categoryId.
