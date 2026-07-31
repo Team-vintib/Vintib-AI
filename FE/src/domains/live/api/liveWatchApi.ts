@@ -41,6 +41,8 @@ const wait = (delay: number) =>
 const mapLiveProductDto = (dto: LiveProductDto, index: number): LiveWatchProduct => ({
   id: dto.productId,
   title: dto.productTitle,
+  // BE 확인 필요: LiveProductResponse에 상세 필드가 없어 null/fallback 유지.
+  // 요청 문서: docs/requests/BE/007-live-tryon-contract.md (3.5)
   brandName: null,
   price: null,
   thumbnailUrl:
@@ -56,7 +58,7 @@ const mapLiveDetailDto = (dto: LiveDetailDto): LiveWatchViewData => ({
   id: dto.id,
   hostId: dto.hostId,
   hostNickname: dto.hostNickname,
-  hostProfileImageUrl: null,
+  hostProfileImageUrl: null, // BE 확인 필요: LiveDetailResponse 미제공 (docs/requests/BE/007 3.5)
   title: dto.title,
   description: null,
   posterUrl: dto.thumbnailUrl || LIVE_WATCH_POSTER_URL,
@@ -66,7 +68,7 @@ const mapLiveDetailDto = (dto: LiveDetailDto): LiveWatchViewData => ({
   endedAt: dto.endedAt,
   currentViewerCount: dto.currentViewerCount ?? null,
   peakViewerCount: dto.peakViewerCount,
-  currentProductId: null,
+  currentProductId: null, // BE 확인 필요: 현재 판매 상품 미제공 → 첫 상품 fallback (docs/requests/BE/007 3.5)
   products: [...dto.products]
     .sort((first, second) => first.sortOrder - second.sortOrder)
     .map(mapLiveProductDto),
