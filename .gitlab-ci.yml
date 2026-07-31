@@ -13,8 +13,8 @@ workflow:
   rules:
     # MR 검증
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    # develop-BE 병합 시 자동 배포 (-262)
-    - if: '$CI_COMMIT_BRANCH == "develop-BE"'
+    # main 병합 시 자동 배포 (-262). 배포 브랜치는 main 하나다 — 아래 deploy 잡 주석 참고.
+    - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_PIPELINE_SOURCE == "web"'
 
 variables:
@@ -127,7 +127,7 @@ mr-check:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "web"'
-    - if: '$CI_COMMIT_BRANCH == "develop-BE"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
   script:
     - echo "MR pipeline initialized successfully."
 
@@ -184,7 +184,22 @@ ai-test:
         exit "${code}";
       fi
 
-# ---------- 배포 (develop-BE 병합 시 EC2 자동 배포) ----------
+# ---------- 배포 (main 병합 시 EC2 자동 배포) ----------
+#
+# ⚠️ 배포 트리거는 **main 하나뿐이다.** 파트별 develop-* 를 각각 트리거로 걸면 안 된다.
+#
+# deploy.sh 는 트리거된 커밋 시점의 **저장소 전체**를 rsync 한다. 파트 브랜치를 트리거로 걸면
+# 나중에 배포하는 쪽이 항상 상대 파트를 되돌린다.
+#
+#   develop-FE 배포 → BE/ 도 develop-FE 시점 것으로 덮임 → BE 롤백
+#   develop-BE 배포 → FE/ 도 develop-BE 시점 것으로 덮임 → FE 롤백
+#
+# "서로 자주 머지하자"로는 못 막는다 — 양쪽이 서로를 포함하려면 두 브랜치가 같은 커밋이어야
+# 하기 때문이다. 파트가 셋(BE/FE/AI)이라 더 그렇다.
+#
+# main 은 이미 세 파트가 모이는 통합 브랜치이므로, 여기서 배포하면 어느 파트도 되돌아가지 않는다.
+# 배포 흐름: feat/* → develop-{BE,FE,AI} → main → 자동 배포
+# 자세한 내용은 BE/docs/infra/ec2.md 「배포 흐름」 참고.
 # 전용 러너(tag: deploy)에서만 실행된다. 그 러너에만 호스트 docker.sock 과
 # 배포 디렉터리가 마운트되어 있어, 일반 테스트 잡은 호스트 도커에 접근하지 못한다.
 #
@@ -194,7 +209,8 @@ ai-test:
 #                   같은 범용 이름을 쓰면 다른 잡까지 흘러든다. PROD_ 접두사를 유지할 것.
 #                   (be-test 는 before_script 의 export 로 자체 방어한다)
 #                ⚠️ EC2 PostgreSQL 볼륨을 처음 만들 때 쓴 값과 반드시 같아야 한다.
-#                ⚠️ "Protected" 로 두려면 develop-BE 도 protected 브랜치여야 한다.
+#                ⚠️ "Protected" 로 두려면 main 도 protected 브랜치여야 한다.
+#                   (배포 브랜치를 develop-BE 에서 main 으로 옮겼으므로 여기도 main 기준이다)
 #   CORS_ALLOWED_ORIGINS 운영에서 API 호출을 허용할 FE 출처(origin). 콤마로 여러 개 지정 가능.
 #                예: https://vintib.example.com
 #   PROD_MINIO_ROOT_USER     운영 MinIO root 계정명. 오브젝트 스토리지는 AWS S3 가 아니라
@@ -218,7 +234,7 @@ deploy:
   tags:
     - deploy
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop-BE"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
   variables:
     # 커밋 SHA 로 이미지를 태깅해 롤백 시 직전 태그를 되살릴 수 있게 한다.
     IMAGE_TAG: $CI_COMMIT_SHORT_SHA

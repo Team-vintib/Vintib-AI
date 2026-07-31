@@ -103,6 +103,48 @@ swapon --show          # /swapfile 4G
 
 - ~~**OpenVidu v3 (WebRTC 미디어 서버)**~~ — 아래 "WebRTC 미디어 서버" 절로 반영 완료(`-448`).
 
+## 배포 흐름 (S15P11A108-27)
+
+```
+feat/*  →  develop-{BE,FE,AI}  →  main  →  자동 배포(EC2)
+```
+
+**배포 트리거는 `main` 하나다.** 파트별 `develop-*`를 각각 트리거로 걸면 안 된다.
+
+### 파트 브랜치를 트리거로 걸면 안 되는 이유
+
+`deploy.sh`는 트리거된 커밋 시점의 **저장소 전체**를 rsync한다. 파트 브랜치를 트리거로 걸면 **나중에 배포하는 쪽이 항상 상대 파트를 되돌린다.**
+
+```
+develop-FE 배포 → BE/ 도 develop-FE 시점 것으로 덮임 → BE 롤백
+develop-BE 배포 → FE/ 도 develop-BE 시점 것으로 덮임 → FE 롤백
+```
+
+"서로 자주 머지하자"는 규칙으로는 못 막는다 — **양쪽이 서로를 포함하려면 두 브랜치가 같은 커밋이어야** 하기 때문이다. 파트가 셋이라 더 그렇다.
+
+`main`은 이미 세 파트가 모이는 통합 브랜치이므로, 여기서 배포하면 어느 파트도 되돌아가지 않는다. 새 브랜치를 만들 필요도 없다.
+
+### 배포하려면
+
+각 파트는 `develop-*`까지 평소대로 진행하고, **배포 시점에 `develop-* → main` MR을 올린다.** main 병합이 곧 배포다.
+
+> ⚠️ CI/CD Variables를 **Protected**로 등록했다면 `main`이 **protected 브랜치**여야 한다. 아니면 배포 잡에서 변수가 비어 `필수 CI/CD Variable 이 비어 있다`로 멈춘다.
+
+### FE 컨테이너 (진행 중)
+
+FE는 `frontend`(nginx) 컨테이너로 배포하고 Caddy가 catch-all을 FE로 보낸다. **`Caddyfile`의 백엔드 경로 명시는 이미 끝났고**(아래), `docker-compose.prod.yml`의 `frontend` 서비스는 `FE/Dockerfile`이 저장소에 들어온 뒤에 추가한다 — 없는 상태로 추가하면 `compose build`가 실패해 배포 잡이 통째로 깨진다.
+
+**백엔드는 `/api` 밖에서도 서비스한다.** catch-all을 FE로 넘기기 전에 아래를 명시적으로 backend로 보내야 한다. `SecurityConfig`의 `PUBLIC_ENDPOINTS`와 같은 목록이므로 한쪽만 고치지 말 것.
+
+| 경로 | 용도 |
+| --- | --- |
+| `/api/*` | REST |
+| `/ws`, `/ws/*` | **STOMP** — 채팅·시청자 수·반응이 전부 여기 얹혀 있다 |
+| `/actuator/*` | 헬스체크 |
+| `/swagger-ui/*`, `/v3/api-docs` | **API 문서 (팀 전체가 쓴다)** |
+
+`/api/*`와 `/ws`만 챙기면 **Swagger와 actuator가 조용히 죽는다.**
+
 ## WebRTC 미디어 서버 (S15P11A108-448)
 
 ### 공식 번들을 쓰지 않고 미디어 코어만 올린다

@@ -25,6 +25,22 @@ i15a108.p.ssafy.io {
 		reverse_proxy livekit:7880
 	}
 
+	# ── 백엔드가 맡는 경로 (S15P11A108-27, FE 배포 대비) ──────────────────────
+	#
+	# 지금은 아래 catch-all 도 backend 라 이 블록이 없어도 결과가 같다. 그런데도 미리 명시하는
+	# 이유는, **FE 컨테이너가 들어오면 catch-all 이 frontend 로 바뀌기 때문**이다. 그때 이 규칙이
+	# 없으면 API·WebSocket 이 통째로 FE 정적 서버로 가서 전부 404 가 된다.
+	#
+	# ⚠️ 백엔드는 /api 밖에서도 서비스한다. /api/* 만 적으면 아래 셋이 조용히 죽는다.
+	#    - /ws        STOMP 핸드셰이크 (채팅·시청자수·반응 전부 여기 얹혀 있다)
+	#    - /actuator  헬스체크
+	#    - /swagger-ui, /v3/api-docs   API 문서 (팀 전체가 쓴다)
+	#    SecurityConfig 의 PUBLIC_ENDPOINTS 와 같은 목록이므로 한쪽만 고치지 말 것.
+	@backend path /api/* /ws /ws/* /actuator/* /swagger-ui/* /swagger-ui.html /v3/api-docs /v3/api-docs/*
+	handle @backend {
+		reverse_proxy backend:8080
+	}
+
 	# AI 게이트웨이 (워커 poll/result, job 접수/조회)
 	handle /ai/* {
 		reverse_proxy ai:8000
