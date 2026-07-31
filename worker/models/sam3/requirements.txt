@@ -25,3 +25,7 @@ huggingface_hub>=0.34
 
 numpy>=1.26
 Pillow>=10.0
+
+# 넘버링 bbox 이미지(CH007) 렌더링용 — rectangle+putText만 쓰므로 GUI 의존성 없는 headless
+# 빌드로 충분하다. validation/QUAL/qc_shared.py의 draw_numbered_boxes()와 같은 라이브러리.
+opencv-python-headless>=4.9
