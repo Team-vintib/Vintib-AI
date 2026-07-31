@@ -6,6 +6,7 @@ import type {
   LinkAccountResponse,
   LoginRequest,
   LoginResponse,
+  ReissueTokenRequest,
   SendEmailVerificationCodeRequest,
   SignUpRequest,
   SignUpResponse,
@@ -19,13 +20,17 @@ import type { ApiResponse } from '@/shared/types/api.types'
 const SSAFY_SSO_START_PATH = '/auth/sso/ssafy'
 
 export const checkEmailDuplicate = async (request: CheckEmailDuplicateRequest) => {
-  const { data } = await http.post<ApiResponse<null>>('/auth/email/check-duplicate', request)
+  const { data } = await http.post<ApiResponse<null>>('/auth/email/check-duplicate', request, {
+    skipAuth: true,
+  })
 
   return data
 }
 
 export const sendEmailVerificationCode = async (request: SendEmailVerificationCodeRequest) => {
-  const { data } = await http.post<ApiResponse<null>>('/auth/email/send-code', request)
+  const { data } = await http.post<ApiResponse<null>>('/auth/email/send-code', request, {
+    skipAuth: true,
+  })
 
   return data
 }
@@ -34,19 +39,34 @@ export const verifyEmailCode = async (request: VerifyEmailCodeRequest) => {
   const { data } = await http.post<ApiResponse<VerifyEmailCodeResponse>>(
     '/auth/email/verify-code',
     request,
+    {
+      skipAuth: true,
+    },
   )
 
   return data
 }
 
 export const signUp = async (request: SignUpRequest) => {
-  const { data } = await http.post<ApiResponse<SignUpResponse>>('/auth/signup', request)
+  const { data } = await http.post<ApiResponse<SignUpResponse>>('/auth/signup', request, {
+    skipAuth: true,
+  })
 
   return data
 }
 
 export const login = async (request: LoginRequest) => {
-  const { data } = await http.post<ApiResponse<LoginResponse>>('/auth/signin', request)
+  const { data } = await http.post<ApiResponse<LoginResponse>>('/auth/signin', request, {
+    skipAuth: true,
+  })
+
+  return data
+}
+
+export const reissueToken = async (request: ReissueTokenRequest) => {
+  const { data } = await http.post<ApiResponse<LoginResponse>>('/auth/reissue', request, {
+    skipAuth: true,
+  })
 
   return data
 }
@@ -61,6 +81,9 @@ export const completeSsafySsoCallback = async (request: SsafySsoCallbackRequest)
   const { data } = await http.post<ApiResponse<SsafySsoCallbackResponse>>(
     '/auth/ssafy/callback',
     request,
+    {
+      skipAuth: true,
+    },
   )
 
   return data

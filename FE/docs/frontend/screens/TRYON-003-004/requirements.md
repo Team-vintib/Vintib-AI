@@ -83,7 +83,7 @@
 ## API 경계
 
 - 현재 등록 사진 조회·변경, 시착 지원 여부, 생성·상태 조회와 결과 저장 계약은
-  `.codex/requests/be/013-live-tryon-contract.md`에서 요청한다.
+  `.codex/requests/be/007-live-tryon-contract.md`에서 요청한다.
 - 실제 연동 전까지 query와 mock view model을 API 계약으로 사용하지 않는다.
 
 ## 제외 범위

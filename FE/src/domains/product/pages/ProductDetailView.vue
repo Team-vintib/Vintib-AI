@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { addWish, removeWish } from '@/domains/product/api/productApi'
 import {
   getProductDetailViewData,
   ProductDetailNotFoundError,
@@ -37,6 +39,7 @@ const PRODUCT_DETAIL_MOCK_SCENARIOS: ProductDetailMockScenario[] = [
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const product = ref<ProductDetailViewData | null>(null)
 const loadState = ref<ProductDetailLoadState>('loading')
@@ -97,8 +100,29 @@ const loadProductDetail = async () => {
   }
 }
 
-const handleToggleLike = () => {
-  isLiked.value = !isLiked.value
+const handleToggleLike = async () => {
+  if (!product.value) {
+    return
+  }
+
+  if (!authStore.isAuthenticated || !authStore.user?.id) {
+    await router.push({ name: ROUTE_NAMES.AUTH_LOGIN })
+    return
+  }
+
+  const wasLiked = isLiked.value
+  isLiked.value = !wasLiked
+
+  try {
+    if (wasLiked) {
+      await removeWish(authStore.user.id, product.value.id)
+    } else {
+      await addWish(authStore.user.id, product.value.id)
+    }
+  } catch {
+    isLiked.value = wasLiked
+    showTemporaryMessage('찜 상태를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+  }
 }
 
 const handleToggleCart = () => {

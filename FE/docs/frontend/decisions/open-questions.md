@@ -26,7 +26,7 @@
 | 카메라 권한 거부 감지 정책 | 미확정 | 모바일 `capture="environment"` 입력 사용, 취소 시 기존 상태 유지 |
 | 회원 유형 저장·최종 온보딩 완료 API | 미확정 | `/api/me/onboarding/complete`와 `GENERAL | BUSINESS` FE 선행 계약 사용, BE Swagger 확정 시 교체 |
 | 온보딩 완료 처리 시점 | BE Entity는 기본 정보 저장 시 완료 처리, 화면 흐름은 ONBOARD-004가 최종 단계 | BE 요청 문서에서 기본 정보 저장과 최종 완료 책임 분리 요청 |
-| 회원가입 직후 인증 토큰과 온보딩/BIZ route guard | 이메일 회원가입 응답에는 토큰이 없지만 온보딩·사업자 API 후보는 Bearer 인증을 사용 | 인증 계약 확정 전 ONBOARD·BIZ route는 가드를 적용하지 않음 |
+| 회원가입 직후 인증 토큰과 온보딩/BIZ route guard | 현재 회원가입 응답에는 토큰이 없고, 로그인 응답에는 토큰만 있으며 `user`/`nextStep`은 없음 | BE에 회원가입/로그인 응답 확장 또는 내 정보 조회 API를 요청한 상태. 확정 전 ONBOARD·BIZ route는 가드를 적용하지 않음 |
 | 사업자등록번호 검증 정책 | 숫자 10자리 외 체크섬 적용 주체 미확정 | FE는 숫자 10자리만 1차 검증 |
 | 사업자등록증 파일 정책 | 확장자, 정확한 MIME, 최대 용량과 최소 해상도 미확정 | 한 개 선택과 `image/*` MIME만 1차 검증 |
 | 사업자 인증 제출·상태 조회 API | endpoint, multipart 필드명, 오류·상태 규격 미확정 | `/api/business-verifications` 후보를 문서화하고 FE는 더미 제출 상태 사용 |
@@ -38,9 +38,10 @@
 | 항목 | 현재 상태 |
 | --- | --- |
 | 모바일/태블릿 breakpoint | 미확정, 1440px desktop first 우선 |
-| 파일 업로드 형식/용량/개수 | 상품 사진 최대 10장 외 세부 미확정 |
+| 상품 이미지 업로드 방식 | BE presigned 3단계 업로드 계약 확인됨. 허용 MIME은 `image/jpeg`, `image/png`, `image/webp`, 상품당 최대 10장. FE도 BE 개수 제한을 따른다 | FE 상품 등록 mock adapter를 실제 연동으로 교체할 때 3단계 업로드와 전체 10장 제한 적용 |
+| 상품 이미지 역할 | Front/Back/Additional 역할 저장 여부 미확정 | BE 상품 계약 보완 요청에 `role` 추가 검토로 남김 |
 | PROD-008 목록 API | pagination, 검색·필터·정렬 query와 상시/경매 가격 응답 구조 미확정 |
-| PROD-008 찜 표시 | 공개 목록 응답의 찜 여부와 비회원 클릭 정책 미확정 |
+| PROD-008 찜 표시 | 찜 등록/해제/목록 API 경로는 확인됨. 공개 목록/검색/상세 응답에 로그인 사용자 기준 `isLiked` 포함 여부는 미확정 | 현재 화면은 mock toggle 또는 로그인 redirect 유지 |
 | 결제 API | 추가 선정 필요 |
 | 배송 조회 API | 외부 API 미확정 |
 | 환불 조건 세부 정책 | 일부 미확정 |

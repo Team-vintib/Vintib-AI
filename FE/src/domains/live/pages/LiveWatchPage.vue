@@ -205,6 +205,15 @@ const openTryOn = () => {
   isTryOnOpen.value = true
 }
 
+const updateViewerCount = (viewerCount: number) => {
+  if (!live.value) return
+
+  live.value = {
+    ...live.value,
+    currentViewerCount: viewerCount,
+  }
+}
+
 watch(
   () => [route.params.liveId, route.query.mock],
   () => {
@@ -295,7 +304,12 @@ onBeforeUnmount(() => {
               @open-try-on="openTryOn"
             >
               <template #overlay>
-                <LiveChatOverlay :status="live.status" />
+                <LiveChatOverlay
+                  :live-id="live.id"
+                  :host-id="live.hostId"
+                  :status="live.status"
+                  @viewer-count="updateViewerCount"
+                />
               </template>
             </LiveVideoStage>
 

@@ -2,11 +2,9 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { submitBusinessVerification } from '@/domains/biz/api/businessVerification'
 import BusinessCertificateUploader from '@/domains/biz/components/BusinessCertificateUploader.vue'
-import {
-  BUSINESS_REGISTRATION_NUMBER_LENGTH,
-  BUSINESS_SUBMISSION_DELAY_MS,
-} from '@/domains/biz/constants/businessVerification'
+import { BUSINESS_REGISTRATION_NUMBER_LENGTH } from '@/domains/biz/constants/businessVerification'
 import { useBusinessVerificationStore } from '@/domains/biz/stores/businessVerificationStore'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 
@@ -136,11 +134,6 @@ const handleCertificateUpdate = (file: File | null) => {
   submitError.value = ''
 }
 
-const waitForDummySubmission = () =>
-  new Promise<void>((resolve) => {
-    window.setTimeout(resolve, BUSINESS_SUBMISSION_DELAY_MS)
-  })
-
 const handleSubmit = async () => {
   if (isSubmitting.value) {
     return
@@ -159,13 +152,26 @@ const handleSubmit = async () => {
   isSubmitting.value = true
 
   try {
-    await waitForDummySubmission()
+    const response = await submitBusinessVerification({
+      businessRegistrationNumber: businessRegistrationNumber.value,
+      businessName: businessName.value.trim(),
+      representativeName: representativeName.value.trim(),
+      certificate: certificateFile.value,
+    })
+
+    if (!response.success || !response.data) {
+      submitError.value = response.error?.message || '사업자 정보를 제출하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+      return
+    }
 
     businessVerificationStore.setSubmission({
+      id: response.data.id,
       businessRegistrationNumber: businessRegistrationNumber.value,
       businessName: businessName.value.trim(),
       representativeName: representativeName.value.trim(),
       certificateFile: certificateFile.value,
+      status: response.data.status,
+      submittedAt: new Date(response.data.submittedAt),
     })
 
     await router.push({ name: ROUTE_NAMES.BIZ_VERIFY_PENDING })

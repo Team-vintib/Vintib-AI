@@ -33,7 +33,7 @@ const formattedSubmittedAt = computed(() => {
 })
 
 const formattedFileSize = computed(() => {
-  const size = submission.value?.certificateFile.size ?? 0
+  const size = submission.value?.certificate.size ?? 0
 
   if (size < 1024) {
     return `${size} B`
@@ -60,7 +60,7 @@ watch(
   (certificateFile) => {
     releaseCertificatePreviewUrl()
 
-    if (certificateFile) {
+    if (certificateFile?.size) {
       certificatePreviewUrl.value = URL.createObjectURL(certificateFile)
     }
   },
@@ -135,8 +135,8 @@ const goHome = async () => {
           />
           <div>
             <strong>사업자등록증</strong>
-            <span :title="submission.certificateFile.name">
-              {{ submission.certificateFile.name }}
+            <span :title="submission.certificate.name">
+              {{ submission.certificate.name }}
             </span>
             <small>{{ formattedFileSize }}</small>
           </div>

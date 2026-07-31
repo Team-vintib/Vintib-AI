@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import {
   completeOnboarding,
   type OnboardingMemberType,
@@ -38,6 +39,7 @@ const memberTypeOptions: MemberTypeOption[] = [
 ]
 
 const router = useRouter()
+const authStore = useAuthStore()
 const selectedMemberType = ref<OnboardingMemberType | null>(null)
 const isSubmitting = ref(false)
 const submitError = ref('')
@@ -100,6 +102,8 @@ const handleComplete = async () => {
 
     const destination =
       memberType === 'GENERAL' ? ROUTE_PATHS.HOME : ROUTE_PATHS.BIZ_VERIFY
+
+    authStore.updateUser({ onboardingCompleted: true })
 
     await router.push(destination)
   } catch (error: unknown) {

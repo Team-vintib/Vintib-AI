@@ -13,10 +13,10 @@ const router = createRouter({
   },
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore()
 
-  authStore.hydrateSession()
+  await authStore.validateStoredSession()
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return {

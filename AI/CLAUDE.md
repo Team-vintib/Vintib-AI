@@ -148,8 +148,8 @@ from my_module import Something  # noqa: E402 — importorskip 이후 import
 | `docs/chat-advancement-strategy.md` | 라이브 댓글 관리(`app/chat/`) 개선 작업을 할 때. 실측 기반 한계점과 기법 우선순위가 있다 |
 | `docs/recommendation-advancement-strategy.md` | 브랜드 유사도 그래프(`app/recommend/`) 개선 작업을 할 때. 크롤링 텍스트 임베딩·다면 유사도·FE 전달 설계가 있다 |
 
-구현 전 설계 계획은 여기가 아니라 루트 `.claude/plans/ai/`에 있다. 소스 파일 docstring의
-`설계: .claude/plans/ai/00N-*.md` 줄이 해당 모듈의 설계 근거를 가리킨다 — 모듈을 고치기 전에
+구현 전 설계 계획은 여기가 아니라 루트 `docs/plans/AI/`에 있다. 소스 파일 docstring의
+`설계: docs/plans/AI/00N-*.md` 줄이 해당 모듈의 설계 근거를 가리킨다 — 모듈을 고치기 전에
 그 문서를 먼저 읽는다.
 
 ## 커밋/브랜치 규칙

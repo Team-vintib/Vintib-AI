@@ -1,7 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
+import {
+  addWish,
+  getProductList,
+  removeWish,
+} from '@/domains/product/api/productApi'
 import ProductCard from '@/domains/product/components/ProductCard.vue'
 import ProductFilterPanel from '@/domains/product/components/ProductFilterPanel.vue'
 import {
@@ -13,11 +19,13 @@ import type {
   ProductSaleTypeTab,
   ProductSortOption,
 } from '@/domains/product/types/productList.types'
+import { normalizeApiError } from '@/shared/api/http'
 import AppSearchBar from '@/shared/components/AppSearchBar.vue'
-import { ROUTE_NAMES } from '@/shared/constants/routes'
+import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const selectedCategoryIds = ref<string[]>([])
 const selectedConditionIds = ref<string[]>([])
 const selectedSaleType = ref<ProductSaleTypeTab['id']>('ALL')
@@ -29,9 +37,12 @@ const maximumPrice = ref('')
 const appliedMinimumPrice = ref<number | null>(null)
 const appliedMaximumPrice = ref<number | null>(null)
 const priceError = ref('')
-const likedProductIds = ref(
-  new Set(PRODUCT_LIST_MOCK_DATA.filter((product) => product.isLiked).map((product) => product.id)),
-)
+const products = ref(PRODUCT_LIST_MOCK_DATA)
+const totalProductCount = ref(PRODUCT_LIST_MOCK_DATA.length)
+const totalPageCount = ref(1)
+const isLoadingProducts = ref(false)
+const productLoadError = ref('')
+const likedProductIds = ref(new Set(PRODUCT_LIST_MOCK_DATA.filter((product) => product.isLiked).map((product) => product.id)))
 const filterStatusMessage = ref('')
 
 const selectedFilterCount = computed(
@@ -42,18 +53,9 @@ const selectedFilterCount = computed(
     Number(Boolean(maximumPrice.value)),
 )
 
-const filteredProducts = computed(() =>
-  PRODUCT_LIST_MOCK_DATA.filter((product) => {
-    if (appliedMinimumPrice.value !== null && product.price < appliedMinimumPrice.value) {
-      return false
-    }
-
-    if (appliedMaximumPrice.value !== null && product.price > appliedMaximumPrice.value) {
-      return false
-    }
-
-    return true
-  }),
+const filteredProducts = computed(() => products.value)
+const visiblePageNumbers = computed(() =>
+  Array.from({ length: totalPageCount.value }, (_, index) => index + 1),
 )
 
 const parseOptionalPrice = (value: string) => {
@@ -75,6 +77,7 @@ const handleFilterReset = () => {
   priceError.value = ''
   selectedPage.value = 1
   filterStatusMessage.value = '선택한 필터를 초기화했습니다.'
+  void loadProducts()
 }
 
 const handleFilterApply = () => {
@@ -102,10 +105,7 @@ const handleFilterApply = () => {
   appliedMinimumPrice.value = nextMinimumPrice
   appliedMaximumPrice.value = nextMaximumPrice
   selectedPage.value = 1
-  filterStatusMessage.value =
-    selectedFilterCount.value > 0
-      ? `선택한 필터를 적용해 상품 ${filteredProducts.value.length}개를 찾았습니다.`
-      : '전체 상품 조건을 선택했습니다.'
+  void loadProducts()
 }
 
 const handleSearch = async (keyword: string) => {
@@ -115,17 +115,105 @@ const handleSearch = async (keyword: string) => {
   })
 }
 
-const handleToggleLike = (productId: number) => {
+const loadProducts = async () => {
+  isLoadingProducts.value = true
+  productLoadError.value = ''
+
+  try {
+    await authStore.validateStoredSession()
+
+    if (!authStore.isAuthenticated) {
+      products.value = []
+      totalProductCount.value = 0
+      totalPageCount.value = 1
+      likedProductIds.value = new Set()
+      productLoadError.value = '상품 목록을 보려면 로그인이 필요합니다.'
+      await router.push({
+        name: ROUTE_NAMES.AUTH_LOGIN,
+        query: { redirect: ROUTE_PATHS.PRODUCT_LIST },
+      })
+      return
+    }
+
+    const response = await getProductList({
+      categoryIds: selectedCategoryIds.value,
+      conditionGrades: selectedConditionIds.value,
+      maxPrice: appliedMaximumPrice.value,
+      minPrice: appliedMinimumPrice.value,
+      page: selectedPage.value,
+      saleType: selectedSaleType.value,
+      sort: selectedSortOption.value,
+    })
+
+    products.value = response.items
+    totalProductCount.value = response.meta.totalElements
+    totalPageCount.value = Math.max(response.meta.totalPages, 1)
+    likedProductIds.value = new Set(response.items.filter((product) => product.isLiked).map((product) => product.id))
+    filterStatusMessage.value =
+      selectedFilterCount.value > 0
+        ? `선택한 필터를 적용해 상품 ${response.meta.totalElements}개를 찾았습니다.`
+        : '전체 상품 조건을 선택했습니다.'
+  } catch (error) {
+    const apiError = normalizeApiError(error)
+
+    products.value = []
+    totalProductCount.value = 0
+    totalPageCount.value = 1
+    likedProductIds.value = new Set()
+    productLoadError.value =
+      apiError.code === 'U010'
+        ? '로그인이 만료되었습니다. 다시 로그인한 뒤 상품 목록을 확인해 주세요.'
+        : '상품 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+
+  } finally {
+    isLoadingProducts.value = false
+  }
+}
+
+const handleToggleLike = async (productId: number) => {
+  if (!authStore.isAuthenticated || !authStore.user?.id) {
+    await router.push({ name: ROUTE_NAMES.AUTH_LOGIN })
+    return
+  }
+
+  const wasLiked = likedProductIds.value.has(productId)
   const nextLikedProductIds = new Set(likedProductIds.value)
 
-  if (nextLikedProductIds.has(productId)) {
+  if (wasLiked) {
     nextLikedProductIds.delete(productId)
   } else {
     nextLikedProductIds.add(productId)
   }
 
   likedProductIds.value = nextLikedProductIds
+
+  try {
+    if (wasLiked) {
+      await removeWish(authStore.user.id, productId)
+    } else {
+      await addWish(authStore.user.id, productId)
+    }
+  } catch {
+    likedProductIds.value = new Set(
+      wasLiked
+        ? [...nextLikedProductIds, productId]
+        : [...nextLikedProductIds].filter((likedProductId) => likedProductId !== productId),
+    )
+  }
 }
+
+const moveToPage = (page: number) => {
+  if (page < 1 || page > totalPageCount.value || page === selectedPage.value) {
+    return
+  }
+
+  selectedPage.value = page
+  void loadProducts()
+}
+
+onMounted(() => {
+  void loadProducts()
+})
 </script>
 
 <template>
@@ -165,16 +253,16 @@ const handleToggleLike = (productId: number) => {
                 type="button"
                 role="tab"
                 :aria-selected="selectedSaleType === tab.id"
-                @click="selectedSaleType = tab.id"
+                @click="selectedSaleType = tab.id; selectedPage = 1; loadProducts()"
               >
                 {{ tab.label }}
               </button>
             </div>
 
             <div class="product-list-page__toolbar">
-              <p>총 {{ filteredProducts.length }}개</p>
+              <p>총 {{ totalProductCount }}개</p>
               <label class="sr-only" for="product-sort">상품 정렬</label>
-              <select id="product-sort" v-model="selectedSortOption">
+              <select id="product-sort" v-model="selectedSortOption" @change="loadProducts">
                 <option
                   v-for="sortOption in PRODUCT_SORT_OPTIONS"
                   :key="sortOption.id"
@@ -188,8 +276,12 @@ const handleToggleLike = (productId: number) => {
 
           <p class="sr-only" aria-live="polite">{{ filterStatusMessage }}</p>
 
+          <p v-if="productLoadError" class="product-list-page__notice" role="status">
+            {{ productLoadError }}
+          </p>
+
           <div
-            v-if="filteredProducts.length"
+            v-if="!isLoadingProducts && filteredProducts.length"
             class="product-list-page__grid"
             aria-label="상품 목록"
           >
@@ -200,6 +292,10 @@ const handleToggleLike = (productId: number) => {
               :is-liked="likedProductIds.has(product.id)"
               @toggle-like="handleToggleLike"
             />
+          </div>
+
+          <div v-else-if="isLoadingProducts" class="product-list-page__empty" role="status">
+            <strong>상품 목록을 불러오는 중입니다.</strong>
           </div>
 
           <div v-else class="product-list-page__empty" role="status">
@@ -223,12 +319,12 @@ const handleToggleLike = (productId: number) => {
               </svg>
             </button>
             <button
-              v-for="page in 5"
+              v-for="page in visiblePageNumbers"
               :key="page"
               type="button"
               :class="{ 'product-list-page__page--active': selectedPage === page }"
               :aria-current="selectedPage === page ? 'page' : undefined"
-              @click="selectedPage = page"
+              @click="moveToPage(page)"
             >
               {{ page }}
             </button>
@@ -352,6 +448,18 @@ const handleToggleLike = (productId: number) => {
 .product-list-page__toolbar select:focus-visible {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.product-list-page__notice {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
 }
 
 .product-list-page__grid {

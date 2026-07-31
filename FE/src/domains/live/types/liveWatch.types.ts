@@ -77,6 +77,7 @@ export interface LiveDetailDto {
   startedAt: string | null
   endedAt: string | null
   peakViewerCount: number
+  currentViewerCount?: number
   products: LiveProductDto[]
   categories?: LiveCategoryDto[]
 }
