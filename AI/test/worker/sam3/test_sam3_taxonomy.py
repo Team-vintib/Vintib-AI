@@ -1,8 +1,8 @@
 """SAM3 레지스트리의 하자 분류 체계 검증 — LAB-12/LAB-46 실측 결론이 코드에 남아 있는지 지킨다.
 
-`worker/models/clipseg/registry.py`용 테스트(`test_clipseg_taxonomy.py`)와 같은 목적이다.
-값 자체는 clipseg 레지스트리와 같아야 한다(정책은 모델이 아니라 하자 유형에 대한 것 —
-`AI/test/quality/test_quality_contract.py`가 이 값이 갈라지지 않는지 별도로 대조한다).
+이 파일의 요점은 **모델이 못 하는 걸 잘하는 척하지 않는 상태를 고정**하는 것이다. 프롬프트를
+추가하다 보면 검증하지 않은 유형을 `trusted=True`로 열어버리기 쉽고, 그러면 신뢰도 없는 판정이
+`DETECTED`로 판매자·구매자에게 그대로 노출된다.
 """
 
 import pytest
@@ -70,21 +70,3 @@ def test_stain_outweighs_a_dirty_mark():
 def test_pilling_is_the_only_defect_exempt_from_a_seller_statement():
     exempt = {t for t, p in registry.DEFECT_TAXONOMY.items() if not p["statement_required"]}
     assert exempt == {DefectType.pilling}
-
-
-def test_taxonomy_policy_values_match_clipseg_registry():
-    """정책은 모델이 아니라 하자 유형 자체에 대한 것 — 두 백엔드 레지스트리가 갈라지면 안 된다.
-
-    `evidence`(백엔드별 검증 근거 서술)만 예외다 — SAM3 쪽은 LAB-46 실측을 별도로 인용하므로
-    문구 자체가 다르다. 판정에 실제로 쓰이는 필드(trusted/needs_seller_review/
-    statement_required/weight)만 값 일치를 지킨다.
-    """
-    import registry as clipseg_registry
-
-    assert set(registry.DEFECT_TAXONOMY) == set(clipseg_registry.DEFECT_TAXONOMY)
-    for defect_type, sam3_policy in registry.DEFECT_TAXONOMY.items():
-        clipseg_policy = clipseg_registry.DEFECT_TAXONOMY[defect_type]
-        for field in ("trusted", "needs_seller_review", "statement_required", "weight"):
-            assert (
-                sam3_policy[field] == clipseg_policy[field]
-            ), f"{defect_type}.{field} 이 clipseg 레지스트리와 어긋납니다"

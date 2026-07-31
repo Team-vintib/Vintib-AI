@@ -1,8 +1,8 @@
 """SAM3 레지스트리의 점수·등급 상수 정합성 검증.
 
-`worker/models/clipseg/registry.py`용 테스트(`test_clipseg_scoring_config.py`)와 같은 목적·같은
-값이어야 한다(점수 산식은 findings의 출처가 아니라 정책 문제) — **이 값들은 근거 없는
-임의값**이라 절대값은 고정하지 않고 순서·구조만 고정한다.
+**이 값들은 근거 없는 임의값**이라(라벨링된 검증셋이 없다) 절대값은 고정하지 않고 순서·구조만
+고정한다 — 가중치를 실측으로 갈아끼울 때 테스트가 발목을 잡지 않으면서도, "SUSPECTED가
+DETECTED보다 더 깎인다" 같은 뒤집힌 설정은 잡히게 하는 게 목적이다.
 """
 
 from sam3 import registry
@@ -59,17 +59,3 @@ def test_grade_thresholds_are_ordered_like_the_grades():
 
 def test_statement_exemption_switch_is_a_boolean_flag():
     assert isinstance(registry.EXEMPT_MINOR_SUSPECTED_FROM_STATEMENT, bool)
-
-
-def test_scoring_constants_match_clipseg_registry():
-    """두 백엔드가 같은 하자에 다른 점수를 매기면 판매자·구매자 신뢰가 깨진다."""
-    import registry as clipseg_registry
-
-    assert registry.SEVERITY_FACTORS == clipseg_registry.SEVERITY_FACTORS
-    assert registry.STATUS_FACTORS == clipseg_registry.STATUS_FACTORS
-    assert registry.SEVERITY_BOUNDS == clipseg_registry.SEVERITY_BOUNDS
-    assert registry.GRADE_THRESHOLDS == clipseg_registry.GRADE_THRESHOLDS
-    assert (
-        registry.EXEMPT_MINOR_SUSPECTED_FROM_STATEMENT
-        == clipseg_registry.EXEMPT_MINOR_SUSPECTED_FROM_STATEMENT
-    )

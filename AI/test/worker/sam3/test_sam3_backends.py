@@ -1,9 +1,7 @@
 """SAM3 세그멘터 백엔드 레지스트리 정합성 검증.
 
-`worker/models/clipseg/registry.py`용 테스트(`test_clipseg_backends.py`)와 같은 목적이지만,
-SAM3는 임계치 구성이 다르다(단일 `defect_threshold`가 아니라 `score_threshold`/
-`mask_threshold`/`garment_score_threshold` 세 갈래) — "동작"이 아니라 **설정이 서로
-어긋나지 않는지**를 지킨다.
+"동작"이 아니라 **설정이 서로 어긋나지 않는지**를 지킨다. SAM3는 단일 `defect_threshold`가
+아니라 `score_threshold`/`mask_threshold`/`garment_score_threshold` 세 갈래 임계치를 쓴다.
 """
 
 import pytest
@@ -35,7 +33,6 @@ def test_default_backend_needs_no_heavy_dependency():
 
 
 def test_expected_backends_are_available():
-    # 별도 분리(CH006 방식 B) — clipseg 레지스트리와 무관한 SAM3 전용 백엔드 집합이다.
     assert set(_BACKENDS) == {"mock", "sam3_pcs"}
 
 

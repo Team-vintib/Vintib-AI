@@ -1,9 +1,8 @@
 """SAM3 프롬프트 세트 조립 검증.
 
-`worker/models/clipseg/prompts.py`용 테스트(`test_clipseg_prompts.py`)와 달리, SAM3의
-`PromptSet`은 `clean_prompt`/`all_prompts`가 없고(모듈 docstring 참고 — 이진화 개념이 없어
-대조항이 필요 없다) `defect_prompts` 자체가 카테고리·색상과 무관하게 고정이다. 여기서는 그
-"조립이 깨지지 않는지"(placeholder 없음, 분류 체계 커버, key만 조합별로 갈라짐)만 지킨다.
+SAM3의 `PromptSet`은 `clean_prompt`/`all_prompts`가 없고(모듈 docstring 참고 — 이진화 개념이
+없어 대조항이 필요 없다) `defect_prompts` 자체가 카테고리·색상과 무관하게 고정이다. 여기서는
+그 "조립이 깨지지 않는지"(placeholder 없음, 분류 체계 커버, key만 조합별로 갈라짐)만 지킨다.
 """
 
 import pytest
@@ -81,7 +80,7 @@ def test_lab_verified_short_noun_phrases_survive_in_the_prompts():
 
 
 def test_defect_prompts_do_not_vary_by_category_or_color():
-    # SAM3 세트는 실측 결과에 따라 카테고리·색상별 문구 변형이 없다 — clipseg와의 핵심 차이.
+    # SAM3 세트는 실측 결과에 따라 카테고리·색상별 문구 변형이 없다.
     knit_light = select_prompt_set(GarmentCategory.top_knit, BaseColor.light)
     pants_dark = select_prompt_set(GarmentCategory.bottom_pants, BaseColor.dark)
     assert knit_light.defect_prompts == pants_dark.defect_prompts

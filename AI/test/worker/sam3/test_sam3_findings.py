@@ -1,9 +1,8 @@
-"""SAM3 네이티브 findings 추출 로직 검증 — CLIPSeg에는 없는 인스턴스 레벨 필터들.
+"""SAM3 네이티브 findings 추출 로직 검증 — 인스턴스 레벨 필터들.
 
 `filter_by_garment`(의류 겹침 안전망)·`suppress_benign`(구조적/질감형 양성 억제)·
-`_section_no_of`(마스크 무게중심 기반 3×3 섹션 매핑)는 SAM3 네이티브 경로(방식 B) 고유의
-로직이라 clipseg 쪽에 대응 테스트가 없다. `extract_findings`가 필터 통과분만
-`kept_instances_by_image`에 담는지(overlay.py가 의존하는 불변식)도 여기서 지킨다.
+`_section_no_of`(마스크 무게중심 기반 3×3 섹션 매핑)를 지킨다. `extract_findings`가 필터
+통과분만 `kept_instances_by_image`에 담는지(overlay.py가 의존하는 불변식)도 여기서 지킨다.
 """
 
 import numpy as np
