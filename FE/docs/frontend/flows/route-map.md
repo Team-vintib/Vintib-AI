@@ -122,7 +122,7 @@ flowchart TD
 | `/products/new`           | PROD-001~003 | true        | false     | 상품 등록 단계형 화면, 실제 등록 API 확정 전 mock adapter 사용 |
 | `/lives/new`              | LIVE 신규   | true         | false     | 라이브 시작 placeholder                          |
 | `/lives/:liveId`          | LIVE-005    | false        | false     | 419 전체 구조, 423 채팅·경매와 425 AI 시착 패널 mock UI 구현. 실제 스트리밍·채팅 STOMP·경매·AI API 연동 대기 |
-| `/notifications`          | NOTI        | true         | false     | 알림센터 placeholder                             |
+| `/notifications`          | NOTI        | true         | false     | 알림센터 목록·탭 필터·읽음 처리 UI 구현, 헤더 알림 팝업과 unread badge 연동 |
 | `/my`                     | MY          | true         | false     | 마이페이지 placeholder                           |
 | `/points`                 | POINT       | true         | false     | 포인트 placeholder                               |
 

@@ -1,0 +1,324 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+import NotificationCard from '@/domains/notification/components/NotificationCard.vue'
+import NotificationCenterState from '@/domains/notification/components/NotificationCenterState.vue'
+import { NOTIFICATION_TABS } from '@/domains/notification/constants/notificationOptions'
+import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
+import { normalizeApiError } from '@/shared/api/http'
+import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
+
+import type {
+  NotificationCategory,
+  NotificationItem,
+} from '@/domains/notification/types/notification.types'
+
+const notificationStore = useNotificationStore()
+const router = useRouter()
+const selectedCategory = ref<NotificationCategory>('ALL')
+const actionErrorMessage = ref('')
+
+const filteredNotifications = computed(() =>
+  selectedCategory.value === 'ALL'
+    ? notificationStore.items
+    : notificationStore.items.filter((item) => item.category === selectedCategory.value),
+)
+
+const isLoading = computed(() => notificationStore.isLoading)
+const hasLoadError = computed(() => notificationStore.hasLoadError)
+const isEmpty = computed(
+  () => notificationStore.loadState === 'success' && notificationStore.items.length === 0,
+)
+const isFilterEmpty = computed(
+  () =>
+    notificationStore.loadState === 'success' &&
+    notificationStore.items.length > 0 &&
+    filteredNotifications.value.length === 0,
+)
+
+const resultStatusMessage = computed(() => {
+  if (isLoading.value) return '알림 목록을 불러오는 중입니다.'
+  if (hasLoadError.value) return notificationStore.errorMessage
+
+  return `${filteredNotifications.value.length}개의 알림을 표시합니다. 읽지 않은 알림은 ${notificationStore.unreadCount}개입니다.`
+})
+
+const selectCategory = (category: NotificationCategory) => {
+  selectedCategory.value = category
+  actionErrorMessage.value = ''
+}
+
+const handleRetry = () => {
+  void notificationStore.loadNotifications({ page: 1 })
+}
+
+const handleMarkAllAsRead = async () => {
+  actionErrorMessage.value = ''
+
+  try {
+    await notificationStore.markAllAsRead()
+  } catch (error) {
+    actionErrorMessage.value = normalizeApiError(error).message
+  }
+}
+
+const handleSelectNotification = async (notification: NotificationItem) => {
+  actionErrorMessage.value = ''
+
+  try {
+    await notificationStore.markAsRead(notification.id)
+
+    if (!notification.route) {
+      actionErrorMessage.value = '연결된 화면이 아직 준비되지 않았습니다.'
+      return
+    }
+
+    await router.push(notification.route)
+  } catch (error) {
+    actionErrorMessage.value = normalizeApiError(error).message
+  }
+}
+
+onMounted(() => {
+  if (notificationStore.loadState === 'idle') {
+    void notificationStore.loadNotifications({ page: 1 })
+  }
+})
+</script>
+
+<template>
+  <DefaultLayout content-max-width="960px">
+    <section class="notification-page" aria-labelledby="notification-title">
+      <header class="notification-page__header">
+        <div>
+          <h1 id="notification-title">알림센터</h1>
+          <p>라이브, 경매, 거래와 배송 상태를 한곳에서 확인합니다.</p>
+        </div>
+
+        <button
+          class="notification-page__read-all"
+          type="button"
+          :disabled="
+            isLoading || notificationStore.unreadCount === 0 || notificationStore.isMarkingAllAsRead
+          "
+          @click="handleMarkAllAsRead"
+        >
+          모두 읽음
+        </button>
+      </header>
+
+      <div class="notification-page__summary" aria-label="알림 요약">
+        <span>전체 {{ notificationStore.totalElements }}개</span>
+        <strong>안 읽음 {{ notificationStore.unreadCount }}개</strong>
+      </div>
+
+      <div class="notification-page__tabs" role="tablist" aria-label="알림 카테고리">
+        <button
+          v-for="tab in NOTIFICATION_TABS"
+          :key="tab.id"
+          type="button"
+          role="tab"
+          :class="{ 'notification-page__tab--active': selectedCategory === tab.id }"
+          :aria-selected="selectedCategory === tab.id"
+          :disabled="isLoading"
+          @click="selectCategory(tab.id)"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+
+      <p class="sr-only" aria-live="polite">{{ resultStatusMessage }}</p>
+
+      <p v-if="actionErrorMessage" class="notification-page__action-error" role="alert">
+        {{ actionErrorMessage }}
+      </p>
+
+      <NotificationCenterState v-if="isLoading" variant="loading" />
+
+      <NotificationCenterState
+        v-else-if="hasLoadError"
+        variant="error"
+        title="알림을 불러오지 못했습니다"
+        :description="notificationStore.errorMessage"
+        @action="handleRetry"
+      />
+
+      <NotificationCenterState
+        v-else-if="isEmpty"
+        variant="empty"
+        title="도착한 알림이 없습니다"
+        description="새로운 소식이 생기면 이곳에 알림이 표시됩니다."
+      />
+
+      <NotificationCenterState
+        v-else-if="isFilterEmpty"
+        variant="filter-empty"
+        title="선택한 카테고리의 알림이 없습니다"
+        description="전체 탭에서 다른 알림을 확인할 수 있습니다."
+        @action="selectCategory('ALL')"
+      />
+
+      <div v-else class="notification-page__list" aria-label="알림 목록">
+        <NotificationCard
+          v-for="notification in filteredNotifications"
+          :key="notification.id"
+          :notification="notification"
+          :disabled="notificationStore.readingIds.has(notification.id)"
+          @select="handleSelectNotification"
+        />
+      </div>
+    </section>
+  </DefaultLayout>
+</template>
+
+<style scoped lang="scss">
+.notification-page {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.notification-page__header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.notification-page__eyebrow {
+  margin-bottom: var(--space-1);
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: var(--font-weight-bold);
+  line-height: 20px;
+}
+
+.notification-page__header h1 {
+  color: var(--color-text-primary);
+  font-size: 36px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 44px;
+}
+
+.notification-page__header p:not(.notification-page__eyebrow) {
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.notification-page__read-all {
+  min-height: var(--button-height-small);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.notification-page__read-all:disabled {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-muted);
+}
+
+.notification-page__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.notification-page__summary strong {
+  color: var(--color-primary);
+}
+
+.notification-page__tabs {
+  display: flex;
+  align-items: end;
+  gap: var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.notification-page__tabs button {
+  position: relative;
+  min-height: 46px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 15px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.notification-page__tabs button::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: transparent;
+  content: '';
+}
+
+.notification-page__tabs button:hover:not(:disabled),
+.notification-page__tabs button:focus-visible,
+.notification-page__tab--active {
+  color: var(--color-primary);
+}
+
+.notification-page__tab--active::after {
+  background: var(--color-primary);
+}
+
+.notification-page__tabs button:focus-visible,
+.notification-page__read-all:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 2px;
+}
+
+.notification-page__action-error {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 22px;
+}
+
+.notification-page__list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .notification-page__header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .notification-page__header h1 {
+    font-size: 30px;
+    line-height: 38px;
+  }
+
+  .notification-page__read-all {
+    width: 100%;
+  }
+
+  .notification-page__tabs {
+    overflow-x: auto;
+    gap: var(--space-4);
+  }
+
+  .notification-page__tabs button {
+    flex: 0 0 auto;
+  }
+}
+</style>

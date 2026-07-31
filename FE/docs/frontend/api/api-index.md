@@ -390,8 +390,73 @@ Authorization: Bearer {accessToken}
 | 배송   | `/api/shipments`                                                     |
 | 환불   | `/api/refunds`                                                       |
 | 포인트 | `/api/points`, `/api/points/transactions`, `/api/points/withdrawals` |
-| 알림   | `/api/notifications`                                                 |
+| 알림   | `/api/users/{userId}/alerts`                                         |
 | 팔로우 | `/api/users/{id}/follow`                                             |
+
+### 알림 목록·읽음 처리
+
+BE 구현 기준 계약입니다. 기존 후보였던 `/api/notifications`는 사용하지 않습니다.
+
+#### 알림 목록 조회
+
+```http
+GET /api/users/{userId}/alerts?unreadOnly=false&page=0&size=20
+Authorization: Bearer {accessToken}
+```
+
+- `{userId}`는 로그인한 본인 ID와 같아야 하며 다르면 `N002`입니다.
+- `page`는 0-base입니다.
+- 정렬은 BE에서 안 읽은 알림 우선, 최신순으로 고정합니다.
+- 서버 카테고리 필터는 없으므로 FE 탭은 `type` 또는 `refType` 기준으로 분류합니다.
+
+성공 응답의 `data`는 BE 공통 `PageResponse` 구조입니다.
+
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "type": "AUCTION_WON",
+      "title": "낙찰되었습니다",
+      "body": "빈티지 자켓 경매에서 낙찰되었습니다.",
+      "refType": "AUCTION",
+      "refId": 10,
+      "isRead": false,
+      "createdAt": "2026-07-29T12:00:00"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1,
+  "hasNext": false
+}
+```
+
+#### 알림 읽음 처리
+
+```http
+PATCH /api/users/{userId}/alerts/{id}
+Authorization: Bearer {accessToken}
+```
+
+성공 응답의 `data`는 `id`, `isRead`를 포함합니다. 이미 읽은 알림도 정상 처리됩니다.
+
+#### 전체 읽음 처리
+
+```http
+PATCH /api/users/{userId}/alerts/read-all
+Authorization: Bearer {accessToken}
+```
+
+성공 응답의 `data.updatedCount`는 이번 요청으로 읽음 처리된 알림 수입니다. 대상이 없어도 정상 처리됩니다.
+
+오류 코드:
+
+| 코드 | 의미 |
+| --- | --- |
+| `N001` | 존재하지 않는 알림 |
+| `N002` | 본인 외 사용자의 알림 조회/처리 |
 
 ### 상품 목록 조회
 
