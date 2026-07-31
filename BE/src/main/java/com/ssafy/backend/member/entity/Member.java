@@ -106,4 +106,13 @@ public class Member extends BaseTimeEntity {
         this.gender = gender;
         this.onboardingCompleted = true;
     }
+
+    /**
+     * ONBOARD-004: 회원 유형(일반/사업자)을 저장하고 온보딩을 최종 완료 처리한다.
+     * 이미 완료한 회원이 다시 호출해도 유형만 갱신하고 성공 처리한다(멱등).
+     */
+    public void completeOnboarding(MemberType memberType) {
+        this.memberType = memberType;
+        this.onboardingCompleted = true;
+    }
 }

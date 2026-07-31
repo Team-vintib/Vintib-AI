@@ -10,12 +10,14 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.dto.request.UpdateInterestsRequest;
 import com.ssafy.backend.member.dto.request.UpdateMemberRequest;
+import com.ssafy.backend.member.dto.request.UpdateMemberTypeRequest;
 import com.ssafy.backend.member.dto.response.InterestsResponse;
 import com.ssafy.backend.member.dto.response.MemberProfileResponse;
 import com.ssafy.backend.member.entity.Gender;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.entity.MemberInterestBrand;
 import com.ssafy.backend.member.entity.MemberInterestCategory;
+import com.ssafy.backend.member.entity.MemberType;
 import com.ssafy.backend.member.repository.MemberInterestBrandRepository;
 import com.ssafy.backend.member.repository.MemberInterestCategoryRepository;
 import com.ssafy.backend.member.repository.MemberRepository;
@@ -154,6 +156,63 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.updateBasicInfo(MEMBER_ID, MEMBER_ID, createRequest()))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NICKNAME_ALREADY_TAKEN);
+    }
+
+    @Test
+    void 회원_유형을_저장하면_온보딩완료_응답을_반환한다() {
+        // given
+        Member member = createMember();
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+
+        UpdateMemberTypeRequest request = new UpdateMemberTypeRequest(MemberType.BUSINESS);
+
+        // when
+        MemberProfileResponse response = userService.completeOnboarding(MEMBER_ID, MEMBER_ID, request);
+
+        // then
+        assertThat(response.memberType()).isEqualTo(MemberType.BUSINESS);
+        assertThat(response.onboardingCompleted()).isTrue();
+    }
+
+    @Test
+    void 본인이_아닌_회원의_유형을_저장하면_FORBIDDEN_예외가_발생한다() {
+        // given
+        Long otherMemberId = 999L;
+        UpdateMemberTypeRequest request = new UpdateMemberTypeRequest(MemberType.GENERAL);
+
+        // when / then
+        assertThatThrownBy(() -> userService.completeOnboarding(MEMBER_ID, otherMemberId, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MEMBER_FORBIDDEN);
+    }
+
+    @Test
+    void 존재하지_않는_회원이면_유형_저장시_USER_NOT_FOUND_예외가_발생한다() {
+        // given
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+        UpdateMemberTypeRequest request = new UpdateMemberTypeRequest(MemberType.GENERAL);
+
+        // when / then
+        assertThatThrownBy(() -> userService.completeOnboarding(MEMBER_ID, MEMBER_ID, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
+    }
+
+    @Test
+    void 이미_온보딩을_완료한_회원이_다시_요청해도_정상_처리된다() {
+        // given: 재요청은 멱등 성공으로 처리한다 — 유형만 갱신하고 막지 않는다.
+        Member member = createMember();
+        member.completeOnboarding(MemberType.GENERAL);
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+
+        UpdateMemberTypeRequest request = new UpdateMemberTypeRequest(MemberType.BUSINESS);
+
+        // when
+        MemberProfileResponse response = userService.completeOnboarding(MEMBER_ID, MEMBER_ID, request);
+
+        // then
+        assertThat(response.memberType()).isEqualTo(MemberType.BUSINESS);
+        assertThat(response.onboardingCompleted()).isTrue();
     }
 
     @Test
