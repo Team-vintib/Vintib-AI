@@ -247,10 +247,14 @@
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `email` | `varchar(255)` | NOT NULL |  | UQ | 로그인 ID 겸 연락 수단. 경매 화면에는 노출하지 않는다. |
-| `password_hash` | `varchar(255)` |  |  |  | 자체 로그인용 해시. SSO 전용 계정은 NULL. |
-| `nickname` | `varchar(30)` | NOT NULL |  | UQ | 공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011). |
+| `password` | `varchar(255)` |  |  |  | 자체 로그인용 해시. SSO 전용 계정은 NULL. |
+| `nickname` | `varchar(30)` |  |  | UQ | 공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011). |
 | `name` | `varchar(50)` |  |  |  | 실명. 배송·정산용이며 외부 노출 금지. |
-| `phone` | `varchar(20)` |  |  |  | 연락처. 배송·정산 확인용이며 외부 노출 금지. |
+| `phone_number` | `varchar(20)` |  |  |  | 연락처. 배송·정산 확인용이며 외부 노출 금지. |
+| `address` | `varchar(200)` |  |  |  | 기본 주소(도로명/지번). 온보딩(ONBOARD-001)에서 입력. |
+| `detail_address` | `varchar(100)` |  |  |  | 상세 주소(동/호수 등). |
+| `postal_code` | `varchar(10)` |  |  |  | 우편번호. 주소 검색을 안 쓰고 직접 입력하면 NULL 허용. |
+| `gender` | `varchar(10)` |  |  |  | MALE \| FEMALE |
 | `member_type` | `varchar(20)` | NOT NULL | `'GENERAL'` |  | GENERAL(일반) \| BUSINESS(사업자) |
 | `status` | `varchar(20)` | NOT NULL | `'ACTIVE'` |  | ACTIVE \| SUSPENDED(정지) \| WITHDRAWN(탈퇴) |
 | `profile_image_url` | `varchar(500)` |  |  |  | 프로필 이미지 URL. |
@@ -261,6 +265,7 @@
 
 **CHECK 제약**
 
+- `ck_member_gender` — `CHECK (((gender)::text = ANY ((ARRAY['MALE'::character varying, 'FEMALE'::character varying])::text[])))`
 - `ck_member_status` — `CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'SUSPENDED'::character varying, 'WITHDRAWN'::character varying])::text[])))`
 - `ck_member_type` — `CHECK (((member_type)::text = ANY ((ARRAY['GENERAL'::character varying, 'BUSINESS'::character varying])::text[])))`
 
@@ -486,6 +491,9 @@
 | `description` | `text` |  |  |  | 상품 상세 설명. |
 | `condition_grade` | `varchar(20)` |  |  |  | 중고 상태 등급. ⚠️ 등급 체계 미확정이라 자유 문자열. |
 | `size_label` | `varchar(50)` |  |  |  | 사이즈 표기(S/M/L, 95/100 등). 브랜드마다 달라 문자열로 둔다. |
+| `color` | `varchar(50)` |  |  |  | 색상(자유 문자열). |
+| `material` | `varchar(50)` |  |  |  | 소재(자유 문자열). |
+| `measurements` | `jsonb` |  |  |  | 실측 치수(cm). 항목(총장/어깨너비 등)이 상품마다 달라 JSONB로 저장. |
 | `sale_type` | `varchar(20)` |  |  |  | DIRECT_SALE(상시 판매) \| AUCTION(경매) |
 | `sale_status` | `varchar(30)` | NOT NULL | `'DRAFT'` |  | DRAFT \| ON_SALE \| AUCTION_SCHEDULED \| AUCTION_IN_PROGRESS \| SOLD |
 | `price` | `bigint` |  |  |  | 상시 판매가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002). |
@@ -508,6 +516,19 @@
 - `ix_product_seller` — `CREATE INDEX ix_product_seller ON public.product USING btree (seller_id, created_at DESC)`
 - `ix_product_status_created` — `CREATE INDEX ix_product_status_created ON public.product USING btree (sale_status, created_at DESC) WHERE (deleted_at IS NULL)`
 - `ix_product_title_trgm` — `CREATE INDEX ix_product_title_trgm ON public.product USING gin (title gin_trgm_ops)`
+
+---
+
+### `product_defect`
+
+판매자가 직접 입력한 하자 목록 (PROD-001).
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `product_id` | `bigint` | NOT NULL |  | FK→product | 대상 상품. |
+| `content` | `text` | NOT NULL |  |  | 하자 내용(자유 문자열). |
+| `sort_order` | `smallint` | NOT NULL | `0` |  | 노출 순서. |
 
 ---
 

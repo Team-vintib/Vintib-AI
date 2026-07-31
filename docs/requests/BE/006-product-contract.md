@@ -28,62 +28,23 @@
   - presigned URL 기반 이미지 업로드/등록 플로우
   - 상품 상세 찜 추가/해제
 - 현재 임시 처리 또는 Mock 사용 여부
-  - 목록 query 필터 일부는 FE에서 보내지만 BE 미구현이면 결과에 반영되지 않는다.
+  - 목록 필터(카테고리/상태등급/판매방식/가격범위/정렬)는 구현 완료 — 아래 3.1 참고. `keyword`
+    (검색어)만 아직 미구현이다(SEARCH-002 스코프, PROD-008과 별도).
   - 상품 상세의 가격 분포, 유사 상품, AI 품질 분석/가격 추천은 화면 내 mock 또는 임시 데이터 성격이 남아 있다.
 
 ## 3. 추가 구현 요청
 
-### 3.1 상품 목록 필터 구현/문서화
+### 3.1 상품 목록 필터 구현/문서화 — `keyword` 제외 구현 완료
 
-- Method / Endpoint: `GET /api/products`
-- 요청 목적: FE 상품 목록 필터 UI가 실제 조회 결과에 반영되도록 한다.
-- FE 사용처: `ProductListView.vue`
-- 요청 데이터
-  - Query
-    - `keyword`: string | null
-    - `categoryIds`: string | null, comma-separated ids
-    - `conditionGrades`: string | null, comma-separated grades
-    - `saleType`: `DIRECT` | `AUCTION` | null
-    - `minPrice`: number | null
-    - `maxPrice`: number | null
-    - `sort`: string | null
-    - `page`: number
-    - `size`: number
-- 응답 데이터
-  - 기존 PageResponse<Product> 유지
-- 응답 예시
+`GET /api/products`에 `categoryIds`(복수), `conditionGrades`(복수), `saleType`
+(`DIRECT_SALE`/`AUCTION` — 기존 엔티티 enum 그대로, 협의 필요 사항의 "DIRECT vs DIRECT_SALE"
+질문은 이걸로 확정), `minPrice`, `maxPrice`, `sort`(`LATEST`/`PRICE_ASC`/`PRICE_DESC`)를
+요청 그대로의 파라미터명으로 구현했다. 응답도 기존 `PageResponse<ProductResponse>` 그대로다
+(요청한 필드 변경 없음).
 
-```json
-{
-  "success": true,
-  "data": {
-    "content": [
-      {
-        "id": 1,
-        "sellerId": 10,
-        "categoryId": 2,
-        "categoryName": "자켓",
-        "brandId": 1,
-        "brandName": "Levi's",
-        "title": "빈티지 자켓",
-        "conditionGrade": "A",
-        "saleType": "DIRECT_SALE",
-        "saleStatus": "ON_SALE",
-        "price": 59000,
-        "primaryImageUrl": null,
-        "isWished": false,
-        "createdAt": "2026-07-31T12:00:00"
-      }
-    ],
-    "page": 0,
-    "size": 20,
-    "totalElements": 1,
-    "totalPages": 1,
-    "hasNext": false
-  },
-  "error": null
-}
-```
+**`keyword`(검색어)만 아직 없다** — `PROD-008`(상품 목록 필터·정렬) 계획 범위 밖이고,
+`/search`(SEARCH-001/002, 통합 검색)가 아직 통째로 미구현 상태라 그쪽에서 다룰 문제로 본다.
+FE가 목록 화면에서 검색어까지 당장 필요하면 별도 요청으로 우선순위를 알려달라.
 
 ### 3.2 상품 상세 응답 보강
 
@@ -127,7 +88,7 @@
 ## 4. 기존 API 변경 요청
 
 - 기존 요청·응답에서 변경할 내용
-  - `GET /api/products` query 필터 반영
+  - `GET /api/products` query 필터 반영 — `keyword` 제외 완료(3.1 참고)
   - `GET /api/products/{id}` 상세 응답 보강
 - 추가할 필드
   - 이미지 role 정책 필요 시 `images[].role`: `FRONT` | `BACK` | `ADDITIONAL`
@@ -152,9 +113,7 @@
 
 ## 6. 협의 필요 사항
 
-- FE·BE 간 결정이 필요한 내용
-  - 목록 query 필터 이름과 enum 이름
-  - `saleType` enum을 `DIRECT`, `DIRECT_SALE`, `AUCTION` 중 무엇으로 통일할지
+- FE·BE 간 결정이 필요한 내용 — 목록 필터 파라미터명·`saleType` enum은 3.1에서 확정돼 제외함
   - 비회원 목록/상세의 `isWished` 값 정책
   - 이미지 role 저장 여부
   - AI 품질 분석 endpoint 위치

@@ -61,8 +61,13 @@ fi
 #   1) set -u 만 믿으면 위에서부터 하나씩 터져, CI/CD Variables 를 한 번에 못 채운다.
 #   2) `cat > .env` 는 리다이렉션이 먼저 처리되므로 확장이 실패하면 운영 .env 가
 #      빈 파일로 남는다 → 다음 배포의 롤백 기준 태그(PREVIOUS_TAG)까지 사라진다.
+#
+# ⚠️ PROD_LIVEKIT_NODE_IP 는 EC2 공인 IP 다. 비어 있으면 미디어 서버가 컨테이너 사설
+#    IP(172.x)를 ICE 후보로 뿌려서 브라우저가 영상에 붙지 못한다 — **에러 없이 화면만
+#    검게 나오는** 형태라 원인을 찾기 어렵다. 그래서 필수 변수로 둔다.
 REQUIRED_VARS="DB_NAME DB_USERNAME PROD_DB_PASSWORD IMAGE_TAG CORS_ALLOWED_ORIGINS
-PROD_MINIO_ROOT_USER PROD_MINIO_ROOT_PASSWORD"
+PROD_MINIO_ROOT_USER PROD_MINIO_ROOT_PASSWORD PROD_MAIL_USERNAME PROD_MAIL_PASSWORD
+PROD_OPENVIDU_API_KEY PROD_OPENVIDU_API_SECRET PROD_OPENVIDU_SERVER_URL PROD_LIVEKIT_NODE_IP"
 
 missing=""
 for name in $REQUIRED_VARS; do
@@ -89,7 +94,14 @@ IMAGE_TAG=${IMAGE_TAG}
 CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
 MINIO_ROOT_USER=${PROD_MINIO_ROOT_USER}
 MINIO_ROOT_PASSWORD=${PROD_MINIO_ROOT_PASSWORD}
+MAIL_USERNAME=${PROD_MAIL_USERNAME}
+MAIL_PASSWORD=${PROD_MAIL_PASSWORD}
 AWS_S3_PUBLIC_ENDPOINT=${PUBLIC_ORIGIN}
+OPENVIDU_API_KEY=${PROD_OPENVIDU_API_KEY}
+OPENVIDU_API_SECRET=${PROD_OPENVIDU_API_SECRET}
+OPENVIDU_SERVER_URL=${PROD_OPENVIDU_SERVER_URL}
+OPENVIDU_API_URL=http://livekit:7880
+LIVEKIT_NODE_IP=${PROD_LIVEKIT_NODE_IP}
 ENV
 mv "$DEPLOY_DIR/.env.tmp" "$DEPLOY_DIR/.env"
 
@@ -101,6 +113,19 @@ $COMPOSE build
 
 log "서비스 교체"
 $COMPOSE up -d
+
+# Caddyfile 은 bind mount 라 **내용이 바뀌어도 compose 가 컨테이너를 다시 만들지 않는다.**
+# Caddy 는 기동 시 한 번만 설정을 읽으므로, 그대로 두면 새 라우팅이 반영되지 않은 채
+# 배포가 "성공"으로 끝난다 — 실제로 -448 에서 /rtc 라우팅이 이 이유로 누락됐다.
+# reload 는 무중단이고, 설정이 잘못되면 기존 설정을 유지한 채 실패한다.
+log "Caddy 설정 반영"
+if docker exec vintib-caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
+    log "  Caddy reload 완료"
+else
+    # 배포 자체를 실패시키지는 않는다 — 백엔드는 이미 새 버전으로 떴고,
+    # Caddy 는 옛 설정으로라도 서비스를 계속하는 편이 낫다.
+    log "  !! Caddy reload 실패 — 라우팅이 옛 설정일 수 있다. Caddyfile 문법을 확인할 것"
+fi
 
 # ---------- 4. 헬스체크 ----------
 # backend 가 healthy 가 되어야 배포 성공으로 본다.

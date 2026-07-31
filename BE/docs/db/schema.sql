@@ -21,10 +21,16 @@
 CREATE TABLE member (
     id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email             VARCHAR(255) NOT NULL UNIQUE,
-    password_hash     VARCHAR(255),                    -- SSO 전용 계정은 NULL
-    nickname          VARCHAR(30)  NOT NULL UNIQUE,    -- 경매 최고 입찰자 표시에 사용(AUCT-011)
+    password          VARCHAR(255),                    -- SSO 전용 계정은 NULL
+    -- 온보딩 완료 전에는 NULL이고, 온보딩 완료 시 애플리케이션에서 필수로 검증한다(UNIQUE만 DB가 보장).
+    nickname          VARCHAR(30)  UNIQUE,              -- 경매 최고 입찰자 표시에 사용(AUCT-011)
     name              VARCHAR(50),
-    phone             VARCHAR(20),
+    phone_number      VARCHAR(20),
+    -- 온보딩(ONBOARD-001)에서 채워지는 정보. 가입 시점에는 전부 NULL이다.
+    address           VARCHAR(200),
+    detail_address    VARCHAR(100),
+    postal_code       VARCHAR(10),                     -- 주소 검색을 안 쓰고 직접 입력하면 NULL 허용
+    gender            VARCHAR(10),
     member_type       VARCHAR(20)  NOT NULL DEFAULT 'GENERAL',
     status            VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
     profile_image_url VARCHAR(500),
@@ -33,7 +39,8 @@ CREATE TABLE member (
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     deleted_at        TIMESTAMPTZ,
     CONSTRAINT ck_member_type   CHECK (member_type IN ('GENERAL', 'BUSINESS')),
-    CONSTRAINT ck_member_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'WITHDRAWN'))
+    CONSTRAINT ck_member_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'WITHDRAWN')),
+    CONSTRAINT ck_member_gender CHECK (gender IN ('MALE', 'FEMALE'))
 );
 
 -- 싸피어스 SSO 등 외부 계정 연결 (AUTH-003, AUTH-004)
@@ -115,6 +122,9 @@ CREATE TABLE product (
     description     TEXT,
     condition_grade VARCHAR(20),                     -- 중고 상태 등급 (체계 미확정)
     size_label      VARCHAR(50),
+    color           VARCHAR(50),
+    material        VARCHAR(50),
+    measurements    JSONB,                           -- 실측 치수(cm). 항목이 상품마다 달라 고정 컬럼 대신 JSONB
     sale_type       VARCHAR(20),                     -- 상시 판매 / 경매. 기본 정보 저장 시점에는 NULL,
                                                        -- 판매 채널을 정하는 API(판매 가격 설정/경매 조건 설정)
                                                        -- 호출 시 확정된다
@@ -146,6 +156,14 @@ CREATE TABLE product_image (
     image_key  VARCHAR(500) NOT NULL,
     sort_order SMALLINT     NOT NULL DEFAULT 0,
     is_primary BOOLEAN      NOT NULL DEFAULT FALSE
+);
+
+-- 판매자가 직접 입력한 하자 목록 (PROD-001)
+CREATE TABLE product_defect (
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    product_id BIGINT      NOT NULL REFERENCES product (id),
+    content    TEXT        NOT NULL,
+    sort_order SMALLINT    NOT NULL DEFAULT 0
 );
 
 -- 찜 (MY-009)

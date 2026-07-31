@@ -89,6 +89,9 @@ public class SecurityConfig {
                         // 채팅 이력 조회(CHAT-001)도 비회원 공개. 시청이 열려 있으니 대화 읽기도
                         // 열어야 한다. 발언은 STOMP 쪽에서 principal 유무로 막는다.
                         .requestMatchers(HttpMethod.GET, "/api/lives/{liveId}/chat-messages").permitAll()
+                        // 영상 접속 토큰도 비회원 발급 대상이다. 시청이 열려 있으니 영상도 열어야 한다.
+                        // 발행 권한은 토큰 안에서 갈린다 — 호스트 본인일 때만 송출이 허용된다.
+                        .requestMatchers(HttpMethod.POST, "/api/lives/{liveId}/video-token").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

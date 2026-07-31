@@ -12,13 +12,17 @@
 -- ---------- 회원 ----------
 COMMENT ON TABLE member IS '서비스 회원. 판매자·구매자 구분 없이 한 테이블을 쓴다.';
 COMMENT ON COLUMN member.email             IS '로그인 ID 겸 연락 수단. 경매 화면에는 노출하지 않는다.';
-COMMENT ON COLUMN member.password_hash     IS '자체 로그인용 해시. SSO 전용 계정은 NULL.';
+COMMENT ON COLUMN member.password          IS '자체 로그인용 해시. SSO 전용 계정은 NULL.';
 COMMENT ON COLUMN member.nickname          IS '공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011).';
 COMMENT ON COLUMN member.name              IS '실명. 배송·정산용이며 외부 노출 금지.';
 COMMENT ON COLUMN member.member_type       IS 'GENERAL(일반) | BUSINESS(사업자)';
 COMMENT ON COLUMN member.status            IS 'ACTIVE | SUSPENDED(정지) | WITHDRAWN(탈퇴)';
 COMMENT ON COLUMN member.onboarding_done   IS '온보딩(관심 브랜드·카테고리·신체 정보) 완료 여부.';
 COMMENT ON COLUMN member.deleted_at        IS '탈퇴 시각. 입찰·주문 이력이 FK 로 남아 물리 삭제하지 않는다.';
+COMMENT ON COLUMN member.address           IS '기본 주소(도로명/지번). 온보딩(ONBOARD-001)에서 입력.';
+COMMENT ON COLUMN member.detail_address    IS '상세 주소(동/호수 등).';
+COMMENT ON COLUMN member.postal_code       IS '우편번호. 주소 검색을 안 쓰고 직접 입력하면 NULL 허용.';
+COMMENT ON COLUMN member.gender            IS 'MALE | FEMALE';
 
 COMMENT ON TABLE member_social_account IS '외부 계정 연결 (AUTH-003, AUTH-004). 한 회원이 여러 provider 를 가질 수 있다.';
 COMMENT ON COLUMN member_social_account.provider         IS 'SSO 공급자. 현재 SSAFY 만 허용.';
@@ -50,6 +54,9 @@ COMMENT ON TABLE product IS '판매 상품. 라이브·경매·주문이 모두 
 COMMENT ON COLUMN product.seller_id       IS '판매자.';
 COMMENT ON COLUMN product.condition_grade IS '중고 상태 등급. ⚠️ 등급 체계 미확정이라 자유 문자열.';
 COMMENT ON COLUMN product.size_label      IS '사이즈 표기(S/M/L, 95/100 등). 브랜드마다 달라 문자열로 둔다.';
+COMMENT ON COLUMN product.color           IS '색상(자유 문자열).';
+COMMENT ON COLUMN product.material        IS '소재(자유 문자열).';
+COMMENT ON COLUMN product.measurements    IS '실측 치수(cm). 항목(총장/어깨너비 등)이 상품마다 달라 JSONB로 저장.';
 COMMENT ON COLUMN product.sale_type       IS 'DIRECT_SALE(상시 판매) | AUCTION(경매)';
 COMMENT ON COLUMN product.sale_status     IS 'DRAFT | ON_SALE | AUCTION_SCHEDULED | AUCTION_IN_PROGRESS | SOLD';
 COMMENT ON COLUMN product.price           IS '상시 판매가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002).';
@@ -59,6 +66,10 @@ COMMENT ON COLUMN product.deleted_at      IS '삭제 시각. 주문 이력 보�
 COMMENT ON TABLE product_image IS '상품 이미지. 시착(TRYON-003) 입력으로도 쓰인다.';
 COMMENT ON COLUMN product_image.sort_order IS '노출 순서.';
 COMMENT ON COLUMN product_image.is_primary IS '대표 이미지 여부. 목록·썸네일에 쓴다.';
+
+COMMENT ON TABLE product_defect IS '판매자가 직접 입력한 하자 목록 (PROD-001).';
+COMMENT ON COLUMN product_defect.content    IS '하자 내용(자유 문자열).';
+COMMENT ON COLUMN product_defect.sort_order IS '노출 순서.';
 
 COMMENT ON TABLE wish   IS '찜 (MY-009). 추천(REC-001) 입력.';
 COMMENT ON TABLE follow IS '회원 팔로우 (FOLLOW-001). 팔로잉 콘텐츠 조회(HOME-002)의 기준.';
@@ -148,7 +159,7 @@ COMMENT ON COLUMN notification.is_read  IS '읽음 여부. 알림함 기본 조�
 
 
 -- ---------- 나머지 컬럼 ----------
-COMMENT ON COLUMN member.phone             IS '연락처. 배송·정산 확인용이며 외부 노출 금지.';
+COMMENT ON COLUMN member.phone_number      IS '연락처. 배송·정산 확인용이며 외부 노출 금지.';
 COMMENT ON COLUMN member.profile_image_url IS '프로필 이미지 URL.';
 
 COMMENT ON COLUMN brand.name    IS '브랜드명. 중복 불가.';
