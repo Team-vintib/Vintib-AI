@@ -13,10 +13,10 @@
 
 ## 파일 규칙
 
-- 경로: `.claude/plans/<파트>/<이니셜><번호>-<slug>.md` (파트: `be` / `fe` / `ai`)
+- 경로: `docs/plans/<파트>/<이니셜><번호>-<slug>.md` (파트: `BE` / `FE` / `AI` 대문자)
   - 이니셜: 작성자를 구분하는 영문 대문자 2자. 같은 파트 팀원끼리 겹치지 않게 각자 정해서 고정으로 사용한다 (예: 이름 로마자 표기 이니셜).
   - 번호: 같은 이니셜 안에서만 `001`부터 3자리로 증가한다. 즉 각자 자기 번호만 신경 쓰면 되고, 다른 팀원의 다음 번호를 확인할 필요가 없다.
-  - 예: `.claude/plans/be/SY001-auction-bid-api.md`, `.claude/plans/be/JY001-payment-webhook.md`, `.claude/plans/be/SY002-live-chat.md`
+  - 예: `docs/plans/BE/SY001-auction-bid-api.md`, `docs/plans/BE/JY001-payment-webhook.md`, `docs/plans/BE/SY002-live-chat.md`
   - slug: 핵심 키워드 1~3단어로 짧고 함축적으로 작성한다 (전체 파일명이 한눈에 들어오는 길이).
     - "implementation", "structure", "management" 같은 군더더기 단어, 조사성 표현은 뺀다.
     - 기능 전체를 풀어 쓰지 말고 핵심 도메인 단어만 남긴다. 예: `product-price-set-direct-sale` → `product-price-sale`, `auth-signup-implementation` → `auth-signup`
@@ -27,6 +27,6 @@
   - **구현 목록**: 체크리스트(`- [ ] ...`) 형태로 작업 단위를 나열
   - (필요하면) 확인이 필요한 미결정 사항
 
-## Codex
+## Claude · Codex 공통
 
-Codex는 동일한 규칙을 `.codex/plans/<파트>/` 아래에 적용한다. 저장 위치(`.claude/plans/` → `.codex/plans/`)만 다르고, 흐름·파일 규칙은 이 문서를 그대로 따른다.
+Claude·Codex 모두 이 `docs/plans/` 폴더를 공통으로 쓴다. (기존 `.claude/plans/`·`.codex/plans/`는 여기로 통합됨.)
