@@ -55,6 +55,16 @@ export const getNotifications = async (
   }
 }
 
+export const getUnreadNotificationCount = async (userId: number) => {
+  const result = await getNotifications(userId, {
+    page: 1,
+    size: 1,
+    unreadOnly: true,
+  })
+
+  return result.meta.totalElements
+}
+
 export const markNotificationAsRead = async (userId: number, notificationId: number) => {
   const response = await http.patch<ApiResponse<NotificationReadResponse>>(
     `/users/${userId}/alerts/${notificationId}`,

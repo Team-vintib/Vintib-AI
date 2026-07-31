@@ -32,9 +32,7 @@ const router = useRouter()
 authStore.hydrateSession()
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
-const canShowNotificationAction = computed(
-  () => isAuthenticated.value || Boolean(notificationStore.activeMockScenario),
-)
+const canShowNotificationAction = computed(() => isAuthenticated.value)
 const displayName = computed(() => authStore.user?.name || '회원')
 const profileInitial = computed(() => displayName.value.slice(0, 1).toUpperCase())
 const cartItemCount = computed<number | null>(() => null)
@@ -121,7 +119,7 @@ const handleLogout = async () => {
 const handleNotificationButtonClick = async () => {
   isNotificationPopupOpen.value = !isNotificationPopupOpen.value
 
-  if (isNotificationPopupOpen.value && notificationStore.loadState === 'idle') {
+  if (isNotificationPopupOpen.value) {
     await notificationStore.loadNotifications({ page: 1, size: 20 })
   }
 }

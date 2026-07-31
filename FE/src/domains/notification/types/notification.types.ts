@@ -6,8 +6,6 @@ export type NotificationCategory = 'ALL' | 'LIVE' | 'AUCTION' | 'TRADE' | 'SHIPP
 
 export type NotificationLoadState = 'idle' | 'loading' | 'success' | 'error'
 
-export type NotificationMockScenario = 'default' | 'loading' | 'empty' | 'error'
-
 export interface NotificationItemDto {
   id: number
   type: string
