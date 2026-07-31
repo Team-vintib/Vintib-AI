@@ -38,7 +38,7 @@ _ENUM_NAMES = (
 )
 
 # 게이트웨이 pydantic 모델 이름 ↔ 워커 dataclass 동명 속성.
-_MODEL_NAMES = ("Finding", "SectionScore", "AttentionMap")
+_MODEL_NAMES = ("Finding", "SectionScore", "AttentionMap", "AnnotatedImage")
 
 _ENUM_CASES = [
     (worker_label, enum_name) for worker_label in _WORKER_CONTRACTS for enum_name in _ENUM_NAMES
@@ -97,6 +97,10 @@ def test_worker_dataclasses_serialize_to_plain_json_types(worker_label):
     assert dumped["section"] == "CHEST_CENTER"
     assert dumped["bbox"] == [0.42, 0.35, 0.55, 0.47]  # 튜플이 아니라 리스트
     assert all(not isinstance(v, tuple) for v in dumped.values())
+    # CH007 필드 — 안 채운 백엔드는 None이어도 스키마를 통과해야 한다(둘 다 optional).
+    assert dumped["no"] is None
+    assert dumped["label"] is None
+    assert dumped["description"] is None
 
 
 @pytest.mark.parametrize("worker_label", _WORKER_CONTRACTS, ids=list(_WORKER_CONTRACTS))
@@ -112,9 +116,32 @@ def test_worker_output_validates_against_gateway_schema(worker_label):
     attention = worker.AttentionMap(
         image_index=0, defect_type=worker.DefectType.stain, url="https://x/y.png"
     )
+    annotated = worker.AnnotatedImage(image_index=0, url="https://x/annotated.png")
+    finding = worker.Finding(
+        key="stain_0_5_1",
+        defect_type=worker.DefectType.stain,
+        status=worker.FindingStatus.detected,
+        image_index=0,
+        section_no=5,
+        section=worker.GarmentSection.chest_center,
+        confidence=0.81,
+        area_ratio=0.031,
+        bbox=(0.42, 0.35, 0.55, 0.47),
+        severity=worker.Severity.moderate,
+        matched_prompt="a stain on fabric",
+        statement_required=True,
+        needs_seller_review=False,
+        no=1,
+        label="오염",
+        description=None,
+    )
 
     assert schemas.SectionScore(**section.to_dict()).section is schemas.GarmentSection.chest_center
     assert schemas.AttentionMap(**attention.to_dict()).defect_type is schemas.DefectType.stain
+    assert schemas.AnnotatedImage(**annotated.to_dict()).image_index == 0
+    gateway_finding = schemas.Finding(**finding.to_dict())
+    assert gateway_finding.no == 1
+    assert gateway_finding.label == "오염"
 
 
 @pytest.mark.parametrize("worker_label", _WORKER_CONTRACTS, ids=list(_WORKER_CONTRACTS))

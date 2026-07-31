@@ -20,6 +20,7 @@ from sam3.findings import (
 from sam3.prompts import select_prompt_set
 from sam3.contracts import BaseColor, GarmentCategory
 from sam3.registry import segmenter_config
+from sam3.scoring import DEFECT_LABELS
 from sam3.segmenter import Instance, SegmentationResult
 
 _SIZE = (9, 9)  # (height, width) — 3x3 그리드가 정확히 3px씩 떨어지도록
@@ -216,3 +217,42 @@ def test_extract_findings_produces_nine_section_scores():
     extracted = extract_findings([result], prompt_set, segmenter_config("mock"))
     assert len(extracted.section_scores) == 9
     assert [s.section_no for s in extracted.section_scores] == list(range(1, 10))
+
+
+# --- CH007: Finding.no / Finding.label ----------------------------------------
+
+
+def test_finding_no_starts_at_1_per_image_and_has_no_gaps():
+    first = _instance(DefectType.stain, _mask_at(1, 1), confidence=0.9)
+    second = _instance(DefectType.fray, _mask_at(7, 7), confidence=0.5)
+    result = _segmentation_result(0, [first, second], garment_mask=_full_mask())
+    prompt_set = select_prompt_set(GarmentCategory.top_knit, BaseColor.light)
+
+    extracted = extract_findings([result], prompt_set, segmenter_config("mock"))
+
+    numbers = sorted(f.no for f in extracted.findings)
+    assert numbers == list(range(1, len(extracted.findings) + 1))
+
+
+def test_finding_no_resets_per_image():
+    inst_image0 = _instance(DefectType.stain, _mask_at(1, 1), confidence=0.9)
+    inst_image1 = _instance(DefectType.stain, _mask_at(1, 1), confidence=0.9)
+    result0 = _segmentation_result(0, [inst_image0], garment_mask=_full_mask())
+    result1 = _segmentation_result(1, [inst_image1], garment_mask=_full_mask())
+    prompt_set = select_prompt_set(GarmentCategory.top_knit, BaseColor.light)
+
+    extracted = extract_findings([result0, result1], prompt_set, segmenter_config("mock"))
+
+    by_image = {f.image_index: f.no for f in extracted.findings}
+    assert by_image[0] == 1
+    assert by_image[1] == 1  # 새 이미지라 다시 1부터
+
+
+def test_finding_label_uses_the_korean_defect_label():
+    inst = _instance(DefectType.stain, _mask_at(4, 4), confidence=0.9)
+    result = _segmentation_result(0, [inst], garment_mask=_full_mask())
+    prompt_set = select_prompt_set(GarmentCategory.top_knit, BaseColor.light)
+
+    extracted = extract_findings([result], prompt_set, segmenter_config("mock"))
+
+    assert extracted.findings[0].label == DEFECT_LABELS[DefectType.stain]
