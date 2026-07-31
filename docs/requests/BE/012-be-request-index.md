@@ -16,6 +16,7 @@
   - Product: `/api/brands`, `/api/categories`, `/api/products`, `/api/products/{id}`, `/api/products/{id}/status`, `/api/products/{id}/auction-schedule`, `/api/products/{id}/images/upload-url`, `/api/products/{id}/images`, `/api/users/{userId}/wishes`
   - Live: `/api/lives`, `/api/lives/schedule`, `/api/lives/{liveId}`
   - Chat/STOMP: `/api/lives/{liveId}/chat-messages`, `/ws`, `/topic/lives/{liveId}/chat`, `/topic/lives/{liveId}/reactions`, `/topic/lives/{liveId}/viewers`
+  - Notification: `/api/users/{userId}/alerts`, `/api/users/{userId}/alerts/{id}`, `/api/users/{userId}/alerts/read-all`
 - FE 구현 완료 범위
   - Auth, Home, Product 일부, Live 일부, Chat realtime 일부는 실제 API 연결 완료
   - Onboarding, Business, Search, Auction, Commerce, MyPage는 mock 또는 미구현 범위가 남아 있음
@@ -46,7 +47,7 @@
 | 005 | `005-search-contract.md` | Search | FE 화면/adapter 있음, BE `/api/search` 없음 | 통합 검색 API |
 | 006 | `006-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | 목록 필터 query 구현, 상세 응답 보강, AI 분석/가격 추천 |
 | 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성 연결 완료 | 생성용 상품 조회, 영상 token, AI 시착 생성, `/api/me/tryon` |
-| 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜 연결 완료 | 팔로우 API, 알림 type/ref 문서화 |
+| 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 알림 목록/읽음 API 재검증 완료. 알림 seed 제거 후 실제 생성 데이터 없음 | 팔로우 API, 알림 type/ref 문서화, 실제 알림 생성 이벤트, 예약 라이브 알림 신청/스케줄러, 탭별 bulk read |
 | 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수 연결 완료 | 경매 snapshot/start/bid/close/STOMP |
 | 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | FE 화면 없음, BE controller 없음 | 주문/배송/환불/포인트 전체 |
 | 011 | `011-user-mypage-contract.md` | User/MyPage | FE 화면 없음, BE API 없음 | `/api/me`, 공개 프로필, 마이페이지 요약 |
@@ -59,7 +60,7 @@
   - Auth: `user`, `nextStep`
   - Home: live card `hostId`
   - Product: 목록 필터 반영, 상세 응답 보강
-  - Social/Notification: 알림 `type/refType/refId` 문서화
+  - Social/Notification: 알림 `type/refType/refId` 문서화, 도메인 이벤트별 알림 생성 정책, 예약 라이브 알림 신청/스케줄러, 탭별 읽음 처리 API
 - 변경 영향 범위
   - route guard
   - 홈/상품/라이브 카드 이동
@@ -73,7 +74,7 @@
   - FE 화면이 없는 MyPage/공개 프로필
   - 상품 수정/삭제/이미지 수정/삭제 API 연결
   - 라이브 상품 관리 UI
-  - 찜 목록/알림 목록 UI
+  - 찜 목록 UI
 - 추후 구현 예정 기능
   - 각 도메인 문서의 5번 섹션을 따른다.
 
@@ -94,5 +95,6 @@
   - Home 현재 화면 렌더링
   - Chat/Reaction/Viewer realtime
   - Product 등록 기본 흐름과 찜 토글
+  - Notification 목록/읽음 처리
 - 기존 규격을 유지하면 되는 기능
   - BE에는 있지만 FE 화면/진입점이 없어 아직 미연결인 API는 각 도메인 화면 설계 후 연결한다.

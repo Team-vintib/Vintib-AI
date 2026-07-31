@@ -139,7 +139,7 @@ export const routes: RouteRecordRaw[] = [
   {
     path: ROUTE_PATHS.NOTIFICATIONS,
     name: ROUTE_NAMES.NOTIFICATIONS,
-    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    component: () => import('@/domains/notification/pages/NotificationCenterPage.vue'),
     meta: { requiresAuth: true, title: '알림센터' },
   },
   {

@@ -122,12 +122,33 @@
 - 응답 데이터: 시착 프로필 요약
 - 응답 예시: `002-onboarding-contract.md` 참고
 
+### 3.5 라이브 시청 화면 상품/상세 필드 보강 (LIVE-005)
+
+- 대상: `LiveDetailResponse`, `LiveProductResponse`
+- 배경: 시청 화면(`LiveWatchPage`)이 `GET /api/lives/{liveId}`를 연결했으나, 상품 카드·헤더에 필요한 필드가 응답에 없어 FE에서 `null`로 비워 둔다(임의 확정 금지 → BE 확정 대기). 현재 FE는 `LiveProductResponse`의 `productId/productTitle/sortOrder`만 사용 중.
+- 요청 필드 (필수/선택 구분)
+
+`LiveProductResponse`에 추가:
+- (필수) `brandName`: string | null — 상품 카드 브랜드
+- (필수) `price`: number | null — 가격(경매 시작가/즉시판매가)
+- (필수) `thumbnailUrl`: string | null — 상품 썸네일 (현재 FE는 fallback 이미지로 대체 중)
+- (필수) `saleType`: `AUCTION` | `FIXED_PRICE` — 경매/즉시판매 구분 (경매 패널 초기화에 필요)
+- (선택) `condition`: string | null — 상품 상태 등급
+- (선택) `material` / `measurements` / `defectSummary`: string | null — 상세 정보. 있으면 표시, 없어도 화면은 동작
+
+`LiveDetailResponse`에 추가:
+- (선택) `currentProductId`: number | null — 현재 판매/노출 중인 상품. 없으면 FE는 첫 상품을 기본 선택
+- (선택) `hostProfileImageUrl`: string | null — 헤더 호스트 프로필 이미지
+- (선택) `description`: string | null — 방송 설명
+
+- **필요 없는 것(FE 미사용)**: `LiveProductResponse`의 `addedAt`, `liveId`, 연결 `id`는 시청 화면에서 쓰지 않는다 → 유지/제거는 BE 판단(우선순위 낮음).
+
 ## 4. 기존 API 변경 요청
 
 - 기존 요청·응답에서 변경할 내용
-  - 라이브 목록/상세 응답 필드는 현재 FE 연결 가능하므로 큰 변경 요청 없음
+  - 라이브 상세는 연결됐으나, 시청 화면 상품 카드·헤더 표시를 위해 **3.5의 필드 보강**이 필요
 - 추가할 필드
-  - 라이브 상세 `products[]`에 경매 가능 여부나 현재 경매 상태가 필요하면 추후 추가
+  - 3.5 참고 — `LiveProductResponse`: brand/price/thumbnail/saleType/condition 등, `LiveDetailResponse`: currentProductId/host 프로필/description
 - 변경 영향 범위
   - 라이브 상세 상품 큐
   - 경매 패널 초기화
