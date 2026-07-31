@@ -23,9 +23,10 @@
 | 라이브 목록 화면 | 부분   | S15P11A108-413·415·418 카드·필터·정렬과 상태 화면, 홈과 같은 공통 검색바의 통합 검색 라이브 탭 이동 구현. `origin/develop-BE@dd6a0b6`에 `GET /api/lives`가 구현됐으며, 최종 009 계약의 복수 `categories[]`·공통 `PageResponse.content`·nullable `viewerCount`·`VIEWERS_DESC` 미지원 정책을 418 adapter에 반영하기 전까지 기본값은 mock |
 | 라이브 개설 화면 | 부분   | LIVE-001/002 `/lives/new` route, 라이브 유형·방송 정보·판매 상품·예약 일정·장비 확인·완료 단계 UI, 필수값/과거 일정 검증, 상품 mock 검색/선택, `getUserMedia` 기반 카메라 미리보기와 마이크 순차 확인 구현. 실제 라이브 생성/예약 API와 방송 SDK 연동 대기 |
 | 라이브 시청 화면 | 부분   | 419 방송 헤더·상품 큐·영상 stage·선택 상품·상태 화면, 423 채팅·반응·경매 패널, 425 사진 중심 AI 시착 패널과 등록 전·생성·결과·실패 mock 상태 구현. 실제 스트리밍·채팅 STOMP·경매·AI API 연동 대기 |
+| 알림 화면        | 부분   | S15P11A108-420·421 `/notifications` 읽지 않은 알림 목록·탭 필터·현재 탭 표시·전체 탭 더보기·단건/전체 읽음 처리와 공통 헤더 알림 팝업·unread badge 구현. 알림 mock data/query와 로컬 DB seed를 제거했고 실제 `/api/users/{userId}/alerts?unreadOnly=true`로 조회하며 읽음 처리된 알림은 목록에서 제거. 조회/읽음 API 재검증 완료, 실제 알림 생성 이벤트·예약 라이브 알림 신청/스케줄러·서버 카테고리 필터·알림 `type/refType` enum 문서화·탭별 bulk read API는 대기 |
 | 공통 컴포넌트   | 부분   | 온보딩 도메인에 BaseButton, BaseInput, BaseField, 단계 표시 구현. shared에는 GlobalNavigation, RoutePlaceholder, 홈·상품·라이브가 재사용하는 AppSearchBar 구현 |
 | API 타입        | 부분   | 공통 응답/에러/pagination, 인증 회원가입·로그인 요청/응답 타입, 온보딩 필드 오류·회원 유형 타입 구현                                   |
-| Mock 데이터     | 부분   | 홈·상품 목록·상품 상세·유사 상품 가격 분포·상품 등록·라이브 채팅·경매·AI 시착 패널 확인용 mock 데이터 구현, 상품 목록은 로컬 WebP와 가격 필터 사용, 홈은 BE 미제공 회원 홈 보조 섹션·콘텐츠 카드·fallback 데이터에 mock 일부 유지 |
+| Mock 데이터     | 부분   | 홈·상품 목록·상품 상세·유사 상품 가격 분포·상품 등록·라이브 채팅·경매·AI 시착 패널 확인용 mock 데이터 구현, 상품 목록은 로컬 WebP와 가격 필터 사용, 홈은 BE 미제공 회원 홈 보조 섹션·콘텐츠 카드·fallback 데이터에 mock 일부 유지. 알림 도메인 mock 데이터는 제거하고 실제 DB/API 확인으로 전환 |
 | 테스트/검증     | 부분   | lint, type-check, build, AUTH-001·002·003·ONBOARD-001~004 검증 완료, 상품 목록→상세와 상세 408·410·412 상태 및 유사 상품 가격대 선택·이동 검증 완료, 상품 등록 409·411·414 type-check/build 완료, LIVE-001/002 type-check 완료, LIVE-005 목록→시청 이동·상품 선택·상태별 브라우저 검증 완료, HOME·BIZ-001·BIZ-001-2 일부 브라우저 수동 검증 대기 |
 
 ## 2026-07-28 검색 화면 상태
