@@ -6,8 +6,6 @@
 
 색상/소재/실측/하자 필드 자체는 `SY015`에서 추가한다. 이 계획은 그 값들을 상세 응답에 포함시키는 것과, 찜/팔로워/연결라이브처럼 **다른 도메인 데이터를 끌어와야 하는 부분**을 다룬다.
 
-Jira: `S15P11A108-238`. 에픽 `S15P11A108-211`.
-
 ## 아키텍처 결정 — 대칭 포트 패턴
 
 `product` 도메인이 `live`(연결 라이브)와 `social`(찜/팔로워)의 데이터를 읽어야 하는데, 두 패키지 모두 이미 `product`를 참조하고 있다(`live/port/ProductQueryAdapter`가 `product.repository.ProductRepository` 등을 import, `social/entity/Wish`가 `product.entity.Product`를 FK로 참조). `product`가 `live`/`social`을 직접 import하면 순환 의존이 생긴다.
