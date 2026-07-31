@@ -20,11 +20,39 @@ const props = withDefaults(
   },
 )
 
+// mock 경쟁자(다른 시청자) 닉네임. 실제 최고 입찰자는 BE 선착순 판정 결과로 대체.
+const MOCK_COMPETITORS = ['bidder_99', 'vintage_lover', 'archive_king']
+const BID_HOLD_MS = 3000
+const EXTEND_THRESHOLD_SECONDS = 3 // 기능 정의서 AUCT-010
+const EXTEND_SECONDS = 5
+
 const currentBid = ref(LIVE_AUCTION_MOCK_SNAPSHOT.currentBid)
 const highestBidder = ref(LIVE_AUCTION_MOCK_SNAPSHOT.highestBidder)
 const remainingSeconds = ref(LIVE_AUCTION_MOCK_SNAPSHOT.remainingSeconds)
 const localState = ref<LiveAuctionMockState>(props.mockState)
+const isAuctionClosed = ref(false)
+let competitorIndex = 0
 let bidTimer: number | null = null
+let holdTimer: number | null = null
+
+const clearBidTimers = () => {
+  if (bidTimer !== null) {
+    window.clearTimeout(bidTimer)
+    bidTimer = null
+  }
+  if (holdTimer !== null) {
+    window.clearTimeout(holdTimer)
+    holdTimer = null
+  }
+}
+
+// 종료 임박(3초 이하)에 유효 입찰 시 +5초 연장(AUCT-010). 실제 연장 판정은 서버 몫.
+// BE 확인 필요: 연장 시점·값은 docs/requests/BE/009 경매 정책 기준으로 대체.
+const extendIfClosing = () => {
+  if (remainingSeconds.value > 0 && remainingSeconds.value <= EXTEND_THRESHOLD_SECONDS) {
+    remainingSeconds.value += EXTEND_SECONDS
+  }
+}
 
 const nextBid = computed(() => currentBid.value + LIVE_AUCTION_MOCK_SNAPSHOT.increment)
 
@@ -32,6 +60,9 @@ const effectiveState = computed<LiveAuctionMockState | 'SCHEDULED' | 'ENDED' | '
   if (!props.product) return 'EMPTY'
   if (props.status === 'SCHEDULED') return 'SCHEDULED'
   if (props.status === 'ENDED' || props.status === 'CANCELED') return 'ENDED'
+  if (isAuctionClosed.value || localState.value === 'WON' || localState.value === 'FAILED') {
+    return 'ENDED'
+  }
   if (nextBid.value > LIVE_AUCTION_MOCK_SNAPSHOT.availablePoints) return 'INSUFFICIENT_POINTS'
   return localState.value
 })
@@ -61,22 +92,40 @@ const resetMockAuction = () => {
     props.mockState === 'LEADING' ? '나' : LIVE_AUCTION_MOCK_SNAPSHOT.highestBidder
   remainingSeconds.value = LIVE_AUCTION_MOCK_SNAPSHOT.remainingSeconds
   localState.value = props.mockState
+  isAuctionClosed.value = false
+  competitorIndex = 0
 
-  if (bidTimer !== null) {
-    window.clearTimeout(bidTimer)
-    bidTimer = null
-  }
+  clearBidTimers()
 }
 
 const placeMockBid = () => {
+  // AUCT-004 중복 클릭 방지: BIDDABLE 이 아니면(처리 중·홀드·종료) 무시한다.
   if (effectiveState.value !== 'BIDDABLE') return
 
+  // AUCT-005 서버 기준 선착순 판정은 서버 몫 — 여기선 접수 흉내 후 확정한다.
+  // BE 확인 필요: 실제 입찰/선착순은 docs/requests/BE/009.
   localState.value = 'PENDING'
+  clearBidTimers()
+
   bidTimer = window.setTimeout(() => {
     currentBid.value = nextBid.value
-    highestBidder.value = '나'
+    highestBidder.value = '나' // 입찰 확인 즉시 최고 입찰자 반영(AUCT-011)
     localState.value = 'LEADING'
+    extendIfClosing()
     bidTimer = null
+
+    // AUCT-006 연속 입찰 제한: 최근 성공자는 다른 사람이 입찰하기 전까지 재입찰 불가.
+    // → 약 3초 홀드 후 mock 경쟁자가 더 높게 입찰하면 다시 입찰 가능(BIDDABLE) 상태로 돌아간다.
+    holdTimer = window.setTimeout(() => {
+      if (isAuctionClosed.value || remainingSeconds.value <= 0) return
+
+      currentBid.value += LIVE_AUCTION_MOCK_SNAPSHOT.increment
+      highestBidder.value = MOCK_COMPETITORS[competitorIndex % MOCK_COMPETITORS.length]
+      competitorIndex += 1
+      localState.value = 'BIDDABLE'
+      extendIfClosing()
+      holdTimer = null
+    }, BID_HOLD_MS)
   }, 480)
 }
 
@@ -87,17 +136,20 @@ watch(
 )
 
 const countdownTimer = window.setInterval(() => {
-  if (props.status === 'LIVE' && remainingSeconds.value > 0) {
-    remainingSeconds.value -= 1
+  if (props.status !== 'LIVE' || remainingSeconds.value <= 0) return
+
+  remainingSeconds.value -= 1
+
+  // 정해진 경매 시간이 끝나면 입찰을 마감한다(종료).
+  if (remainingSeconds.value <= 0) {
+    isAuctionClosed.value = true
+    clearBidTimers()
   }
 }, 1000)
 
 onBeforeUnmount(() => {
   window.clearInterval(countdownTimer)
-
-  if (bidTimer !== null) {
-    window.clearTimeout(bidTimer)
-  }
+  clearBidTimers()
 })
 </script>
 

@@ -85,7 +85,7 @@
   - `POST /api/auctions/{auctionId}/close`
   - `GET /api/auctions/{auctionId}/bids`
   - `GET /api/auctions/{auctionId}/winner`
-- 요청 목적: 호스트 경매 진행, 사용자 입찰, 입찰 내역/낙찰 결과 조회를 처리한다.
+- 요청 목적: 호스트 경매 진행, 사용자 입찰, 입찰 내역/낙찰 결과 조회를 처리한다. FE 입찰 버튼(AUCT-003~006)이 이 API로 동작하며, **선착순(AUCT-005)·연속 입찰 제한(AUCT-006)·종료 직전 연장(AUCT-010, 종료 3초 이하 → +5초) 판정은 서버가 확정**한다. (현재 FE는 mock 사이클로 연출 중)
 - FE 사용처: 라이브 경매 패널
 - 요청 데이터
   - 입찰: `{ "amount": number }`
