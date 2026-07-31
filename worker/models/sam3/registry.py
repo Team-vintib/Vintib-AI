@@ -30,6 +30,8 @@ class SegmenterConfig(TypedDict):
     garment_overlap_min: float  # 하자 마스크가 의류 마스크에 겹쳐야 하는 최소 비율(사후 안전망)
     suppress_benign: bool  # 양성(주름·그림자·구조적 개구부) 억제 로직 on/off
     benign_containment: float  # 하자가 양성에 이만큼 잠기면 억제 후보로 본다
+    dedupe_cross_type: bool  # 서로 다른 defect_type이 같은 실물 부위를 중복 검출했을 때 병합 on/off
+    cross_type_iou_min: float  # 이 이상 겹치면 confidence 낮은 쪽을 버린다(findings.py 참고)
     min_area_ratio: float  # 이 면적 비율 미달 인스턴스는 노이즈로 폐기
     max_defect_area_ratio: float  # 이 비율 초과 인스턴스는 세그멘테이션 실패로 보고 폐기
 
@@ -48,6 +50,12 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         "garment_overlap_min": 0.6,
         "suppress_benign": True,
         "benign_containment": 0.6,
+        # ⚠️ 라벨링된 검증셋 없이 잡은 값(confident_threshold와 같은 한계) — 스윕 대상.
+        # 실측 중복 쌍(scratch.jpg)은 bbox가 1px 이내로 거의 동일해 IoU가 0.9대로 매우
+        # 높았다. 0.5보다 여유 있게 0.7로 잡아 "진짜 인접했지만 서로 다른 하자"까지
+        # 잘못 합칠 위험을 줄인다.
+        "dedupe_cross_type": True,
+        "cross_type_iou_min": 0.7,
         "min_area_ratio": 0.0015,
         "max_defect_area_ratio": 0.35,
     },
@@ -70,6 +78,12 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         "garment_overlap_min": 0.6,
         "suppress_benign": True,
         "benign_containment": 0.6,
+        # ⚠️ 라벨링된 검증셋 없이 잡은 값(confident_threshold와 같은 한계) — 스윕 대상.
+        # 실측 중복 쌍(scratch.jpg)은 bbox가 1px 이내로 거의 동일해 IoU가 0.9대로 매우
+        # 높았다. 0.5보다 여유 있게 0.7로 잡아 "진짜 인접했지만 서로 다른 하자"까지
+        # 잘못 합칠 위험을 줄인다.
+        "dedupe_cross_type": True,
+        "cross_type_iou_min": 0.7,
         "min_area_ratio": 0.0015,
         "max_defect_area_ratio": 0.35,
     },

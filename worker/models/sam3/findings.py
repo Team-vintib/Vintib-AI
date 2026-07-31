@@ -30,7 +30,13 @@ import numpy as np
 
 from . import registry
 from .contracts import Finding, FindingStatus, SectionScore, Severity
-from .prompts import SECTION_COUNT, SECTION_GRID, STRUCTURAL_BENIGN_PROMPTS, PromptSet, section_label
+from .prompts import (
+    SECTION_COUNT,
+    SECTION_GRID,
+    STRUCTURAL_BENIGN_PROMPTS,
+    PromptSet,
+    section_label,
+)
 from .registry import SegmenterConfig
 from .scoring import DEFECT_LABELS
 from .segmenter import Instance, SegmentationResult
@@ -63,6 +69,22 @@ def _containment(a: np.ndarray, b: np.ndarray) -> float:
     if area == 0:
         return 0.0
     return float(np.logical_and(a_bool, b.astype(bool)).sum() / area)
+
+
+def _mask_iou(a: np.ndarray, b: np.ndarray) -> float:
+    """|a ∩ b| / |a ∪ b| — 대칭 겹침 비율. 둘 다 비면 0.
+
+    `_containment`(비대칭, "a가 b에 얼마나 잠겼는가")와 달리, 두 마스크가 **같은 대상을
+    가리키는지** 볼 때는 대칭 비교가 맞다 — `dedupe_cross_type_overlap`이 이걸 쓴다.
+    `AI/validation/QUAL/qc_shared.py`의 `mask_iou()`와 같은 계산이지만, 프로덕션은
+    validation을 import하지 않으므로(레포 규율) 로컬 사본을 둔다 — `_containment`도
+    이미 같은 이유로 중복돼 있다.
+    """
+    a_bool, b_bool = a.astype(bool), b.astype(bool)
+    union = int(np.logical_or(a_bool, b_bool).sum())
+    if union == 0:
+        return 0.0
+    return float(np.logical_and(a_bool, b_bool).sum() / union)
 
 
 def _section_no_of(mask: np.ndarray) -> int:
@@ -123,6 +145,42 @@ def suppress_benign(
                 hit = benign
                 break
         (dropped if hit is not None else kept).append(defect)
+    return kept, dropped
+
+
+def dedupe_cross_type_overlap(
+    instances: Sequence[Instance], min_iou: float
+) -> tuple[list[Instance], list[Instance]]:
+    """서로 다른 defect_type이 같은 실물 부위를 중복 검출했을 때 병합한다. (kept, dropped) 반환.
+
+    SAM3는 defect_type마다 독립된 프롬프트로 탐지한다("a dirty mark" vs "a hole or tear in
+    fabric" 등, `prompts.py`). 같은 자리가 두 프롬프트 모두에 걸리면 defect_type만 다른
+    Finding 2개가 생긴다 — 실측(scratch.jpg)에서 bbox가 1px 이내로 겹치는 DIRT_MARK/
+    HOLE_TEAR 쌍 5개가 확인됐다. `suppress_benign()`은 이 케이스를 못 거른다(그건 별도
+    benign 카테고리 전용이라 defect끼리는 비교하지 않는다).
+
+    confidence 내림차순(동률이면 `defect_type.value`로 결정적 tie-break — `_to_findings()`가
+    쓰는 정렬 키와 동일)으로 훑으며, **다른 타입**이면서 이미 kept에 들어간 인스턴스와
+    `_mask_iou`가 `min_iou` 이상이면 버린다. 같은 타입끼리는 비교하지 않는다 — 같은
+    프롬프트 안에서의 중복은 SAM3 자체 후처리가 이미 걸렀다고 본다.
+
+    ⚠️ 알려진 단순화: 이미 kept된 것과만 비교하는 그리디라, IoU가 전이적이지 않은 경우
+    (A-B 겹침, B-C 겹침, A-C는 안 겹침)를 이론상 놓칠 수 있다. 실측 중복은 IoU가 매우
+    높아(거의 동일 bbox) 이 케이스가 실제로 발생할 가능성은 낮다고 보고 1차로는 이 방식을
+    쓴다.
+    """
+    ordered = sorted(instances, key=lambda inst: (-inst.confidence, inst.defect_type.value))
+    kept: list[Instance] = []
+    dropped: list[Instance] = []
+    for inst in ordered:
+        hit = None
+        for kept_inst in kept:
+            if kept_inst.defect_type == inst.defect_type:
+                continue
+            if _mask_iou(inst.mask, kept_inst.mask) >= min_iou:
+                hit = kept_inst
+                break
+        (dropped if hit is not None else kept).append(inst)
     return kept, dropped
 
 
@@ -227,10 +285,10 @@ def extract_findings(
 ) -> FindingsResult:
     """인스턴스들 → 하자 항목 리스트 + 부위별 확률 9개.
 
-    이미지별로 ⑴ 의류 겹침 필터 ⑵ 양성 억제를 거친 뒤 `Finding`으로 승격한다. 확률 히트맵의
-    이진화·flood-fill·프롬프트 간 병합이 없다 — SAM3 인스턴스는 이미 분리돼 있어 병합 대상이
-    원천적으로 적다(동일 영역에 여러 프롬프트가 동시에 반응할 가능성 자체가 없어지는 건
-    아니라서, 실측에서 중복 검출이 관찰되면 후속 작업으로 병합 로직을 추가한다).
+    이미지별로 ⑴ 의류 겹침 필터 ⑵ 양성 억제 ⑶ **cross-type 중복 병합**을 거친 뒤 `Finding`으로
+    승격한다. SAM3 인스턴스는 defect_type별 독립 프롬프트로 나오다 보니 동일 영역이 여러
+    프롬프트에 동시에 반응하는 경우가 실측(scratch.jpg)에서 확인됐다 — `dedupe_cross_type_overlap()`
+    이 그 병합을 담당한다(설계: `.claude/plans/ai/CH010-sam3-cross-type-dedup.md`).
     """
     section_peaks = [0.0] * SECTION_COUNT
     kept_by_image: list[tuple[int, Instance]] = []
@@ -246,6 +304,13 @@ def extract_findings(
             )
         else:
             final = after_garment
+
+        # benign 억제 다음, 넘버링/누적 전 — 구조적 개구부 오탐(hole_tear)을 먼저 걷어내야
+        # cross-type dedup이 "진짜 하자끼리의 중복"만 보게 된다.
+        if config["dedupe_cross_type"]:
+            final, _cross_type_dupes = dedupe_cross_type_overlap(
+                final, config["cross_type_iou_min"]
+            )
 
         section_peaks = [
             max(existing, peak)
