@@ -2,7 +2,8 @@
 
 게이트웨이가 `POST /quality/inspections`로 받은 job을 폴링해 처리한다. 판정 로직은
 `worker/models/sam3/`에 있고, 이 파일은 **오케스트레이션만** 한다:
-프롬프트 선택 → 세그멘테이션 → 하자 항목화 → 점수 → 넘버링 bbox 이미지 → (선택) 히트맵 업로드.
+프롬프트 선택 → 세그멘테이션 → 하자 항목화 → 점수 → 넘버링 bbox 이미지 → (선택) 히트맵 업로드
+→ 판단 근거 로컬 로그.
 
 **GPU 없이도 돌릴 수 있다.** `QUALITY_BACKEND=mock`이면 목업으로 인스턴스를 합성하므로
 전 경로(항목화·점수·오버레이)를 그대로 검증할 수 있다.
@@ -17,7 +18,7 @@ QUALITY_BACKEND=sam3_pcs python quality_check_worker_example.py
 반환하고, 오버레이 PNG는 업로드해 URL로 넘긴다.
 
 설계: .claude/plans/ai/005-quality-inspection-prototype.md, .claude/plans/ai/CH006-sam3-quality-segmenter.md,
-.claude/plans/ai/CH007-quality-bbox-bullets.md
+.claude/plans/ai/CH007-quality-bbox-bullets.md, .claude/plans/ai/CH008-quality-judgment-log.md
 BE 계약: .claude/requests/be/001-quality-inspection-async.md
 """
 
@@ -26,6 +27,7 @@ import sys
 import time
 
 from base_worker import BaseWorker
+from inspection_logger import log_inspection_result
 from storage_utils import upload_image
 
 # `sam3/`는 `worker/models/garment_measurement/`와 같은 이유로 진짜 서브패키지(`__init__.py`
@@ -107,7 +109,7 @@ class QualityCheckWorker(BaseWorker):
         # 기본 산출물로 취급해 항상 만든다(플래그 없음, CH007 미결정 사항 참고).
         annotated_images = build_annotated_images(results, extracted.findings, upload_image)
 
-        return {
+        result = {
             "inspection_id": f"insp_{product_id}_{self.worker_id}",
             "product_id": product_id,
             "model": {
@@ -125,6 +127,12 @@ class QualityCheckWorker(BaseWorker):
             "notes": notes,
             "latency_ms": round((time.perf_counter() - started) * 1000, 3),
         }
+
+        # 판단 근거 로컬 로그(CH008) — Redis job result는 1시간 뒤 사라지고 BE는 finding.key/
+        # statement_required만 저장한다. best-effort라 실패해도 검수 응답은 그대로 나간다.
+        log_inspection_result(payload, result)
+
+        return result
 
 
 if __name__ == "__main__":
