@@ -12,7 +12,7 @@
 -- ---------- 회원 ----------
 COMMENT ON TABLE member IS '서비스 회원. 판매자·구매자 구분 없이 한 테이블을 쓴다.';
 COMMENT ON COLUMN member.email             IS '로그인 ID 겸 연락 수단. 경매 화면에는 노출하지 않는다.';
-COMMENT ON COLUMN member.password_hash     IS '자체 로그인용 해시. SSO 전용 계정은 NULL.';
+COMMENT ON COLUMN member.password          IS '자체 로그인용 해시. SSO 전용 계정은 NULL.';
 COMMENT ON COLUMN member.nickname          IS '공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011).';
 COMMENT ON COLUMN member.name              IS '실명. 배송·정산용이며 외부 노출 금지.';
 COMMENT ON COLUMN member.member_type       IS 'GENERAL(일반) | BUSINESS(사업자)';
