@@ -108,6 +108,11 @@ class Finding:
     matched_prompt: str
     statement_required: bool
     needs_seller_review: bool
+    # CH007(넘버링 bbox 이미지 + 불릿 리스트) 필드. 이 워커(clipseg)는 아직 채우지 않는다 —
+    # test_quality_contract.py의 필드 이름 드리프트 가드를 맞추기 위해 이름만 동기화한다.
+    no: int | None = None
+    label: str | None = None
+    description: str | None = None
 
     def to_dict(self) -> dict:
         return {key: _plain(value) for key, value in asdict(self).items()}
@@ -127,6 +132,17 @@ class SectionScore:
 class AttentionMap:
     image_index: int
     defect_type: DefectType
+    url: str
+
+    def to_dict(self) -> dict:
+        return {key: _plain(value) for key, value in asdict(self).items()}
+
+
+@dataclass(frozen=True)
+class AnnotatedImage:
+    """숫자만 넘버링된 bbox 오버레이 PNG. 이 워커(clipseg)는 아직 생성하지 않는다(CH007 범위 밖)."""
+
+    image_index: int
     url: str
 
     def to_dict(self) -> dict:

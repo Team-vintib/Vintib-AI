@@ -104,6 +104,11 @@ class Finding:
     matched_prompt: str
     statement_required: bool
     needs_seller_review: bool
+    # CH007(넘버링 bbox 이미지 + 불릿 리스트). no/label은 findings.py가 채운다. description은
+    # sVLM이 나중에 채울 자리라 항상 None(이 계획 범위 밖).
+    no: int | None = None
+    label: str | None = None
+    description: str | None = None
 
     def to_dict(self) -> dict:
         return {key: _plain(value) for key, value in asdict(self).items()}
@@ -123,6 +128,17 @@ class SectionScore:
 class AttentionMap:
     image_index: int
     defect_type: DefectType
+    url: str
+
+    def to_dict(self) -> dict:
+        return {key: _plain(value) for key, value in asdict(self).items()}
+
+
+@dataclass(frozen=True)
+class AnnotatedImage:
+    """숫자만 넘버링된 bbox 오버레이 PNG. 숫자는 같은 image_index의 Finding.no와 일치한다."""
+
+    image_index: int
     url: str
 
     def to_dict(self) -> dict:
