@@ -5,6 +5,8 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
+import com.ssafy.backend.product.dto.request.ProductListFilterParams;
+import com.ssafy.backend.product.dto.request.ProductSortType;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
@@ -31,7 +33,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ProductService {
 
-    private static final List<SaleStatus> HIDDEN_FROM_LIST = List.of(SaleStatus.DRAFT);
 
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
@@ -123,12 +124,32 @@ public class ProductService {
         return ProductResponse.from(product);
     }
 
-    public PageResponse<ProductResponse> getProductList(Pageable pageable) {
-        // 정렬은 최신순 고정(PROD-008 범위 밖) — 클라이언트가 Pageable에 다른 sort를 실어 보내도 무시하고 createdAt DESC로 강제한다.
-        Pageable sortedByLatest = PageRequest.of(
-                pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<Product> products = productRepository.findBySaleStatusNotIn(HIDDEN_FROM_LIST, sortedByLatest);
+    public PageResponse<ProductResponse> getProductList(ProductListFilterParams filter, Pageable pageable) {
+        Sort sort = buildSort(filter.resolvedSort());
+        Pageable sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
+
+        // 카테고리 필터가 없으면 JPQL에 빈 리스트를 넘기면 안 된다(IN 절 오류).
+        // 플래그가 false일 때는 쿼리에서 조건을 건너뛰므로 더미값을 넣어도 무방하다.
+        List<Long> categoryIds = filter.hasCategoryFilter() ? filter.categoryIds() : List.of(-1L);
+        List<String> conditionGrades = filter.hasConditionFilter() ? filter.conditionGrades() : List.of("");
+
+        Page<Product> products = productRepository.findWithFilter(
+                filter.hasCategoryFilter(), categoryIds,
+                filter.hasConditionFilter(), conditionGrades,
+                filter.hasSaleTypeFilter(), filter.saleType(),
+                filter.hasMinPriceFilter(), filter.minPrice(),
+                filter.hasMaxPriceFilter(), filter.maxPrice(),
+                sortedPageable);
+
         return PageResponse.from(products.map(ProductResponse::from));
+    }
+
+    private Sort buildSort(ProductSortType sortType) {
+        return switch (sortType) {
+            case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price");
+            case PRICE_DESC -> Sort.by(Sort.Direction.DESC, "price");
+            default -> Sort.by(Sort.Direction.DESC, "createdAt");
+        };
     }
 
     public ProductDetailResponse getProductDetail(Long viewerId, Long productId) {
