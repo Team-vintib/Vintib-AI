@@ -190,16 +190,25 @@ def query_color(image_path: Path, model_key: str = ACTIVE_VLM) -> tuple[str, str
 
 # --------------------------------------------------------------------------
 # VRAM 동시 적재 실측 — CH012 §12 "노트북 VRAM 미측정" 리스크를 직접 확인한다.
-# SAM3 로딩 함수는 `worker/models/sam3/`가 정의한다(이 스파이크 밖) — 여기서는 그 모듈을
-# 지연 import만 하고, 없으면(worker/ 경로가 안 잡히면) 명확한 에러로 알린다.
+# 실제 API: `worker/models/sam3/segmenter.py`의 `build_segmenter() -> DefectSegmenter`
+# (`Sam3PcsSegmenter`는 `_ensure_loaded()`가 실제 로드를 트리거하는 지연 로딩 구조 —
+# 공개 프리로드 진입점이 따로 없어 밑줄 붙은 메서드를 직접 부른다. 진단 전용 스크립트라
+# 이 정도 계층 위반은 감수한다).
 # --------------------------------------------------------------------------
 def measure_vram_with_sam3() -> dict:
     """**사용자가 직접, 명시적으로만 실행할 것.** Qwen3-VL(4bit) + SAM3를 같은 프로세스에
     순서대로 올리면서 각 단계의 `torch.cuda.memory_allocated()`를 잰다."""
+    import sys
+    from pathlib import Path
+
     import torch
 
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA 없음 — 이 측정은 GPU가 있는 노트북에서만 의미가 있다")
+
+    repo_root = Path(__file__).resolve().parents[4]  # .../CLASS/product-info-check -> repo root
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
 
     readings = {"baseline_mb": torch.cuda.memory_allocated() / (1024**2)}
 
@@ -209,18 +218,17 @@ def measure_vram_with_sam3() -> dict:
     readings["qwen_vl_load_s"] = time.perf_counter() - t0
 
     try:
-        from worker.models.sam3 import loader as sam3_loader  # type: ignore[import-not-found]
+        from worker.models.sam3.segmenter import build_segmenter
     except ImportError as exc:
         readings["sam3_load_error"] = (
-            f"worker.models.sam3.loader import 실패: {exc}. "
-            "이 스파이크(AI/validation/CLASS/)에서 worker/ 코드를 직접 import하는 것은 "
-            "정상 경로가 아니다 — sys.path에 리포 루트를 넣었는지, worker/models/sam3/의 "
-            "실제 로더 함수 이름이 맞는지 확인할 것."
+            f"worker.models.sam3.segmenter import 실패: {exc}. "
+            f"repo_root로 추정한 경로가 틀렸을 수 있다: {repo_root}"
         )
         return readings
 
     t0 = time.perf_counter()
-    sam3_loader.load_default_model()  # 실제 함수명은 worker/models/sam3/ 구현에 맞춰 조정할 것
+    segmenter = build_segmenter("sam3_pcs")  # 기본값 "mock"이 아니라 실모델을 명시로 켠다
+    segmenter._ensure_loaded()  # noqa: SLF001 — 공개 프리로드 API 없음(위 주석 참고)
     readings["after_sam3_mb"] = torch.cuda.memory_allocated() / (1024**2)
     readings["sam3_load_s"] = time.perf_counter() - t0
 
