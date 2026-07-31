@@ -40,7 +40,7 @@ sys.path.insert(0, str(_REPO_ROOT / "worker" / "models"))
 from sam3 import registry  # noqa: E402
 from sam3.contracts import BaseColor, GarmentCategory  # noqa: E402
 from sam3.findings import extract_findings  # noqa: E402
-from sam3.overlay import build_attention_maps  # noqa: E402
+from sam3.overlay import build_annotated_images, build_attention_maps  # noqa: E402
 from sam3.prompts import select_prompt_set  # noqa: E402
 from sam3.scoring import build_notes, score_findings, summarize  # noqa: E402
 from sam3.segmenter import InspectionTarget, build_segmenter  # noqa: E402
@@ -94,6 +94,7 @@ def main() -> None:
     attention_maps = build_attention_maps(
         results, extracted.kept_instances_by_image, extracted.findings, _local_uploader
     )
+    annotated_images = build_annotated_images(results, extracted.findings, _local_uploader)
 
     output = {
         "model": {"backend": BACKEND, "model_id": config["model_id"], "prompt_set": prompt_set.key},
@@ -103,6 +104,7 @@ def main() -> None:
         "findings": [f.to_dict() for f in extracted.findings],
         "section_scores": [s.to_dict() for s in extracted.section_scores],
         "attention_maps": [m.to_dict() for m in attention_maps],
+        "annotated_images": [m.to_dict() for m in annotated_images],
         "notes": notes,
     }
 
@@ -114,6 +116,7 @@ def main() -> None:
     print()
     print(f"결과 저장 -> {out_json}")
     print(f"어텐션 맵 PNG {len(attention_maps)}장 -> {OUTPUT_DIR}")
+    print(f"넘버링 bbox 이미지 {len(annotated_images)}장 -> {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":
