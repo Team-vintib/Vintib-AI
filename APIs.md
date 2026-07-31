@@ -25,9 +25,9 @@
 | :--- | :--- | :--- | :---: | :--- | :---: |
 | 내 정보 조회 | GET | `/users/me` |  | MY-001 |  |
 | 회원 상세 조회 | GET | `/users/{id}` |  |  |  |
-| 회원 정보 등록, 수정 | PATCH | `/users/{id}` |  | ONBOARD-001, MY-001 |  |
-| 관심 정보 조회 | GET | `/users/{id}/interests` |  | ONBOARD-002 |  |
-| 관심 정보 등록, 수정 | PUT | `/users/{id}/interests` |  | ONBOARD-002 |  |
+| 회원 정보 등록, 수정 | PATCH | `/users/{id}` | ✓ | ONBOARD-001, MY-001 | ✓ |
+| 관심 정보 조회 | GET | `/users/{id}/interests` | ✓ | ONBOARD-002 | ✓ |
+| 관심 정보 등록, 수정 | PUT | `/users/{id}/interests` | ✓ | ONBOARD-002 | ✓ |
 
 ## 사업자 (Businesses)
 

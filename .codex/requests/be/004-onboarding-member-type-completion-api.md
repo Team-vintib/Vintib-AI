@@ -79,15 +79,19 @@ Content-Type: application/json
 - `GENERAL`은 `ROUTE_PATHS.HOME`, `BUSINESS`는 `ROUTE_PATHS.BIZ_VERIFY`로 이동한다.
 - 실패 시 ONBOARD-004에 남아 선택값을 유지하고 오류를 표시한다.
 
-## BE 확인 필요
+## BE 확인 필요 — 남은 항목
 
-1. `member` 테이블의 `member_type`과 Java Entity enum 매핑을 확정해야 한다.
-2. 기본 정보 저장 단계에서 조기 완료되는 현재 `Member.completeOnboarding()` 책임을
-   ONBOARD-004 최종 완료 단계에 맞게 분리해야 한다.
-3. 이미 완료한 회원의 재요청과 회원 유형 변경 허용 정책을 확정해야 한다.
-4. 완료 이후 인증 응답 또는 내 정보 조회에서 `memberType`과
-   `onboardingCompleted`를 제공할지 확정해야 한다.
-5. 구현 후 Swagger에 요청, 응답과 오류 응답을 문서화해야 한다.
+- **~~1. `member_type`과 Java Entity enum 매핑~~** — 해결됨. `MemberType`(GENERAL/BUSINESS)
+  필드와 `schema.sql`의 `member_type VARCHAR(20)` + `ck_member_type` CHECK 제약까지 이미
+  반영돼 있다(001/002 작업 중 회원 스키마를 다듬으면서 함께 정리됨).
+- **~~4. 내 정보 조회에서 `memberType`/`onboardingCompleted` 노출~~** — 해결됨.
+  `MemberProfileResponse`(ONBOARD-001/MY-001 조회 응답)가 이미 두 필드를 모두 내려준다.
+- **2. `POST /api/me/onboarding/complete` 자체는 아직 미구현** — 회원 유형 저장 + 온보딩
+  최종 완료를 하나의 트랜잭션으로 묶는 엔드포인트가 없다. 완료 시점을 ONBOARD-004로
+  옮기는 설계는 001·002 요청과 공통 이슈라
+  `.claude/plans/be/SY019-onboarding-enforcement.md`에서 함께 다룰 예정.
+- **3. 이미 완료한 회원의 재요청/유형 변경 허용 정책** — 미결정.
+- **5. Swagger 문서화** — 엔드포인트 구현 후 진행.
 
 ## FE 관련 파일
 
@@ -95,11 +99,8 @@ Content-Type: application/json
 - `FE/src/domains/onboard/pages/OnboardingMemberTypeView.vue`
 - `FE/docs/frontend/api/api-index.md`
 
-## 진행 상황 (2026-07-29)
+## 진행 상황 (2026-07-31)
 
-**미구현.** `POST /api/me/onboarding/complete` 엔드포인트, 관련 컨트롤러/서비스 모두 아직 없다.
-
-- `Member` 엔티티에 `memberType`(GENERAL/BUSINESS) 필드가 없다 — "BE 확인 필요 1" 미해결.
-- `Member.completeOnboarding()`은 001번 요청(기본 정보 저장)이 아직 미구현이라 여전히 존재하지 않는 메서드 호출 지점 자체가 없는 상태 — "BE 확인 필요 2"는 001·004를 함께 설계해야 풀린다.
-
-이 요청은 001(기본 정보), 002(관심 정보), 003(시착 프로필) 저장 흐름과 온보딩 완료 시점을 공유하므로, 네 요청을 한 번에 묶어서 `Member` 도메인 계획(`.claude/plans/be/`)을 세우는 게 나을 것 같다 — 순서대로 따로 구현하면 001에서 만든 완료 처리 로직을 004에서 다시 옮겨야 한다.
+`POST /api/me/onboarding/complete` 엔드포인트, 관련 컨트롤러/서비스는 여전히 없다 — 001(기본
+정보)·002(관심 정보) 저장 API는 이번에 구현했지만, 이 요청(회원 유형 저장 + 온보딩 완료)은
+아직 착수 전이다. `SY019` 계획에서 완료 시점 설계가 정해지면 그 계획에 따라 구현한다.
