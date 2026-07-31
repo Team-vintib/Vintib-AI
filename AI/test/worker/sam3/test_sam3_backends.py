@@ -17,6 +17,7 @@ _RATIO_FIELDS = (
     "garment_crop_pad_ratio",
     "garment_overlap_min",
     "benign_containment",
+    "cross_type_iou_min",
     "min_area_ratio",
     "max_defect_area_ratio",
 )
@@ -67,6 +68,7 @@ def test_every_backend_declares_a_description_and_benign_switch(backend):
     config = registry.SEGMENTER_BACKENDS[backend]
     assert config["description"], f"{backend}: 설명이 비어 있습니다"
     assert isinstance(config["suppress_benign"], bool)
+    assert isinstance(config["dedupe_cross_type"], bool)
 
 
 def test_segmenter_config_defaults_to_active_backend():
