@@ -138,6 +138,14 @@ RESTRICT_TO_GARMENT = True
 BENIGN_CONTAINMENT = 0.6  # 하자 마스크가 양성 마스크에 이만큼 잠기면 억제 후보
 SUPPRESS_BENIGN = True
 
+# 서로 다른 defect_type이 같은 실물 부위를 중복 검출했을 때 병합하는 임계치.
+# ⚠️ 라벨링된 검증셋 없이 잡은 값(BENIGN_CONTAINMENT와 같은 한계) — 스윕 대상.
+# 실측 중복 쌍(scratch.jpg, DIRT_MARK/HOLE_TEAR)은 bbox가 1px 이내로 거의 동일해
+# IoU가 0.9대로 매우 높았다 — 0.5보다 여유 있게 0.7로 잡아 "진짜 인접했지만 서로
+# 다른 하자"까지 잘못 합칠 위험을 줄인다. 프로덕션(worker/models/sam3/registry.py의
+# cross_type_iou_min)과 같은 값을 쓴다.
+CROSS_TYPE_IOU_MIN = 0.7
+
 # 판정 구간: PASS < 0.4 <= REVIEW <= 0.7 < FAIL
 # ⚠️ 근거 없는 초기값이다. 라벨링된 검증셋 확보 후 스윕해서 확정해야 한다.
 VERDICT_THRESHOLDS = (0.4, 0.7)
@@ -412,6 +420,43 @@ def suppress_benign(
             kept.append(inst)
         else:
             inst["suppressed_by"] = f"{hit['type']}({hit['confidence']:.2f})"
+            dropped.append(inst)
+    return kept, dropped
+
+
+def dedupe_cross_type(instances, min_iou=CROSS_TYPE_IOU_MIN):
+    """서로 다른 defect_type이 같은 실물 부위를 중복 검출했을 때 병합한다. (kept, dropped) 반환.
+
+    SAM3/CLIPSeg는 defect_type마다 독립된 프롬프트로 탐지한다("a dirty mark" vs "a hole or
+    tear in fabric" 등). 같은 자리가 두 프롬프트 모두에 걸리면 defect_type만 다른 인스턴스
+    2개가 생긴다 — 실측(scratch.jpg)에서 bbox가 1px 이내로 겹치는 DIRT_MARK/HOLE_TEAR 쌍
+    5개가 확인됐다. `suppress_benign()`은 이 케이스를 못 거른다(그건 별도 benign 카테고리
+    전용이라 defect끼리는 비교하지 않는다).
+
+    confidence 내림차순(동률이면 `type` 알파벳순으로 결정적 tie-break)으로 훑으며, **다른
+    타입**이면서 이미 kept에 들어간 인스턴스와 `mask_iou`가 `min_iou` 이상이면 버린다. 같은
+    타입끼리는 비교하지 않는다 — 같은 프롬프트 안에서의 중복은 탐지 백엔드 자체 후처리가
+    이미 걸렀다고 본다.
+
+    ⚠️ 알려진 단순화(프로덕션 `worker/models/sam3/findings.py`의
+    `dedupe_cross_type_overlap()`과 동일): 이미 kept된 것과만 비교하는 그리디라, IoU가
+    전이적이지 않은 경우를 이론상 놓칠 수 있다. 실측 중복은 IoU가 매우 높아 이 케이스가
+    실제로 발생할 가능성은 낮다고 보고 1차로는 이 방식을 쓴다.
+    """
+    ordered = sorted(instances, key=lambda d: (-d["confidence"], d["type"]))
+    kept, dropped = [], []
+    for inst in ordered:
+        hit = None
+        for kept_inst in kept:
+            if kept_inst["type"] == inst["type"]:
+                continue
+            if mask_iou(inst["mask"], kept_inst["mask"]) >= min_iou:
+                hit = kept_inst
+                break
+        if hit is None:
+            kept.append(inst)
+        else:
+            inst["duplicate_of"] = f"{hit['type']}({hit['confidence']:.2f})"
             dropped.append(inst)
     return kept, dropped
 
