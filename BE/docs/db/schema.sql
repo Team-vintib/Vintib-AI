@@ -21,7 +21,7 @@
 CREATE TABLE member (
     id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email             VARCHAR(255) NOT NULL UNIQUE,
-    password_hash     VARCHAR(255),                    -- SSO 전용 계정은 NULL
+    password          VARCHAR(255),                    -- SSO 전용 계정은 NULL
     -- 온보딩 완료 전에는 NULL이고, 온보딩 완료 시 애플리케이션에서 필수로 검증한다(UNIQUE만 DB가 보장).
     nickname          VARCHAR(30)  UNIQUE,              -- 경매 최고 입찰자 표시에 사용(AUCT-011)
     name              VARCHAR(50),
