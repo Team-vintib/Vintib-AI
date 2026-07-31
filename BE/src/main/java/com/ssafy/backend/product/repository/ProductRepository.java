@@ -18,6 +18,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     /** 카테고리로 상품을 찾는다. 라이브 목록의 카테고리 필터가 쓴다. */
     List<Product> findByCategoryIdIn(Collection<Long> categoryIds);
 
+    /** 판매자의 공개 상품 수(DRAFT 제외) — 상품 상세의 판매자 통계에 쓴다. */
+    long countBySeller_IdAndSaleStatusNot(Long sellerId, SaleStatus excludedStatus);
+
     /**
      * 선택적 필터·정렬을 지원하는 상품 목록 조회 (PROD-008).
      *
@@ -51,4 +54,4 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             @Param("hasMaxPrice") boolean hasMaxPrice,
             @Param("maxPrice") Long maxPrice,
             Pageable pageable);
-}
+}

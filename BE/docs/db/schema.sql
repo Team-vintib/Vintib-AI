@@ -174,16 +174,6 @@ CREATE TABLE wish (
     PRIMARY KEY (member_id, product_id)
 );
 
--- 팔로우 (FOLLOW-001) — HOME-002 팔로잉 콘텐츠 조회의 기준
-CREATE TABLE follow (
-    follower_id  BIGINT      NOT NULL REFERENCES member (id),
-    following_id BIGINT      NOT NULL REFERENCES member (id),
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (follower_id, following_id),
-    CONSTRAINT ck_follow_not_self CHECK (follower_id <> following_id)
-);
-
-
 -- AI 가상 시착 결과물. product_id 를 참조하므로 product 다음에 둔다.
 -- 다중 아이템 합성("빈티지 코디" 등)은 이번 범위 밖 — 상품 1개 기준 단일 합성 결과만 다룬다.
 CREATE TABLE tryon_result (
@@ -514,3 +504,16 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX ix_product_title_trgm   ON product USING gin (title gin_trgm_ops);
 CREATE INDEX ix_member_nickname_trgm ON member  USING gin (nickname gin_trgm_ops);
 CREATE INDEX ix_live_title_trgm      ON live    USING gin (title gin_trgm_ops);
+
+-- =============================================================================
+-- 11. 소셜 (찜/팔로우)
+-- =============================================================================
+
+CREATE TABLE follow (
+    id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    follower_id  BIGINT      NOT NULL REFERENCES member (id),
+    following_id BIGINT      NOT NULL REFERENCES member (id),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ux_follow UNIQUE (follower_id, following_id),
+    CONSTRAINT ck_follow_not_self CHECK (follower_id <> following_id)
+);
