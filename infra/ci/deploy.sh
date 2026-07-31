@@ -114,6 +114,19 @@ $COMPOSE build
 log "서비스 교체"
 $COMPOSE up -d
 
+# Caddyfile 은 bind mount 라 **내용이 바뀌어도 compose 가 컨테이너를 다시 만들지 않는다.**
+# Caddy 는 기동 시 한 번만 설정을 읽으므로, 그대로 두면 새 라우팅이 반영되지 않은 채
+# 배포가 "성공"으로 끝난다 — 실제로 -448 에서 /rtc 라우팅이 이 이유로 누락됐다.
+# reload 는 무중단이고, 설정이 잘못되면 기존 설정을 유지한 채 실패한다.
+log "Caddy 설정 반영"
+if docker exec vintib-caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
+    log "  Caddy reload 완료"
+else
+    # 배포 자체를 실패시키지는 않는다 — 백엔드는 이미 새 버전으로 떴고,
+    # Caddy 는 옛 설정으로라도 서비스를 계속하는 편이 낫다.
+    log "  !! Caddy reload 실패 — 라우팅이 옛 설정일 수 있다. Caddyfile 문법을 확인할 것"
+fi
+
 # ---------- 4. 헬스체크 ----------
 # backend 가 healthy 가 되어야 배포 성공으로 본다.
 log "헬스체크 (최대 ${HEALTH_TIMEOUT}초)"

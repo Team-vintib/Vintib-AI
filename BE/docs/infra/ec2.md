@@ -143,11 +143,38 @@ OpenVidu v3 Community 번들은 **자체 Caddy·Redis·MinIO·MongoDB·대시보
 
 `deploy.sh`가 `PROD_LIVEKIT_NODE_IP`를 필수 변수로 검사한다.
 
+### ⚠️ UDP 버퍼를 키우지 않으면 영상이 끊긴다
+
+기동 로그에 이 경고가 나오면 커널 UDP 버퍼가 부족한 것이다.
+
+```
+WARN  UDP receive buffer is too small for a production set-up
+      {"current": 425984, "suggested": 5000000}
+```
+
+WebRTC는 UDP로 미디어를 나르므로 **버퍼가 작으면 트래픽이 몰릴 때 커널이 패킷을 버린다.** 시청자가 늘수록 심해지고, 애플리케이션 로그에는 아무것도 안 남아 원인을 찾기 어렵다. 호스트 커널 설정이라 컨테이너 안에서는 못 바꾼다.
+
+```bash
+bash infra/ec2/setup-udp-buffer.sh
+sudo docker restart vintib-livekit
+```
+
+### `.env`는 `ubuntu` 계정으로 읽을 수 없다
+
+배포 스크립트가 `umask 077`(600)로 만들고 **GitLab 러너 사용자 소유**다. 시크릿이 들어 있어 의도한 것이다. `docker compose` 명령은 `.env`를 읽으므로 **`sudo`를 붙여야 한다.**
+
+```bash
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -p vintib ps
+```
+
+`docker logs`는 파일을 읽지 않아 `sudo` 없이 된다.
+
 ### 적용 절차
 
 ```bash
 bash infra/ec2/setup-ufw-media.sh
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d livekit
+bash infra/ec2/setup-udp-buffer.sh
+sudo docker restart vintib-livekit
 ```
 
 확인:
