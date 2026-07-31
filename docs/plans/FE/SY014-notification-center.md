@@ -67,10 +67,12 @@ FE/src/domains/notification/
 - [x] 알림 목록/읽음 처리/전체 읽음 상태를 관리하는 store 또는 composable 구현
 - [x] 알림 카드 컴포넌트 구현
 - [x] 알림 센터 탭, 목록, 모두 읽음, 상태 화면 구현
+- [x] BE 페이지네이션 `hasNext` 기준 전체 탭 더보기 구현
 - [x] `/notifications` placeholder를 알림 센터 View로 교체
 - [x] 알림 팝업 컴포넌트 구현
 - [x] `GlobalNavigation` 알림 버튼, unread badge, 팝업 연동
 - [x] 알림 클릭 시 단건 읽음 처리와 연결 route 이동 구현
+- [x] 수동 화면 확인용 `mock=default|empty|error|loading` query 지원
 - [x] `api-index.md`, `route-map.md`, `screen-inventory.md`, `current-structure.md`, `status.md` 갱신
 - [x] `npm run type-check` 검증
 

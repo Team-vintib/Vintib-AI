@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import NotificationCard from '@/domains/notification/components/NotificationCard.vue'
 import NotificationCenterState from '@/domains/notification/components/NotificationCenterState.vue'
@@ -12,12 +12,20 @@ import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 import type {
   NotificationCategory,
   NotificationItem,
+  NotificationMockScenario,
 } from '@/domains/notification/types/notification.types'
 
 const notificationStore = useNotificationStore()
+const route = useRoute()
 const router = useRouter()
 const selectedCategory = ref<NotificationCategory>('ALL')
 const actionErrorMessage = ref('')
+const NOTIFICATION_MOCK_SCENARIOS: NotificationMockScenario[] = [
+  'default',
+  'loading',
+  'empty',
+  'error',
+]
 
 const filteredNotifications = computed(() =>
   selectedCategory.value === 'ALL'
@@ -35,6 +43,12 @@ const isFilterEmpty = computed(
     notificationStore.loadState === 'success' &&
     notificationStore.items.length > 0 &&
     filteredNotifications.value.length === 0,
+)
+const canLoadMore = computed(
+  () =>
+    selectedCategory.value === 'ALL' &&
+    notificationStore.loadState === 'success' &&
+    notificationStore.hasNext,
 )
 
 const resultStatusMessage = computed(() => {
@@ -63,6 +77,16 @@ const handleMarkAllAsRead = async () => {
   }
 }
 
+const handleLoadMore = async () => {
+  actionErrorMessage.value = ''
+
+  try {
+    await notificationStore.loadNextPage()
+  } catch (error) {
+    actionErrorMessage.value = normalizeApiError(error).message
+  }
+}
+
 const handleSelectNotification = async (notification: NotificationItem) => {
   actionErrorMessage.value = ''
 
@@ -80,11 +104,32 @@ const handleSelectNotification = async (notification: NotificationItem) => {
   }
 }
 
-onMounted(() => {
-  if (notificationStore.loadState === 'idle') {
+const getMockScenario = (): NotificationMockScenario | null => {
+  const queryValue = Array.isArray(route.query.mock) ? route.query.mock[0] : route.query.mock
+
+  return NOTIFICATION_MOCK_SCENARIOS.includes(queryValue as NotificationMockScenario)
+    ? (queryValue as NotificationMockScenario)
+    : null
+}
+
+watch(
+  () => route.query.mock,
+  () => {
+    selectedCategory.value = 'ALL'
+    actionErrorMessage.value = ''
+
+    const scenario = getMockScenario()
+
+    if (scenario) {
+      notificationStore.loadMockNotifications(scenario, { page: 1, size: 20 })
+      return
+    }
+
+    notificationStore.clearMockMode()
     void notificationStore.loadNotifications({ page: 1 })
-  }
-})
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -167,6 +212,20 @@ onMounted(() => {
           :disabled="notificationStore.readingIds.has(notification.id)"
           @select="handleSelectNotification"
         />
+
+        <div v-if="canLoadMore" class="notification-page__pagination">
+          <button
+            type="button"
+            :disabled="notificationStore.isLoadingMore"
+            @click="handleLoadMore"
+          >
+            {{ notificationStore.isLoadingMore ? '불러오는 중' : '더 보기' }}
+          </button>
+          <p>
+            {{ notificationStore.items.length }}개 표시 중 · 전체
+            {{ notificationStore.totalElements }}개
+          </p>
+        </div>
       </div>
     </section>
   </DefaultLayout>
@@ -294,6 +353,41 @@ onMounted(() => {
 .notification-page__list {
   display: grid;
   gap: var(--space-3);
+}
+
+.notification-page__pagination {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) 0 0;
+}
+
+.notification-page__pagination button {
+  min-height: var(--button-height-standard);
+  padding: 0 var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+}
+
+.notification-page__pagination button:hover:not(:disabled),
+.notification-page__pagination button:focus-visible {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.notification-page__pagination button:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 2px;
+}
+
+.notification-page__pagination p {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 20px;
 }
 
 @media (max-width: 640px) {
