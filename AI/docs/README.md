@@ -20,6 +20,7 @@ AI 파트의 참조 문서 모음. 실행 방법·디렉터리 구조는 `../REA
 | 라이브 채팅 RAG **전체 플로우와 아키텍처 결정 이유**가 궁금하다 | [`chat-rag-architecture.md`](./chat-rag-architecture.md) — STT→저장→판정→생성 전체 흐름, Redis를 검색에 안 쓰는 이유, 벡터 검색을 워커가 인메모리로 하는 이유 (`S15P11A108-444`) |
 | 라이브 채팅 RAG를 **실 모델로 검증한 결과**가 궁금하다 | [`chat-rag-verification-results.md`](./chat-rag-verification-results.md) — 판정 정확도 회귀 확인, STT/chat_rag 실 모델 E2E, 발견한 버그와 수정 내역 (`S15P11A108-443`, `-444`) |
 | 가격 책정이 **왜 워커 큐가 아닌지** 알고 싶다 | `infra-architecture.md` §6 — 자원이 아웃바운드 외부 API면 인바운드 제약이 없어 컨테이너 내 백그라운드로 간다. 설계 전문은 `.claude/plans/ai/CH003-pricing-service-prototype.md` (`S15P11A108-338`) |
+| 품질 검수 **모델 입력 전처리 방법론**이 궁금하다 | [`quality-preprocessing-methods.md`](./quality-preprocessing-methods.md) — 의류 세그먼트·마스킹 크롭, 의류 겹침 필터, 양성(benign) 판정, 면적 기반 노이즈 필터링 요약 (`S15P11A108-307`) |
 
 > ⚠️ `infra-architecture.md`의 "7. 저장소 디렉토리 구조" 절은 `app/` 패키지 재구성 이전 상태로
 > 남아 있다. 현재 구조는 `../README.md`의 디렉터리 구조 절을 본다.
