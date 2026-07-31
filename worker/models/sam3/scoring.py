@@ -1,9 +1,8 @@
 """하자 항목 → 컨디션 점수·등급·요약문 (SAM3 백엔드용).
 
-`worker/models/clipseg/scoring.py`와 **로직이 완전히 동일한 사본**이다 — 이 모듈은 `Finding`/
-`FindingStatus`/`DefectType`만 갖고 순수 집계하므로 어느 세그멘터가 findings를 뽑았는지와
-무관하다(백엔드 비종속). 두 사본이 값까지 어긋나지 않아야 "같은 하자는 어느 모델이 찾았든
-같은 점수"라는 정책 일관성이 유지된다.
+이 모듈은 `Finding`/`FindingStatus`/`DefectType`만 갖고 순수 집계하므로 어느 세그멘터가
+findings를 뽑았는지와 무관하다(백엔드 비종속) — "같은 하자는 어느 모델이 찾았든 같은 점수"라는
+정책 일관성이 이 구조에서 나온다.
 
 ⚠️ **가중치·구간 경계는 근거 없는 임의값이다.** `registry.py`에 상수로 노출해 두고 확정은
 검증셋 확보 이후의 별도 작업으로 미룬다. 이 모듈이 고정하는 건 값이 아니라 **구조**다.
@@ -21,7 +20,7 @@ from .contracts import ConditionGrade, DefectType, Finding, FindingStatus
 
 MAX_SCORE = 100.0
 
-# 요약문에 쓰는 한국어 라벨. clipseg/scoring.py의 DEFECT_LABELS와 값이 같아야 한다.
+# 요약문·Finding.label 에 쓰는 한국어 라벨.
 DEFECT_LABELS: dict[DefectType, str] = {
     DefectType.stain: "오염",
     DefectType.dirt_mark: "얼룩",

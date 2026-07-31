@@ -1,17 +1,16 @@
-"""SAM3 세그멘터 — 프로토타입에서 **모델에 의존하는 유일한 지점**.
+"""SAM3 세그멘터 — 서비스에서 **모델에 의존하는 유일한 지점**.
 
-CLIPSeg(`worker/models/clipseg/segmenter.py`)와 근본적으로 다른 점: SAM3 PCS(Promptable
-Concept Segmentation)는 확률 히트맵이 아니라 **인스턴스**(마스크+박스+score)를 직접 낸다.
-그래서 `SegmentationResult`도 CLIPSeg와 모양이 다르다 — `masks: dict[프롬프트, 히트맵]` 대신
-`instances: tuple[Instance, ...]`이고, `clean_mask`(대조 정규화 감산항) 대신 `garment_mask`
-(사후 겹침 필터용)를 들고 있다.
+SAM3 PCS(Promptable Concept Segmentation)는 확률 히트맵이 아니라 **인스턴스**(마스크+박스+
+score)를 직접 낸다. 그래서 `SegmentationResult`는 `masks: dict[프롬프트, 히트맵]` 대신
+`instances: tuple[Instance, ...]`을 갖고, 대조 정규화 감산항 대신 `garment_mask`(사후 겹침
+필터용)를 들고 있다.
 
 **마스킹 전처리가 여기 내장돼 있다.** `AI/validation/QUAL/sam3-condition-check/
 sam3_qc_test_masking.ipynb` 스파이크에서 검증한 방식 그대로: 1) `clothing` 프롬프트로 의류
 위치를 찾고 2) 그 bbox로 이미지를 자른 뒤 3) 마스크 밖(의류가 아닌 픽셀)을 검정(0)으로 채워
 4) 그 안에서 하자·양성 프롬프트를 탐지한다. 배경(바닥·소품) 오탐을 구조적으로 차단한다.
 의류를 못 찾으면 크롭·마스킹 없이 원본 그대로 탐지한다("하자 없음"과 "탐지 실패"를 뭉개지
-않기 위한 안전장치, `clipseg`의 `filter_by_garment` None 처리와 같은 원칙).
+않기 위한 안전장치, `findings.py`의 `filter_by_garment` None 처리와 같은 원칙).
 
 설계: `.claude/plans/ai/CH006-sam3-quality-segmenter.md`
 """
@@ -54,7 +53,7 @@ class ImageFetchFailed(Exception):
 
 @dataclass(frozen=True)
 class InspectionTarget:
-    """세그멘터에 넘기는 검수 대상 컨텍스트. `clipseg.segmenter.InspectionTarget`과 같은 모양."""
+    """세그멘터에 넘기는 검수 대상 컨텍스트."""
 
     product_id: int
     image_urls: tuple[str, ...]
@@ -163,7 +162,7 @@ def _mask_bbox(mask: np.ndarray) -> tuple[int, int, int, int] | None:
 
 
 def _seed_from(*parts: object) -> int:
-    """키 조각들을 결정적 시드로 바꾼다(`clipseg` 목업과 같은 방식)."""
+    """키 조각들을 결정적 시드로 바꾼다."""
     key = "|".join(str(part) for part in parts)
     return int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest()[:8], "little")
 
@@ -181,10 +180,9 @@ def _gaussian_disk(size: tuple[int, int], center: tuple[float, float], radius: f
 class MockSegmenter(DefectSegmenter):
     """product_id 로 결정적 인스턴스를 합성한다(torch 불필요).
 
-    CLIPSeg 목업처럼 named 시나리오 JSON을 쓰지 않는다 — SAM3 네이티브 경로는 확률 히트맵/
-    clean 대조 개념이 없어 CLIPSeg 목업의 blob 합성 로직이 그대로 맞지 않는다. 대신
-    `(product_id, image_index)` 해시로 0~2개의 하자 인스턴스를 직접 합성한다. 같은 입력은
-    항상 같은 결과를 낸다(CI 재현성).
+    named 시나리오 JSON을 쓰지 않는다 — SAM3 네이티브 경로는 확률 히트맵/clean 대조 개념이
+    없어 그런 blob 합성 로직이 그대로 맞지 않는다. 대신 `(product_id, image_index)` 해시로
+    0~2개의 하자 인스턴스를 직접 합성한다. 같은 입력은 항상 같은 결과를 낸다(CI 재현성).
     """
 
     def __init__(self, config: registry.SegmenterConfig | None = None) -> None:
@@ -235,7 +233,7 @@ class MockSegmenter(DefectSegmenter):
 def load_source_image(url: str) -> Image.Image:
     """검수 대상 이미지를 RGB로 읽는다. 실패는 전부 `ImageFetchFailed`로 모은다.
 
-    HTTP(S) URL과 로컬 경로를 모두 받는다(clipseg와 동일한 규약).
+    HTTP(S) URL과 로컬 경로를 모두 받는다.
     """
     try:
         if url.startswith(("http://", "https://")):

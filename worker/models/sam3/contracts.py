@@ -1,9 +1,9 @@
 """품질 검수 job result 계약 — 워커 쪽 사본 (SAM3 백엔드용).
 
-`worker/models/clipseg/contracts.py`와 **필드 단위로 동일한 사본**이다. BE에는 세그멘터가
-CLIPSeg든 SAM3든 같은 모양의 JSON이 나가야 하므로, 두 백엔드가 독립 배포 단위(각자 conda
-환경)로 나뉘어도 이 계약만은 어긋나면 안 된다 — `AI/test/quality/test_quality_contract.py`가
-`AI/app/quality/schemas.py` 및 두 워커 사본 전부를 상호 대조한다.
+`AI/app/quality/schemas.py`와 **필드 단위로 동일한 사본**이다. 워커는 게이트웨이와 배포
+단위가 달라서(팀원 노트북에서 git clone으로 실행, 도커 이미지에 안 들어감) `AI/` 코드를
+import할 수 없다 — `AI/test/quality/test_quality_contract.py`가 두 사본이 어긋나지 않는지
+상호 대조한다.
 
 **pydantic을 쓰지 않는다.** 워커 의존성을 가볍게 유지하려는 것이다. 대신 `to_dict()`로 job
 result에 실을 순수 dict를 만든다 — 검증은 요청 시점에 게이트웨이가 이미 한다.

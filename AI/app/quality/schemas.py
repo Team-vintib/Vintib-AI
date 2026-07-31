@@ -143,9 +143,9 @@ class InspectionEnqueued(BaseModel):
 
 
 # --- job result 계약 --------------------------------------------------------
-# 아래 모델들은 **AI가 직접 생성하지 않는다.** 워커(worker/models/clipseg/)가 만들어
+# 아래 모델들은 **AI가 직접 생성하지 않는다.** 워커(worker/models/sam3/)가 만들어
 # `JobResult.result`에 dict로 싣는 값의 형태를 문서화·고정하는 용도다. 워커 쪽 사본은
-# `worker/models/clipseg/contracts.py`이며, 둘이 어긋나지 않는지는
+# `worker/models/sam3/contracts.py`이며, 둘이 어긋나지 않는지는
 # `AI/test/quality/test_quality_contract.py`가 검사한다.
 
 
@@ -242,6 +242,6 @@ class InspectionResult(BaseModel):
 
 
 # 활성 설정 노출용 스키마(`GET /quality/prompt-sets`)는 제거했다 — 프롬프트·임계치·하자 분류
-# 체계가 전부 워커(`worker/models/clipseg/registry.py`)로 옮겨가서 게이트웨이가 그 값을 알지
+# 체계가 전부 워커(`worker/models/sam3/registry.py`)로 옮겨가서 게이트웨이가 그 값을 알지
 # 못한다. 설정을 확인하려면 워커 쪽 파일을 보거나, 필요해지면 워커가 job result에 실어 보내는
 # 방식으로 되살린다(`ModelInfo`가 이미 백엔드·프롬프트 세트를 담고 있다).

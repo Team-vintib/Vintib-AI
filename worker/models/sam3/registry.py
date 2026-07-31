@@ -1,17 +1,15 @@
 """품질 검수 백엔드 레지스트리 — SAM3 세그멘터의 유일한 스왑 지점.
 
-`worker/models/clipseg/registry.py`와 같은 패턴(설계: `.claude/plans/ai/005-quality-inspection-
-prototype.md`)을 따르되, SAM3는 **연속 확률 히트맵이 아니라 인스턴스(마스크+박스+score)를
-직접 낸다** — 그래서 `SegmenterConfig`의 임계치 구성이 CLIPSeg와 다르다(`defect_threshold`
-하나가 아니라 `score_threshold`/`mask_threshold`/`garment_score_threshold` 세 갈래).
+설계: `.claude/plans/ai/005-quality-inspection-prototype.md`,
+`.claude/plans/ai/CH006-sam3-quality-segmenter.md` (방식 B — 네이티브 경로).
 
-설계: `.claude/plans/ai/CH006-sam3-quality-segmenter.md` (방식 B — 네이티브 경로, 레지스트리는
-`worker/models/clipseg/`와 완전히 분리).
+SAM3는 **연속 확률 히트맵이 아니라 인스턴스(마스크+박스+score)를 직접 낸다** — 그래서
+`SegmenterConfig`의 임계치 구성이 단일 `defect_threshold`가 아니라 `score_threshold`/
+`mask_threshold`/`garment_score_threshold` 세 갈래다.
 
-**`DEFECT_TAXONOMY`/점수 상수는 CLIPSeg 레지스트리와 값이 같아야 한다** — 하자 유형의
-감점·신뢰도 정책은 "어느 모델이 찾았는가"가 아니라 "그 하자 유형 자체의 성격"에 대한 것이라
-백엔드가 바뀌어도 동일해야 정책 일관성이 유지된다. 이 값이 갈라지지 않는지는
-`AI/test/quality/test_quality_contract.py`가 `worker/models/clipseg/registry.py`와 대조한다.
+**`DEFECT_TAXONOMY`/점수 상수는 하자 유형 자체의 성격에 대한 정책이다** — "어느 모델이
+찾았는가"가 아니라 그 하자 유형의 감점·신뢰도 취급 기준이므로, 나중에 다른 백엔드가
+추가되더라도 이 값들은 동일하게 유지돼야 정책 일관성이 지켜진다.
 """
 
 from typing import TypedDict
@@ -38,7 +36,7 @@ class SegmenterConfig(TypedDict):
 
 SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
     # 기본 — 목업 시나리오로 결정적 인스턴스를 합성한다. torch 불필요, CI에서 전 경로가
-    # 그대로 검증된다. CLIPSeg 쪽 mock과 같은 원칙(하드코딩 응답이 아니라 실제 합성).
+    # 그대로 검증된다(하드코딩 응답이 아니라 실제 합성).
     "mock": {
         "model_id": None,
         "description": "목업 시나리오 기반 결정적 인스턴스 합성(의존성 없음)",
@@ -57,7 +55,7 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
     # sam3_qc_test_masking.ipynb 스파이크의 마지막 실험값을 그대로 가져왔다.
     #
     # ⚠️ 이 임계치들은 **라벨링된 검증셋 없이 육안 판단으로 조정된 값**이다(007/CH006 계획의
-    # 공통 한계). 특히 confident_threshold는 CLIPSeg처럼 실측 근거가 없는 신규 값이다 —
+    # 공통 한계). 특히 confident_threshold는 실측 근거가 없는 신규 값이다 —
     # 검증셋 확보 후 스윕 대상.
     #
     # gated 저장소다(HF 약관 동의 필요) — 배포 환경의 워커 실행 계정이 승인돼 있어야 한다.
@@ -90,10 +88,10 @@ class DefectPolicy(TypedDict):
     evidence: str  # 위 판단의 근거(LAB-12/LAB-46 실측 / 미검증)
 
 
-# LAB-12·LAB-46 검증 결론을 그대로 코드에 넣는다. `worker/models/clipseg/registry.py`의
-# DEFECT_TAXONOMY와 **값이 같아야 한다** — 정책은 모델이 아니라 하자 유형에 대한 것이다.
+# LAB-12·LAB-46 검증 결론을 그대로 코드에 넣는다. 정책은 모델이 아니라 하자 유형에 대한
+# 것이다.
 #
-# ⚠️ `weight`는 **근거 없는 임의값**이다(CLIPSeg 레지스트리와 동일한 한계).
+# ⚠️ `weight`는 **근거 없는 임의값**이다(라벨링된 검증셋이 없다).
 DEFECT_TAXONOMY: dict[DefectType, DefectPolicy] = {
     DefectType.stain: {
         "trusted": True,
@@ -143,7 +141,7 @@ DEFECT_TAXONOMY: dict[DefectType, DefectPolicy] = {
 }
 
 
-# --- 점수·등급 (전부 미확정 임의값, clipseg 레지스트리와 동일) ---------------
+# --- 점수·등급 (전부 미확정 임의값) -----------------------------------------
 
 SEVERITY_FACTORS: dict[Severity, float] = {
     Severity.minor: 0.5,

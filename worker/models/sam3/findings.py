@@ -1,20 +1,17 @@
 """SAM3 인스턴스 → 판매자가 소명할 수 있는 하자 항목 리스트 (네이티브 경로).
 
-CLIPSeg 쪽(`worker/models/clipseg/findings.py`)과 근본적으로 다른 점: **확률 히트맵을
-이진화·flood-fill 하지 않는다.** SAM3가 이미 인스턴스(마스크+박스+score)를 직접 주므로,
-`segmenter.py`가 낸 `Instance`를 그대로 `Finding`으로 승격한다 — 정규화(`normalize_mask`)/
-3×3 풀링(연속값 기준)/blob 추출이 전부 없고, 섹션 번호만 마스크 무게중심으로 계산한다.
+**확률 히트맵을 이진화·flood-fill 하지 않는다.** SAM3가 이미 인스턴스(마스크+박스+score)를
+직접 주므로, `segmenter.py`가 낸 `Instance`를 그대로 `Finding`으로 승격한다 — 정규화
+(`normalize_mask`)/3×3 풀링(연속값 기준)/blob 추출이 전부 없고, 섹션 번호만 마스크 무게중심으로
+계산한다. 이게 이 계획 문서가 "방식 B(네이티브 경로)"라고 부른 것의 실체다 — SAM3의 장점(이미
+분리된 정밀 인스턴스)을 그대로 살리고, 확률 히트맵 전용 개념(clean 대조, 이진화 임계치)을
+억지로 끼워 맞추지 않는다.
 
-이게 이 계획 문서가 "방식 B(네이티브 경로)"라고 부른 것의 실체다 — SAM3의 장점(이미 분리된
-정밀 인스턴스)을 그대로 살리고, CLIPSeg 전용 개념(clean 대조, 이진화 임계치)을 억지로
-끼워 맞추지 않는다.
-
-대신 인스턴스 레벨 필터 두 가지가 CLIPSeg의 이진화·병합 자리를 대신한다.
+대신 인스턴스 레벨 필터 두 가지가 그 이진화·병합 자리를 대신한다.
 
 ⑴ **의류 겹침 필터** — `segmenter.py`가 이미 마스킹 전처리로 배경을 지웠지만, 크롭 bbox
 여백·마스크 경계 반올림 때문에 일부 인스턴스가 여전히 의류 밖에 걸칠 수 있어 사후 안전망으로
-한 번 더 확인한다(clipseg의 `filter_by_garment`와 같은 원칙 — 의류를 못 찾았으면 필터
-자체를 건너뛴다).
+한 번 더 확인한다(의류를 못 찾았으면 필터 자체를 건너뛴다).
 
 ⑵ **양성(benign) 억제** — 구조적 개구부(암홀·넥라인·밑단·소매끝)는 겹치면 무조건 억제하고,
 질감형(주름·접힘·그림자·솔기·프린트)은 겹치고 + confidence가 하자보다 높을 때만 억제한다.
@@ -43,10 +40,10 @@ from .segmenter import Instance, SegmentationResult
 class FindingsResult:
     """`extract_findings`의 산출물.
 
-    `unreliable_prompts`는 CLIPSeg 쪽과 필드 모양을 맞추기 위해 남겨 뒀지만 SAM3 네이티브
+    `unreliable_prompts`는 게이트웨이 계약과 필드 모양을 맞추기 위해 남겨 뒀지만 SAM3 네이티브
     경로에서는 항상 빈 튜플이다 — 과포화 인스턴스는 `segmenter.py`가 개별적으로 걸러서 로그만
-    남기고(프롬프트 단위 마스크 전체가 과포화되는 CLIPSeg와 달리 인스턴스 단위라 "이 프롬프트
-    전체를 못 믿는다"는 개념 자체가 성립하지 않는다), BE에 별도로 드러낼 근거가 약하다.
+    남긴다(SAM3는 인스턴스 단위라 "이 프롬프트 전체를 못 믿는다"는 개념 자체가 성립하지
+    않는다), BE에 별도로 드러낼 근거가 약하다.
 
     `kept_instances_by_image`는 의류 겹침 필터·양성 억제를 **통과한** 인스턴스만 담는다 —
     `overlay.py`가 이 값을 그대로 써야 한다. `SegmentationResult.instances`(원본, 필터 전)를
@@ -141,7 +138,7 @@ def _severity_of(area_ratio: float, peak: float) -> Severity:
 
 
 def _status_of(defect_type, peak: float, confident_threshold: float) -> FindingStatus:
-    """LAB-12/LAB-46 실측을 반영한 강등 규칙. clipseg의 `_status_of`와 같은 규칙이다."""
+    """LAB-12/LAB-46 실측을 반영한 강등 규칙."""
     if not registry.defect_policy(defect_type)["trusted"]:
         return FindingStatus.suspected
     return FindingStatus.detected if peak >= confident_threshold else FindingStatus.suspected
@@ -160,8 +157,7 @@ def _statement_required(defect_type, status: FindingStatus, severity: Severity) 
 
 
 def _section_peaks_from(instances: Sequence[Instance]) -> list[float]:
-    """섹션별 최대 confidence 9개. CLIPSeg의 `_section_peaks`(연속 마스크 풀링)와 같은 목적을
-    인스턴스 confidence의 섹션별 최댓값으로 달성한다."""
+    """섹션별 최대 confidence 9개. 인스턴스 confidence의 섹션별 최댓값으로 계산한다."""
     peaks = [0.0] * SECTION_COUNT
     for inst in instances:
         section_no = _section_no_of(inst.mask)
@@ -177,7 +173,7 @@ def _to_findings(
     """(image_index, Instance) 쌍을 `Finding`으로 승격하고 **안정 키 + 표시 번호**를 매긴다.
 
     키는 BE가 판매자 소명을 매다는 앵커라서 결정적이어야 한다 — 정렬을 먼저 고정하고
-    `{유형}_{이미지}_{섹션}_{순번}`으로 번호를 매긴다(clipseg와 같은 키 형식).
+    `{유형}_{이미지}_{섹션}_{순번}`으로 번호를 매긴다.
 
     `no`(CH007)는 별개다 — 같은 image_index 안에서 정렬 순서 그대로 1부터 매기는 **표시용**
     번호로, `overlay.py`의 넘버링 bbox 이미지가 그리는 숫자와 정확히 같은 값이어야 한다(같은
@@ -231,7 +227,7 @@ def extract_findings(
 ) -> FindingsResult:
     """인스턴스들 → 하자 항목 리스트 + 부위별 확률 9개.
 
-    이미지별로 ⑴ 의류 겹침 필터 ⑵ 양성 억제를 거친 뒤 `Finding`으로 승격한다. CLIPSeg 경로의
+    이미지별로 ⑴ 의류 겹침 필터 ⑵ 양성 억제를 거친 뒤 `Finding`으로 승격한다. 확률 히트맵의
     이진화·flood-fill·프롬프트 간 병합이 없다 — SAM3 인스턴스는 이미 분리돼 있어 병합 대상이
     원천적으로 적다(동일 영역에 여러 프롬프트가 동시에 반응할 가능성 자체가 없어지는 건
     아니라서, 실측에서 중복 검출이 관찰되면 후속 작업으로 병합 로직을 추가한다).

@@ -5,8 +5,8 @@
 - **Attention Map**(`build_attention_maps`) — 연속 확률 마스크가 아니라 **이산 인스턴스
   마스크 여러 개**를 하나로 합쳐 렌더링용 의사 확률맵을 만든다 — 인스턴스가 있는 픽셀은 그
   인스턴스의 confidence 값, 없는 픽셀은 0인 맵이다. 겹치는 인스턴스는 confidence가 더 높은
-  쪽이 이긴다(max). 이렇게 만들면 CLIPSeg와 같은 `render_overlay()`(Pillow + numpy 알파
-  합성)를 그대로 재사용할 수 있다. 하자유형별로 여러 장 나올 수 있다.
+  쪽이 이긴다(max). 이렇게 만들면 `render_overlay()`(Pillow + numpy 알파 합성)가 연속값
+  [0,1] 히트맵 입력만 받으면 되는 단순한 인터페이스를 유지한다. 하자유형별로 여러 장 나올 수 있다.
 - **넘버링 bbox 이미지**(`build_annotated_images`, CH007) — 이미지 1장당 최대 1장, 숫자만
   적힌 빨간 박스로 하자 위치를 표시한다. FE가 bbox 이미지의 숫자와 불릿 리스트(`Finding.no`)를
   1:1로 매칭하는 데 쓴다 — 한글 태그는 이미지에 안 그린다(불릿 리스트가 담당).
@@ -82,8 +82,8 @@ def _resize_mask(mask: np.ndarray, size: tuple[int, int]) -> np.ndarray:
 def _instances_to_pseudo_mask(instances: Sequence[Instance], size: tuple[int, int]) -> np.ndarray:
     """같은 하자 유형의 인스턴스 마스크들을 confidence 값으로 합친 의사 확률맵.
 
-    겹치는 영역은 confidence가 더 높은 인스턴스가 이긴다(max) — `render_overlay()`가
-    CLIPSeg와 같은 [0,1] 연속값 인터페이스를 그대로 받게 하는 어댑터다. size = (height, width).
+    겹치는 영역은 confidence가 더 높은 인스턴스가 이긴다(max) — `render_overlay()`의 [0,1]
+    연속값 인터페이스를 그대로 받게 하는 어댑터다. size = (height, width).
     """
     height, width = size
     canvas = np.zeros((height, width), dtype=np.float32)
@@ -102,8 +102,8 @@ def render_overlay(
     """원본 위에 확률(의사) 히트맵을 알파 합성한 RGB 이미지를 만든다.
 
     `floor` 미만은 완전 투명이라 원본이 그대로 보인다. SAM3 경로는 마스크 자체가 이미
-    "인스턴스 있음/없음" 이진 정보를 confidence로 담고 있어 `floor=0.0`이 기본이다 —
-    CLIPSeg처럼 연속 히트맵을 findings와 맞추기 위해 추가로 자를 필요가 없다.
+    "인스턴스 있음/없음" 이진 정보를 confidence로 담고 있어 `floor=0.0`이 기본이다 — 연속
+    히트맵을 findings와 맞추기 위해 추가로 자를 필요가 없다.
     """
     base = base_image.convert("RGB")
     resized = _resize_mask(mask, base.size)

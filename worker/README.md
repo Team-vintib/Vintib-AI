@@ -21,12 +21,12 @@ S15P11A108-27(인프라 세팅) / S15P11A108-210(CatVTON 모델 연결) 관련 �
 | `base_worker.py` | 모든 워커가 상속하는 공통 골격. poll → 추론 → 결과 제출 → 실패 시 재시도를 처리한다. **이 파일은 기능이 늘어나도 수정할 필요가 거의 없다.** |
 | `storage_utils.py` | 게이트웨이와 파일을 주고받는 유틸(`download_image`/`upload_image`/`download_bytes`). S3 권한이 없어 EC2 로컬 디스크 저장 방식을 쓰기 때문에, 워커가 직접 디스크에 쓰지 않고 HTTP로 전송한다. `tryon_worker_example.py`가 import하므로 이 파일 없이는 워커가 기동하지 않는다. |
 | `tryon_worker_example.py` | 시착(CatVTON) 워커. 현재 `worker/models/catvton`의 검증 코드(`verify_fit_tryon.py`)를 기반으로 실제 모델이 연결되어 있다. |
-| `quality_check_worker_example.py` | 품질검수(CLIPSeg) 워커. 판정 로직은 `models/clipseg/`에 있고 이 파일은 오케스트레이션만 한다. **`QUALITY_BACKEND=mock`이면 GPU 없이도 전 경로가 돈다.** |
+| `quality_check_worker_example.py` | 품질검수(SAM3) 워커. 판정 로직은 `models/sam3/`에 있고 이 파일은 오케스트레이션만 한다. **`QUALITY_BACKEND=mock`이면 GPU 없이도 전 경로가 돈다.** |
 | `stt_worker_example.py` | 라이브 발언 STT 워커. Whisper로 전사하고 같은 프로세스에서 KURE-v1 임베딩까지 계산해 게이트웨이엔 텍스트+벡터를 그대로 넘긴다(게이트웨이엔 torch가 없어서). **`STT_BACKEND=mock`(기본값)이면 GPU 없이도 전 경로가 돈다.** 실제 방송 오디오는 OpenVidu 설치 전이라 아직 없다. |
 | `chat_rag_worker_example.py` | 반복질문 답변 생성 워커. 게이트웨이가 `live_id`로 가져온 문서 후보 + 질문을 받아 KURE-v1로 임베딩·랭킹하고, 그라운딩 임계치를 넘으면 LangChain + `LiquidAI/LFM2.5-230M`으로 답변까지 생성해 돌려준다(검색·판단·생성을 왕복 1회로 처리). **`CHAT_RAG_BACKEND=mock`(기본값)이면 GPU 없이도 전 경로가 돈다.** |
 | `garment_measurement_worker_example.py` | 의류 실측(cm) 측정 워커. 기준 물체(A4) 검출 → 원단 분할 → 랜드마크 검출 → cm 환산을 순서대로 처리하고, 앞 단계가 실패하면 뒷 단계(특히 GPU가 필요한 랜드마크 검출)를 아예 건너뛴다. 세 단계 모두 독립적으로 스왑 가능해 환경변수도 3개다. **전부 `mock`(기본값)이면 GPU/opencv 없이도 전 경로가 돈다.** |
-| `models/clipseg/` | 품질검수 판정 로직 — 세그멘테이션(목업/CLIPSeg) · 하자 항목화 · 점수 · 히트맵. 순수 로직은 `AI/test/worker/clipseg/`가 CI에서 검증한다. |
-| `models/garment_measurement/` | 실측 판정 로직 — 기준물체 검출(목업/OpenCV) · 원단 분할(목업/GrabCut) · 랜드마크 검출(목업/HRNet) · cm 환산. clipseg와 달리 **진짜 서브패키지**다(`__init__.py` 보유) — 이유는 아래 "왜 서브패키지인가" 참고. 순수 로직은 `AI/test/worker/garment_measurement/`가 CI에서 검증한다. |
+| `models/sam3/` | 품질검수 판정 로직 — 세그멘테이션(목업/SAM3 PCS) · 하자 항목화 · 점수 · 히트맵 · 넘버링 bbox 이미지. **진짜 서브패키지**다(`__init__.py` 보유) — 이유는 아래 "왜 서브패키지인가" 참고. 순수 로직은 `AI/test/worker/sam3/`가 CI에서 검증한다. |
+| `models/garment_measurement/` | 실측 판정 로직 — 기준물체 검출(목업/OpenCV) · 원단 분할(목업/GrabCut) · 랜드마크 검출(목업/HRNet) · cm 환산. `models/sam3/`와 같은 이유로 **진짜 서브패키지**다(`__init__.py` 보유) — 이유는 아래 "왜 서브패키지인가" 참고. 순수 로직은 `AI/test/worker/garment_measurement/`가 CI에서 검증한다. |
 | `requirements.txt` | 워커 공통 의존성. `requests`, `Pillow`(storage_utils.py가 `PIL.Image`를 다룬다), `opencv-python-headless`(기준물체 검출·원단 분할, torch 불필요라 공용). CatVTON·HRNet 등 무거운 모델 자체의 의존성(torch, diffusers 등)은 각자 기존에 구성해둔 conda 환경을 그대로 쓴다 — 이 파일에 포함하지 않는다. |
 | `.env.example` | 워커 실행에 필요한 환경변수 예시. 필요한 값은 아래 "실행 방법" 참고. |
 
@@ -48,14 +48,19 @@ export CATVTON_CODE_PATH=/path/to/worker/models/catvton   # 기본값: worker/ �
 품질검수 워커는 아래를 쓴다:
 
 ```bash
-export QUALITY_BACKEND=mock                    # 기본값. GPU 불필요 — 목업 시나리오로 전 경로 검증
-export QUALITY_BACKEND=clipseg_rd64_refined    # 실제 CLIPSeg. torch/transformers 필요
-export CLIPSEG_CODE_PATH=/path/to/worker/models/clipseg   # 기본값: worker/ 기준 models/clipseg
+export QUALITY_BACKEND=mock          # 기본값. GPU 불필요 — 목업 인스턴스로 전 경로 검증
+export QUALITY_BACKEND=sam3_pcs      # 실제 SAM3(facebook/sam3, gated repo). torch/transformers>=5.0 필요
+export QUALITY_MODEL_CODE_PATH=/path/to/worker/models   # 기본값: worker/ 기준 models (sam3의 부모)
 ```
 
-`mock` 백엔드는 `models/clipseg/data/mock_inspections.json`의 시나리오(오염 명확 / 미세 오염 /
-찢어짐 / 깨끗함 / 프린트)로 확률 마스크를 **결정적으로 합성**한다. GPU가 없는 팀원도 워커를 띄워
-게이트웨이 큐 왕복부터 리포트 JSON까지 그대로 확인할 수 있다.
+`mock` 백엔드는 `(product_id, image_index)` 해시로 하자 인스턴스(마스크+박스+score)를
+**결정적으로 합성**한다(`worker/models/sam3/segmenter.py`의 `MockSegmenter`). GPU가 없는
+팀원도 워커를 띄워 게이트웨이 큐 왕복부터 리포트 JSON까지 그대로 확인할 수 있다.
+
+`sam3_pcs`로 전환하려면 ① https://huggingface.co/facebook/sam3 에서 gated 라이선스 동의 ②
+`worker/models/sam3/requirements.txt` 설치(별도 conda 환경 권장, `validation/
+requirements-test.txt`와 같은 환경에 섞지 말 것 — transformers 버전이 충돌한다) ③ `HF_TOKEN`
+환경변수 또는 `huggingface-cli login`으로 승인된 계정 로그인이 먼저 필요하다.
 
 STT 워커는 아래를 쓴다:
 
@@ -109,13 +114,14 @@ export HRNET_CHECKPOINT_PATH=/path/to/pose_hrnet-w48_384x288-deepfashion2_mAP_0.
 지정하거나, 위 기본 경로에 그대로 두면 된다 — `worker/models/garment_measurement/hrnet/.gitignore`가
 `models/`를 무시하므로 실수로 커밋될 걱정은 없다.
 
-**왜 `models/garment_measurement/`만 서브패키지인가**: `clipseg/`처럼
-`contracts.py`/`registry.py`/`scenarios.py`/`segmenter.py`를 flat하게 sys.path에 바로 두면,
-두 폴더가 같은 이름의 파일을 가지고 있어서(AI의 pytest 세션에서 둘 다 동시에 sys.path에 들어감)
-`import contracts`가 어느 쪽을 가져올지 꼬인다(먼저 import된 모듈이 전역 캐시에 남음 —
-`S15P11A108-339` 구현 중 실제로 겪은 버그). 그래서 `garment_measurement/`는 `__init__.py`를 둬서
-진짜 패키지로 만들고, `MEASUREMENT_CODE_PATH`(기본값: `worker/models/`, 즉 이 폴더의 **부모**)를
-sys.path에 넣어 `from garment_measurement.xxx import ...` 형태로만 접근한다.
+**왜 `models/garment_measurement/`·`models/sam3/`가 서브패키지인가**: 여러 워커 패키지의
+`contracts.py`/`registry.py`/`segmenter.py` 등을 flat하게 sys.path에 바로 두면, 서로 다른
+폴더가 같은 이름의 파일을 가지고 있어서(AI의 pytest 세션처럼 여러 패키지가 동시에 sys.path에
+들어가는 상황) `import contracts`가 어느 쪽을 가져올지 꼬인다(먼저 import된 모듈이 전역
+캐시에 남음 — `S15P11A108-339` 구현 중 삭제 전 `models/clipseg/`와 겪었던 실제 버그). 그래서
+이 둘은 `__init__.py`를 둬서 진짜 패키지로 만들고, `MEASUREMENT_CODE_PATH`/
+`QUALITY_MODEL_CODE_PATH`(기본값: `worker/models/`, 즉 이 폴더의 **부모**)를 sys.path에 넣어
+`from garment_measurement.xxx import ...`/`from sam3.xxx import ...` 형태로만 접근한다.
 
 ```bash
 export MEASUREMENT_CODE_PATH=/path/to/worker/models   # 기본값: worker/ 기준 models (garment_measurement의 부모)
@@ -317,7 +323,7 @@ curl https://i15a108.p.ssafy.io/ai/jobs/{job_id}
 
 ## 남은 작업
 
-- 품질검수 워커를 실제 GPU 노트북에서 `QUALITY_BACKEND=clipseg_rd64_refined`로 돌려보기 (지금까지는 `mock`으로만 검증했다)
+- 품질검수 워커를 실제 GPU 노트북에서 `QUALITY_BACKEND=sam3_pcs`로 돌려보기 (지금까지는 `mock`으로만 검증했다 — 절차는 위 "실행 방법" 참고)
 - 워커 여러 대(팀원별)를 동시에 띄웠을 때 동작 검증
 - CatVTON 모델 로딩 시간이 길 경우, 워커 기동 시점에 미리 로딩해두는 방식(lazy 대신 eager)으로 바꿀지 검토
 - STT 워커를 실제 GPU 노트북에서 `STT_BACKEND=faster_whisper`로 돌려보기 (지금까지는 `mock`으로만 검증했다)
