@@ -35,12 +35,20 @@ export const getNotificationCategory = (
   type: string | null | undefined,
   refType: string | null | undefined,
 ): Exclude<NotificationCategory, 'ALL'> => {
-  const tokens = `${type ?? ''} ${refType ?? ''}`.toUpperCase()
+  const tokens = [type, refType]
+    .flatMap((value) => value?.toUpperCase().split(/[^A-Z0-9]+|_/) ?? [])
+    .filter(Boolean)
 
-  if (tokens.includes('LIVE') || tokens.includes('BROADCAST')) return 'LIVE'
-  if (tokens.includes('AUCTION') || tokens.includes('BID')) return 'AUCTION'
-  if (tokens.includes('SHIP') || tokens.includes('DELIVERY')) return 'SHIPPING'
-  if (tokens.includes('POINT') || tokens.includes('WALLET') || tokens.includes('WITHDRAW')) {
+  if (tokens.some((token) => token === 'LIVE' || token === 'BROADCAST')) return 'LIVE'
+  if (tokens.some((token) => token === 'AUCTION' || token === 'BID')) return 'AUCTION'
+  if (
+    tokens.some(
+      (token) => token === 'SHIP' || token === 'SHIPMENT' || token === 'SHIPPING' || token === 'DELIVERY',
+    )
+  ) {
+    return 'SHIPPING'
+  }
+  if (tokens.some((token) => token === 'POINT' || token === 'WALLET' || token === 'WITHDRAW')) {
     return 'POINT'
   }
 

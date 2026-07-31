@@ -6,13 +6,20 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from '@/domains/notification/api/notificationApi'
+import { NOTIFICATION_MOCK_DATA } from '@/domains/notification/constants/notificationMockData'
+import {
+  getNotificationCategory,
+  getNotificationRoute,
+} from '@/domains/notification/constants/notificationOptions'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { normalizeApiError } from '@/shared/api/http'
 
 import type {
+  NotificationItemDto,
   NotificationItem,
   NotificationListResult,
   NotificationLoadState,
+  NotificationMockScenario,
 } from '@/domains/notification/types/notification.types'
 
 const DEFAULT_PAGE_SIZE = 20
@@ -29,6 +36,8 @@ export const useNotificationStore = defineStore('notification', () => {
   const totalPages = ref(0)
   const hasNext = ref(false)
   const isMarkingAllAsRead = ref(false)
+  const isLoadingMore = ref(false)
+  const activeMockScenario = ref<NotificationMockScenario | null>(null)
   const readingIds = ref<Set<number>>(new Set())
   let loadRequestId = 0
 
@@ -37,7 +46,14 @@ export const useNotificationStore = defineStore('notification', () => {
   const isLoading = computed(() => loadState.value === 'loading')
   const hasLoadError = computed(() => loadState.value === 'error')
 
-  const loadNotifications = async (options: { page?: number; size?: number } = {}) => {
+  const loadNotifications = async (
+    options: { append?: boolean; page?: number; size?: number } = {},
+  ) => {
+    if (activeMockScenario.value) {
+      loadMockNotifications(activeMockScenario.value, options)
+      return
+    }
+
     authStore.hydrateSession()
 
     const userId = authStore.user?.id
@@ -49,10 +65,15 @@ export const useNotificationStore = defineStore('notification', () => {
     }
 
     const requestId = ++loadRequestId
+    const shouldAppend = options.append === true
     const nextPage = options.page ?? page.value
     const nextSize = options.size ?? size.value
 
-    loadState.value = 'loading'
+    if (shouldAppend) {
+      isLoadingMore.value = true
+    } else {
+      loadState.value = 'loading'
+    }
     errorMessage.value = ''
 
     try {
@@ -63,7 +84,7 @@ export const useNotificationStore = defineStore('notification', () => {
 
       if (requestId !== loadRequestId) return
 
-      applyListResult(result)
+      applyListResult(result, shouldAppend)
       loadState.value = 'success'
     } catch (error) {
       if (requestId !== loadRequestId) return
@@ -71,7 +92,70 @@ export const useNotificationStore = defineStore('notification', () => {
       const apiError = normalizeApiError(error)
       errorMessage.value = apiError.message
       loadState.value = 'error'
+    } finally {
+      if (requestId === loadRequestId) {
+        isLoadingMore.value = false
+      }
     }
+  }
+
+  const loadNextPage = async () => {
+    if (!hasNext.value || isLoading.value || isLoadingMore.value) {
+      return
+    }
+
+    await loadNotifications({
+      append: true,
+      page: page.value + 1,
+      size: size.value,
+    })
+  }
+
+  const loadMockNotifications = (
+    scenario: NotificationMockScenario,
+    options: { append?: boolean; page?: number; size?: number } = {},
+  ) => {
+    activeMockScenario.value = scenario
+    errorMessage.value = ''
+
+    if (scenario === 'loading') {
+      items.value = []
+      loadState.value = 'loading'
+      return
+    }
+
+    if (scenario === 'error') {
+      items.value = []
+      loadState.value = 'error'
+      errorMessage.value = '수동 확인용 알림 오류 상태입니다.'
+      return
+    }
+
+    const nextPage = options.page ?? 1
+    const nextSize = options.size ?? size.value
+    const shouldAppend = options.append === true
+    const sourceItems = scenario === 'empty' ? [] : NOTIFICATION_MOCK_DATA
+    const pageStartIndex = (nextPage - 1) * nextSize
+    const pageItems = sourceItems.slice(pageStartIndex, pageStartIndex + nextSize)
+
+    applyListResult(
+      {
+        items: pageItems.map(toMockNotificationItem),
+        meta: {
+          page: nextPage,
+          size: nextSize,
+          totalElements: sourceItems.length,
+          totalPages: Math.ceil(sourceItems.length / nextSize),
+        },
+        hasNext: pageStartIndex + nextSize < sourceItems.length,
+      },
+      shouldAppend,
+    )
+    loadState.value = 'success'
+  }
+
+  const clearMockMode = () => {
+    activeMockScenario.value = null
   }
 
   const markAsRead = async (notificationId: number) => {
@@ -119,13 +203,30 @@ export const useNotificationStore = defineStore('notification', () => {
     )
   }
 
-  const applyListResult = (result: NotificationListResult) => {
-    items.value = result.items
+  const applyListResult = (result: NotificationListResult, append = false) => {
+    items.value = append ? mergeNotificationItems(items.value, result.items) : result.items
     page.value = result.meta.page
     size.value = result.meta.size
     totalElements.value = result.meta.totalElements
     totalPages.value = result.meta.totalPages
     hasNext.value = result.hasNext
+  }
+
+  const mergeNotificationItems = (
+    previousItems: NotificationItem[],
+    nextItems: NotificationItem[],
+  ) => {
+    const itemMap = new Map<number, NotificationItem>()
+
+    for (const item of previousItems) {
+      itemMap.set(item.id, item)
+    }
+
+    for (const item of nextItems) {
+      itemMap.set(item.id, item)
+    }
+
+    return Array.from(itemMap.values())
   }
 
   return {
@@ -142,9 +243,27 @@ export const useNotificationStore = defineStore('notification', () => {
     isLoading,
     hasLoadError,
     isMarkingAllAsRead,
+    isLoadingMore,
+    activeMockScenario,
     readingIds,
     loadNotifications,
+    loadMockNotifications,
+    clearMockMode,
+    loadNextPage,
     markAsRead,
     markAllAsRead,
   }
+})
+
+const toMockNotificationItem = (notification: NotificationItemDto): NotificationItem => ({
+  id: notification.id,
+  type: notification.type,
+  title: notification.title,
+  body: notification.body ?? '',
+  refType: notification.refType,
+  refId: notification.refId,
+  isRead: notification.isRead,
+  createdAt: notification.createdAt,
+  category: getNotificationCategory(notification.type, notification.refType),
+  route: getNotificationRoute(notification),
 })
