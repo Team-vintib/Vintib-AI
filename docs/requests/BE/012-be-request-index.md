@@ -47,7 +47,7 @@
 | 005 | `005-search-contract.md` | Search | FE 화면/adapter 있음, BE `/api/search` 없음 | 통합 검색 API |
 | 006 | `006-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | 목록 필터 query 구현, 상세 응답 보강, AI 분석/가격 추천 |
 | 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성 연결 완료 | 생성용 상품 조회, 영상 token, AI 시착 생성, `/api/me/tryon` |
-| 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 알림 목록/읽음 연결 완료 | 팔로우 API, 알림 type/ref 문서화, 실제 알림 생성 이벤트 |
+| 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 알림 목록/읽음 API 재검증 완료. 알림 seed 제거 후 실제 생성 데이터 없음 | 팔로우 API, 알림 type/ref 문서화, 실제 알림 생성 이벤트, 예약 라이브 알림 신청/스케줄러, 탭별 bulk read |
 | 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수 연결 완료 | 경매 snapshot/start/bid/close/STOMP |
 | 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | FE 화면 없음, BE controller 없음 | 주문/배송/환불/포인트 전체 |
 | 011 | `011-user-mypage-contract.md` | User/MyPage | FE 화면 없음, BE API 없음 | `/api/me`, 공개 프로필, 마이페이지 요약 |
@@ -60,7 +60,7 @@
   - Auth: `user`, `nextStep`
   - Home: live card `hostId`
   - Product: 목록 필터 반영, 상세 응답 보강
-  - Social/Notification: 알림 `type/refType/refId` 문서화, 도메인 이벤트별 알림 생성 정책
+  - Social/Notification: 알림 `type/refType/refId` 문서화, 도메인 이벤트별 알림 생성 정책, 예약 라이브 알림 신청/스케줄러, 탭별 읽음 처리 API
 - 변경 영향 범위
   - route guard
   - 홈/상품/라이브 카드 이동

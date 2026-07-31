@@ -26,9 +26,24 @@
 - 현재 임시 처리 또는 Mock 사용 여부
   - 팔로우/언팔로우 화면 연결은 아직 없다.
   - 알림 도메인의 FE mock data와 `mock` query는 제거했다.
-  - 알림 수동 확인은 실제 `notification` DB row를 생성해 진행한다.
+  - 알림 수동 확인용 DB seed row도 제거했다. 현재 로컬 `notification` 테이블은 비어 있다.
   - unread badge는 `unreadOnly=true` 조회의 `totalElements`를 사용한다.
   - 읽음 처리된 알림은 FE 목록에서 즉시 제거한다.
+
+### 2.1 2026-07-31 알림 API 재검증 결과
+
+- 검증 환경: 로컬 FE `VITE_API_BASE_URL=http://localhost:8080/api`, 로컬 BE/DB
+- 검증 계정: `notification.viewer@vintib.local`
+- 검증 방식: 임시 `notification` row 1건을 생성해 API 확인 후 삭제
+- 결과
+  - `POST /api/auth/signin`: 정상
+  - `GET /api/users/{userId}/alerts?unreadOnly=true&page=0&size=20`: 정상, PageResponse 수신
+  - `PATCH /api/users/{userId}/alerts/{id}`: 정상, `id/isRead` 수신
+  - `GET /api/users/{userId}/alerts?unreadOnly=true&page=0&size=20` 재조회: 읽음 처리된 알림 제외 확인
+  - `PATCH /api/users/{userId}/alerts/read-all`: 정상, 대상 0건이면 `updatedCount=0`
+- 현재 문제
+  - 조회/읽음 API는 정상이나, 실제 도메인 이벤트에서 `notification` row를 생성하는 흐름이 확인되지 않아 mock/seed 없이 시연할 알림 데이터가 없다.
+  - FE는 특정 탭의 `모두 읽음`을 현재 필터에 보이는 알림 각각에 `PATCH /alerts/{id}`를 호출해 처리한다. BE에는 타입/카테고리별 bulk read API가 없다.
 
 ## 3. 추가 구현 요청
 
@@ -187,6 +202,52 @@ FE 현재 임시 이동:
 | 배송 완료 | `SHIPMENT_COMPLETED` | `SHIPMENT` / order or shipment id |
 | 포인트 충전/환불/출금 완료 | `POINT_CHARGED`, `POINT_REFUNDED`, `WITHDRAW_COMPLETED` | `POINT` / point transaction id |
 
+### 3.4.1 예약 라이브 알림 신청과 스케줄러
+
+- Method / Endpoint 제안
+  - `POST /api/lives/{liveId}/reminders`
+  - `DELETE /api/lives/{liveId}/reminders`
+  - `GET /api/lives/{liveId}` 또는 라이브 목록 응답에 `isReminderSet` 포함
+- 요청 목적: 사용자가 예정된 라이브에 알림을 신청하고, 라이브 시작 시점 또는 시작 N분 전에 실제 `notification` row가 생성되도록 한다.
+- FE 사용처: 라이브 예정 목록/상세의 알림 신청 버튼, 알림센터, 공통 헤더 알림 팝업
+- 요청 데이터
+  - Header: `Authorization: Bearer {accessToken}`
+  - Path: `liveId`
+- 응답 데이터 제안
+  - `liveId`: number
+  - `isReminderSet`: boolean
+  - `reminderCount`: number
+  - `scheduledAt`: string
+
+응답 예시:
+
+```json
+{
+  "success": true,
+  "data": {
+    "liveId": 15,
+    "isReminderSet": true,
+    "reminderCount": 8,
+    "scheduledAt": "2026-07-31T20:00:00"
+  },
+  "error": null
+}
+```
+
+BE 구현 요청:
+
+- `live_reminder` 또는 동등한 구독 테이블을 두고 `(user_id, live_id)` 중복 신청을 방지해 주세요.
+- 라이브 시작 시점 또는 시작 10분 전 등 정책으로 정한 시점에 스케줄러가 `notification` row를 생성해 주세요.
+- 생성 알림의 권장 값은 `type=LIVE_REMINDER`, `refType=LIVE`, `refId={liveId}`입니다.
+- 이미 시작했거나 종료된 라이브에는 신청할 수 없는지, 신청 가능하다면 어떤 응답을 줄지 정책을 정해 주세요.
+- 스케줄러 재시도나 서버 재기동 시 같은 라이브 알림이 중복 생성되지 않도록 idempotency 기준을 정해 주세요.
+- 목록/상세 응답에 `isReminderSet`이 없으면 FE가 버튼의 현재 상태를 표시할 수 없으므로 필드 제공이 필요합니다.
+
+FE 현재 처리 방침:
+
+- 위 API가 없을 때 localStorage/mock 상태로 알림 신청을 흉내 내지 않습니다.
+- API가 제공되면 라이브 예정 카드/상세에 신청 토글을 연결하고, 실제 notification 목록에서만 알림 노출을 확인합니다.
+
 ### 3.5 unread count 전용 API 검토
 
 - Method / Endpoint 후보
@@ -208,6 +269,28 @@ FE 현재 임시 이동:
 }
 ```
 
+### 3.6 카테고리/타입별 읽음 처리 API 검토
+
+- Method / Endpoint 후보
+  - `PATCH /api/users/{userId}/alerts/read-all?category=POINT`
+  - 또는 `PATCH /api/users/{userId}/alerts/read-all` body `{ "refTypes": ["POINT"] }`
+- 요청 목적: FE 알림센터는 전체/라이브/경매/거래/배송/포인트 탭을 제공한다. 현재 전체 탭은 기존 `read-all`을 사용하지만, 특정 탭에서는 해당 탭에 보이는 알림 ID마다 단건 읽음 API를 여러 번 호출해야 한다.
+- FE 사용처: 알림센터 탭별 `모두 읽음`
+- 응답 데이터 후보
+  - `updatedCount`: number
+
+응답 예시:
+
+```json
+{
+  "success": true,
+  "data": {
+    "updatedCount": 3
+  },
+  "error": null
+}
+```
+
 ## 4. 기존 API 변경 요청
 
 - 기존 요청·응답에서 변경할 내용
@@ -215,10 +298,12 @@ FE 현재 임시 이동:
 - 추가할 필드
   - 알림 item의 `refType`, `refId` enum 문서화
   - 가능하면 unread count 전용 응답
+  - 가능하면 타입/카테고리별 bulk read 처리
 - 변경 영향 범위
   - 찜 해제 API adapter
   - 알림 클릭 이동
   - 헤더 unread badge
+  - 알림센터 탭별 모두 읽음
 
 ## 5. 보류 또는 시연 제외 범위
 
@@ -237,6 +322,7 @@ FE 현재 임시 이동:
   - 비회원 요청에서 `isWished`, `isFollowing`을 `false` 또는 `null` 중 무엇으로 줄지
   - 알림 `type`, `refType` enum 목록
   - 배송 알림의 `refId`가 order id인지 shipment id인지 확정
+  - 알림센터 카테고리 기준을 BE enum으로 둘지 FE 분류 규칙으로 둘지 확정
 - 아직 확정되지 않은 응답 구조나 정책
   - 팔로우 중복 요청 처리
   - 자기 자신 팔로우 요청 처리
