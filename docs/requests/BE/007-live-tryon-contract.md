@@ -143,6 +143,16 @@
 
 - **필요 없는 것(FE 미사용)**: `LiveProductResponse`의 `addedAt`, `liveId`, 연결 `id`는 시청 화면에서 쓰지 않는다 → 유지/제거는 BE 판단(우선순위 낮음).
 
+### 3.6 상품 상세 AI 시착 생성 (TRYON-003)
+
+- 대상: 상품 상세(`ProductDetailView`)의 AI 시착 팝업 (라이브 밖, 상품 단위 시착)
+- 배경: 상품 상세 "AI 시착" 버튼에 팝업(모달)을 구현했다. 등록 상품 이미지를 회원 전신 사진에 합성(TRYON-003). BE에 (a) 회원 전신 사진 조회, (b) 상품 단위 시착 생성 API가 없어 팝업은 mock으로 동작한다.
+- 요청
+  - **전신 사진 조회**: 3.4의 `GET /api/me/tryon`(시착 프로필)로 회원 전신 사진 URL을 내려주면 팝업 초기 이미지로 사용한다.
+  - **상품 시착 생성(비 라이브)**: `POST /api/users/{userId}/tryons` 또는 `POST /api/products/{productId}/tryons` — 상품 이미지 + 회원 전신 사진 합성 결과를 생성한다. 3.3(라이브 시착 생성)과 같은 합성이나 라이브 컨텍스트가 아니다.
+  - 응답: `tryonId`, `status`(`PENDING|PROCESSING|DONE|FAILED`), `resultImageUrl`(null 가능). polling vs STOMP push 방식은 3.3과 동일 정책을 따른다.
+- 참고: 시착 결과 저장(TRYON-005)은 "추가" 우선순위로 이번 범위 밖. 결과 조회/삭제(`GET`/`DELETE /api/users/{userId}/tryons`)는 이미 존재한다.
+
 ## 4. 기존 API 변경 요청
 
 - 기존 요청·응답에서 변경할 내용
