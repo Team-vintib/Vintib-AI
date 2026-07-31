@@ -51,10 +51,8 @@
 
 ## 관련 요청 문서
 
-`onboardingCompleted`가 정확히 언제 `true`로 바뀌어야 하는지는 이 계획과 별개로
-`.codex/requests/be/001-onboarding-basic-info-api.md`,
-`002-onboarding-interests-api.md`, `004-onboarding-member-type-completion-api.md`에도
-공통으로 걸려 있던 미결정 사항이다(2026-07-31 정리하며 이 문서로 모았다). 현재 동작은
-ONBOARD-001(기본 정보 저장) 시점에 바로 완료 처리되는데, FE 화면 흐름은
-001→002→003→004 네 단계를 거치므로 004(회원 유형 저장)까지 마친 시점으로 옮겨야
-할 가능성이 크다 — 위 "확인 필요한 미결정 사항" 1번과 같은 질문이다.
+~~`onboardingCompleted`가 정확히 언제 `true`로 바뀌어야 하는지~~ — **해결됨.**
+`docs/plans/BE/SY021-onboard-member-type.md`에서 ONBOARD-001(기본 정보 저장) 시점이 아니라
+ONBOARD-004(회원 유형 저장, `PATCH /api/users/{id}/member-type`) 시점으로 완료 처리를 옮겼다.
+이 계획에 남은 건 위 "확인 필요한 미결정 사항"의 나머지(인터셉터/화이트리스트 방식, 회원가입
+자체를 막을지 여부, 기존 회원 마이그레이션, 표시명 대체 규칙)뿐이다.

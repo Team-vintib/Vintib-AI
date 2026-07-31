@@ -3,6 +3,7 @@ package com.ssafy.backend.member.controller;
 import com.ssafy.backend.global.response.ApiResponse;
 import com.ssafy.backend.member.dto.request.UpdateInterestsRequest;
 import com.ssafy.backend.member.dto.request.UpdateMemberRequest;
+import com.ssafy.backend.member.dto.request.UpdateMemberTypeRequest;
 import com.ssafy.backend.member.dto.response.InterestsResponse;
 import com.ssafy.backend.member.dto.response.MemberProfileResponse;
 import com.ssafy.backend.member.service.UserService;
@@ -58,6 +59,31 @@ public class UserController {
             @Valid @RequestBody UpdateMemberRequest request) {
         Long requesterId = (Long) authentication.getPrincipal();
         MemberProfileResponse response = userService.updateBasicInfo(requesterId, id, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "회원 유형 저장 및 온보딩 완료",
+            description = """
+                    회원 유형(GENERAL/BUSINESS)을 저장하고 온보딩을 최종 완료 처리한다(ONBOARD-004).
+                    이미 온보딩을 완료한 회원이 다시 호출해도 유형을 갱신하며 성공 처리한다(멱등).
+                    본인 외 타인의 정보를 수정할 수 없다.
+                    """)
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "저장 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "입력값 오류"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 수정 불가"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않는 회원")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @PatchMapping("/{id}/member-type")
+    public ResponseEntity<ApiResponse<MemberProfileResponse>> completeOnboarding(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateMemberTypeRequest request) {
+        Long requesterId = (Long) authentication.getPrincipal();
+        MemberProfileResponse response = userService.completeOnboarding(requesterId, id, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

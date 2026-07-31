@@ -4,6 +4,7 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.dto.request.UpdateInterestsRequest;
 import com.ssafy.backend.member.dto.request.UpdateMemberRequest;
+import com.ssafy.backend.member.dto.request.UpdateMemberTypeRequest;
 import com.ssafy.backend.member.dto.response.InterestsResponse;
 import com.ssafy.backend.member.dto.response.MemberProfileResponse;
 import com.ssafy.backend.member.entity.Member;
@@ -80,6 +81,32 @@ public class UserService {
             // unique 제약(닉네임 중복) 위반을 도메인 예외로 변환
             throw new CustomException(ErrorCode.NICKNAME_ALREADY_TAKEN);
         }
+
+        return MemberProfileResponse.from(member);
+    }
+
+    /**
+     * ONBOARD-004: 회원 유형(일반/사업자)을 저장하고 온보딩을 최종 완료 처리한다.
+     *
+     * <p>이미 온보딩을 완료한 회원이 다시 호출해도 막지 않고 유형을 갱신하며 성공 처리한다(멱등).
+     *
+     * @param requesterId 요청을 보낸 로그인 회원 ID
+     * @param targetId    수정 대상 회원 ID (path variable)
+     * @param request     저장할 회원 유형
+     * @return 수정 후 회원 프로필
+     * @throws CustomException USER_NOT_FOUND — 대상 회원이 없을 때
+     * @throws CustomException MEMBER_FORBIDDEN — 본인 외 타인의 정보를 수정하려 할 때 (403)
+     */
+    @Transactional
+    public MemberProfileResponse completeOnboarding(Long requesterId, Long targetId, UpdateMemberTypeRequest request) {
+        if (!requesterId.equals(targetId)) {
+            throw new CustomException(ErrorCode.MEMBER_FORBIDDEN);
+        }
+
+        Member member = memberRepository.findById(targetId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        member.completeOnboarding(request.memberType());
 
         return MemberProfileResponse.from(member);
     }

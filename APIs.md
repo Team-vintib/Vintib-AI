@@ -28,6 +28,7 @@
 | 회원 정보 등록, 수정 | PATCH | `/users/{id}` | ✓ | ONBOARD-001, MY-001 | ✓ |
 | 관심 정보 조회 | GET | `/users/{id}/interests` | ✓ | ONBOARD-002 | ✓ |
 | 관심 정보 등록, 수정 | PUT | `/users/{id}/interests` | ✓ | ONBOARD-002 | ✓ |
+| 회원 유형 저장, 온보딩 완료 | PATCH | `/users/{id}/member-type` | ✓ | ONBOARD-004 | ✓ |
 
 ## 사업자 (Businesses)
 
