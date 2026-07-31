@@ -248,13 +248,13 @@
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `email` | `varchar(255)` | NOT NULL |  | UQ | 로그인 ID 겸 연락 수단. 경매 화면에는 노출하지 않는다. |
 | `password_hash` | `varchar(255)` |  |  |  | 자체 로그인용 해시. SSO 전용 계정은 NULL. |
-| `nickname` | `varchar(30)` | NOT NULL |  | UQ | 공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011). |
+| `nickname` | `varchar(30)` |  |  | UQ | 공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011). |
 | `name` | `varchar(50)` |  |  |  | 실명. 배송·정산용이며 외부 노출 금지. |
-| `phone` | `varchar(20)` |  |  |  | 연락처. 배송·정산 확인용이며 외부 노출 금지. |
+| `phone_number` | `varchar(20)` |  |  |  | 연락처. 배송·정산 확인용이며 외부 노출 금지. |
 | `address` | `varchar(200)` |  |  |  | 기본 주소(도로명/지번). 온보딩(ONBOARD-001)에서 입력. |
 | `detail_address` | `varchar(100)` |  |  |  | 상세 주소(동/호수 등). |
 | `postal_code` | `varchar(10)` |  |  |  | 우편번호. 주소 검색을 안 쓰고 직접 입력하면 NULL 허용. |
-| `gender` | `varchar(10)` |  |  |  | MALE \| FEMALE \| OTHER |
+| `gender` | `varchar(10)` |  |  |  | MALE \| FEMALE |
 | `member_type` | `varchar(20)` | NOT NULL | `'GENERAL'` |  | GENERAL(일반) \| BUSINESS(사업자) |
 | `status` | `varchar(20)` | NOT NULL | `'ACTIVE'` |  | ACTIVE \| SUSPENDED(정지) \| WITHDRAWN(탈퇴) |
 | `profile_image_url` | `varchar(500)` |  |  |  | 프로필 이미지 URL. |
@@ -265,7 +265,7 @@
 
 **CHECK 제약**
 
-- `ck_member_gender` — `CHECK (((gender)::text = ANY ((ARRAY['MALE'::character varying, 'FEMALE'::character varying, 'OTHER'::character varying])::text[])))`
+- `ck_member_gender` — `CHECK (((gender)::text = ANY ((ARRAY['MALE'::character varying, 'FEMALE'::character varying])::text[])))`
 - `ck_member_status` — `CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'SUSPENDED'::character varying, 'WITHDRAWN'::character varying])::text[])))`
 - `ck_member_type` — `CHECK (((member_type)::text = ANY ((ARRAY['GENERAL'::character varying, 'BUSINESS'::character varying])::text[])))`
 

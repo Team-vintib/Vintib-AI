@@ -41,7 +41,7 @@ public record UpdateMemberRequest(
         @Size(max = 10, message = "우편번호는 10자 이하로 입력해주세요.")
         String postalCode,
 
-        @Schema(description = "성별 (MALE/FEMALE/OTHER)", example = "MALE")
+        @Schema(description = "성별 (MALE/FEMALE)", example = "MALE")
         @NotNull(message = "성별은 필수입니다.")
         Gender gender
 ) {

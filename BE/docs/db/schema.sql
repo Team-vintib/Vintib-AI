@@ -22,9 +22,10 @@ CREATE TABLE member (
     id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email             VARCHAR(255) NOT NULL UNIQUE,
     password_hash     VARCHAR(255),                    -- SSO 전용 계정은 NULL
-    nickname          VARCHAR(30)  NOT NULL UNIQUE,    -- 경매 최고 입찰자 표시에 사용(AUCT-011)
+    -- 온보딩 완료 전에는 NULL이고, 온보딩 완료 시 애플리케이션에서 필수로 검증한다(UNIQUE만 DB가 보장).
+    nickname          VARCHAR(30)  UNIQUE,              -- 경매 최고 입찰자 표시에 사용(AUCT-011)
     name              VARCHAR(50),
-    phone             VARCHAR(20),
+    phone_number      VARCHAR(20),
     -- 온보딩(ONBOARD-001)에서 채워지는 정보. 가입 시점에는 전부 NULL이다.
     address           VARCHAR(200),
     detail_address    VARCHAR(100),
@@ -39,7 +40,7 @@ CREATE TABLE member (
     deleted_at        TIMESTAMPTZ,
     CONSTRAINT ck_member_type   CHECK (member_type IN ('GENERAL', 'BUSINESS')),
     CONSTRAINT ck_member_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'WITHDRAWN')),
-    CONSTRAINT ck_member_gender CHECK (gender IN ('MALE', 'FEMALE', 'OTHER'))
+    CONSTRAINT ck_member_gender CHECK (gender IN ('MALE', 'FEMALE'))
 );
 
 -- 싸피어스 SSO 등 외부 계정 연결 (AUTH-003, AUTH-004)
