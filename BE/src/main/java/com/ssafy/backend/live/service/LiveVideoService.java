@@ -91,15 +91,15 @@ public class LiveVideoService {
     /**
      * 화면에 뜨는 이름. 비회원은 식별할 값이 없어 고정 문구를 쓴다.
      *
-     * <p>닉네임은 <b>온보딩을 마쳐야 채워진다.</b> 그 전에는 이름으로 대체한다 — 채팅
-     * ({@code ChatMessage.senderNickname})과 같은 규칙이라 같은 사람이 화면마다 다르게 보이지 않는다.
+     * <p>회원이면 온보딩을 완료해야 이 기능(영상 접속) 자체를 쓸 수 있고(SY019 게이트), 온보딩
+     * 완료는 닉네임이 있어야만 가능하므로(SY019 순서 보장) 여기 도달한 회원은 항상 닉네임이 있다.
      */
     private String displayName(Long memberId) {
         if (memberId == null) {
             return "게스트";
         }
         return memberRepository.findById(memberId)
-                .map(member -> member.getNickname() != null ? member.getNickname() : member.getName())
+                .map(Member::getNickname)
                 .orElse("게스트");
     }
 }

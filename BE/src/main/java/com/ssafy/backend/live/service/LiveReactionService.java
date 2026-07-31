@@ -70,12 +70,9 @@ public class LiveReactionService {
         Member sender = memberRepository.findById(senderId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        // 닉네임은 온보딩을 마쳐야 채워진다. 채팅과 같은 규칙으로 이름을 대체값으로 쓴다 —
-        // 같은 사람이 채팅에서는 이름으로, 반응에서는 null 로 보이면 안 된다.
-        String senderNickname =
-                sender.getNickname() != null ? sender.getNickname() : sender.getName();
-
-        return ReactionResponse.of(liveId, type, sender.getId(), senderNickname, LocalDateTime.now());
+        // 온보딩을 완료해야 반응 보내기 등 다른 기능을 쓸 수 있고(SY019 게이트), 온보딩 완료는
+        // 닉네임이 있어야만 가능하므로(SY019 순서 보장) 여기 도달한 회원은 항상 닉네임이 있다.
+        return ReactionResponse.of(liveId, type, sender.getId(), sender.getNickname(), LocalDateTime.now());
     }
 
     /**

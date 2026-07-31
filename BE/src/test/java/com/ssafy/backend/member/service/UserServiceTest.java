@@ -163,6 +163,7 @@ class UserServiceTest {
     void 회원_유형을_저장하면_온보딩완료_응답을_반환한다() {
         // given
         Member member = createMember();
+        member.updateBasicInfo("빈티지헌터", "01012345678", "서울시 강남구", "3층", "06236", Gender.MALE);
         when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
 
         UpdateMemberTypeRequest request = new UpdateMemberTypeRequest(MemberType.BUSINESS);
@@ -203,6 +204,7 @@ class UserServiceTest {
     void 이미_온보딩을_완료한_회원이_다시_요청해도_정상_처리된다() {
         // given: 재요청은 멱등 성공으로 처리한다 — 유형만 갱신하고 막지 않는다.
         Member member = createMember();
+        member.updateBasicInfo("빈티지헌터", "01012345678", "서울시 강남구", "3층", "06236", Gender.MALE);
         member.completeOnboarding(MemberType.GENERAL);
         when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
 
@@ -214,6 +216,20 @@ class UserServiceTest {
         // then
         assertThat(response.memberType()).isEqualTo(MemberType.BUSINESS);
         assertThat(response.onboardingCompleted()).isTrue();
+    }
+
+    @Test
+    void 닉네임이_없으면_회원_유형_저장시_ONBOARDING_BASIC_INFO_REQUIRED_예외가_발생한다() {
+        // given: ONBOARD-001(기본 정보 저장)을 건너뛰고 004(회원 유형)부터 부른 경우.
+        Member member = createMember();
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+
+        UpdateMemberTypeRequest request = new UpdateMemberTypeRequest(MemberType.GENERAL);
+
+        // when / then
+        assertThatThrownBy(() -> userService.completeOnboarding(MEMBER_ID, MEMBER_ID, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ONBOARDING_BASIC_INFO_REQUIRED);
     }
 
     @Test

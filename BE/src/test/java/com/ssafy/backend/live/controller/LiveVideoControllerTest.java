@@ -10,6 +10,7 @@ import com.ssafy.backend.live.entity.LiveStatus;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.live.service.LiveVideoService;
 import com.ssafy.backend.member.entity.Member;
+import com.ssafy.backend.member.entity.MemberType;
 import com.ssafy.backend.member.repository.MemberRepository;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -70,11 +71,17 @@ class LiveVideoControllerTest {
     }
 
     private Member saveMember(String name) {
-        return memberRepository.save(Member.builder()
+        Member member = Member.builder()
                 .email("video-" + name + "-" + UUID.randomUUID() + "@example.com")
                 .password("encoded")
                 .name(name)
-                .build());
+                .build();
+        // SY019 게이트: 온보딩 미완료 회원은 이 컨트롤러 자체를 못 쓰므로 완료 상태로 만든다.
+        // 닉네임은 unique 제약이 있어 매 호출마다 겹치지 않게 만든다.
+        String nickname = name + "-" + UUID.randomUUID().toString().substring(0, 8);
+        member.updateBasicInfo(nickname, "01000000000", "서울", "1층", null, com.ssafy.backend.member.entity.Gender.MALE);
+        member.completeOnboarding(MemberType.GENERAL);
+        return memberRepository.save(member);
     }
 
     /** room 이 배정된 진행 중 방송. 실제 개설 경로와 같은 방식으로 이름을 넣는다. */

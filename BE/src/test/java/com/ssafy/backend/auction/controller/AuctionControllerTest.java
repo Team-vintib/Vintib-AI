@@ -9,7 +9,9 @@ import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveProduct;
 import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
+import com.ssafy.backend.member.entity.Gender;
 import com.ssafy.backend.member.entity.Member;
+import com.ssafy.backend.member.entity.MemberType;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.CategoryRepository;
@@ -74,11 +76,17 @@ class AuctionControllerTest {
                 .build();
 
         String email = "auction-host-" + UUID.randomUUID() + "@example.com";
-        Member host = memberRepository.save(Member.builder()
+        Member host = Member.builder()
                 .email(email)
                 .password("encoded")
                 .name("호스트")
-                .build());
+                .build();
+        // SY019 게이트: 온보딩 미완료 회원은 경매 설정 등 다른 기능을 쓸 수 없다.
+        // 닉네임은 unique 제약이 있어 매 테스트마다 겹치지 않게 만든다.
+        String nickname = "host-" + UUID.randomUUID().toString().substring(0, 8);
+        host.updateBasicInfo(nickname, "01000000000", "서울", "1층", null, Gender.MALE);
+        host.completeOnboarding(MemberType.GENERAL);
+        host = memberRepository.save(host);
         hostToken = jwtTokenProvider.createAccessToken(host.getId(), email);
 
         // 카테고리는 필수다(PROD-001). 시드된 마스터에서 아무거나 하나 집는다 — 경매 검증에

@@ -109,13 +109,11 @@ public class ChatMessage {
     }
 
     /**
-     * 표시할 작성자명. 닉네임은 온보딩 단계에서 채워지므로 가입 직후 회원은 비어 있을 수 있다.
-     * 그대로 내리면 작성자 없는 말풍선이 되므로 이름으로 대체한다.
+     * 표시할 작성자명. 온보딩을 완료해야 채팅 등 다른 기능을 쓸 수 있고(SY019 게이트),
+     * 온보딩 완료는 닉네임이 있어야만 가능하므로(SY019 순서 보장) 여기 도달한 회원은
+     * 항상 닉네임이 채워져 있다.
      */
     public String senderDisplayName() {
-        if (sender == null) {
-            return null;
-        }
-        return sender.getNickname() != null ? sender.getNickname() : sender.getName();
+        return sender == null ? null : sender.getNickname();
     }
 }
