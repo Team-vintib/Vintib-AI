@@ -19,6 +19,8 @@
 | 22 | SSH | 공개 (UFW) |
 | 80 | HTTP → HTTPS 리다이렉트 + Let's Encrypt ACME | 공개 (UFW) |
 | 443 | HTTPS (Caddy TLS 종단) | 공개 (UFW) |
+| 7881 | WebRTC 미디어 TCP 폴백 (LiveKit) | 공개 (**Docker publish**) |
+| 7885/udp | WebRTC 미디어 UDP mux (LiveKit) | 공개 (**Docker publish**) |
 | 8989 | **Gerrit (SSAFY, 건드리지 말 것)** | 공개 (UFW) |
 
 **앱 내부 포트(8080 backend / 5432 postgres / 6379 redis / 8000 ai)는 호스트에 노출하지 않는다.** Docker는 포트 publish 시 iptables를 직접 조작해 UFW를 우회하므로, 이들을 publish하면 UFW와 무관하게 외부에 뚫린다. 전부 `vintib-net` 내부 통신 전용이며, 외부 접근은 Caddy(443)를 통해서만 backend로 들어간다.
@@ -99,5 +101,97 @@ swapon --show          # /swapfile 4G
 
 ## 범위 밖 (후속 티켓)
 
-- **OpenVidu v3 (WebRTC 미디어 서버)** — 로드맵상 2주차 초. 설치 시 TURN/미디어 UDP 포트를 UFW에 추가하고, 이 Caddy와 정합(또는 OpenVidu 내장 Caddy로 일원화)한다.
+- ~~**OpenVidu v3 (WebRTC 미디어 서버)**~~ — 아래 "WebRTC 미디어 서버" 절로 반영 완료(`-448`).
+
+## WebRTC 미디어 서버 (S15P11A108-448)
+
+### 공식 번들을 쓰지 않고 미디어 코어만 올린다
+
+OpenVidu v3 Community 번들은 **자체 Caddy·Redis·MinIO·MongoDB·대시보드**를 함께 띄운다. 우리 환경에서는 대가가 크다.
+
+| 문제 | 내용 |
+| --- | --- |
+| **443 충돌** | 번들 내장 Caddy가 443을 요구한다. 우리 Caddy가 이미 쓰고 있고 인증서도 거기 있다 |
+| **중복** | Redis·MinIO를 이미 운영 중이다. 같은 것을 두 벌 돌릴 이유가 없다 |
+| **메모리** | 현재 8.5GB(+러너 버스트 3GB) / 15GB. 번들은 4~6GB를 더 먹어 예산을 넘는다 |
+
+**OpenVidu v3는 LiveKit 기반이라 미디어 코어(`livekit-server`)만 올려도 클라이언트(`livekit-client`)·서버 SDK·room 개념이 전부 동일하다.** 우리가 쓰는 것은 그 부분뿐이고, 번들이 더해주는 것은 관측·대시보드다. 그래서 `livekit-server` 단일 컨테이너로 간다(약 500MB).
+
+> 나중에 STT용 오디오 추출이 필요하면 LiveKit Egress 컨테이너를 추가로 붙인다. 번들 전체를 되돌릴 필요는 없다.
+
+### 시그널링은 기존 Caddy가, 미디어는 직접
+
+**서브도메인을 쓸 수 없어**(SSAFY가 호스트 하나만 준다) 같은 도메인의 경로로 나눈다.
+
+```
+브라우저 ──wss://i15a108.p.ssafy.io/rtc──▶ Caddy(443) ──▶ livekit:7880   (시그널링)
+브라우저 ──────────UDP 7885 / TCP 7881──────────────────▶ livekit        (미디어, 직통)
+백엔드   ──http://livekit:7880/twirp/*──────────────────▶ livekit        (room 관리)
+```
+
+**미디어는 Caddy를 통과할 수 없다.** 리버스 프록시가 다룰 수 있는 HTTP가 아니라 브라우저와 서버가 직접 주고받는 UDP 스트림이기 때문이다. 그래서 이 두 포트만은 호스트에 publish한다.
+
+> ⚠️ Docker는 publish 시 iptables를 직접 조작해 **UFW를 우회한다.** 즉 7885/7881은 UFW 규칙과 무관하게 외부에 열린다. **이건 실수가 아니라 의도다** — 시청자가 어디서든 붙어야 한다. `infra/ec2/setup-ufw-media.sh`로 UFW에도 규칙을 넣는 이유는 `ufw status`가 서버의 실제 개방 상태를 그대로 보여주게 하기 위해서다.
+
+**미디어 포트는 단일 포트로 묶었다(UDP mux).** 기본값은 50000-60000 범위인데, 그러면 UFW에 만 개짜리 규칙이 생기고 Docker publish도 그만큼 느려진다. 우리 규모에서는 차이가 없다.
+
+### ⚠️ `LIVEKIT_NODE_IP`를 반드시 채운다
+
+컨테이너가 보는 IP는 사설 주소(`172.x`)다. 그대로 두면 **브라우저에 사설 IP를 ICE 후보로 알려 미디어 연결이 성립하지 않는다.** 증상이 고약하다 — **에러 없이 화면만 검게 나온다.**
+
+설정 파일은 `use_external_ip: false`다. 켜면 기동 시 STUN으로 공인 IP를 조회하는데, 외부 UDP가 막힌 환경에서는 타임아웃되어 **서버가 아예 뜨지 않는다.** 그래서 자동 탐지 대신 `NODE_IP`로 공인 IP를 직접 알려준다.
+
+`deploy.sh`가 `PROD_LIVEKIT_NODE_IP`를 필수 변수로 검사한다.
+
+### ⚠️ UDP 버퍼를 키우지 않으면 영상이 끊긴다
+
+기동 로그에 이 경고가 나오면 커널 UDP 버퍼가 부족한 것이다.
+
+```
+WARN  UDP receive buffer is too small for a production set-up
+      {"current": 425984, "suggested": 5000000}
+```
+
+WebRTC는 UDP로 미디어를 나르므로 **버퍼가 작으면 트래픽이 몰릴 때 커널이 패킷을 버린다.** 시청자가 늘수록 심해지고, 애플리케이션 로그에는 아무것도 안 남아 원인을 찾기 어렵다. 호스트 커널 설정이라 컨테이너 안에서는 못 바꾼다.
+
+```bash
+bash infra/ec2/setup-udp-buffer.sh
+sudo docker restart vintib-livekit
+```
+
+### `.env`는 `ubuntu` 계정으로 읽을 수 없다
+
+배포 스크립트가 `umask 077`(600)로 만들고 **GitLab 러너 사용자 소유**다. 시크릿이 들어 있어 의도한 것이다. `docker compose` 명령은 `.env`를 읽으므로 **`sudo`를 붙여야 한다.**
+
+```bash
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -p vintib ps
+```
+
+`docker logs`는 파일을 읽지 않아 `sudo` 없이 된다.
+
+### 적용 절차
+
+```bash
+bash infra/ec2/setup-ufw-media.sh
+bash infra/ec2/setup-udp-buffer.sh
+sudo docker restart vintib-livekit
+```
+
+확인:
+
+```bash
+docker logs vintib-livekit          # nodeIP 가 공인 IP 인지 (사설 172.x 면 잘못됨)
+sudo ss -ulnp | grep 7885
+sudo ss -tlnp | grep 7881
+curl -s https://i15a108.p.ssafy.io/rtc/validate?access_token=<토큰>   # success 면 정상
+```
+
+### 필요한 CI/CD Variables
+
+| 변수 | 예시 |
+| --- | --- |
+| `PROD_OPENVIDU_API_KEY` | `openssl rand -hex 8` |
+| `PROD_OPENVIDU_API_SECRET` | `openssl rand -base64 36` |
+| `PROD_OPENVIDU_SERVER_URL` | `wss://i15a108.p.ssafy.io` |
+| `PROD_LIVEKIT_NODE_IP` | EC2 공인 IP |
 - **git 기반 자동 배포(CD)** — `-262`. 현재는 작업트리 tarball 수동 배치이며, 러너가 `develop-BE` 병합 시 `/home/ubuntu/vintib`를 git으로 갱신·재기동하도록 파이프라인을 구성한다.

@@ -83,6 +83,33 @@ services:
       timeout: 5s
       retries: 10
 
+  # WebRTC 미디어 서버 — OpenVidu v3 의 미디어 코어(LiveKit). S15P11A108-448
+  #
+  # ⚠️ OpenVidu v3 공식 번들(Community)을 통째로 올리지 않는다. 그 번들은 자체 Caddy·Redis·
+  #    MinIO·MongoDB·대시보드를 함께 띄우는데, 우리는 Caddy(443)·Redis·MinIO 를 이미 쓰고
+  #    있어 443 포트가 정면 충돌하고 메모리 예산(15GB)도 넘긴다.
+  #    OpenVidu v3 는 LiveKit 기반이라 미디어 코어만 올려도 클라이언트(livekit-client)·
+  #    서버 SDK·room 개념이 전부 동일하다. 자세한 판단은 BE/docs/infra/ec2.md 참고.
+  livekit:
+    image: livekit/livekit-server:v1.9.1
+    container_name: vintib-livekit
+    restart: unless-stopped
+    command: ["--config", "/etc/livekit.yaml"]
+    environment:
+      # "key: secret" 형태의 문자열. 백엔드의 OPENVIDU_API_* 와 반드시 같은 값이어야 한다 —
+      # 다르면 토큰 서명 검증이 전부 실패한다. 그래서 같은 변수에서 파생시킨다.
+      LIVEKIT_KEYS: "${OPENVIDU_API_KEY:-devkey}: ${OPENVIDU_API_SECRET:-devsecret-change-me-at-least-32-chars}"
+    volumes:
+      - ./infra/livekit/livekit.yaml:/etc/livekit.yaml:ro
+    networks:
+      - vintib-net
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:7880/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ./BE
@@ -117,6 +144,13 @@ services:
       # presigned·공개 URL 은 브라우저가 여는 것이라 외부에서 닿는 주소여야 한다.
       # local 은 override.yml 이, 운영은 deploy.sh 가 .env 로 채운다.
       AWS_S3_PUBLIC_ENDPOINT: ${AWS_S3_PUBLIC_ENDPOINT:-}
+      # 영상(OpenVidu/LiveKit). 브라우저용 주소와 내부 API 주소가 다르다 —
+      # 브라우저는 Caddy(443)를 거쳐 들어오고, 백엔드는 도커 네트워크 안에서 직접 붙는다.
+      OPENVIDU_SERVER_URL: ${OPENVIDU_SERVER_URL:-}
+      OPENVIDU_API_URL: ${OPENVIDU_API_URL:-http://livekit:7880}
+      OPENVIDU_API_KEY: ${OPENVIDU_API_KEY:-}
+      OPENVIDU_API_SECRET: ${OPENVIDU_API_SECRET:-}
+      OPENVIDU_TOKEN_TTL: ${OPENVIDU_TOKEN_TTL:-2h}
     depends_on:
       postgres:
         condition: service_healthy

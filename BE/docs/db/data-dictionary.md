@@ -247,7 +247,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `email` | `varchar(255)` | NOT NULL |  | UQ | 로그인 ID 겸 연락 수단. 경매 화면에는 노출하지 않는다. |
-| `password_hash` | `varchar(255)` |  |  |  | 자체 로그인용 해시. SSO 전용 계정은 NULL. |
+| `password` | `varchar(255)` |  |  |  | 자체 로그인용 해시. SSO 전용 계정은 NULL. |
 | `nickname` | `varchar(30)` |  |  | UQ | 공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011). |
 | `name` | `varchar(50)` |  |  |  | 실명. 배송·정산용이며 외부 노출 금지. |
 | `phone_number` | `varchar(20)` |  |  |  | 연락처. 배송·정산 확인용이며 외부 노출 금지. |

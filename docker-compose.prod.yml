@@ -25,9 +25,39 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      livekit:
+        # ⚠️ service_healthy 로 두면 안 된다. 미디어 서버가 뜨지 못했을 때 Caddy 까지
+        #    기동을 멈춰 **사이트 전체가 죽는다.** 영상이 안 되는 것과 서비스가 통째로
+        #    내려가는 것은 전혀 다른 문제다.
+        #    started 로 두면 컨테이너만 생겨 DNS 가 잡히고, livekit 이 죽어 있으면
+        #    /rtc 요청만 502 가 된다.
+        condition: service_started
     networks:
       - vintib-net
     mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ⚠️ 이 파일에서 호스트 포트를 여는 유일한 예외다.
+  #
+  # WebRTC 미디어는 Caddy 를 통과할 수 없다 — TCP 리버스 프록시가 아니라 브라우저와
+  # 서버가 직접 주고받는 UDP 스트림이기 때문이다. 그래서 미디어 포트만은 호스트에 발행한다.
+  #
+  # Docker 는 publish 시 iptables 를 직접 조작해 UFW 를 우회하므로 이 두 포트는 UFW 규칙과
+  # 무관하게 외부에 열린다. **이건 실수가 아니라 의도다** — 시청자가 어디서든 붙어야 한다.
+  # 시그널링(7880)은 발행하지 않는다. Caddy 가 /rtc·/twirp 만 프록시한다.
+  livekit:
+    environment:
+      # ⚠️ **EC2 공인 IP 를 반드시 채운다.** 비우면 컨테이너 사설 IP(172.x)를 ICE 후보로
+      #    뿌려서 브라우저가 미디어에 붙지 못한다 — 방송 화면이 검게 나오고 에러는 안 난다.
+      #    설정 파일이 use_external_ip: false 라 STUN 자동 탐지도 하지 않는다(의도).
+      NODE_IP: ${LIVEKIT_NODE_IP:?LIVEKIT_NODE_IP 가 필요하다 - EC2 공인 IP 를 .env 에 넣어라}
+    ports:
+      - "7885:7885/udp"   # 미디어 (UDP mux)
+      - "7881:7881"       # 미디어 TCP 폴백 (UDP 차단 망)
     logging:
       driver: json-file
       options:

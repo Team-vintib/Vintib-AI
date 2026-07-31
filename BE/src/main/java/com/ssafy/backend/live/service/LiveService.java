@@ -87,6 +87,10 @@ public class LiveService {
                 Live.openNow(host, request.title(), request.thumbnailUrl(), LocalDateTime.now()));
         liveProductService.linkProductsOnCreate(hostId, live, request.productIds());
 
+        // 즉시 개설은 생성 시점에 이미 LIVE 라 여기서 room 을 배정한다. 이름에 ID 가 들어가므로
+        // save() 로 ID 가 나온 뒤여야 한다.
+        live.assignOpenviduRoom(LiveVideoService.newRoomName(live.getId()));
+
         return LiveResponse.from(live);
     }
 
@@ -228,6 +232,11 @@ public class LiveService {
 
         live.transitionTo(request.status(), LocalDateTime.now());
 
+        // 예정 방송이 실제로 시작되는 지점. 여기서 room 을 배정한다 — 미디어 서버를 부르지 않고
+        // 이름만 정한다(LiveKit 은 첫 참가자가 들어올 때 room 을 자동 생성한다).
+        if (request.status() == LiveStatus.LIVE) {
+            live.assignOpenviduRoom(LiveVideoService.newRoomName(live.getId()));
+        }
         if (request.status() == LiveStatus.ENDED) {
             cleanupHooks.forEach(hook -> hook.onLiveEnded(live));
         }
