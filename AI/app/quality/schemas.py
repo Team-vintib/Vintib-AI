@@ -175,6 +175,21 @@ class Finding(BaseModel):
     matched_prompt: str = Field(description="이 항목을 잡아낸 프롬프트")
     statement_required: bool = Field(description="판매자 소명 입력 대상인지(저장은 BE)")
     needs_seller_review: bool = Field(description="모델 신뢰도가 낮아 판매자 확인이 필수인지")
+    no: int | None = Field(
+        default=None,
+        description=(
+            "같은 image_index 안에서의 표시 번호(1부터). annotated_images의 bbox 숫자와 "
+            "일치한다 — FE가 이 값으로 이미지 위 숫자와 리스트 항목을 매칭한다. 이 필드를 "
+            "아직 채우지 않는 백엔드는 None"
+        ),
+    )
+    label: str | None = Field(
+        default=None, description="하자 유형의 한글 태그(오염/얼룩/구멍·찢어짐 등). 미채움 시 None"
+    )
+    description: str | None = Field(
+        default=None,
+        description="하자에 대한 짧은 설명(sVLM 생성 예정, CH007 범위 밖). 지금은 항상 None",
+    )
 
 
 class SectionScore(BaseModel):
@@ -193,6 +208,17 @@ class AttentionMap(BaseModel):
     url: str
 
 
+class AnnotatedImage(BaseModel):
+    """숫자만 넘버링된 bbox 오버레이 PNG의 공개 URL. 이미지 1장당 최대 1개(하자가 있을 때만).
+
+    `attention_maps`(하자유형별 연속 히트맵, 여러 장)와는 다른 산출물이다 — 이건 원본 위에
+    박스 + 숫자만 그린 이미지 1장이고, 숫자는 같은 image_index의 `Finding.no`와 일치한다.
+    """
+
+    image_index: int = Field(ge=0)
+    url: str
+
+
 class InspectionResult(BaseModel):
     """검수 1건의 결과. `GET /ai/jobs/{job_id}` 응답의 `result` 필드에 담긴다."""
 
@@ -205,6 +231,10 @@ class InspectionResult(BaseModel):
     findings: list[Finding]
     section_scores: list[SectionScore]
     attention_maps: list[AttentionMap]
+    annotated_images: list[AnnotatedImage] = Field(
+        default_factory=list,
+        description="숫자 넘버링 bbox 이미지(이미지당 최대 1장, 하자 있는 이미지만). 미구현 백엔드는 빈 리스트",
+    )
     notes: list[str] = Field(
         default_factory=list, description="판매자·FE에 보일 주의 문구(모델 한계 안내 등)"
     )
