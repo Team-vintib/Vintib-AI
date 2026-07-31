@@ -69,12 +69,18 @@ if QUALITY_MODEL_FAMILY == "clipseg":
     def _render_attention_maps(results, extracted, prompt_set, config):
         return _build_attention_maps(results, extracted.findings, prompt_set, config, upload_image)
 
+    def _render_annotated_images(results, extracted, prompt_set, config):
+        # CH007(넘버링 bbox 이미지)은 SAM3만 우선 구현한다 — clipseg는 당장 빈 리스트.
+        del results, extracted, prompt_set, config
+        return []
+
 else:  # sam3
     sys.path.insert(0, os.getenv("QUALITY_MODEL_CODE_PATH", _MODELS_DIR))
 
     from sam3 import registry  # noqa: E402
     from sam3.contracts import BaseColor, GarmentCategory  # noqa: E402
     from sam3.findings import extract_findings  # noqa: E402
+    from sam3.overlay import build_annotated_images as _build_annotated_images  # noqa: E402
     from sam3.overlay import build_attention_maps as _build_attention_maps  # noqa: E402
     from sam3.prompts import select_prompt_set  # noqa: E402
     from sam3.scoring import build_notes, score_findings, summarize  # noqa: E402
@@ -90,6 +96,11 @@ else:  # sam3
         return _build_attention_maps(
             results, extracted.kept_instances_by_image, extracted.findings, upload_image
         )
+
+    def _render_annotated_images(results, extracted, prompt_set, config):
+        # 넘버링 bbox 이미지(CH007)는 findings만 있으면 그려지므로 config/prompt_set이 필요 없다.
+        del prompt_set, config
+        return _build_annotated_images(results, extracted.findings, upload_image)
 
 
 # 어떤 세그멘터로 돌릴지. registry.SEGMENTER_BACKENDS 의 키(패밀리 안에서만 유효).
@@ -152,6 +163,10 @@ class QualityCheckWorker(BaseWorker):
         if payload.get("include_attention_maps"):
             attention_maps = _render_attention_maps(results, extracted, prompt_set, self._config)
 
+        # 넘버링 bbox 이미지(CH007)는 attention_maps와 달리 옵션이 아니다 — FE/BE에 넘길
+        # 기본 산출물로 취급해 항상 만든다(플래그 없음, CH007 미결정 사항 참고).
+        annotated_images = _render_annotated_images(results, extracted, prompt_set, self._config)
+
         return {
             "inspection_id": f"insp_{product_id}_{self.worker_id}",
             "product_id": product_id,
@@ -166,6 +181,7 @@ class QualityCheckWorker(BaseWorker):
             "findings": [f.to_dict() for f in extracted.findings],
             "section_scores": [s.to_dict() for s in extracted.section_scores],
             "attention_maps": [m.to_dict() for m in attention_maps],
+            "annotated_images": [m.to_dict() for m in annotated_images],
             "notes": notes,
             "latency_ms": round((time.perf_counter() - started) * 1000, 3),
         }
