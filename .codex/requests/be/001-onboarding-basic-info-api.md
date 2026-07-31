@@ -87,29 +87,15 @@ Content-Type: application/json
 - 일반/네트워크 오류는 폼 공통 오류로 표시
 - 실패 시 입력값 유지 및 재시도 허용
 
-## BE 확인 필요
+## 진행 상황 (2026-07-31) — 남은 항목
 
-1. 현재 `Member` 엔티티는 주소 문자열 하나만 가지므로 우편번호, 기본 주소, 상세 주소의
-   저장 모델을 결정해야 한다.
-2. DB 데이터 사전의 `member`에는 `gender`와 회원 기본 주소 컬럼이 확인되지 않아
-   스키마 정합성을 확인해야 한다.
-3. 현재 `completeOnboarding()`은 기본 정보 저장 즉시 `onboardingCompleted=true`로
-   변경한다. 실제 온보딩은 ONBOARD-004까지 있으므로 완료 시점을 조정해야 한다.
-4. 닉네임 고유성 검증과 중복 오류 규격을 확정해야 한다.
-5. 구현 후 Swagger의 요청 DTO, 응답, 오류 응답에 위 계약을 문서화해야 한다.
+**구현 완료.** `PATCH /api/users/{id}`로 구현했다(엔드포인트 경로는 `APIs.md` 공식 스펙을
+따랐다 — 결정 및 상세 계약은 `.claude/requests/fe/004-onboarding-basic-info-contract.md`
+참고). 우편번호/기본주소/상세주소/성별 컬럼 추가, 닉네임 중복 검증(409
+`NICKNAME_ALREADY_TAKEN`), Swagger 문서화까지 전부 반영했다 — 아래 항목만 남았다.
 
-## FE 관련 파일
-
-- `FE/src/domains/onboard/api/onboarding.ts`
-- `FE/src/domains/onboard/pages/OnboardingBasicInfoView.vue`
-- `FE/docs/frontend/api/api-index.md`
-
-## 진행 상황 (2026-07-29)
-
-**미구현.** `PATCH /api/me/onboarding` 엔드포인트, 관련 컨트롤러/서비스 모두 아직 없다.
-
-- `Member` 엔티티는 여전히 `nickname`/`phoneNumber`/`address`/`gender`만 있고 `postalCode`, `detailAddress` 컬럼이 없다 — "BE 확인 필요 1, 2" 미해결.
-- `completeOnboarding()`도 여전히 기본 정보 저장 시점에 `onboardingCompleted=true`로 바꾸는 기존 동작 그대로다 — "BE 확인 필요 3" 미해결(004번 요청과 함께 다뤄야 함).
-- 닉네임 중복 검증도 미구현 — "BE 확인 필요 4" 미해결.
-
-착수 시 CLAUDE.md 규율상 신규 API라 `.claude/plans/be/`에 설계 계획부터 세우고 승인받아야 한다.
+- **완료 시점 조정(구 "BE 확인 필요 3")**: 여전히 기본 정보 저장 즉시
+  `onboardingCompleted=true`로 바뀐다. 실제 온보딩은 ONBOARD-004(회원 유형 저장)까지
+  있으므로 완료 시점을 그때로 옮겨야 하는지는 아직 미결정 — 관심 정보(002)·회원 유형(004)
+  요청에도 같은 이슈가 공통으로 걸려 있어, 한 곳에서 정리하기로 하고
+  `.claude/plans/be/SY019-onboarding-enforcement.md`로 옮겨 추적한다.
