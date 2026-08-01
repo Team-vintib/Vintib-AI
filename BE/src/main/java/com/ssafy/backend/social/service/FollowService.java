@@ -104,6 +104,8 @@ public class FollowService {
                 member,
                 followerCounts.getOrDefault(member.getId(), 0L),
                 productCounts.getOrDefault(member.getId(), 0L),
-                viewerId == null ? null : followingByViewer.contains(member.getId()))));
+                // 비회원 조회는 false — 상품 상세 isWished와 동일한 정책(006). FE가 이미
+                // API 원본에서 `?? false`로 뭉개 쓰고 있어 null을 구분해서 얻는 실익이 없다.
+                viewerId != null && followingByViewer.contains(member.getId()))));
     }
 }

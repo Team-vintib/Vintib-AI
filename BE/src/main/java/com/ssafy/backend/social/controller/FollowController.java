@@ -63,7 +63,7 @@ public class FollowController {
 
     @Operation(summary = "팔로워 목록 조회",
             description = "특정 회원을 팔로우하는 사람들의 목록을 최신 팔로우순으로 조회한다. 비회원도 조회할 수 있다. "
-                    + "로그인 상태로 조회하면 각 항목에 조회자 기준 isFollowing이 채워지고, 비회원이면 null이다.")
+                    + "로그인 상태로 조회하면 각 항목에 조회자 기준 isFollowing이 채워지고, 비회원이면 false다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "대상 회원이 존재하지 않음")

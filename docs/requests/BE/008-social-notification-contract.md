@@ -6,7 +6,7 @@
 - 대상 파트: BE
 - 요청 목적: 찜, 팔로우, 알림 API의 FE 연동 상태와 남은 계약 요청을 정리한다.
 - 우선순위: P1
-- 시연 필수 여부: 상품 상세 찜과 알림센터는 현재 실제 API로 시연 가능. 팔로우 화면을 시연하면 추가 구현 필요.
+- 시연 필수 여부: 상품 상세 찜, 팔로우, 알림센터는 현재 실제 API로 시연 가능.
 
 ## 2. 현재 연동 상태
 
@@ -17,6 +17,10 @@
   - `GET /api/users/{userId}/alerts?unreadOnly=true&page=0&size=1`
   - `PATCH /api/users/{userId}/alerts/{id}`
   - `PATCH /api/users/{userId}/alerts/read-all`
+  - `POST /api/users/{userId}/followers`
+  - `DELETE /api/users/{userId}/followers`
+  - `GET /api/users/{userId}/followers`
+  - `GET /api/users/{userId}/followings`
 - FE 구현 완료 범위
   - 상품 상세 찜 추가/해제
   - 상품 목록/검색/상세에서 `isWished` 표시 후보
@@ -47,78 +51,7 @@
 
 ## 3. 추가 구현 요청
 
-### 3.1 팔로우/언팔로우
-
-- Method / Endpoint
-  - `POST /api/users/{targetUserId}/followers`
-  - `DELETE /api/users/{targetUserId}/followers`
-- 요청 목적: 공개 프로필/검색 결과에서 사용자를 팔로우하거나 해제한다.
-- FE 사용처: 검색 회원 카드, 공개 프로필, 판매자 영역
-- 요청 데이터
-  - Header: `Authorization: Bearer {accessToken}`
-  - Path: `targetUserId`
-- 응답 데이터
-  - `targetUserId`: number
-  - `isFollowing`: boolean
-  - `followerCount`: number
-- 응답 예시
-
-```json
-{
-  "success": true,
-  "data": {
-    "targetUserId": 10,
-    "isFollowing": true,
-    "followerCount": 124
-  },
-  "error": null
-}
-```
-
-### 3.2 팔로워/팔로잉 목록
-
-- Method / Endpoint
-  - `GET /api/users/{userId}/followers`
-  - `GET /api/users/{userId}/followings`
-- 요청 목적: 공개 프로필 또는 마이페이지에서 팔로워/팔로잉 목록을 표시한다.
-- FE 사용처: 공개 프로필, 마이페이지
-- 요청 데이터
-  - Path: `userId`
-  - Query: `page`, `size`
-- 응답 데이터
-  - `id`: number
-  - `nickname`: string
-  - `profileImageUrl`: string | null
-  - `followerCount`: number
-  - `productCount`: number
-  - `isFollowing`: boolean
-- 응답 예시
-
-```json
-{
-  "success": true,
-  "data": {
-    "content": [
-      {
-        "id": 10,
-        "nickname": "seller",
-        "profileImageUrl": null,
-        "followerCount": 124,
-        "productCount": 8,
-        "isFollowing": true
-      }
-    ],
-    "page": 0,
-    "size": 20,
-    "totalElements": 1,
-    "totalPages": 1,
-    "hasNext": false
-  },
-  "error": null
-}
-```
-
-### 3.3 알림 type/ref 문서화
+### 3.1 알림 type/ref 문서화
 
 - Method / Endpoint
   - `GET /api/users/{userId}/alerts`
@@ -181,7 +114,7 @@ FE 현재 임시 이동:
 | `AUCTION` | `/my?section=auctions` |
 | 기타/null | 이동하지 않고 알림센터에 머묾 |
 
-### 3.4 실제 알림 생성 이벤트 연결
+### 3.2 실제 알림 생성 이벤트 연결
 
 - Method / Endpoint: 내부 도메인 이벤트 또는 서비스 호출
 - 요청 목적: FE가 mock 없이 실제 DB/API로만 알림센터를 확인할 수 있도록 주요 도메인 이벤트에서 `notification` row가 생성되어야 한다.
@@ -202,7 +135,7 @@ FE 현재 임시 이동:
 | 배송 완료 | `SHIPMENT_COMPLETED` | `SHIPMENT` / order or shipment id |
 | 포인트 충전/환불/출금 완료 | `POINT_CHARGED`, `POINT_REFUNDED`, `WITHDRAW_COMPLETED` | `POINT` / point transaction id |
 
-### 3.4.1 예약 라이브 알림 신청과 스케줄러
+### 3.2.1 예약 라이브 알림 신청과 스케줄러
 
 - Method / Endpoint 제안
   - `POST /api/lives/{liveId}/reminders`
@@ -248,7 +181,7 @@ FE 현재 처리 방침:
 - 위 API가 없을 때 localStorage/mock 상태로 알림 신청을 흉내 내지 않습니다.
 - API가 제공되면 라이브 예정 카드/상세에 신청 토글을 연결하고, 실제 notification 목록에서만 알림 노출을 확인합니다.
 
-### 3.5 unread count 전용 API 검토
+### 3.3 unread count 전용 API 검토
 
 - Method / Endpoint 후보
   - `GET /api/users/{userId}/alerts/unread-count`
@@ -269,7 +202,7 @@ FE 현재 처리 방침:
 }
 ```
 
-### 3.6 카테고리/타입별 읽음 처리 API 검토
+### 3.4 카테고리/타입별 읽음 처리 API 검토
 
 - Method / Endpoint 후보
   - `PATCH /api/users/{userId}/alerts/read-all?category=POINT`
@@ -319,13 +252,10 @@ FE 현재 처리 방침:
 
 - FE·BE 간 결정이 필요한 내용
   - wish delete path의 `{productId}` 의미 확정
-  - 비회원 요청에서 `isWished`, `isFollowing`을 `false` 또는 `null` 중 무엇으로 줄지
   - 알림 `type`, `refType` enum 목록
   - 배송 알림의 `refId`가 order id인지 shipment id인지 확정
   - 알림센터 카테고리 기준을 BE enum으로 둘지 FE 분류 규칙으로 둘지 확정
 - 아직 확정되지 않은 응답 구조나 정책
-  - 팔로우 중복 요청 처리
-  - 자기 자신 팔로우 요청 처리
   - 실제 알림 생성 이벤트와 중복 알림 방지 정책
 
 ## 7. 추가 요청 없음
@@ -336,6 +266,9 @@ FE 현재 처리 방침:
   - 알림 목록 조회
   - 알림 단건 읽음 처리
   - 알림 전체 읽음 처리
+  - 팔로우/팔로우 해제
+  - 팔로워/팔로잉 목록 조회
 - 기존 규격을 유지하면 되는 기능
   - 찜 목록 API endpoint 자체는 BE에 있으나 FE 화면이 없어 미연결
   - 알림 목록/읽음 API endpoint는 현재 규격 유지 시 FE에서 계속 사용 가능
+  - 팔로우/팔로잉 목록 API endpoint도 BE에 있으나 FE 화면이 없어 미연결

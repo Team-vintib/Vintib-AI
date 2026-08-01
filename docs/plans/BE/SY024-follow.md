@@ -4,7 +4,7 @@
 
 ## 배경/목표
 
-`social` 패키지에는 `Follow` 엔티티(서로게이트 PK, `follower`/`following` FK, DB `@Check`로 자기팔로우 방지)만 있고 CUD·조회 API가 없다. `APIs.md` "팔로우 / 찜 (Socials)" 섹션과 FE 계약 문서(`docs/requests/BE/008-social-notification-contract.md` §3.1~3.2)에 스펙이 이미 합의돼 있으므로 이를 API로 구현한다. 아울러 `home` 패키지 `FollowingService.getFollowingContent`가 전부 Mock인 것 중 "팔로우한 판매자"·"그 판매자들의 상품" 두 섹션을 실데이터로 전환한다.
+`social` 패키지에는 `Follow` 엔티티(서로게이트 PK, `follower`/`following` FK, DB `@Check`로 자기팔로우 방지)만 있고 CUD·조회 API가 없다. `APIs.md` "팔로우 / 찜 (Socials)" 섹션과 FE 계약 문서(`docs/requests/BE/008-social-notification-contract.md`, 반영 후 해당 섹션은 문서에서 제거됨)에 스펙이 이미 합의돼 있으므로 이를 API로 구현한다. 아울러 `home` 패키지 `FollowingService.getFollowingContent`가 전부 Mock인 것 중 "팔로우한 판매자"·"그 판매자들의 상품" 두 섹션을 실데이터로 전환한다.
 
 ## 작업 내용
 
@@ -21,7 +21,7 @@
 - `GET /api/users/{userId}/followers`, `GET /api/users/{userId}/followings` — **인증 불필요**(공개 프로필). `WishController`의 `requireSelf`와 달리 본인 확인을 하지 않는다. `Authentication`을 nullable로 받아 `ProductController.getProductDetail`과 동일하게 `viewerId`를 뽑는다.
 - 대상 회원이 존재하지 않으면 404.
 - 정렬은 최신 팔로우순 고정(Wish와 동일 정책).
-- 응답 `PageResponse<FollowUserResponse>` — `id, nickname, profileImageUrl, followerCount, productCount, isFollowing`. 비회원 조회 시 `isFollowing`은 `false`가 아니라 **null**(상품 상세의 `isWished` 비회원 관례와 동일 — "안 팔로우함"과 "몰라서 못 채움"을 구분).
+- 응답 `PageResponse<FollowUserResponse>` — `id, nickname, profileImageUrl, followerCount, productCount, isFollowing`. 비회원 조회 시 `isFollowing`은 **false**로 내린다(006 상품 상세 `isWished`와 동일 정책 — 최초에는 "안 팔로우함"과 "몰라서 못 채움"을 구분하려고 `null`로 설계했으나, FE 조사 결과 API 응답을 받는 지점에서 이미 `?? false`로 null을 뭉개 쓰고 truthy/falsy 체크만 하며 비회원 분기는 별도의 인증 상태 플래그로 하고 있어 `null`을 구분해서 얻는 실익이 없다고 판단해 `false`로 통일했다 — 아래 "구현 중 계획과 달라진 점" 참고).
 - **N+1 방지**: 페이지 조회 1회 + 대상 회원들의 팔로워 수 배치 카운트(`GROUP BY`) 1회 + 상품 수 배치 카운트 1회 + 조회자의 isFollowing 배치 조회 1회, 총 4회 고정 쿼리로 페이지 크기와 무관하게 끝낸다. `ProductRepository`에 셀러 ID 목록 기준 배치 카운트 메서드를 추가한다(기존 `countBySeller_IdAndSaleStatusNot`은 단건이라 재사용 안 함).
 
 ### 3. ErrorCode
@@ -70,3 +70,4 @@
 
 - `FollowingService.toProductCards`에서 판매자 닉네임(`Member.getNickname()`)을 `Collectors.toMap`으로 모으면, 온보딩 전이라 닉네임이 `null`인 판매자가 있을 때 `Map.merge`가 NPE를 던진다는 걸 실제 DB 연동 테스트에서 확인했다. `HashMap`에 직접 채우는 방식으로 바꿔 null 값을 허용하도록 고쳤다(계획 대비 발견한 버그 수정, 범위 변경 아님).
 - `FollowingControllerTest`는 실제 회원 row를 시딩하는 방식으로 바뀌면서 `OnboardingRequiredFilter`(SY019, `/api/home/following`은 화이트리스트 밖)에 걸려 온보딩 미완료 회원은 403을 받는다는 게 드러났다. 테스트 회원을 `completeOnboarding()`으로 처리한 뒤 시딩하도록 수정했다 — 실제 운영 동작과 일치하는 정상적인 제약이라 별도 대응 불필요.
+- 머지 후 `isFollowing` 비회원 정책을 `null` → `false`로 재조정했다. `FollowUserResponse.isFollowing`을 `Boolean` → `boolean`으로, `FollowService.toResponse`의 분기를 `viewerId == null ? null : ...`에서 `viewerId != null && ...`로 바꾸고, 관련 테스트(`비회원이_조회하면_isFollowing이_null이다` → `...false다`)와 컨트롤러 Swagger 설명을 함께 갱신했다.
