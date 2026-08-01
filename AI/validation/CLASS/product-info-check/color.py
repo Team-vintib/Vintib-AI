@@ -1,9 +1,13 @@
-"""V3 — 색상 추출 백엔드 3종 비교.
+"""V3 — 색상 추출 백엔드 4종 비교.
 
   (a) kmeans_palette  — 경량 마스크(중앙 크롭+배경색 추정+saturation 필터) + k-means(k=3)
                         + 팔레트 스냅  [설계안, CH012 §6.2 그대로]
   (b) mean_color      — 마스크 없이 전체 이미지 평균색 + 팔레트 스냅              [baseline]
   (c) vlm              — Qwen3-VL에 직접 질의(vlm_control.query_color 위임)        [대조군]
+  (d) clip_vit_b32/clip_vit_l14/siglip_so400m — CLIP/SigLIP zero-shot(색상 라벨 텍스트와
+                        이미지 임베딩 코사인 유사도). classify.py의 카테고리 zero-shot과
+                        같은 메커니즘을 색상에 적용 — 2026-08-02 추가, "CLIP 파인튜닝으로
+                        색상까지 처리" 결정 전에 먼저 zero-shot 신호부터 본다.
 
 설계: `.claude/plans/ai/CH012-~2.MD`(파일명이 이렇게 커밋돼 있다 — 원래 의도한 이름은
 `CH012-product-info-classify.md`로 보인다, 정리 필요).
@@ -267,13 +271,105 @@ class VLMColorExtractor(ColorExtractor):
         )
 
 
-COLOR_BACKENDS: dict[str, type[ColorExtractor]] = {
+# --------------------------------------------------------------------------
+# (d) CLIP zero-shot — 카테고리(classify.py)와 완전히 같은 메커니즘(이미지-텍스트 코사인
+# 유사도 + temperature softmax)을 색상 라벨에 그대로 적용한다. 지금까지 색상은 (a)/(b)
+# 고전 CV, (c) VLM만 있었고 CLIP 자체가 색상을 얼마나 "이해"하는지는 검증한 적이 없었다.
+#
+# 파인튜닝(100~200건)에 들어가기 전에 이 zero-shot 결과부터 본다 — 카테고리도 en_clip_style
+# 프롬프트 하나로 71%까지 나왔던 전례가 있어서, 색상도 프롬프트만으로 어느 정도 나오는지가
+# "파인튜닝이 꼭 필요한가"를 가르는 첫 번째 신호다.
+# --------------------------------------------------------------------------
+EN_COLOR_LABELS: dict[str, str] = {
+    "BLACK": "black",
+    "WHITE": "white",
+    "GRAY": "gray",
+    "IVORY": "ivory",
+    "BEIGE": "beige",
+    "BROWN": "brown",
+    "KHAKI": "khaki",
+    "NAVY": "navy blue",
+    "BLUE": "blue",
+    "SKYBLUE": "sky blue",
+    "GREEN": "green",
+    "YELLOW": "yellow",
+    "ORANGE": "orange",
+    "RED": "red",
+    "PINK": "pink",
+    "PURPLE": "purple",
+    "WINE": "wine red",
+    "SILVER": "silver",
+    "GOLD": "gold",
+    MULTI_LABEL: "multicolored patterned",
+}
+assert set(EN_COLOR_LABELS) == set(PALETTE) | {MULTI_LABEL}
+
+
+class ClipZeroShotColorExtractor(ColorExtractor):
+    """CLIP/SigLIP 임베딩에 색상 라벨 텍스트를 직접 물어본다(합성 — `EmbeddingZeroShotClassifier`를
+    상속하지 않고 내부에 들고 쓴다. `ColorExtractor` ABC와 `CategoryClassifier` ABC는 반환
+    타입이 달라서 상속으로 엮으면 타입이 꼬인다)."""
+
+    # 2등 후보가 이 정도 확률 이상이어야 보조색상으로 인정한다 — 안 그러면 항상 2등 답까지
+    # 억지로 보조색상으로 채워서 정확도를 스스로 깎아먹는다.
+    SECONDARY_MIN_SCORE = 0.15
+
+    def __init__(self, model_id: str, name: str = "clip_zeroshot"):
+        self._model_id = model_id
+        self.name = name
+        self._backend = None
+
+    def _get_backend(self) -> "EmbeddingZeroShotClassifier":  # noqa: F821 — 지연 import
+        if self._backend is None:
+            from classify import EmbeddingZeroShotClassifier
+
+            self._backend = EmbeddingZeroShotClassifier(self._model_id)
+        return self._backend
+
+    def extract(self, image_path: Path) -> ColorResult:
+        codes = list(PALETTE) + [MULTI_LABEL]
+        texts = [f"a photo of {EN_COLOR_LABELS[code]} clothing" for code in codes]
+        scores = self._get_backend().score_labels(image_path, texts)
+
+        order = sorted(range(len(codes)), key=lambda i: -scores[i])
+        primary_code = codes[order[0]]
+        primary_score = scores[order[0]]
+        secondary_code = (
+            codes[order[1]]
+            if len(order) > 1 and scores[order[1]] >= self.SECONDARY_MIN_SCORE
+            else None
+        )
+
+        return ColorResult(
+            primary=primary_code,
+            secondary=secondary_code,
+            is_multicolor=primary_code == MULTI_LABEL,
+            confidence=float(primary_score),
+            backend=self.name,
+            raw={
+                "scores": {code: round(float(s), 3) for code, s in zip(codes, scores, strict=True)}
+            },
+        )
+
+
+COLOR_BACKENDS: dict[str, "callable[[], ColorExtractor]"] = {
     "mock": MockColorExtractor,
     "mean_color": MeanColorExtractor,
     "kmeans_palette": KMeansPaletteColorExtractor,
     "vlm": VLMColorExtractor,
+    # (d) CLIP/SigLIP zero-shot. model_id는 classify.py의 CATEGORY_MODELS와 동일 후보를 쓴다 —
+    # 카테고리·색상에 같은 체크포인트를 쓰면 나중에 임베딩 공유(인코더 1회 호출)로 합칠 수 있다.
+    "clip_vit_b32": lambda: _make_clip_color("clip_vit_b32"),
+    "clip_vit_l14": lambda: _make_clip_color("clip_vit_l14"),
+    "siglip_so400m": lambda: _make_clip_color("siglip_so400m"),
 }
 ACTIVE_COLOR_BACKEND = os.environ.get("PRODUCT_INFO_COLOR_BACKEND", "mock")
+
+
+def _make_clip_color(model_key: str) -> ClipZeroShotColorExtractor:
+    from classify import CATEGORY_MODELS  # 지연 import — 무거운 의존성 체인 회피
+
+    return ClipZeroShotColorExtractor(CATEGORY_MODELS[model_key], name=model_key)
 
 
 def get_color_extractor(name: str | None = None) -> ColorExtractor:

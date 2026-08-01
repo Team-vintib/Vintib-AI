@@ -100,9 +100,14 @@ class MockCategoryClassifier(CategoryClassifier):
 # CLIP / SigLIP zero-shot — transformers AutoModel/AutoProcessor로 이미지·텍스트 임베딩을
 # 뽑아 코사인 유사도 + temperature softmax로 점수를 만든다.
 # --------------------------------------------------------------------------
-class _EmbeddingZeroShotClassifier(CategoryClassifier):
+class EmbeddingZeroShotClassifier(CategoryClassifier):
     """CLIP/SigLIP 공용 구현. `model_id`만 다르면 서브클래스 없이도 재사용 가능하지만,
-    레지스트리 키와 1:1로 매핑되는 이름을 노출하려고 얇은 서브클래스로 감싼다."""
+    레지스트리 키와 1:1로 매핑되는 이름을 노출하려고 얇은 서브클래스로 감싼다.
+
+    **카테고리 전용이 아니다** — `score_labels(image, texts)`는 "이미지 vs 임의의 텍스트
+    라벨 목록"의 코사인 유사도만 계산하는 도메인 중립 로직이라, `color.py`의
+    `ClipZeroShotColorExtractor`가 색상 라벨 목록을 넘겨 그대로 재사용한다(합성/composition,
+    상속 아님 — `ColorExtractor` ABC와 타입이 다르므로)."""
 
     TEMPERATURE = 100.0  # CLIP의 학습된 logit_scale(~100)과 비슷한 값으로 고정
 
@@ -141,7 +146,7 @@ class _EmbeddingZeroShotClassifier(CategoryClassifier):
         return probs.tolist()
 
 
-class ClipCategoryClassifier(_EmbeddingZeroShotClassifier):
+class ClipCategoryClassifier(EmbeddingZeroShotClassifier):
     name = "clip"
 
     def __init__(self, model_key: str):
@@ -149,7 +154,7 @@ class ClipCategoryClassifier(_EmbeddingZeroShotClassifier):
         self.name = model_key
 
 
-class SiglipCategoryClassifier(_EmbeddingZeroShotClassifier):
+class SiglipCategoryClassifier(EmbeddingZeroShotClassifier):
     name = "siglip_so400m"
 
     def __init__(self):
