@@ -57,7 +57,8 @@ services:
       - vintib-net
     mem_limit: 256m
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/healthz >/dev/null 2>&1 || exit 1"]
+      # localhost 는 IPv6(::1)로 붙는데 nginx 는 IPv4(0.0.0.0:80)만 들어서 실패 → 127.0.0.1 로.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
