@@ -6,6 +6,15 @@
 워커 구조에서 "패키지 격리 — product_info가 quality_vlm을 직접 임포트하면 도메인 격리가
 깨진다"고 못박은 것과 같은 이유다. 검증 스파이크 단계에서부터 그 경계를 지킨다.
 
+**양자화 설정은 실제 프로덕션과 byte-for-byte 동일함을 확인했다(2026-08-01)** —
+`worker/models/quality_vlm/loader.py:46-57`(하자 설명을 생성하는 마지막 단계,
+`Qwen3VlDescriber.describe()`가 쓰는 바로 그 로더)가 쓰는
+`BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16,
+bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True)`와 아래 `load_qwen_vl()`의 설정이
+글자 하나까지 같다(둘 다 `QUAL/vlm-description-check/loaders.py`에서 파생됐다 — model_id,
+`generate_from_image()` 구현도 동일). 따라서 이 스파이크가 재는 지연·VRAM·정확도는 프로덕션과
+다른 양자화를 쓴 결과가 아니다.
+
 **이 모듈은 무거운 GPU 실행을 스크립트가 자동으로 하지 않는다.** mock 백엔드 경로
 (classify.py/color.py의 "vlm"이 아닌 다른 백엔드)는 이 모듈을 아예 import하지 않는다.
 V5 실측(정확도/지연/VRAM)은 아래 `if __name__ == "__main__":` 블록을 **사용자가 직접**
@@ -186,6 +195,62 @@ def query_color(image_path: Path, model_key: str = ACTIVE_VLM) -> tuple[str, str
     secondary_raw = parsed.get("secondary")
     secondary = _match_label(str(secondary_raw), valid_codes) if secondary_raw else None
     return primary, secondary, {"raw_text": raw_text}
+
+
+_CATEGORY_AND_COLOR_PROMPT_TEMPLATE = (
+    "다음은 중고 거래 플랫폼에 올라온 상품 사진이다. 아래 두 목록을 보고 JSON으로만 답하라. "
+    "다른 설명은 절대 붙이지 마라.\n"
+    "1) 카테고리: 목록에 있는 단어 중 이 상품에 가장 가까운 것 정확히 하나\n"
+    "2) 색상: 색상 코드 목록 중 주 색상 하나(필수), 보조 색상 하나(뚜렷하지 않으면 null, 여러 "
+    '색이 비슷한 비중이면 "MULTI")\n'
+    '형식: {{"subcategory": "코드", "primary_color": "코드", "secondary_color": "코드 또는 null"}}\n'
+    "카테고리 목록: {labels}\n"
+    "색상 코드 목록: {codes}"
+)
+
+
+@dataclass
+class CombinedVLMResult:
+    subcategory: str | None
+    primary: str
+    secondary: str | None
+    raw_text: str
+
+
+def query_category_and_color(image_path: Path, model_key: str = ACTIVE_VLM) -> CombinedVLMResult:
+    """카테고리+색상을 **한 번의 호출**로 같이 질의한다 — "VLM만 쓰는 파이프라인"용.
+
+    `query_category()` + `query_color()`를 따로 부르면 같은 이미지를 두 번 인코딩하게 된다.
+    VLM을 카테고리·색상 둘 다에 쓰기로 한 경우엔 이 함수로 이미지 인코딩 1회 + 생성 1회로
+    합쳐서 그 비용을 아낀다(2026-08-01 논의). **카테고리를 CLIP(CPU)에 남겨두는 기본 권고와는
+    별개다** — 이 함수는 "VLM-only 파이프라인"을 실제로 잴 때만 쓴다(`product_info_check.ipynb`
+    §7-2 참고). 파싱 실패는 예외 대신 필드별 폴백으로 처리한다(`query_color()`와 동일한 실패
+    격리 원칙 — 실패도 데이터다).
+    """
+    from PIL import Image
+
+    bundle = _get_bundle()
+    with Image.open(image_path) as img:
+        image = img.convert("RGB")
+    valid_codes = list(PALETTE) + [MULTI_LABEL]
+    prompt = _CATEGORY_AND_COLOR_PROMPT_TEMPLATE.format(
+        labels=", ".join(ALL_SUBCATEGORIES), codes=", ".join(valid_codes)
+    )
+    raw_text = generate_from_image(bundle, image, prompt, max_new_tokens=100)
+
+    match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+    if not match:
+        return CombinedVLMResult(None, "UNKNOWN", None, raw_text)
+    try:
+        parsed = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return CombinedVLMResult(None, "UNKNOWN", None, raw_text)
+
+    subcategory = _match_label(str(parsed.get("subcategory", "")), list(ALL_SUBCATEGORIES))
+    primary = _match_label(str(parsed.get("primary_color", "")), valid_codes) or "UNKNOWN"
+    secondary_raw = parsed.get("secondary_color")
+    secondary = _match_label(str(secondary_raw), valid_codes) if secondary_raw else None
+    return CombinedVLMResult(subcategory, primary, secondary, raw_text)
 
 
 # --------------------------------------------------------------------------
