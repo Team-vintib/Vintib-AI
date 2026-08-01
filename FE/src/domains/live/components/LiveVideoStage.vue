@@ -10,10 +10,12 @@ const props = withDefaults(
     status: LiveWatchStatus
     tryOnDisabled?: boolean
     tryOnOpen?: boolean
+    showTryOn?: boolean
   }>(),
   {
     tryOnDisabled: false,
     tryOnOpen: false,
+    showTryOn: true,
   },
 )
 
@@ -63,7 +65,7 @@ const stageMessage = computed(() => {
     </div>
 
     <button
-      v-if="!tryOnOpen"
+      v-if="showTryOn && !tryOnOpen"
       class="live-video-stage__try-on"
       type="button"
       :disabled="tryOnDisabled"
