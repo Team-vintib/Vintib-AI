@@ -43,5 +43,6 @@ validation/TRYON/sam3d-condition-check/outputs/
 validation/TRYON/sam3d-garment-finetune-check/artifacts/
 # 상품 정보 분류 스파이크 산출물 — evaluate.py 리포트(JSON/MD)와 ONNX 변환 캐시, 전부 재생성 가능하다.
 validation/CLASS/product-info-check/outputs/
+validation/CLASS/product-info-check/inputs/
 validation/CLASS/product-info-check/.onnx_cache/
 
