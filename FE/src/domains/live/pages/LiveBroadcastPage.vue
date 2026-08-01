@@ -41,6 +41,9 @@ const loadState = ref<LiveWatchLoadState>('loading')
 const errorMessage = ref('')
 const selectedProductId = ref<number | null>(null)
 const now = ref(Date.now())
+// 방송 상세는 시청자와 같은 GET /lives/{liveId} 실 API를 재사용한다(VITE_LIVE_WATCH_API_ENABLED).
+// 판매자 전용 상태(방송 소유자 여부·currentProductId 등)는 BE 미제공 → liveWatchApi에서 null/fallback.
+// (BE 확인 필요: docs/requests/BE/007 3.5, docs/requests/BE/013)
 const apiEnabled = isLiveWatchApiEnabled()
 let loadRequestId = 0
 
@@ -147,8 +150,10 @@ const goBack = () => {
   void router.push({ name: ROUTE_NAMES.LIVE_LIST })
 }
 
-// 판매자 제어(437). 서버 반영 계약이 없어 로컬 상태(mock)만 바꾼다.
-// 실제 전환/종료 엔드포인트·시청자 전파는 docs/requests/BE/013 요청 후 연결.
+// 판매자 제어(437/439). 서버 반영 계약이 아직 없어 로컬 상태(Mock 전용)만 바꾼다. — BE 확인 필요
+//   · 방송 종료: POST /lives/{liveId}/end
+//   · 현재 상품 전환: PATCH /lives/{liveId}/current-product
+// 실제 엔드포인트·시청자 전파(STOMP)는 docs/requests/BE/013 확정 후 연결한다.
 const isEndConfirmOpen = ref(false)
 const transitionNotice = ref('')
 let transitionNoticeTimer: number | undefined

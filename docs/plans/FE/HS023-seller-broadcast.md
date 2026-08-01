@@ -182,3 +182,66 @@ FE/src/domains/live/
   - `[S15P11A108-437] feat: 상품 전환·종료 버튼 구현`
 - MR: 스토리 86 완료(435+437) 시 `[LIVE] 판매자 방송 화면` → `develop-FE`
 - push는 사용자가 직접 수행한다.
+
+---
+
+## 작업 내용 (439 — 판매자 화면 API 연결)
+
+Jira `S15P11A108-439 [LIVE-003 | FE] 판매자 화면 API 연결 구현` (스토리 `-86`[LIVE-003], 에픽 `-217`[LIVE]).
+
+435/437에서 만든 판매자 방송 화면을 실 BE API에 연결한다. 조사 결과 **시청자 API 연결(430, HS021)과
+같은 상태**다: 방송 상세 로드는 이미 실 API로 붙어 있고, 판매자 전용 쓰기 제어(종료·현재 상품 전환)는
+계약이 없어 여전히 로컬 mock이다. 따라서 실제 범위는 **① 호스트 관점 실서버 로드 검증 → ② 판매자 제어
+API gap 유지·요청 최신화 → ③ 연결 가능한 잔여 배선**이다.
+
+### 현재 연결 상태 (조사 결과)
+
+- ✅ 방송 상세 로드: `LiveBroadcastPage` → `getLiveWatchViewData` → `requestLiveWatch()` →
+  `GET /lives/{liveId}` (`liveWatchApi.ts:80`). `VITE_LIVE_WATCH_API_ENABLED`가 `.env.local`·
+  `.env.production` 모두 `true` → 실 API 연결됨(시청자와 동일 계약 재사용).
+- ✅ 실시간(채팅·반응·시청자 수): `LiveChatOverlay` + `liveRealtimeClient` 재사용, 시청자 수 →
+  `updateViewerCount`.
+- ⛔ 방송 종료(`confirmEndBroadcast`, `LiveBroadcastPage.vue:192`) — 로컬 상태만 `ENDED`. 계약 없음 →
+  `POST /lives/{liveId}/end` (`docs/requests/BE/013` 요청 중, 실제 호출 코드 0건 = 미제공).
+- ⛔ 현재 상품 전환(`transitionToSelectedProduct`, `:163`) — 로컬 `currentProductId`만 갱신. 계약 없음 →
+  `PATCH /lives/{liveId}/current-product` (`013` 요청 중).
+- ⚠️ `currentProductId` BE 항상 `null`(`007` 3.5 pending) → 전환 서버 지속 불가, 초기 선택 첫 상품 fallback.
+- ⚠️ 판매자 상세 조회가 `skipAuth: true`(시청자용 재사용) → 호스트 전용 상태(소유자 여부 등) 없음.
+
+### 작업 내용
+
+1. **실서버 검증(호스트 관점)**: 배포 서버(`https://i15a108.p.ssafy.io/api`) 대상, 판매자가
+   라이브 생성 → 방송 화면 진입 시 상세가 실 API로 뜨는지, loading/error/not-found 상태가 정상인지 확인.
+2. **판매자 제어 gap 유지·요청 최신화**: 013(종료·전환·시청자 전파) 미제공 → mock 유지. `liveWatchApi`·
+   페이지의 mock 지점에 `Mock 전용`/`BE 확인 필요` 주석을 현재 코드 기준으로 정리하고, `013`을 코드 현황에
+   맞게 최신화(미해결 유지). FE는 엔드포인트를 임의 확정하지 않는다.
+3. **연결 가능한 잔여 배선**: BE가 이미 주는데 판매자 화면이 안 쓰는 값이 있으면 매핑 보강(현재 없음 —
+   검증으로 확인).
+
+### 구현하지 않는 범위 (439)
+
+- 013 엔드포인트(종료·전환) 실제 호출 배선 — 계약 확정 전.
+- 호스트 인증 상세 조회 전환 — BE가 호스트 전용 필드를 줄 때.
+- OpenVidu 송출·영상 토큰, 경매/낙찰/미낙찰 API(별도 작업 438/441/440).
+
+### 구현 목록 (439)
+
+- [ ] 판매자 방송 화면이 `GET /lives/{liveId}` 실 API로 로드되는지 배포 서버에서 확인(호스트 진입 흐름)
+- [ ] loading/error/not-found 상태 실서버 기준 확인
+- [ ] 종료·전환 mock 지점 주석 정리(`Mock 전용`·`BE 확인 필요` + `013` 위치 표기)
+- [ ] `docs/requests/BE/013` 코드 현황 반영해 최신화, 미해결 유지
+- [ ] (연결 가능 값 있으면) `mapLiveDetailDto`/페이지 매핑 보강
+- [ ] 변경 파일 ESLint·`type-check`·`build-only` 검증
+- [ ] 실행 화면에서 판매자 로드·상태 사용자 확인
+
+### 확인 필요 (미결정)
+
+- 판매자 상세 조회에 인증을 붙여 호스트 전용 상태를 받을지(현재 `skipAuth`) — BE 계약 확정 후.
+- 013 엔드포인트 형태 확정 시 mock→실연결 전환 시점(그때 별도 작업으로 배선).
+
+## Git / MR 단위 (439)
+
+- 브랜치: `feat/217-live-product-management` (스토리 86, 435/437과 동일 — `develop-FE`로 ff 최신화 완료)
+- 커밋: `[S15P11A108-439] <type>: 판매자 화면 API 연결` (검증·gap 정리 위주면 `docs`, 배선 추가 시 `feat`)
+- MR: 스토리 86은 이미 병합됨 → 439는 같은 브랜치에 쌓아 후속 MR `[LIVE] 판매자 화면 API 연결` →
+  `develop-FE`. push는 사용자가 직접.
