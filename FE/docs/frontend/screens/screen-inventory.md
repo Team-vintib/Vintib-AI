@@ -45,3 +45,9 @@
 | 묶음 | 화면 ID | 상태 |
 | --- | --- | --- |
 | 홈/탐색 | SEARCH-001, SEARCH-002 | `/search` route, 검색 결과 탭, 전체 탭 섹션별 preview·전체보기, 개별 탭 페이지네이션, 상품/라이브/회원 mock 결과, 카테고리·상태·가격·판매 유형 필터, 상품 결과 정렬, 초기/loading/error/empty/filter-empty/price-error 상태 화면 구현. 실제 통합 검색 API 대기 |
+## 2026-08-01 포인트 화면 상태
+
+| 묶음 | 화면 ID | 상태 |
+| --- | --- | --- |
+| 포인트 | POINT-001~004 | `/points` route를 실제 포인트 지갑 화면으로 연결. 잔액 요약, 충전 입력, 거래 내역 필터, 출금 계좌/출금 신청 UI 구현. `VITE_POINT_API_ENABLED=false` 기본값에서는 mock fallback 사용. BE 포인트 API 계약 확정 전까지 실제 충전/출금/정산 처리는 대기 |
+| 포인트 | POINT-002 | `/points/history` 전체 내역 페이지 추가. 전체/출금/입금 필터와 시작일/종료일 기간 필터 제공 |

@@ -25,6 +25,7 @@ export const ROUTE_NAMES = {
   LIVE_WATCH: 'live-watch',
   MY: 'my',
   POINT: 'point',
+  POINT_HISTORY: 'point-history',
 } as const
 
 export const ROUTE_PATHS = {
@@ -54,6 +55,7 @@ export const ROUTE_PATHS = {
   LIVE_WATCH: '/lives/:liveId',
   MY: '/my',
   POINT: '/points',
+  POINT_HISTORY: '/points/history',
 } as const
 
 export type RouteName = (typeof ROUTE_NAMES)[keyof typeof ROUTE_NAMES]
