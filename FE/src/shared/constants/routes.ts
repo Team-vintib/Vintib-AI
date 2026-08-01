@@ -23,6 +23,7 @@ export const ROUTE_NAMES = {
   PRODUCT_CREATE: 'product-create',
   LIVE_CREATE: 'live-create',
   LIVE_WATCH: 'live-watch',
+  LIVE_BROADCAST: 'live-broadcast',
   MY: 'my',
   POINT: 'point',
 } as const
@@ -52,6 +53,7 @@ export const ROUTE_PATHS = {
   PRODUCT_CREATE: '/products/new',
   LIVE_CREATE: '/lives/new',
   LIVE_WATCH: '/lives/:liveId',
+  LIVE_BROADCAST: '/lives/:liveId/broadcast',
   MY: '/my',
   POINT: '/points',
 } as const
