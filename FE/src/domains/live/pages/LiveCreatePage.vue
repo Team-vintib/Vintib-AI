@@ -93,7 +93,7 @@ const completeActionLabel = computed(() =>
 )
 const completeActionTo = computed(() =>
   form.mode === 'IMMEDIATE'
-    ? { name: ROUTE_NAMES.LIVE_WATCH, params: { liveId: createdLiveId.value ?? 'preview' } }
+    ? { name: ROUTE_NAMES.LIVE_BROADCAST, params: { liveId: createdLiveId.value ?? 'preview' } }
     : ROUTE_PATHS.LIVE_LIST,
 )
 const isFirstStep = computed(() => currentStepIndex.value === 0)

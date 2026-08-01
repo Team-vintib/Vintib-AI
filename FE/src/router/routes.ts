@@ -131,6 +131,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: '라이브 시작' },
   },
   {
+    path: ROUTE_PATHS.LIVE_BROADCAST,
+    name: ROUTE_NAMES.LIVE_BROADCAST,
+    component: () => import('@/domains/live/pages/LiveBroadcastPage.vue'),
+    meta: { requiresAuth: true, title: '라이브 송출' },
+  },
+  {
     path: ROUTE_PATHS.LIVE_WATCH,
     name: ROUTE_NAMES.LIVE_WATCH,
     component: () => import('@/domains/live/pages/LiveWatchPage.vue'),
