@@ -155,9 +155,15 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: '마이페이지' },
   },
   {
+    path: ROUTE_PATHS.POINT_HISTORY,
+    name: ROUTE_NAMES.POINT_HISTORY,
+    component: () => import('@/domains/point/pages/PointHistoryPage.vue'),
+    meta: { requiresAuth: true, title: '포인트 내역' },
+  },
+  {
     path: ROUTE_PATHS.POINT,
     name: ROUTE_NAMES.POINT,
-    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    component: () => import('@/domains/point/pages/PointWalletPage.vue'),
     meta: { requiresAuth: true, title: '포인트' },
   },
 ]

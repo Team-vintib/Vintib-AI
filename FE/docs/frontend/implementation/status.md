@@ -51,3 +51,9 @@
 | 상품 이미지 업로드 계약 | 문서 반영 | `.claude/requests/fe/001-product-image-presigned-upload.md` 기준으로 `POST /api/products/{productId}/images/upload-url` → S3 `PUT` → `POST /api/products/{productId}/images` 3단계 흐름, 이미지 수정/삭제, 오류 코드 `P004`~`P007`을 API 문서에 반영 |
 | 상품 찜 계약 | 문서 반영 | `.claude/requests/fe/002-wish-api-contract.md` 기준으로 실제 경로 `/api/users/{userId}/wishes`와 0-base 목록 pagination, 오류 코드 `P001`, `S001`~`S003`을 API 문서에 반영 |
 | 인증 계약 | 문서 반영 | `.codex/requests/be/001-auth-contract.md` 기준으로 FE API 문서의 로그인 endpoint를 `/api/auth/signin`, 토큰 재발급을 `/api/auth/reissue`로 정정하고 현재 BE 응답/추가 필요 사항을 분리 |
+## 2026-08-01 포인트 지갑 화면 상태
+
+| 영역 | 상태 | 비고 |
+| --- | --- | --- |
+| 포인트 화면 | 부분 | `/points` route를 `PointWalletPage`로 연결하고 `domains/point`에 잔액 요약, 충전, 거래 내역, 출금 패널을 추가. `VITE_POINT_API_ENABLED=false` 기본값에서는 mock fallback으로 동작하며, BE 최종 계약 확정 후 `/users/{id}/points` 계열 호출을 실제 응답 필드에 맞춰 조정 필요 |
+| 포인트 UI 개선 | 부분 | `/points` 상단에 사용 가능 포인트를 크게 배치하고 보유/출금 가능/정산 예정/출금 처리 중 카드를 추가. 내역/충전/출금 버튼으로 메인 기능을 전환하며, 전체 내역은 `/points/history`에서 전체/출금/입금 및 기간 필터로 조회 |

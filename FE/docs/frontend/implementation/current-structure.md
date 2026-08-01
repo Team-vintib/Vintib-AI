@@ -236,10 +236,19 @@ src/
         liveTryOn.types.ts
     point/
       api/
+        pointApi.ts
       components/
+        PointChargePanel.vue
+        PointSummaryPanel.vue
+        PointTransactionList.vue
+        PointWithdrawalPanel.vue
       constants/
+        pointOptions.ts
       pages/
+        PointHistoryPage.vue
+        PointWalletPage.vue
       types/
+        point.types.ts
     sale/
       api/
       components/
