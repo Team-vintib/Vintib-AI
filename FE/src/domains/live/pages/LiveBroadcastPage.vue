@@ -97,6 +97,9 @@ const loadLiveBroadcast = async () => {
   selectedProductId.value = null
   loadState.value = 'loading'
   errorMessage.value = ''
+  isEndConfirmOpen.value = false
+  transitionNotice.value = ''
+  window.clearTimeout(transitionNoticeTimer)
 
   if (liveId === null) {
     loadState.value = 'not-found'
@@ -143,14 +146,57 @@ const goBack = () => {
   void router.push({ name: ROUTE_NAMES.LIVE_LIST })
 }
 
-// 상품 전환·방송 종료 동작은 437(상품 전환·종료 버튼)에서 연결한다.
-// 실시간 전환 브로드캐스트(/topic/lives/{id}/product)는 BE Phase 5 예정 → 확정 후 연결.
-const transitionToNextProduct = () => {
-  // TODO(437): 다음 상품으로 전환 + 시청자 알림
+// 판매자 제어(437). 서버 반영 계약이 없어 로컬 상태(mock)만 바꾼다.
+// 실제 전환/종료 엔드포인트·시청자 전파는 docs/requests/BE/013 요청 후 연결.
+const isEndConfirmOpen = ref(false)
+const transitionNotice = ref('')
+let transitionNoticeTimer: number | undefined
+
+const canTransition = computed(
+  () =>
+    live.value?.status === 'LIVE' &&
+    selectedProductId.value !== null &&
+    selectedProductId.value !== live.value?.currentProductId,
+)
+
+const transitionToSelectedProduct = () => {
+  if (!live.value || !canTransition.value || selectedProductId.value === null) return
+
+  const nextProduct = live.value.products.find(
+    (product) => product.id === selectedProductId.value,
+  )
+
+  live.value = { ...live.value, currentProductId: selectedProductId.value }
+
+  transitionNotice.value = nextProduct
+    ? `‘${nextProduct.title}’(으)로 넘어갔습니다`
+    : '현재 상품을 전환했습니다'
+
+  window.clearTimeout(transitionNoticeTimer)
+  transitionNoticeTimer = window.setTimeout(() => {
+    transitionNotice.value = ''
+  }, 2600)
 }
 
-const endBroadcast = () => {
-  // TODO(437): 방송 종료 확인 후 종료 처리
+const requestEndBroadcast = () => {
+  if (live.value?.status !== 'LIVE') return
+
+  isEndConfirmOpen.value = true
+}
+
+const cancelEndBroadcast = () => {
+  isEndConfirmOpen.value = false
+}
+
+const confirmEndBroadcast = () => {
+  if (!live.value) return
+
+  live.value = {
+    ...live.value,
+    status: 'ENDED',
+    endedAt: new Date(now.value).toISOString(),
+  }
+  isEndConfirmOpen.value = false
 }
 
 const updateViewerCount = (viewerCount: number) => {
@@ -177,6 +223,7 @@ const elapsedTimer = window.setInterval(() => {
 onBeforeUnmount(() => {
   loadRequestId += 1
   window.clearInterval(elapsedTimer)
+  window.clearTimeout(transitionNoticeTimer)
 })
 </script>
 
@@ -217,7 +264,7 @@ onBeforeUnmount(() => {
         :live="live"
         :elapsed-time="elapsedTime"
         @back="goBack"
-        @end-broadcast="endBroadcast"
+        @end-broadcast="requestEndBroadcast"
       />
 
       <div class="live-broadcast-page__body">
@@ -229,17 +276,25 @@ onBeforeUnmount(() => {
             @select="selectedProductId = $event"
           />
 
-          <!-- 상품 전환 액션 자리 — 437에서 구현 -->
+          <!-- 상품 전환(넘어가는 알림) — 437 -->
           <div class="live-broadcast-page__queue-action">
             <button
               class="live-broadcast-page__transition"
               type="button"
-              :disabled="live.status !== 'LIVE' || live.products.length === 0"
-              @click="transitionToNextProduct"
+              :disabled="!canTransition"
+              @click="transitionToSelectedProduct"
             >
-              다음 상품으로 전환
+              선택 상품으로 전환
             </button>
-            <p class="live-broadcast-page__slot-note">상품 전환·알림 · 437에서 구현</p>
+            <p class="live-broadcast-page__slot-note">
+              {{
+                live.status !== 'LIVE'
+                  ? '방송 중일 때 상품을 전환할 수 있습니다.'
+                  : canTransition
+                    ? '선택한 상품을 현재 소개 상품으로 바꿉니다.'
+                    : '큐에서 다른 상품을 선택하면 전환할 수 있습니다.'
+              }}
+            </p>
           </div>
         </aside>
 
@@ -259,6 +314,22 @@ onBeforeUnmount(() => {
               />
             </template>
           </LiveVideoStage>
+
+          <p v-if="transitionNotice" class="live-broadcast-page__notice" role="status">
+            {{ transitionNotice }}
+          </p>
+
+          <div
+            v-if="live.status === 'ENDED'"
+            class="live-broadcast-page__ended"
+            role="status"
+          >
+            <strong>방송을 종료했습니다</strong>
+            <p>시청자에게 방송이 종료된 것으로 표시됩니다.</p>
+            <button type="button" @click="router.push({ name: ROUTE_NAMES.LIVE_LIST })">
+              라이브 목록으로
+            </button>
+          </div>
         </main>
 
         <aside class="live-broadcast-page__control">
@@ -280,6 +351,38 @@ onBeforeUnmount(() => {
             <p class="live-broadcast-page__slot-note">경매 설정 패널 · 436에서 구현</p>
           </section>
         </aside>
+      </div>
+
+      <div
+        v-if="isEndConfirmOpen"
+        class="live-broadcast-page__modal-backdrop"
+        @click.self="cancelEndBroadcast"
+      >
+        <div
+          class="live-broadcast-page__modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="end-broadcast-title"
+        >
+          <h2 id="end-broadcast-title">방송을 종료할까요?</h2>
+          <p>종료하면 시청자에게 방송이 끝난 것으로 표시되고, 다시 시작할 수 없습니다.</p>
+          <div class="live-broadcast-page__modal-actions">
+            <button
+              type="button"
+              class="live-broadcast-page__modal-cancel"
+              @click="cancelEndBroadcast"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              class="live-broadcast-page__modal-confirm"
+              @click="confirmEndBroadcast"
+            >
+              방송 종료
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </LiveLayout>
@@ -405,6 +508,139 @@ onBeforeUnmount(() => {
   font-size: 10px;
   letter-spacing: 0.02em;
   opacity: 0.75;
+}
+
+.live-broadcast-page__notice {
+  position: absolute;
+  z-index: 3;
+  top: var(--space-4);
+  left: 50%;
+  max-width: calc(100% - var(--space-8));
+  padding: 8px 16px;
+  border: 1px solid var(--color-live-border);
+  border-radius: var(--radius-chip);
+  background: rgba(10, 12, 11, 0.86);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  backdrop-filter: blur(8px);
+  transform: translateX(-50%);
+  animation: live-broadcast-notice 200ms ease-out;
+}
+
+@keyframes live-broadcast-notice {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}
+
+.live-broadcast-page__ended {
+  display: grid;
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  background: rgba(6, 8, 7, 0.78);
+  text-align: center;
+  backdrop-filter: blur(3px);
+}
+
+.live-broadcast-page__ended strong {
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.live-broadcast-page__ended p {
+  max-width: 320px;
+  color: var(--color-live-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.live-broadcast-page__ended button {
+  min-height: 42px;
+  margin-top: var(--space-2);
+  padding: 0 var(--space-6);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-live);
+  color: var(--color-text-inverse);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.live-broadcast-page__modal-backdrop {
+  display: grid;
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  place-items: center;
+  padding: var(--space-4);
+  background: rgba(4, 6, 5, 0.62);
+}
+
+.live-broadcast-page__modal {
+  display: flex;
+  width: 100%;
+  max-width: 360px;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  border: 1px solid var(--color-live-border);
+  border-radius: var(--radius-card);
+  background: var(--color-live-surface);
+}
+
+.live-broadcast-page__modal h2 {
+  color: var(--color-live-text-primary);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.live-broadcast-page__modal p {
+  color: var(--color-live-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.live-broadcast-page__modal-actions {
+  display: flex;
+  margin-top: var(--space-3);
+  gap: var(--space-2);
+}
+
+.live-broadcast-page__modal-actions button {
+  flex: 1;
+  min-height: 42px;
+  border-radius: var(--radius-control);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.live-broadcast-page__modal-cancel {
+  border: 1px solid var(--color-live-border);
+  background: transparent;
+  color: var(--color-live-text-primary);
+}
+
+.live-broadcast-page__modal-confirm {
+  border: 1px solid color-mix(in srgb, var(--color-error) 55%, transparent);
+  background: var(--color-error);
+  color: #fff;
+}
+
+.live-broadcast-page__modal-cancel:hover {
+  background: var(--color-live-surface-raised);
+}
+
+.live-broadcast-page__modal-confirm:hover {
+  opacity: 0.92;
 }
 
 .live-broadcast-loading {
