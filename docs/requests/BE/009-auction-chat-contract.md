@@ -85,7 +85,7 @@
   - `POST /api/auctions/{auctionId}/close`
   - `GET /api/auctions/{auctionId}/bids`
   - `GET /api/auctions/{auctionId}/winner`
-- 요청 목적: 호스트 경매 진행, 사용자 입찰, 입찰 내역/낙찰 결과 조회를 처리한다.
+- 요청 목적: 호스트 경매 진행, 사용자 입찰, 입찰 내역/낙찰 결과 조회를 처리한다. FE 입찰 버튼(AUCT-003~006)이 이 API로 동작하며, **선착순(AUCT-005)·연속 입찰 제한(AUCT-006)·종료 직전 연장(AUCT-010, 종료 3초 이하 → +5초) 판정은 서버가 확정**한다. (현재 FE는 mock 사이클로 연출 중)
 - FE 사용처: 라이브 경매 패널
 - 요청 데이터
   - 입찰: `{ "amount": number }`
@@ -118,6 +118,7 @@
 - 응답 데이터
   - `type`: `AUCTION_STARTED` | `BID_PLACED` | `AUCTION_CLOSED`
   - `auction`: snapshot
+  - **낙찰 축하 연출(AUCT-013)**: `AUCTION_CLOSED` 이벤트(및 `GET /api/auctions/{auctionId}/winner`)로 FE가 라이브 화면 위에 낙찰자 닉네임(전체)·낙찰가를 강조 연출한다. → snapshot에 `highestBidderNickname`(낙찰자)·`currentPrice`(낙찰가)가 반드시 포함돼야 한다. (현재 FE는 이 이벤트가 없어 mock 트리거로 연출)
 - 응답 예시
 
 ```json

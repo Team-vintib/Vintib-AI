@@ -32,9 +32,36 @@ services:
         #    started 로 두면 컨테이너만 생겨 DNS 가 잡히고, livekit 이 죽어 있으면
         #    /rtc 요청만 502 가 된다.
         condition: service_started
+      # ⚠️ frontend 도 service_started 로만 (service_healthy 금지). FE 가 죽어도
+      #    Caddy 는 떠 있어야 API·이미지·영상이 안 죽는다. FE 만 502 가 된다.
+      frontend:
+        condition: service_started
     networks:
       - vintib-net
     mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # FE 정적 서빙 (Caddy 뒤). build: ./FE 로 이미지 빌드 → nginx 가 dist 서빙.
+  # 호스트 포트는 열지 않는다 (Caddy 만 접근). Caddy catch-all 이 frontend:80 으로 온다.
+  frontend:
+    build:
+      context: ./FE
+    image: vintib-frontend:${IMAGE_TAG:-local}
+    container_name: vintib-frontend
+    restart: unless-stopped
+    networks:
+      - vintib-net
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     logging:
       driver: json-file
       options:

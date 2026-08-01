@@ -3,6 +3,8 @@ export type LiveAuctionMockState =
   | 'PENDING'
   | 'LEADING'
   | 'INSUFFICIENT_POINTS'
+  | 'WON'
+  | 'FAILED'
 
 export interface LiveAuctionMockSnapshot {
   currentBid: number
@@ -10,4 +12,9 @@ export interface LiveAuctionMockSnapshot {
   remainingSeconds: number
   highestBidder: string
   availablePoints: number
+}
+
+export interface LiveAuctionResult {
+  winnerNickname: string
+  winningBid: number
 }
