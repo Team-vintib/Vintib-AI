@@ -22,6 +22,31 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     long countBySeller_IdAndSaleStatusNot(Long sellerId, SaleStatus excludedStatus);
 
     /**
+     * 여러 판매자의 공개 상품 수(DRAFT 제외)를 한 번에 센다.
+     *
+     * <p>팔로워/팔로잉 목록, 홈 팔로잉 카드처럼 판매자가 여러 명인 응답에서 판매자마다
+     * {@link #countBySeller_IdAndSaleStatusNot}을 부르면 N+1이 되므로 배치로 묶는다.
+     */
+    @Query("""
+            SELECT p.seller.id AS sellerId, COUNT(p) AS count
+            FROM Product p
+            WHERE p.seller.id IN :sellerIds AND p.saleStatus <> :excludedStatus
+            GROUP BY p.seller.id
+            """)
+    List<SellerProductCount> countBySellerIdsAndSaleStatusNot(
+            @Param("sellerIds") Collection<Long> sellerIds, @Param("excludedStatus") SaleStatus excludedStatus);
+
+    /** 여러 판매자의 상시 판매(ON_SALE) 상품을 최신순으로 가져온다(홈 팔로잉 콘텐츠) — {@code pageable}로 상위 N개만 캡. */
+    List<Product> findBySeller_IdInAndSaleStatusOrderByCreatedAtDesc(
+            Collection<Long> sellerIds, SaleStatus saleStatus, Pageable pageable);
+
+    interface SellerProductCount {
+        Long getSellerId();
+
+        Long getCount();
+    }
+
+    /**
      * 선택적 필터·정렬을 지원하는 상품 목록 조회 (PROD-008).
      *
      * <p>각 boolean 플래그가 false 이면 대응하는 WHERE 절을 건너뛴다
