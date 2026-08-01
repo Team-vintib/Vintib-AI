@@ -6,7 +6,6 @@ import { useAuthStore } from '@/domains/auth/stores/authStore'
 import {
   chargePoints,
   getPointWallet,
-  isPointApiEnabled,
   requestWithdrawal,
 } from '@/domains/point/api/pointApi'
 import PointChargePanel from '@/domains/point/components/PointChargePanel.vue'
@@ -42,9 +41,6 @@ const isLoading = computed(() => loadState.value === 'loading')
 const hasLoadError = computed(() => loadState.value === 'error')
 const isGuest = computed(() => loadState.value === 'guest')
 const recentTransactions = computed(() => transactions.value.slice(0, 10))
-const pointApiStatusLabel = computed(() =>
-  isPointApiEnabled() ? '실제 API 연동 중' : 'Mock 데이터 사용 중',
-)
 
 const sectionButtons: Array<{ id: PointMainSection; label: string }> = [
   { id: 'history', label: '내역' },
@@ -163,7 +159,6 @@ onMounted(() => {
           <h1 id="point-page-title">포인트</h1>
           <p>충전, 정산과 출금 상태를 한 곳에서 확인합니다.</p>
         </div>
-        <span class="point-page__api-status">{{ pointApiStatusLabel }}</span>
       </header>
 
       <div v-if="isLoading" class="point-page__state" role="status">
@@ -268,18 +263,6 @@ onMounted(() => {
   line-height: 24px;
 }
 
-.point-page__api-status {
-  flex: 0 0 auto;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-secondary);
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: var(--font-weight-bold);
-  line-height: 20px;
-}
-
 .point-page__section-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -357,10 +340,6 @@ onMounted(() => {
   .point-page__header {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .point-page__api-status {
-    width: fit-content;
   }
 }
 

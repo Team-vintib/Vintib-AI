@@ -69,3 +69,8 @@ FE 구현에서는 `http`의 baseURL이 이미 `/api`를 포함하므로 코드 
 - 운영자 출금 승인 화면
 
 위 항목은 BE 거래/경매 도메인과 함께 별도 계획으로 진행한다.
+## 2026-08-01 후속 BE 요청
+
+- `docs/requests/BE/010-commerce-wallet-contract.md`에 포인트 상세 계약을 병합했다.
+- 요청 범위: 포인트 잔액 조회, 거래 내역 조회, 충전, 출금 계좌 조회, 출금 신청, 출금 내역 조회.
+- FE는 BE 계약 확정 전까지 `VITE_POINT_API_ENABLED=false` mock fallback을 유지한다.
