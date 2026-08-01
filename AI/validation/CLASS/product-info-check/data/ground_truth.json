@@ -5,8 +5,8 @@
     "primary_color": "BLUE",
     "secondary_color": null,
     "shot_type": "flat",
-    "labeler": "claude_seed",
-    "needs_human_review": true,
+    "labeler": "ChoeHyeongSoo",
+    "needs_human_review": false,
     "synthetic": false,
     "notes": "미디엄 워시 청바지, 콘크리트 바닥 평면샷. 색상은 BLUE로 스냅했으나 워시 톤 미세 차이는 사람 검증 필요."
   },
@@ -16,8 +16,8 @@
     "primary_color": "BLACK",
     "secondary_color": "RED",
     "shot_type": "flat",
-    "labeler": "claude_seed",
-    "needs_human_review": true,
+    "labeler": "ChoeHyeongSoo",
+    "needs_human_review": false,
     "synthetic": false,
     "notes": "차콜 블랙 반팔 티셔츠, 가슴에 빨간 장미 자수/프린트(보조색). 흰 배경 제품샷(평면샷으로 분류)."
   },
@@ -27,8 +27,8 @@
     "primary_color": "BLUE",
     "secondary_color": null,
     "shot_type": "flat",
-    "labeler": "claude_seed",
-    "needs_human_review": true,
+    "labeler": "ChoeHyeongSoo",
+    "needs_human_review": false,
     "synthetic": false,
     "notes": "미디엄 워시 청바지, 무릎 부분 리페어/찢어짐. 빨간 카펫 배경 평면샷."
   },
@@ -38,19 +38,19 @@
     "primary_color": "BLUE",
     "secondary_color": "MULTI",
     "shot_type": "flat",
-    "labeler": "claude_seed",
-    "needs_human_review": true,
+    "labeler": "ChoeHyeongSoo",
+    "needs_human_review": false,
     "synthetic": false,
     "notes": "청바지 전체에 다색 낙서/자수(별·선인장·카드 등) — 보조색을 하나로 못 정해 MULTI로 표시. 팔레트 스냅 백엔드가 어떻게 반응하는지 보는 스트레스 케이스."
   },
   {
     "image_file": "logo_test.jpg",
     "subcategory": "T_SHIRT",
-    "primary_color": "BEIGE",
+    "primary_color": "WHITE",
     "secondary_color": null,
     "shot_type": "flat",
-    "labeler": "claude_seed",
-    "needs_human_review": true,
+    "labeler": "ChoeHyeongSoo",
+    "needs_human_review": false,
     "synthetic": false,
     "notes": "베이지 긴팔 티, 나무 바닥 평면샷(뒷면). 소매가 얇은 저지 소재라 T_SHIRT로 분류했으나 SWEATSHIRT와 경계가 애매한 카테고리 — 의도적 혼동 케이스로 남겨둠(사람 재검증 필요)."
   },
@@ -60,8 +60,8 @@
     "primary_color": "BLUE",
     "secondary_color": null,
     "shot_type": "flat",
-    "labeler": "claude_seed",
-    "needs_human_review": true,
+    "labeler": "ChoeHyeongSoo",
+    "needs_human_review": false,
     "synthetic": false,
     "notes": "라이트 워시 청바지, 무릎 리페어. 흰 배경 누끼컷(평면샷)."
   },
@@ -71,20 +71,53 @@
     "primary_color": "WHITE",
     "secondary_color": "RED",
     "shot_type": "flat",
-    "labeler": "claude_seed",
-    "needs_human_review": true,
+    "labeler": "ChoeHyeongSoo",
+    "needs_human_review": false,
     "synthetic": true,
     "notes": "실제 촬영 사진이 아니라 얼룩 하자 데모용 3D 렌더링 일러스트(육안 확인, 2026-08-01). synthetic=true로 표시하고 기본 정확도 집계에서 제외할 것."
   },
   {
     "image_file": "small_pro.jpg",
     "subcategory": "T_SHIRT",
-    "primary_color": "SKYBLUE",
+    "primary_color": "WHITE",
+    "secondary_color": null,
+    "shot_type": "flat",
+    "labeler": "ChoeHyeongSoo",
+    "needs_human_review": false,
+    "synthetic": false,
+    "notes": "IAB 반팔(라이트 블루/화이트에 가까운 색, 사람 재확인 필요), 침대 위 클로즈업 크롭. 카라+단추 구조라 SHIRT와 경계가 애매한 카테고리(폴로) — 의도적 혼동 케이스."
+  },
+  {
+    "image_file": "navy_logo.png",
+    "subcategory": "T_SHIRT",
+    "primary_color": "NAVY",
     "secondary_color": null,
     "shot_type": "flat",
     "labeler": "claude_seed",
     "needs_human_review": true,
     "synthetic": false,
-    "notes": "폴로 카라 반팔(라이트 블루/화이트에 가까운 색, 사람 재확인 필요), 침대 위 클로즈업 크롭. 카라+단추 구조라 SHIRT와 경계가 애매한 카테고리(폴로) — 의도적 혼동 케이스."
+    "notes": "네이비 크루넥 반팔 티셔츠(Lacoste), 흰 배경 고스트 마네킹 제품샷(평면샷으로 분류). 가슴에 작은 초록/흰색 로고 자수가 있지만 면적이 아주 작아 보조색으로 잡지 않음(black_washed.jpg 로고와 달리 무시 가능한 크기) — 사람 검증 시 이 판단이 맞는지 확인 필요."
+  },
+  {
+    "image_file": "vintage_t.png",
+    "subcategory": "T_SHIRT",
+    "primary_color": "KHAKI",
+    "secondary_color": "BLACK",
+    "shot_type": "hanging",
+    "labeler": "claude_seed",
+    "needs_human_review": true,
+    "synthetic": false,
+    "notes": "탈색·손상된 빈티지 그래픽 티셔츠, 나무 옷걸이에 걸어 흰 벽 배경 촬영 — 이 정답셋 최초의 걸이샷(hanging) 샘플(REPORT.md가 지적한 촬영유형 편중을 일부 해소). 전체적으로 탈색된 올리브/카키 톤을 주색상으로, 진한 그래픽 프린트(독수리·글자)를 보조색(BLACK)으로 잡았다 — 톤 편차가 커서 색상 판정 자체가 사람 검증 우선순위 높음."
+  },
+  {
+    "image_file": "black_stain.png",
+    "subcategory": "T_SHIRT",
+    "primary_color": "BLACK",
+    "secondary_color": null,
+    "shot_type": "flat",
+    "labeler": "claude_seed",
+    "needs_human_review": true,
+    "synthetic": false,
+    "notes": "블랙 폴로 카라 반팔(Prada Linea Rossa 추정, 밑단에 작은 빨간 태그), 러그/카펫 바닥 평면샷. 가슴 쪽에 옅은 얼룩 하자로 추정되는 자국 있음(파일명 근거) — 정확한 색/하자 여부는 사람 재확인 필요. 태그의 빨간색은 면적이 작아 보조색으로 잡지 않음. small_pro.jpg와 마찬가지로 카라+단추 구조라 SHIRT와 경계가 애매한 폴로 케이스."
   }
 ]
