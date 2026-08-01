@@ -1,7 +1,8 @@
 """카테고리(소분류 30-way) 분류 — 모델 교체 경계.
 
 `worker/models/quality_vlm/describer.py`의 `DefectDescriber(ABC)` + `build_describer()`
-패턴을 그대로 따른다 — 여기가 카테고리 분류 모델 교체의 유일한 지점이다.
+패턴을 그대로 따른다 — 여기가 카테고리 분류 모델 교체의 유일한 지점이다. 결과 데이터 모양은
+`contracts.py`(게이트웨이 스키마와 대조되는 계약 사본)에 있다.
 
 **실백엔드는 아직 없다.** `AI/validation/CLASS/product-info-check/`에서 CLIP 파인튜닝
 검증이 끝난 뒤 `ClipFinetunedClassifier` 같은 클래스를 추가하고 `registry.py`의
@@ -13,44 +14,17 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 
 from PIL import Image
 
 from . import registry
-from .taxonomy import ALL_SUBCATEGORIES, MajorCategory, Subcategory, category_path, major_of
-from .thresholds import CATEGORY_THRESHOLDS, Action, resolve_action
+from .contracts import CategoryCandidate, CategoryPrediction, build_category_prediction
+from .taxonomy import ALL_SUBCATEGORIES
+from .thresholds import CATEGORY_THRESHOLDS, resolve_action
 
 
 class ClassifierNotReady(Exception):
     """활성 백엔드가 준비되지 않음(라이브러리 미설치 등)."""
-
-
-@dataclass
-class CategoryCandidate:
-    subcategory: Subcategory
-    score: float
-
-
-@dataclass
-class CategoryPrediction:
-    subcategory: Subcategory | None
-    major: MajorCategory | None
-    path: list[str]
-    score: float
-    action: Action
-    candidates: list[CategoryCandidate] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        return {
-            "value": self.subcategory.value if self.subcategory else None,
-            "path": self.path,
-            "score": self.score,
-            "action": self.action,
-            "candidates": [
-                {"value": c.subcategory.value, "score": c.score} for c in self.candidates
-            ],
-        }
 
 
 class CategoryClassifier(ABC):
@@ -72,10 +46,8 @@ class MockCategoryClassifier(CategoryClassifier):
 
     def classify(self, image: Image.Image) -> CategoryPrediction:
         placeholder = ALL_SUBCATEGORIES[0]
-        return CategoryPrediction(
+        return build_category_prediction(
             subcategory=placeholder,
-            major=major_of(placeholder),
-            path=category_path(placeholder),
             score=0.0,
             action=resolve_action(0.0, CATEGORY_THRESHOLDS),
             candidates=[CategoryCandidate(subcategory=placeholder, score=0.0)],

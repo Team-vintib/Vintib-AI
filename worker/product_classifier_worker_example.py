@@ -95,7 +95,10 @@ class ProductClassifierWorker(BaseWorker):
         product_id = int(payload["product_id"])
         image = download_image(payload["image_url"])
 
-        fields: dict = {}
+        # 키는 항상 셋 다 채운다(성공하면 값, 실패하면 None) — `app/product_classifier/schemas.py`의
+        # `ProductClassifyFields`가 "키는 항상 있고 값만 nullable"을 전제로 한다. 실패했다고
+        # 키 자체를 빼면 BE/FE가 매번 `.get()`으로 방어해야 한다.
+        fields: dict = {"category": None, "color_primary": None, "color_secondary": None}
         category_error: str | None = None
         color_error: str | None = None
 

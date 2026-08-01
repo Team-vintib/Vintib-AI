@@ -1,9 +1,11 @@
 """색상(주색상/보조색상) 추출 — 모델 교체 경계.
 
-`classifier.py`와 같은 ABC+팩토리 패턴. 원래 설계안(경량 마스크+k-means+팔레트 스냅)은
-`AI/validation/CLASS/product-info-check/REPORT.md` §V3 실측에서 **0% 정확도로 완전히
-실패**했다(배경 오염, 클로즈업 마스크 붕괴) — 그래서 여기 실백엔드를 아직 안 넣었다. "CLIP
-임베딩+분류 헤드" 등 대체 방식이 검증 중이며 결정되지 않았다(2026-08-02).
+`classifier.py`와 같은 ABC+팩토리 패턴. 결과 데이터 모양(`ColorFieldPrediction`)은
+`contracts.py`에 있다 — 게이트웨이 스키마와 대조되는 계약 사본이다. 원래 설계안(경량
+마스크+k-means+팔레트 스냅)은 `AI/validation/CLASS/product-info-check/REPORT.md` §V3
+실측에서 **0% 정확도로 완전히 실패**했다(배경 오염, 클로즈업 마스크 붕괴) — 그래서 여기
+실백엔드를 아직 안 넣었다. "CLIP 임베딩+분류 헤드" 등 대체 방식이 검증 중이며 결정되지
+않았다(2026-08-02).
 
 설계: `.claude/plans/ai/CH012-~2.MD`
 """
@@ -11,12 +13,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from PIL import Image
 
 from . import registry
-from .thresholds import COLOR_THRESHOLDS, Action, resolve_action
+from .contracts import ColorCandidate, ColorFieldPrediction
+from .thresholds import COLOR_THRESHOLDS, resolve_action
 
 
 class ColorExtractorNotReady(Exception):
@@ -51,31 +54,10 @@ MULTI_LABEL = "MULTI"  # 팔레트 색 하나로 스냅하기 어려운 패턴/�
 
 
 @dataclass
-class ColorCandidate:
-    code: str
-    score: float
-
-
-@dataclass
-class ColorFieldPrediction:
-    code: str | None
-    hex: str | None
-    score: float
-    action: Action
-    candidates: list[ColorCandidate] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        return {
-            "value": self.code,
-            "hex": self.hex,
-            "score": self.score,
-            "action": self.action,
-            "candidates": [{"value": c.code, "score": c.score} for c in self.candidates],
-        }
-
-
-@dataclass
 class ColorPrediction:
+    """주색상/보조색상 쌍 — extract()의 반환 타입. BE JSON에는 각 필드가 독립적으로
+    실리므로(fields.color_primary/color_secondary) 이 쌍 자체는 계약 대상이 아니다."""
+
     primary: ColorFieldPrediction
     secondary: ColorFieldPrediction | None
 

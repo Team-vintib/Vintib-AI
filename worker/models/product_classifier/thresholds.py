@@ -11,9 +11,9 @@ REPORT.md` §V4도 같은 결론이다 — 소분류 30종 기준 실측 권장�
 참고).
 """
 
-from typing import Literal, TypedDict
+from typing import TypedDict
 
-Action = Literal["autofill", "suggest", "none"]
+from .contracts import Action
 
 
 class FieldThresholds(TypedDict):
