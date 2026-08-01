@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import SellerAuctionPanel from '@/domains/auction/components/SellerAuctionPanel.vue'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import {
   getLiveWatchViewData,
@@ -335,21 +336,7 @@ onBeforeUnmount(() => {
         <aside class="live-broadcast-page__control">
           <LiveBroadcastInfo :live="live" :elapsed-time="elapsedTime" />
 
-          <!-- 경매 설정 패널 자리 — 436에서 구현 -->
-          <section class="live-broadcast-page__auction-slot" aria-label="경매 설정">
-            <div class="live-broadcast-page__slot-head">
-              <h2>경매 설정</h2>
-              <span>준비 중</span>
-            </div>
-            <p class="live-broadcast-page__slot-body">
-              {{
-                selectedProduct
-                  ? `‘${selectedProduct.title}’ 상품의 경매 시작가·증가폭·시간 설정 패널이 이 자리에 들어갑니다.`
-                  : '상품을 선택하면 경매 설정 패널이 이 자리에 표시됩니다.'
-              }}
-            </p>
-            <p class="live-broadcast-page__slot-note">경매 설정 패널 · 436에서 구현</p>
-          </section>
+          <SellerAuctionPanel :product="selectedProduct" :status="live.status" />
         </aside>
       </div>
 
@@ -461,46 +448,6 @@ onBeforeUnmount(() => {
   padding: var(--space-4);
   border-left: 1px solid var(--color-live-border);
   background: var(--color-live-background);
-}
-
-.live-broadcast-page__auction-slot {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px dashed var(--color-live-border);
-  border-radius: var(--radius-control);
-  background: var(--color-live-surface);
-}
-
-.live-broadcast-page__slot-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.live-broadcast-page__slot-head h2 {
-  color: var(--color-live-text-primary);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.live-broadcast-page__slot-head span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 20px;
-  padding: 0 7px;
-  border-radius: var(--radius-badge);
-  background: var(--color-live-surface-raised);
-  color: var(--color-live-text-secondary);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.live-broadcast-page__slot-body {
-  color: var(--color-live-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
 }
 
 .live-broadcast-page__slot-note {
