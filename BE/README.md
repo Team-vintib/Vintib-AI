@@ -122,8 +122,8 @@ BE/
 │   │   └── dto/
 │   ├── home/                    # 홈/팔로잉 콘텐츠 조회 (HOME) — 정윤
 │   │   ├── controller/
-│   │   ├── service/
-│   │   └── dto/response/        # 카드 DTO는 현재 Mock 응답용 (2주차 실데이터 연결)
+│   │   ├── service/              # FollowingService: followedSellers·products는 실데이터(SY024), lives는 아직 Mock 제거 후 빈 배열
+│   │   └── dto/response/        # 카드 DTO(HOME-001 소유, HOME-002 재사용). HOME-001 라이브·상시판매 섹션은 여전히 Mock
 │   ├── live/                    # 라이브 방 개설/조회/상태 전이, 시청자 수, 반응 (LIVE) — 정윤
 │   │   ├── controller/          # LiveController, LiveProductController, LiveReactionStompController(STOMP)
 │   │   ├── service/             # LiveService, LiveProductService, LiveViewerService, LiveReactionService
@@ -147,10 +147,10 @@ BE/
 │   │   ├── entity/               # TryOnResult
 │   │   ├── repository/
 │   │   └── dto/response/
-│   ├── social/                   # 상품 찜/해제 (WISH, APIs.md "팔로우 / 찜" 섹션 기준) — 서윤
-│   │   ├── controller/
-│   │   ├── service/
-│   │   ├── entity/               # Wish, WishId(복합키)
+│   ├── social/                   # 상품 찜/해제, 팔로우 (WISH/FOLLOW, APIs.md "팔로우 / 찜" 섹션 기준) — 서윤
+│   │   ├── controller/           # WishController, FollowController
+│   │   ├── service/               # WishService, FollowService
+│   │   ├── entity/               # Wish, WishId(복합키), Follow
 │   │   ├── repository/
 │   │   └── dto/
 │   ├── notification/             # 알림함 읽음 처리 (NOTI, APIs.md "알림" 섹션 기준) — 서윤
@@ -191,6 +191,7 @@ BE/
 - 토큰 재발급: `POST /api/auth/reissue` (바디에 refreshToken)
 - 로그아웃: `POST /api/auth/logout` — Redis에 저장된 Refresh Token만 삭제(Access Token은 자연 만료까지 유효)
 - `/api/auth/signup`, `/api/auth/signin`, `/api/auth/reissue`, `/api/auth/email/**`, `/api/health`, `/api/home`, `/actuator/**`, swagger 경로는 인증 없이 접근 가능. 그 외 모든 API는 인증 필요. (`/api/home/following`은 정확 일치가 아니라 인증 필요)
+- `GET /api/users/{userId}/followers`, `GET /api/users/{userId}/followings`(팔로워/팔로잉 목록, 공개 프로필)도 인증 없이 접근 가능하다. 같은 경로의 `POST`/`DELETE`(팔로우/해제)는 인증 필요.
 
 ## 공통 응답 규격
 
