@@ -43,6 +43,9 @@ class ListingSpec:
     # 목록 URL 자체가 카테고리인 경우(예: .../outer/jacket) 그 카테고리 텍스트를 고정한다.
     category: str | None = None
     category_selector: str | None = None
+    # 카테고리별 목록 URL 목록 — `[{url, category}, ...]`. 실제 쇼핑몰은 소분류마다 URL이
+    # 따로 있어서, 이게 없으면 카테고리 수만큼 스펙 파일을 복사해야 한다.
+    category_urls: list[dict[str, str]] = field(default_factory=list)
     # 페이지네이션 — {page}가 1부터 채워진다. 없으면 첫 페이지만 본다.
     page_url_template: str | None = None
     page_start: int = 1
@@ -140,11 +143,18 @@ def _validate(spec: SiteSpec) -> None:
     else:
         if not spec.listing.image_selector:
             raise SpecError("follow_detail: false면 listing.image_selector가 필요하다")
-        if not (spec.listing.category or spec.listing.category_selector):
+        if not (
+            spec.listing.category or spec.listing.category_selector or spec.listing.category_urls
+        ):
             raise SpecError(
-                "follow_detail: false면 listing.category(고정 문자열) 또는 "
-                "listing.category_selector 중 하나는 있어야 한다 — 카테고리 없이는 라벨을 만들 수 없다"
+                "follow_detail: false면 listing.category(고정 문자열)·category_selector·"
+                "category_urls 중 하나는 있어야 한다 — 카테고리 없이는 라벨을 만들 수 없다"
             )
+
+    for entry in spec.listing.category_urls:
+        missing = sorted({"url", "category"} - set(entry))
+        if missing:
+            raise SpecError(f"category_urls 항목에 {missing} 키가 없다: {entry}")
 
     # category_map의 값이 실제 taxonomy 코드인지 — 오타는 조용히 라벨을 오염시킨다.
     bad = sorted({code for code in spec.category_map.values() if not is_valid_subcategory(code)})

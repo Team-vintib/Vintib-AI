@@ -84,17 +84,31 @@ def build_item(
     )
 
 
-def _listing_urls(spec: SiteSpec, start_url: str | None, max_pages: int) -> list[str]:
-    """긁을 목록 페이지 URL들. `--url`이 있으면 그 한 장만 본다(스펙 템플릿보다 우선)."""
+def _listing_urls(
+    spec: SiteSpec, start_url: str | None, max_pages: int
+) -> list[tuple[str, str | None]]:
+    """긁을 (목록 URL, 그 URL의 카테고리) 목록.
+
+    우선순위: `--url` > 스펙의 `category_urls` > `page_url_template`.
+    카테고리가 URL로만 구분되는 사이트(대부분)에서는 두 번째가 기본 경로다.
+    """
     listing = spec.listing
     assert listing is not None
     if start_url:
-        return [start_url]
+        # 스펙에 등록된 URL을 그대로 넘긴 경우 그 카테고리를 잃지 않게 먼저 찾아본다.
+        for entry in listing.category_urls:
+            if entry["url"] == start_url:
+                return [(start_url, entry["category"])]
+        return [(start_url, listing.category)]
+    if listing.category_urls:
+        return [(entry["url"], entry["category"]) for entry in listing.category_urls]
     template = listing.page_url_template
     if template:
         pages = range(listing.page_start, listing.page_start + max_pages)
-        return [url for url in (next_page_url(template, p) for p in pages) if url]
-    raise SystemExit("URL이 필요하다 — --url을 주거나 스펙에 listing.page_url_template을 넣어라")
+        return [(url, listing.category) for p in pages if (url := next_page_url(template, p))]
+    raise SystemExit(
+        "URL이 필요하다 — --url을 주거나 스펙에 category_urls/page_url_template을 넣어라"
+    )
 
 
 def crawl(spec: SiteSpec, args: argparse.Namespace) -> list[CollectedItem]:
@@ -114,8 +128,8 @@ def crawl(spec: SiteSpec, args: argparse.Namespace) -> list[CollectedItem]:
         delay_seconds=args.delay if args.delay is not None else spec.delay_seconds,
         respect_robots=not args.ignore_robots,
     ) as fetcher:
-        for page_url in _listing_urls(spec, args.url, max_pages):
-            print(f"[목록] {page_url}", file=sys.stderr)
+        for page_url, category in _listing_urls(spec, args.url, max_pages):
+            print(f"[목록] {page_url}" + (f"  ({category})" if category else ""), file=sys.stderr)
             try:
                 html = fetcher.get_html(
                     page_url,
@@ -139,6 +153,9 @@ def crawl(spec: SiteSpec, args: argparse.Namespace) -> list[CollectedItem]:
                     return collected
                 if raw.source_url and raw.source_url in seen_urls:
                     continue
+                # 카드 안에 카테고리 표기가 없는 사이트(대부분의 SPA)는 URL이 곧 카테고리다.
+                if category and not raw.category_raw:
+                    raw.category_raw = category
                 item = _collect_one(raw, spec, fetcher, store, args)
                 if item is None:
                     continue

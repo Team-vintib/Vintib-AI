@@ -234,6 +234,23 @@ class TestSiteSpec:
         with pytest.raises(SpecError, match="카테고리"):
             spec_from_dict(data)
 
+    def test_category_urls_satisfies_category_requirement(self):
+        """카테고리가 URL로만 구분되는 사이트(번개장터 등)의 기본 구성."""
+        data = self._minimal()
+        del data["listing"]["category"]
+        data["listing"]["category_urls"] = [
+            {"url": "https://m.example.com/categories/1", "category": "아우터 > 코트"}
+        ]
+        spec = spec_from_dict(data)
+        assert spec.listing is not None
+        assert spec.listing.category_urls[0]["category"] == "아우터 > 코트"
+
+    def test_category_urls_entry_missing_key_raises(self):
+        data = self._minimal()
+        data["listing"]["category_urls"] = [{"url": "https://m.example.com/c/1"}]
+        with pytest.raises(SpecError, match="category_urls"):
+            spec_from_dict(data)
+
     def test_invalid_shot_type_raises(self):
         with pytest.raises(SpecError, match="shot_type_default"):
             spec_from_dict(self._minimal(shot_type_default="studio"))
