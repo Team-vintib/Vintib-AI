@@ -22,7 +22,12 @@ import {
   MY_SECTION_OPTIONS,
   MY_SETTLEMENT_STATUS_LABELS,
 } from '@/domains/my/constants/myMockData'
-import type { MyPageViewData, MyProfileUpdateRequest, MySectionId } from '@/domains/my/types/my.types'
+import type {
+  MyPageViewData,
+  MyProductStatus,
+  MyProfileUpdateRequest,
+  MySectionId,
+} from '@/domains/my/types/my.types'
 import { normalizeApiError } from '@/shared/api/http'
 import type { InterestBrand, InterestCategory } from '@/shared/api/mockInterestStorage'
 import { readImageFileAsDataUrl } from '@/shared/api/mockProfileMediaStorage'
@@ -64,6 +69,13 @@ const selectedInterestCategoryIds = ref<number[]>([])
 const interestBrandSearchQuery = ref('')
 const isInterestLoading = ref(false)
 const interestLoadMessage = ref('')
+type ProductFilterId = 'ALL' | Extract<MyProductStatus, 'ON_SALE' | 'SOLD'>
+const productFilterOptions = [
+  { id: 'ALL', label: '전체' },
+  { id: 'ON_SALE', label: '판매 중' },
+  { id: 'SOLD', label: '판매 완료' },
+] satisfies Array<{ id: ProductFilterId; label: string }>
+const selectedProductFilter = ref<ProductFilterId>('ALL')
 
 const profile = computed(() => viewData.value?.summary.profile ?? null)
 const isLoading = computed(() => loadState.value === 'loading')
@@ -100,6 +112,15 @@ const filteredInterestBrands = computed(() => {
 const visibleInterestCategories = computed(() =>
   interestCategoryOptions.value.filter((category) => category.depth <= 2),
 )
+const filteredProducts = computed(() => {
+  const products = viewData.value?.products ?? []
+
+  if (selectedProductFilter.value === 'ALL') {
+    return products
+  }
+
+  return products.filter((item) => item.status === selectedProductFilter.value)
+})
 const currentSectionLabel = computed(
   () =>
     MY_SECTION_OPTIONS.find((section) => section.id === selectedSection.value)?.label ??
@@ -329,6 +350,20 @@ const toggleInterestBrand = (brandId: number) => {
 const handleInterestCategoryChange = () => {
   profileSaveState.value = 'idle'
   profileSaveMessage.value = ''
+}
+
+const selectProductFilter = (filterId: ProductFilterId) => {
+  selectedProductFilter.value = filterId
+}
+
+const getProductFilterCount = (filterId: ProductFilterId) => {
+  const products = viewData.value?.products ?? []
+
+  if (filterId === 'ALL') {
+    return products.length
+  }
+
+  return products.filter((item) => item.status === filterId).length
 }
 
 const loadMyInterests = async (userId: number) => {
@@ -1017,14 +1052,31 @@ onMounted(() => {
                 <h2>판매 상품 관리</h2>
                 <button type="button" @click="goToProductCreate">새 상품 등록</button>
               </div>
-              <article v-for="item in viewData.products" :key="item.id" class="my-row">
-                <img :src="item.product.imageUrl" :alt="item.product.imageAlt" />
-                <div>
-                  <strong>{{ item.product.name }}</strong>
-                  <p>{{ item.product.brand }} · {{ item.product.price.toLocaleString('ko-KR') }}P</p>
-                </div>
-                <span>{{ MY_PRODUCT_STATUS_LABELS[item.status] }}</span>
-              </article>
+              <div class="my-product-tabs" role="tablist" aria-label="판매 상품 상태 필터">
+                <button
+                  v-for="filter in productFilterOptions"
+                  :key="filter.id"
+                  type="button"
+                  role="tab"
+                  :aria-selected="selectedProductFilter === filter.id"
+                  :class="{ 'my-product-tabs__item--active': selectedProductFilter === filter.id }"
+                  @click="selectProductFilter(filter.id)"
+                >
+                  {{ filter.label }}
+                  <span>{{ getProductFilterCount(filter.id) }}</span>
+                </button>
+              </div>
+              <div v-if="filteredProducts.length" class="my-product-grid">
+                <article v-for="item in filteredProducts" :key="item.id" class="my-product-card">
+                  <img :src="item.product.imageUrl" :alt="item.product.imageAlt" />
+                  <div class="my-product-card__body">
+                    <span>{{ MY_PRODUCT_STATUS_LABELS[item.status] }}</span>
+                    <strong>{{ item.product.name }}</strong>
+                    <p>{{ item.product.price.toLocaleString('ko-KR') }}P</p>
+                  </div>
+                </article>
+              </div>
+              <p v-else class="my-product-empty">해당 상태의 판매 상품이 없습니다.</p>
             </template>
 
             <template v-else-if="selectedSection === 'orders'">
@@ -1294,6 +1346,7 @@ onMounted(() => {
 .my-profile-hero__stats button:focus-visible,
 .my-dashboard__card:focus-visible,
 .my-todo-row:focus-visible,
+.my-product-tabs button:focus-visible,
 .my-profile-photo__actions button:focus-visible,
 .my-tryon-photo__actions button:focus-visible,
 .my-interest-editor__chips button:focus-visible,
@@ -1739,6 +1792,110 @@ onMounted(() => {
 
 .my-text-row {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.my-product-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-bottom: var(--space-1);
+}
+
+.my-product-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--button-height-small);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+}
+
+.my-product-tabs button:hover,
+.my-product-tabs__item--active {
+  border-color: var(--color-primary) !important;
+  background: var(--color-primary-soft) !important;
+  color: var(--color-primary) !important;
+}
+
+.my-product-tabs button span {
+  color: inherit;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.my-product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.my-product-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgb(23 26 31 / 8%);
+}
+
+.my-product-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.my-product-card__body {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.my-product-card__body span {
+  justify-self: start;
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-badge);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  line-height: 18px;
+}
+
+.my-product-card__body strong {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-product-card__body p {
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 22px;
+}
+
+.my-product-empty {
+  padding: var(--space-8);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 22px;
+  text-align: center;
 }
 
 .my-row img {
@@ -2253,6 +2410,10 @@ onMounted(() => {
     justify-self: start;
   }
 
+  .my-product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .my-interest-editor__categories {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2283,6 +2444,10 @@ onMounted(() => {
 
   .my-profile-hero__stats {
     gap: 18px;
+  }
+
+  .my-product-grid {
+    grid-template-columns: 1fr;
   }
 
   .my-interest-editor__header {
