@@ -18,6 +18,7 @@
   - 조회 대상: `GET /api/users/{userId}/mypage` 또는 `GET /api/me`
   - 필드: `profileImageUrl: string | null`
   - 업로드/수정 후보: `PUT /api/me/profile-image`
+  - 파일 필드: `profileImage`
   - 삭제 후보: `DELETE /api/me/profile-image`
   - 이 API는 `defaultTryOnImageUrl`을 변경하지 않아야 한다.
 - 온보딩 시착 프로필 저장 API의 사진 필드를 기본 시착 사진으로 저장한다.
@@ -36,6 +37,20 @@
   - 권장 제한: 5MB 이하
 
 ## 응답 예시
+
+프로필 사진 변경:
+
+```json
+{
+  "success": true,
+  "data": {
+    "profileImageUrl": "https://.../profile.jpg"
+  },
+  "error": null
+}
+```
+
+AI 시착용 기본 사진 변경:
 
 ```json
 {

@@ -3,7 +3,14 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import { getMyPageViewData, updateMyProfile } from '@/domains/my/api/myApi'
+import {
+  deleteMyDefaultTryOnImage,
+  deleteMyProfileImage,
+  getMyPageViewData,
+  updateMyDefaultTryOnImage,
+  updateMyProfile,
+  updateMyProfileImage,
+} from '@/domains/my/api/myApi'
 import {
   MY_BUSINESS_STATUS_LABELS,
   MY_LIVE_STATUS_LABELS,
@@ -14,6 +21,7 @@ import {
 } from '@/domains/my/constants/myMockData'
 import type { MyPageViewData, MyProfileUpdateRequest, MySectionId } from '@/domains/my/types/my.types'
 import { normalizeApiError } from '@/shared/api/http'
+import { readImageFileAsDataUrl } from '@/shared/api/mockProfileMediaStorage'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
@@ -36,10 +44,12 @@ const profileForm = ref<MyProfileUpdateRequest>({
 const profileSaveState = ref<'idle' | 'saving' | 'success' | 'error'>('idle')
 const profileSaveMessage = ref('')
 const profileImageInput = ref<HTMLInputElement | null>(null)
+const selectedProfileImageFile = ref<File | null>(null)
 const profileImagePreviewUrl = ref('')
 const isProfileImageRemoved = ref(false)
 const selectedProfileImageName = ref('')
 const tryOnImageInput = ref<HTMLInputElement | null>(null)
+const selectedTryOnImageFile = ref<File | null>(null)
 const tryOnImagePreviewUrl = ref('')
 const isTryOnImageRemoved = ref(false)
 const selectedTryOnImageName = ref('')
@@ -246,9 +256,11 @@ const syncProfileForm = () => {
   }
   profileSaveState.value = 'idle'
   profileSaveMessage.value = ''
+  selectedProfileImageFile.value = null
   profileImagePreviewUrl.value = ''
   isProfileImageRemoved.value = false
   selectedProfileImageName.value = ''
+  selectedTryOnImageFile.value = null
   tryOnImagePreviewUrl.value = ''
   isTryOnImageRemoved.value = false
   selectedTryOnImageName.value = ''
@@ -281,24 +293,6 @@ const openTryOnImagePicker = () => {
   tryOnImageInput.value?.click()
 }
 
-const readImageFile = (file: File, fallbackMessage: string) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result)
-        return
-      }
-
-      reject(new Error(fallbackMessage))
-    })
-    reader.addEventListener('error', () => {
-      reject(new Error(fallbackMessage))
-    })
-    reader.readAsDataURL(file)
-  })
-
 const handleProfileImageChange = async (event: Event) => {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -322,7 +316,8 @@ const handleProfileImageChange = async (event: Event) => {
   }
 
   try {
-    profileImagePreviewUrl.value = await readImageFile(file, '프로필 사진을 읽지 못했습니다.')
+    profileImagePreviewUrl.value = await readImageFileAsDataUrl(file, '프로필 사진을 읽지 못했습니다.')
+    selectedProfileImageFile.value = file
     isProfileImageRemoved.value = false
     selectedProfileImageName.value = file.name
     profileSaveState.value = 'idle'
@@ -356,7 +351,8 @@ const handleTryOnImageChange = async (event: Event) => {
   }
 
   try {
-    tryOnImagePreviewUrl.value = await readImageFile(file, 'AI 시착용 사진을 읽지 못했습니다.')
+    tryOnImagePreviewUrl.value = await readImageFileAsDataUrl(file, 'AI 시착용 사진을 읽지 못했습니다.')
+    selectedTryOnImageFile.value = file
     isTryOnImageRemoved.value = false
     selectedTryOnImageName.value = file.name
     profileSaveState.value = 'idle'
@@ -368,6 +364,7 @@ const handleTryOnImageChange = async (event: Event) => {
 }
 
 const removeProfileImage = () => {
+  selectedProfileImageFile.value = null
   profileImagePreviewUrl.value = ''
   selectedProfileImageName.value = ''
   isProfileImageRemoved.value = true
@@ -378,6 +375,7 @@ const removeProfileImage = () => {
 }
 
 const removeTryOnImage = () => {
+  selectedTryOnImageFile.value = null
   tryOnImagePreviewUrl.value = ''
   selectedTryOnImageName.value = ''
   isTryOnImageRemoved.value = true
@@ -412,12 +410,24 @@ const submitProfileForm = async () => {
       detailAddress: profileForm.value.detailAddress.trim(),
     }
     const nextProfile = await updateMyProfile(profile.value.id, request)
-    const nextProfileImageUrl = isProfileImageRemoved.value
-      ? null
-      : profileImagePreviewUrl.value || profile.value.profileImageUrl
-    const nextTryOnImageUrl = isTryOnImageRemoved.value
-      ? null
-      : tryOnImagePreviewUrl.value || profile.value.defaultTryOnImageUrl
+    let nextProfileImageUrl = profile.value.profileImageUrl
+    let nextTryOnImageUrl = profile.value.defaultTryOnImageUrl
+
+    if (isProfileImageRemoved.value) {
+      const response = await deleteMyProfileImage(profile.value.id)
+      nextProfileImageUrl = response.profileImageUrl
+    } else if (selectedProfileImageFile.value) {
+      const response = await updateMyProfileImage(profile.value.id, selectedProfileImageFile.value)
+      nextProfileImageUrl = response.profileImageUrl
+    }
+
+    if (isTryOnImageRemoved.value) {
+      const response = await deleteMyDefaultTryOnImage(profile.value.id)
+      nextTryOnImageUrl = response.defaultTryOnImageUrl
+    } else if (selectedTryOnImageFile.value) {
+      const response = await updateMyDefaultTryOnImage(profile.value.id, selectedTryOnImageFile.value)
+      nextTryOnImageUrl = response.defaultTryOnImageUrl
+    }
 
     viewData.value = {
       ...viewData.value,
@@ -430,8 +440,12 @@ const submitProfileForm = async () => {
         },
       },
     }
+    selectedProfileImageFile.value = null
+    profileImagePreviewUrl.value = ''
     selectedProfileImageName.value = ''
     isProfileImageRemoved.value = false
+    selectedTryOnImageFile.value = null
+    tryOnImagePreviewUrl.value = ''
     selectedTryOnImageName.value = ''
     isTryOnImageRemoved.value = false
     profileSaveState.value = 'success'

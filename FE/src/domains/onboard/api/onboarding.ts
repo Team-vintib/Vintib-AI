@@ -1,4 +1,8 @@
 import { http } from '@/shared/api/http'
+import {
+  readImageFileAsDataUrl,
+  saveMockDefaultTryOnImage,
+} from '@/shared/api/mockProfileMediaStorage'
 
 import type { ApiResponse } from '@/shared/types/api.types'
 
@@ -35,6 +39,14 @@ export interface SaveOnboardingTryOnProfileRequest {
   hip?: string
 }
 
+export interface SaveOnboardingTryOnProfileOptions {
+  userId?: number | null
+}
+
+export interface SaveOnboardingTryOnProfileResponse {
+  defaultTryOnImageUrl: string | null
+}
+
 export interface CompleteOnboardingRequest {
   memberType: OnboardingMemberType
 }
@@ -61,9 +73,27 @@ export const saveOnboardingInterests = async (request: SaveOnboardingInterestsRe
 
 export const saveOnboardingTryOnProfile = async (
   request: SaveOnboardingTryOnProfileRequest,
-) => {
+  options: SaveOnboardingTryOnProfileOptions = {},
+): Promise<ApiResponse<SaveOnboardingTryOnProfileResponse | null>> => {
   if (!ONBOARDING_API_ENABLED) {
-    return ONBOARDING_SUCCESS_RESPONSE
+    if (!request.bodyPhoto) {
+      return ONBOARDING_SUCCESS_RESPONSE
+    }
+
+    const defaultTryOnImageUrl = await readImageFileAsDataUrl(
+      request.bodyPhoto,
+      'AI 시착용 사진을 읽지 못했습니다.',
+    )
+
+    saveMockDefaultTryOnImage(options.userId, defaultTryOnImageUrl)
+
+    return {
+      success: true,
+      data: {
+        defaultTryOnImageUrl,
+      },
+      error: null,
+    }
   }
 
   const formData = new FormData()
@@ -74,7 +104,7 @@ export const saveOnboardingTryOnProfile = async (
     }
   })
 
-  const { data } = await http.put<ApiResponse<null>>('/me/tryon', formData, {
+  const { data } = await http.put<ApiResponse<SaveOnboardingTryOnProfileResponse | null>>('/me/tryon', formData, {
     headers: {
       'Content-Type': undefined,
     },
