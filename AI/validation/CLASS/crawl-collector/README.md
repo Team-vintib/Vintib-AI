@@ -45,6 +45,18 @@ python crawl.py --spec sites/my-mall.yaml --url "https://..." --limit 200 --out 
 `follow_detail: false`(목록에서 이미지·카테고리를 바로 뽑기)를 기본으로 삼는 게 좋다 —
 상품 수만큼 요청이 줄고, 목록 URL 자체가 카테고리라 라벨이 흔들리지 않는다.
 
+카테고리가 URL로만 구분되는 사이트(대부분의 SPA)는 `listing.category_urls`에
+`{url, category}` 목록을 넣으면 **스펙 하나로 여러 카테고리를 순회**한다.
+
+### 검증된 스펙
+
+- `sites/bunjang.yaml` — 번개장터(중고). 실제 렌더 DOM으로 검증(2026-08-02). 남성의류
+  아우터/상의/바지 12개 카테고리. robots.txt 허용 확인.
+- `sites/example-*.yaml` — 구조 설명용. 실제 DOM 검증 안 됨.
+
+**무신사는 대상에서 제외했다.** robots.txt가 `User-agent: * / Disallow: /`로, 명시된
+검색엔진 봇 외 모든 크롤러를 차단한다.
+
 ## 산출물
 
 ```

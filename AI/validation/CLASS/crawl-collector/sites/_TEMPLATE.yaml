@@ -39,6 +39,11 @@ listing:
   category: "아우터 > 자켓"
   # 또는 카드 안에 카테고리 표기가 있으면 셀렉터로.
   # category_selector: ".category-label"
+  # 카테고리가 URL로만 구분되면(대부분의 SPA) 이 목록을 쓴다 — 스펙 하나로 여러 카테고리를
+  # 순회한다. 실사용 예는 sites/bunjang.yaml 참고.
+  # category_urls:
+  #   - url: "https://example.com/categories/1001"
+  #     category: "아우터 > 코트"
   # 페이지네이션. {page}가 page_start부터 채워진다. 없으면 --url 한 장만 본다.
   page_url_template: "https://example.com/category/outer/jacket?page={page}"
   page_start: 1
