@@ -274,6 +274,6 @@ v3(폴로는 예외로 T_SHIRT)은 **"이게 폴로다"라는 개념적 인식�
 
 **구현**: `vlm_control.py`의 `CATEGORY_PROMPT_VERSIONS`(`"v1"`/`"v2_disambiguation"`/
 `"v3_polo_exception"`/`"v4_button_length"`) — `query_category(image_path,
-prompt_version=...)`로 스왑. 지금까지 나온 것 중 `v4_button_length`가 최선이지만, 위 한계
-때문에 아직 `ACTIVE_CATEGORY_PROMPT_VERSION`(기본값 `"v1"`)을 바꾸지는 않았다 — 정답셋
-확장 후 재검증하고 나서 기본값을 올릴 것.
+prompt_version=...)`로 스왑. **`ACTIVE_CATEGORY_PROMPT_VERSION` 기본값을
+`"v4_button_length"`로 확정**(2026-08-02, 사용자 확인) — 위 한계(N=10, 1회 측정)는 여전히
+유효하니, 정답셋 확장 후 재검증에서 뒤집힐 수 있다는 점은 감안할 것.

@@ -226,7 +226,7 @@ CATEGORY_PROMPT_VERSIONS: dict[str, str] = {
     "v3_polo_exception": _CATEGORY_PROMPT_TEMPLATE_V3,
     "v4_button_length": _CATEGORY_PROMPT_TEMPLATE_V4,
 }
-ACTIVE_CATEGORY_PROMPT_VERSION = "v1"
+ACTIVE_CATEGORY_PROMPT_VERSION = "v4_button_length"  # 2026-08-02: N=10 실측 10/10, 사용자 확정
 
 _COLOR_PROMPT_TEMPLATE = (
     "다음은 중고 거래 플랫폼에 올라온 상품 사진이다. 아래 색상 코드 목록 중 이 상품의 주 색상과 "
