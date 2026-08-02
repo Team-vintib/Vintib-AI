@@ -15,6 +15,7 @@
   - `GET /api/lives/{liveId}`
   - `POST /api/lives`
   - `POST /api/lives/schedule`
+  - `GET`/`PUT`/`DELETE /api/users/{userId}/tryon`, `POST /api/users/{userId}/tryon/upload-url`(시착 프로필)
 - FE 구현 완료 범위
   - 라이브 목록 화면
   - 라이브 상세/시청 화면
@@ -113,15 +114,6 @@
 }
 ```
 
-### 3.4 사용자 시착 프로필 조회/저장
-
-- Method / Endpoint: `GET /api/me/tryon`, `PUT /api/me/tryon`
-- 요청 목적: AI 시착에 필요한 사용자 신체 프로필과 전신 사진을 조회/저장한다.
-- FE 사용처: 온보딩 시착 단계, 라이브 시착 패널
-- 요청 데이터: `002-onboarding-contract.md`의 `PUT /api/me/tryon`과 동일
-- 응답 데이터: 시착 프로필 요약
-- 응답 예시: `002-onboarding-contract.md` 참고
-
 ### 3.5 라이브 시청 화면 상품/상세 필드 보강 (LIVE-005)
 
 - 대상: `LiveDetailResponse`, `LiveProductResponse`
@@ -148,7 +140,7 @@
 - 대상: 상품 상세(`ProductDetailView`)의 AI 시착 팝업 (라이브 밖, 상품 단위 시착)
 - 배경: 상품 상세 "AI 시착" 버튼에 팝업(모달)을 구현했다. 등록 상품 이미지를 회원 전신 사진에 합성(TRYON-003). BE에 (a) 회원 전신 사진 조회, (b) 상품 단위 시착 생성 API가 없어 팝업은 mock으로 동작한다.
 - 요청
-  - **전신 사진 조회**: 3.4의 `GET /api/me/tryon`(시착 프로필)로 회원 전신 사진 URL을 내려주면 팝업 초기 이미지로 사용한다.
+  - **전신 사진 조회**: `GET /api/users/{userId}/tryon`(시착 프로필, 구현 완료 — `docs/requests/FE/009-tryon-profile-presigned-upload.md` 참고)로 회원 전신 사진 URL을 내려주면 팝업 초기 이미지로 사용한다.
   - **상품 시착 생성(비 라이브)**: `POST /api/users/{userId}/tryons` 또는 `POST /api/products/{productId}/tryons` — 상품 이미지 + 회원 전신 사진 합성 결과를 생성한다. 3.3(라이브 시착 생성)과 같은 합성이나 라이브 컨텍스트가 아니다.
   - 응답: `tryonId`, `status`(`PENDING|PROCESSING|DONE|FAILED`), `resultImageUrl`(null 가능). polling vs STOMP push 방식은 3.3과 동일 정책을 따른다.
 - 참고: 시착 결과 저장(TRYON-005)은 "추가" 우선순위로 이번 범위 밖. 결과 조회/삭제(`GET`/`DELETE /api/users/{userId}/tryons`)는 이미 존재한다.
@@ -193,5 +185,7 @@
   - `GET /api/lives/{liveId}`
   - `POST /api/lives`
   - `POST /api/lives/schedule`
+  - 시착 프로필 조회/등록·수정/삭제, 업로드 URL 발급
 - 기존 규격을 유지하면 되는 기능
   - 라이브 목록/상세 기본 렌더링
+  - 시착 프로필 API — `docs/requests/FE/009-tryon-profile-presigned-upload.md` 기준 유지

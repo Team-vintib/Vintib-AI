@@ -289,9 +289,12 @@
 | 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
 | --- | --- | --- | --- | --- | --- |
 | `member_id` | `bigint` | NOT NULL |  | FK→member, PK | 대상 회원. |
-| `body_photo_url` | `varchar(500)` |  |  |  | 전신 사진 URL. 미등록이면 시착 불가. |
+| `body_photo_key` | `varchar(500)` |  |  |  | 전신 사진 S3 key(비공개 버킷). 미등록이면 시착 불가. |
 | `height_cm` | `smallint` |  |  |  | 키(cm). |
 | `weight_kg` | `smallint` |  |  |  | 몸무게(kg). |
+| `chest_cm` | `smallint` |  |  |  | 가슴둘레(cm). |
+| `waist_cm` | `smallint` |  |  |  | 허리둘레(cm). |
+| `hip_cm` | `smallint` |  |  |  | 엉덩이둘레(cm). |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
 
 ---

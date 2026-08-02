@@ -35,59 +35,17 @@
 
 ## 3. 추가 구현 요청
 
-### 3.1 상품 목록 필터 구현/문서화 — `keyword` 제외 구현 완료
+### 3.1 상품 목록 필터 구현/문서화 — 구현 완료, 계약은 다르게 확정됨
 
-`GET /api/products`에 `categoryIds`(복수), `conditionGrades`(복수), `saleType`
-(`DIRECT_SALE`/`AUCTION` — 기존 엔티티 enum 그대로, 협의 필요 사항의 "DIRECT vs DIRECT_SALE"
-질문은 이걸로 확정), `minPrice`, `maxPrice`, `sort`(`LATEST`/`PRICE_ASC`/`PRICE_DESC`)를
-요청 그대로의 파라미터명으로 구현했다. 응답도 기존 `PageResponse<ProductResponse>` 그대로다
-(요청한 필드 변경 없음).
+요청 그대로의 파라미터명으로 구현했다. `keyword`(검색어)만 통합 검색(005) 범위로 미룬 상태다.
+확정 계약은 `docs/requests/FE/010-product-list-detail-contract.md` 참고.
 
-**`keyword`(검색어)만 아직 없다** — `PROD-008`(상품 목록 필터·정렬) 계획 범위 밖이고,
-`/search`(SEARCH-001/002, 통합 검색)가 아직 통째로 미구현 상태라 그쪽에서 다룰 문제로 본다.
-FE가 목록 화면에서 검색어까지 당장 필요하면 별도 요청으로 우선순위를 알려달라.
+### 3.2 상품 상세 응답 보강 — 구현 완료, 계약은 다르게 확정됨
 
-### 3.2 상품 상세 응답 보강 — `similarProducts`/`priceDistribution` 제외 구현 완료
-
-`GET /api/products/{id}`(`ProductDetailResponse`)에 다음을 추가했다:
-
-- `categoryName`, `brandName` — 카테고리/브랜드 표시명(각각 없으면 `null`)
-- `isWished` — 찜 여부. **비회원은 `null`이 아니라 `false`로 확정**(협의 필요 사항의 "비회원
-  isWished 정책" 질문 해소). 로그인 회원은 실제 찜 여부.
-- `sellerFollowerCount`, `sellerProductCount` — 판매자 팔로워 수, 판매 중인 상품 수(DRAFT 제외).
-  요청 문서의 `seller` 중첩 객체 대신 최상위 평탄 필드로 냈다 — 기존 `sellerNickname`과 같은
-  레벨에 두는 게 일관적이라고 판단했다.
-- `linkedLive` — 연결된 라이브 요약(`liveId`, `title`, `status`, `scheduledAt`, `startedAt`,
-  `thumbnailUrl`), 없으면 `null`. 요청한 `relatedLive`와 이름만 다르다.
-- `measurements`는 이미 반영돼 있었다(SY015).
-
-**아직 없는 것**: `similarProducts`(유사 상품), `priceDistribution`(가격 분포) — 이번 스코프
-밖(`docs/plans/BE/SY017-product-detail-social-live.md`), 응답 구조 자체가 미확정이라 별도
-계획으로 다뤄야 한다. 이미지 `role`(FRONT/BACK/ADDITIONAL)도 아직 없다.
-
-- 응답 예시
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "sellerNickname": "vintagelover",
-    "categoryName": "자켓",
-    "brandName": "리바이스",
-    "images": [],
-    "measurements": {
-      "chest": 52,
-      "length": 68
-    },
-    "isWished": false,
-    "sellerFollowerCount": 120,
-    "sellerProductCount": 45,
-    "linkedLive": null
-  },
-  "error": null
-}
-```
+`categoryName`/`brandName`/`isWished`/`sellerFollowerCount`/`sellerProductCount`/`linkedLive`를
+추가했다. `seller` 중첩 객체 대신 최상위 평탄 필드로 냈고, 요청한 `relatedLive`는 `linkedLive`로
+이름이 다르다. `similarProducts`/`priceDistribution`/이미지 `role`은 이번 범위 밖. 확정 계약은
+`docs/requests/FE/010-product-list-detail-contract.md` 참고.
 
 ### 3.3 AI 품질 분석/가격 추천
 

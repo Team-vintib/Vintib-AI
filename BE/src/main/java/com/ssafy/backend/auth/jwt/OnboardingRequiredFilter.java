@@ -48,11 +48,14 @@ public class OnboardingRequiredFilter extends OncePerRequestFilter {
             // 토큰 재발급/로그아웃 — 온보딩 진행 중 액세스 토큰이 만료돼도 복구할 수 있어야 한다.
             new WhitelistEntry(null, "/api/auth/reissue"),
             new WhitelistEntry(null, "/api/auth/logout"),
-            // 온보딩 API 자체(ONBOARD-001~004). /api/me/tryon(ONBOARD-003)은 아직 미구현이지만 미리 넣어둔다.
+            // 온보딩 API 자체(ONBOARD-001~004).
             new WhitelistEntry(null, "/api/users/*"),
             new WhitelistEntry(null, "/api/users/*/interests"),
             new WhitelistEntry(null, "/api/users/*/member-type"),
-            new WhitelistEntry(null, "/api/me/tryon"),
+            // 시착 프로필(ONBOARD-003)도 온보딩 절차 자체라 화이트리스트 필요. */tryon 만으로는
+            // /api/users/*/tryon/upload-url 을 못 잡는다(AntPathMatcher의 *는 한 세그먼트만 매칭).
+            new WhitelistEntry(null, "/api/users/*/tryon"),
+            new WhitelistEntry(null, "/api/users/*/tryon/upload-url"),
             // SecurityConfig.PUBLIC_ENDPOINTS와 짝을 이루는 항목 — 비회원도 여는 경로라 토큰이
             // 실려 와도 온보딩 여부와 무관하게 통과해야 한다.
             new WhitelistEntry("GET", "/api/home"),

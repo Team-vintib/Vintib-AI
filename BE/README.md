@@ -141,12 +141,12 @@ BE/
 │   ├── auction/                 # 경매 조건 설정/진행 (AUCT) — 정윤
 │   │   ├── entity/              # Auction, AuctionStatus
 │   │   └── repository/
-│   ├── tryon/                    # AI 가상 시착 결과 저장/조회/삭제 (TRYON) — 서윤
-│   │   ├── controller/
+│   ├── tryon/                    # AI 가상 시착 결과·프로필 저장/조회/삭제 (TRYON) — 서윤
+│   │   ├── controller/           # TryOnController(결과), TryOnProfileController(프로필)
 │   │   ├── service/
-│   │   ├── entity/               # TryOnResult
+│   │   ├── entity/               # TryOnResult, MemberBodyProfile
 │   │   ├── repository/
-│   │   └── dto/response/
+│   │   └── dto/
 │   ├── social/                   # 상품 찜/해제, 팔로우 (WISH/FOLLOW, APIs.md "팔로우 / 찜" 섹션 기준) — 서윤
 │   │   ├── controller/           # WishController, FollowController
 │   │   ├── service/               # WishService, FollowService
