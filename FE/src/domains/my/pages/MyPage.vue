@@ -250,7 +250,6 @@ const todoCards = computed(() => {
   return [
     { label: '배송 대기', value: todo?.shippingPending ?? 0, section: 'sales' },
     { label: '환불 요청', value: todo?.refundRequests ?? 0, section: 'sales' },
-    { label: '비공개 상품', value: todo?.privateProducts ?? 0, section: 'products' },
     { label: '예약 라이브', value: todo?.scheduledLives ?? 0, section: 'lives' },
   ] satisfies Array<{ label: string; value: number; section: MySectionId }>
 })
@@ -262,7 +261,6 @@ const productStatusCards = computed(() => {
     { label: '판매중', value: counts?.onSale ?? 0 },
     { label: '경매 예정', value: counts?.auctionScheduled ?? 0 },
     { label: '판매 완료', value: counts?.sold ?? 0 },
-    { label: '비공개', value: counts?.private ?? 0 },
   ]
 })
 
@@ -612,6 +610,14 @@ const goToLogin = () => {
 
 const goToProductCreate = () => {
   void router.push({ name: ROUTE_NAMES.PRODUCT_CREATE })
+}
+
+const goToProductDetail = (productId: number) => {
+  void router.push({
+    name: ROUTE_NAMES.PRODUCT_DETAIL,
+    params: { productId },
+    query: { mock: 'mock' },
+  })
 }
 
 const goToLiveCreate = () => {
@@ -1068,12 +1074,16 @@ onMounted(() => {
               </div>
               <div v-if="filteredProducts.length" class="my-product-grid">
                 <article v-for="item in filteredProducts" :key="item.id" class="my-product-card">
-                  <img :src="item.product.imageUrl" :alt="item.product.imageAlt" />
-                  <div class="my-product-card__body">
+                  <button
+                    type="button"
+                    class="my-product-card__main"
+                    @click="goToProductDetail(item.product.id)"
+                  >
+                    <img :src="item.product.imageUrl" :alt="item.product.imageAlt" />
                     <span>{{ MY_PRODUCT_STATUS_LABELS[item.status] }}</span>
                     <strong>{{ item.product.name }}</strong>
                     <p>{{ item.product.price.toLocaleString('ko-KR') }}P</p>
-                  </div>
+                  </button>
                 </article>
               </div>
               <p v-else class="my-product-empty">해당 상태의 판매 상품이 없습니다.</p>
@@ -1347,6 +1357,7 @@ onMounted(() => {
 .my-dashboard__card:focus-visible,
 .my-todo-row:focus-visible,
 .my-product-tabs button:focus-visible,
+.my-product-card__main:focus-visible,
 .my-profile-photo__actions button:focus-visible,
 .my-tryon-photo__actions button:focus-visible,
 .my-interest-editor__chips button:focus-visible,
@@ -1836,6 +1847,7 @@ onMounted(() => {
 }
 
 .my-product-card {
+  display: grid;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -1844,25 +1856,42 @@ onMounted(() => {
   box-shadow: 0 1px 3px rgb(23 26 31 / 8%);
 }
 
-.my-product-card img {
+.my-product-card__main {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.my-product-card__main:hover strong {
+  color: var(--color-primary);
+}
+
+.my-product-card__main img {
   display: block;
   width: 100%;
   aspect-ratio: 1 / 1;
   object-fit: cover;
 }
 
-.my-product-card__body {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-4);
+.my-product-card__main span,
+.my-product-card__main strong,
+.my-product-card__main p {
+  margin-right: var(--space-4);
+  margin-left: var(--space-4);
 }
 
-.my-product-card__body span {
+.my-product-card__main span {
   justify-self: start;
   min-height: 24px;
   padding: 2px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-badge);
+  margin-top: var(--space-4);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
   font-size: 12px;
@@ -1870,8 +1899,9 @@ onMounted(() => {
   line-height: 18px;
 }
 
-.my-product-card__body strong {
+.my-product-card__main strong {
   overflow: hidden;
+  margin-top: var(--space-2);
   color: var(--color-text-primary);
   font-size: 14px;
   font-weight: var(--font-weight-extrabold);
@@ -1880,7 +1910,8 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-.my-product-card__body p {
+.my-product-card__main p {
+  margin-top: var(--space-2);
   color: var(--color-text-primary);
   font-size: 15px;
   font-weight: var(--font-weight-extrabold);

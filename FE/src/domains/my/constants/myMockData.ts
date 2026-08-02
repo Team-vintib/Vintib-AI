@@ -32,7 +32,6 @@ export const MY_PRODUCT_STATUS_LABELS: Record<MyProductStatus, string> = {
   ON_SALE: '판매중',
   AUCTION_SCHEDULED: '경매 예정',
   SOLD: '판매 완료',
-  PRIVATE: '비공개',
 }
 
 export const MY_ORDER_STATUS_LABELS: Record<MyOrderItem['status'], string> = {
@@ -85,7 +84,7 @@ export const mockMyProfile: MyProfile = {
 const mockProducts: MyProductItem[] = PRODUCT_LIST_MOCK_DATA.slice(0, 4).map((product, index) => ({
   id: product.id,
   product,
-  status: (['ON_SALE', 'AUCTION_SCHEDULED', 'SOLD', 'PRIVATE'] as const)[index],
+  status: (['ON_SALE', 'AUCTION_SCHEDULED', 'SOLD', 'ON_SALE'] as const)[index],
   updatedAt: `2026-08-0${index + 1}T10:00:00+09:00`,
 }))
 
@@ -180,14 +179,12 @@ export const mockMyPageViewData: MyPageViewData = {
     todoCounts: {
       shippingPending: 3,
       refundRequests: 1,
-      privateProducts: 2,
       scheduledLives: 2,
     },
     productStatusCounts: {
       onSale: 9,
       auctionScheduled: 4,
       sold: 18,
-      private: 2,
     },
     monthlyRevenue: [
       { month: '3월', revenue: 420000, soldCount: 4 },

@@ -25,7 +25,7 @@ export type MyOrderStatus =
   | 'CONFIRMED'
   | 'REFUND_REQUESTED'
   | 'REFUNDED'
-export type MyProductStatus = 'ON_SALE' | 'AUCTION_SCHEDULED' | 'SOLD' | 'PRIVATE'
+export type MyProductStatus = 'ON_SALE' | 'AUCTION_SCHEDULED' | 'SOLD'
 export type MyLiveStatus = 'LIVE' | 'SCHEDULED' | 'ENDED'
 export type MySettlementStatus = 'ESCROW' | 'PENDING' | 'SETTLED' | 'REFUND_REQUESTED'
 
@@ -86,7 +86,6 @@ export interface MySettlementSummary {
 export interface MyTodoCounts {
   shippingPending: number
   refundRequests: number
-  privateProducts: number
   scheduledLives: number
 }
 
@@ -94,7 +93,6 @@ export interface MyProductStatusCounts {
   onSale: number
   auctionScheduled: number
   sold: number
-  private: number
 }
 
 export interface MyMonthlyRevenue {
