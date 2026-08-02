@@ -117,6 +117,11 @@ export interface MyOrderItem {
   sellerNickname: string
   paidAmount: number
   createdAt: string
+  recipientName: string
+  recipientPhoneNumber: string
+  postalCode: string
+  address: string
+  detailAddress: string
 }
 
 export interface MySaleItem {

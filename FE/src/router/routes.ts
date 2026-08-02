@@ -155,6 +155,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: '마이페이지' },
   },
   {
+    path: ROUTE_PATHS.MY_ORDER_DETAIL,
+    name: ROUTE_NAMES.MY_ORDER_DETAIL,
+    component: () => import('@/domains/my/pages/MyOrderDetailPage.vue'),
+    meta: { requiresAuth: true, title: '구매 상세' },
+  },
+  {
     path: ROUTE_PATHS.POINT_HISTORY,
     name: ROUTE_NAMES.POINT_HISTORY,
     component: () => import('@/domains/point/pages/PointHistoryPage.vue'),

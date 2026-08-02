@@ -23,6 +23,7 @@ import {
   MY_SETTLEMENT_STATUS_LABELS,
 } from '@/domains/my/constants/myMockData'
 import type {
+  MyOrderStatus,
   MyPageViewData,
   MyProductStatus,
   MyProfileUpdateRequest,
@@ -76,6 +77,14 @@ const productFilterOptions = [
   { id: 'SOLD', label: '판매 완료' },
 ] satisfies Array<{ id: ProductFilterId; label: string }>
 const selectedProductFilter = ref<ProductFilterId>('ALL')
+type OrderFilterId = 'ALL' | 'IN_PROGRESS' | 'COMPLETED' | 'REFUND'
+const orderFilterOptions = [
+  { id: 'ALL', label: '전체' },
+  { id: 'IN_PROGRESS', label: '진행 중' },
+  { id: 'COMPLETED', label: '완료' },
+  { id: 'REFUND', label: '환불' },
+] satisfies Array<{ id: OrderFilterId; label: string }>
+const selectedOrderFilter = ref<OrderFilterId>('ALL')
 
 const profile = computed(() => viewData.value?.summary.profile ?? null)
 const isLoading = computed(() => loadState.value === 'loading')
@@ -120,6 +129,15 @@ const filteredProducts = computed(() => {
   }
 
   return products.filter((item) => item.status === selectedProductFilter.value)
+})
+const filteredOrders = computed(() => {
+  const orders = viewData.value?.orders ?? []
+
+  if (selectedOrderFilter.value === 'ALL') {
+    return orders
+  }
+
+  return orders.filter((order) => isOrderInFilter(order.status, selectedOrderFilter.value))
 })
 const currentSectionLabel = computed(
   () =>
@@ -363,6 +381,52 @@ const getProductFilterCount = (filterId: ProductFilterId) => {
 
   return products.filter((item) => item.status === filterId).length
 }
+
+const isOrderInFilter = (status: MyOrderStatus, filterId: OrderFilterId) => {
+  if (filterId === 'IN_PROGRESS') {
+    return status === 'CREATED' || status === 'PAID' || status === 'SHIPPING' || status === 'DELIVERED'
+  }
+
+  if (filterId === 'COMPLETED') {
+    return status === 'CONFIRMED'
+  }
+
+  if (filterId === 'REFUND') {
+    return status === 'REFUND_REQUESTED' || status === 'REFUNDED'
+  }
+
+  return true
+}
+
+const selectOrderFilter = (filterId: OrderFilterId) => {
+  selectedOrderFilter.value = filterId
+}
+
+const goToOrderDetail = (orderId: number) => {
+  void router.push({ name: ROUTE_NAMES.MY_ORDER_DETAIL, params: { orderId } })
+}
+
+const getOrderFilterCount = (filterId: OrderFilterId) => {
+  const orders = viewData.value?.orders ?? []
+
+  if (filterId === 'ALL') {
+    return orders.length
+  }
+
+  return orders.filter((order) => isOrderInFilter(order.status, filterId)).length
+}
+
+const formatOrderDate = (value: string) =>
+  new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+
+const getOrderTypeLabel = (type: 'DIRECT' | 'AUCTION') =>
+  type === 'AUCTION' ? '경매 낙찰' : '즉시 구매'
 
 const loadMyInterests = async (userId: number) => {
   isInterestLoading.value = true
@@ -1092,16 +1156,57 @@ onMounted(() => {
             <template v-else-if="selectedSection === 'orders'">
               <div class="my-card__title">
                 <h2>구매·낙찰 내역</h2>
-                <button type="button">주문 상세 보기</button>
               </div>
-              <article v-for="order in viewData.orders" :key="order.id" class="my-row">
-                <img :src="order.productThumbnailUrl" :alt="order.productName" />
-                <div>
-                  <strong>{{ order.productName }}</strong>
-                  <p>{{ order.sellerNickname }} · {{ order.paidAmount.toLocaleString('ko-KR') }}P</p>
-                </div>
-                <span>{{ MY_ORDER_STATUS_LABELS[order.status] }}</span>
-              </article>
+              <div class="my-order-tabs" role="tablist" aria-label="구매 내역 상태 필터">
+                <button
+                  v-for="filter in orderFilterOptions"
+                  :key="filter.id"
+                  type="button"
+                  role="tab"
+                  :aria-selected="selectedOrderFilter === filter.id"
+                  :class="{ 'my-order-tabs__item--active': selectedOrderFilter === filter.id }"
+                  @click="selectOrderFilter(filter.id)"
+                >
+                  {{ filter.label }}
+                  <span>{{ getOrderFilterCount(filter.id) }}</span>
+                </button>
+              </div>
+              <div v-if="filteredOrders.length" class="my-order-grid">
+                <article
+                  v-for="order in filteredOrders"
+                  :key="order.id"
+                  class="my-order-card"
+                >
+                  <button
+                    type="button"
+                    class="my-order-card__main"
+                    @click="goToOrderDetail(order.id)"
+                  >
+                    <img :src="order.productThumbnailUrl" :alt="order.productName" />
+                    <div class="my-order-card__body">
+                      <div class="my-order-card__top">
+                        <span>{{ getOrderTypeLabel(order.type) }}</span>
+                        <strong>{{ MY_ORDER_STATUS_LABELS[order.status] }}</strong>
+                      </div>
+                      <h3>{{ order.productName }}</h3>
+                      <p>{{ order.sellerNickname }}</p>
+                      <dl>
+                        <div>
+                          <dt>결제 금액</dt>
+                          <dd>{{ order.paidAmount.toLocaleString('ko-KR') }}P</dd>
+                        </div>
+                        <div>
+                          <dt>구매 일시</dt>
+                          <dd>{{ formatOrderDate(order.createdAt) }}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </button>
+                </article>
+              </div>
+              <p v-if="!filteredOrders.length" class="my-order-empty">
+                해당 상태의 구매 내역이 없습니다.
+              </p>
             </template>
 
             <template v-else-if="selectedSection === 'sales'">
@@ -1357,7 +1462,9 @@ onMounted(() => {
 .my-dashboard__card:focus-visible,
 .my-todo-row:focus-visible,
 .my-product-tabs button:focus-visible,
+.my-order-tabs button:focus-visible,
 .my-product-card__main:focus-visible,
+.my-order-card__main:focus-visible,
 .my-profile-photo__actions button:focus-visible,
 .my-tryon-photo__actions button:focus-visible,
 .my-interest-editor__chips button:focus-visible,
@@ -1812,7 +1919,8 @@ onMounted(() => {
   padding-bottom: var(--space-1);
 }
 
-.my-product-tabs button {
+.my-product-tabs button,
+.my-order-tabs button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1828,16 +1936,26 @@ onMounted(() => {
 }
 
 .my-product-tabs button:hover,
-.my-product-tabs__item--active {
+.my-product-tabs__item--active,
+.my-order-tabs button:hover,
+.my-order-tabs__item--active {
   border-color: var(--color-primary) !important;
   background: var(--color-primary-soft) !important;
   color: var(--color-primary) !important;
 }
 
-.my-product-tabs button span {
+.my-product-tabs button span,
+.my-order-tabs button span {
   color: inherit;
   font-size: 12px;
   line-height: 18px;
+}
+
+.my-order-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-bottom: var(--space-1);
 }
 
 .my-product-grid {
@@ -1919,6 +2037,141 @@ onMounted(() => {
 }
 
 .my-product-empty {
+  padding: var(--space-8);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 22px;
+  text-align: center;
+}
+
+.my-order-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.my-order-card {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgb(23 26 31 / 8%);
+}
+
+.my-order-card__main {
+  display: grid;
+  width: 100%;
+  min-height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  grid-template-columns: 124px minmax(0, 1fr);
+  text-align: left;
+}
+
+.my-order-card__main:hover h3 {
+  color: var(--color-primary);
+}
+
+.my-order-card__main img {
+  width: 124px;
+  height: 100%;
+  min-height: 168px;
+  object-fit: cover;
+}
+
+.my-order-card__body {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+}
+
+.my-order-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.my-order-card__top span,
+.my-order-card__top strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 2px 10px;
+  border-radius: var(--radius-badge);
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  line-height: 18px;
+}
+
+.my-order-card__top span {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.my-order-card__top strong {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+}
+
+.my-order-card h3 {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-order-card p {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.my-order-card dl {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.my-order-card dl div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.my-order-card dt {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.my-order-card dd {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: var(--font-weight-bold);
+  line-height: 20px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-order-empty {
   padding: var(--space-8);
   border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-control);
@@ -2445,6 +2698,10 @@ onMounted(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .my-order-grid {
+    grid-template-columns: 1fr;
+  }
+
   .my-interest-editor__categories {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2479,6 +2736,20 @@ onMounted(() => {
 
   .my-product-grid {
     grid-template-columns: 1fr;
+  }
+
+  .my-order-card__main {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+
+  .my-order-card__main img {
+    width: 96px;
+    min-height: 154px;
+  }
+
+  .my-order-card__top {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .my-interest-editor__header {

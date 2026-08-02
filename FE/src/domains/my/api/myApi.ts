@@ -3,6 +3,7 @@ import {
   mockMyProfile,
 } from '@/domains/my/constants/myMockData'
 import type {
+  MyOrderItem,
   MyPageViewData,
   MyProfile,
   MyProfileUpdateRequest,
@@ -82,6 +83,25 @@ export const getMyProfile = async (userId: number): Promise<MyProfile> => {
 
   const response = await http.get<ApiResponse<MyProfile>>('/me')
   return unwrapApiData(response.data, '회원 정보를 불러오지 못했습니다.')
+}
+
+export const getMyOrderDetail = async (
+  userId: number,
+  orderId: number,
+): Promise<MyOrderItem> => {
+  if (!MY_API_ENABLED) {
+    await wait(MOCK_DELAY_MS)
+    const order = mockMyPageViewData.orders.find((item) => item.id === orderId)
+
+    if (!order) {
+      throw new Error('구매 내역을 찾지 못했습니다.')
+    }
+
+    return order
+  }
+
+  const response = await http.get<ApiResponse<MyOrderItem>>(`/users/${userId}/orders/${orderId}`)
+  return unwrapApiData(response.data, '구매 상세 정보를 불러오지 못했습니다.')
 }
 
 export const updateMyProfile = async (

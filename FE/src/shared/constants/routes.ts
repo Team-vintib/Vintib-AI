@@ -25,6 +25,7 @@ export const ROUTE_NAMES = {
   LIVE_WATCH: 'live-watch',
   LIVE_BROADCAST: 'live-broadcast',
   MY: 'my',
+  MY_ORDER_DETAIL: 'my-order-detail',
   POINT: 'point',
   POINT_HISTORY: 'point-history',
 } as const
@@ -56,6 +57,7 @@ export const ROUTE_PATHS = {
   LIVE_WATCH: '/lives/:liveId',
   LIVE_BROADCAST: '/lives/:liveId/broadcast',
   MY: '/my',
+  MY_ORDER_DETAIL: '/my/orders/:orderId',
   POINT: '/points',
   POINT_HISTORY: '/points/history',
 } as const
