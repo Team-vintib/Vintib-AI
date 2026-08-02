@@ -38,7 +38,9 @@ COMMENT ON COLUMN member_body_profile.hip_cm         IS '엉덩이둘레(cm).';
 
 COMMENT ON TABLE business_info IS '사업자 인증 정보 (BIZ-001).';
 COMMENT ON COLUMN business_info.business_number     IS '사업자등록번호.';
-COMMENT ON COLUMN business_info.certificate_url     IS '사업자등록증 사본 URL.';
+COMMENT ON COLUMN business_info.business_name       IS '상호명.';
+COMMENT ON COLUMN business_info.representative_name IS '대표자명.';
+COMMENT ON COLUMN business_info.certificate_key     IS '사업자등록증 사본 S3 key(비공개 버킷).';
 COMMENT ON COLUMN business_info.verification_status IS 'PENDING | APPROVED | REJECTED';
 
 

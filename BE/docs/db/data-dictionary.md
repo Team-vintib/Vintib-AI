@@ -124,7 +124,9 @@
 | --- | --- | --- | --- | --- | --- |
 | `member_id` | `bigint` | NOT NULL |  | FK→member, PK | 대상 회원. |
 | `business_number` | `varchar(20)` | NOT NULL |  |  | 사업자등록번호. |
-| `certificate_url` | `varchar(500)` | NOT NULL |  |  | 사업자등록증 사본 URL. |
+| `business_name` | `varchar(100)` | NOT NULL |  |  | 상호명. |
+| `representative_name` | `varchar(50)` | NOT NULL |  |  | 대표자명. |
+| `certificate_key` | `varchar(500)` | NOT NULL |  |  | 사업자등록증 사본 S3 key(비공개 버킷). |
 | `verification_status` | `varchar(20)` | NOT NULL | `'PENDING'` |  | PENDING \| APPROVED \| REJECTED |
 | `submitted_at` | `timestamptz` | NOT NULL | `now()` |  | 인증 서류 제출 시각. |
 | `verified_at` | `timestamptz` |  |  |  | 인증 승인·거절 처리 시각. |

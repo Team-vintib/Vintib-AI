@@ -19,12 +19,14 @@
   - Chat/STOMP: `/api/lives/{liveId}/chat-messages`, `/ws`, `/topic/lives/{liveId}/chat`, `/topic/lives/{liveId}/reactions`, `/topic/lives/{liveId}/viewers`
   - Notification: `/api/users/{userId}/alerts`, `/api/users/{userId}/alerts/{id}`, `/api/users/{userId}/alerts/read-all`
   - Social(Follow): `/api/users/{userId}/followers`(POST/DELETE/GET), `/api/users/{userId}/followings`(GET)
+  - Business: `/api/users/{userId}/business`(GET/POST), `/api/users/{userId}/business/upload-url`
 - FE 구현 완료 범위
   - Auth, Home, Product 일부, Live 일부, Chat realtime 일부는 실제 API 연결 완료
-  - Onboarding, Business, Search, Auction, Commerce, MyPage는 mock 또는 미구현 범위가 남아 있음
+  - Onboarding, Search, Auction, Commerce, MyPage는 mock 또는 미구현 범위가 남아 있음
+  - Business는 BE 구현 완료(제출/조회/재제출) — FE는 아직 mock 사용 중(`docs/requests/FE/011-business-invoice-contract.md` 반영 필요)
 - 현재 임시 처리 또는 Mock 사용 여부
   - Onboarding: mock-success fallback
-  - Business: mock `PENDING` fallback
+  - Business: FE가 아직 `docs/requests/FE/011-business-invoice-contract.md` 미반영 — mock `PENDING` fallback 유지 중
   - Search: mock data 기반 화면
   - Auction: mock snapshot
   - Commerce/Wallet, MyPage: FE 화면 없음
@@ -43,7 +45,7 @@
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
 | 001 | `001-auth-contract.md` | Auth | 이메일 auth API 연결 완료 | `GET /api/me`, auth 응답 `user/nextStep`, SSAFY SSO |
-| 003 | `003-business-contract.md` | Business | FE 화면/API adapter 있음, mock fallback | 사업자 인증 제출/조회 |
+| 003 | `003-business-contract.md` | Business | FE 화면/API adapter 있음, mock fallback | 사업자 인증 제출/조회 API 구현 완료(`docs/requests/FE/011-business-invoice-contract.md`) — FE 반영 필요. 관리자 승인/반려 API는 범위 밖 |
 | 004 | `004-home-contract.md` | Home | 홈/팔로잉 홈 연결 완료 | live card `hostId`, 정렬/노출 정책 문서화 |
 | 005 | `005-search-contract.md` | Search | FE 화면/adapter 있음, BE `/api/search` 없음 | 통합 검색 API |
 | 006 | `006-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |

@@ -69,10 +69,13 @@ CREATE TABLE member_body_profile (
 );
 
 -- 사업자 정보 (BIZ-001)
+-- certificate_key: 비공개(private) 버킷 S3 key. presigned GET으로만 열림 — member_body_profile.body_photo_key와 동일한 이유.
 CREATE TABLE business_info (
     member_id            BIGINT PRIMARY KEY REFERENCES member (id),
     business_number      VARCHAR(20)  NOT NULL,
-    certificate_url      VARCHAR(500) NOT NULL,
+    business_name        VARCHAR(100) NOT NULL,
+    representative_name  VARCHAR(50)  NOT NULL,
+    certificate_key      VARCHAR(500) NOT NULL,
     verification_status  VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
     submitted_at         TIMESTAMPTZ  NOT NULL DEFAULT now(),
     verified_at          TIMESTAMPTZ,

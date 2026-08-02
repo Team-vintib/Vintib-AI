@@ -53,6 +53,11 @@ public enum ErrorCode {
     WITHDRAWAL_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "W002", "출금 가능 금액을 초과했습니다."),
     INVALID_ORDER_STATE(HttpStatus.BAD_REQUEST, "O001", "현재 상태에서는 해당 처리를 할 수 없습니다."),
 
+    // [사업자]
+    BUSINESS_CERTIFICATE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "B001", "업로드가 확인되지 않았습니다. 먼저 사업자등록증을 업로드해주세요."),
+    BUSINESS_INFO_FORBIDDEN(HttpStatus.FORBIDDEN, "B002", "본인의 사업자 정보만 처리할 수 있습니다."),
+    BUSINESS_INFO_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "B003", "이미 제출했거나 승인된 사업자 정보입니다."),
+
     // [AI 가상 시착]
     TRYON_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "T001", "가상 시착 프로필이 등록되지 않았습니다."),
     TRYON_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "T002", "가상 시착 이미지 생성 중 오류가 발생했습니다."),

@@ -159,6 +159,12 @@ BE/
 │   │   ├── entity/               # Notification
 │   │   ├── repository/
 │   │   └── dto/response/
+│   ├── business/                 # 사업자 인증 정보 제출/조회/재제출 (BIZ-001) — 서윤
+│   │   ├── controller/
+│   │   ├── service/
+│   │   ├── entity/               # BusinessInfo, BusinessVerificationStatus
+│   │   ├── repository/
+│   │   └── dto/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
 │       ├── client/              # AiClient — Spring → FastAPI
 │       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig
