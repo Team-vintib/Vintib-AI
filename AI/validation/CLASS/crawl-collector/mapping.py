@@ -28,6 +28,7 @@ from typing import Literal
 from mapping_rules import (
     AMBIGUOUS_CONFIDENCE_CAP,
     CONFIDENCE_AUTO_THRESHOLD,
+    NAME_RESOLVE_CONFIDENCE_CAP,
     PRODUCT_NAME_PENALTY,
     RULES,
     TIE_CONFIDENCE_CAP,
@@ -93,6 +94,11 @@ class MappingResult:
     matched_text: str | None = None
     runner_up_code: str | None = None
     reason: str = ""
+    # 텍스트만으로 좁혀진 후보 코드들(2개 이상이면 검수 대상). 상품명으로 이 중 하나를
+    # 골라낼 수 있는지 판단할 때 쓴다.
+    candidates: tuple[str, ...] = ()
+    # 이 결과가 ambiguous 규칙("패딩", "팬츠" 등)에서 나왔는지.
+    ambiguous: bool = False
 
     @property
     def needs_human(self) -> bool:
@@ -155,10 +161,12 @@ def match_text(text: str) -> MappingResult:
     margin = best.score - (runner_up.score if runner_up else 0)
     confidence = _confidence(best, margin)
 
+    candidates: tuple[str, ...] = (best.code,)
     if best.ambiguous:
         confidence = min(confidence, AMBIGUOUS_CONFIDENCE_CAP)
         reason = "모호 규칙(사진을 봐야 확정 가능)"
     elif margin == 0 and runner_up is not None:
+        candidates = (best.code, runner_up.code)
         # 두 코드가 같은 강도로 걸린 경우 — 사이트가 우리보다 뭉뚱그린 1:N 카테고리
         # ("숄더백/토트백")이거나 복합 아이템("니트 베스트")이다. 브리핑 §5.2가
         # "자동 매핑할지 사람이 재분류할지 판단이 필요하다"고 한 지점이라, 점수가
@@ -178,6 +186,8 @@ def match_text(text: str) -> MappingResult:
         matched_text=text,
         runner_up_code=runner_up.code if runner_up else None,
         reason=reason,
+        candidates=candidates,
+        ambiguous=best.ambiguous,
     )
 
 
@@ -213,6 +223,48 @@ def _match_segment(segment: str) -> MappingResult:
         reason=(
             f"한 카테고리에 {'/'.join(codes)}가 함께 나열됨 — 사이트 분류가 우리보다 넓다(§5.2)"
         ),
+        candidates=tuple(codes),
+    )
+
+
+def _resolve_with_product_name(pending: MappingResult, product_name: str) -> MappingResult | None:
+    """검수로 갈 뻔한 결과를 **상품명으로 갈라낸다**. 못 가르면 None.
+
+    번개장터 `"상의 > 후드티/후드집업"`처럼 사이트가 우리보다 넓게 묶은 카테고리에서,
+    상품명은 보통 어느 쪽인지 말해준다("... 후드집업", "... 후드티"). 카테고리가 이미
+    후보를 2~3개로 좁혀 놨기 때문에, 상품명을 **열린 30지선다가 아니라 그 후보 안에서만**
+    받아들이면 오라벨 위험 없이 검수량을 줄일 수 있다.
+
+    두 경우에만 적용한다:
+      - 동점/병합 카테고리 → 상품명 결과가 **후보 집합 안**일 때만 채택.
+      - 모호 규칙("패딩") → 상품명이 **모호하지 않은 다른 코드**를 가리킬 때 채택
+        ("롱패딩" → COAT).
+    상품명 자체가 또 모호하면 채택하지 않는다 — 모호함을 모호함으로 덮지 않는다.
+    """
+    from_name = match_text(product_name)
+    if from_name.subcategory_code is None or from_name.ambiguous:
+        return None
+
+    if len(pending.candidates) > 1:
+        if from_name.subcategory_code not in pending.candidates:
+            return None
+        reason = f"카테고리 후보 {'/'.join(pending.candidates)} 중 상품명이 지목"
+    elif pending.ambiguous:
+        reason = "모호한 카테고리를 상품명이 구체화"
+    else:
+        return None
+
+    confidence = round(min(from_name.confidence, NAME_RESOLVE_CONFIDENCE_CAP), 3)
+    status: MappingStatus = "mapped" if confidence >= CONFIDENCE_AUTO_THRESHOLD else "needs_review"
+    return MappingResult(
+        subcategory_code=from_name.subcategory_code,
+        status=status,
+        confidence=confidence,
+        method="keyword",
+        matched_keyword=from_name.matched_keyword,
+        matched_text=product_name,
+        runner_up_code=pending.subcategory_code,
+        reason=f"{reason}: '{from_name.matched_keyword}'",
     )
 
 
@@ -261,6 +313,10 @@ def map_category(
             fallback = result  # needs_review 후보는 기억만 해두고 더 구체적인 세그먼트를 계속 본다
 
     if fallback is not None:
+        if product_name:
+            resolved = _resolve_with_product_name(fallback, product_name)
+            if resolved is not None:
+                return resolved
         return fallback
 
     if product_name:
