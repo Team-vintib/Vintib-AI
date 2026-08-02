@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { useBusinessVerificationStore } from '@/domains/biz/stores/businessVerificationStore'
 import {
   deleteMyDefaultTryOnImage,
   deleteMyProfileImage,
@@ -40,6 +41,7 @@ import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const businessVerificationStore = useBusinessVerificationStore()
 
 const viewData = ref<MyPageViewData | null>(null)
 const selectedSection = ref<MySectionId>('dashboard')
@@ -191,6 +193,68 @@ const visibleSocialUsers = computed(() => {
   return selectedSocialTab.value === 'followers'
     ? viewData.value.followers
     : viewData.value.followings
+})
+const businessSubmission = computed(() => businessVerificationStore.submission)
+const businessStatusDescription = computed(() => {
+  const status = profile.value?.businessVerificationStatus
+
+  if (status === 'APPROVED') {
+    return '사업자 인증이 완료되어 판매자 기능을 사용할 수 있습니다.'
+  }
+
+  if (status === 'PENDING') {
+    return '제출한 사업자 정보가 검토 중입니다.'
+  }
+
+  if (status === 'REJECTED') {
+    return '사업자 인증이 반려되었습니다. 정보를 확인한 뒤 다시 신청해 주세요.'
+  }
+
+  return '사업자 인증을 완료하면 판매자 기능을 사용할 수 있습니다.'
+})
+const businessActionLabel = computed(() => {
+  const status = profile.value?.businessVerificationStatus
+
+  if (status === 'APPROVED') {
+    return '재제출'
+  }
+
+  if (status === 'PENDING') {
+    return businessSubmission.value ? '제출 내역 보기' : '인증 상태 확인'
+  }
+
+  if (status === 'REJECTED') {
+    return '다시 신청'
+  }
+
+  return '사업자 인증하기'
+})
+const businessInfoCards = computed(() => {
+  const submission = businessSubmission.value
+  const canShowMockBusinessInfo = profile.value?.businessVerificationStatus === 'APPROVED'
+
+  return [
+    {
+      label: '상호명',
+      value: submission?.businessName ?? (canShowMockBusinessInfo ? 'VinTib Archive' : '-'),
+    },
+    {
+      label: '대표자',
+      value: submission?.representativeName ?? (canShowMockBusinessInfo ? profile.value?.name : '-') ?? '-',
+    },
+    {
+      label: '사업자등록번호',
+      value: submission?.businessRegistrationNumber ?? (canShowMockBusinessInfo ? '1234567890' : '-'),
+    },
+    {
+      label: '제출 일시',
+      value: submission
+        ? formatBusinessDate(submission.submittedAt)
+        : canShowMockBusinessInfo
+          ? '2026. 8. 1. 오후 02:30'
+          : '-',
+    },
+  ]
 })
 const currentSectionLabel = computed(
   () =>
@@ -548,6 +612,15 @@ const formatOrderDate = (value: string) =>
     minute: '2-digit',
   }).format(new Date(value))
 
+const formatBusinessDate = (value: string | Date) =>
+  new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+
 const getOrderTypeLabel = (type: 'DIRECT' | 'AUCTION') =>
   type === 'AUCTION' ? '경매 낙찰' : '즉시 구매'
 
@@ -795,10 +868,6 @@ const goToLogin = () => {
   void router.push({ name: ROUTE_NAMES.AUTH_LOGIN, query: { redirect: ROUTE_PATHS.MY } })
 }
 
-const goToProductCreate = () => {
-  void router.push({ name: ROUTE_NAMES.PRODUCT_CREATE })
-}
-
 const goToProductDetail = (productId: number) => {
   void router.push({
     name: ROUTE_NAMES.PRODUCT_DETAIL,
@@ -845,8 +914,15 @@ const removeWishItem = async (productId: number) => {
   }
 }
 
-const goToLiveCreate = () => {
-  void router.push({ name: ROUTE_NAMES.LIVE_CREATE })
+const goToBusinessVerification = () => {
+  const status = profile.value?.businessVerificationStatus
+
+  if (status === 'PENDING' && businessSubmission.value) {
+    void router.push({ name: ROUTE_NAMES.BIZ_VERIFY_PENDING })
+    return
+  }
+
+  void router.push({ name: ROUTE_NAMES.BIZ_VERIFY })
 }
 
 const logout = async () => {
@@ -930,10 +1006,6 @@ onMounted(() => {
               <p v-if="selectedSection === 'seller'">
                 판매 성과와 정산, 처리할 일을 확인합니다.
               </p>
-            </div>
-            <div class="my-content__actions">
-              <button type="button" @click="goToProductCreate">새 상품 등록</button>
-              <button type="button" @click="goToLiveCreate">예약 라이브 만들기</button>
             </div>
           </header>
 
@@ -1281,7 +1353,6 @@ onMounted(() => {
             <template v-else-if="selectedSection === 'products'">
               <div class="my-card__title">
                 <h2>판매 상품 관리</h2>
-                <button type="button" @click="goToProductCreate">새 상품 등록</button>
               </div>
               <div class="my-product-tabs" role="tablist" aria-label="판매 상품 상태 필터">
                 <button
@@ -1425,7 +1496,6 @@ onMounted(() => {
             <template v-else-if="selectedSection === 'lives'">
               <div class="my-card__title">
                 <h2>라이브 관리</h2>
-                <button type="button" @click="goToLiveCreate">예약 라이브 만들기</button>
               </div>
               <div class="my-order-tabs" role="tablist" aria-label="라이브 상태 필터">
                 <button
@@ -1565,13 +1635,29 @@ onMounted(() => {
             <template v-else-if="selectedSection === 'business'">
               <div class="my-card__title">
                 <h2>사업자 정보</h2>
-                <button type="button" @click="router.push({ name: ROUTE_NAMES.BIZ_VERIFY })">
-                  다시 제출
+                <button type="button" @click="goToBusinessVerification">
+                  {{ businessActionLabel }}
                 </button>
               </div>
-              <div class="my-empty">
-                <strong>{{ MY_BUSINESS_STATUS_LABELS[profile.businessVerificationStatus] }}</strong>
-                <p>사업자 정보 조회·수정 API는 BE 계약 확정 대기입니다.</p>
+              <section class="my-business-status" aria-label="사업자 인증 상태">
+                <div>
+                  <span>{{ profile.memberType === 'BUSINESS' ? '사업자 회원' : '일반 회원' }}</span>
+                  <strong>{{ MY_BUSINESS_STATUS_LABELS[profile.businessVerificationStatus] }}</strong>
+                  <p>{{ businessStatusDescription }}</p>
+                </div>
+                <button type="button" @click="goToBusinessVerification">
+                  {{ businessActionLabel }}
+                </button>
+              </section>
+              <dl class="my-business-grid">
+                <div v-for="item in businessInfoCards" :key="item.label">
+                  <dt>{{ item.label }}</dt>
+                  <dd>{{ item.value }}</dd>
+                </div>
+              </dl>
+              <div class="my-business-guide">
+                <strong>사업자 정보 관리</strong>
+                <p>인증 정보 변경이 필요하면 사업자 정보를 다시 제출해 검토를 요청할 수 있습니다.</p>
               </div>
             </template>
           </section>
@@ -1766,6 +1852,7 @@ onMounted(() => {
 .my-product-card__main:focus-visible,
 .my-order-card__main:focus-visible,
 .my-wish-card__remove:focus-visible,
+.my-business-status button:focus-visible,
 .my-profile-photo__actions button:focus-visible,
 .my-tryon-photo__actions button:focus-visible,
 .my-interest-editor__chips button:focus-visible,
@@ -2507,6 +2594,118 @@ onMounted(() => {
   justify-self: start;
 }
 
+.my-business-status {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-secondary);
+}
+
+.my-business-status div {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.my-business-status span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  min-height: 24px;
+  padding: 2px 10px;
+  border-radius: var(--radius-badge);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  line-height: 18px;
+}
+
+.my-business-status strong {
+  color: var(--color-text-primary);
+  font-size: 22px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 32px;
+}
+
+.my-business-status p,
+.my-business-guide p {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.my-business-status button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  line-height: 22px;
+  cursor: pointer;
+}
+
+.my-business-status button:hover {
+  background: var(--color-primary-hover);
+}
+
+.my-business-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.my-business-grid div {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.my-business-grid dt {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.my-business-grid dd {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: var(--font-weight-bold);
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-business-guide {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+}
+
+.my-business-guide strong {
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 22px;
+}
+
 .my-order-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3139,6 +3338,7 @@ onMounted(() => {
   .my-dashboard,
   .my-dashboard-grid,
   .my-dashboard--home,
+  .my-business-grid,
   .my-point-panel__grid,
   .my-profile-form__grid,
   .my-profile-grid {
@@ -3209,6 +3409,10 @@ onMounted(() => {
   .my-social-card__avatar {
     width: 48px;
     height: 48px;
+  }
+
+  .my-business-status {
+    flex-direction: column;
   }
 
   .my-order-card__main {
