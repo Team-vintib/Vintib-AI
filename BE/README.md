@@ -165,12 +165,18 @@ BE/
 │   │   ├── entity/               # BusinessInfo, BusinessVerificationStatus
 │   │   ├── repository/
 │   │   └── dto/
-│   ├── order/                    # 주문 FK 대상 엔티티(생성 API 없음) + 세금계산서 (BIZ-002) — 서윤
-│   │   ├── controller/           # InvoiceController
-│   │   ├── service/              # InvoiceService
+│   ├── order/                    # 주문 FK 대상 엔티티(생성 API 없음) + 세금계산서(BIZ-002) + 구매/판매 내역(MY-003/004) — 서윤
+│   │   ├── controller/           # InvoiceController, OrderController(구매/판매 내역)
+│   │   ├── service/              # InvoiceService, OrderService
 │   │   ├── entity/               # Order(package-private 빌더), OrderStatus, Invoice
-│   │   ├── repository/           # OrderRepository(findById만), InvoiceRepository
+│   │   ├── repository/           # OrderRepository, InvoiceRepository
 │   │   └── dto/response/
+│   ├── point/                    # 포인트 잔액/충전/출금 (MY-007) — 서윤
+│   │   ├── controller/
+│   │   ├── service/
+│   │   ├── entity/               # PointAccount(공유 PK 1:1), PointTransaction(원장), PointTransactionType
+│   │   ├── repository/
+│   │   └── dto/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
 │       ├── client/              # AiClient — Spring → FastAPI
 │       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig
