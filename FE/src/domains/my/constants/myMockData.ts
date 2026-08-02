@@ -76,6 +76,7 @@ export const mockMyProfile: MyProfile = {
   detailAddress: '3층',
   gender: 'FEMALE',
   profileImageUrl: null,
+  defaultTryOnImageUrl: null,
   memberType: 'BUSINESS',
   businessVerificationStatus: 'APPROVED',
   onboardingCompleted: true,

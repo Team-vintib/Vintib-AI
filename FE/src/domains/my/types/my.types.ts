@@ -40,6 +40,7 @@ export interface MyProfile {
   detailAddress: string
   gender: 'MALE' | 'FEMALE'
   profileImageUrl: string | null
+  defaultTryOnImageUrl: string | null
   memberType: MyMemberType
   businessVerificationStatus: MyBusinessVerificationStatus
   onboardingCompleted: boolean

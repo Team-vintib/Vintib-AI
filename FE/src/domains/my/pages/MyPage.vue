@@ -35,6 +35,14 @@ const profileForm = ref<MyProfileUpdateRequest>({
 })
 const profileSaveState = ref<'idle' | 'saving' | 'success' | 'error'>('idle')
 const profileSaveMessage = ref('')
+const profileImageInput = ref<HTMLInputElement | null>(null)
+const profileImagePreviewUrl = ref('')
+const isProfileImageRemoved = ref(false)
+const selectedProfileImageName = ref('')
+const tryOnImageInput = ref<HTMLInputElement | null>(null)
+const tryOnImagePreviewUrl = ref('')
+const isTryOnImageRemoved = ref(false)
+const selectedTryOnImageName = ref('')
 
 const profile = computed(() => viewData.value?.summary.profile ?? null)
 const isLoading = computed(() => loadState.value === 'loading')
@@ -42,6 +50,21 @@ const isGuest = computed(() => loadState.value === 'guest')
 const hasLoadError = computed(() => loadState.value === 'error')
 const isProfileSaving = computed(() => profileSaveState.value === 'saving')
 const profileInitial = computed(() => (profile.value?.nickname || profile.value?.name || '회').slice(0, 1))
+const profileImageDisplayUrl = computed(() => {
+  if (isProfileImageRemoved.value) {
+    return ''
+  }
+
+  return profileImagePreviewUrl.value || profile.value?.profileImageUrl || ''
+})
+const profileAvatarUrl = computed(() => profileImageDisplayUrl.value)
+const tryOnImageDisplayUrl = computed(() => {
+  if (isTryOnImageRemoved.value) {
+    return ''
+  }
+
+  return tryOnImagePreviewUrl.value || profile.value?.defaultTryOnImageUrl || ''
+})
 const currentSectionLabel = computed(
   () =>
     MY_SECTION_OPTIONS.find((section) => section.id === selectedSection.value)?.label ??
@@ -58,7 +81,6 @@ const homeCards = computed(() => {
       section: 'products',
       suffix: '건',
       tone: 'green',
-      icon: 'box',
     },
     {
       label: '배송 중',
@@ -66,7 +88,6 @@ const homeCards = computed(() => {
       section: 'sales',
       suffix: '건',
       tone: 'orange',
-      icon: 'bag',
     },
     {
       label: '정산 예정',
@@ -74,7 +95,6 @@ const homeCards = computed(() => {
       section: 'sales',
       suffix: 'P',
       tone: 'green',
-      icon: 'wallet',
     },
     {
       label: '예정 라이브',
@@ -82,7 +102,6 @@ const homeCards = computed(() => {
       section: 'lives',
       suffix: '건',
       tone: 'red',
-      icon: 'video',
     },
   ] satisfies Array<{
     label: string
@@ -90,7 +109,6 @@ const homeCards = computed(() => {
     section: MySectionId
     suffix?: string
     tone: 'green' | 'orange' | 'red'
-    icon: 'box' | 'bag' | 'wallet' | 'video'
   }>
 })
 
@@ -228,6 +246,12 @@ const syncProfileForm = () => {
   }
   profileSaveState.value = 'idle'
   profileSaveMessage.value = ''
+  profileImagePreviewUrl.value = ''
+  isProfileImageRemoved.value = false
+  selectedProfileImageName.value = ''
+  tryOnImagePreviewUrl.value = ''
+  isTryOnImageRemoved.value = false
+  selectedTryOnImageName.value = ''
 }
 
 const validateProfileForm = () => {
@@ -247,6 +271,120 @@ const validateProfileForm = () => {
   }
 
   return ''
+}
+
+const openProfileImagePicker = () => {
+  profileImageInput.value?.click()
+}
+
+const openTryOnImagePicker = () => {
+  tryOnImageInput.value?.click()
+}
+
+const readImageFile = (file: File, fallbackMessage: string) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result)
+        return
+      }
+
+      reject(new Error(fallbackMessage))
+    })
+    reader.addEventListener('error', () => {
+      reject(new Error(fallbackMessage))
+    })
+    reader.readAsDataURL(file)
+  })
+
+const handleProfileImageChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+
+  if (!file) {
+    return
+  }
+
+  if (!file.type.startsWith('image/')) {
+    profileSaveState.value = 'error'
+    profileSaveMessage.value = '이미지 파일만 업로드할 수 있습니다.'
+    input.value = ''
+    return
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    profileSaveState.value = 'error'
+    profileSaveMessage.value = '프로필 사진은 5MB 이하로 선택해 주세요.'
+    input.value = ''
+    return
+  }
+
+  try {
+    profileImagePreviewUrl.value = await readImageFile(file, '프로필 사진을 읽지 못했습니다.')
+    isProfileImageRemoved.value = false
+    selectedProfileImageName.value = file.name
+    profileSaveState.value = 'idle'
+    profileSaveMessage.value = ''
+  } catch (error) {
+    profileSaveState.value = 'error'
+    profileSaveMessage.value = normalizeApiError(error).message
+  }
+}
+
+const handleTryOnImageChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+
+  if (!file) {
+    return
+  }
+
+  if (!file.type.startsWith('image/')) {
+    profileSaveState.value = 'error'
+    profileSaveMessage.value = '이미지 파일만 업로드할 수 있습니다.'
+    input.value = ''
+    return
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    profileSaveState.value = 'error'
+    profileSaveMessage.value = 'AI 시착용 사진은 5MB 이하로 선택해 주세요.'
+    input.value = ''
+    return
+  }
+
+  try {
+    tryOnImagePreviewUrl.value = await readImageFile(file, 'AI 시착용 사진을 읽지 못했습니다.')
+    isTryOnImageRemoved.value = false
+    selectedTryOnImageName.value = file.name
+    profileSaveState.value = 'idle'
+    profileSaveMessage.value = ''
+  } catch (error) {
+    profileSaveState.value = 'error'
+    profileSaveMessage.value = normalizeApiError(error).message
+  }
+}
+
+const removeProfileImage = () => {
+  profileImagePreviewUrl.value = ''
+  selectedProfileImageName.value = ''
+  isProfileImageRemoved.value = true
+
+  if (profileImageInput.value) {
+    profileImageInput.value.value = ''
+  }
+}
+
+const removeTryOnImage = () => {
+  tryOnImagePreviewUrl.value = ''
+  selectedTryOnImageName.value = ''
+  isTryOnImageRemoved.value = true
+
+  if (tryOnImageInput.value) {
+    tryOnImageInput.value.value = ''
+  }
 }
 
 const submitProfileForm = async () => {
@@ -274,14 +412,28 @@ const submitProfileForm = async () => {
       detailAddress: profileForm.value.detailAddress.trim(),
     }
     const nextProfile = await updateMyProfile(profile.value.id, request)
+    const nextProfileImageUrl = isProfileImageRemoved.value
+      ? null
+      : profileImagePreviewUrl.value || profile.value.profileImageUrl
+    const nextTryOnImageUrl = isTryOnImageRemoved.value
+      ? null
+      : tryOnImagePreviewUrl.value || profile.value.defaultTryOnImageUrl
 
     viewData.value = {
       ...viewData.value,
       summary: {
         ...viewData.value.summary,
-        profile: nextProfile,
+        profile: {
+          ...nextProfile,
+          profileImageUrl: nextProfileImageUrl,
+          defaultTryOnImageUrl: nextTryOnImageUrl,
+        },
       },
     }
+    selectedProfileImageName.value = ''
+    isProfileImageRemoved.value = false
+    selectedTryOnImageName.value = ''
+    isTryOnImageRemoved.value = false
     profileSaveState.value = 'success'
     profileSaveMessage.value = '기본 정보가 저장되었습니다.'
   } catch (error) {
@@ -389,7 +541,10 @@ onMounted(() => {
       <template v-else-if="viewData && profile">
         <aside class="my-sidebar" aria-label="마이페이지 메뉴">
           <div class="my-sidebar__profile">
-            <div class="my-sidebar__avatar" aria-hidden="true">{{ profileInitial }}</div>
+            <div class="my-sidebar__avatar" aria-hidden="true">
+              <img v-if="profileAvatarUrl" :src="profileAvatarUrl" :alt="`${profile.name} 프로필 사진`" />
+              <span v-else>{{ profileInitial }}</span>
+            </div>
             <div>
               <strong>{{ profile.name }} 님</strong>
               <span>{{ profile.memberType === 'BUSINESS' ? '사업자 회원' : '일반 회원' }}</span>
@@ -404,14 +559,12 @@ onMounted(() => {
               :class="{ 'my-sidebar__nav-item--active': selectedSection === section.id }"
               @click="selectSection(section.id)"
             >
-              <span aria-hidden="true"></span>
               {{ section.label }}
             </button>
           </nav>
 
           <div class="my-sidebar__footer">
             <button type="button" @click="logout">
-              <span aria-hidden="true"></span>
               로그아웃
             </button>
           </div>
@@ -433,7 +586,10 @@ onMounted(() => {
 
           <template v-if="selectedSection === 'dashboard'">
             <section class="my-profile-hero" aria-label="회원 요약">
-              <div class="my-profile-hero__avatar" aria-hidden="true">{{ profileInitial }}</div>
+              <div class="my-profile-hero__avatar" aria-hidden="true">
+                <img v-if="profileAvatarUrl" :src="profileAvatarUrl" :alt="`${profile.name} 프로필 사진`" />
+                <span v-else>{{ profileInitial }}</span>
+              </div>
               <div class="my-profile-hero__body">
                 <div class="my-profile-hero__title">
                   <h2>{{ profile.name }} 님</h2>
@@ -468,7 +624,6 @@ onMounted(() => {
                 type="button"
                 @click="selectSection(card.section)"
               >
-                <i class="my-dashboard__icon" :class="`my-dashboard__icon--${card.icon}`" aria-hidden="true"></i>
                 <span>{{ card.label }}</span>
                 <strong>
                   {{ card.value.toLocaleString('ko-KR') }}{{ card.suffix ?? '' }}
@@ -594,6 +749,70 @@ onMounted(() => {
                 >
                   {{ profileSaveMessage }}
                 </p>
+
+                <div class="my-profile-photo">
+                  <div class="my-profile-photo__preview" aria-hidden="true">
+                    <img
+                      v-if="profileImageDisplayUrl"
+                      :src="profileImageDisplayUrl"
+                      :alt="`${profile.name} 프로필 사진 미리보기`"
+                    />
+                    <span v-else>{{ profileInitial }}</span>
+                  </div>
+                  <div class="my-profile-photo__body">
+                    <strong>프로필 사진</strong>
+                    <p>마이페이지와 판매자 정보에 표시되는 사진입니다. AI 시착용 사진과 별도로 관리됩니다.</p>
+                    <p v-if="selectedProfileImageName" class="my-profile-photo__file">
+                      {{ selectedProfileImageName }}
+                    </p>
+                    <div class="my-profile-photo__actions">
+                      <button type="button" @click="openProfileImagePicker">사진 선택</button>
+                      <button v-if="profileImageDisplayUrl" type="button" @click="removeProfileImage">
+                        사진 삭제
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    ref="profileImageInput"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    class="my-profile-photo__input"
+                    aria-label="프로필 사진 선택"
+                    @change="handleProfileImageChange"
+                  />
+                </div>
+
+                <div class="my-tryon-photo">
+                  <div class="my-tryon-photo__preview" aria-hidden="true">
+                    <img
+                      v-if="tryOnImageDisplayUrl"
+                      :src="tryOnImageDisplayUrl"
+                      :alt="`${profile.name} AI 시착용 사진 미리보기`"
+                    />
+                    <span v-else>{{ profileInitial }}</span>
+                  </div>
+                  <div class="my-tryon-photo__body">
+                    <strong>AI 시착용 기본 사진</strong>
+                    <p>온보딩에서 등록한 시착용 사진입니다. JPG, PNG, WebP 이미지를 5MB 이하로 업로드할 수 있습니다.</p>
+                    <p v-if="selectedTryOnImageName" class="my-tryon-photo__file">
+                      {{ selectedTryOnImageName }}
+                    </p>
+                    <div class="my-tryon-photo__actions">
+                      <button type="button" @click="openTryOnImagePicker">사진 선택</button>
+                      <button v-if="tryOnImageDisplayUrl" type="button" @click="removeTryOnImage">
+                        사진 삭제
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    ref="tryOnImageInput"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    class="my-tryon-photo__input"
+                    aria-label="AI 시착용 사진 선택"
+                    @change="handleTryOnImageChange"
+                  />
+                </div>
 
                 <div class="my-profile-form__grid">
                   <label>
@@ -748,7 +967,9 @@ onMounted(() => {
   gap: 0;
   min-height: 720px;
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
   background: var(--color-surface);
+  overflow: hidden;
 }
 
 .my-sidebar {
@@ -761,9 +982,9 @@ onMounted(() => {
 .my-sidebar__profile {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   min-height: 76px;
-  padding: 16px;
+  padding: var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -774,10 +995,18 @@ onMounted(() => {
   width: 38px;
   height: 38px;
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-primary);
   font-size: 15px;
   font-weight: var(--font-weight-extrabold);
+  overflow: hidden;
+}
+
+.my-sidebar__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .my-sidebar__profile strong,
@@ -809,31 +1038,22 @@ onMounted(() => {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 36px;
-  padding: 0 12px;
-  gap: 12px;
+  min-height: var(--button-height-small);
+  padding: 0 var(--space-3);
   border: 0;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-semibold);
   line-height: 22px;
   text-align: left;
 }
 
-.my-sidebar__nav button > span,
-.my-sidebar__footer button > span {
-  width: 16px;
-  height: 16px;
-  border: 1px solid currentColor;
-  border-radius: 3px;
-  opacity: 0.7;
-}
-
 .my-sidebar__nav button:hover,
 .my-sidebar__nav-item--active {
-  background: var(--color-surface-secondary) !important;
-  color: var(--color-text-primary) !important;
+  background: var(--color-primary-soft) !important;
+  color: var(--color-primary) !important;
 }
 
 .my-sidebar__footer {
@@ -874,25 +1094,57 @@ onMounted(() => {
 
 .my-content__actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .my-content__actions button,
 .my-card__title button,
 .my-state button {
-  min-height: 36px;
-  padding: 0 16px;
+  min-height: var(--button-height-small);
+  padding: 0 var(--space-4);
   border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 13px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .my-content__actions button:first-child,
 .my-card__title button:first-of-type {
-  background: var(--color-text-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary);
   color: var(--color-text-inverse);
+}
+
+.my-content__actions button:hover,
+.my-card__title button:hover,
+.my-state button:hover {
+  background: var(--color-surface-secondary);
+}
+
+.my-content__actions button:first-child:hover,
+.my-card__title button:first-of-type:hover {
+  background: var(--color-primary-hover);
+}
+
+.my-content__actions button:focus-visible,
+.my-card__title button:focus-visible,
+.my-state button:focus-visible,
+.my-profile-hero__edit:focus-visible,
+.my-profile-hero__stats button:focus-visible,
+.my-dashboard__card:focus-visible,
+.my-todo-row:focus-visible,
+.my-profile-photo__actions button:focus-visible,
+.my-tryon-photo__actions button:focus-visible,
+.my-point-panel__actions button:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 2px;
 }
 
 .my-profile-hero {
@@ -904,6 +1156,7 @@ onMounted(() => {
   margin: 32px 32px 24px;
   padding: 32px;
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
   background: var(--color-surface);
   box-shadow: 0 1px 3px rgb(23 26 31 / 10%);
 }
@@ -914,10 +1167,17 @@ onMounted(() => {
   width: 88px;
   height: 88px;
   border-radius: 50%;
-  background: #2c4635;
+  background: var(--color-primary);
   color: var(--color-text-inverse);
   font-size: 32px;
   font-weight: var(--font-weight-extrabold);
+  overflow: hidden;
+}
+
+.my-profile-hero__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .my-profile-hero__body {
@@ -941,8 +1201,9 @@ onMounted(() => {
 .my-profile-hero__title span {
   min-height: 28px;
   padding: 5px 12px;
-  background: #e5eee8;
-  color: #2c4635;
+  border-radius: var(--radius-badge);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
   font-size: 12px;
   font-weight: var(--font-weight-bold);
 }
@@ -986,12 +1247,13 @@ onMounted(() => {
 }
 
 .my-profile-hero__edit {
-  min-height: 40px;
-  padding: 0 18px;
+  min-height: var(--button-height-small);
+  padding: 0 var(--space-4);
   border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 13px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
@@ -1010,6 +1272,7 @@ onMounted(() => {
 .my-dashboard__card,
 .my-card {
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
   background: var(--color-surface);
   box-shadow: 0 1px 3px rgb(23 26 31 / 10%);
 }
@@ -1019,112 +1282,24 @@ onMounted(() => {
   gap: 8px;
   min-height: 128px;
   padding: 20px;
+  border-radius: var(--radius-card);
   text-align: left;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.my-dashboard__card:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: 0 6px 18px rgb(23 26 31 / 10%);
+  transform: translateY(-1px);
 }
 
 .my-dashboard--home .my-dashboard__card {
-  grid-template-rows: 44px auto auto;
-  min-height: 142px;
+  align-content: center;
+  min-height: 128px;
   padding: 22px;
-}
-
-.my-dashboard__icon {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: #e8f0eb;
-}
-
-.my-dashboard__icon::before,
-.my-dashboard__icon::after {
-  position: absolute;
-  box-sizing: border-box;
-  content: '';
-}
-
-.my-dashboard__icon::before {
-  border: 2px solid #2c4635;
-}
-
-.my-dashboard__card--orange .my-dashboard__icon {
-  background: #f8ebdc;
-}
-
-.my-dashboard__card--orange .my-dashboard__icon::before,
-.my-dashboard__card--orange .my-dashboard__icon::after {
-  border-color: #b36a1f;
-}
-
-.my-dashboard__card--red .my-dashboard__icon {
-  background: #f5e5e8;
-}
-
-.my-dashboard__card--red .my-dashboard__icon::before,
-.my-dashboard__card--red .my-dashboard__icon::after {
-  border-color: #b84b58;
-}
-
-.my-dashboard__icon--box::before {
-  width: 17px;
-  height: 17px;
-  border-radius: 4px;
-  transform: rotate(45deg) skew(-8deg, -8deg);
-}
-
-.my-dashboard__icon--box::after {
-  width: 9px;
-  height: 2px;
-  background: #2c4635;
-  transform: translateY(-1px) rotate(45deg);
-}
-
-.my-dashboard__icon--bag::before {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-}
-
-.my-dashboard__icon--bag::after {
-  top: 12px;
-  width: 9px;
-  height: 6px;
-  border: 2px solid #b36a1f;
-  border-bottom: 0;
-  border-radius: 7px 7px 0 0;
-}
-
-.my-dashboard__icon--wallet::before {
-  width: 19px;
-  height: 15px;
-  border-radius: 4px;
-}
-
-.my-dashboard__icon--wallet::after {
-  right: 11px;
-  width: 8px;
-  height: 7px;
-  border: 2px solid #2c4635;
-  border-radius: 3px;
-}
-
-.my-dashboard__icon--video::before {
-  left: 13px;
-  width: 15px;
-  height: 12px;
-  border-radius: 3px;
-}
-
-.my-dashboard__icon--video::after {
-  right: 11px;
-  width: 8px;
-  height: 8px;
-  border: 2px solid #b84b58;
-  border-left: 0;
-  border-radius: 2px;
-  clip-path: polygon(0 18%, 100% 0, 100% 100%, 0 82%);
 }
 
 .my-dashboard__card span {
@@ -1143,7 +1318,7 @@ onMounted(() => {
 }
 
 .my-dashboard__card small {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-muted);
   font-size: 12px;
   font-weight: var(--font-weight-medium);
   line-height: 18px;
@@ -1157,6 +1332,7 @@ onMounted(() => {
   min-height: auto;
   padding: 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
   color: var(--color-text-primary);
 }
@@ -1172,6 +1348,7 @@ onMounted(() => {
   gap: 8px;
   min-height: 112px;
   padding: 20px;
+  border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
 }
 
@@ -1189,7 +1366,7 @@ onMounted(() => {
 }
 
 .my-point-panel__grid p {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-muted);
   font-size: 12px;
   font-weight: var(--font-weight-medium);
   line-height: 18px;
@@ -1197,22 +1374,36 @@ onMounted(() => {
 
 .my-point-panel__actions {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .my-point-panel__actions button {
-  min-height: 40px;
-  padding: 0 18px;
+  min-height: var(--button-height-small);
+  padding: 0 var(--space-4);
   border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 13px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
 .my-point-panel__actions button:first-child {
-  background: #2c4635;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
   color: var(--color-text-inverse);
+}
+
+.my-point-panel__actions button:hover {
+  background: var(--color-surface-secondary);
+}
+
+.my-point-panel__actions button:first-child:hover {
+  background: var(--color-primary-hover);
 }
 
 .my-dashboard-grid {
@@ -1269,7 +1460,7 @@ onMounted(() => {
 .my-revenue-chart__item span,
 .my-revenue-chart__item small {
   overflow: hidden;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-muted);
   font-size: 11px;
   font-weight: var(--font-weight-medium);
   line-height: 16px;
@@ -1282,13 +1473,16 @@ onMounted(() => {
   align-items: end;
   justify-content: center;
   height: 128px;
+  border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
+  overflow: hidden;
 }
 
 .my-revenue-chart__item i {
   display: block;
   width: 100%;
   min-height: 10px;
+  border-radius: var(--radius-control) var(--radius-control) 3px 3px;
   background: var(--color-primary);
 }
 
@@ -1346,6 +1540,7 @@ onMounted(() => {
   min-height: 86px;
   padding: 16px;
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
 }
 
@@ -1406,6 +1601,7 @@ onMounted(() => {
   min-height: 26px;
   padding: 0 12px;
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-badge);
   background: var(--color-surface-secondary);
   color: var(--color-text-primary);
   font-size: 12px;
@@ -1421,6 +1617,7 @@ onMounted(() => {
 .my-profile-grid div {
   padding: 16px;
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
 }
 
@@ -1445,16 +1642,203 @@ onMounted(() => {
 
 .my-profile-form__message {
   padding: 12px 14px;
-  background: #e5eee8;
-  color: #2c4635;
+  border-radius: var(--radius-control);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
   font-size: 13px;
   font-weight: var(--font-weight-semibold);
   line-height: 20px;
 }
 
 .my-profile-form__message--error {
-  background: #f5e5e8;
-  color: #b84b58;
+  background: var(--color-error-soft);
+  color: var(--color-error);
+}
+
+.my-profile-photo {
+  position: relative;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+}
+
+.my-profile-photo__preview {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 30px;
+  font-weight: var(--font-weight-extrabold);
+  overflow: hidden;
+}
+
+.my-profile-photo__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.my-profile-photo__body {
+  min-width: 0;
+}
+
+.my-profile-photo strong {
+  display: block;
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 24px;
+}
+
+.my-profile-photo p {
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.my-profile-photo__file {
+  color: var(--color-primary) !important;
+  font-weight: var(--font-weight-semibold);
+}
+
+.my-profile-photo__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.my-profile-photo__actions button {
+  min-height: var(--button-height-small);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+}
+
+.my-profile-photo__actions button:first-child {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.my-profile-photo__actions button:hover {
+  background: var(--color-surface);
+}
+
+.my-profile-photo__actions button:first-child:hover {
+  background: var(--color-primary-hover);
+}
+
+.my-profile-photo__input {
+  display: none;
+}
+
+.my-tryon-photo {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(160px, 180px) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+}
+
+.my-tryon-photo__preview {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  max-width: 180px;
+  height: 220px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 42px;
+  font-weight: var(--font-weight-extrabold);
+  overflow: hidden;
+}
+
+.my-tryon-photo__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.my-tryon-photo__body {
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.my-tryon-photo strong {
+  display: block;
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 24px;
+}
+
+.my-tryon-photo p {
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.my-tryon-photo__file {
+  color: var(--color-primary) !important;
+  font-weight: var(--font-weight-semibold);
+}
+
+.my-tryon-photo__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.my-tryon-photo__actions button {
+  min-height: var(--button-height-small);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+}
+
+.my-tryon-photo__actions button:first-child {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.my-tryon-photo__actions button:hover {
+  background: var(--color-surface);
+}
+
+.my-tryon-photo__actions button:first-child:hover {
+  background: var(--color-primary-hover);
+}
+
+.my-tryon-photo__input {
+  display: none;
 }
 
 .my-profile-form__grid {
@@ -1481,9 +1865,10 @@ onMounted(() => {
 .my-profile-form__grid input,
 .my-profile-form__grid select {
   width: 100%;
-  min-height: 44px;
+  min-height: var(--button-height-standard);
   padding: 0 14px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
   font-size: 14px;
@@ -1492,13 +1877,14 @@ onMounted(() => {
 
 .my-profile-form__grid input:disabled {
   background: var(--color-surface-secondary);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-muted);
 }
 
 .my-profile-form__grid input:focus,
 .my-profile-form__grid select:focus {
-  border-color: #2c4635;
-  outline: 2px solid rgb(44 70 53 / 14%);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  outline: none;
 }
 
 .my-profile-form__wide,
@@ -1509,6 +1895,7 @@ onMounted(() => {
 .my-profile-form__readonly {
   padding: 16px;
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
 }
 
@@ -1530,6 +1917,7 @@ onMounted(() => {
   gap: 12px;
   padding: 48px;
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
   background: var(--color-surface);
   color: var(--color-text-secondary);
   text-align: center;
@@ -1598,6 +1986,21 @@ onMounted(() => {
 
   .my-profile-hero__stats {
     gap: 18px;
+  }
+
+  .my-profile-photo {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .my-tryon-photo {
+    grid-template-columns: 1fr;
+  }
+
+  .my-tryon-photo__preview {
+    width: 100%;
+    max-width: 220px;
+    height: 260px;
   }
 
   .my-point-panel__actions {
