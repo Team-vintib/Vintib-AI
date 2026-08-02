@@ -70,7 +70,21 @@ const profileMenuItems = computed<ProfileMenuItem[]>(() => [
   { label: '포인트', path: ROUTE_PATHS.POINT },
 ])
 
-const isActivePath = (path: RoutePath) => {
+const getRouteSection = () => {
+  const section = route.query.section
+
+  return typeof section === 'string' ? section : ''
+}
+
+const isSameQuery = (query?: Record<string, string>) => {
+  if (!query) {
+    return getRouteSection() === ''
+  }
+
+  return Object.entries(query).every(([key, value]) => route.query[key] === value)
+}
+
+const isActivePath = (path: RoutePath, query?: Record<string, string>) => {
   if (path === ROUTE_PATHS.HOME) {
     return route.path === ROUTE_PATHS.HOME
   }
@@ -83,7 +97,15 @@ const isActivePath = (path: RoutePath) => {
     return false
   }
 
-  return route.path === path || route.path.startsWith(`${path}/`)
+  if (route.path !== path && !route.path.startsWith(`${path}/`)) {
+    return false
+  }
+
+  if (path === ROUTE_PATHS.MY) {
+    return isSameQuery(query)
+  }
+
+  return true
 }
 
 const goToPath = async (
@@ -200,7 +222,7 @@ watch(
             v-for="item in userActionItems"
             :key="item.label"
             class="global-nav__action global-nav__action--badge"
-            :class="{ 'global-nav__action--active': isActivePath(item.path) }"
+            :class="{ 'global-nav__action--active': isActivePath(item.path, item.query) }"
             type="button"
             @click="goToPath(item.path, { authRequired: true, query: item.query })"
           >

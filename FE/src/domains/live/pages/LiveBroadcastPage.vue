@@ -2,18 +2,22 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
 import SellerAuctionPanel from '@/domains/auction/components/SellerAuctionPanel.vue'
+import { LIVE_AUCTION_MOCK_RESULT } from '@/domains/auction/constants/liveAuctionMockData'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import {
   getLiveWatchViewData,
   isLiveWatchApiEnabled,
   LiveWatchNotFoundError,
 } from '@/domains/live/api/liveWatchApi'
+import LiveBroadcastEndDashboard from '@/domains/live/components/LiveBroadcastEndDashboard.vue'
 import LiveBroadcastHeader from '@/domains/live/components/LiveBroadcastHeader.vue'
 import LiveBroadcastInfo from '@/domains/live/components/LiveBroadcastInfo.vue'
 import LiveProductQueue from '@/domains/live/components/LiveProductQueue.vue'
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchState from '@/domains/live/components/LiveWatchState.vue'
+import { buildBroadcastEndSummary } from '@/domains/live/constants/liveBroadcastEndMock'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import LiveLayout from '@/shared/layouts/LiveLayout.vue'
@@ -40,7 +44,16 @@ const live = ref<LiveWatchViewData | null>(null)
 const loadState = ref<LiveWatchLoadState>('loading')
 const errorMessage = ref('')
 const selectedProductId = ref<number | null>(null)
+// 441 판매자 낙찰 이벤트 — 경매 낙찰 시 방송 영상 위 축하 오버레이(시청자 434 재사용) 표시용.
+const auctionWin = ref<{
+  winnerNickname: string
+  winningBid: number
+  productTitle: string | null
+} | null>(null)
 const now = ref(Date.now())
+// 방송 상세는 시청자와 같은 GET /lives/{liveId} 실 API를 재사용한다(VITE_LIVE_WATCH_API_ENABLED).
+// 판매자 전용 상태(방송 소유자 여부·currentProductId 등)는 BE 미제공 → liveWatchApi에서 null/fallback.
+// (BE 확인 필요: docs/requests/BE/007 3.5, docs/requests/BE/013)
 const apiEnabled = isLiveWatchApiEnabled()
 let loadRequestId = 0
 
@@ -99,6 +112,7 @@ const loadLiveBroadcast = async () => {
   loadState.value = 'loading'
   errorMessage.value = ''
   isEndConfirmOpen.value = false
+  auctionWin.value = null
   transitionNotice.value = ''
   window.clearTimeout(transitionNoticeTimer)
 
@@ -120,6 +134,15 @@ const loadLiveBroadcast = async () => {
     selectedProductId.value = response.currentProductId ?? response.products.at(0)?.id ?? null
     now.value = Date.now()
     loadState.value = 'success'
+
+    // mock 확인용: ?win 쿼리면 낙찰 축하 오버레이를 바로 띄운다(실사용 트리거는 handleAuctionEnded).
+    if (!apiEnabled && route.query.win !== undefined) {
+      auctionWin.value = {
+        winnerNickname: LIVE_AUCTION_MOCK_RESULT.winnerNickname,
+        winningBid: LIVE_AUCTION_MOCK_RESULT.winningBid,
+        productTitle: selectedProduct.value?.title ?? null,
+      }
+    }
   } catch (error) {
     if (requestId !== loadRequestId) return
 
@@ -147,8 +170,10 @@ const goBack = () => {
   void router.push({ name: ROUTE_NAMES.LIVE_LIST })
 }
 
-// 판매자 제어(437). 서버 반영 계약이 없어 로컬 상태(mock)만 바꾼다.
-// 실제 전환/종료 엔드포인트·시청자 전파는 docs/requests/BE/013 요청 후 연결.
+// 판매자 제어(437/439). 서버 반영 계약이 아직 없어 로컬 상태(Mock 전용)만 바꾼다. — BE 확인 필요
+//   · 방송 종료: POST /lives/{liveId}/end
+//   · 현재 상품 전환: PATCH /lives/{liveId}/current-product
+// 실제 엔드포인트·시청자 전파(STOMP)는 docs/requests/BE/013 확정 후 연결한다.
 const isEndConfirmOpen = ref(false)
 const transitionNotice = ref('')
 let transitionNoticeTimer: number | undefined
@@ -209,6 +234,33 @@ const updateViewerCount = (viewerCount: number) => {
   }
 }
 
+const handleAuctionEnded = (result: {
+  outcome: 'WON' | 'FAILED'
+  winnerNickname: string | null
+  winningBid: number
+  productTitle: string | null
+}) => {
+  // 낙찰(WON)일 때만 축하 오버레이. 미낙찰은 패널 표기(ENDED_FAILED)로 충분.
+  auctionWin.value =
+    result.outcome === 'WON' && result.winnerNickname
+      ? {
+          winnerNickname: result.winnerNickname,
+          winningBid: result.winningBid,
+          productTitle: result.productTitle,
+        }
+      : null
+}
+
+const closeAuctionWin = () => {
+  auctionWin.value = null
+}
+
+// 438 방송 종료 대시보드 — 종료 시 방송 요약(mock). 실제 경매 결과/방송 요약 API 없음(docs/requests/BE/009, 013).
+// ?result=sold 이면 전부 낙찰(미낙찰 처리 섹션 숨김 확인용).
+const broadcastSummary = computed(() =>
+  buildBroadcastEndSummary(live.value?.products ?? [], route.query.result === 'sold'),
+)
+
 watch(
   () => [route.params.liveId, route.query.mock],
   () => {
@@ -261,14 +313,24 @@ onBeforeUnmount(() => {
     />
 
     <div v-else-if="live" class="live-broadcast-page">
+      <LiveBroadcastEndDashboard
+        v-if="live.status === 'ENDED'"
+        :title="live.title"
+        :elapsed-time="elapsedTime"
+        :peak-viewer-count="live.peakViewerCount"
+        :summary="broadcastSummary"
+        @to-list="router.push({ name: ROUTE_NAMES.LIVE_LIST })"
+      />
+
       <LiveBroadcastHeader
+        v-if="live.status !== 'ENDED'"
         :live="live"
         :elapsed-time="elapsedTime"
         @back="goBack"
         @end-broadcast="requestEndBroadcast"
       />
 
-      <div class="live-broadcast-page__body">
+      <div v-if="live.status !== 'ENDED'" class="live-broadcast-page__body">
         <aside class="live-broadcast-page__queue">
           <LiveProductQueue
             :products="live.products"
@@ -316,27 +378,27 @@ onBeforeUnmount(() => {
             </template>
           </LiveVideoStage>
 
+          <LiveAuctionResultOverlay
+            v-if="auctionWin"
+            :winner-nickname="auctionWin.winnerNickname"
+            :winning-bid="auctionWin.winningBid"
+            :product-title="auctionWin.productTitle"
+            @close="closeAuctionWin"
+          />
+
           <p v-if="transitionNotice" class="live-broadcast-page__notice" role="status">
             {{ transitionNotice }}
           </p>
-
-          <div
-            v-if="live.status === 'ENDED'"
-            class="live-broadcast-page__ended"
-            role="status"
-          >
-            <strong>방송을 종료했습니다</strong>
-            <p>시청자에게 방송이 종료된 것으로 표시됩니다.</p>
-            <button type="button" @click="router.push({ name: ROUTE_NAMES.LIVE_LIST })">
-              라이브 목록으로
-            </button>
-          </div>
         </main>
 
         <aside class="live-broadcast-page__control">
           <LiveBroadcastInfo :live="live" :elapsed-time="elapsedTime" />
 
-          <SellerAuctionPanel :product="selectedProduct" :status="live.status" />
+          <SellerAuctionPanel
+            :product="selectedProduct"
+            :status="live.status"
+            @auction-ended="handleAuctionEnded"
+          />
         </aside>
       </div>
 
@@ -481,45 +543,6 @@ onBeforeUnmount(() => {
     opacity: 0;
     transform: translate(-50%, -6px);
   }
-}
-
-.live-broadcast-page__ended {
-  display: grid;
-  position: absolute;
-  z-index: 4;
-  inset: 0;
-  align-content: center;
-  justify-items: center;
-  gap: var(--space-3);
-  padding: var(--space-6);
-  background: rgba(6, 8, 7, 0.78);
-  text-align: center;
-  backdrop-filter: blur(3px);
-}
-
-.live-broadcast-page__ended strong {
-  color: #fff;
-  font-size: 20px;
-  font-weight: 800;
-}
-
-.live-broadcast-page__ended p {
-  max-width: 320px;
-  color: var(--color-live-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.live-broadcast-page__ended button {
-  min-height: 42px;
-  margin-top: var(--space-2);
-  padding: 0 var(--space-6);
-  border: 0;
-  border-radius: var(--radius-control);
-  background: var(--color-live);
-  color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 700;
 }
 
 .live-broadcast-page__modal-backdrop {

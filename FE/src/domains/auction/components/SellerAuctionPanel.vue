@@ -24,6 +24,19 @@ const props = defineProps<{
   status: LiveWatchStatus
 }>()
 
+// 경매 종료(낙찰/미낙찰) 결과를 상위(LiveBroadcastPage)로 알린다 — 441 판매자 낙찰 이벤트.
+// 실제 종료/낙찰 확정은 서버 몫(docs/requests/BE/009) → 지금은 mock 타이머 종료 시점에 emit.
+const emit = defineEmits<{
+  'auction-ended': [
+    result: {
+      outcome: 'WON' | 'FAILED'
+      winnerNickname: string | null
+      winningBid: number
+      productTitle: string | null
+    },
+  ]
+}>()
+
 const phase = ref<SellerAuctionPhase>('IDLE')
 const startPrice = ref(SELLER_AUCTION_DEFAULT_START_PRICE)
 const increment = ref(SELLER_AUCTION_DEFAULT_CONFIG.increment)
@@ -128,7 +141,14 @@ const simulateBid = () => {
 
 const endAuction = () => {
   clearTimers()
-  phase.value = bidderCount.value > 0 ? 'ENDED_WON' : 'ENDED_FAILED'
+  const won = bidderCount.value > 0
+  phase.value = won ? 'ENDED_WON' : 'ENDED_FAILED'
+  emit('auction-ended', {
+    outcome: won ? 'WON' : 'FAILED',
+    winnerNickname: highestBidder.value,
+    winningBid: currentBid.value,
+    productTitle: props.product?.title ?? null,
+  })
 }
 
 const tick = () => {

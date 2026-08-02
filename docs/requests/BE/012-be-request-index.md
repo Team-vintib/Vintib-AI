@@ -100,3 +100,8 @@
   - Onboarding 기본 정보/관심 정보/시착 프로필/온보딩 완료 전체(경로는 `/api/me/X`가 아니라 `/api/users/{id}/X`로 확정 — 처리 완료된 `002-onboarding-contract.md`는 삭제됨)
 - 기존 규격을 유지하면 되는 기능
   - BE에는 있지만 FE 화면/진입점이 없어 아직 미연결인 API는 각 도메인 화면 설계 후 연결한다.
+## 2026-08-01 추가 반영
+
+| 번호 | 문서 | 도메인 | FE 기준 상태 | 핵심 BE 요청 |
+| --- | --- | --- | --- | --- |
+| 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | `/points`, `/points/history` FE 화면 구현, mock fallback | 포인트 잔액, 거래 내역, 충전, 출금 계좌, 출금 신청/내역 상세 계약을 010에 병합 |

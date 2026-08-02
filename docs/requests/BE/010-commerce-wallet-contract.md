@@ -11,10 +11,14 @@
 ## 2. 현재 연동 상태
 
 - 연동 완료 API: 없음
-- FE 구현 완료 범위: 없음
+- 2026-08-02 FE 구현 완료 범위
+  - `/my?section=orders`: 구매/낙찰 내역 카드형 목록과 `/my/orders/{orderId}` 상세 페이지 구현.
+  - `/my?section=sales`: 판매/정산 내역 카드형 목록과 `/my/sales/{saleId}` 상세 페이지 구현.
+  - 위 두 영역은 주문/배송/환불/정산 API가 없어 mock fallback으로 동작한다.
 - 현재 임시 처리 또는 Mock 사용 여부
-  - 주문/배송/환불/포인트/지갑 화면과 route가 아직 없다.
-  - API가 구현되어도 별도 FE 설계 후 연결해야 한다.
+  - 주문/판매 내역, 배송지, 구매 방식, 정산 상태는 FE mock data를 사용한다.
+  - `/points`, `/points/history`는 기존 point 화면의 mock fallback을 유지한다.
+  - 주문/배송/환불/포인트/지갑 API가 구현되면 FE adapter를 실제 응답 mapper로 교체해야 한다.
 
 ## 3. 추가 구현 요청
 
@@ -147,3 +151,186 @@
 
 - 이미 정상 연동된 API: 없음
 - 기존 규격을 유지하면 되는 기능: 없음
+# 2026-08-01 포인트 지갑 상세 계약 요청
+
+`/points`, `/points/history` FE 화면이 구현되어 mock fallback으로 동작 중이다. 포인트는 이 문서의 Commerce/Wallet 범위에 포함되므로 별도 요청 문서로 분리하지 않고 여기에서 상세 계약을 추적한다.
+
+## 현재 FE 상태
+
+- `/points`: 사용 가능 포인트, 보유/출금 가능/정산 예정/출금 처리 중 카드
+- `/points`: 내역/충전/출금 탭
+- `/points`: 최근 내역 10개
+- `/points/history`: 전체/출금/입금 필터, 시작일/종료일 기간 필터
+- 충전: 금액 선택, 결제 수단 선택, 충전 금액/충전 후 잔액 표시
+- 출금: 계좌 확인, 출금 금액 입력, 출금 신청
+- `VITE_POINT_API_ENABLED=false` 기본값으로 mock fallback 사용
+- FE adapter는 임시로 `/users/{userId}/points` 계열 호출 기준
+
+기존 문서 충돌:
+
+- `FE/docs/frontend/api/api-index.md`: `/api/points`, `/api/points/transactions`, `/api/points/withdrawals`
+- `APIs.md`: `/users/{id}/points`, `/users/{id}/points/logs`, `/users/{id}/points/charges`, `/users/{id}/withdrawals`
+
+## 포인트 잔액 조회
+
+- Method / Endpoint 제안: `GET /api/users/{userId}/points`
+- 인증: 필요. `{userId}`는 로그인한 본인 ID와 같아야 한다.
+- FE 사용처: `/points` 상단 요약
+
+```json
+{
+  "available": 128500,
+  "held": 42000,
+  "escrow": 78000,
+  "pendingSettlement": 156000,
+  "withdrawalProcessing": 30000,
+  "withdrawable": 128500,
+  "lastChangedAt": "2026-08-01T14:20:00"
+}
+```
+
+## 포인트 거래 내역 조회
+
+- Method / Endpoint 제안: `GET /api/users/{userId}/points/logs`
+- 인증: 필요
+- FE 사용처: `/points` 최근 내역, `/points/history` 전체 내역
+- Query: `page`, `size`, optional `type`, optional `flow=ALL|DEPOSIT|WITHDRAWAL`, optional `startDate`, optional `endDate`
+- `type` 후보: `CHARGE | USE | HOLD | HOLD_RELEASE | SETTLEMENT | REFUND | WITHDRAWAL`
+- `status` 후보: `COMPLETED | PENDING | FAILED`
+
+```json
+{
+  "success": true,
+  "data": {
+    "content": [
+      {
+        "id": 101,
+        "type": "CHARGE",
+        "title": "포인트 충전",
+        "amount": 50000,
+        "balanceAfter": 128500,
+        "status": "COMPLETED",
+        "createdAt": "2026-08-01T14:20:00",
+        "memo": "카드 결제"
+      }
+    ],
+    "page": 0,
+    "size": 10,
+    "totalElements": 1,
+    "totalPages": 1,
+    "hasNext": false
+  },
+  "error": null
+}
+```
+
+## 포인트 충전
+
+- Method / Endpoint 제안: `POST /api/users/{userId}/points/charges`
+- 인증: 필요
+- FE 사용처: `/points` 충전 탭
+
+```json
+{
+  "amount": 50000,
+  "paymentMethod": "CARD"
+}
+```
+
+결제 수단 enum 후보: `CARD`, `BANK_TRANSFER`, `SIMPLE_PAY`
+
+확인 필요:
+
+- MVP에서 실제 PG 없이 mock 충전을 허용할지
+- 최소 충전 금액. FE 임시 기준은 `1,000P`
+- 충전 실패/취소 상태를 거래 로그에 남기는지
+
+## 출금 계좌 조회
+
+- Method / Endpoint 제안: `GET /api/users/{userId}/points/account`
+- 인증: 필요
+- FE 사용처: `/points` 출금 탭
+
+```json
+{
+  "bankName": "신한은행",
+  "accountNumber": "110-123-456789",
+  "holderName": "김서윤"
+}
+```
+
+확인 필요:
+
+- 계좌가 없을 때 `data: null`로 줄지, 별도 오류 코드로 줄지
+- 계좌 등록/수정 API를 별도로 제공할지, 출금 신청 body에 포함된 계좌로 저장할지
+
+## 출금 신청
+
+- Method / Endpoint 제안: `POST /api/users/{userId}/withdrawals`
+- 인증: 필요
+- FE 사용처: `/points` 출금 탭
+
+```json
+{
+  "amount": 30000,
+  "account": {
+    "bankName": "신한은행",
+    "accountNumber": "110-123-456789",
+    "holderName": "김서윤"
+  }
+}
+```
+
+응답 데이터 요청 필드:
+
+```json
+{
+  "id": 12,
+  "amount": 30000,
+  "fee": 0,
+  "status": "REQUESTED",
+  "requestedAt": "2026-08-01T15:00:00",
+  "completedAt": null,
+  "account": {
+    "bankName": "신한은행",
+    "accountNumber": "110-123-456789",
+    "holderName": "김서윤"
+  }
+}
+```
+
+출금 상태 enum 후보: `REQUESTED`, `PROCESSING`, `COMPLETED`, `REJECTED`
+
+확인 필요:
+
+- 최소 출금 금액. FE 임시 기준은 `10,000P`
+- 출금 수수료 정책
+- 출금 신청 시 `withdrawable` 차감 시점
+- 반려 시 포인트 복구 방식
+
+## 출금 내역 조회
+
+- Method / Endpoint 제안: `GET /api/users/{userId}/withdrawals`
+- 인증: 필요
+- FE 사용처: 출금 처리 중 금액 계산, 향후 출금 내역 상세
+- Query: optional `page`, `size`, `status`
+- 응답 데이터: page 또는 list 중 BE 표준에 맞춰 확정 필요
+
+## 오류 코드 요청
+
+| 코드 | 상황 |
+| --- | --- |
+| `POINT_INSUFFICIENT` | 충전/출금/결제/입찰에서 포인트 부족 |
+| `POINT_ACCOUNT_REQUIRED` | 출금 계좌 없음 |
+| `POINT_WITHDRAWAL_MIN_AMOUNT` | 최소 출금 금액 미달 |
+| `POINT_CHARGE_MIN_AMOUNT` | 최소 충전 금액 미달 |
+| `POINT_FORBIDDEN_USER` | 본인이 아닌 사용자 포인트 조회/처리 |
+
+기존 BE `ErrorCode`에 `INSUFFICIENT_POINTS`가 있다면 FE와 코드명을 맞출 필요가 있다.
+
+## FE 반영 계획
+
+- `FE/src/domains/point/api/pointApi.ts` endpoint 경로와 응답 mapper 수정
+- `VITE_POINT_API_ENABLED=true`로 전환
+- 필요 시 `/points/history` 필터를 서버 query로 위임
+- API 문서와 화면 상태 문서 갱신
