@@ -33,7 +33,7 @@ const wait = (delay: number) =>
     window.setTimeout(resolve, delay)
   })
 
-const mapLiveProductDto = (dto: LiveProductDto, _index: number): LiveWatchProduct => ({
+const mapLiveProductDto = (dto: LiveProductDto): LiveWatchProduct => ({
   id: dto.productId,
   title: dto.productTitle,
   brandName: null,

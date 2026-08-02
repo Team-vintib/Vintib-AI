@@ -15,4 +15,8 @@ export class ProductDetailNotFoundError extends Error {
 export const getProductDetailViewData = async (
   productId: number,
   _scenario: ProductDetailMockScenario = 'default',
-): Promise<ProductDetailViewData> => getProductDetail(productId)
+): Promise<ProductDetailViewData> => {
+  void _scenario
+
+  return getProductDetail(productId)
+}
