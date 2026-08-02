@@ -214,7 +214,7 @@ const mockSales: MySaleItem[] = [
   },
 ]
 
-const mockLives: MyLiveItem[] = liveListMockData.slice(0, 3).map((live) => ({
+const mockLives: MyLiveItem[] = liveListMockData.map((live) => ({
   id: live.id,
   title: live.title,
   status: live.status,

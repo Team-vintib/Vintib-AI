@@ -23,6 +23,7 @@ import {
   MY_SETTLEMENT_STATUS_LABELS,
 } from '@/domains/my/constants/myMockData'
 import type {
+  MyLiveStatus,
   MyOrderStatus,
   MyPageViewData,
   MyProductStatus,
@@ -93,6 +94,14 @@ const saleFilterOptions = [
   { id: 'REFUND', label: '환불' },
 ] satisfies Array<{ id: SaleFilterId; label: string }>
 const selectedSaleFilter = ref<SaleFilterId>('ALL')
+type LiveFilterId = 'ALL' | MyLiveStatus
+const liveFilterOptions = [
+  { id: 'ALL', label: '전체' },
+  { id: 'LIVE', label: '진행 중' },
+  { id: 'SCHEDULED', label: '예약' },
+  { id: 'ENDED', label: '종료' },
+] satisfies Array<{ id: LiveFilterId; label: string }>
+const selectedLiveFilter = ref<LiveFilterId>('ALL')
 
 const profile = computed(() => viewData.value?.summary.profile ?? null)
 const isLoading = computed(() => loadState.value === 'loading')
@@ -155,6 +164,15 @@ const filteredSales = computed(() => {
   }
 
   return sales.filter((sale) => isSaleInFilter(sale.status, selectedSaleFilter.value))
+})
+const filteredLives = computed(() => {
+  const lives = viewData.value?.lives ?? []
+
+  if (selectedLiveFilter.value === 'ALL') {
+    return lives
+  }
+
+  return lives.filter((live) => live.status === selectedLiveFilter.value)
 })
 const currentSectionLabel = computed(
   () =>
@@ -439,12 +457,26 @@ const selectSaleFilter = (filterId: SaleFilterId) => {
   selectedSaleFilter.value = filterId
 }
 
+const selectLiveFilter = (filterId: LiveFilterId) => {
+  selectedLiveFilter.value = filterId
+}
+
 const goToOrderDetail = (orderId: number) => {
   void router.push({ name: ROUTE_NAMES.MY_ORDER_DETAIL, params: { orderId } })
 }
 
 const goToSaleDetail = (saleId: number) => {
   void router.push({ name: ROUTE_NAMES.MY_SALE_DETAIL, params: { saleId } })
+}
+
+const goToLiveDetail = (liveId: number, status: MyLiveStatus) => {
+  const mockScenario = status === 'LIVE' ? 'default' : status.toLowerCase()
+
+  void router.push({
+    name: status === 'LIVE' ? ROUTE_NAMES.LIVE_BROADCAST : ROUTE_NAMES.LIVE_WATCH,
+    params: { liveId },
+    query: { mock: mockScenario },
+  })
 }
 
 const getOrderFilterCount = (filterId: OrderFilterId) => {
@@ -465,6 +497,16 @@ const getSaleFilterCount = (filterId: SaleFilterId) => {
   }
 
   return sales.filter((sale) => isSaleInFilter(sale.status, filterId)).length
+}
+
+const getLiveFilterCount = (filterId: LiveFilterId) => {
+  const lives = viewData.value?.lives ?? []
+
+  if (filterId === 'ALL') {
+    return lives.length
+  }
+
+  return lives.filter((live) => live.status === filterId).length
 }
 
 const formatOrderDate = (value: string) =>
@@ -1317,14 +1359,52 @@ onMounted(() => {
                 <h2>라이브 관리</h2>
                 <button type="button" @click="goToLiveCreate">예약 라이브 만들기</button>
               </div>
-              <article v-for="live in viewData.lives" :key="live.id" class="my-row">
-                <img :src="live.thumbnailUrl" :alt="live.title" />
-                <div>
-                  <strong>{{ live.title }}</strong>
-                  <p>상품 {{ live.productCount }}개 · 시청 {{ live.viewerCount.toLocaleString('ko-KR') }}</p>
-                </div>
-                <span>{{ MY_LIVE_STATUS_LABELS[live.status] }}</span>
-              </article>
+              <div class="my-order-tabs" role="tablist" aria-label="라이브 상태 필터">
+                <button
+                  v-for="filter in liveFilterOptions"
+                  :key="filter.id"
+                  type="button"
+                  role="tab"
+                  :aria-selected="selectedLiveFilter === filter.id"
+                  :class="{ 'my-order-tabs__item--active': selectedLiveFilter === filter.id }"
+                  @click="selectLiveFilter(filter.id)"
+                >
+                  {{ filter.label }}
+                  <span>{{ getLiveFilterCount(filter.id) }}</span>
+                </button>
+              </div>
+              <div v-if="filteredLives.length" class="my-order-grid">
+                <article v-for="live in filteredLives" :key="live.id" class="my-order-card">
+                  <button
+                    type="button"
+                    class="my-order-card__main"
+                    @click="goToLiveDetail(live.id, live.status)"
+                  >
+                    <img :src="live.thumbnailUrl" :alt="live.title" />
+                    <div class="my-order-card__body">
+                      <div class="my-order-card__top">
+                        <span>{{ MY_LIVE_STATUS_LABELS[live.status] }}</span>
+                        <strong>상품 {{ live.productCount }}개</strong>
+                      </div>
+                      <h3>{{ live.title }}</h3>
+                      <p>시청 {{ live.viewerCount.toLocaleString('ko-KR') }}</p>
+                      <dl>
+                        <div>
+                          <dt>방송 일시</dt>
+                          <dd>{{ formatOrderDate(live.broadcastAt) }}</dd>
+                        </div>
+                        <div>
+                          <dt>관리 이동</dt>
+                          <dd>{{ live.status === 'LIVE' ? '송출 화면' : '상세 화면' }}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </button>
+                </article>
+              </div>
+              <p v-if="!filteredLives.length" class="my-order-empty">
+                해당 상태의 라이브가 없습니다.
+              </p>
             </template>
 
             <template v-else-if="selectedSection === 'wishlist'">
