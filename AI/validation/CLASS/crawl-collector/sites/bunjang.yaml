@@ -1,0 +1,83 @@
+# 번개장터 — 중고 거래 플랫폼.
+#
+# **실제 렌더된 DOM으로 검증한 스펙이다**(2026-08-02, Playwright chromium). 예시 스펙과 달리
+# 셀렉터·카테고리 URL 모두 실측값이다.
+#
+# 왜 이 사이트인가: 브리핑 §4.2의 도메인 갭 — CLIP/Qwen3-VL은 깨끗한 스튜디오 제품샷으로
+# 학습됐는데 우리 서비스 입력은 개인 판매자가 스마트폰으로 찍은 중고 사진이다. 번개장터는
+# 그 분포에 가장 가깝다. (무신사는 robots.txt가 `User-agent: * Disallow: /`라 대상에서 제외했다.)
+#
+# robots.txt: `User-agent: * / Allow: /` — 수집 허용. 상품 목록·상세 경로에 제한 없음.
+
+site: bunjang
+
+# 정적 HTML은 3KB짜리 빈 껍데기다(상품이 0건). 반드시 브라우저 렌더가 필요하다.
+render: playwright
+
+# 카드 안에 이미지·상품명이 다 있어서 상세 페이지를 열 필요가 없다.
+# 상품 1건마다 요청이 더 나가지 않으므로 이쪽이 훨씬 예의 바르다.
+follow_detail: false
+
+# 중고 사진은 착용샷/평면샷/걸이샷이 섞여 있다 — 단정하지 말고 비워 두고 사후 라벨링한다.
+# 이 필드를 대충 채우면 브리핑 §4.2의 "촬영유형별로 나눠 평가" 자체가 불가능해진다.
+shot_type_default: null
+
+delay_seconds: 2.0
+
+listing:
+  # 상품 카드가 곧 <a>다. 클래스명은 CSS 모듈 해시(`_container_15rjm_1`)라 배포마다 바뀌므로
+  # 절대 쓰지 않는다 — href 패턴만이 안정적인 앵커다.
+  item_selector: 'a[href^="/products/"]'
+  image_selector: "img"
+  # 카드 안 <p>는 순서대로 [가격, 상품명]이다. 첫 번째를 잡으면 "27,000원"이 들어온다.
+  name_selector: "p:nth-of-type(2)"
+  # 이게 뜰 때까지 기다린 뒤 HTML을 뜬다. 없으면 빈 페이지를 파싱한다.
+  wait_selector: 'a[href^="/products/"]'
+  # 무한스크롤. 1회 렌더에 60건이 잡히고, 스크롤마다 더 붙는다.
+  scroll_times: 3
+
+  # 카테고리는 URL로만 구분된다(카드에도 페이지에도 소분류 표기가 없다).
+  # 카테고리 ID는 실제 사이트 내비게이션에서 수집한 값이다.
+  category_urls:
+    - url: "https://m.bunjang.co.kr/categories/320300100"
+      category: "남성의류 > 아우터 > 코트"
+    - url: "https://m.bunjang.co.kr/categories/320300200"
+      category: "남성의류 > 아우터 > 점퍼"
+    - url: "https://m.bunjang.co.kr/categories/320300300"
+      category: "남성의류 > 아우터 > 패딩"
+    - url: "https://m.bunjang.co.kr/categories/320300400"
+      category: "남성의류 > 아우터 > 자켓"
+    - url: "https://m.bunjang.co.kr/categories/320210400"
+      category: "남성의류 > 상의 > 셔츠"
+    - url: "https://m.bunjang.co.kr/categories/320210500"
+      category: "남성의류 > 상의 > 맨투맨"
+    - url: "https://m.bunjang.co.kr/categories/320210600"
+      category: "남성의류 > 상의 > 후드티/후드집업"
+    - url: "https://m.bunjang.co.kr/categories/320210700"
+      category: "남성의류 > 상의 > 니트/스웨터"
+    - url: "https://m.bunjang.co.kr/categories/320120100"
+      category: "남성의류 > 바지 > 면바지"
+    - url: "https://m.bunjang.co.kr/categories/320120200"
+      category: "남성의류 > 바지 > 슬랙스"
+    - url: "https://m.bunjang.co.kr/categories/320120300"
+      category: "남성의류 > 바지 > 트레이닝/조거팬츠"
+    - url: "https://m.bunjang.co.kr/categories/320120600"
+      category: "남성의류 > 바지 > 데님/청바지"
+
+# 비워 둔다. 위 12개 중 8개는 공용 키워드 규칙이 그대로 맞히고, 나머지 4개는 **일부러**
+# 검수로 보낸다 — 아래 notes 참고. 여기에 강제 매핑을 넣으면 그 판단을 코드가 숨기게 된다.
+category_map: {}
+
+notes: |
+  매핑 결과(12개 카테고리, `--map-only`로 확인):
+    자동 확정 8 — 코트/점퍼/자켓/셔츠/맨투맨/니트·스웨터/슬랙스/데님·청바지
+    검수 대상 4 — 아래 넷은 텍스트만으로는 결정할 수 없는 게 맞다:
+      - "패딩"            : 점퍼형(JACKET) / 롱패딩(COAT) 둘 다 흔함
+      - "후드티/후드집업"  : 한 카테고리가 우리 HOODIE / HOODIE_ZIP_UP 둘에 걸침(§5.2)
+      - "면바지"          : 소재어라 SLACKS / CARGO_PANTS 어느 쪽도 가능
+      - "트레이닝/조거팬츠": 조거는 우리 taxonomy에 없음 — SLACKS 제안 + 검수
+
+  남은 작업:
+  - 여성의류(/categories/310) 하위 트리를 아직 조사하지 않았다. SKIRT는 여기에만 있다.
+  - SHOES / BAG / ACCESSORY 카테고리 ID는 미확인 — 남성의류 내비게이션에 노출되지 않는다.
+    사이트에서 해당 대분류를 열어 ID를 확인한 뒤 위 목록에 추가할 것(브리핑 §4.3 커버리지).
