@@ -152,6 +152,52 @@ class TestMapCategory:
         assert map_category("").status == "unmapped"
 
 
+class TestProductNameResolvesReview:
+    """카테고리가 좁혀 준 후보 안에서 상품명이 하나를 지목하면 검수를 면제한다.
+
+    번개장터 `"상의 > 후드티/후드집업"`이 실제 사례다 — 이 카테고리는 통째로 검수행이었는데,
+    상품명에 "후드집업"/"후드티"가 대부분 적혀 있어 그대로 갈라낼 수 있다.
+    """
+
+    MERGED = "남성의류 > 상의 > 후드티/후드집업"
+
+    def test_name_picks_one_of_the_merged_candidates(self):
+        result = map_category(self.MERGED, product_name="오라리 스무스 소프트 후드집업 블랙")
+        assert result.subcategory_code == "HOODIE_ZIP_UP"
+        assert result.status == "mapped"
+
+    def test_name_picks_the_other_candidate(self):
+        result = map_category(self.MERGED, product_name="베트멍 후드 L")
+        assert result.subcategory_code == "HOODIE"
+        assert result.status == "mapped"
+
+    def test_name_outside_candidate_set_is_ignored(self):
+        """상품명이 후보 밖(무지 티셔츠)을 가리키면 채택하지 않는다 — 후보 제한이 안전장치."""
+        result = map_category(self.MERGED, product_name="베이직 무지 티셔츠")
+        assert result.status == "needs_review"
+        assert result.subcategory_code in ("HOODIE", "HOODIE_ZIP_UP")
+
+    def test_name_with_no_keyword_leaves_review(self):
+        result = map_category(self.MERGED, product_name="정품 급처 팝니다")
+        assert result.status == "needs_review"
+
+    def test_ambiguous_category_specified_by_name(self):
+        """'패딩'(JACKET/COAT 모호) + '롱패딩' → COAT."""
+        result = map_category("남성의류 > 아우터 > 패딩", product_name="노스페이스 롱패딩 블랙")
+        assert result.subcategory_code == "COAT"
+        assert result.status == "mapped"
+
+    def test_ambiguous_name_does_not_resolve_ambiguous_category(self):
+        """모호함을 모호함으로 덮지 않는다 — 상품명도 '패딩'뿐이면 그대로 검수."""
+        result = map_category("남성의류 > 아우터 > 패딩", product_name="겨울 패딩 급처")
+        assert result.status == "needs_review"
+
+    def test_resolved_confidence_stays_below_direct_category_match(self):
+        resolved = map_category(self.MERGED, product_name="오라리 후드집업")
+        direct = map_category("상의 > 후드집업")
+        assert resolved.confidence < direct.confidence
+
+
 class TestRulesCoverTaxonomy:
     def test_every_subcategory_has_a_rule(self):
         """30종 중 하나라도 규칙이 없으면 그 코드는 영원히 수집되지 않는다."""
