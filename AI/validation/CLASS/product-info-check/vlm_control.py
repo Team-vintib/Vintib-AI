@@ -236,6 +236,39 @@ _COLOR_PROMPT_TEMPLATE = (
     "색상 코드 목록: {codes}"
 )
 
+# 색상 개선안 1·2번(팔레트 코드 시각적 앵커 + 색상 혼동쌍 명시, Notion "실험실/[CLASS] 색상
+# 판정 정확도 개선 방안 고찰" 참고, 2026-08-03). 카테고리 v2(위 `_CATEGORY_PROMPT_TEMPLATE_V2`)
+# 와 같은 형식 — 사진에서 직접 관찰 가능한 밝기/색조 기준만 쓴다(주관적 인상 배제). 근접색
+# 그룹은 정답셋 라벨링 정정 이력이 근거다(logo_test.jpg BEIGE->WHITE, small_pro.jpg
+# SKYBLUE->WHITE).
+_COLOR_PROMPT_TEMPLATE_V2 = (
+    "다음은 중고 거래 플랫폼에 올라온 상품 사진이다. 아래 색상 코드 목록 중 이 상품의 주 색상과 "
+    "보조 색상을 하나씩 골라 JSON으로만 답하라. 보조 색상이 뚜렷하지 않으면 null로 두고, "
+    '여러 색이 비슷한 비중으로 섞여 있으면 "MULTI"를 골라도 된다. 다른 설명은 절대 붙이지 마라.\n'
+    "\n"
+    "헷갈리기 쉬운 색상 구분 기준(사진에 실제로 보이는 밝기·색조로만 판단):\n"
+    "- WHITE vs IVORY vs BEIGE: WHITE는 더 밝힐 수 없는 순백. IVORY는 흰색보다 살짝 "
+    "노르스름한 미색(약간 누런 흰색). BEIGE는 IVORY보다 더 진하고 갈색기가 도는 살구/모래색\n"
+    "- BLACK vs NAVY: BLACK은 푸른기 없는 순수 무채색 검정. NAVY는 검정처럼 보여도 자세히 "
+    "보면 푸른기가 도는 아주 짙은 남색\n"
+    "- GRAY vs SILVER: GRAY는 광택 없이 밝지도 어둡지도 않은 중간 회색. SILVER는 GRAY보다 "
+    "밝고 은은한 광택/금속 느낌이 있다\n"
+    "- BROWN vs KHAKI: BROWN은 채도 높은 순수 갈색. KHAKI는 갈색과 국방색이 섞인 듯한 탁한 "
+    "황갈색\n"
+    "- SKYBLUE vs BLUE vs NAVY: SKYBLUE는 연하고 밝은 하늘색. BLUE는 그보다 진하고 선명한 "
+    "파랑. NAVY는 그보다 훨씬 어두운 남색\n"
+    "\n"
+    '형식: {{"primary": "코드", "secondary": "코드 또는 null"}}\n'
+    "색상 코드 목록: {codes}"
+)
+
+COLOR_PROMPT_VERSIONS: dict[str, str] = {
+    "v1": _COLOR_PROMPT_TEMPLATE,
+    "v2_anchored": _COLOR_PROMPT_TEMPLATE_V2,
+}
+# 카테고리(v4)와 달리 아직 실측 검증 전이라 기본값은 v1 그대로 둔다 — 실측 후 결정.
+ACTIVE_COLOR_PROMPT_VERSION = "v1"
+
 
 def _match_label(raw_text: str, labels: list[str]) -> str | None:
     """VLM 출력은 자유 텍스트라 정확히 안 맞을 수 있다 — 대소문자/공백 무시하고
@@ -270,18 +303,26 @@ def query_category(
     return _match_label(raw, list(ALL_SUBCATEGORIES)), raw
 
 
-def query_color(image_path: Path, model_key: str = ACTIVE_VLM) -> tuple[str, str | None, dict]:
+def query_color(
+    image_path: Path,
+    model_key: str = ACTIVE_VLM,
+    prompt_version: str = ACTIVE_COLOR_PROMPT_VERSION,
+) -> tuple[str, str | None, dict]:
     """color.py의 VLMColorExtractor가 호출하는 진입점. (primary, secondary, raw) 반환.
 
     파싱 실패 시 예외를 던지지 않고 primary="UNKNOWN"으로 폴백한다 — evaluate.py가 이걸
-    "팔레트 밖으로 나가는 비율" 지표에 그대로 잡을 수 있게 하기 위해서다(실패도 데이터다)."""
+    "팔레트 밖으로 나가는 비율" 지표에 그대로 잡을 수 있게 하기 위해서다(실패도 데이터다).
+
+    `prompt_version`: `COLOR_PROMPT_VERSIONS`의 키(`"v1"` 기본 / `"v2_anchored"` — 팔레트
+    코드 시각적 앵커 + 근접색 구분 기준을 명시한 버전, 2026-08-03 추가)."""
     from PIL import Image
 
     bundle = _get_bundle()
     with Image.open(image_path) as img:
         image = img.convert("RGB")
     valid_codes = list(PALETTE) + [MULTI_LABEL]
-    prompt = _COLOR_PROMPT_TEMPLATE.format(codes=", ".join(valid_codes))
+    template = COLOR_PROMPT_VERSIONS[prompt_version]
+    prompt = template.format(codes=", ".join(valid_codes))
     raw_text = generate_from_image(bundle, image, prompt)
 
     match = re.search(r"\{.*\}", raw_text, re.DOTALL)
