@@ -25,6 +25,11 @@
 - 메인 요약
   - 사용자 카드: 프로필 이미지 fallback, 이름/닉네임, 이메일, 회원 유형, 사업자 인증 상태
   - 카운터: 구매/낙찰, 판매, 찜, 팔로워, 알림
+  - 개인 홈 요약: 구매/낙찰, 찜, 팔로워, 사용 가능 포인트
+- `seller`
+  - 판매 대시보드: 판매 완료 건수, 누적 판매/순수익, 평균 판매가, 정산 완료, 월별 수익 추이
+  - 운영 대기: 배송 대기, 환불 요청, 비공개 상품, 예약 라이브
+  - 상품 상태 분포: 판매중, 경매 예정, 판매 완료, 비공개
   - 포인트 요약: 사용 가능 포인트와 `/points` 이동 CTA
   - 빠른 메뉴: 상품 등록, 라이브 시작, 알림센터, 사업자 인증/관리
 - `profile` 또는 기본 섹션
@@ -62,11 +67,12 @@
 
 ## 구현 목록
 
-- [ ] `domains/my/types`에 마이페이지 요약, 프로필, 판매 상품, 주문, 판매/정산, 라이브, 찜/팔로우 view model 타입을 정의한다.
-- [ ] `domains/my/constants`에 mock profile, summary, 메뉴, 상태 라벨과 섹션 옵션을 둔다.
-- [ ] `domains/my/api`에 `getMyPageSummary`, `getMyProfile`, `updateMyProfile`, `getMyWishList` 등 adapter 함수를 만든다.
-- [ ] `/my` route를 `domains/my/pages/MyPage.vue`로 연결한다.
-- [ ] 마이페이지 레이아웃을 구현한다: 상단 사용자 요약, 포인트 카드, 카운터, 탭/사이드 메뉴, 섹션 콘텐츠.
+- [x] `domains/my/types`에 마이페이지 요약, 프로필, 판매 상품, 주문, 판매/정산, 라이브, 찜/팔로우 view model 타입을 정의한다.
+- [x] `domains/my/constants`에 mock profile, summary, 메뉴, 상태 라벨과 섹션 옵션을 둔다.
+- [x] `domains/my/api`에 `getMyPageSummary`, `getMyProfile`, `updateMyProfile`, `getMyWishList` 등 adapter 함수를 만든다.
+- [x] `/my` route를 `domains/my/pages/MyPage.vue`로 연결한다.
+- [x] 마이페이지 레이아웃을 구현한다: 상단 사용자 요약, 포인트 카드, 카운터, 탭/사이드 메뉴, 섹션 콘텐츠.
+- [x] 마이페이지 목록에 판매자 대시보드 섹션을 추가한다: KPI, 월별 수익, 처리 대기, 상품 상태 분포.
 - [ ] MY-001 프로필 조회/수정 UI를 구현하고, 저장 중/성공/검증 오류/권한 오류 상태를 처리한다.
 - [ ] MY-002 판매 상품 관리 shell을 구현한다.
 - [ ] MY-003 구매/낙찰 내역 shell을 구현한다.
@@ -83,7 +89,7 @@
 
 - `011-user-mypage-contract.md`에서 우선 확정 필요
   - `GET /api/me`: 마이페이지와 auth guard가 최신 사용자 정보를 얻기 위해 필요
-  - `GET /api/users/{userId}/mypage`: 첫 화면 카운터와 포인트 요약을 한 번에 받을지 결정 필요
+  - `GET /api/users/{userId}/mypage`: 첫 화면 카운터, 포인트 요약, 판매 KPI, 월별 수익, 처리 대기, 상품 상태 분포를 한 번에 받을지 결정 필요
   - `PATCH /api/me` 제공 여부: 현재 `PATCH /api/users/{id}`는 전체 필수 필드 방식이라 부분 수정 UX와 충돌 가능
   - 프로필 이미지 업로드 방식과 응답 필드
   - 사업자 인증 상태 필드 위치
@@ -106,4 +112,3 @@
 - 공개 프로필 상세 화면
 - AI 시착 결과 저장/비교 관리 화면
 - 장바구니 기능: 기능 정의서와 API 목록에서 명확한 도메인 계약이 없어 헤더의 `cart` query는 준비 상태로만 처리
-

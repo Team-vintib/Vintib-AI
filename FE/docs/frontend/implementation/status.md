@@ -24,6 +24,7 @@
 | 라이브 개설 화면 | 부분   | LIVE-001/002 `/lives/new` route, 라이브 유형·방송 정보·판매 상품·예약 일정·장비 확인·완료 단계 UI, 필수값/과거 일정 검증, 상품 mock 검색/선택, `getUserMedia` 기반 카메라 미리보기와 마이크 순차 확인 구현. 실제 라이브 생성/예약 API와 방송 SDK 연동 대기 |
 | 라이브 시청 화면 | 부분   | 419 방송 헤더·상품 큐·영상 stage·선택 상품·상태 화면, 423 채팅·반응·경매 패널, 425 사진 중심 AI 시착 패널과 등록 전·생성·결과·실패 mock 상태 구현. 실제 스트리밍·채팅 STOMP·경매·AI API 연동 대기 |
 | 알림 화면        | 부분   | S15P11A108-420·421 `/notifications` 읽지 않은 알림 목록·탭 필터·현재 탭 표시·전체 탭 더보기·단건/전체 읽음 처리와 공통 헤더 알림 팝업·unread badge 구현. 알림 mock data/query와 로컬 DB seed를 제거했고 실제 `/api/users/{userId}/alerts?unreadOnly=true`로 조회하며 읽음 처리된 알림은 목록에서 제거. 조회/읽음 API 재검증 완료, 실제 알림 생성 이벤트·예약 라이브 알림 신청/스케줄러·서버 카테고리 필터·알림 `type/refType` enum 문서화·탭별 bulk read API는 대기 |
+| 마이페이지 화면   | 부분   | `/my` route를 `domains/my/pages/MyPage.vue`로 연결하고 사용자 요약, 포인트 카드, 구매/판매/찜 카운터, 프로필·판매 상품·구매/낙찰·판매/정산·라이브·찜/팔로우·사업자 섹션 전환을 구현. `VITE_MY_API_ENABLED=false` 기본값에서는 mock fallback 사용. 프로필 저장과 주문/배송/환불/포인트/팔로우/사업자 상세 API는 BE 계약 확정 대기 |
 | 공통 컴포넌트   | 부분   | 온보딩 도메인에 BaseButton, BaseInput, BaseField, 단계 표시 구현. shared에는 GlobalNavigation, RoutePlaceholder, 홈·상품·라이브가 재사용하는 AppSearchBar 구현 |
 | API 타입        | 부분   | 공통 응답/에러/pagination, 인증 회원가입·로그인 요청/응답 타입, 온보딩 필드 오류·회원 유형 타입 구현                                   |
 | Mock 데이터     | 부분   | 홈·상품 목록·상품 상세·유사 상품 가격 분포·상품 등록·라이브 채팅·경매·AI 시착 패널 확인용 mock 데이터 구현, 상품 목록은 로컬 WebP와 가격 필터 사용, 홈은 BE 미제공 회원 홈 보조 섹션·콘텐츠 카드·fallback 데이터에 mock 일부 유지. 알림 도메인 mock 데이터는 제거하고 실제 DB/API 확인으로 전환 |
@@ -57,3 +58,9 @@
 | --- | --- | --- |
 | 포인트 화면 | 부분 | `/points` route를 `PointWalletPage`로 연결하고 `domains/point`에 잔액 요약, 충전, 거래 내역, 출금 패널을 추가. `VITE_POINT_API_ENABLED=false` 기본값에서는 mock fallback으로 동작하며, BE 최종 계약 확정 후 `/users/{id}/points` 계열 호출을 실제 응답 필드에 맞춰 조정 필요 |
 | 포인트 UI 개선 | 부분 | `/points` 상단에 사용 가능 포인트를 크게 배치하고 보유/출금 가능/정산 예정/출금 처리 중 카드를 추가. 내역/충전/출금 버튼으로 메인 기능을 전환하며, 전체 내역은 `/points/history`에서 전체/출금/입금 및 기간 필터로 조회 |
+
+## 2026-08-02 마이페이지 화면 상태
+
+| 영역 | 상태 | 비고 |
+| --- | --- | --- |
+| 마이페이지 화면 | 부분 | `domains/my`에 타입, mock data, API adapter, `MyPage`를 추가하고 `/my` route를 실제 화면으로 연결. 헤더 드롭다운의 `/my?section=orders/sales/wishlist` 이동을 섹션 전환으로 처리한다. `VITE_MY_API_ENABLED=false` 기본값에서는 mock fallback 사용 |

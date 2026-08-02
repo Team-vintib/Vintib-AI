@@ -1,0 +1,1429 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+
+import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { getMyPageViewData } from '@/domains/my/api/myApi'
+import {
+  MY_BUSINESS_STATUS_LABELS,
+  MY_LIVE_STATUS_LABELS,
+  MY_ORDER_STATUS_LABELS,
+  MY_PRODUCT_STATUS_LABELS,
+  MY_SECTION_OPTIONS,
+  MY_SETTLEMENT_STATUS_LABELS,
+} from '@/domains/my/constants/myMockData'
+import type { MyPageViewData, MySectionId } from '@/domains/my/types/my.types'
+import { normalizeApiError } from '@/shared/api/http'
+import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
+import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
+
+const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
+
+const viewData = ref<MyPageViewData | null>(null)
+const selectedSection = ref<MySectionId>('dashboard')
+const loadState = ref<'idle' | 'loading' | 'success' | 'error' | 'guest'>('idle')
+const errorMessage = ref('')
+
+const profile = computed(() => viewData.value?.summary.profile ?? null)
+const isLoading = computed(() => loadState.value === 'loading')
+const isGuest = computed(() => loadState.value === 'guest')
+const hasLoadError = computed(() => loadState.value === 'error')
+const profileInitial = computed(() => (profile.value?.nickname || profile.value?.name || '회').slice(0, 1))
+const currentSectionLabel = computed(
+  () =>
+    MY_SECTION_OPTIONS.find((section) => section.id === selectedSection.value)?.label ??
+    '마이페이지',
+)
+
+const homeCards = computed(() => {
+  const summary = viewData.value?.summary
+
+  return [
+    {
+      label: '진행 중인 판매',
+      value: summary?.productStatusCounts.onSale ?? 0,
+      section: 'products',
+      suffix: '건',
+      tone: 'green',
+      icon: 'box',
+    },
+    {
+      label: '배송 중',
+      value: summary?.todoCounts.shippingPending ?? 0,
+      section: 'sales',
+      suffix: '건',
+      tone: 'orange',
+      icon: 'bag',
+    },
+    {
+      label: '정산 예정',
+      value: summary?.settlementSummary.pendingAmount ?? summary?.pendingSettlementAmount ?? 0,
+      section: 'sales',
+      suffix: 'P',
+      tone: 'green',
+      icon: 'wallet',
+    },
+    {
+      label: '예정 라이브',
+      value: summary?.todoCounts.scheduledLives ?? 0,
+      section: 'lives',
+      suffix: '건',
+      tone: 'red',
+      icon: 'video',
+    },
+  ] satisfies Array<{
+    label: string
+    value: number
+    section: MySectionId
+    suffix?: string
+    tone: 'green' | 'orange' | 'red'
+    icon: 'box' | 'bag' | 'wallet' | 'video'
+  }>
+})
+
+const profileStats = computed(() => {
+  const summary = viewData.value?.summary
+
+  return [
+    { label: '팔로워', value: summary?.counts.followers ?? 0, suffix: '' },
+    { label: '팔로잉', value: 42, suffix: '' },
+    {
+      label: '판매 완료',
+      value: summary?.salesPerformance.soldCount ?? summary?.counts.sales ?? 0,
+      suffix: '건',
+    },
+    { label: '보유 포인트', value: summary?.pointBalance ?? 0, suffix: 'P' },
+  ]
+})
+
+const pointCards = computed(() => {
+  const summary = viewData.value?.summary
+
+  return [
+    {
+      label: '사용 가능',
+      value: summary?.pointBalance ?? 0,
+      helper: '즉시 사용 가능',
+    },
+    {
+      label: '입찰 보류',
+      value: 39000,
+      helper: '경매 종료 시 반환',
+    },
+    {
+      label: '거래 보관',
+      value: summary?.settlementSummary.escrowAmount ?? 0,
+      helper: '구매 확정 후 정산',
+    },
+    {
+      label: '판매 정산',
+      value: summary?.settlementSummary.pendingAmount ?? summary?.pendingSettlementAmount ?? 0,
+      helper: '출금 신청 가능',
+    },
+  ]
+})
+
+const kpiCards = computed(() => {
+  const summary = viewData.value?.summary
+
+  return [
+    {
+      label: '판매 완료',
+      value: summary?.salesPerformance.soldCount ?? 0,
+      section: 'sales',
+      suffix: '건',
+      helper: `판매 전환율 ${summary?.salesPerformance.sellThroughRate ?? 0}%`,
+    },
+    {
+      label: '누적 순수익',
+      value: summary?.salesPerformance.netRevenue ?? 0,
+      section: 'sales',
+      suffix: 'P',
+      helper: `평균 ${formatPoint(summary?.salesPerformance.averageOrderAmount ?? 0)}`,
+    },
+    {
+      label: '정산 완료',
+      value: summary?.settlementSummary.settledAmount ?? 0,
+      section: 'sales',
+      suffix: 'P',
+      helper: `마지막 정산 ${formatShortDate(summary?.settlementSummary.lastSettledAt)}`,
+    },
+  ] satisfies Array<{
+    label: string
+    value: number
+    section: MySectionId
+    suffix?: string
+    helper: string
+  }>
+})
+
+const todoCards = computed(() => {
+  const todo = viewData.value?.summary.todoCounts
+
+  return [
+    { label: '배송 대기', value: todo?.shippingPending ?? 0, section: 'sales' },
+    { label: '환불 요청', value: todo?.refundRequests ?? 0, section: 'sales' },
+    { label: '비공개 상품', value: todo?.privateProducts ?? 0, section: 'products' },
+    { label: '예약 라이브', value: todo?.scheduledLives ?? 0, section: 'lives' },
+  ] satisfies Array<{ label: string; value: number; section: MySectionId }>
+})
+
+const productStatusCards = computed(() => {
+  const counts = viewData.value?.summary.productStatusCounts
+
+  return [
+    { label: '판매중', value: counts?.onSale ?? 0 },
+    { label: '경매 예정', value: counts?.auctionScheduled ?? 0 },
+    { label: '판매 완료', value: counts?.sold ?? 0 },
+    { label: '비공개', value: counts?.private ?? 0 },
+  ]
+})
+
+const monthlyRevenue = computed(() => viewData.value?.summary.monthlyRevenue ?? [])
+const maxMonthlyRevenue = computed(() =>
+  Math.max(1, ...monthlyRevenue.value.map((item) => item.revenue)),
+)
+
+const getRevenueBarHeight = (revenue: number) =>
+  `${Math.max(10, Math.round((revenue / maxMonthlyRevenue.value) * 100))}%`
+
+const formatPoint = (value: number) => `${value.toLocaleString('ko-KR')}P`
+
+const formatShortDate = (value?: string) => {
+  if (!value) {
+    return '-'
+  }
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'numeric',
+    day: 'numeric',
+  }).format(new Date(value))
+}
+
+const setSectionFromQuery = () => {
+  const section = route.query.section
+  const nextSection = typeof section === 'string' ? section : 'dashboard'
+  const normalizedSection = nextSection === 'followers' ? 'social' : nextSection
+  const isKnownSection = MY_SECTION_OPTIONS.some((option) => option.id === normalizedSection)
+
+  selectedSection.value = isKnownSection ? (normalizedSection as MySectionId) : 'dashboard'
+}
+
+const selectSection = async (section: MySectionId) => {
+  if (section === 'points') {
+    await router.push({ name: ROUTE_NAMES.POINT })
+    return
+  }
+
+  selectedSection.value = section
+  await router.replace({
+    name: ROUTE_NAMES.MY,
+    query: section === 'dashboard' ? {} : { section },
+  })
+}
+
+const loadMyPage = async () => {
+  await authStore.validateStoredSession()
+
+  if (!authStore.user?.id) {
+    loadState.value = 'guest'
+    return
+  }
+
+  loadState.value = 'loading'
+  errorMessage.value = ''
+
+  try {
+    viewData.value = await getMyPageViewData(authStore.user.id)
+    loadState.value = 'success'
+  } catch (error) {
+    errorMessage.value = normalizeApiError(error).message
+    loadState.value = 'error'
+  }
+}
+
+const goToLogin = () => {
+  void router.push({ name: ROUTE_NAMES.AUTH_LOGIN, query: { redirect: ROUTE_PATHS.MY } })
+}
+
+const goToProductCreate = () => {
+  void router.push({ name: ROUTE_NAMES.PRODUCT_CREATE })
+}
+
+const goToLiveCreate = () => {
+  void router.push({ name: ROUTE_NAMES.LIVE_CREATE })
+}
+
+const logout = async () => {
+  await authStore.logoutSession()
+  await router.replace({ name: ROUTE_NAMES.HOME })
+}
+
+watch(
+  () => route.query.section,
+  () => {
+    setSectionFromQuery()
+  },
+  { immediate: true },
+)
+
+onMounted(() => {
+  void loadMyPage()
+})
+</script>
+
+<template>
+  <DefaultLayout content-max-width="1440px">
+    <section class="my-shell" aria-labelledby="my-page-title">
+      <div v-if="isLoading" class="my-state" role="status">마이페이지 정보를 불러오는 중입니다.</div>
+
+      <div v-else-if="isGuest" class="my-state">
+        <strong>로그인이 필요합니다.</strong>
+        <button type="button" @click="goToLogin">로그인으로 이동</button>
+      </div>
+
+      <div v-else-if="hasLoadError" class="my-state" role="alert">
+        <strong>마이페이지 정보를 불러오지 못했습니다.</strong>
+        <p>{{ errorMessage }}</p>
+        <button type="button" @click="loadMyPage">다시 시도</button>
+      </div>
+
+      <template v-else-if="viewData && profile">
+        <aside class="my-sidebar" aria-label="마이페이지 메뉴">
+          <div class="my-sidebar__profile">
+            <div class="my-sidebar__avatar" aria-hidden="true">{{ profileInitial }}</div>
+            <div>
+              <strong>{{ profile.name }} 님</strong>
+              <span>{{ profile.memberType === 'BUSINESS' ? '사업자 회원' : '일반 회원' }}</span>
+            </div>
+          </div>
+
+          <nav class="my-sidebar__nav">
+            <button
+              v-for="section in MY_SECTION_OPTIONS"
+              :key="section.id"
+              type="button"
+              :class="{ 'my-sidebar__nav-item--active': selectedSection === section.id }"
+              @click="selectSection(section.id)"
+            >
+              <span aria-hidden="true"></span>
+              {{ section.label }}
+            </button>
+          </nav>
+
+          <div class="my-sidebar__footer">
+            <button type="button" @click="logout">
+              <span aria-hidden="true"></span>
+              로그아웃
+            </button>
+          </div>
+        </aside>
+
+        <main class="my-content">
+          <header v-if="selectedSection !== 'dashboard'" class="my-content__header">
+            <div>
+              <h1 id="my-page-title">{{ currentSectionLabel }}</h1>
+              <p v-if="selectedSection === 'seller'">
+                판매 성과와 정산, 처리할 일을 확인합니다.
+              </p>
+            </div>
+            <div class="my-content__actions">
+              <button type="button" @click="goToProductCreate">새 상품 등록</button>
+              <button type="button" @click="goToLiveCreate">예약 라이브 만들기</button>
+            </div>
+          </header>
+
+          <template v-if="selectedSection === 'dashboard'">
+            <section class="my-profile-hero" aria-label="회원 요약">
+              <div class="my-profile-hero__avatar" aria-hidden="true">{{ profileInitial }}</div>
+              <div class="my-profile-hero__body">
+                <div class="my-profile-hero__title">
+                  <h2>{{ profile.name }} 님</h2>
+                  <span>{{ MY_BUSINESS_STATUS_LABELS[profile.businessVerificationStatus] }}</span>
+                </div>
+                <p>
+                  {{ profile.nickname }} · {{ profile.email }} · 가입 2024.03.15
+                </p>
+                <div class="my-profile-hero__stats">
+                  <button
+                    v-for="stat in profileStats"
+                    :key="stat.label"
+                    type="button"
+                    @click="stat.label === '보유 포인트' ? selectSection('points') : undefined"
+                  >
+                    <strong>{{ stat.value.toLocaleString('ko-KR') }}{{ stat.suffix }}</strong>
+                    <span>{{ stat.label }}</span>
+                  </button>
+                </div>
+              </div>
+              <button class="my-profile-hero__edit" type="button" @click="selectSection('profile')">
+                정보 수정
+              </button>
+            </section>
+
+            <section class="my-dashboard my-dashboard--home" aria-label="마이페이지 현황">
+              <button
+                v-for="card in homeCards"
+                :key="card.label"
+                class="my-dashboard__card"
+                :class="`my-dashboard__card--${card.tone}`"
+                type="button"
+                @click="selectSection(card.section)"
+              >
+                <i class="my-dashboard__icon" :class="`my-dashboard__icon--${card.icon}`" aria-hidden="true"></i>
+                <span>{{ card.label }}</span>
+                <strong>
+                  {{ card.value.toLocaleString('ko-KR') }}{{ card.suffix ?? '' }}
+                </strong>
+              </button>
+            </section>
+
+            <section class="my-card my-point-panel" aria-label="포인트 현황">
+              <div class="my-card__title">
+                <h2>포인트 현황</h2>
+                <button type="button" @click="selectSection('points')">자세히 보기</button>
+              </div>
+              <div class="my-point-panel__grid">
+                <article v-for="point in pointCards" :key="point.label">
+                  <span>{{ point.label }}</span>
+                  <strong>{{ formatPoint(point.value) }}</strong>
+                  <p>{{ point.helper }}</p>
+                </article>
+              </div>
+              <div class="my-point-panel__actions">
+                <button type="button" @click="selectSection('points')">포인트 충전</button>
+                <button type="button" @click="selectSection('points')">출금 신청</button>
+              </div>
+            </section>
+          </template>
+
+          <template v-else-if="selectedSection === 'seller'">
+            <section class="my-dashboard" aria-label="판매자 대시보드 요약">
+              <button
+                v-for="card in kpiCards"
+                :key="card.label"
+                class="my-dashboard__card"
+                type="button"
+                @click="selectSection(card.section)"
+              >
+                <span>{{ card.label }}</span>
+                <strong>
+                  {{ card.value.toLocaleString('ko-KR') }}{{ card.suffix ?? '' }}
+                </strong>
+                <small>{{ card.helper }}</small>
+              </button>
+            </section>
+
+            <section class="my-dashboard-grid" aria-label="판매 대시보드">
+              <article class="my-card my-card--revenue">
+                <div class="my-card__title">
+                  <h2>월별 수익</h2>
+                  <strong>{{ formatPoint(viewData.summary.salesPerformance.grossRevenue) }}</strong>
+                </div>
+                <div class="my-revenue-chart">
+                  <div v-for="item in monthlyRevenue" :key="item.month" class="my-revenue-chart__item">
+                    <span>{{ formatPoint(item.revenue) }}</span>
+                    <div>
+                      <i :style="{ height: getRevenueBarHeight(item.revenue) }" />
+                    </div>
+                    <b>{{ item.month }}</b>
+                    <small>{{ item.soldCount }}건</small>
+                  </div>
+                </div>
+              </article>
+
+              <article class="my-card my-card--todo">
+                <div class="my-card__title">
+                  <h2>처리할 일</h2>
+                  <button type="button" @click="selectSection('sales')">전체 보기</button>
+                </div>
+                <button
+                  v-for="todo in todoCards"
+                  :key="todo.label"
+                  class="my-todo-row"
+                  type="button"
+                  @click="selectSection(todo.section)"
+                >
+                  <span>{{ todo.label }}</span>
+                  <strong>{{ todo.value }}</strong>
+                </button>
+              </article>
+            </section>
+
+            <section class="my-card my-card--split" aria-label="판매 운영 현황">
+              <div>
+                <div class="my-card__title">
+                  <h2>상품 상태</h2>
+                  <button type="button" @click="selectSection('products')">관리</button>
+                </div>
+                <div class="my-status-grid">
+                  <div v-for="status in productStatusCards" :key="status.label">
+                    <span>{{ status.label }}</span>
+                    <strong>{{ status.value }}</strong>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div class="my-card__title">
+                  <h2>최근 판매</h2>
+                  <button type="button" @click="selectSection('sales')">내역</button>
+                </div>
+                <article v-for="sale in viewData.sales.slice(0, 3)" :key="sale.id" class="my-text-row">
+                  <div>
+                    <strong>{{ sale.productName }}</strong>
+                    <p>{{ sale.buyerNickname }} · {{ sale.paidAmount.toLocaleString('ko-KR') }}P</p>
+                  </div>
+                  <span>{{ MY_SETTLEMENT_STATUS_LABELS[sale.settlementStatus] }}</span>
+                </article>
+              </div>
+            </section>
+          </template>
+
+          <section v-else class="my-card" :aria-label="currentSectionLabel">
+            <template v-if="selectedSection === 'profile'">
+              <div class="my-card__title">
+                <h2>기본 정보</h2>
+                <button type="button">기본 정보 저장</button>
+              </div>
+              <dl class="my-profile-grid">
+                <div>
+                  <dt>이름</dt>
+                  <dd>{{ profile.name }}</dd>
+                </div>
+                <div>
+                  <dt>닉네임</dt>
+                  <dd>{{ profile.nickname }}</dd>
+                </div>
+                <div>
+                  <dt>전화번호</dt>
+                  <dd>{{ profile.phoneNumber }}</dd>
+                </div>
+                <div>
+                  <dt>주소</dt>
+                  <dd>{{ profile.address }} {{ profile.detailAddress }}</dd>
+                </div>
+                <div>
+                  <dt>성별</dt>
+                  <dd>{{ profile.gender === 'FEMALE' ? '여성' : '남성' }}</dd>
+                </div>
+                <div>
+                  <dt>인증 상태</dt>
+                  <dd>{{ MY_BUSINESS_STATUS_LABELS[profile.businessVerificationStatus] }}</dd>
+                </div>
+              </dl>
+            </template>
+
+            <template v-else-if="selectedSection === 'products'">
+              <div class="my-card__title">
+                <h2>판매 상품 관리</h2>
+                <button type="button" @click="goToProductCreate">새 상품 등록</button>
+              </div>
+              <article v-for="item in viewData.products" :key="item.id" class="my-row">
+                <img :src="item.product.imageUrl" :alt="item.product.imageAlt" />
+                <div>
+                  <strong>{{ item.product.name }}</strong>
+                  <p>{{ item.product.brand }} · {{ item.product.price.toLocaleString('ko-KR') }}P</p>
+                </div>
+                <span>{{ MY_PRODUCT_STATUS_LABELS[item.status] }}</span>
+              </article>
+            </template>
+
+            <template v-else-if="selectedSection === 'orders'">
+              <div class="my-card__title">
+                <h2>구매·낙찰 내역</h2>
+                <button type="button">주문 상세 보기</button>
+              </div>
+              <article v-for="order in viewData.orders" :key="order.id" class="my-row">
+                <img :src="order.productThumbnailUrl" :alt="order.productName" />
+                <div>
+                  <strong>{{ order.productName }}</strong>
+                  <p>{{ order.sellerNickname }} · {{ order.paidAmount.toLocaleString('ko-KR') }}P</p>
+                </div>
+                <span>{{ MY_ORDER_STATUS_LABELS[order.status] }}</span>
+              </article>
+            </template>
+
+            <template v-else-if="selectedSection === 'sales'">
+              <div class="my-card__title">
+                <h2>판매·정산 내역</h2>
+                <button type="button">엑셀 다운로드</button>
+              </div>
+              <article v-for="sale in viewData.sales" :key="sale.id" class="my-text-row">
+                <div>
+                  <strong>{{ sale.productName }}</strong>
+                  <p>{{ sale.buyerNickname }} · {{ sale.paidAmount.toLocaleString('ko-KR') }}P</p>
+                </div>
+                <span>{{ MY_SETTLEMENT_STATUS_LABELS[sale.settlementStatus] }}</span>
+              </article>
+            </template>
+
+            <template v-else-if="selectedSection === 'lives'">
+              <div class="my-card__title">
+                <h2>라이브 관리</h2>
+                <button type="button" @click="goToLiveCreate">예약 라이브 만들기</button>
+              </div>
+              <article v-for="live in viewData.lives" :key="live.id" class="my-row">
+                <img :src="live.thumbnailUrl" :alt="live.title" />
+                <div>
+                  <strong>{{ live.title }}</strong>
+                  <p>상품 {{ live.productCount }}개 · 시청 {{ live.viewerCount.toLocaleString('ko-KR') }}</p>
+                </div>
+                <span>{{ MY_LIVE_STATUS_LABELS[live.status] }}</span>
+              </article>
+            </template>
+
+            <template v-else-if="selectedSection === 'wishlist'">
+              <div class="my-card__title">
+                <h2>찜한 상품</h2>
+                <button type="button">찜 해제</button>
+              </div>
+              <article v-for="wish in viewData.wishes" :key="wish.product.id" class="my-row">
+                <img :src="wish.product.imageUrl" :alt="wish.product.imageAlt" />
+                <div>
+                  <strong>{{ wish.product.name }}</strong>
+                  <p>{{ wish.product.brand }} · {{ wish.product.price.toLocaleString('ko-KR') }}P</p>
+                </div>
+                <span>찜</span>
+              </article>
+            </template>
+
+            <template v-else-if="selectedSection === 'social'">
+              <div class="my-card__title">
+                <h2>팔로워·팔로잉</h2>
+              </div>
+              <div class="my-empty">
+                <strong>팔로워·팔로잉 API 계약 확정 대기</strong>
+              </div>
+            </template>
+
+            <template v-else-if="selectedSection === 'business'">
+              <div class="my-card__title">
+                <h2>사업자 정보</h2>
+                <button type="button" @click="router.push({ name: ROUTE_NAMES.BIZ_VERIFY })">
+                  다시 제출
+                </button>
+              </div>
+              <div class="my-empty">
+                <strong>{{ MY_BUSINESS_STATUS_LABELS[profile.businessVerificationStatus] }}</strong>
+                <p>사업자 정보 조회·수정 API는 BE 계약 확정 대기입니다.</p>
+              </div>
+            </template>
+          </section>
+        </main>
+      </template>
+    </section>
+  </DefaultLayout>
+</template>
+
+<style scoped lang="scss">
+.my-shell {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 0;
+  min-height: 720px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.my-sidebar {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.my-sidebar__profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.my-sidebar__avatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: var(--font-weight-extrabold);
+}
+
+.my-sidebar__profile strong,
+.my-row strong,
+.my-text-row strong,
+.my-empty strong {
+  display: block;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  line-height: 21px;
+}
+
+.my-sidebar__profile span {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.my-sidebar__nav {
+  display: grid;
+  gap: 4px;
+  padding: 12px 8px;
+}
+
+.my-sidebar__nav button,
+.my-sidebar__footer button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 22px;
+  text-align: left;
+}
+
+.my-sidebar__nav button > span,
+.my-sidebar__footer button > span {
+  width: 16px;
+  height: 16px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  opacity: 0.7;
+}
+
+.my-sidebar__nav button:hover,
+.my-sidebar__nav-item--active {
+  background: var(--color-surface-secondary) !important;
+  color: var(--color-text-primary) !important;
+}
+
+.my-sidebar__footer {
+  margin-top: auto;
+  padding: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.my-content {
+  min-width: 0;
+  background: var(--color-page);
+}
+
+.my-content__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 96px;
+  padding: 28px 32px 18px;
+}
+
+.my-content__header h1 {
+  color: var(--color-text-primary);
+  font-size: 28px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 36px;
+}
+
+.my-content__header p,
+.my-row p,
+.my-text-row p,
+.my-empty p {
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.my-content__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.my-content__actions button,
+.my-card__title button,
+.my-state button {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: var(--font-weight-bold);
+}
+
+.my-content__actions button:first-child,
+.my-card__title button:first-of-type {
+  background: var(--color-text-primary);
+  color: var(--color-text-inverse);
+}
+
+.my-profile-hero {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 24px;
+  min-height: 180px;
+  margin: 32px 32px 24px;
+  padding: 32px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgb(23 26 31 / 10%);
+}
+
+.my-profile-hero__avatar {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: #2c4635;
+  color: var(--color-text-inverse);
+  font-size: 32px;
+  font-weight: var(--font-weight-extrabold);
+}
+
+.my-profile-hero__body {
+  min-width: 0;
+}
+
+.my-profile-hero__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.my-profile-hero__title h2 {
+  color: var(--color-text-primary);
+  font-size: 28px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 36px;
+}
+
+.my-profile-hero__title span {
+  min-height: 28px;
+  padding: 5px 12px;
+  background: #e5eee8;
+  color: #2c4635;
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+}
+
+.my-profile-hero__body > p {
+  margin-top: 4px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.my-profile-hero__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 34px;
+  margin-top: 22px;
+}
+
+.my-profile-hero__stats button {
+  display: grid;
+  gap: 4px;
+  min-width: 64px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.my-profile-hero__stats strong {
+  color: var(--color-text-primary);
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 30px;
+}
+
+.my-profile-hero__stats span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.my-profile-hero__edit {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: var(--font-weight-bold);
+}
+
+.my-dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 0 32px 16px;
+}
+
+.my-dashboard--home {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding-bottom: 24px;
+}
+
+.my-dashboard__card,
+.my-card {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgb(23 26 31 / 10%);
+}
+
+.my-dashboard__card {
+  display: grid;
+  gap: 8px;
+  min-height: 128px;
+  padding: 20px;
+  text-align: left;
+}
+
+.my-dashboard--home .my-dashboard__card {
+  grid-template-rows: 44px auto auto;
+  min-height: 142px;
+  padding: 22px;
+}
+
+.my-dashboard__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: #e8f0eb;
+}
+
+.my-dashboard__icon::before,
+.my-dashboard__icon::after {
+  position: absolute;
+  box-sizing: border-box;
+  content: '';
+}
+
+.my-dashboard__icon::before {
+  border: 2px solid #2c4635;
+}
+
+.my-dashboard__card--orange .my-dashboard__icon {
+  background: #f8ebdc;
+}
+
+.my-dashboard__card--orange .my-dashboard__icon::before,
+.my-dashboard__card--orange .my-dashboard__icon::after {
+  border-color: #b36a1f;
+}
+
+.my-dashboard__card--red .my-dashboard__icon {
+  background: #f5e5e8;
+}
+
+.my-dashboard__card--red .my-dashboard__icon::before,
+.my-dashboard__card--red .my-dashboard__icon::after {
+  border-color: #b84b58;
+}
+
+.my-dashboard__icon--box::before {
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  transform: rotate(45deg) skew(-8deg, -8deg);
+}
+
+.my-dashboard__icon--box::after {
+  width: 9px;
+  height: 2px;
+  background: #2c4635;
+  transform: translateY(-1px) rotate(45deg);
+}
+
+.my-dashboard__icon--bag::before {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+.my-dashboard__icon--bag::after {
+  top: 12px;
+  width: 9px;
+  height: 6px;
+  border: 2px solid #b36a1f;
+  border-bottom: 0;
+  border-radius: 7px 7px 0 0;
+}
+
+.my-dashboard__icon--wallet::before {
+  width: 19px;
+  height: 15px;
+  border-radius: 4px;
+}
+
+.my-dashboard__icon--wallet::after {
+  right: 11px;
+  width: 8px;
+  height: 7px;
+  border: 2px solid #2c4635;
+  border-radius: 3px;
+}
+
+.my-dashboard__icon--video::before {
+  left: 13px;
+  width: 15px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.my-dashboard__icon--video::after {
+  right: 11px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #b84b58;
+  border-left: 0;
+  border-radius: 2px;
+  clip-path: polygon(0 18%, 100% 0, 100% 100%, 0 82%);
+}
+
+.my-dashboard__card span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 18px;
+}
+
+.my-dashboard__card strong {
+  color: var(--color-text-primary);
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 32px;
+}
+
+.my-dashboard__card small {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  line-height: 18px;
+}
+
+.my-point-panel {
+  gap: 20px;
+}
+
+.my-point-panel .my-card__title button {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+}
+
+.my-point-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.my-point-panel__grid article {
+  display: grid;
+  gap: 8px;
+  min-height: 112px;
+  padding: 20px;
+  background: var(--color-surface-secondary);
+}
+
+.my-point-panel__grid span {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.my-point-panel__grid strong {
+  color: var(--color-text-primary);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-extrabold);
+}
+
+.my-point-panel__grid p {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  line-height: 18px;
+}
+
+.my-point-panel__actions {
+  display: flex;
+  gap: 12px;
+}
+
+.my-point-panel__actions button {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: var(--font-weight-bold);
+}
+
+.my-point-panel__actions button:first-child {
+  background: #2c4635;
+  color: var(--color-text-inverse);
+}
+
+.my-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.55fr);
+  gap: 16px;
+  padding: 0 32px 16px;
+}
+
+.my-dashboard-grid .my-card {
+  margin: 0;
+}
+
+.my-card {
+  display: grid;
+  gap: 16px;
+  margin: 0 32px 32px;
+  padding: 24px;
+}
+
+.my-card--split {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.my-card--revenue {
+  align-content: start;
+}
+
+.my-card--revenue .my-card__title > strong {
+  color: var(--color-text-primary);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-extrabold);
+}
+
+.my-revenue-chart {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+  min-height: 216px;
+  padding-top: 8px;
+}
+
+.my-revenue-chart__item {
+  display: grid;
+  grid-template-rows: 20px 128px 18px 16px;
+  gap: 6px;
+  align-items: end;
+  min-width: 0;
+  text-align: center;
+}
+
+.my-revenue-chart__item span,
+.my-revenue-chart__item small {
+  overflow: hidden;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-revenue-chart__item div {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  height: 128px;
+  background: var(--color-surface-secondary);
+}
+
+.my-revenue-chart__item i {
+  display: block;
+  width: 100%;
+  min-height: 10px;
+  background: var(--color-primary);
+}
+
+.my-revenue-chart__item b {
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  line-height: 18px;
+}
+
+.my-card--todo {
+  align-content: start;
+}
+
+.my-todo-row {
+  display: grid;
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-primary);
+  text-align: left;
+}
+
+.my-todo-row:last-child {
+  border-bottom: 0;
+}
+
+.my-todo-row span {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.my-todo-row strong {
+  color: var(--color-text-primary);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-extrabold);
+}
+
+.my-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.my-status-grid div {
+  display: grid;
+  gap: 6px;
+  min-height: 86px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-secondary);
+}
+
+.my-status-grid span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.my-status-grid strong {
+  color: var(--color-text-primary);
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-extrabold);
+}
+
+.my-card h2,
+.my-card__title h2 {
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 24px;
+}
+
+.my-card__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.my-row,
+.my-text-row {
+  display: grid;
+  align-items: center;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.my-text-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.my-row img {
+  width: 84px;
+  height: 84px;
+  border: 1px solid var(--color-border);
+  object-fit: cover;
+}
+
+.my-row > span,
+.my-text-row > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+}
+
+.my-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.my-profile-grid div {
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-secondary);
+}
+
+.my-profile-grid dt {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.my-profile-grid dd {
+  margin-top: 6px;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  line-height: 22px;
+}
+
+.my-empty,
+.my-state {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 48px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.my-state {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 980px) {
+  .my-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .my-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .my-sidebar__nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .my-card--split,
+  .my-dashboard,
+  .my-dashboard-grid,
+  .my-dashboard--home,
+  .my-point-panel__grid,
+  .my-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .my-profile-hero {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .my-profile-hero__edit {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .my-dashboard,
+  .my-dashboard-grid {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .my-card {
+    margin-right: 16px;
+    margin-left: 16px;
+    padding: 18px;
+  }
+
+  .my-profile-hero {
+    grid-template-columns: 1fr;
+    margin: 16px;
+    padding: 22px;
+  }
+
+  .my-profile-hero__edit {
+    grid-column: auto;
+  }
+
+  .my-profile-hero__stats {
+    gap: 18px;
+  }
+
+  .my-point-panel__actions {
+    flex-direction: column;
+  }
+
+  .my-revenue-chart {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    row-gap: 18px;
+  }
+
+  .my-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .my-content__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .my-content__actions {
+    flex-direction: column;
+  }
+
+  .my-row {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .my-row img {
+    width: 64px;
+    height: 64px;
+  }
+
+  .my-row > span {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+</style>

@@ -151,7 +151,7 @@ export const routes: RouteRecordRaw[] = [
   {
     path: ROUTE_PATHS.MY,
     name: ROUTE_NAMES.MY,
-    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    component: () => import('@/domains/my/pages/MyPage.vue'),
     meta: { requiresAuth: true, title: '마이페이지' },
   },
   {
