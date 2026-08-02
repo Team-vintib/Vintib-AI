@@ -190,11 +190,41 @@ _CATEGORY_PROMPT_TEMPLATE_V3 = (
     "목록: {labels}"
 )
 
+# v4 — 2026-08-02 추가. v3의 "폴로는 예외"는 모델이 먼저 "이게 폴로다"라고 개념적으로
+# 인식해야만 적용되는 규칙이라, 정작 그 인식 자체가 실패하면(small_pro.jpg처럼 클로즈업
+# 크롭 등) 예외가 발동하지 않았다(v3 실측: 폴로 2건 중 1건만 회복). 사용자 제안대로,
+# "폴로 개념을 아는지"에 기대지 않고 **단추가 이어지는 길이**라는 더 저수준·구조적인
+# 시각 기준으로 바꿨다 — 셔츠는 단추가 목~밑단까지 쭉 이어지고, 폴로는 목 부근 2~4개뿐이고
+# 그 아래는 막혀 있다. 크롭 범위와 무관하게 "단추가 어디서 끝나는지"만 보면 되므로 v3보다
+# 크롭에 덜 민감할 것으로 기대한다.
+_CATEGORY_PROMPT_TEMPLATE_V4 = (
+    "다음은 중고 거래 플랫폼에 올라온 상품 사진이다. 아래 카테고리 목록 중 이 상품에 가장 "
+    "가까운 것을 정확히 하나만, 목록에 있는 단어 그대로 답하라. 다른 설명은 절대 붙이지 마라.\n"
+    "\n"
+    "헷갈리기 쉬운 항목 구분 기준:\n"
+    "- SHIRT vs T_SHIRT: 단추가 목 아래부터 밑단까지 쭉 이어지면 SHIRT. "
+    "카라가 있어도 단추가 목 부근 2~4개에서 끝나고 그 아래는 막혀 있으면(폴로 셔츠) T_SHIRT. "
+    "카라 자체가 없으면(둥근넥·브이넥) 당연히 T_SHIRT\n"
+    "- JACKET vs COAT: 기장이 허벅지를 넘으면 COAT, 엉덩이 정도면 JACKET\n"
+    "- HOODIE vs HOODIE_ZIP_UP: 앞이 막혀 있어 머리로 뒤집어 입으면 HOODIE, "
+    "지퍼로 앞이 열리면 HOODIE_ZIP_UP\n"
+    "- CARDIGAN vs HOODIE_ZIP_UP: 후드가 없고 편물(니트) 질감이면 CARDIGAN, "
+    "후드가 있으면 HOODIE_ZIP_UP\n"
+    "- KNIT vs SWEATSHIRT: 골지·케이블 같은 짜임 무늬가 보이면 KNIT, "
+    "매끈한 원단에 안감이 있으면 SWEATSHIRT\n"
+    "- SLACKS vs CARGO_PANTS: 옆에 플랩 달린 큰 주머니가 있으면 CARGO_PANTS, 없으면 SLACKS\n"
+    "- SHOULDER_BAG vs CROSS_BAG vs TOTE_BAG: 몸을 가로지르는 긴 끈이면 CROSS_BAG, "
+    "한쪽 어깨에 거는 중간 길이 끈이면 SHOULDER_BAG, 짧은 손잡이에 위가 트여 있으면 TOTE_BAG\n"
+    "\n"
+    "목록: {labels}"
+)
+
 # taxonomy.py의 PROMPT_TEMPLATES/ACTIVE_* 관례와 동일 — 키 하나만 바꾸면 스왑된다.
 CATEGORY_PROMPT_VERSIONS: dict[str, str] = {
     "v1": _CATEGORY_PROMPT_TEMPLATE,
     "v2_disambiguation": _CATEGORY_PROMPT_TEMPLATE_V2,
     "v3_polo_exception": _CATEGORY_PROMPT_TEMPLATE_V3,
+    "v4_button_length": _CATEGORY_PROMPT_TEMPLATE_V4,
 }
 ACTIVE_CATEGORY_PROMPT_VERSION = "v1"
 
