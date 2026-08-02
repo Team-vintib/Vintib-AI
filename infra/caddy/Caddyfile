@@ -67,9 +67,10 @@ i15a108.p.ssafy.io {
 		reverse_proxy minio:9000
 	}
 
-	# 헬스체크·REST·(추후)WebSocket 전부 백엔드로
+	# catch-all — 위 @backend·@livekit·/ai·/results·/vintib-* 에 안 걸린 나머지는
+	# 전부 FE(정적 서버)로 보낸다. (S15P11A108-27, FE 배포)
 	handle {
-		reverse_proxy backend:8080
+		reverse_proxy frontend:80
 	}
 
 	# 접근 로그 (컨테이너 stdout → docker logs)

@@ -2,8 +2,12 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { LIVE_AUCTION_MOCK_STATES } from '@/domains/auction/constants/liveAuctionMockData'
+import {
+  LIVE_AUCTION_MOCK_RESULT,
+  LIVE_AUCTION_MOCK_STATES,
+} from '@/domains/auction/constants/liveAuctionMockData'
 import LiveAuctionPanel from '@/domains/auction/components/LiveAuctionPanel.vue'
+import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import {
   getLiveWatchViewData,
@@ -48,6 +52,7 @@ const selectedProductId = ref<number | null>(null)
 const isFollowing = ref(false)
 const wishedProductIds = ref<number[]>([])
 const isTryOnOpen = ref(false)
+const isAuctionResultDismissed = ref(false)
 const now = ref(Date.now())
 const apiEnabled = isLiveWatchApiEnabled()
 let loadRequestId = 0
@@ -76,6 +81,19 @@ const auctionMockState = computed<LiveAuctionMockState>(() => {
     ? (queryValue as LiveAuctionMockState)
     : 'BIDDABLE'
 })
+
+// 경매 종료 후 낙찰 축하 연출(AUCT-013). 지금은 mock 트리거(?auction=won).
+// 실제 낙찰 확정/실시간 트리거는 BE 낙찰 결과·STOMP 연결 후 대체 → docs/requests/BE/009.
+const isAuctionResultVisible = computed(
+  () =>
+    live.value !== null &&
+    auctionMockState.value === 'WON' &&
+    !isAuctionResultDismissed.value,
+)
+
+const dismissAuctionResult = () => {
+  isAuctionResultDismissed.value = true
+}
 
 const tryOnMockScenario = computed<LiveTryOnMockScenario>(() => {
   const queryValue = Array.isArray(route.query.tryon)
@@ -133,6 +151,7 @@ const loadLiveWatch = async () => {
   live.value = null
   selectedProductId.value = null
   isTryOnOpen.value = false
+  isAuctionResultDismissed.value = false
   loadState.value = 'loading'
   errorMessage.value = ''
 
@@ -228,6 +247,10 @@ watch(isTryOnAvailable, (isAvailable) => {
   }
 })
 
+watch(auctionMockState, () => {
+  isAuctionResultDismissed.value = false
+})
+
 const elapsedTimer = window.setInterval(() => {
   now.value = Date.now()
 }, 1000)
@@ -320,6 +343,14 @@ onBeforeUnmount(() => {
               :product="selectedProduct"
               :mock-scenario="tryOnMockScenario"
               @close="isTryOnOpen = false"
+            />
+
+            <LiveAuctionResultOverlay
+              v-if="isAuctionResultVisible"
+              :winner-nickname="LIVE_AUCTION_MOCK_RESULT.winnerNickname"
+              :winning-bid="LIVE_AUCTION_MOCK_RESULT.winningBid"
+              :product-title="selectedProduct?.title ?? null"
+              @close="dismissAuctionResult"
             />
           </div>
 
