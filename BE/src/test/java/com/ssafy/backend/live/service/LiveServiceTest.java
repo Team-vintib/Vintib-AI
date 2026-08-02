@@ -10,10 +10,13 @@ import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.live.dto.request.LiveInstantRequest;
+import com.ssafy.backend.live.dto.request.LiveListSort;
 import com.ssafy.backend.live.dto.request.LiveScheduleRequest;
 import com.ssafy.backend.live.dto.request.LiveStatusUpdateRequest;
 import com.ssafy.backend.live.dto.response.LiveDetailResponse;
+import com.ssafy.backend.live.dto.response.LiveListItemResponse;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveStatus;
@@ -28,6 +31,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class LiveServiceTest {
@@ -205,5 +213,23 @@ class LiveServiceTest {
 
         assertThatThrownBy(() -> liveService.scheduleLive(HOST_ID, request))
                 .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 호스트_필터에_전체_상태를_넘기면_종료_취소된_방송도_포함해_반환한다() {
+        when(host.getId()).thenReturn(HOST_ID);
+        Live ended = Live.schedule(host, TITLE, THUMBNAIL_URL, LocalDateTime.now().plusDays(1));
+        ReflectionTestUtils.setField(ended, "id", LIVE_ID);
+        ReflectionTestUtils.setField(ended, "status", LiveStatus.ENDED);
+        Page<Live> page = new PageImpl<>(List.of(ended), PageRequest.of(0, 20), 1);
+        when(liveRepository.findPublicLives(
+                eq(LiveService.ALL_STATUSES), eq(false), any(), eq(true), eq(HOST_ID), any(Pageable.class)))
+                .thenReturn(page);
+
+        PageResponse<LiveListItemResponse> response =
+                liveService.getLives(null, HOST_ID, LiveService.ALL_STATUSES, LiveListSort.LATEST, 0, 20);
+
+        assertThat(response.content()).hasSize(1);
+        assertThat(response.content().get(0).broadcastStatus()).isEqualTo(LiveStatus.ENDED);
     }
 }
