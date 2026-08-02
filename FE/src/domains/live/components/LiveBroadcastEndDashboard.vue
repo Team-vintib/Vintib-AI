@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
 import type { BroadcastEndSummary } from '@/domains/live/constants/liveBroadcastEndMock'
 
@@ -12,10 +12,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'to-list': []
+  'manage-unsold': []
 }>()
-
-// 미낙찰 상품 처리(경매 재시도/상시 판매 선택)의 실제 동작은 440에서 연결 → 지금은 진입 안내 placeholder.
-const relistNoticeVisible = ref(false)
 
 const unsoldResults = computed(() =>
   props.summary.results.filter((result) => result.outcome === 'UNSOLD'),
@@ -87,21 +85,14 @@ const outcomeLabel: Record<string, string> = {
         남은 상품 {{ summary.unsoldCount }}개
       </h2>
       <p class="broadcast-end__unsold-desc">
-        낙찰되지 않은 상품이에요. 경매를 다시 열거나 상시 판매로 돌릴 수 있어요.
+        낙찰되지 않은 상품이에요. 상시 판매로 전환하거나 경매 예정으로 되돌릴 수 있어요.
       </p>
       <ul class="broadcast-end__unsold-list">
         <li v-for="result in unsoldResults" :key="result.productId">{{ result.title }}</li>
       </ul>
-      <button
-        type="button"
-        class="broadcast-end__unsold-action"
-        @click="relistNoticeVisible = true"
-      >
-        남은 상품 처리하기
+      <button type="button" class="broadcast-end__unsold-action" @click="emit('manage-unsold')">
+        남은 상품 관리
       </button>
-      <p v-if="relistNoticeVisible" class="broadcast-end__unsold-note" role="status">
-        남은 상품 처리(경매 재시도·상시 판매 선택)는 다음 단계에서 연결됩니다.
-      </p>
     </div>
 
     <div class="broadcast-end__actions">
@@ -319,12 +310,6 @@ const outcomeLabel: Record<string, string> = {
 
 .broadcast-end__unsold-action:hover {
   opacity: 0.92;
-}
-
-.broadcast-end__unsold-note {
-  margin-top: var(--space-2);
-  color: var(--color-live-text-secondary);
-  font-size: 12px;
 }
 
 .broadcast-end__actions {

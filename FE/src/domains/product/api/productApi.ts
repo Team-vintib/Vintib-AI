@@ -168,6 +168,16 @@ export const getProductDetail = async (productId: number): Promise<ProductDetail
   return toProductDetailViewData(unwrapApiData(response.data))
 }
 
+// 미낙찰 상품 처리(440) — 상품을 상시 판매(가격 지정)로 전환하거나 경매 예정으로 되돌린다.
+// 상품 등록의 판매 방식 설정(publishProduct)과 같은 엔드포인트를 재사용한다.
+export const convertProductToDirectSale = async (productId: number, price: number) => {
+  await http.patch<ApiResponse<ProductListDto>>(`/products/${productId}/status`, { price })
+}
+
+export const scheduleProductAuction = async (productId: number) => {
+  await http.patch<ApiResponse<ProductListDto>>(`/products/${productId}/auction-schedule`)
+}
+
 export const getBrands = async () => {
   const response = await http.get<ApiResponse<BrandDto[]>>('/brands', { skipAuth: true })
 
@@ -219,14 +229,12 @@ export const submitProduct = async (
 
 const publishProduct = async (productId: number, draft: ProductRegistrationDraft) => {
   if (draft.saleType === 'DIRECT') {
-    await http.patch<ApiResponse<ProductListDto>>(`/products/${productId}/status`, {
-      price: Number(draft.directSalePrice),
-    })
+    await convertProductToDirectSale(productId, Number(draft.directSalePrice))
     return
   }
 
   if (draft.saleType === 'AUCTION') {
-    await http.patch<ApiResponse<ProductListDto>>(`/products/${productId}/auction-schedule`)
+    await scheduleProductAuction(productId)
     return
   }
 }

@@ -15,6 +15,7 @@ import LiveBroadcastEndDashboard from '@/domains/live/components/LiveBroadcastEn
 import LiveBroadcastHeader from '@/domains/live/components/LiveBroadcastHeader.vue'
 import LiveBroadcastInfo from '@/domains/live/components/LiveBroadcastInfo.vue'
 import LiveProductQueue from '@/domains/live/components/LiveProductQueue.vue'
+import LiveUnsoldManage from '@/domains/live/components/LiveUnsoldManage.vue'
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchState from '@/domains/live/components/LiveWatchState.vue'
 import { buildBroadcastEndSummary } from '@/domains/live/constants/liveBroadcastEndMock'
@@ -50,6 +51,8 @@ const auctionWin = ref<{
   winningBid: number
   productTitle: string | null
 } | null>(null)
+// 438/440 방송 종료 화면 단계: 대시보드 → (미낙찰 있으면) 남은 상품 관리.
+const endView = ref<'dashboard' | 'manage'>('dashboard')
 const now = ref(Date.now())
 // 방송 상세는 시청자와 같은 GET /lives/{liveId} 실 API를 재사용한다(VITE_LIVE_WATCH_API_ENABLED).
 // 판매자 전용 상태(방송 소유자 여부·currentProductId 등)는 BE 미제공 → liveWatchApi에서 null/fallback.
@@ -113,6 +116,7 @@ const loadLiveBroadcast = async () => {
   errorMessage.value = ''
   isEndConfirmOpen.value = false
   auctionWin.value = null
+  endView.value = 'dashboard'
   transitionNotice.value = ''
   window.clearTimeout(transitionNoticeTimer)
 
@@ -261,6 +265,16 @@ const broadcastSummary = computed(() =>
   buildBroadcastEndSummary(live.value?.products ?? [], route.query.result === 'sold'),
 )
 
+const unsoldProducts = computed(() => {
+  const unsoldIds = new Set(
+    broadcastSummary.value.results
+      .filter((result) => result.outcome === 'UNSOLD')
+      .map((result) => result.productId),
+  )
+
+  return (live.value?.products ?? []).filter((product) => unsoldIds.has(product.id))
+})
+
 watch(
   () => [route.params.liveId, route.query.mock],
   () => {
@@ -314,11 +328,19 @@ onBeforeUnmount(() => {
 
     <div v-else-if="live" class="live-broadcast-page">
       <LiveBroadcastEndDashboard
-        v-if="live.status === 'ENDED'"
+        v-if="live.status === 'ENDED' && endView === 'dashboard'"
         :title="live.title"
         :elapsed-time="elapsedTime"
         :peak-viewer-count="live.peakViewerCount"
         :summary="broadcastSummary"
+        @manage-unsold="endView = 'manage'"
+        @to-list="router.push({ name: ROUTE_NAMES.LIVE_LIST })"
+      />
+
+      <LiveUnsoldManage
+        v-else-if="live.status === 'ENDED' && endView === 'manage'"
+        :products="unsoldProducts"
+        @back="endView = 'dashboard'"
         @to-list="router.push({ name: ROUTE_NAMES.LIVE_LIST })"
       />
 
