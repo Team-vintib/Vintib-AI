@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 import {
@@ -12,6 +12,7 @@ import {
   SELLER_AUCTION_MOCK_BID_INTERVAL_SECONDS,
   SELLER_AUCTION_MOCK_COMPETITORS,
 } from '@/domains/auction/constants/sellerAuctionMockData'
+import { configureLiveAuction } from '@/domains/live/api/liveControlApi'
 
 import type { SellerAuctionPhase } from '@/domains/auction/types/sellerAuction.types'
 import type {
@@ -20,12 +21,12 @@ import type {
 } from '@/domains/live/types/liveWatch.types'
 
 const props = defineProps<{
+  liveId: number
   product: LiveWatchProduct | null
   status: LiveWatchStatus
 }>()
 
-// 경매 종료(낙찰/미낙찰) 결과를 상위(LiveBroadcastPage)로 알린다 — 441 판매자 낙찰 이벤트.
-// 실제 종료/낙찰 확정은 서버 몫(docs/requests/BE/009) → 지금은 mock 타이머 종료 시점에 emit.
+// 경매 종료 결과를 상위 화면으로 전달한다. 실제 낙찰 확정은 BE 계약이 필요해 현재는 mock 타이머 기준으로 emit한다.
 const emit = defineEmits<{
   'auction-ended': [
     result: {
@@ -47,6 +48,8 @@ const highestBidder = ref<string | null>(null)
 const remainingSeconds = ref(0)
 const bidderCount = ref(0)
 const isExtendFlashing = ref(false)
+const isConfiguring = ref(false)
+const configError = ref('')
 
 let countdownTimer: number | undefined
 let extendFlashTimer: number | undefined
@@ -76,7 +79,11 @@ const isConfigValid = computed(
 )
 
 const canStart = computed(
-  () => props.product !== null && props.status === 'LIVE' && isConfigValid.value,
+  () =>
+    props.product !== null &&
+    props.status === 'LIVE' &&
+    isConfigValid.value &&
+    !isConfiguring.value,
 )
 
 const formattedRemaining = computed(() => {
@@ -98,10 +105,12 @@ const durationLabel = computed(() => {
 })
 
 const applyDurationPreset = (seconds: number) => {
+  configError.value = ''
   durationSeconds.value = seconds
 }
 
 const applyIncrementPreset = (value: number) => {
+  configError.value = ''
   increment.value = value
 }
 
@@ -113,6 +122,8 @@ const resetToIdle = () => {
   remainingSeconds.value = 0
   bidderCount.value = 0
   isExtendFlashing.value = false
+  isConfiguring.value = false
+  configError.value = ''
   secondsElapsed = 0
   startPrice.value = props.product?.price ?? SELLER_AUCTION_DEFAULT_START_PRICE
 }
@@ -125,7 +136,7 @@ const flashExtend = () => {
   }, 1500)
 }
 
-// mock 가짜 입찰. 실제 입찰·선착순 판정은 서버 몫(docs/requests/BE/009).
+// 실제 입찰/연장 API가 없어 판매자 화면에서는 mock 입찰로 진행 상태만 보여준다.
 const simulateBid = () => {
   currentBid.value += increment.value
   highestBidder.value =
@@ -169,8 +180,26 @@ const tick = () => {
   }
 }
 
-const startAuction = () => {
-  if (!canStart.value) return
+const startAuction = async () => {
+  if (!canStart.value || !props.product) return
+
+  isConfiguring.value = true
+  configError.value = ''
+
+  try {
+    await configureLiveAuction(props.liveId, {
+      productId: props.product.id,
+      startPrice: startPrice.value,
+      bidUnit: increment.value,
+      durationSeconds: durationSeconds.value,
+    })
+  } catch (error) {
+    configError.value =
+      error instanceof Error ? error.message : '경매 조건을 저장하지 못했습니다.'
+    return
+  } finally {
+    isConfiguring.value = false
+  }
 
   currentBid.value = startPrice.value
   highestBidder.value = null
@@ -184,7 +213,7 @@ const startAuction = () => {
   countdownTimer = window.setInterval(tick, 1000)
 }
 
-// PROD-005 미낙찰 후속 판매 방식 선택은 내일 별도 구현 → 지금은 자리/링크만.
+// PROD-005 판매 방식 선택은 별도 구현 전까지 안내만 표시한다.
 const relistPlaceholderNotice = ref(false)
 const openRelistFlow = () => {
   relistPlaceholderNotice.value = true
@@ -198,7 +227,7 @@ watch(
   { immediate: true },
 )
 
-// 방송이 종료/취소되면 진행 중 경매도 정리한다.
+// 방송이 종료/취소되면 진행 중인 경매도 정리한다.
 watch(
   () => props.status,
   (status) => {
@@ -233,15 +262,13 @@ onBeforeUnmount(() => {
       </span>
     </div>
 
-    <!-- 상품 미선택 -->
     <p v-if="!product" class="seller-auction__empty">
-      큐에서 상품을 선택하면 경매를 설정할 수 있습니다.
+      경매를 진행할 상품을 선택해 주세요.
     </p>
 
-    <!-- 설정 전(IDLE) -->
     <template v-else-if="phase === 'IDLE'">
       <p class="seller-auction__target">
-        <span>경매 상품</span>
+        <span>대상 상품</span>
         <strong>{{ product.title }}</strong>
       </p>
 
@@ -261,7 +288,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="seller-auction__field">
-        <span class="seller-auction__label">증액 단위</span>
+        <span class="seller-auction__label">입찰 단위</span>
         <div class="seller-auction__presets">
           <button
             v-for="preset in SELLER_AUCTION_INCREMENT_PRESETS"
@@ -280,7 +307,7 @@ onBeforeUnmount(() => {
             min="0"
             step="1000"
             inputmode="numeric"
-            aria-label="증액 단위 직접 입력"
+            aria-label="입찰 단위 직접 입력"
           />
           <span>P</span>
         </div>
@@ -315,7 +342,7 @@ onBeforeUnmount(() => {
           {{ SELLER_AUCTION_DURATION_RANGE.min }}~{{ SELLER_AUCTION_DURATION_RANGE.max }}초 사이로
           입력해 주세요.
         </p>
-        <p v-else class="seller-auction__hint">{{ durationLabel }} 동안 진행됩니다.</p>
+        <p v-else class="seller-auction__hint">{{ durationLabel }} 동안 진행합니다.</p>
       </div>
 
       <button
@@ -324,23 +351,25 @@ onBeforeUnmount(() => {
         :disabled="!canStart"
         @click="startAuction"
       >
-        경매 시작
+        {{ isConfiguring ? '경매 설정 중' : '경매 시작' }}
       </button>
+      <p v-if="configError" class="seller-auction__hint seller-auction__hint--error">
+        {{ configError }}
+      </p>
       <p v-if="status !== 'LIVE'" class="seller-auction__hint">
         방송 중일 때 경매를 시작할 수 있습니다.
       </p>
     </template>
 
-    <!-- 진행 중(RUNNING) -->
     <template v-else-if="phase === 'RUNNING'">
       <p class="seller-auction__target">
-        <span>경매 상품</span>
+        <span>진행 상품</span>
         <strong>{{ product.title }}</strong>
       </p>
 
       <div class="seller-auction__metrics">
         <div class="seller-auction__metric seller-auction__metric--current">
-          <span>현재 입찰가</span>
+          <span>현재가</span>
           <strong>{{ currentBid.toLocaleString('ko-KR') }}P</strong>
         </div>
         <div class="seller-auction__metric">
@@ -354,21 +383,20 @@ onBeforeUnmount(() => {
           <strong>{{ highestBidder ?? '입찰 대기 중' }}</strong>
         </div>
         <div class="seller-auction__metric">
-          <span>참여 입찰</span>
+          <span>입찰 수</span>
           <strong>{{ bidderCount.toLocaleString('ko-KR') }}회</strong>
         </div>
       </div>
 
       <p v-if="isExtendFlashing" class="seller-auction__extend" role="status">
-        종료 임박 · {{ SELLER_AUCTION_EXTEND_SECONDS }}초 연장
+        종료 임박으로 {{ SELLER_AUCTION_EXTEND_SECONDS }}초 연장
       </p>
-      <p class="seller-auction__hint">경매는 남은 시간이 끝나면 자동 종료됩니다.</p>
+      <p class="seller-auction__hint">남은 시간이 끝나면 경매가 자동 종료됩니다.</p>
     </template>
 
-    <!-- 낙찰(ENDED_WON) -->
     <template v-else-if="phase === 'ENDED_WON'">
       <div class="seller-auction__result seller-auction__result--won">
-        <strong>낙찰되었습니다</strong>
+        <strong>낙찰되었습니다.</strong>
         <dl>
           <div>
             <dt>낙찰자</dt>
@@ -382,19 +410,17 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <!-- 미낙찰(ENDED_FAILED, AUCT-014) -->
     <template v-else>
       <div class="seller-auction__result seller-auction__result--failed">
         <strong>미낙찰</strong>
-        <p>입찰자가 없어 상품이 판매자 관리 목록으로 되돌아갑니다.</p>
+        <p>입찰자가 없어 상품이 판매 관리 목록으로 돌아갑니다.</p>
       </div>
-      <!-- PROD-005 판매 방식 선택은 내일 별도 구현 → 지금은 링크/자리만 -->
       <button class="seller-auction__relist" type="button" @click="openRelistFlow">
         판매 방식 선택
         <span class="seller-auction__soon">준비 중</span>
       </button>
       <p v-if="relistPlaceholderNotice" class="seller-auction__hint">
-        판매 방식 선택(PROD-005)은 곧 연결됩니다.
+        판매 방식 선택(PROD-005)은 이후 연결됩니다.
       </p>
     </template>
   </section>

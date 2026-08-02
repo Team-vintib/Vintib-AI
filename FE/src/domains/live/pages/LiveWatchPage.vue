@@ -9,6 +9,7 @@ import {
 import LiveAuctionPanel from '@/domains/auction/components/LiveAuctionPanel.vue'
 import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
+import { issueLiveVideoToken } from '@/domains/live/api/liveControlApi'
 import {
   getLiveWatchViewData,
   isLiveWatchApiEnabled,
@@ -54,6 +55,7 @@ const wishedProductIds = ref<number[]>([])
 const isTryOnOpen = ref(false)
 const isAuctionResultDismissed = ref(false)
 const now = ref(Date.now())
+const videoConnectionLabel = ref('')
 const apiEnabled = isLiveWatchApiEnabled()
 let loadRequestId = 0
 
@@ -154,6 +156,7 @@ const loadLiveWatch = async () => {
   isAuctionResultDismissed.value = false
   loadState.value = 'loading'
   errorMessage.value = ''
+  videoConnectionLabel.value = ''
 
   if (liveId === null) {
     loadState.value = 'not-found'
@@ -174,6 +177,10 @@ const loadLiveWatch = async () => {
       response.currentProductId ?? response.products.at(0)?.id ?? null
     now.value = Date.now()
     loadState.value = 'success'
+
+    if (response.status === 'LIVE') {
+      void loadVideoToken(response.id)
+    }
   } catch (error) {
     if (requestId !== loadRequestId) return
 
@@ -230,6 +237,18 @@ const updateViewerCount = (viewerCount: number) => {
   live.value = {
     ...live.value,
     currentViewerCount: viewerCount,
+  }
+}
+
+const loadVideoToken = async (liveId: number) => {
+  videoConnectionLabel.value = '영상 토큰 발급 중'
+
+  try {
+    const token = await issueLiveVideoToken(liveId)
+    videoConnectionLabel.value =
+      token.role === 'PUBLISHER' ? '송출 토큰 발급 완료' : '시청 토큰 발급 완료'
+  } catch {
+    videoConnectionLabel.value = '영상 토큰 발급 실패'
   }
 }
 
@@ -322,6 +341,7 @@ onBeforeUnmount(() => {
               :title="live.title"
               :poster-url="live.posterUrl"
               :status="live.status"
+              :connection-label="videoConnectionLabel"
               :try-on-disabled="!isTryOnAvailable"
               :try-on-open="isTryOnOpen"
               @open-try-on="openTryOn"

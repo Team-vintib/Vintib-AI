@@ -11,11 +11,13 @@ const props = withDefaults(
     tryOnDisabled?: boolean
     tryOnOpen?: boolean
     showTryOn?: boolean
+    connectionLabel?: string
   }>(),
   {
     tryOnDisabled: false,
     tryOnOpen: false,
     showTryOn: true,
+    connectionLabel: '',
   },
 )
 
@@ -24,6 +26,7 @@ const emit = defineEmits<{
 }>()
 
 const stageMessage = computed(() => {
+  if (props.status === 'LIVE' && props.connectionLabel) return props.connectionLabel
   if (props.status === 'SCHEDULED') return '방송 시작 전입니다'
   if (props.status === 'ENDED') return '종료된 라이브입니다'
   if (props.status === 'CANCELED') return '취소된 라이브입니다'
@@ -46,7 +49,7 @@ const stageMessage = computed(() => {
       <slot name="overlay"></slot>
     </div>
 
-    <div v-if="status !== 'LIVE'" class="live-video-stage__notice" role="status">
+    <div v-if="status !== 'LIVE' || connectionLabel" class="live-video-stage__notice" role="status">
       <span aria-hidden="true"></span>
       {{ stageMessage }}
     </div>

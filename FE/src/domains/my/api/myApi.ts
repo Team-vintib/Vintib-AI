@@ -170,19 +170,13 @@ export const getMyPageViewData = async (userId: number): Promise<MyPageViewData>
 }
 
 export const getMyProfile = async (userId: number): Promise<MyProfile> => {
-  if (!MY_API_ENABLED) {
-    await wait(MOCK_DELAY_MS)
-    return {
-      ...mockMyProfile,
-      ...readMockProfileMedia(userId),
-      id: userId,
-    }
+  await wait(MOCK_DELAY_MS)
+  return {
+    ...mockMyProfile,
+    ...readMockProfileMedia(userId),
+    id: userId,
   }
-
-  const response = await http.get<ApiResponse<MyProfile>>('/me')
-  return unwrapApiData(response.data, '회원 정보를 불러오지 못했습니다.')
 }
-
 const getMyWishList = async (userId: number) => {
   const response = await http.get<
     ApiResponse<PageResponse<MyWishApiDto> | BackendPageResponse<MyWishApiDto>>
@@ -245,35 +239,27 @@ export const getMyOrderDetail = async (
   userId: number,
   orderId: number,
 ): Promise<MyOrderItem> => {
-  if (!MY_API_ENABLED) {
-    await wait(MOCK_DELAY_MS)
-    const order = mockMyPageViewData.orders.find((item) => item.id === orderId)
+  void userId
+  await wait(MOCK_DELAY_MS)
+  const order = mockMyPageViewData.orders.find((item) => item.id === orderId)
 
-    if (!order) {
-      throw new Error('구매 내역을 찾지 못했습니다.')
-    }
-
-    return order
+  if (!order) {
+    throw new Error('구매 내역을 찾지 못했습니다.')
   }
 
-  const response = await http.get<ApiResponse<MyOrderItem>>(`/users/${userId}/orders/${orderId}`)
-  return unwrapApiData(response.data, '구매 상세 정보를 불러오지 못했습니다.')
+  return order
 }
 
 export const getMySaleDetail = async (userId: number, saleId: number): Promise<MySaleItem> => {
-  if (!MY_API_ENABLED) {
-    await wait(MOCK_DELAY_MS)
-    const sale = mockMyPageViewData.sales.find((item) => item.id === saleId)
+  void userId
+  await wait(MOCK_DELAY_MS)
+  const sale = mockMyPageViewData.sales.find((item) => item.id === saleId)
 
-    if (!sale) {
-      throw new Error('판매 내역을 찾지 못했습니다.')
-    }
-
-    return sale
+  if (!sale) {
+    throw new Error('판매 내역을 찾지 못했습니다.')
   }
 
-  const response = await http.get<ApiResponse<MySaleItem>>(`/users/${userId}/sales/${saleId}`)
-  return unwrapApiData(response.data, '판매 상세 정보를 불러오지 못했습니다.')
+  return sale
 }
 
 export const updateMyProfile = async (
@@ -295,80 +281,36 @@ export const updateMyProfile = async (
 }
 
 export const updateMyProfileImage = async (userId: number, file: File) => {
-  if (!MY_API_ENABLED) {
-    await wait(MOCK_DELAY_MS)
-    const profileImageUrl = await readImageFileAsDataUrl(file, '프로필 사진을 읽지 못했습니다.')
+  await wait(MOCK_DELAY_MS)
+  const profileImageUrl = await readImageFileAsDataUrl(file, '프로필 사진을 읽지 못했습니다.')
 
-    saveMockProfileImage(userId, profileImageUrl)
+  saveMockProfileImage(userId, profileImageUrl)
 
-    return { profileImageUrl } satisfies MyProfileImageResponse
-  }
-
-  const formData = new FormData()
-  formData.append('profileImage', file)
-
-  const response = await http.put<ApiResponse<MyProfileImageResponse>>('/me/profile-image', formData, {
-    headers: {
-      'Content-Type': undefined,
-    },
-  })
-
-  return unwrapApiData(response.data, '프로필 사진을 저장하지 못했습니다.')
+  return { profileImageUrl } satisfies MyProfileImageResponse
 }
-
 export const deleteMyProfileImage = async (userId: number) => {
-  if (!MY_API_ENABLED) {
-    await wait(MOCK_DELAY_MS)
-    deleteMockProfileImage(userId)
+  await wait(MOCK_DELAY_MS)
+  deleteMockProfileImage(userId)
 
-    return { profileImageUrl: null } satisfies MyProfileImageResponse
-  }
-
-  const response = await http.delete<ApiResponse<MyProfileImageResponse | null>>('/me/profile-image')
-  const data = unwrapNullableApiData(response.data, '프로필 사진을 삭제하지 못했습니다.')
-
-  return data ?? { profileImageUrl: null }
+  return { profileImageUrl: null } satisfies MyProfileImageResponse
 }
-
 export const updateMyDefaultTryOnImage = async (userId: number, file: File) => {
-  if (!MY_API_ENABLED) {
-    await wait(MOCK_DELAY_MS)
-    const defaultTryOnImageUrl = await readImageFileAsDataUrl(
-      file,
-      'AI 시착용 사진을 읽지 못했습니다.',
-    )
+  await wait(MOCK_DELAY_MS)
+  const defaultTryOnImageUrl = await readImageFileAsDataUrl(
+    file,
+    'AI 시착 사진을 읽지 못했습니다.',
+  )
 
-    saveMockDefaultTryOnImage(userId, defaultTryOnImageUrl)
+  saveMockDefaultTryOnImage(userId, defaultTryOnImageUrl)
 
-    return { defaultTryOnImageUrl } satisfies MyDefaultTryOnImageResponse
-  }
-
-  const formData = new FormData()
-  formData.append('bodyPhoto', file)
-
-  const response = await http.put<ApiResponse<MyDefaultTryOnImageResponse>>('/me/tryon', formData, {
-    headers: {
-      'Content-Type': undefined,
-    },
-  })
-
-  return unwrapApiData(response.data, 'AI 시착용 사진을 저장하지 못했습니다.')
+  return { defaultTryOnImageUrl } satisfies MyDefaultTryOnImageResponse
 }
-
 export const deleteMyDefaultTryOnImage = async (userId: number) => {
-  if (!MY_API_ENABLED) {
-    await wait(MOCK_DELAY_MS)
-    deleteMockDefaultTryOnImage(userId)
+  await wait(MOCK_DELAY_MS)
+  deleteMockDefaultTryOnImage(userId)
 
-    return { defaultTryOnImageUrl: null } satisfies MyDefaultTryOnImageResponse
-  }
-
-  const response = await http.delete<ApiResponse<MyDefaultTryOnImageResponse | null>>('/me/tryon/image')
-  const data = unwrapNullableApiData(response.data, 'AI 시착용 사진을 삭제하지 못했습니다.')
-
-  return data ?? { defaultTryOnImageUrl: null }
+  return { defaultTryOnImageUrl: null } satisfies MyDefaultTryOnImageResponse
 }
-
 export const getMyInterestOptions = async () => {
   if (!MY_API_ENABLED) {
     await wait(MOCK_DELAY_MS)
@@ -516,17 +458,6 @@ const fallbackBrandLabel = (brandId: number | null) =>
 
 const unwrapApiData = <T>(response: ApiResponse<T>, fallbackMessage: string) => {
   if (!response.success || response.data === null) {
-    throw new Error(response.error?.message ?? fallbackMessage)
-  }
-
-  return response.data
-}
-
-const unwrapNullableApiData = <T>(
-  response: ApiResponse<T | null>,
-  fallbackMessage: string,
-) => {
-  if (!response.success) {
     throw new Error(response.error?.message ?? fallbackMessage)
   }
 

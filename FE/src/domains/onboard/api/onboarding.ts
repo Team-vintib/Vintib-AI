@@ -26,6 +26,10 @@ export interface SaveBasicInfoRequest {
   detailAddress: string
 }
 
+export interface SaveBasicInfoOptions {
+  userId?: number | null
+}
+
 export interface SaveOnboardingInterestsRequest {
   brandIds: number[]
   categoryIds: number[]
@@ -56,12 +60,23 @@ export interface CompleteOnboardingRequest {
   memberType: OnboardingMemberType
 }
 
-export const saveOnboardingBasicInfo = async (request: SaveBasicInfoRequest) => {
-  if (!ONBOARDING_API_ENABLED) {
-    return ONBOARDING_SUCCESS_RESPONSE
+export interface CompleteOnboardingOptions {
+  userId?: number | null
+}
+
+export const saveOnboardingBasicInfo = async (
+  request: SaveBasicInfoRequest,
+  options: SaveBasicInfoOptions = {},
+) => {
+  if (!options.userId) {
+    if (!ONBOARDING_API_ENABLED) {
+      return ONBOARDING_SUCCESS_RESPONSE
+    }
+
+    throw new Error('기본 정보를 저장할 회원 ID가 없습니다.')
   }
 
-  const { data } = await http.patch<ApiResponse<null>>('/me/onboarding', request)
+  const { data } = await http.patch<ApiResponse<null>>(`/users/${options.userId}`, request)
 
   return data
 }
@@ -70,16 +85,16 @@ export const saveOnboardingInterests = async (
   request: SaveOnboardingInterestsRequest,
   options: SaveOnboardingInterestsOptions = {},
 ): Promise<ApiResponse<UserInterests | null>> => {
-  if (!ONBOARDING_API_ENABLED) {
+  if (!options.userId) {
+    if (ONBOARDING_API_ENABLED) {
+      throw new Error('관심 정보를 저장할 회원 ID가 없습니다.')
+    }
+
     return {
       success: true,
       data: saveMockUserInterests(options.userId, request.brandIds, request.categoryIds),
       error: null,
     }
-  }
-
-  if (!options.userId) {
-    throw new Error('관심 정보를 저장할 회원 ID가 없습니다.')
   }
 
   const { data } = await http.put<ApiResponse<UserInterests>>(
@@ -89,55 +104,45 @@ export const saveOnboardingInterests = async (
 
   return data
 }
-
 export const saveOnboardingTryOnProfile = async (
   request: SaveOnboardingTryOnProfileRequest,
   options: SaveOnboardingTryOnProfileOptions = {},
 ): Promise<ApiResponse<SaveOnboardingTryOnProfileResponse | null>> => {
-  if (!ONBOARDING_API_ENABLED) {
-    if (!request.bodyPhoto) {
-      return ONBOARDING_SUCCESS_RESPONSE
-    }
-
-    const defaultTryOnImageUrl = await readImageFileAsDataUrl(
-      request.bodyPhoto,
-      'AI 시착용 사진을 읽지 못했습니다.',
-    )
-
-    saveMockDefaultTryOnImage(options.userId, defaultTryOnImageUrl)
-
-    return {
-      success: true,
-      data: {
-        defaultTryOnImageUrl,
-      },
-      error: null,
-    }
-  }
-
-  const formData = new FormData()
-
-  Object.entries(request).forEach(([field, value]) => {
-    if (value !== undefined) {
-      formData.append(field, value)
-    }
-  })
-
-  const { data } = await http.put<ApiResponse<SaveOnboardingTryOnProfileResponse | null>>('/me/tryon', formData, {
-    headers: {
-      'Content-Type': undefined,
-    },
-  })
-
-  return data
-}
-
-export const completeOnboarding = async (request: CompleteOnboardingRequest) => {
-  if (!ONBOARDING_API_ENABLED) {
+  if (!request.bodyPhoto) {
     return ONBOARDING_SUCCESS_RESPONSE
   }
 
-  const { data } = await http.post<ApiResponse<null>>('/me/onboarding/complete', request)
+  const defaultTryOnImageUrl = await readImageFileAsDataUrl(
+    request.bodyPhoto,
+    'AI 시착 사진을 읽지 못했습니다.',
+  )
+
+  saveMockDefaultTryOnImage(options.userId, defaultTryOnImageUrl)
+
+  return {
+    success: true,
+    data: {
+      defaultTryOnImageUrl,
+    },
+    error: null,
+  }
+}
+export const completeOnboarding = async (
+  request: CompleteOnboardingRequest,
+  options: CompleteOnboardingOptions = {},
+) => {
+  if (!options.userId) {
+    if (!ONBOARDING_API_ENABLED) {
+      return ONBOARDING_SUCCESS_RESPONSE
+    }
+
+    throw new Error('온보딩을 완료할 회원 ID가 없습니다.')
+  }
+
+  const { data } = await http.patch<ApiResponse<null>>(
+    `/users/${options.userId}/member-type`,
+    request,
+  )
 
   return data
 }

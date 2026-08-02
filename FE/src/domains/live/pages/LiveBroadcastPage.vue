@@ -6,6 +6,7 @@ import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionRe
 import SellerAuctionPanel from '@/domains/auction/components/SellerAuctionPanel.vue'
 import { LIVE_AUCTION_MOCK_RESULT } from '@/domains/auction/constants/liveAuctionMockData'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
+import { issueLiveVideoToken, updateLiveStatus } from '@/domains/live/api/liveControlApi'
 import {
   getLiveWatchViewData,
   isLiveWatchApiEnabled,
@@ -54,6 +55,7 @@ const auctionWin = ref<{
 // 438/440 방송 종료 화면 단계: 대시보드 → (미낙찰 있으면) 남은 상품 관리.
 const endView = ref<'dashboard' | 'manage'>('dashboard')
 const now = ref(Date.now())
+const videoConnectionLabel = ref('')
 // 방송 상세는 시청자와 같은 GET /lives/{liveId} 실 API를 재사용한다(VITE_LIVE_WATCH_API_ENABLED).
 // 판매자 전용 상태(방송 소유자 여부·currentProductId 등)는 BE 미제공 → liveWatchApi에서 null/fallback.
 // (BE 확인 필요: docs/requests/BE/007 3.5, docs/requests/BE/013)
@@ -118,6 +120,7 @@ const loadLiveBroadcast = async () => {
   auctionWin.value = null
   endView.value = 'dashboard'
   transitionNotice.value = ''
+  videoConnectionLabel.value = ''
   window.clearTimeout(transitionNoticeTimer)
 
   if (liveId === null) {
@@ -138,6 +141,10 @@ const loadLiveBroadcast = async () => {
     selectedProductId.value = response.currentProductId ?? response.products.at(0)?.id ?? null
     now.value = Date.now()
     loadState.value = 'success'
+
+    if (response.status === 'LIVE') {
+      void loadVideoToken(response.id)
+    }
 
     // mock 확인용: ?win 쿼리면 낙찰 축하 오버레이를 바로 띄운다(실사용 트리거는 handleAuctionEnded).
     if (!apiEnabled && route.query.win !== undefined) {
@@ -218,15 +225,39 @@ const cancelEndBroadcast = () => {
   isEndConfirmOpen.value = false
 }
 
-const confirmEndBroadcast = () => {
+const confirmEndBroadcast = async () => {
   if (!live.value) return
 
-  live.value = {
-    ...live.value,
-    status: 'ENDED',
-    endedAt: new Date(now.value).toISOString(),
+  try {
+    const response = await updateLiveStatus(live.value.id, 'ENDED')
+
+    live.value = {
+      ...live.value,
+      status: response.status,
+      endedAt: new Date(now.value).toISOString(),
+    }
+    isEndConfirmOpen.value = false
+  } catch (error) {
+    transitionNotice.value =
+      error instanceof Error ? error.message : '방송을 종료하지 못했습니다.'
+
+    window.clearTimeout(transitionNoticeTimer)
+    transitionNoticeTimer = window.setTimeout(() => {
+      transitionNotice.value = ''
+    }, 2600)
   }
-  isEndConfirmOpen.value = false
+}
+
+const loadVideoToken = async (liveId: number) => {
+  videoConnectionLabel.value = '영상 토큰 발급 중'
+
+  try {
+    const token = await issueLiveVideoToken(liveId)
+    videoConnectionLabel.value =
+      token.role === 'PUBLISHER' ? '송출 토큰 발급 완료' : '시청 토큰 발급 완료'
+  } catch {
+    videoConnectionLabel.value = '영상 토큰 발급 실패'
+  }
 }
 
 const updateViewerCount = (viewerCount: number) => {
@@ -388,6 +419,7 @@ onBeforeUnmount(() => {
             :title="live.title"
             :poster-url="live.posterUrl"
             :status="live.status"
+            :connection-label="videoConnectionLabel"
             :show-try-on="false"
           >
             <template #overlay>
@@ -417,6 +449,7 @@ onBeforeUnmount(() => {
           <LiveBroadcastInfo :live="live" :elapsed-time="elapsedTime" />
 
           <SellerAuctionPanel
+            :live-id="live.id"
             :product="selectedProduct"
             :status="live.status"
             @auction-ended="handleAuctionEnded"
