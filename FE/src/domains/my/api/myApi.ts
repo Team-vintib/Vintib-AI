@@ -27,6 +27,7 @@ import {
   type UserInterests,
 } from '@/shared/api/mockInterestStorage'
 import { getBrands, getCategories } from '@/domains/product/api/productApi'
+import { removeWish } from '@/domains/product/api/productApi'
 import type { ApiResponse } from '@/shared/types/api.types'
 
 const MOCK_DELAY_MS = 250
@@ -246,6 +247,15 @@ export const updateMyInterests = async (userId: number, request: UpdateMyInteres
 
   const response = await http.put<ApiResponse<UserInterests>>(`/users/${userId}/interests`, request)
   return unwrapApiData(response.data, '관심 정보를 저장하지 못했습니다.')
+}
+
+export const removeMyWish = async (userId: number, productId: number) => {
+  if (!MY_API_ENABLED) {
+    await wait(MOCK_DELAY_MS)
+    return
+  }
+
+  await removeWish(userId, productId)
 }
 
 export const isMyApiEnabled = () => MY_API_ENABLED
