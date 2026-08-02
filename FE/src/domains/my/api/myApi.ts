@@ -16,6 +16,15 @@ import {
   saveMockDefaultTryOnImage,
   saveMockProfileImage,
 } from '@/shared/api/mockProfileMediaStorage'
+import {
+  getMockInterestOptions,
+  readMockUserInterests,
+  saveMockUserInterests,
+  type InterestBrand,
+  type InterestCategory,
+  type UserInterests,
+} from '@/shared/api/mockInterestStorage'
+import { getBrands, getCategories } from '@/domains/product/api/productApi'
 import type { ApiResponse } from '@/shared/types/api.types'
 
 const MOCK_DELAY_MS = 250
@@ -27,6 +36,11 @@ interface MyProfileImageResponse {
 
 interface MyDefaultTryOnImageResponse {
   defaultTryOnImageUrl: string | null
+}
+
+interface UpdateMyInterestsRequest {
+  brandIds: number[]
+  categoryIds: number[]
 }
 
 const wait = (delay: number) =>
@@ -161,6 +175,40 @@ export const deleteMyDefaultTryOnImage = async (userId: number) => {
   const data = unwrapNullableApiData(response.data, 'AI 시착용 사진을 삭제하지 못했습니다.')
 
   return data ?? { defaultTryOnImageUrl: null }
+}
+
+export const getMyInterestOptions = async () => {
+  if (!MY_API_ENABLED) {
+    await wait(MOCK_DELAY_MS)
+    return getMockInterestOptions()
+  }
+
+  const [brands, categories] = await Promise.all([getBrands(), getCategories()])
+
+  return {
+    brands: brands satisfies InterestBrand[],
+    categories: categories satisfies InterestCategory[],
+  }
+}
+
+export const getMyInterests = async (userId: number) => {
+  if (!MY_API_ENABLED) {
+    await wait(MOCK_DELAY_MS)
+    return readMockUserInterests(userId)
+  }
+
+  const response = await http.get<ApiResponse<UserInterests>>(`/users/${userId}/interests`)
+  return unwrapApiData(response.data, '관심 정보를 불러오지 못했습니다.')
+}
+
+export const updateMyInterests = async (userId: number, request: UpdateMyInterestsRequest) => {
+  if (!MY_API_ENABLED) {
+    await wait(MOCK_DELAY_MS)
+    return saveMockUserInterests(userId, request.brandIds, request.categoryIds)
+  }
+
+  const response = await http.put<ApiResponse<UserInterests>>(`/users/${userId}/interests`, request)
+  return unwrapApiData(response.data, '관심 정보를 저장하지 못했습니다.')
 }
 
 export const isMyApiEnabled = () => MY_API_ENABLED

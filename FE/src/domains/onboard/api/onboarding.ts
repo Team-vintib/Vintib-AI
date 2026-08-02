@@ -3,6 +3,7 @@ import {
   readImageFileAsDataUrl,
   saveMockDefaultTryOnImage,
 } from '@/shared/api/mockProfileMediaStorage'
+import { saveMockUserInterests, type UserInterests } from '@/shared/api/mockInterestStorage'
 
 import type { ApiResponse } from '@/shared/types/api.types'
 
@@ -26,8 +27,12 @@ export interface SaveBasicInfoRequest {
 }
 
 export interface SaveOnboardingInterestsRequest {
-  brandIds: string[]
-  categoryIds: string[]
+  brandIds: number[]
+  categoryIds: number[]
+}
+
+export interface SaveOnboardingInterestsOptions {
+  userId?: number | null
 }
 
 export interface SaveOnboardingTryOnProfileRequest {
@@ -61,12 +66,26 @@ export const saveOnboardingBasicInfo = async (request: SaveBasicInfoRequest) => 
   return data
 }
 
-export const saveOnboardingInterests = async (request: SaveOnboardingInterestsRequest) => {
+export const saveOnboardingInterests = async (
+  request: SaveOnboardingInterestsRequest,
+  options: SaveOnboardingInterestsOptions = {},
+): Promise<ApiResponse<UserInterests | null>> => {
   if (!ONBOARDING_API_ENABLED) {
-    return ONBOARDING_SUCCESS_RESPONSE
+    return {
+      success: true,
+      data: saveMockUserInterests(options.userId, request.brandIds, request.categoryIds),
+      error: null,
+    }
   }
 
-  const { data } = await http.put<ApiResponse<null>>('/me/interests', request)
+  if (!options.userId) {
+    throw new Error('관심 정보를 저장할 회원 ID가 없습니다.')
+  }
+
+  const { data } = await http.put<ApiResponse<UserInterests>>(
+    `/users/${options.userId}/interests`,
+    request,
+  )
 
   return data
 }

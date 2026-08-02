@@ -7,7 +7,10 @@ import {
   deleteMyDefaultTryOnImage,
   deleteMyProfileImage,
   getMyPageViewData,
+  getMyInterestOptions,
+  getMyInterests,
   updateMyDefaultTryOnImage,
+  updateMyInterests,
   updateMyProfile,
   updateMyProfileImage,
 } from '@/domains/my/api/myApi'
@@ -21,6 +24,7 @@ import {
 } from '@/domains/my/constants/myMockData'
 import type { MyPageViewData, MyProfileUpdateRequest, MySectionId } from '@/domains/my/types/my.types'
 import { normalizeApiError } from '@/shared/api/http'
+import type { InterestBrand, InterestCategory } from '@/shared/api/mockInterestStorage'
 import { readImageFileAsDataUrl } from '@/shared/api/mockProfileMediaStorage'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
@@ -53,6 +57,13 @@ const selectedTryOnImageFile = ref<File | null>(null)
 const tryOnImagePreviewUrl = ref('')
 const isTryOnImageRemoved = ref(false)
 const selectedTryOnImageName = ref('')
+const interestBrandOptions = ref<InterestBrand[]>([])
+const interestCategoryOptions = ref<InterestCategory[]>([])
+const selectedInterestBrandIds = ref<number[]>([])
+const selectedInterestCategoryIds = ref<number[]>([])
+const interestBrandSearchQuery = ref('')
+const isInterestLoading = ref(false)
+const interestLoadMessage = ref('')
 
 const profile = computed(() => viewData.value?.summary.profile ?? null)
 const isLoading = computed(() => loadState.value === 'loading')
@@ -75,6 +86,20 @@ const tryOnImageDisplayUrl = computed(() => {
 
   return tryOnImagePreviewUrl.value || profile.value?.defaultTryOnImageUrl || ''
 })
+const filteredInterestBrands = computed(() => {
+  const normalizedQuery = interestBrandSearchQuery.value.trim().toLowerCase()
+
+  if (!normalizedQuery) {
+    return interestBrandOptions.value
+  }
+
+  return interestBrandOptions.value.filter((brand) =>
+    `${brand.name} ${brand.nameEn ?? ''}`.toLowerCase().includes(normalizedQuery),
+  )
+})
+const visibleInterestCategories = computed(() =>
+  interestCategoryOptions.value.filter((category) => category.depth <= 2),
+)
 const currentSectionLabel = computed(
   () =>
     MY_SECTION_OPTIONS.find((section) => section.id === selectedSection.value)?.label ??
@@ -285,6 +310,48 @@ const validateProfileForm = () => {
   return ''
 }
 
+const isInterestBrandSelected = (brandId: number) => selectedInterestBrandIds.value.includes(brandId)
+
+const toggleInterestBrand = (brandId: number) => {
+  profileSaveState.value = 'idle'
+  profileSaveMessage.value = ''
+
+  if (isInterestBrandSelected(brandId)) {
+    selectedInterestBrandIds.value = selectedInterestBrandIds.value.filter(
+      (selectedBrandId) => selectedBrandId !== brandId,
+    )
+    return
+  }
+
+  selectedInterestBrandIds.value = [...selectedInterestBrandIds.value, brandId]
+}
+
+const handleInterestCategoryChange = () => {
+  profileSaveState.value = 'idle'
+  profileSaveMessage.value = ''
+}
+
+const loadMyInterests = async (userId: number) => {
+  isInterestLoading.value = true
+  interestLoadMessage.value = ''
+
+  try {
+    const [options, interests] = await Promise.all([
+      getMyInterestOptions(),
+      getMyInterests(userId),
+    ])
+
+    interestBrandOptions.value = options.brands
+    interestCategoryOptions.value = options.categories
+    selectedInterestBrandIds.value = interests.brands.map((brand) => brand.id)
+    selectedInterestCategoryIds.value = interests.categories.map((category) => category.id)
+  } catch (error) {
+    interestLoadMessage.value = normalizeApiError(error).message
+  } finally {
+    isInterestLoading.value = false
+  }
+}
+
 const openProfileImagePicker = () => {
   profileImageInput.value?.click()
 }
@@ -429,6 +496,11 @@ const submitProfileForm = async () => {
       nextTryOnImageUrl = response.defaultTryOnImageUrl
     }
 
+    await updateMyInterests(profile.value.id, {
+      brandIds: [...selectedInterestBrandIds.value],
+      categoryIds: [...selectedInterestCategoryIds.value],
+    })
+
     viewData.value = {
       ...viewData.value,
       summary: {
@@ -449,7 +521,7 @@ const submitProfileForm = async () => {
     selectedTryOnImageName.value = ''
     isTryOnImageRemoved.value = false
     profileSaveState.value = 'success'
-    profileSaveMessage.value = '기본 정보가 저장되었습니다.'
+    profileSaveMessage.value = '내 정보가 저장되었습니다.'
   } catch (error) {
     profileSaveState.value = 'error'
     profileSaveMessage.value = normalizeApiError(error).message
@@ -491,6 +563,7 @@ const loadMyPage = async () => {
 
   try {
     viewData.value = await getMyPageViewData(authStore.user.id)
+    await loadMyInterests(authStore.user.id)
     loadState.value = 'success'
   } catch (error) {
     errorMessage.value = normalizeApiError(error).message
@@ -869,6 +942,73 @@ onMounted(() => {
                     <strong>{{ MY_BUSINESS_STATUS_LABELS[profile.businessVerificationStatus] }}</strong>
                   </div>
                 </div>
+
+                <section class="my-interest-editor" aria-labelledby="my-interest-editor-title">
+                  <div class="my-interest-editor__header">
+                    <div>
+                      <h3 id="my-interest-editor-title">관심 정보</h3>
+                      <p>맞춤 상품과 라이브 추천에 사용하는 브랜드와 카테고리입니다.</p>
+                    </div>
+                    <span v-if="isInterestLoading">불러오는 중</span>
+                    <span v-else>
+                      {{ selectedInterestBrandIds.length + selectedInterestCategoryIds.length }}개 선택
+                    </span>
+                  </div>
+
+                  <p v-if="interestLoadMessage" class="my-interest-editor__message">
+                    {{ interestLoadMessage }}
+                  </p>
+
+                  <div class="my-interest-editor__group">
+                    <label class="my-interest-editor__search">
+                      <span>관심 브랜드</span>
+                      <input
+                        v-model.trim="interestBrandSearchQuery"
+                        type="search"
+                        placeholder="브랜드명을 검색해 주세요."
+                        :disabled="isInterestLoading"
+                      />
+                    </label>
+
+                    <div v-if="filteredInterestBrands.length" class="my-interest-editor__chips">
+                      <button
+                        v-for="brand in filteredInterestBrands"
+                        :key="brand.id"
+                        type="button"
+                        :class="{ 'my-interest-editor__chip--selected': isInterestBrandSelected(brand.id) }"
+                        :aria-pressed="isInterestBrandSelected(brand.id)"
+                        :disabled="isInterestLoading"
+                        @click="toggleInterestBrand(brand.id)"
+                      >
+                        {{ brand.nameEn ? `${brand.name} (${brand.nameEn})` : brand.name }}
+                      </button>
+                    </div>
+                    <p v-else class="my-interest-editor__empty">검색 결과가 없습니다.</p>
+                  </div>
+
+                  <div class="my-interest-editor__group">
+                    <div class="my-interest-editor__label">관심 카테고리</div>
+                    <div class="my-interest-editor__categories">
+                      <label
+                        v-for="category in visibleInterestCategories"
+                        :key="category.id"
+                        class="my-interest-editor__category"
+                        :class="{
+                          'my-interest-editor__category--selected': selectedInterestCategoryIds.includes(category.id),
+                        }"
+                      >
+                        <input
+                          v-model="selectedInterestCategoryIds"
+                          type="checkbox"
+                          :value="category.id"
+                          :disabled="isInterestLoading"
+                          @change="handleInterestCategoryChange"
+                        />
+                        <span>{{ category.name }}</span>
+                      </label>
+                    </div>
+                  </div>
+                </section>
               </form>
             </template>
 
@@ -1156,6 +1296,7 @@ onMounted(() => {
 .my-todo-row:focus-visible,
 .my-profile-photo__actions button:focus-visible,
 .my-tryon-photo__actions button:focus-visible,
+.my-interest-editor__chips button:focus-visible,
 .my-point-panel__actions button:focus-visible {
   outline: 3px solid var(--color-primary-soft);
   outline-offset: 2px;
@@ -1919,6 +2060,144 @@ onMounted(() => {
   font-weight: var(--font-weight-bold);
 }
 
+.my-interest-editor {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+}
+
+.my-interest-editor__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.my-interest-editor__header h3 {
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 24px;
+}
+
+.my-interest-editor__header p {
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.my-interest-editor__header > span {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: var(--radius-badge);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  line-height: 20px;
+}
+
+.my-interest-editor__message,
+.my-interest-editor__empty {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.my-interest-editor__group,
+.my-interest-editor__search {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.my-interest-editor__search span,
+.my-interest-editor__label {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 18px;
+}
+
+.my-interest-editor__search input {
+  width: 100%;
+  min-height: var(--button-height-standard);
+  padding: 0 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+.my-interest-editor__search input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  outline: none;
+}
+
+.my-interest-editor__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.my-interest-editor__chips button {
+  min-height: var(--button-height-small);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+}
+
+.my-interest-editor__chips button:hover,
+.my-interest-editor__chip--selected {
+  border-color: var(--color-primary) !important;
+  background: var(--color-primary-soft) !important;
+  color: var(--color-primary) !important;
+}
+
+.my-interest-editor__categories {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.my-interest-editor__category {
+  display: flex;
+  align-items: center;
+  min-height: var(--button-height-standard);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+}
+
+.my-interest-editor__category input {
+  width: 16px;
+  height: 16px;
+  margin: 0 var(--space-2) 0 0;
+  accent-color: var(--color-primary);
+}
+
+.my-interest-editor__category:hover,
+.my-interest-editor__category--selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
 .my-card__title button:disabled {
   cursor: wait;
   opacity: 0.65;
@@ -1973,6 +2252,10 @@ onMounted(() => {
     grid-column: 2;
     justify-self: start;
   }
+
+  .my-interest-editor__categories {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -2000,6 +2283,14 @@ onMounted(() => {
 
   .my-profile-hero__stats {
     gap: 18px;
+  }
+
+  .my-interest-editor__header {
+    flex-direction: column;
+  }
+
+  .my-interest-editor__categories {
+    grid-template-columns: 1fr;
   }
 
   .my-profile-photo {

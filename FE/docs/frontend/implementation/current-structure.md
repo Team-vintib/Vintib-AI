@@ -291,6 +291,8 @@ src/
     api/
       authTokenStorage.ts
       http.ts
+      mockInterestStorage.ts
+      mockProfileMediaStorage.ts
     components/
       AppSearchBar.vue
       GlobalNavigation.vue
@@ -448,6 +450,7 @@ docs/
   `/my`에서 `section` query를 기준으로 섹션을 전환하고, 실제 마이페이지 API 계약 확정 전까지 `VITE_MY_API_ENABLED=false` 기본값으로 mock fallback을 사용합니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
+- `shared/api/mockInterestStorage.ts`와 `mockProfileMediaStorage.ts`에는 온보딩·마이페이지 mock fallback에서 공유하는 관심 정보와 프로필/AI 시착용 사진 저장 유틸이 구현되어 있습니다.
 - `shared/utils/validators.ts`에는 회원가입과 로그인 입력 검증에 사용하는 순수 검증 유틸이 구현되어 있습니다.
 - 전역 스타일은 디자인 토큰, reset, 기본 font-family와 온보딩 오류 토큰을 포함합니다.
 
