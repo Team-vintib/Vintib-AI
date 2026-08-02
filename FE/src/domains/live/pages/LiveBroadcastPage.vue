@@ -2,7 +2,9 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
 import SellerAuctionPanel from '@/domains/auction/components/SellerAuctionPanel.vue'
+import { LIVE_AUCTION_MOCK_RESULT } from '@/domains/auction/constants/liveAuctionMockData'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import {
   getLiveWatchViewData,
@@ -40,6 +42,12 @@ const live = ref<LiveWatchViewData | null>(null)
 const loadState = ref<LiveWatchLoadState>('loading')
 const errorMessage = ref('')
 const selectedProductId = ref<number | null>(null)
+// 441 판매자 낙찰 이벤트 — 경매 낙찰 시 방송 영상 위 축하 오버레이(시청자 434 재사용) 표시용.
+const auctionWin = ref<{
+  winnerNickname: string
+  winningBid: number
+  productTitle: string | null
+} | null>(null)
 const now = ref(Date.now())
 // 방송 상세는 시청자와 같은 GET /lives/{liveId} 실 API를 재사용한다(VITE_LIVE_WATCH_API_ENABLED).
 // 판매자 전용 상태(방송 소유자 여부·currentProductId 등)는 BE 미제공 → liveWatchApi에서 null/fallback.
@@ -102,6 +110,7 @@ const loadLiveBroadcast = async () => {
   loadState.value = 'loading'
   errorMessage.value = ''
   isEndConfirmOpen.value = false
+  auctionWin.value = null
   transitionNotice.value = ''
   window.clearTimeout(transitionNoticeTimer)
 
@@ -123,6 +132,15 @@ const loadLiveBroadcast = async () => {
     selectedProductId.value = response.currentProductId ?? response.products.at(0)?.id ?? null
     now.value = Date.now()
     loadState.value = 'success'
+
+    // mock 확인용: ?win 쿼리면 낙찰 축하 오버레이를 바로 띄운다(실사용 트리거는 handleAuctionEnded).
+    if (!apiEnabled && route.query.win !== undefined) {
+      auctionWin.value = {
+        winnerNickname: LIVE_AUCTION_MOCK_RESULT.winnerNickname,
+        winningBid: LIVE_AUCTION_MOCK_RESULT.winningBid,
+        productTitle: selectedProduct.value?.title ?? null,
+      }
+    }
   } catch (error) {
     if (requestId !== loadRequestId) return
 
@@ -212,6 +230,27 @@ const updateViewerCount = (viewerCount: number) => {
     ...live.value,
     currentViewerCount: viewerCount,
   }
+}
+
+const handleAuctionEnded = (result: {
+  outcome: 'WON' | 'FAILED'
+  winnerNickname: string | null
+  winningBid: number
+  productTitle: string | null
+}) => {
+  // 낙찰(WON)일 때만 축하 오버레이. 미낙찰은 패널 표기(ENDED_FAILED)로 충분.
+  auctionWin.value =
+    result.outcome === 'WON' && result.winnerNickname
+      ? {
+          winnerNickname: result.winnerNickname,
+          winningBid: result.winningBid,
+          productTitle: result.productTitle,
+        }
+      : null
+}
+
+const closeAuctionWin = () => {
+  auctionWin.value = null
 }
 
 watch(
@@ -321,6 +360,14 @@ onBeforeUnmount(() => {
             </template>
           </LiveVideoStage>
 
+          <LiveAuctionResultOverlay
+            v-if="auctionWin"
+            :winner-nickname="auctionWin.winnerNickname"
+            :winning-bid="auctionWin.winningBid"
+            :product-title="auctionWin.productTitle"
+            @close="closeAuctionWin"
+          />
+
           <p v-if="transitionNotice" class="live-broadcast-page__notice" role="status">
             {{ transitionNotice }}
           </p>
@@ -341,7 +388,11 @@ onBeforeUnmount(() => {
         <aside class="live-broadcast-page__control">
           <LiveBroadcastInfo :live="live" :elapsed-time="elapsedTime" />
 
-          <SellerAuctionPanel :product="selectedProduct" :status="live.status" />
+          <SellerAuctionPanel
+            :product="selectedProduct"
+            :status="live.status"
+            @auction-ended="handleAuctionEnded"
+          />
         </aside>
       </div>
 
