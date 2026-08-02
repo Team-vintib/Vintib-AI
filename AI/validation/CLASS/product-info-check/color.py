@@ -8,6 +8,11 @@
                         이미지 임베딩 코사인 유사도). classify.py의 카테고리 zero-shot과
                         같은 메커니즘을 색상에 적용 — 2026-08-02 추가, "CLIP 파인튜닝으로
                         색상까지 처리" 결정 전에 먼저 zero-shot 신호부터 본다.
+  (e) *_ensemble(예: clip_vit_b32_ensemble) — (d)와 모델은 같고, 단일 문구 대신 템플릿 x
+                        동의어 프롬프트 앙상블로 스코어링(2026-08-03 추가, 색상 개선안
+                        1·2번). `EN_COLOR_SYNONYMS`/`_COLOR_ENSEMBLE_TEMPLATES` 참고.
+                        **실측 결과 (d)보다 나쁘다(N=10: 0.20 -> 0.10, `REPORT.md` §11)** —
+                        코드는 회귀 사례 재현용으로 남겨뒀을 뿐 권장 백엔드가 아니다.
 
 설계: `.claude/plans/ai/CH012-~2.MD`(파일명이 이렇게 커밋돼 있다 — 원래 의도한 이름은
 `CH012-product-info-classify.md`로 보인다, 정리 필요).
@@ -304,19 +309,56 @@ EN_COLOR_LABELS: dict[str, str] = {
 }
 assert set(EN_COLOR_LABELS) == set(PALETTE) | {MULTI_LABEL}
 
+# --------------------------------------------------------------------------
+# 프롬프트 앙상블(색상 개선안 1·2번, 2026-08-03 추가) — 단일 템플릿/단일 단어의 어휘
+# 노이즈를 줄이려고 여러 템플릿 x 여러 동의어 조합의 임베딩을 평균 낸다(원조 CLIP zero-shot
+# 앙상블 레시피). 동의어는 실제로 헷갈렸던 코드에만 추가한다 — 정답셋 라벨링 정정 이력
+# (logo_test.jpg BEIGE->WHITE, small_pro.jpg SKYBLUE->WHITE)이 근거다. 나머지는 원래
+# 단어 하나로 충분하다(과설계 방지).
+# --------------------------------------------------------------------------
+_COLOR_ENSEMBLE_TEMPLATES: tuple[str, ...] = (
+    "a photo of {color} clothing",
+    "{color} colored clothing",
+    "clothing in {color}",
+    "a {color} garment",
+)
+
+EN_COLOR_SYNONYMS: dict[str, tuple[str, ...]] = {
+    code: (word,) for code, word in EN_COLOR_LABELS.items()
+}
+EN_COLOR_SYNONYMS.update(
+    {
+        "IVORY": ("ivory", "off-white", "cream"),
+        "BEIGE": ("beige", "tan", "sand"),
+        "NAVY": ("navy blue", "dark blue", "deep blue"),
+        "GRAY": ("gray", "grey"),
+        "SILVER": ("silver", "metallic gray"),
+        "BROWN": ("brown", "chocolate brown"),
+        "KHAKI": ("khaki", "olive tan"),
+        "SKYBLUE": ("sky blue", "light blue"),
+    }
+)
+assert set(EN_COLOR_SYNONYMS) == set(EN_COLOR_LABELS)
+
 
 class ClipZeroShotColorExtractor(ColorExtractor):
     """CLIP/SigLIP 임베딩에 색상 라벨 텍스트를 직접 물어본다(합성 — `EmbeddingZeroShotClassifier`를
     상속하지 않고 내부에 들고 쓴다. `ColorExtractor` ABC와 `CategoryClassifier` ABC는 반환
-    타입이 달라서 상속으로 엮으면 타입이 꼬인다)."""
+    타입이 달라서 상속으로 엮으면 타입이 꼬인다).
+
+    `use_ensemble=True`면 단일 문구 대신 `_COLOR_ENSEMBLE_TEMPLATES` x `EN_COLOR_SYNONYMS`
+    조합을 전부 평균해 스코어링한다(색상 개선안 1·2번, `score_label_groups` 위임).
+    **실측 결과 회귀했다(N=10: 0.20 -> 0.10, `REPORT.md` §11)** — 권장하지 않는다,
+    재현/참고용으로만 남겨둠."""
 
     # 2등 후보가 이 정도 확률 이상이어야 보조색상으로 인정한다 — 안 그러면 항상 2등 답까지
     # 억지로 보조색상으로 채워서 정확도를 스스로 깎아먹는다.
     SECONDARY_MIN_SCORE = 0.15
 
-    def __init__(self, model_id: str, name: str = "clip_zeroshot"):
+    def __init__(self, model_id: str, name: str = "clip_zeroshot", use_ensemble: bool = False):
         self._model_id = model_id
         self.name = name
+        self._use_ensemble = use_ensemble
         self._backend = None
 
     def _get_backend(self) -> "EmbeddingZeroShotClassifier":  # noqa: F821 — 지연 import
@@ -328,8 +370,19 @@ class ClipZeroShotColorExtractor(ColorExtractor):
 
     def extract(self, image_path: Path) -> ColorResult:
         codes = list(PALETTE) + [MULTI_LABEL]
-        texts = [f"a photo of {EN_COLOR_LABELS[code]} clothing" for code in codes]
-        scores = self._get_backend().score_labels(image_path, texts)
+        if self._use_ensemble:
+            groups = [
+                [
+                    t.format(color=syn)
+                    for t in _COLOR_ENSEMBLE_TEMPLATES
+                    for syn in EN_COLOR_SYNONYMS[code]
+                ]
+                for code in codes
+            ]
+            scores = self._get_backend().score_label_groups(image_path, groups)
+        else:
+            texts = [f"a photo of {EN_COLOR_LABELS[code]} clothing" for code in codes]
+            scores = self._get_backend().score_labels(image_path, texts)
 
         order = sorted(range(len(codes)), key=lambda i: -scores[i])
         primary_code = codes[order[0]]
@@ -362,14 +415,20 @@ COLOR_BACKENDS: dict[str, "callable[[], ColorExtractor]"] = {
     "clip_vit_b32": lambda: _make_clip_color("clip_vit_b32"),
     "clip_vit_l14": lambda: _make_clip_color("clip_vit_l14"),
     "siglip_so400m": lambda: _make_clip_color("siglip_so400m"),
+    # 프롬프트 앙상블(색상 개선안 1·2번, 2026-08-03 추가) — 모델은 위와 동일, 스코어링만
+    # 템플릿 x 동의어 앙상블로 바꾼 버전. REPORT.md §11 참고.
+    "clip_vit_b32_ensemble": lambda: _make_clip_color("clip_vit_b32", ensemble=True),
+    "clip_vit_l14_ensemble": lambda: _make_clip_color("clip_vit_l14", ensemble=True),
+    "siglip_so400m_ensemble": lambda: _make_clip_color("siglip_so400m", ensemble=True),
 }
 ACTIVE_COLOR_BACKEND = os.environ.get("PRODUCT_INFO_COLOR_BACKEND", "mock")
 
 
-def _make_clip_color(model_key: str) -> ClipZeroShotColorExtractor:
+def _make_clip_color(model_key: str, ensemble: bool = False) -> ClipZeroShotColorExtractor:
     from classify import CATEGORY_MODELS  # 지연 import — 무거운 의존성 체인 회피
 
-    return ClipZeroShotColorExtractor(CATEGORY_MODELS[model_key], name=model_key)
+    name = f"{model_key}_ensemble" if ensemble else model_key
+    return ClipZeroShotColorExtractor(CATEGORY_MODELS[model_key], name=name, use_ensemble=ensemble)
 
 
 def get_color_extractor(name: str | None = None) -> ColorExtractor:
