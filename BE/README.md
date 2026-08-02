@@ -165,6 +165,12 @@ BE/
 │   │   ├── entity/               # BusinessInfo, BusinessVerificationStatus
 │   │   ├── repository/
 │   │   └── dto/
+│   ├── order/                    # 주문 FK 대상 엔티티(생성 API 없음) + 세금계산서 (BIZ-002) — 서윤
+│   │   ├── controller/           # InvoiceController
+│   │   ├── service/              # InvoiceService
+│   │   ├── entity/               # Order(package-private 빌더), OrderStatus, Invoice
+│   │   ├── repository/           # OrderRepository(findById만), InvoiceRepository
+│   │   └── dto/response/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
 │       ├── client/              # AiClient — Spring → FastAPI
 │       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig

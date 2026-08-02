@@ -20,6 +20,7 @@
   - Notification: `/api/users/{userId}/alerts`, `/api/users/{userId}/alerts/{id}`, `/api/users/{userId}/alerts/read-all`
   - Social(Follow): `/api/users/{userId}/followers`(POST/DELETE/GET), `/api/users/{userId}/followings`(GET)
   - Business: `/api/users/{userId}/business`(GET/POST), `/api/users/{userId}/business/upload-url`
+  - Invoice: `/api/orders/{orderId}/invoices`(POST/GET) — 주문 생성 API가 없어 아직 실제 호출 가능한 주문은 없음
 - FE 구현 완료 범위
   - Auth, Home, Product 일부, Live 일부, Chat realtime 일부는 실제 API 연결 완료
   - Onboarding, Search, Auction, Commerce, MyPage는 mock 또는 미구현 범위가 남아 있음
@@ -52,7 +53,7 @@
 | 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필 연결 완료 | 생성용 상품 조회, 영상 token, AI 시착 생성 |
 | 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API 연동 완료. 알림 seed 제거 후 실제 생성 데이터 없음 | 알림 type/ref 문서화, 실제 알림 생성 이벤트, 예약 라이브 알림 신청/스케줄러, 탭별 bulk read |
 | 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수 연결 완료 | 경매 snapshot/start/bid/close/STOMP |
-| 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | FE 화면 없음, BE controller 없음 | 주문/배송/환불/포인트 전체 |
+| 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | FE 화면 없음, BE controller 없음 | 주문 생성/배송/환불/포인트 전체(세금계산서 발행/조회는 구현 완료 — `docs/requests/FE/011-business-invoice-contract.md` §4~5, 단 주문 생성 API가 없어 아직 실호출 불가) |
 | 011 | `011-user-mypage-contract.md` | User/MyPage | FE 화면 없음, BE API 없음 | `/api/me`, 공개 프로필, 마이페이지 요약 |
 | 013 | `013-live-seller-control.md` | Live | FE mock으로 UI 구현 완료 | 방송 종료, 현재 소개 상품 전환 트리거 엔드포인트 |
 

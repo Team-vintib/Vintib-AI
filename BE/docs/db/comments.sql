@@ -142,6 +142,14 @@ COMMENT ON COLUMN orders.auto_confirm_at IS '자동 구매 확정 예정 시각(
 COMMENT ON TABLE order_shipment IS '배송지·송장 정보 (SHIP-*). 주문 1건당 1행.';
 COMMENT ON COLUMN order_shipment.courier         IS '택배사. 송장 등록 전에는 NULL.';
 COMMENT ON COLUMN order_shipment.tracking_number IS '운송장 번호. 판매자가 등록한다.';
+
+COMMENT ON TABLE invoice IS '세금계산서 (BIZ-002). 주문당 1건, 발행 시점 사업자 정보를 스냅샷으로 저장.';
+COMMENT ON COLUMN invoice.business_number      IS '발행 시점 판매자 사업자등록번호(스냅샷).';
+COMMENT ON COLUMN invoice.business_name        IS '발행 시점 판매자 상호명(스냅샷).';
+COMMENT ON COLUMN invoice.representative_name  IS '발행 시점 판매자 대표자명(스냅샷).';
+COMMENT ON COLUMN invoice.supply_amount        IS '공급가액. round(orders.order_price / 1.1).';
+COMMENT ON COLUMN invoice.tax_amount           IS '부가세. orders.order_price - supply_amount.';
+COMMENT ON COLUMN invoice.total_amount         IS '합계금액. orders.order_price와 동일.';
 COMMENT ON COLUMN order_shipment.delivered_at    IS '배송 완료 시각. orders.auto_confirm_at 계산 기준.';
 
 
