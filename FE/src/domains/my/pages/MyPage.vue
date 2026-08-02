@@ -105,6 +105,12 @@ const liveFilterOptions = [
   { id: 'ENDED', label: '종료' },
 ] satisfies Array<{ id: LiveFilterId; label: string }>
 const selectedLiveFilter = ref<LiveFilterId>('ALL')
+type SocialTabId = 'followers' | 'followings'
+const socialTabOptions = [
+  { id: 'followers', label: '팔로워' },
+  { id: 'followings', label: '팔로잉' },
+] satisfies Array<{ id: SocialTabId; label: string }>
+const selectedSocialTab = ref<SocialTabId>('followers')
 
 const profile = computed(() => viewData.value?.summary.profile ?? null)
 const isLoading = computed(() => loadState.value === 'loading')
@@ -176,6 +182,15 @@ const filteredLives = computed(() => {
   }
 
   return lives.filter((live) => live.status === selectedLiveFilter.value)
+})
+const visibleSocialUsers = computed(() => {
+  if (!viewData.value) {
+    return []
+  }
+
+  return selectedSocialTab.value === 'followers'
+    ? viewData.value.followers
+    : viewData.value.followings
 })
 const currentSectionLabel = computed(
   () =>
@@ -464,6 +479,10 @@ const selectLiveFilter = (filterId: LiveFilterId) => {
   selectedLiveFilter.value = filterId
 }
 
+const selectSocialTab = (tabId: SocialTabId) => {
+  selectedSocialTab.value = tabId
+}
+
 const goToOrderDetail = (orderId: number) => {
   void router.push({ name: ROUTE_NAMES.MY_ORDER_DETAIL, params: { orderId } })
 }
@@ -510,6 +529,14 @@ const getLiveFilterCount = (filterId: LiveFilterId) => {
   }
 
   return lives.filter((live) => live.status === filterId).length
+}
+
+const getSocialTabCount = (tabId: SocialTabId) => {
+  if (!viewData.value) {
+    return 0
+  }
+
+  return tabId === 'followers' ? viewData.value.followers.length : viewData.value.followings.length
 }
 
 const formatOrderDate = (value: string) =>
@@ -1492,9 +1519,47 @@ onMounted(() => {
               <div class="my-card__title">
                 <h2>팔로워·팔로잉</h2>
               </div>
-              <div class="my-empty">
-                <strong>팔로워·팔로잉 API 계약 확정 대기</strong>
+              <div class="my-order-tabs" role="tablist" aria-label="팔로워 팔로잉 탭">
+                <button
+                  v-for="tab in socialTabOptions"
+                  :key="tab.id"
+                  type="button"
+                  role="tab"
+                  :aria-selected="selectedSocialTab === tab.id"
+                  :class="{ 'my-order-tabs__item--active': selectedSocialTab === tab.id }"
+                  @click="selectSocialTab(tab.id)"
+                >
+                  {{ tab.label }}
+                  <span>{{ getSocialTabCount(tab.id) }}</span>
+                </button>
               </div>
+              <div v-if="visibleSocialUsers.length" class="my-social-grid">
+                <article v-for="user in visibleSocialUsers" :key="user.id" class="my-social-card">
+                  <div class="my-social-card__avatar" aria-hidden="true">
+                    <img v-if="user.profileImageUrl" :src="user.profileImageUrl" :alt="user.nickname" />
+                    <span v-else>{{ user.nickname.slice(0, 1) }}</span>
+                  </div>
+                  <div class="my-social-card__body">
+                    <strong>{{ user.nickname }}</strong>
+                    <p>{{ user.introduction }}</p>
+                    <dl>
+                      <div>
+                        <dt>팔로워</dt>
+                        <dd>{{ user.followerCount.toLocaleString('ko-KR') }}</dd>
+                      </div>
+                      <div>
+                        <dt>팔로잉</dt>
+                        <dd>{{ user.followingCount.toLocaleString('ko-KR') }}</dd>
+                      </div>
+                    </dl>
+                    <span>{{ formatOrderDate(user.followedAt) }}</span>
+                  </div>
+                  <button type="button" disabled>
+                    {{ selectedSocialTab === 'followers' && !user.isFollowing ? '팔로우' : '프로필 보기' }}
+                  </button>
+                </article>
+              </div>
+              <p v-else class="my-product-empty">표시할 사용자가 없습니다.</p>
             </template>
 
             <template v-else-if="selectedSection === 'business'">
@@ -2340,6 +2405,108 @@ onMounted(() => {
   line-height: 20px;
 }
 
+.my-social-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.my-social-card {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgb(23 26 31 / 8%);
+}
+
+.my-social-card__avatar {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 20px;
+  font-weight: var(--font-weight-extrabold);
+}
+
+.my-social-card__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.my-social-card__body {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.my-social-card__body strong {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-social-card__body p {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.my-social-card__body dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.my-social-card__body dl div {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.my-social-card__body dt,
+.my-social-card__body > span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.my-social-card__body dd {
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  line-height: 18px;
+}
+
+.my-social-card > button {
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: var(--font-weight-bold);
+  grid-column: 2;
+  justify-self: start;
+}
+
 .my-order-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2991,6 +3158,10 @@ onMounted(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .my-social-grid {
+    grid-template-columns: 1fr;
+  }
+
   .my-order-grid {
     grid-template-columns: 1fr;
   }
@@ -3029,6 +3200,15 @@ onMounted(() => {
 
   .my-product-grid {
     grid-template-columns: 1fr;
+  }
+
+  .my-social-card {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .my-social-card__avatar {
+    width: 48px;
+    height: 48px;
   }
 
   .my-order-card__main {

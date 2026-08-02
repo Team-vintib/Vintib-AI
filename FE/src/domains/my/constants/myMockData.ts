@@ -11,6 +11,7 @@ import type {
   MySaleItem,
   MySectionId,
   MySettlementStatus,
+  MySocialUser,
   MyWishItem,
 } from '@/domains/my/types/my.types'
 
@@ -231,6 +232,72 @@ const mockWishes: MyWishItem[] = PRODUCT_LIST_MOCK_DATA.filter((product) => prod
   }),
 )
 
+const mockFollowers: MySocialUser[] = [
+  {
+    id: 701,
+    nickname: 'slowbuyer',
+    profileImageUrl: null,
+    introduction: '빈티지 데님과 가죽 제품을 자주 찾는 구매자',
+    followerCount: 42,
+    followingCount: 18,
+    followedAt: '2026-08-01T08:30:00+09:00',
+    isFollowing: false,
+  },
+  {
+    id: 702,
+    nickname: 'rarecollector',
+    profileImageUrl: null,
+    introduction: '희소성 있는 아카이브 상품을 모으고 있어요.',
+    followerCount: 128,
+    followingCount: 36,
+    followedAt: '2026-07-31T16:20:00+09:00',
+    isFollowing: true,
+  },
+  {
+    id: 703,
+    nickname: 'minimalist',
+    profileImageUrl: null,
+    introduction: '좋은 소재와 단정한 실루엣을 좋아합니다.',
+    followerCount: 21,
+    followingCount: 9,
+    followedAt: '2026-07-28T10:10:00+09:00',
+    isFollowing: false,
+  },
+]
+
+const mockFollowings: MySocialUser[] = [
+  {
+    id: 801,
+    nickname: 'Archive Room',
+    profileImageUrl: null,
+    introduction: '90s 아메카지, 데님, 워크웨어 중심 셀렉션',
+    followerCount: 892,
+    followingCount: 24,
+    followedAt: '2026-07-25T12:00:00+09:00',
+    isFollowing: true,
+  },
+  {
+    id: 802,
+    nickname: 'Second Vault',
+    profileImageUrl: null,
+    introduction: '디자이너 백과 컨템포러리 소품을 소개합니다.',
+    followerCount: 534,
+    followingCount: 17,
+    followedAt: '2026-07-20T09:40:00+09:00',
+    isFollowing: true,
+  },
+  {
+    id: 803,
+    nickname: 'Time Archive',
+    profileImageUrl: null,
+    introduction: '빈티지 워치와 클래식 액세서리 전문',
+    followerCount: 1203,
+    followingCount: 11,
+    followedAt: '2026-07-18T21:15:00+09:00',
+    isFollowing: true,
+  },
+]
+
 export const mockMyPageViewData: MyPageViewData = {
   summary: {
     profile: mockMyProfile,
@@ -238,7 +305,7 @@ export const mockMyPageViewData: MyPageViewData = {
       orders: mockOrders.length,
       sales: mockSales.length,
       wishes: mockWishes.length,
-      followers: 12,
+      followers: mockFollowers.length,
       unreadNotifications: 1,
     },
     pointBalance: 128500,
@@ -282,6 +349,8 @@ export const mockMyPageViewData: MyPageViewData = {
   sales: mockSales,
   lives: mockLives,
   wishes: mockWishes,
+  followers: mockFollowers,
+  followings: mockFollowings,
   wishMeta: {
     page: 1,
     size: 20,

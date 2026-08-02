@@ -155,6 +155,17 @@ export interface MyWishItem {
   wishedAt: string
 }
 
+export interface MySocialUser {
+  id: number
+  nickname: string
+  profileImageUrl: string | null
+  introduction: string
+  followerCount: number
+  followingCount: number
+  followedAt: string
+  isFollowing: boolean
+}
+
 export interface MyPageViewData {
   summary: MySummary
   products: MyProductItem[]
@@ -162,6 +173,8 @@ export interface MyPageViewData {
   sales: MySaleItem[]
   lives: MyLiveItem[]
   wishes: MyWishItem[]
+  followers: MySocialUser[]
+  followings: MySocialUser[]
   wishMeta: PageMeta
 }
 
