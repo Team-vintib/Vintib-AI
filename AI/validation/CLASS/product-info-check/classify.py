@@ -145,6 +145,41 @@ class EmbeddingZeroShotClassifier(CategoryClassifier):
         probs = torch.softmax(sims, dim=-1)
         return probs.tolist()
 
+    def score_label_groups(
+        self, image_path: Path, label_prompt_groups: list[list[str]]
+    ) -> list[float]:
+        """`score_labels`의 프롬프트 앙상블 버전. 라벨 하나당 문구 변형 여러 개(템플릿 x
+        동의어 조합)를 받아, 원조 CLIP zero-shot 레시피(프롬프트별 정규화 임베딩 평균 ->
+        재정규화)로 라벨당 대표 임베딩 하나를 만든 뒤 코사인 유사도 + softmax를 낸다.
+        단일 문구의 어휘 노이즈를 줄이려는 목적 — `color.py`의 색상 프롬프트 개선안 1·2번."""
+        import torch
+        from PIL import Image
+
+        self._load()
+        with Image.open(image_path) as img:
+            image = img.convert("RGB")
+
+        flat_texts = [text for group in label_prompt_groups for text in group]
+        inputs = self._processor(text=flat_texts, images=image, return_tensors="pt", padding=True)
+        with torch.no_grad():
+            out = self._model(**inputs)
+
+        image_embeds = out.image_embeds / out.image_embeds.norm(dim=-1, keepdim=True)
+        text_embeds = out.text_embeds / out.text_embeds.norm(dim=-1, keepdim=True)
+
+        group_embeds = []
+        offset = 0
+        for group in label_prompt_groups:
+            n = len(group)
+            group_mean = text_embeds[offset : offset + n].mean(dim=0)
+            group_embeds.append(group_mean / group_mean.norm())
+            offset += n
+
+        label_embeds = torch.stack(group_embeds)
+        sims = (image_embeds @ label_embeds.T).squeeze(0) * self.TEMPERATURE
+        probs = torch.softmax(sims, dim=-1)
+        return probs.tolist()
+
 
 class ClipCategoryClassifier(EmbeddingZeroShotClassifier):
     name = "clip"
