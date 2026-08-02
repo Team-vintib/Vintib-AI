@@ -46,7 +46,6 @@
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
 | 001 | `001-auth-contract.md` | Auth | 이메일 auth API 연결 완료 | `GET /api/me`, auth 응답 `user/nextStep`, SSAFY SSO |
-| 003 | `003-business-contract.md` | Business | FE 화면/API adapter 있음, mock fallback | 사업자 인증 제출/조회 API 구현 완료(`docs/requests/FE/011-business-invoice-contract.md`) — FE 반영 필요. 관리자 승인/반려 API는 범위 밖 |
 | 004 | `004-home-contract.md` | Home | 홈/팔로잉 홈 연결 완료 | live card `hostId`, 정렬/노출 정책 문서화 |
 | 005 | `005-search-contract.md` | Search | FE 화면/adapter 있음, BE `/api/search` 없음 | 통합 검색 API |
 | 006 | `006-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
@@ -101,5 +100,6 @@
   - Notification 목록/읽음 처리
   - Social 팔로우/팔로우 해제, 팔로워/팔로잉 목록 조회
   - Onboarding 기본 정보/관심 정보/시착 프로필/온보딩 완료 전체(경로는 `/api/me/X`가 아니라 `/api/users/{id}/X`로 확정 — 처리 완료된 `002-onboarding-contract.md`는 삭제됨)
+  - Business 사업자 정보 제출/조회/재제출 — `docs/requests/FE/011-business-invoice-contract.md` 기준(경로·업로드 방식이 요청과 다르게 확정 — 처리 완료된 `003-business-contract.md`는 삭제됨). 관리자 승인/반려 API는 범위 밖
 - 기존 규격을 유지하면 되는 기능
   - BE에는 있지만 FE 화면/진입점이 없어 아직 미연결인 API는 각 도메인 화면 설계 후 연결한다.
