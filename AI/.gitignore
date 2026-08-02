@@ -41,4 +41,8 @@ validation/QUAL/clipseg-sam3tracker-hybrid-check/outputs/
 validation/TRYON/sam3d-condition-check/outputs/
 # 의류 파인튜닝 스캐폴드의 산출물 — 더미 데이터·캐시·체크포인트·렌더·리포트 전부 재생성 가능하다.
 validation/TRYON/sam3d-garment-finetune-check/artifacts/
+# VLM 카테고리 분류용 크롤링 수집물(상품 사진 + JSONL 라벨). 크롤러로 재수집 가능하고,
+# 남의 쇼핑몰 이미지라 저장소에 커밋하지 않는다. 수집기 코드/사이트 스펙은 커밋한다.
+validation/CLASS/crawl-collector/out/
+validation/CLASS/crawl-collector/**/out/
 
