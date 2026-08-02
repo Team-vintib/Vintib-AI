@@ -53,22 +53,22 @@ BE 계약이 최종 확정되기 전까지는 다음 기준을 사용한다.
 
 ## 구현 목록
 
-- [ ] `domains/tryon/types`에 사용자 시착 프로필 타입을 추가한다.
-- [ ] `domains/tryon/api`에 시착 프로필 조회/저장/삭제 adapter를 추가한다.
-- [ ] `domains/tryon/constants`에 mock 시착 프로필과 상태 라벨을 둔다.
-- [ ] `domains/my`의 섹션 옵션에 `AI 시착` 탭을 추가하고 `section=tryon`을 처리한다.
-- [ ] 마이페이지 프로필 섹션에 있던 기본 시착 이미지 관리를 AI 시착 탭으로 이동한다.
-- [ ] AI 시착 탭 UI를 구현한다: 상태 요약, 전신 사진 관리, 신체 정보 form, 저장/삭제 상태.
-- [ ] 온보딩에서 사용한 전신 사진 업로더/검증 흐름을 재사용하거나, 마이페이지 화면에 맞는 전용 컴포넌트로 분리한다.
-- [ ] 선택 숫자 입력 검증을 구현한다: 빈 값 허용, 값이 있으면 0보다 큰 정수만 허용.
-- [ ] 저장 중 중복 제출 방지, 성공/실패 메시지, 서버 필드 오류 매핑을 처리한다.
-- [ ] 전신 사진 삭제 시 상품/라이브 AI 시착 사용 불가 상태가 명확히 보이도록 한다.
-- [ ] `ProductDetailView`와 `LiveTryOnPanel`은 이번 구현에서 생성 API까지 연결하지 않고, 후속 연결 지점만 타입/API 기준으로 맞춘다.
-- [ ] `.env.example`에 `VITE_TRYON_API_ENABLED=false`를 추가한다.
-- [ ] `FE/docs/frontend/screens/screen-inventory.md`에 마이페이지 AI 시착 탭 상태를 반영한다.
-- [ ] `FE/docs/frontend/implementation/current-structure.md`에 `domains/tryon/api`와 사용자 프로필 관리 구조를 반영한다.
-- [ ] `FE/docs/frontend/implementation/status.md`가 있으면 TRYON/MY 상태를 갱신한다.
-- [ ] `npm run type-check`와 가능한 경우 `npm run build`로 검증한다.
+- [x] `domains/tryon/types`에 사용자 시착 프로필 타입을 추가한다.
+- [x] `domains/tryon/api`에 시착 프로필 조회/저장/삭제 adapter를 추가한다.
+- [x] `domains/tryon/constants`에 mock 시착 프로필과 상태 라벨을 둔다.
+- [x] `domains/my`의 섹션 옵션에 `AI 시착` 탭을 추가하고 `section=tryon`을 처리한다.
+- [x] 마이페이지 프로필 섹션에 있던 기본 시착 이미지 관리를 AI 시착 탭으로 이동한다.
+- [x] AI 시착 탭 UI를 구현한다: 상태 요약, 전신 사진 관리, 신체 정보 form, 저장/삭제 상태.
+- [x] 온보딩에서 사용한 전신 사진 업로더/검증 흐름을 재사용하거나, 마이페이지 화면에 맞는 전용 컴포넌트로 분리한다.
+- [x] 선택 숫자 입력 검증을 구현한다: 빈 값 허용, 값이 있으면 0보다 큰 정수만 허용.
+- [x] 저장 중 중복 제출 방지, 성공/실패 메시지, 서버 필드 오류 매핑을 처리한다.
+- [x] 전신 사진 삭제 시 상품/라이브 AI 시착 사용 불가 상태가 명확히 보이도록 한다.
+- [x] `ProductDetailView`와 `LiveTryOnPanel`은 이번 구현에서 생성 API까지 연결하지 않고, 후속 연결 지점만 타입/API 기준으로 맞춘다.
+- [x] `.env.example`에 `VITE_TRYON_API_ENABLED=false`를 추가한다.
+- [x] `FE/docs/frontend/screens/screen-inventory.md`에 마이페이지 AI 시착 탭 상태를 반영한다.
+- [x] `FE/docs/frontend/implementation/current-structure.md`에 `domains/tryon/api`와 사용자 프로필 관리 구조를 반영한다.
+- [x] `FE/docs/frontend/implementation/status.md`가 있으면 TRYON/MY 상태를 갱신한다.
+- [x] `npm run type-check`와 가능한 경우 `npm run build`로 검증한다.
 
 ## BE 확인 필요
 

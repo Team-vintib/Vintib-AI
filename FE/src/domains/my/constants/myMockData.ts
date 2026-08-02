@@ -19,6 +19,7 @@ export const MY_SECTION_OPTIONS: Array<{ id: MySectionId; label: string }> = [
   { id: 'dashboard', label: '마이페이지' },
   { id: 'seller', label: '판매자 대시보드' },
   { id: 'profile', label: '내 정보 변경' },
+  { id: 'tryon', label: 'AI 시착' },
   { id: 'products', label: '판매 상품 관리' },
   { id: 'orders', label: '구매·낙찰 내역' },
   { id: 'sales', label: '판매·정산 내역' },

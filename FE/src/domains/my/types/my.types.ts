@@ -5,6 +5,7 @@ export type MySectionId =
   | 'dashboard'
   | 'seller'
   | 'profile'
+  | 'tryon'
   | 'products'
   | 'orders'
   | 'sales'
