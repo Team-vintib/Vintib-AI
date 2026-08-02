@@ -7,6 +7,7 @@ import type {
   MyPageViewData,
   MyProfile,
   MyProfileUpdateRequest,
+  MySaleItem,
 } from '@/domains/my/types/my.types'
 import { http } from '@/shared/api/http'
 import {
@@ -102,6 +103,22 @@ export const getMyOrderDetail = async (
 
   const response = await http.get<ApiResponse<MyOrderItem>>(`/users/${userId}/orders/${orderId}`)
   return unwrapApiData(response.data, '구매 상세 정보를 불러오지 못했습니다.')
+}
+
+export const getMySaleDetail = async (userId: number, saleId: number): Promise<MySaleItem> => {
+  if (!MY_API_ENABLED) {
+    await wait(MOCK_DELAY_MS)
+    const sale = mockMyPageViewData.sales.find((item) => item.id === saleId)
+
+    if (!sale) {
+      throw new Error('판매 내역을 찾지 못했습니다.')
+    }
+
+    return sale
+  }
+
+  const response = await http.get<ApiResponse<MySaleItem>>(`/users/${userId}/sales/${saleId}`)
+  return unwrapApiData(response.data, '판매 상세 정보를 불러오지 못했습니다.')
 }
 
 export const updateMyProfile = async (

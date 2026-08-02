@@ -85,6 +85,14 @@ const orderFilterOptions = [
   { id: 'REFUND', label: '환불' },
 ] satisfies Array<{ id: OrderFilterId; label: string }>
 const selectedOrderFilter = ref<OrderFilterId>('ALL')
+type SaleFilterId = 'ALL' | 'IN_PROGRESS' | 'COMPLETED' | 'REFUND'
+const saleFilterOptions = [
+  { id: 'ALL', label: '전체' },
+  { id: 'IN_PROGRESS', label: '진행 중' },
+  { id: 'COMPLETED', label: '완료' },
+  { id: 'REFUND', label: '환불' },
+] satisfies Array<{ id: SaleFilterId; label: string }>
+const selectedSaleFilter = ref<SaleFilterId>('ALL')
 
 const profile = computed(() => viewData.value?.summary.profile ?? null)
 const isLoading = computed(() => loadState.value === 'loading')
@@ -138,6 +146,15 @@ const filteredOrders = computed(() => {
   }
 
   return orders.filter((order) => isOrderInFilter(order.status, selectedOrderFilter.value))
+})
+const filteredSales = computed(() => {
+  const sales = viewData.value?.sales ?? []
+
+  if (selectedSaleFilter.value === 'ALL') {
+    return sales
+  }
+
+  return sales.filter((sale) => isSaleInFilter(sale.status, selectedSaleFilter.value))
 })
 const currentSectionLabel = computed(
   () =>
@@ -398,12 +415,36 @@ const isOrderInFilter = (status: MyOrderStatus, filterId: OrderFilterId) => {
   return true
 }
 
+const isSaleInFilter = (status: MyOrderStatus, filterId: SaleFilterId) => {
+  if (filterId === 'IN_PROGRESS') {
+    return status === 'CREATED' || status === 'PAID' || status === 'SHIPPING' || status === 'DELIVERED'
+  }
+
+  if (filterId === 'COMPLETED') {
+    return status === 'CONFIRMED'
+  }
+
+  if (filterId === 'REFUND') {
+    return status === 'REFUND_REQUESTED' || status === 'REFUNDED'
+  }
+
+  return true
+}
+
 const selectOrderFilter = (filterId: OrderFilterId) => {
   selectedOrderFilter.value = filterId
 }
 
+const selectSaleFilter = (filterId: SaleFilterId) => {
+  selectedSaleFilter.value = filterId
+}
+
 const goToOrderDetail = (orderId: number) => {
   void router.push({ name: ROUTE_NAMES.MY_ORDER_DETAIL, params: { orderId } })
+}
+
+const goToSaleDetail = (saleId: number) => {
+  void router.push({ name: ROUTE_NAMES.MY_SALE_DETAIL, params: { saleId } })
 }
 
 const getOrderFilterCount = (filterId: OrderFilterId) => {
@@ -414,6 +455,16 @@ const getOrderFilterCount = (filterId: OrderFilterId) => {
   }
 
   return orders.filter((order) => isOrderInFilter(order.status, filterId)).length
+}
+
+const getSaleFilterCount = (filterId: SaleFilterId) => {
+  const sales = viewData.value?.sales ?? []
+
+  if (filterId === 'ALL') {
+    return sales.length
+  }
+
+  return sales.filter((sale) => isSaleInFilter(sale.status, filterId)).length
 }
 
 const formatOrderDate = (value: string) =>
@@ -1212,15 +1263,53 @@ onMounted(() => {
             <template v-else-if="selectedSection === 'sales'">
               <div class="my-card__title">
                 <h2>판매·정산 내역</h2>
-                <button type="button">엑셀 다운로드</button>
               </div>
-              <article v-for="sale in viewData.sales" :key="sale.id" class="my-text-row">
-                <div>
-                  <strong>{{ sale.productName }}</strong>
-                  <p>{{ sale.buyerNickname }} · {{ sale.paidAmount.toLocaleString('ko-KR') }}P</p>
-                </div>
-                <span>{{ MY_SETTLEMENT_STATUS_LABELS[sale.settlementStatus] }}</span>
-              </article>
+              <div class="my-order-tabs" role="tablist" aria-label="판매 내역 상태 필터">
+                <button
+                  v-for="filter in saleFilterOptions"
+                  :key="filter.id"
+                  type="button"
+                  role="tab"
+                  :aria-selected="selectedSaleFilter === filter.id"
+                  :class="{ 'my-order-tabs__item--active': selectedSaleFilter === filter.id }"
+                  @click="selectSaleFilter(filter.id)"
+                >
+                  {{ filter.label }}
+                  <span>{{ getSaleFilterCount(filter.id) }}</span>
+                </button>
+              </div>
+              <div v-if="filteredSales.length" class="my-order-grid">
+                <article v-for="sale in filteredSales" :key="sale.id" class="my-order-card">
+                  <button
+                    type="button"
+                    class="my-order-card__main"
+                    @click="goToSaleDetail(sale.id)"
+                  >
+                    <img :src="sale.productThumbnailUrl" :alt="sale.productName" />
+                    <div class="my-order-card__body">
+                      <div class="my-order-card__top">
+                        <span>{{ MY_ORDER_STATUS_LABELS[sale.status] }}</span>
+                        <strong>{{ MY_SETTLEMENT_STATUS_LABELS[sale.settlementStatus] }}</strong>
+                      </div>
+                      <h3>{{ sale.productName }}</h3>
+                      <p>{{ sale.buyerNickname }}</p>
+                      <dl>
+                        <div>
+                          <dt>판매 금액</dt>
+                          <dd>{{ sale.paidAmount.toLocaleString('ko-KR') }}P</dd>
+                        </div>
+                        <div>
+                          <dt>판매 일시</dt>
+                          <dd>{{ formatOrderDate(sale.createdAt) }}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </button>
+                </article>
+              </div>
+              <p v-if="!filteredSales.length" class="my-order-empty">
+                해당 상태의 판매 내역이 없습니다.
+              </p>
             </template>
 
             <template v-else-if="selectedSection === 'lives'">

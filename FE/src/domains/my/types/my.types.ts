@@ -129,9 +129,15 @@ export interface MySaleItem {
   status: MyOrderStatus
   settlementStatus: MySettlementStatus
   productName: string
+  productThumbnailUrl: string
   buyerNickname: string
   paidAmount: number
   createdAt: string
+  recipientName: string
+  recipientPhoneNumber: string
+  postalCode: string
+  address: string
+  detailAddress: string
 }
 
 export interface MyLiveItem {

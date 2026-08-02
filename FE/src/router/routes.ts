@@ -161,6 +161,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: '구매 상세' },
   },
   {
+    path: ROUTE_PATHS.MY_SALE_DETAIL,
+    name: ROUTE_NAMES.MY_SALE_DETAIL,
+    component: () => import('@/domains/my/pages/MySaleDetailPage.vue'),
+    meta: { requiresAuth: true, title: '판매 상세' },
+  },
+  {
     path: ROUTE_PATHS.POINT_HISTORY,
     name: ROUTE_NAMES.POINT_HISTORY,
     component: () => import('@/domains/point/pages/PointHistoryPage.vue'),
