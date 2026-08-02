@@ -65,15 +65,22 @@
 
 ## 구현 목록
 
-- [ ] `SellerAuctionPanel` 경매 종료 결과 emit(WON/FAILED + 낙찰자·낙찰가·상품명)
-- [ ] `LiveBroadcastPage`에서 WON 시 `LiveAuctionResultOverlay` 재사용 표시·닫기(영상 위)
-- [ ] 판매자 낙찰 연출 확인 경로(mock 시나리오)
-- [ ] `live.status==='ENDED'` 시 방송 종료 대시보드로 전환(경매 설정 패널 미노출)
-- [ ] 대시보드: 방송 요약 + 상품별 결과(낙찰/미낙찰) + 미낙찰 처리 진입 섹션(있을 때만)
-- [ ] 종료 대시보드 mock 데이터·시나리오(전부 낙찰 / 일부 미낙찰)
-- [ ] (필요 시) 009/013에 방송 요약 필드 보강
-- [ ] 변경 파일 ESLint·`type-check`·`build-only`
-- [ ] 실행 화면에서 낙찰 연출·종료 대시보드(미낙찰 유/무) 사용자 확인
+- [x] (441) `SellerAuctionPanel` 경매 종료 결과 emit(`auction-ended`: WON/FAILED + 낙찰자·낙찰가·상품명)
+- [x] (441) `LiveBroadcastPage`에서 WON 시 `LiveAuctionResultOverlay` 재사용 표시·닫기(영상 위)
+- [x] (441) 판매자 낙찰 연출 확인 경로 — `?win` mock 트리거(`!apiEnabled`일 때만)
+- [x] (438) `live.status==='ENDED'` 시 방송 종료 대시보드로 **본문 전체 전환**(경매 설정 패널 미노출)
+- [x] (438) 대시보드: 방송 요약 + 상품별 결과(낙찰/미낙찰) + 미낙찰 처리 진입 섹션(있을 때만) — `LiveBroadcastEndDashboard.vue`
+- [x] (438) 종료 대시보드 mock(`liveBroadcastEndMock.ts`)·시나리오 — 기본 일부 미낙찰 / `?result=sold` 전부 낙찰
+- [x] (438) 009/013 검토 — 방송 요약은 mock, 009에 close/winner 계약 이미 존재 → 추가 요청 없음
+- [x] 변경 파일 ESLint·`type-check`·`build-only` 통과
+- [x] 실행 화면에서 낙찰 연출·종료 대시보드(미낙찰 유/무) 사용자 확인 완료
+
+### 구현 메모
+
+- 441: 실제 종료/낙찰 확정은 BE 미제공 → `SellerAuctionPanel` mock 타이머 종료 시점에 `auction-ended` emit,
+  낙찰(WON)만 `LiveAuctionResultOverlay`(시청자 434 재사용) 표시. `?win`은 확인용 mock 트리거.
+- 438: 미낙찰 처리 "남은 상품 처리하기"는 **placeholder**(안내 문구만) → 실제 경매 재시도/상시 판매 선택
+  동작은 **440**(스토리 103)에서 연결. 대시보드 요약 데이터는 전부 mock.
 
 ## 확인 필요 (미결정)
 
