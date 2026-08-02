@@ -45,10 +45,13 @@ public record MemberProfileResponse(
         MemberStatus status,
 
         @Schema(example = "true")
-        boolean onboardingCompleted
+        boolean onboardingCompleted,
+
+        @Schema(description = "NONE(미제출) | PENDING | APPROVED | REJECTED", example = "NONE")
+        String businessVerificationStatus
 ) {
 
-    public static MemberProfileResponse from(Member member) {
+    public static MemberProfileResponse from(Member member, String businessVerificationStatus) {
         return new MemberProfileResponse(
                 member.getId(),
                 member.getEmail(),
@@ -61,7 +64,8 @@ public record MemberProfileResponse(
                 member.getGender(),
                 member.getMemberType(),
                 member.getStatus(),
-                member.isOnboardingCompleted()
+                member.isOnboardingCompleted(),
+                businessVerificationStatus
         );
     }
 }

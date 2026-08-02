@@ -36,6 +36,25 @@ public class UserController {
     private final UserService userService;
 
     @Operation(
+            summary = "회원 기본 정보 조회",
+            description = "본인의 기본 정보를 조회한다(MY-001). 사업자 인증 상태(businessVerificationStatus)도 함께 내려준다. "
+                    + "본인 외 타인의 정보는 조회할 수 없다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 조회 불가"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않는 회원")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<MemberProfileResponse>> getProfile(
+            Authentication authentication, @PathVariable Long id) {
+        Long requesterId = (Long) authentication.getPrincipal();
+        MemberProfileResponse response = userService.getProfile(requesterId, id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
             summary = "회원 기본 정보 등록·수정",
             description = """
                     닉네임·전화번호·주소·상세주소·성별을 저장한다(우편번호는 선택).

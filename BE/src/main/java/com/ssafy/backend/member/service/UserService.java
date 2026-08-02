@@ -1,5 +1,6 @@
 package com.ssafy.backend.member.service;
 
+import com.ssafy.backend.business.repository.BusinessInfoRepository;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.dto.request.UpdateInterestsRequest;
@@ -40,6 +41,7 @@ public class UserService {
     private final MemberInterestCategoryRepository memberInterestCategoryRepository;
     private final BrandRepository brandRepository;
     private final CategoryRepository categoryRepository;
+    private final BusinessInfoRepository businessInfoRepository;
 
     /**
      * ONBOARD-001 / MY-001: 닉네임·전화번호·주소·상세주소·우편번호·성별을 저장하고 회원 프로필을 반환한다.
@@ -82,7 +84,7 @@ public class UserService {
             throw new CustomException(ErrorCode.NICKNAME_ALREADY_TAKEN);
         }
 
-        return MemberProfileResponse.from(member);
+        return MemberProfileResponse.from(member, businessVerificationStatusOf(targetId));
     }
 
     /**
@@ -115,7 +117,30 @@ public class UserService {
 
         member.completeOnboarding(request.memberType());
 
-        return MemberProfileResponse.from(member);
+        return MemberProfileResponse.from(member, businessVerificationStatusOf(targetId));
+    }
+
+    /**
+     * MY-001: 회원 본인의 기본 정보를 조회한다.
+     *
+     * @throws CustomException USER_NOT_FOUND — 대상 회원이 없을 때
+     * @throws CustomException MEMBER_FORBIDDEN — 본인 외 타인의 정보를 조회하려 할 때 (403)
+     */
+    public MemberProfileResponse getProfile(Long requesterId, Long targetId) {
+        if (!requesterId.equals(targetId)) {
+            throw new CustomException(ErrorCode.MEMBER_FORBIDDEN);
+        }
+
+        Member member = memberRepository.findById(targetId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        return MemberProfileResponse.from(member, businessVerificationStatusOf(targetId));
+    }
+
+    private String businessVerificationStatusOf(Long memberId) {
+        return businessInfoRepository.findById(memberId)
+                .map(businessInfo -> businessInfo.getVerificationStatus().name())
+                .orElse("NONE");
     }
 
     /**

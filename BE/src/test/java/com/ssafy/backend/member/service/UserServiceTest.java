@@ -3,9 +3,13 @@ package com.ssafy.backend.member.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.ssafy.backend.business.entity.BusinessInfo;
+import com.ssafy.backend.business.entity.BusinessVerificationStatus;
+import com.ssafy.backend.business.repository.BusinessInfoRepository;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.dto.request.UpdateInterestsRequest;
@@ -56,6 +60,9 @@ class UserServiceTest {
     private CategoryRepository categoryRepository;
 
     @Mock
+    private BusinessInfoRepository businessInfoRepository;
+
+    @Mock
     private Brand nike;
 
     @Mock
@@ -70,7 +77,8 @@ class UserServiceTest {
                 memberInterestBrandRepository,
                 memberInterestCategoryRepository,
                 brandRepository,
-                categoryRepository);
+                categoryRepository,
+                businessInfoRepository);
     }
 
     private Member createMember() {
@@ -321,5 +329,53 @@ class UserServiceTest {
         assertThat(response.categories()).isEmpty();
         verify(memberInterestBrandRepository).deleteAllByMemberId(MEMBER_ID);
         verify(memberInterestCategoryRepository).deleteAllByMemberId(MEMBER_ID);
+    }
+
+    @Test
+    void 사업자_정보_제출_이력이_없으면_조회시_NONE을_반환한다() {
+        // given
+        Member member = createMember();
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(businessInfoRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+
+        // when
+        MemberProfileResponse response = userService.getProfile(MEMBER_ID, MEMBER_ID);
+
+        // then
+        assertThat(response.businessVerificationStatus()).isEqualTo("NONE");
+    }
+
+    @Test
+    void 사업자_정보가_있으면_조회시_실제_상태를_반환한다() {
+        // given
+        Member member = createMember();
+        BusinessInfo businessInfo = mock(BusinessInfo.class);
+        when(businessInfo.getVerificationStatus()).thenReturn(BusinessVerificationStatus.APPROVED);
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(businessInfoRepository.findById(MEMBER_ID)).thenReturn(Optional.of(businessInfo));
+
+        // when
+        MemberProfileResponse response = userService.getProfile(MEMBER_ID, MEMBER_ID);
+
+        // then
+        assertThat(response.businessVerificationStatus()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void 본인이_아닌_타인의_정보를_조회하면_FORBIDDEN_예외가_발생한다() {
+        Long otherMemberId = 999L;
+
+        assertThatThrownBy(() -> userService.getProfile(MEMBER_ID, otherMemberId))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MEMBER_FORBIDDEN);
+    }
+
+    @Test
+    void 존재하지_않는_회원을_조회하면_USER_NOT_FOUND_예외가_발생한다() {
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.getProfile(MEMBER_ID, MEMBER_ID))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
     }
 }
