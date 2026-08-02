@@ -448,6 +448,7 @@ docs/
   DB row를 넣어 진행합니다. 서버 카테고리 필터와 `type/refType/refId` enum 문서화는 대기 중입니다.
 - `domains/my`에는 마이페이지 요약, 프로필, 판매 상품, 주문/판매 내역, 라이브, 찜/팔로우, 사업자 섹션을 표시하는 1차 화면이 구현되어 있습니다.
   `/my`에서 `section` query를 기준으로 섹션을 전환하고, 실제 마이페이지 API 계약 확정 전까지 `VITE_MY_API_ENABLED=false` 기본값으로 mock fallback을 사용합니다.
+  단, 라이브 섹션은 라이브 목록과 동일하게 `VITE_LIVE_LIST_API_ENABLED`가 `false`가 아니면 `/lives`를 조회한 뒤 현재 사용자 `hostId` 기준으로 필터링합니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/api/mockInterestStorage.ts`와 `mockProfileMediaStorage.ts`에는 온보딩·마이페이지 mock fallback에서 공유하는 관심 정보와 프로필/AI 시착용 사진 저장 유틸이 구현되어 있습니다.

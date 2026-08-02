@@ -67,3 +67,9 @@ AI 시착용 기본 사진 변경:
 - API 확정 전까지 마이페이지는 선택한 이미지를 미리보기/mock 상태로 반영한다.
 - 실제 저장 연동 시 `profileImageUrl`은 건드리지 않고 `defaultTryOnImageUrl`만 갱신해야 한다.
 - 프로필 사진 변경 UI는 같은 저장 버튼 안에서 mock 상태로 반영하되, 실제 API 연동 시에는 `profileImageUrl` 전용 API만 호출해야 한다.
+
+## 2026-08-02 확인 결과
+
+- BE 컨트롤러 기준으로 `GET/PUT /api/me/tryon`, `DELETE /api/me/tryon/image`, `PUT/DELETE /api/me/profile-image` 구현은 확인되지 않았다.
+- FE는 온보딩 AI 시착용 기본 사진과 마이페이지 프로필/시착용 사진 관리를 mock/local fallback으로 유지한다.
+- `GET /api/users/{userId}/tryons`, `GET /api/users/{userId}/tryons/{id}`, `DELETE /api/users/{userId}/tryons/{id}`는 시착 결과 내역용 API로 확인되며, 기본 시착 사진 저장/조회 API와는 용도가 다르므로 이번 마이페이지 사진 관리에는 직접 연결하지 않는다.

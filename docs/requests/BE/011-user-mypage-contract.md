@@ -10,14 +10,19 @@
 
 ## 2. 현재 연동 상태
 
-- 연동 완료 API: 없음
-- FE 구현 완료 범위
-  - `domains/my` 마이페이지 화면 없음
-  - 공개 프로필 상세 화면 없음
-  - auth route guard는 현재 `authStore.user`의 최소 정보만 사용
+- 2026-08-02 FE 연동 반영
+  - `PATCH /api/users/{id}`: 마이페이지 내 정보 수정에 연결 가능 상태.
+  - `GET /api/users/{id}/interests`, `PUT /api/users/{id}/interests`: 관심 브랜드·카테고리 관리에 연결.
+  - `GET /api/brands`, `GET /api/categories`: 관심 정보 옵션 조회에 연결.
+  - `GET /api/users/{userId}/wishes`, `DELETE /api/users/{userId}/wishes/{productId}`: 찜 목록/찜 해제에 연결.
+  - `GET /api/products`: 마이페이지 판매 상품 관리에서 `sellerId === 로그인 사용자 id` 클라이언트 필터로 임시 연결.
+  - `GET /api/lives`: 마이페이지 라이브 관리에서 `hostId === 로그인 사용자 id` 클라이언트 필터로 임시 연결. 단 공개 목록 특성상 종료 라이브는 내려오지 않는다.
+  - `GET /api/users/{userId}/alerts?unreadOnly=true`: 마이페이지 알림 카운트에 연결.
 - 현재 임시 처리 또는 Mock 사용 여부
-  - `GET /api/me`가 없어 Auth에서는 JWT payload와 로그인/재발급 응답에 의존한다.
-  - 마이페이지/공개 프로필은 화면 설계 후 연결해야 한다.
+  - `GET /api/users/{userId}/mypage`가 없어 FE는 마이페이지 view model을 mock 기본값으로 만들고, 위 개별 API 성공 결과만 덮어쓴다.
+  - `GET /api/me`가 없어 최신 프로필 조회, `businessVerificationStatus`, `profileImageUrl`, `defaultTryOnImageUrl`은 mock/local fallback을 사용한다.
+  - 팔로워/팔로잉 목록, 사업자 정보 조회/수정은 mock shell 상태다.
+  - 판매 상품/라이브 관리는 기존 공개 목록 API를 클라이언트에서 임시 필터링하므로 페이지네이션 정확도가 보장되지 않는다.
 
 ## 3. 추가 구현 요청
 
@@ -154,6 +159,39 @@
   - Query: `page`, `size`
 - 응답 데이터: 기존 product/live card DTO 재사용 권장
 - 응답 예시: 기존 상품/라이브 목록 응답과 동일
+
+### 3.6 마이페이지 팔로워/팔로잉 목록
+
+- Method / Endpoint: `GET /api/users/{userId}/followers`, `GET /api/users/{userId}/followings`
+- 요청 목적: 마이페이지 팔로워·팔로잉 탭의 실제 사용자 목록을 조회한다.
+- FE 사용처: `/my?section=social`
+- 요청 데이터
+  - Header: `Authorization: Bearer {accessToken}`
+  - Path: `userId`
+  - Query: `page`, `size`
+- 응답 데이터
+  - `id`: number
+  - `nickname`: string
+  - `profileImageUrl`: string | null
+  - `introduction`: string | null
+  - `followerCount`: number
+  - `followingCount`: number
+  - `followedAt`: string(datetime)
+  - `isFollowing`: boolean
+
+### 3.7 사업자 정보 조회/수정
+
+- Method / Endpoint: `GET /api/users/{userId}/business`, `PATCH /api/users/{userId}/business` 또는 기존 사업자 인증 도메인과 통합
+- 요청 목적: 마이페이지 사업자 정보 섹션에서 인증 상태와 제출 정보를 조회·수정한다.
+- FE 사용처: `/my?section=business`
+- 응답 데이터
+  - `businessVerificationStatus`: `NONE` | `PENDING` | `APPROVED` | `REJECTED`
+  - `businessRegistrationNumber`: string | null
+  - `businessName`: string | null
+  - `representativeName`: string | null
+  - `submittedAt`: string(datetime) | null
+  - `reviewedAt`: string(datetime) | null
+  - `rejectionReason`: string | null
 
 ## 4. 기존 API 변경 요청
 

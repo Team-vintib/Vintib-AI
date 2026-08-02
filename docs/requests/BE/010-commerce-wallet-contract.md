@@ -11,10 +11,14 @@
 ## 2. 현재 연동 상태
 
 - 연동 완료 API: 없음
-- FE 구현 완료 범위: 없음
+- 2026-08-02 FE 구현 완료 범위
+  - `/my?section=orders`: 구매/낙찰 내역 카드형 목록과 `/my/orders/{orderId}` 상세 페이지 구현.
+  - `/my?section=sales`: 판매/정산 내역 카드형 목록과 `/my/sales/{saleId}` 상세 페이지 구현.
+  - 위 두 영역은 주문/배송/환불/정산 API가 없어 mock fallback으로 동작한다.
 - 현재 임시 처리 또는 Mock 사용 여부
-  - 주문/배송/환불/포인트/지갑 화면과 route가 아직 없다.
-  - API가 구현되어도 별도 FE 설계 후 연결해야 한다.
+  - 주문/판매 내역, 배송지, 구매 방식, 정산 상태는 FE mock data를 사용한다.
+  - `/points`, `/points/history`는 기존 point 화면의 mock fallback을 유지한다.
+  - 주문/배송/환불/포인트/지갑 API가 구현되면 FE adapter를 실제 응답 mapper로 교체해야 한다.
 
 ## 3. 추가 구현 요청
 

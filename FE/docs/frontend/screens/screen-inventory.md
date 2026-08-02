@@ -56,4 +56,4 @@
 
 | 묶음 | 화면 ID | 상태 |
 | --- | --- | --- |
-| 마이페이지 | MY-001~009 | `/my` route를 `MyPage`로 연결하고 사용자 요약, 포인트 카드, 카운터, 섹션 메뉴를 구현. `section` query로 프로필, 판매 상품, 구매/낙찰, 판매/정산, 라이브, 찜/팔로우, 사업자 섹션을 전환한다. `VITE_MY_API_ENABLED=false` 기본값에서는 mock fallback 사용. 프로필 저장, 주문/배송/환불/포인트/팔로우/사업자 상세 API는 BE 계약 확정 대기 |
+| 마이페이지 | MY-001~009 | `/my` route를 `MyPage`로 연결하고 사용자 요약, 포인트 카드, 카운터, 섹션 메뉴를 구현. `section` query로 프로필, 판매 상품, 구매/낙찰, 판매/정산, 라이브, 찜/팔로우, 사업자 섹션을 전환한다. `VITE_MY_API_ENABLED=false` 기본값에서는 mock fallback 사용. 라이브 섹션은 `VITE_LIVE_LIST_API_ENABLED` 기준으로 실제 `/lives` 목록을 현재 사용자 `hostId`로 필터링한다. 프로필 저장, 주문/배송/환불/포인트/팔로우/사업자 상세 API는 BE 계약 확정 대기 |
