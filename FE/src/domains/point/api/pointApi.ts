@@ -1,9 +1,3 @@
-import {
-  mockPointAccount,
-  mockPointBalance,
-  mockPointTransactions,
-  mockWithdrawalHistory,
-} from '@/domains/point/constants/pointOptions'
 import type {
   PointAccount,
   PointBalance,
@@ -15,12 +9,15 @@ import type {
 } from '@/domains/point/types/point.types'
 import type { PageResponse } from '@/shared/types/api.types'
 
-const MOCK_DELAY_MS = 350
-
-const wait = (delay: number) =>
-  new Promise<void>((resolve) => {
-    window.setTimeout(resolve, delay)
-  })
+const EMPTY_POINT_BALANCE: PointBalance = {
+  available: 0,
+  held: 0,
+  escrow: 0,
+  pendingSettlement: 0,
+  withdrawalProcessing: 0,
+  withdrawable: 0,
+  lastChangedAt: '',
+}
 
 export const getPointWallet = async (
   userId: number,
@@ -44,68 +41,54 @@ export const getPointWallet = async (
 
 export const getPointBalance = async (userId: number): Promise<PointBalance> => {
   void userId
-  await wait(MOCK_DELAY_MS)
-  return { ...mockPointBalance }
+  return { ...EMPTY_POINT_BALANCE }
 }
 
 export const getPointTransactions = async (
   userId: number,
-  { page = 1, size = 10, type = 'ALL' }: PointTransactionQuery = {},
+  { page = 1, size = 10 }: PointTransactionQuery = {},
 ): Promise<PageResponse<PointTransaction>> => {
   void userId
-  await wait(MOCK_DELAY_MS)
-  const filteredItems =
-    type === 'ALL'
-      ? mockPointTransactions
-      : mockPointTransactions.filter((transaction) => transaction.type === type)
-
   return {
-    items: filteredItems,
+    items: [],
     meta: {
       page,
       size,
-      totalElements: filteredItems.length,
-      totalPages: filteredItems.length > 0 ? 1 : 0,
+      totalElements: 0,
+      totalPages: 0,
     },
   }
 }
 
 export const chargePoints = async (userId: number, amount: number): Promise<PointBalance> => {
   void userId
-  await wait(MOCK_DELAY_MS)
-  return {
-    ...mockPointBalance,
-    available: mockPointBalance.available + amount,
-    withdrawable: mockPointBalance.withdrawable + amount,
-    lastChangedAt: new Date().toISOString(),
-  }
+  void amount
+  return { ...EMPTY_POINT_BALANCE }
 }
 
 export const getPointAccount = async (userId: number): Promise<PointAccount | null> => {
   void userId
-  await wait(MOCK_DELAY_MS)
-  return { ...mockPointAccount }
+  return null
 }
+
 export const requestWithdrawal = async (
   userId: number,
   request: WithdrawalRequest,
 ): Promise<WithdrawalHistory> => {
   void userId
-  await wait(MOCK_DELAY_MS)
   return {
-    id: Date.now(),
+    id: 0,
     amount: request.amount,
     fee: 0,
     status: 'REQUESTED',
-    requestedAt: new Date().toISOString(),
+    requestedAt: '',
     account: request.account,
   }
 }
 
 export const getWithdrawals = async (userId: number): Promise<WithdrawalHistory[]> => {
   void userId
-  await wait(MOCK_DELAY_MS)
-  return [...mockWithdrawalHistory]
+  return []
 }
 
 export const isPointApiEnabled = () => false

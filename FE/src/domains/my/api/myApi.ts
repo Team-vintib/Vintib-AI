@@ -1,9 +1,6 @@
-import {
-  mockMyPageViewData,
-  mockMyProfile,
-} from '@/domains/my/constants/myMockData'
-import { PRODUCT_LIST_MOCK_DATA } from '@/domains/product/constants/productListMockData'
 import { getUnreadNotificationCount } from '@/domains/notification/api/notificationApi'
+import { getBrands, getCategories, removeWish } from '@/domains/product/api/productApi'
+
 import type {
   MyLiveItem,
   MyOrderItem,
@@ -15,28 +12,15 @@ import type {
   MySaleItem,
   MyWishItem,
 } from '@/domains/my/types/my.types'
-import { http } from '@/shared/api/http'
-import {
-  deleteMockDefaultTryOnImage,
-  deleteMockProfileImage,
-  readImageFileAsDataUrl,
-  readMockProfileMedia,
-  saveMockDefaultTryOnImage,
-  saveMockProfileImage,
-} from '@/shared/api/mockProfileMediaStorage'
-import {
-  getMockInterestOptions,
-  readMockUserInterests,
-  saveMockUserInterests,
-  type InterestBrand,
-  type InterestCategory,
-  type UserInterests,
-} from '@/shared/api/mockInterestStorage'
-import { getBrands, getCategories, removeWish } from '@/domains/product/api/productApi'
 import type { ProductConditionGrade, ProductListItem } from '@/domains/product/types/productList.types'
+import { http } from '@/shared/api/http'
+import type {
+  InterestBrand,
+  InterestCategory,
+  UserInterests,
+} from '@/shared/api/mockInterestStorage'
 import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.types'
 
-const MOCK_DELAY_MS = 250
 const MY_API_ENABLED = import.meta.env.VITE_MY_API_ENABLED === 'true'
 const MY_LIVE_API_ENABLED = import.meta.env.VITE_LIVE_LIST_API_ENABLED !== 'false'
 
@@ -106,29 +90,81 @@ interface BackendPageResponse<T> {
   hasNext: boolean
 }
 
-const wait = (delay: number) =>
-  new Promise<void>((resolve) => {
-    window.setTimeout(resolve, delay)
-  })
+const EMPTY_PAGE_META: PageMeta = {
+  page: 1,
+  size: 0,
+  totalElements: 0,
+  totalPages: 0,
+}
+
+const createEmptyProfile = (userId: number): MyProfile => ({
+  id: userId,
+  email: '',
+  name: '',
+  nickname: '',
+  phoneNumber: '',
+  postalCode: null,
+  address: '',
+  detailAddress: '',
+  gender: 'MALE',
+  profileImageUrl: null,
+  defaultTryOnImageUrl: null,
+  memberType: 'GENERAL',
+  businessVerificationStatus: 'NONE',
+  onboardingCompleted: false,
+})
+
+const createEmptyMyPageViewData = (userId: number): MyPageViewData => ({
+  summary: {
+    profile: createEmptyProfile(userId),
+    counts: {
+      orders: 0,
+      sales: 0,
+      wishes: 0,
+      followers: 0,
+      unreadNotifications: 0,
+    },
+    pointBalance: 0,
+    pendingSettlementAmount: 0,
+    salesPerformance: {
+      soldCount: 0,
+      grossRevenue: 0,
+      netRevenue: 0,
+      averageOrderAmount: 0,
+      sellThroughRate: 0,
+      repeatBuyerCount: 0,
+    },
+    settlementSummary: {
+      settledAmount: 0,
+      pendingAmount: 0,
+      escrowAmount: 0,
+      withdrawableAmount: 0,
+      lastSettledAt: '',
+    },
+    todoCounts: {
+      shippingPending: 0,
+      refundRequests: 0,
+      scheduledLives: 0,
+    },
+    productStatusCounts: {
+      onSale: 0,
+      auctionScheduled: 0,
+      sold: 0,
+    },
+    monthlyRevenue: [],
+  },
+  products: [],
+  orders: [],
+  sales: [],
+  lives: [],
+  wishes: [],
+  followers: [],
+  followings: [],
+  wishMeta: EMPTY_PAGE_META,
+})
 
 export const getMyPageViewData = async (userId: number): Promise<MyPageViewData> => {
-  await wait(MY_API_ENABLED || MY_LIVE_API_ENABLED ? 0 : MOCK_DELAY_MS)
-  const media = readMockProfileMedia(userId)
-  const baseViewData: MyPageViewData = {
-    ...mockMyPageViewData,
-    summary: {
-      ...mockMyPageViewData.summary,
-      profile: {
-        ...mockMyPageViewData.summary.profile,
-        ...media,
-        id: userId,
-      },
-    },
-  }
-
-  if (!MY_API_ENABLED && !MY_LIVE_API_ENABLED) {
-    return baseViewData
-  }
+  const baseViewData = createEmptyMyPageViewData(userId)
 
   const [wishesResult, productsResult, livesResult, notificationCountResult] =
     await Promise.allSettled([
@@ -145,38 +181,28 @@ export const getMyPageViewData = async (userId: number): Promise<MyPageViewData>
 
   return {
     ...baseViewData,
-    products: products ?? baseViewData.products,
-    lives: lives ?? baseViewData.lives,
-    wishes: wishes?.items ?? baseViewData.wishes,
-    wishMeta: wishes?.meta ?? baseViewData.wishMeta,
+    products: products ?? [],
+    lives: lives ?? [],
+    wishes: wishes?.items ?? [],
+    wishMeta: wishes?.meta ?? EMPTY_PAGE_META,
     summary: {
       ...baseViewData.summary,
       counts: {
         ...baseViewData.summary.counts,
-        wishes: wishes?.items.length ?? baseViewData.summary.counts.wishes,
-        unreadNotifications: unreadNotifications ?? baseViewData.summary.counts.unreadNotifications,
+        wishes: wishes?.items.length ?? 0,
+        unreadNotifications: unreadNotifications ?? 0,
       },
-      productStatusCounts: products
-        ? getProductStatusCounts(products)
-        : baseViewData.summary.productStatusCounts,
-      todoCounts: lives
-        ? {
-            ...baseViewData.summary.todoCounts,
-            scheduledLives: lives.filter((live) => live.status === 'SCHEDULED').length,
-          }
-        : baseViewData.summary.todoCounts,
+      productStatusCounts: products ? getProductStatusCounts(products) : baseViewData.summary.productStatusCounts,
+      todoCounts: {
+        ...baseViewData.summary.todoCounts,
+        scheduledLives: lives?.filter((live) => live.status === 'SCHEDULED').length ?? 0,
+      },
     },
   }
 }
 
-export const getMyProfile = async (userId: number): Promise<MyProfile> => {
-  await wait(MOCK_DELAY_MS)
-  return {
-    ...mockMyProfile,
-    ...readMockProfileMedia(userId),
-    id: userId,
-  }
-}
+export const getMyProfile = async (userId: number): Promise<MyProfile> => createEmptyProfile(userId)
+
 const getMyWishList = async (userId: number) => {
   const response = await http.get<
     ApiResponse<PageResponse<MyWishApiDto> | BackendPageResponse<MyWishApiDto>>
@@ -240,26 +266,14 @@ export const getMyOrderDetail = async (
   orderId: number,
 ): Promise<MyOrderItem> => {
   void userId
-  await wait(MOCK_DELAY_MS)
-  const order = mockMyPageViewData.orders.find((item) => item.id === orderId)
-
-  if (!order) {
-    throw new Error('구매 내역을 찾지 못했습니다.')
-  }
-
-  return order
+  void orderId
+  throw new Error('구매 상세 API가 아직 연결되지 않았습니다.')
 }
 
 export const getMySaleDetail = async (userId: number, saleId: number): Promise<MySaleItem> => {
   void userId
-  await wait(MOCK_DELAY_MS)
-  const sale = mockMyPageViewData.sales.find((item) => item.id === saleId)
-
-  if (!sale) {
-    throw new Error('판매 내역을 찾지 못했습니다.')
-  }
-
-  return sale
+  void saleId
+  throw new Error('판매 상세 API가 아직 연결되지 않았습니다.')
 }
 
 export const updateMyProfile = async (
@@ -267,12 +281,9 @@ export const updateMyProfile = async (
   request: MyProfileUpdateRequest,
 ): Promise<MyProfile> => {
   if (!MY_API_ENABLED) {
-    await wait(MOCK_DELAY_MS)
     return {
-      ...mockMyProfile,
-      ...readMockProfileMedia(userId),
+      ...createEmptyProfile(userId),
       ...request,
-      id: userId,
     }
   }
 
@@ -281,40 +292,33 @@ export const updateMyProfile = async (
 }
 
 export const updateMyProfileImage = async (userId: number, file: File) => {
-  await wait(MOCK_DELAY_MS)
-  const profileImageUrl = await readImageFileAsDataUrl(file, '프로필 사진을 읽지 못했습니다.')
-
-  saveMockProfileImage(userId, profileImageUrl)
-
-  return { profileImageUrl } satisfies MyProfileImageResponse
-}
-export const deleteMyProfileImage = async (userId: number) => {
-  await wait(MOCK_DELAY_MS)
-  deleteMockProfileImage(userId)
-
+  void userId
+  void file
   return { profileImageUrl: null } satisfies MyProfileImageResponse
 }
-export const updateMyDefaultTryOnImage = async (userId: number, file: File) => {
-  await wait(MOCK_DELAY_MS)
-  const defaultTryOnImageUrl = await readImageFileAsDataUrl(
-    file,
-    'AI 시착 사진을 읽지 못했습니다.',
-  )
 
-  saveMockDefaultTryOnImage(userId, defaultTryOnImageUrl)
-
-  return { defaultTryOnImageUrl } satisfies MyDefaultTryOnImageResponse
+export const deleteMyProfileImage = async (userId: number) => {
+  void userId
+  return { profileImageUrl: null } satisfies MyProfileImageResponse
 }
-export const deleteMyDefaultTryOnImage = async (userId: number) => {
-  await wait(MOCK_DELAY_MS)
-  deleteMockDefaultTryOnImage(userId)
 
+export const updateMyDefaultTryOnImage = async (userId: number, file: File) => {
+  void userId
+  void file
   return { defaultTryOnImageUrl: null } satisfies MyDefaultTryOnImageResponse
 }
+
+export const deleteMyDefaultTryOnImage = async (userId: number) => {
+  void userId
+  return { defaultTryOnImageUrl: null } satisfies MyDefaultTryOnImageResponse
+}
+
 export const getMyInterestOptions = async () => {
   if (!MY_API_ENABLED) {
-    await wait(MOCK_DELAY_MS)
-    return getMockInterestOptions()
+    return {
+      brands: [] satisfies InterestBrand[],
+      categories: [] satisfies InterestCategory[],
+    }
   }
 
   const [brands, categories] = await Promise.all([getBrands(), getCategories()])
@@ -327,8 +331,11 @@ export const getMyInterestOptions = async () => {
 
 export const getMyInterests = async (userId: number) => {
   if (!MY_API_ENABLED) {
-    await wait(MOCK_DELAY_MS)
-    return readMockUserInterests(userId)
+    void userId
+    return {
+      brands: [],
+      categories: [],
+    } satisfies UserInterests
   }
 
   const response = await http.get<ApiResponse<UserInterests>>(`/users/${userId}/interests`)
@@ -337,8 +344,11 @@ export const getMyInterests = async (userId: number) => {
 
 export const updateMyInterests = async (userId: number, request: UpdateMyInterestsRequest) => {
   if (!MY_API_ENABLED) {
-    await wait(MOCK_DELAY_MS)
-    return saveMockUserInterests(userId, request.brandIds, request.categoryIds)
+    void userId
+    return {
+      brands: [],
+      categories: [],
+    } satisfies UserInterests
   }
 
   const response = await http.put<ApiResponse<UserInterests>>(`/users/${userId}/interests`, request)
@@ -347,7 +357,6 @@ export const updateMyInterests = async (userId: number, request: UpdateMyInteres
 
 export const removeMyWish = async (userId: number, productId: number) => {
   if (!MY_API_ENABLED) {
-    await wait(MOCK_DELAY_MS)
     return
   }
 
@@ -398,17 +407,7 @@ const toMyProductItem = (product: MyProductApiDto): MyProductItem | null => {
 }
 
 const toMyLiveItem = (live: MyLiveApiDto): MyLiveItem | null => {
-  if (
-    live.broadcastStatus !== 'LIVE' &&
-    live.broadcastStatus !== 'SCHEDULED' &&
-    live.broadcastStatus !== 'ENDED'
-  ) {
-    return null
-  }
-
-  const broadcastAt = live.broadcastStatus === 'LIVE' ? live.startedAt : live.scheduledAt
-
-  if (!broadcastAt) {
+  if (live.broadcastStatus === 'CANCELED') {
     return null
   }
 
@@ -416,45 +415,49 @@ const toMyLiveItem = (live: MyLiveApiDto): MyLiveItem | null => {
     id: live.liveId,
     title: live.title,
     status: live.broadcastStatus,
-    thumbnailUrl: live.thumbnailUrl || PRODUCT_LIST_MOCK_DATA[0]?.imageUrl || '',
+    thumbnailUrl: live.thumbnailUrl || '',
     productCount: 0,
     viewerCount: live.viewerCount,
-    broadcastAt,
+    broadcastAt: live.startedAt ?? live.scheduledAt ?? '',
   }
 }
 
-const toProductListItem = (product: MyProductApiDto): ProductListItem => {
-  const mockFallback = PRODUCT_LIST_MOCK_DATA.find((item) => item.id === product.id)
-
-  return {
-    id: product.id,
-    brand: product.brandName || mockFallback?.brand || fallbackBrandLabel(product.brandId),
-    name: product.title,
-    price: product.price ?? 0,
-    conditionGrade: product.conditionGrade,
-    saleType: product.saleType === 'AUCTION' ? 'AUCTION' : 'DIRECT',
-    imageUrl: product.primaryImageUrl || mockFallback?.imageUrl || PRODUCT_LIST_MOCK_DATA[0]?.imageUrl || '',
-    imageAlt: `${product.title} 상품 이미지`,
-    isLiked: product.isWished ?? true,
-  }
-}
+const toProductListItem = (product: MyProductApiDto): ProductListItem => ({
+  id: product.id,
+  brand: product.brandName || fallbackBrandLabel(product.brandId),
+  name: product.title,
+  price: product.price ?? 0,
+  conditionGrade: product.conditionGrade,
+  saleType: product.saleType === 'AUCTION' ? 'AUCTION' : 'DIRECT',
+  imageUrl: product.primaryImageUrl || '',
+  imageAlt: `${product.title} 상품 이미지`,
+  isLiked: product.isWished ?? true,
+})
 
 const toMyProductStatus = (status: ProductSaleStatusDto): MyProductStatus | null => {
-  if (status === 'ON_SALE' || status === 'AUCTION_SCHEDULED' || status === 'SOLD') {
-    return status
+  if (status === 'ON_SALE') {
+    return 'ON_SALE'
+  }
+
+  if (status === 'AUCTION_SCHEDULED' || status === 'AUCTION_IN_PROGRESS' || status === 'AUCTION_FAILED') {
+    return 'AUCTION_SCHEDULED'
+  }
+
+  if (status === 'SOLD') {
+    return 'SOLD'
   }
 
   return null
 }
 
 const getProductStatusCounts = (products: MyProductItem[]) => ({
-  onSale: products.filter((item) => item.status === 'ON_SALE').length,
-  auctionScheduled: products.filter((item) => item.status === 'AUCTION_SCHEDULED').length,
-  sold: products.filter((item) => item.status === 'SOLD').length,
+  onSale: products.filter((product) => product.status === 'ON_SALE').length,
+  auctionScheduled: products.filter((product) => product.status === 'AUCTION_SCHEDULED').length,
+  sold: products.filter((product) => product.status === 'SOLD').length,
 })
 
 const fallbackBrandLabel = (brandId: number | null) =>
-  brandId ? `브랜드 #${brandId}` : '브랜드 미상'
+  brandId ? `브랜드 #${brandId}` : ''
 
 const unwrapApiData = <T>(response: ApiResponse<T>, fallbackMessage: string) => {
   if (!response.success || response.data === null) {

@@ -33,7 +33,7 @@ authStore.hydrateSession()
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const canShowNotificationAction = computed(() => isAuthenticated.value)
-const displayName = computed(() => authStore.user?.name || '회원')
+const displayName = computed(() => authStore.user?.name || authStore.user?.email || '회원')
 const profileInitial = computed(() => displayName.value.slice(0, 1).toUpperCase())
 const cartItemCount = computed<number | null>(() => null)
 const isLoggingOut = ref(false)

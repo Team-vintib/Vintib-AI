@@ -87,10 +87,7 @@ const auctionMockState = computed<LiveAuctionMockState>(() => {
 // 경매 종료 후 낙찰 축하 연출(AUCT-013). 지금은 mock 트리거(?auction=won).
 // 실제 낙찰 확정/실시간 트리거는 BE 낙찰 결과·STOMP 연결 후 대체 → docs/requests/BE/009.
 const isAuctionResultVisible = computed(
-  () =>
-    live.value !== null &&
-    auctionMockState.value === 'WON' &&
-    !isAuctionResultDismissed.value,
+  () => false,
 )
 
 const dismissAuctionResult = () => {

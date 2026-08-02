@@ -600,7 +600,7 @@ const runAiQualityCheck = () => {
   draft.aiPhotoResults = draft.aiCheckPhotoIds.map((photoId) => ({
     photoId,
     status: 'completed',
-    candidates: createMockAiCandidates(),
+    candidates: [],
     regeneratedImageUrl: '',
     confirmed: false,
   }))

@@ -19,7 +19,7 @@ import LiveProductQueue from '@/domains/live/components/LiveProductQueue.vue'
 import LiveUnsoldManage from '@/domains/live/components/LiveUnsoldManage.vue'
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchState from '@/domains/live/components/LiveWatchState.vue'
-import { buildBroadcastEndSummary } from '@/domains/live/constants/liveBroadcastEndMock'
+import type { BroadcastEndSummary } from '@/domains/live/constants/liveBroadcastEndMock'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import LiveLayout from '@/shared/layouts/LiveLayout.vue'
@@ -147,7 +147,7 @@ const loadLiveBroadcast = async () => {
     }
 
     // mock 확인용: ?win 쿼리면 낙찰 축하 오버레이를 바로 띄운다(실사용 트리거는 handleAuctionEnded).
-    if (!apiEnabled && route.query.win !== undefined) {
+    if (false && !apiEnabled && route.query.win !== undefined) {
       auctionWin.value = {
         winnerNickname: LIVE_AUCTION_MOCK_RESULT.winnerNickname,
         winningBid: LIVE_AUCTION_MOCK_RESULT.winningBid,
@@ -292,9 +292,13 @@ const closeAuctionWin = () => {
 
 // 438 방송 종료 대시보드 — 종료 시 방송 요약(mock). 실제 경매 결과/방송 요약 API 없음(docs/requests/BE/009, 013).
 // ?result=sold 이면 전부 낙찰(미낙찰 처리 섹션 숨김 확인용).
-const broadcastSummary = computed(() =>
-  buildBroadcastEndSummary(live.value?.products ?? [], route.query.result === 'sold'),
-)
+const broadcastSummary = computed<BroadcastEndSummary>(() => ({
+  productCount: live.value?.products.length ?? 0,
+  soldCount: 0,
+  unsoldCount: 0,
+  totalSales: 0,
+  results: [],
+}))
 
 const unsoldProducts = computed(() => {
   const unsoldIds = new Set(

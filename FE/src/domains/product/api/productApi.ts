@@ -1,7 +1,5 @@
 import axios from 'axios'
 
-import { PRODUCT_LIST_MOCK_DATA } from '@/domains/product/constants/productListMockData'
-import { PRODUCT_DETAIL_MOCK_DATA } from '@/domains/product/constants/productDetailMockData'
 import type {
   ProductConditionGrade,
   ProductListItem,
@@ -125,11 +123,16 @@ interface ProductSubmitOptions {
   categories?: CategoryDto[]
 }
 
-const FALLBACK_IMAGE_URL = PRODUCT_LIST_MOCK_DATA[0]?.imageUrl ?? ''
-const FALLBACK_BRAND_NAME = '브랜드 미상'
-const FALLBACK_CATEGORY_NAME = '빈티지 상품'
-const FALLBACK_SELLER_PRODUCT_COUNT = 0
-const FALLBACK_SELLER_FOLLOWER_COUNT = 0
+const EMPTY_AI_QUALITY_ANALYSIS = {
+  status: 'NOT_REQUESTED',
+  originalImageUrl: '',
+  originalImageAlt: '',
+  analyzedImageUrl: '',
+  analyzedImageAlt: '',
+  summary: '',
+  findings: [],
+  disclaimer: '',
+} satisfies ProductDetailViewData['aiQualityAnalysis']
 
 export const getProductList = async ({
   categoryIds = [],
@@ -155,9 +158,10 @@ export const getProductList = async ({
     },
   })
   const pageResponse = normalizePageResponse(unwrapApiData(response.data))
+  const items = await Promise.all(pageResponse.items.map(toProductListItem))
 
   return {
-    items: pageResponse.items.map(toProductListItem),
+    items,
     meta: pageResponse.meta,
   }
 }
@@ -166,6 +170,15 @@ export const getProductDetail = async (productId: number): Promise<ProductDetail
   const response = await http.get<ApiResponse<ProductDetailDto>>(`/products/${productId}`)
 
   return toProductDetailViewData(unwrapApiData(response.data))
+}
+
+export const getProductPrimaryImageUrl = async (productId: number) => {
+  const response = await http.get<ApiResponse<ProductDetailDto>>(`/products/${productId}`, {
+    skipAuth: true,
+  })
+  const product = unwrapApiData(response.data)
+
+  return getPrimaryImageUrl(product)
 }
 
 // 미낙찰 상품 처리(440) — 상품을 상시 판매(가격 지정)로 전환하거나 경매 예정으로 되돌린다.
@@ -316,47 +329,25 @@ const normalizePageResponse = <T>(
   }
 }
 
-const toProductListItem = (product: ProductListDto): ProductListItem => {
-  const mockFallback = PRODUCT_LIST_MOCK_DATA.find((item) => item.id === product.id)
+const toProductListItem = async (product: ProductListDto): Promise<ProductListItem> => {
+  const imageUrl =
+    product.primaryImageUrl || (await getProductPrimaryImageUrl(product.id).catch(() => ''))
 
   return {
     id: product.id,
-    brand: product.brandName || mockFallback?.brand || fallbackBrandLabel(product.brandId),
+    brand: product.brandName || fallbackBrandLabel(product.brandId),
     name: product.title,
     price: product.price ?? 0,
     conditionGrade: product.conditionGrade,
     saleType: toProductSaleType(product.saleType),
-    imageUrl: product.primaryImageUrl || mockFallback?.imageUrl || FALLBACK_IMAGE_URL,
+    imageUrl,
     imageAlt: `${product.title} 상품 이미지`,
     isLiked: product.isWished ?? false,
   }
 }
 
 const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewData => {
-  const mockFallback = {
-    ...PRODUCT_DETAIL_MOCK_DATA,
-    seller: { ...PRODUCT_DETAIL_MOCK_DATA.seller },
-    linkedLive: PRODUCT_DETAIL_MOCK_DATA.linkedLive ? { ...PRODUCT_DETAIL_MOCK_DATA.linkedLive } : null,
-    similarProducts: PRODUCT_DETAIL_MOCK_DATA.similarProducts.map((similarProduct) => ({
-      ...similarProduct,
-    })),
-    sellerDisclosedDefects: PRODUCT_DETAIL_MOCK_DATA.sellerDisclosedDefects.map((defect) => ({
-      ...defect,
-    })),
-    aiQualityAnalysis: {
-      ...PRODUCT_DETAIL_MOCK_DATA.aiQualityAnalysis,
-      findings: PRODUCT_DETAIL_MOCK_DATA.aiQualityAnalysis.findings.map((finding) => ({
-        ...finding,
-      })),
-    },
-  }
-  const sortedImages = [...(product.images ?? [])].sort((left, right) => {
-    if (left.isPrimary !== right.isPrimary) {
-      return left.isPrimary ? -1 : 1
-    }
-
-    return left.sortOrder - right.sortOrder
-  })
+  const sortedImages = getSortedProductImages(product)
   const images = sortedImages.length
     ? sortedImages.map((image, index) => ({
         id: String(image.id),
@@ -364,13 +355,9 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
         alt: `${product.title} 상품 이미지 ${index + 1}`,
         label: image.isPrimary ? '대표' : `${index + 1}번`,
       }))
-    : mockFallback.images.map((image) => ({
-        ...image,
-        alt: `${product.title} 상품 이미지`,
-      }))
+    : []
 
   return {
-    ...mockFallback,
     id: product.id,
     brand: product.brandName || fallbackBrandLabel(product.brandId),
     title: product.title,
@@ -378,8 +365,8 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
     category: product.categoryName || fallbackCategoryLabel(product.categoryId),
     conditionLabel: `${product.conditionGrade}급`,
     sizeLabel: product.sizeLabel,
-    material: product.material || mockFallback.material,
-    color: product.color || mockFallback.color,
+    material: product.material || '',
+    color: product.color || '',
     price: product.price ?? 0,
     saleType: product.saleType,
     saleStatus: product.saleStatus,
@@ -387,9 +374,16 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
     images,
     seller: {
       id: product.sellerId,
-      nickname: product.sellerNickname?.trim() || mockFallback.seller.nickname,
-      followerCount: FALLBACK_SELLER_FOLLOWER_COUNT,
-      productCount: FALLBACK_SELLER_PRODUCT_COUNT,
+      nickname: product.sellerNickname?.trim() || '',
+      followerCount: 0,
+      productCount: 0,
+    },
+    linkedLive: null,
+    similarProducts: [],
+    sellerDisclosedDefects: [],
+    aiQualityAnalysis: {
+      ...EMPTY_AI_QUALITY_ANALYSIS,
+      findings: [],
     },
   }
 }
@@ -397,11 +391,23 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
 const toProductSaleType = (saleType: ProductSaleTypeDto): ProductSaleType =>
   saleType === 'AUCTION' ? 'AUCTION' : 'DIRECT'
 
+const getPrimaryImageUrl = (product: ProductDetailDto) =>
+  getSortedProductImages(product)[0]?.url ?? ''
+
+const getSortedProductImages = (product: Pick<ProductDetailDto, 'images'>) =>
+  [...(product.images ?? [])].sort((left, right) => {
+    if (left.isPrimary !== right.isPrimary) {
+      return left.isPrimary ? -1 : 1
+    }
+
+    return left.sortOrder - right.sortOrder
+  })
+
 const fallbackBrandLabel = (brandId: number | null) =>
-  brandId ? `${FALLBACK_BRAND_NAME} #${brandId}` : FALLBACK_BRAND_NAME
+  brandId ? `브랜드 #${brandId}` : ''
 
 const fallbackCategoryLabel = (categoryId: number | null) =>
-  categoryId ? `${FALLBACK_CATEGORY_NAME} #${categoryId}` : FALLBACK_CATEGORY_NAME
+  categoryId ? `카테고리 #${categoryId}` : ''
 
 const findBrandId = (brandName: string, brands: BrandDto[]) => {
   const normalizedBrandName = brandName.trim().toLowerCase()

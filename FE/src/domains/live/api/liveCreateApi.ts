@@ -1,7 +1,7 @@
 import { http } from '@/shared/api/http'
-import fallbackThumbnail from '@/assets/images/products/product-denim-jacket.webp'
 
 import type { LiveCreateProduct } from '@/domains/live/types/liveCreate.types'
+import { getProductPrimaryImageUrl } from '@/domains/product/api/productApi'
 import type { ApiResponse } from '@/shared/types/api.types'
 
 export type LiveCreateStatus = 'LIVE' | 'SCHEDULED' | 'ENDED' | 'CANCELED'
@@ -75,18 +75,21 @@ export const getLiveCreateProducts = async (sellerId: number): Promise<LiveCreat
     throw new Error(data.error?.message ?? '라이브에 연결할 상품을 불러오지 못했습니다.')
   }
 
-  return data.data.content
-    .filter((product) => product.sellerId === sellerId)
-    .map((product) => ({
-      id: product.id,
-      name: product.title,
-      brand: product.brandName || '브랜드 미상',
-      category: product.categoryName || '카테고리 미상',
-      condition: product.conditionGrade || product.saleStatus || '상태 미상',
-      price: product.price ?? 0,
-      thumbnailUrl: product.primaryImageUrl || fallbackThumbnail,
-    }))
+  const sellerProducts = data.data.content.filter((product) => product.sellerId === sellerId)
+
+  return Promise.all(sellerProducts.map(toLiveCreateProduct))
 }
+
+const toLiveCreateProduct = async (product: LiveCreateProductDto): Promise<LiveCreateProduct> => ({
+  id: product.id,
+  name: product.title,
+  brand: product.brandName || '브랜드 미상',
+  category: product.categoryName || '카테고리 미상',
+  condition: product.conditionGrade || product.saleStatus || '상태 미상',
+  price: product.price ?? 0,
+  thumbnailUrl:
+    product.primaryImageUrl || (await getProductPrimaryImageUrl(product.id).catch(() => '')),
+})
 
 const unwrapLiveCreateResponse = (response: ApiResponse<LiveCreateResponse>) => {
   if (!response.success || !response.data) {

@@ -12,10 +12,10 @@ import {
   SEARCH_CONDITION_FILTER_OPTIONS,
   SEARCH_SALE_TYPE_FILTER_OPTIONS,
 } from '@/domains/search/constants/searchFilterOptions'
-import { SEARCH_MOCK_RESULTS } from '@/domains/search/constants/searchMockData'
 import type {
   SearchProductResult,
   SearchResultTabId,
+  SearchResultsViewModel,
   SearchSortOptionId,
   SearchStateContent,
   SearchStateKind,
@@ -34,6 +34,11 @@ const SEARCH_RESULT_PREVIEW_LIMIT = 3
 const SEARCH_PRODUCT_PAGE_SIZE = 3
 const SEARCH_LIVE_PAGE_SIZE = 2
 const SEARCH_MEMBER_PAGE_SIZE = 2
+const EMPTY_SEARCH_RESULTS: SearchResultsViewModel = {
+  products: [],
+  lives: [],
+  members: [],
+}
 const SEARCH_SORT_OPTIONS: { id: SearchSortOptionId; label: string }[] = [
   { id: 'LATEST', label: '최신순' },
   { id: 'PRICE_ASC', label: '가격 낮은순' },
@@ -103,12 +108,12 @@ const minPriceInput = ref(queryMinPrice.value?.toString() ?? '')
 const maxPriceInput = ref(queryMaxPrice.value?.toString() ?? '')
 const likedProductIds = ref(
   new Set(
-    SEARCH_MOCK_RESULTS.products.filter((product) => product.isLiked).map((product) => product.id),
+    EMPTY_SEARCH_RESULTS.products.filter((product) => product.isLiked).map((product) => product.id),
   ),
 )
 const followedMemberIds = ref(
   new Set(
-    SEARCH_MOCK_RESULTS.members.filter((member) => member.isFollowing).map((member) => member.id),
+    EMPTY_SEARCH_RESULTS.members.filter((member) => member.isFollowing).map((member) => member.id),
   ),
 )
 const liveMessage = ref('')
@@ -226,7 +231,7 @@ const filteredProducts = computed(() => {
     return []
   }
 
-  return SEARCH_MOCK_RESULTS.products.filter((product) => {
+  return EMPTY_SEARCH_RESULTS.products.filter((product) => {
     if (
       !matchesKeyword([
         product.brand,
@@ -292,7 +297,7 @@ const visibleLives = computed(() => {
     return []
   }
 
-  return SEARCH_MOCK_RESULTS.lives.filter((live) =>
+  return EMPTY_SEARCH_RESULTS.lives.filter((live) =>
     matchesKeyword([live.title, live.hostName, live.status]),
   )
 })
@@ -301,7 +306,7 @@ const visibleMembers = computed(() => {
     return []
   }
 
-  return SEARCH_MOCK_RESULTS.members.filter((member) =>
+  return EMPTY_SEARCH_RESULTS.members.filter((member) =>
     matchesKeyword([member.nickname, member.description]),
   )
 })

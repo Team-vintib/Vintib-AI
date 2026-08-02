@@ -1,10 +1,5 @@
 import axios from 'axios'
 
-import {
-  getLiveWatchMockData,
-  LIVE_WATCH_FALLBACK_PRODUCT_IMAGES,
-  LIVE_WATCH_POSTER_URL,
-} from '@/domains/live/constants/liveWatchMockData'
 import { http } from '@/shared/api/http'
 
 import type {
@@ -38,15 +33,12 @@ const wait = (delay: number) =>
     window.setTimeout(resolve, delay)
   })
 
-const mapLiveProductDto = (dto: LiveProductDto, index: number): LiveWatchProduct => ({
+const mapLiveProductDto = (dto: LiveProductDto, _index: number): LiveWatchProduct => ({
   id: dto.productId,
   title: dto.productTitle,
-  // BE 확인 필요: LiveProductResponse에 상세 필드가 없어 null/fallback 유지.
-  // 요청 문서: docs/requests/BE/007-live-tryon-contract.md (3.5)
   brandName: null,
   price: null,
-  thumbnailUrl:
-    LIVE_WATCH_FALLBACK_PRODUCT_IMAGES[index % LIVE_WATCH_FALLBACK_PRODUCT_IMAGES.length] ?? null,
+  thumbnailUrl: null,
   saleType: null,
   material: null,
   condition: null,
@@ -61,7 +53,7 @@ const mapLiveDetailDto = (dto: LiveDetailDto): LiveWatchViewData => ({
   hostProfileImageUrl: null, // BE 확인 필요: LiveDetailResponse 미제공 (docs/requests/BE/007 3.5)
   title: dto.title,
   description: null,
-  posterUrl: dto.thumbnailUrl || LIVE_WATCH_POSTER_URL,
+  posterUrl: dto.thumbnailUrl || null,
   status: dto.status,
   scheduledAt: dto.scheduledAt,
   startedAt: dto.startedAt,
@@ -100,20 +92,38 @@ const requestLiveWatch = async (liveId: number): Promise<LiveWatchViewData> => {
   }
 }
 
-const getMockLiveWatch = async (
+const getEmptyLiveWatch = async (
+  liveId: number,
   scenario: LiveWatchMockScenario,
 ): Promise<LiveWatchViewData> => {
   await wait(MOCK_DELAY_MS)
 
   if (scenario === 'error') {
-    throw new Error('LIVE_WATCH_MOCK_ERROR')
+    throw new Error('LIVE_WATCH_ERROR')
   }
 
   if (scenario === 'not-found') {
     throw new LiveWatchNotFoundError()
   }
 
-  return getLiveWatchMockData(scenario)
+  return {
+    id: liveId,
+    hostId: 0,
+    hostNickname: '',
+    hostProfileImageUrl: null,
+    title: '',
+    description: null,
+    posterUrl: null,
+    status: 'ENDED',
+    scheduledAt: null,
+    startedAt: null,
+    endedAt: null,
+    currentViewerCount: null,
+    peakViewerCount: 0,
+    currentProductId: null,
+    products: [],
+    categories: [],
+  }
 }
 
 export const getLiveWatchViewData = (
@@ -124,7 +134,7 @@ export const getLiveWatchViewData = (
     return requestLiveWatch(liveId)
   }
 
-  return getMockLiveWatch(scenario)
+  return getEmptyLiveWatch(liveId, scenario)
 }
 
 export const isLiveWatchApiEnabled = () => LIVE_WATCH_API_ENABLED

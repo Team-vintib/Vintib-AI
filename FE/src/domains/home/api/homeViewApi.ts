@@ -1,4 +1,3 @@
-import { homeMockData } from '@/domains/home/constants/homeMockData'
 import type {
   HomeCategoryProductSection,
   HomeFollowedSellerItem,
@@ -131,12 +130,12 @@ const toHomeViewData = (
   const followingProducts = followingContent?.empty ? [] : (followingContent?.products ?? [])
   const categoryProductSections = homeContent.categoryProductSections?.length
     ? homeContent.categoryProductSections.map(toHomeCategoryProductSection)
-    : homeMockData.categoryProductSections
+    : []
   const followedSellers = followingContent
     ? followingContent.empty
       ? []
       : (followingContent.followedSellers ?? []).map(toHomeFollowedSellerItem)
-    : homeMockData.followedSellers
+    : []
 
   return {
     liveNow: homeContent.liveNow.map(toHomeLiveCardItem),
@@ -147,7 +146,7 @@ const toHomeViewData = (
     recommendedProducts:
       followingProducts.length > 0
         ? followingProducts.map(toHomeRecommendedProductItem)
-        : homeMockData.recommendedProducts,
+        : [],
     categoryProductSections,
   }
 }

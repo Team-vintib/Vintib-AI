@@ -9,10 +9,7 @@ import {
   type BackendViewerCount,
   getLiveChatMessages,
 } from '@/domains/chat/api/liveChatApi'
-import {
-  LIVE_CHAT_MOCK_MESSAGES,
-  LIVE_REACTION_EMOJIS,
-} from '@/domains/chat/constants/liveChatMockData'
+import { LIVE_REACTION_EMOJIS } from '@/domains/chat/constants/liveChatMockData'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import {
   isLiveRealtimeApiEnabled,
@@ -46,7 +43,7 @@ const REALTIME_ENABLED = isLiveRealtimeApiEnabled()
 
 const authStore = useAuthStore()
 const { isAuthenticated } = storeToRefs(authStore)
-const messages = ref<LiveChatMessage[]>(REALTIME_ENABLED ? [] : [...LIVE_CHAT_MOCK_MESSAGES])
+const messages = ref<LiveChatMessage[]>([])
 const draft = ref('')
 const activeReaction = ref<LiveReactionEmoji | null>(null)
 const reactionParticles = ref<LiveReactionParticle[]>([])
@@ -60,7 +57,7 @@ let reactionTimer: number | null = null
 const reactionParticleTimers = new Map<number, number>()
 
 const canPublishRealtime = computed(
-  () => !REALTIME_ENABLED || (isConnected.value && isAuthenticated.value),
+  () => REALTIME_ENABLED && isConnected.value && isAuthenticated.value,
 )
 
 const composerPlaceholder = computed(() => {
@@ -84,8 +81,7 @@ const scrollToLatestMessage = async () => {
 
 const loadChatHistory = async () => {
   if (!REALTIME_ENABLED) {
-    messages.value = [...LIVE_CHAT_MOCK_MESSAGES]
-    void scrollToLatestMessage()
+    messages.value = []
     return
   }
 
@@ -215,7 +211,6 @@ const react = (emoji: LiveReactionEmoji) => {
   if (props.status !== 'LIVE') return
 
   if (!REALTIME_ENABLED) {
-    showReactionParticle(emoji)
     return
   }
 

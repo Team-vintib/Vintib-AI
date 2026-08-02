@@ -1,9 +1,4 @@
 import { http } from '@/shared/api/http'
-import {
-  readImageFileAsDataUrl,
-  saveMockDefaultTryOnImage,
-} from '@/shared/api/mockProfileMediaStorage'
-import { saveMockUserInterests, type UserInterests } from '@/shared/api/mockInterestStorage'
 
 import type { ApiResponse } from '@/shared/types/api.types'
 
@@ -84,49 +79,33 @@ export const saveOnboardingBasicInfo = async (
 export const saveOnboardingInterests = async (
   request: SaveOnboardingInterestsRequest,
   options: SaveOnboardingInterestsOptions = {},
-): Promise<ApiResponse<UserInterests | null>> => {
+): Promise<ApiResponse<null>> => {
   if (!options.userId) {
-    if (ONBOARDING_API_ENABLED) {
-      throw new Error('관심 정보를 저장할 회원 ID가 없습니다.')
+    if (!ONBOARDING_API_ENABLED) {
+      void request
+      return ONBOARDING_SUCCESS_RESPONSE
     }
 
-    return {
-      success: true,
-      data: saveMockUserInterests(options.userId, request.brandIds, request.categoryIds),
-      error: null,
-    }
+    throw new Error('관심 정보를 저장할 회원 ID가 없습니다.')
   }
 
-  const { data } = await http.put<ApiResponse<UserInterests>>(
+  const { data } = await http.put<ApiResponse<null>>(
     `/users/${options.userId}/interests`,
     request,
   )
 
   return data
 }
+
 export const saveOnboardingTryOnProfile = async (
   request: SaveOnboardingTryOnProfileRequest,
   options: SaveOnboardingTryOnProfileOptions = {},
 ): Promise<ApiResponse<SaveOnboardingTryOnProfileResponse | null>> => {
-  if (!request.bodyPhoto) {
-    return ONBOARDING_SUCCESS_RESPONSE
-  }
-
-  const defaultTryOnImageUrl = await readImageFileAsDataUrl(
-    request.bodyPhoto,
-    'AI 시착 사진을 읽지 못했습니다.',
-  )
-
-  saveMockDefaultTryOnImage(options.userId, defaultTryOnImageUrl)
-
-  return {
-    success: true,
-    data: {
-      defaultTryOnImageUrl,
-    },
-    error: null,
-  }
+  void request
+  void options
+  return ONBOARDING_SUCCESS_RESPONSE
 }
+
 export const completeOnboarding = async (
   request: CompleteOnboardingRequest,
   options: CompleteOnboardingOptions = {},

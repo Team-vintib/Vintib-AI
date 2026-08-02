@@ -556,12 +556,9 @@ const goToSaleDetail = (saleId: number) => {
 }
 
 const goToLiveDetail = (liveId: number, status: MyLiveStatus) => {
-  const mockScenario = status === 'LIVE' ? 'default' : status.toLowerCase()
-
   void router.push({
     name: status === 'LIVE' ? ROUTE_NAMES.LIVE_BROADCAST : ROUTE_NAMES.LIVE_WATCH,
     params: { liveId },
-    query: { mock: mockScenario },
   })
 }
 
@@ -855,12 +852,40 @@ const loadMyPage = async () => {
   errorMessage.value = ''
 
   try {
-    viewData.value = await getMyPageViewData(authStore.user.id)
+    const nextViewData = await getMyPageViewData(authStore.user.id)
+    viewData.value = mergeSessionProfile(nextViewData)
     await loadMyInterests(authStore.user.id)
     loadState.value = 'success'
   } catch (error) {
     errorMessage.value = normalizeApiError(error).message
     loadState.value = 'error'
+  }
+}
+
+const mergeSessionProfile = (data: MyPageViewData): MyPageViewData => {
+  const sessionUser = authStore.user
+
+  if (!sessionUser) {
+    return data
+  }
+
+  const profile = data.summary.profile
+  const sessionName = sessionUser.name?.trim() || sessionUser.email || ''
+
+  return {
+    ...data,
+    summary: {
+      ...data.summary,
+      profile: {
+        ...profile,
+        id: sessionUser.id,
+        email: profile.email || sessionUser.email,
+        name: profile.name || sessionName,
+        nickname: profile.nickname || sessionUser.name?.trim() || '',
+        onboardingCompleted:
+          profile.onboardingCompleted || sessionUser.onboardingCompleted === true,
+      },
+    },
   }
 }
 
@@ -872,7 +897,6 @@ const goToProductDetail = (productId: number) => {
   void router.push({
     name: ROUTE_NAMES.PRODUCT_DETAIL,
     params: { productId },
-    query: { mock: 'mock' },
   })
 }
 

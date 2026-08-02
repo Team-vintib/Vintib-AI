@@ -1,4 +1,3 @@
-import { BUSINESS_SUBMISSION_DELAY_MS } from '@/domains/biz/constants/businessVerification'
 import type { ApiResponse } from '@/shared/types/api.types'
 
 export type BusinessVerificationStatus = 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED'
@@ -16,24 +15,16 @@ export interface BusinessVerificationResponse {
   submittedAt: string
 }
 
-const waitForMockSubmission = () =>
-  new Promise<void>((resolve) => {
-    window.setTimeout(resolve, BUSINESS_SUBMISSION_DELAY_MS)
-  })
-
 export const submitBusinessVerification = async (
   request: SubmitBusinessVerificationRequest,
 ): Promise<ApiResponse<BusinessVerificationResponse>> => {
   void request
-  await waitForMockSubmission()
-
   return {
-    success: true,
-    data: {
-      id: Date.now(),
-      status: 'PENDING',
-      submittedAt: new Date().toISOString(),
+    success: false,
+    data: null,
+    error: {
+      code: 'BUSINESS_VERIFICATION_API_NOT_CONNECTED',
+      message: '사업자 인증 API가 아직 연결되지 않았습니다.',
     },
-    error: null,
-  } satisfies ApiResponse<BusinessVerificationResponse>
+  }
 }

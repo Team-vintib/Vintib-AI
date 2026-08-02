@@ -10,7 +10,6 @@ import BaseInput from '@/domains/onboard/components/BaseInput.vue'
 import OnboardingLayout from '@/domains/onboard/components/OnboardingLayout.vue'
 import { getBrands, getCategories } from '@/domains/product/api/productApi'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
-import { getMockInterestOptions } from '@/shared/api/mockInterestStorage'
 
 import type { ApiErrorBody as ApiError, ApiResponse } from '@/shared/types/api.types'
 
@@ -19,21 +18,9 @@ interface InterestOption {
   label: string
 }
 
-const mockInterestOptions = getMockInterestOptions()
-
 const brandSearchQuery = ref('')
-const brands = ref<InterestOption[]>(
-  mockInterestOptions.brands.map((brand) => ({
-    id: brand.id,
-    label: brand.nameEn ? `${brand.name} (${brand.nameEn})` : brand.name,
-  })),
-)
-const categories = ref<InterestOption[]>(
-  mockInterestOptions.categories.map((category) => ({
-    id: category.id,
-    label: category.name,
-  })),
-)
+const brands = ref<InterestOption[]>([])
+const categories = ref<InterestOption[]>([])
 const selectedBrandIds = ref<number[]>([])
 const selectedCategoryIds = ref<number[]>([])
 const isSubmitting = ref(false)
@@ -132,14 +119,8 @@ const loadInterestOptions = async () => {
         label: category.name,
       }))
   } catch {
-    brands.value = mockInterestOptions.brands.map((brand) => ({
-      id: brand.id,
-      label: brand.nameEn ? `${brand.name} (${brand.nameEn})` : brand.name,
-    }))
-    categories.value = mockInterestOptions.categories.map((category) => ({
-      id: category.id,
-      label: category.name,
-    }))
+    brands.value = []
+    categories.value = []
   }
 }
 

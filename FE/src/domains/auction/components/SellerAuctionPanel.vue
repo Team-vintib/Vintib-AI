@@ -1,16 +1,12 @@
 ﻿<script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import {
   SELLER_AUCTION_DEFAULT_CONFIG,
   SELLER_AUCTION_DEFAULT_START_PRICE,
   SELLER_AUCTION_DURATION_PRESETS,
   SELLER_AUCTION_DURATION_RANGE,
-  SELLER_AUCTION_EXTEND_SECONDS,
-  SELLER_AUCTION_EXTEND_THRESHOLD_SECONDS,
   SELLER_AUCTION_INCREMENT_PRESETS,
-  SELLER_AUCTION_MOCK_BID_INTERVAL_SECONDS,
-  SELLER_AUCTION_MOCK_COMPETITORS,
 } from '@/domains/auction/constants/sellerAuctionMockData'
 import { configureLiveAuction } from '@/domains/live/api/liveControlApi'
 
@@ -26,18 +22,6 @@ const props = defineProps<{
   status: LiveWatchStatus
 }>()
 
-// 경매 종료 결과를 상위 화면으로 전달한다. 실제 낙찰 확정은 BE 계약이 필요해 현재는 mock 타이머 기준으로 emit한다.
-const emit = defineEmits<{
-  'auction-ended': [
-    result: {
-      outcome: 'WON' | 'FAILED'
-      winnerNickname: string | null
-      winningBid: number
-      productTitle: string | null
-    },
-  ]
-}>()
-
 const phase = ref<SellerAuctionPhase>('IDLE')
 const startPrice = ref(SELLER_AUCTION_DEFAULT_START_PRICE)
 const increment = ref(SELLER_AUCTION_DEFAULT_CONFIG.increment)
@@ -50,17 +34,6 @@ const bidderCount = ref(0)
 const isExtendFlashing = ref(false)
 const isConfiguring = ref(false)
 const configError = ref('')
-
-let countdownTimer: number | undefined
-let extendFlashTimer: number | undefined
-let secondsElapsed = 0
-
-const clearTimers = () => {
-  window.clearInterval(countdownTimer)
-  window.clearTimeout(extendFlashTimer)
-  countdownTimer = undefined
-  extendFlashTimer = undefined
-}
 
 const isDurationValid = computed(
   () =>
@@ -115,7 +88,6 @@ const applyIncrementPreset = (value: number) => {
 }
 
 const resetToIdle = () => {
-  clearTimers()
   phase.value = 'IDLE'
   currentBid.value = 0
   highestBidder.value = null
@@ -124,60 +96,7 @@ const resetToIdle = () => {
   isExtendFlashing.value = false
   isConfiguring.value = false
   configError.value = ''
-  secondsElapsed = 0
   startPrice.value = props.product?.price ?? SELLER_AUCTION_DEFAULT_START_PRICE
-}
-
-const flashExtend = () => {
-  isExtendFlashing.value = true
-  window.clearTimeout(extendFlashTimer)
-  extendFlashTimer = window.setTimeout(() => {
-    isExtendFlashing.value = false
-  }, 1500)
-}
-
-// 실제 입찰/연장 API가 없어 판매자 화면에서는 mock 입찰로 진행 상태만 보여준다.
-const simulateBid = () => {
-  currentBid.value += increment.value
-  highestBidder.value =
-    SELLER_AUCTION_MOCK_COMPETITORS[bidderCount.value % SELLER_AUCTION_MOCK_COMPETITORS.length]
-  bidderCount.value += 1
-
-  // AUCT-010 종료 직전 자동 연장(mock 연출).
-  if (remainingSeconds.value <= SELLER_AUCTION_EXTEND_THRESHOLD_SECONDS) {
-    remainingSeconds.value += SELLER_AUCTION_EXTEND_SECONDS
-    flashExtend()
-  }
-}
-
-const endAuction = () => {
-  clearTimers()
-  const won = bidderCount.value > 0
-  phase.value = won ? 'ENDED_WON' : 'ENDED_FAILED'
-  emit('auction-ended', {
-    outcome: won ? 'WON' : 'FAILED',
-    winnerNickname: highestBidder.value,
-    winningBid: currentBid.value,
-    productTitle: props.product?.title ?? null,
-  })
-}
-
-const tick = () => {
-  if (remainingSeconds.value <= 0) return
-
-  remainingSeconds.value -= 1
-  secondsElapsed += 1
-
-  if (
-    remainingSeconds.value > 0 &&
-    secondsElapsed % SELLER_AUCTION_MOCK_BID_INTERVAL_SECONDS === 0
-  ) {
-    simulateBid()
-  }
-
-  if (remainingSeconds.value <= 0) {
-    endAuction()
-  }
 }
 
 const startAuction = async () => {
@@ -205,12 +124,9 @@ const startAuction = async () => {
   highestBidder.value = null
   bidderCount.value = 0
   remainingSeconds.value = durationSeconds.value
-  secondsElapsed = 0
   isExtendFlashing.value = false
   phase.value = 'RUNNING'
 
-  clearTimers()
-  countdownTimer = window.setInterval(tick, 1000)
 }
 
 // PROD-005 판매 방식 선택은 별도 구현 전까지 안내만 표시한다.
@@ -232,14 +148,11 @@ watch(
   () => props.status,
   (status) => {
     if (status !== 'LIVE' && phase.value === 'RUNNING') {
-      endAuction()
+      resetToIdle()
     }
   },
 )
 
-onBeforeUnmount(() => {
-  clearTimers()
-})
 </script>
 
 <template>
@@ -388,10 +301,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <p v-if="isExtendFlashing" class="seller-auction__extend" role="status">
-        종료 임박으로 {{ SELLER_AUCTION_EXTEND_SECONDS }}초 연장
-      </p>
-      <p class="seller-auction__hint">남은 시간이 끝나면 경매가 자동 종료됩니다.</p>
+      <p class="seller-auction__hint">입찰 진행 상태는 실제 경매 API 연결 후 표시됩니다.</p>
     </template>
 
     <template v-else-if="phase === 'ENDED_WON'">
