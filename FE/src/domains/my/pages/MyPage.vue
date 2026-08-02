@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import { getMyPageViewData } from '@/domains/my/api/myApi'
+import { getMyPageViewData, updateMyProfile } from '@/domains/my/api/myApi'
 import {
   MY_BUSINESS_STATUS_LABELS,
   MY_LIVE_STATUS_LABELS,
@@ -12,7 +12,7 @@ import {
   MY_SECTION_OPTIONS,
   MY_SETTLEMENT_STATUS_LABELS,
 } from '@/domains/my/constants/myMockData'
-import type { MyPageViewData, MySectionId } from '@/domains/my/types/my.types'
+import type { MyPageViewData, MyProfileUpdateRequest, MySectionId } from '@/domains/my/types/my.types'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
@@ -25,11 +25,22 @@ const viewData = ref<MyPageViewData | null>(null)
 const selectedSection = ref<MySectionId>('dashboard')
 const loadState = ref<'idle' | 'loading' | 'success' | 'error' | 'guest'>('idle')
 const errorMessage = ref('')
+const profileForm = ref<MyProfileUpdateRequest>({
+  nickname: '',
+  phoneNumber: '',
+  postalCode: null,
+  address: '',
+  detailAddress: '',
+  gender: 'FEMALE',
+})
+const profileSaveState = ref<'idle' | 'saving' | 'success' | 'error'>('idle')
+const profileSaveMessage = ref('')
 
 const profile = computed(() => viewData.value?.summary.profile ?? null)
 const isLoading = computed(() => loadState.value === 'loading')
 const isGuest = computed(() => loadState.value === 'guest')
 const hasLoadError = computed(() => loadState.value === 'error')
+const isProfileSaving = computed(() => profileSaveState.value === 'saving')
 const profileInitial = computed(() => (profile.value?.nickname || profile.value?.name || '회').slice(0, 1))
 const currentSectionLabel = computed(
   () =>
@@ -202,6 +213,83 @@ const formatShortDate = (value?: string) => {
   }).format(new Date(value))
 }
 
+const syncProfileForm = () => {
+  if (!profile.value) {
+    return
+  }
+
+  profileForm.value = {
+    nickname: profile.value.nickname,
+    phoneNumber: profile.value.phoneNumber,
+    postalCode: profile.value.postalCode,
+    address: profile.value.address,
+    detailAddress: profile.value.detailAddress,
+    gender: profile.value.gender,
+  }
+  profileSaveState.value = 'idle'
+  profileSaveMessage.value = ''
+}
+
+const validateProfileForm = () => {
+  const form = profileForm.value
+  const phoneNumber = form.phoneNumber.replaceAll('-', '').trim()
+
+  if (form.nickname.trim().length < 2) {
+    return '닉네임은 2자 이상 입력해 주세요.'
+  }
+
+  if (!/^\d{10,11}$/.test(phoneNumber)) {
+    return '전화번호는 숫자 10~11자리로 입력해 주세요.'
+  }
+
+  if (!form.address.trim()) {
+    return '주소를 입력해 주세요.'
+  }
+
+  return ''
+}
+
+const submitProfileForm = async () => {
+  if (!profile.value || !viewData.value) {
+    return
+  }
+
+  const validationMessage = validateProfileForm()
+  if (validationMessage) {
+    profileSaveState.value = 'error'
+    profileSaveMessage.value = validationMessage
+    return
+  }
+
+  profileSaveState.value = 'saving'
+  profileSaveMessage.value = ''
+
+  try {
+    const request: MyProfileUpdateRequest = {
+      ...profileForm.value,
+      nickname: profileForm.value.nickname.trim(),
+      phoneNumber: profileForm.value.phoneNumber.replaceAll('-', '').trim(),
+      postalCode: profileForm.value.postalCode?.trim() || null,
+      address: profileForm.value.address.trim(),
+      detailAddress: profileForm.value.detailAddress.trim(),
+    }
+    const nextProfile = await updateMyProfile(profile.value.id, request)
+
+    viewData.value = {
+      ...viewData.value,
+      summary: {
+        ...viewData.value.summary,
+        profile: nextProfile,
+      },
+    }
+    profileSaveState.value = 'success'
+    profileSaveMessage.value = '기본 정보가 저장되었습니다.'
+  } catch (error) {
+    profileSaveState.value = 'error'
+    profileSaveMessage.value = normalizeApiError(error).message
+  }
+}
+
 const setSectionFromQuery = () => {
   const section = route.query.section
   const nextSection = typeof section === 'string' ? section : 'dashboard'
@@ -265,6 +353,14 @@ watch(
   () => route.query.section,
   () => {
     setSectionFromQuery()
+  },
+  { immediate: true },
+)
+
+watch(
+  profile,
+  () => {
+    syncProfileForm()
   },
   { immediate: true },
 )
@@ -483,36 +579,64 @@ onMounted(() => {
 
           <section v-else class="my-card" :aria-label="currentSectionLabel">
             <template v-if="selectedSection === 'profile'">
-              <div class="my-card__title">
-                <h2>기본 정보</h2>
-                <button type="button">기본 정보 저장</button>
-              </div>
-              <dl class="my-profile-grid">
-                <div>
-                  <dt>이름</dt>
-                  <dd>{{ profile.name }}</dd>
+              <form class="my-profile-form" @submit.prevent="submitProfileForm">
+                <div class="my-card__title">
+                  <h2>기본 정보</h2>
+                  <button type="submit" :disabled="isProfileSaving">
+                    {{ isProfileSaving ? '저장 중' : '기본 정보 저장' }}
+                  </button>
                 </div>
-                <div>
-                  <dt>닉네임</dt>
-                  <dd>{{ profile.nickname }}</dd>
+
+                <p
+                  v-if="profileSaveMessage"
+                  class="my-profile-form__message"
+                  :class="{ 'my-profile-form__message--error': profileSaveState === 'error' }"
+                >
+                  {{ profileSaveMessage }}
+                </p>
+
+                <div class="my-profile-form__grid">
+                  <label>
+                    <span>이름</span>
+                    <input :value="profile.name" type="text" disabled />
+                  </label>
+                  <label>
+                    <span>이메일</span>
+                    <input :value="profile.email" type="email" disabled />
+                  </label>
+                  <label>
+                    <span>닉네임</span>
+                    <input v-model.trim="profileForm.nickname" type="text" maxlength="20" autocomplete="nickname" />
+                  </label>
+                  <label>
+                    <span>전화번호</span>
+                    <input v-model.trim="profileForm.phoneNumber" type="tel" inputmode="numeric" autocomplete="tel" />
+                  </label>
+                  <label>
+                    <span>우편번호</span>
+                    <input v-model.trim="profileForm.postalCode" type="text" inputmode="numeric" />
+                  </label>
+                  <label>
+                    <span>성별</span>
+                    <select v-model="profileForm.gender">
+                      <option value="FEMALE">여성</option>
+                      <option value="MALE">남성</option>
+                    </select>
+                  </label>
+                  <label class="my-profile-form__wide">
+                    <span>주소</span>
+                    <input v-model.trim="profileForm.address" type="text" autocomplete="street-address" />
+                  </label>
+                  <label class="my-profile-form__wide">
+                    <span>상세 주소</span>
+                    <input v-model.trim="profileForm.detailAddress" type="text" />
+                  </label>
+                  <div class="my-profile-form__readonly">
+                    <span>인증 상태</span>
+                    <strong>{{ MY_BUSINESS_STATUS_LABELS[profile.businessVerificationStatus] }}</strong>
+                  </div>
                 </div>
-                <div>
-                  <dt>전화번호</dt>
-                  <dd>{{ profile.phoneNumber }}</dd>
-                </div>
-                <div>
-                  <dt>주소</dt>
-                  <dd>{{ profile.address }} {{ profile.detailAddress }}</dd>
-                </div>
-                <div>
-                  <dt>성별</dt>
-                  <dd>{{ profile.gender === 'FEMALE' ? '여성' : '남성' }}</dd>
-                </div>
-                <div>
-                  <dt>인증 상태</dt>
-                  <dd>{{ MY_BUSINESS_STATUS_LABELS[profile.businessVerificationStatus] }}</dd>
-                </div>
-              </dl>
+              </form>
             </template>
 
             <template v-else-if="selectedSection === 'products'">
@@ -1314,6 +1438,91 @@ onMounted(() => {
   line-height: 22px;
 }
 
+.my-profile-form {
+  display: grid;
+  gap: 18px;
+}
+
+.my-profile-form__message {
+  padding: 12px 14px;
+  background: #e5eee8;
+  color: #2c4635;
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 20px;
+}
+
+.my-profile-form__message--error {
+  background: #f5e5e8;
+  color: #b84b58;
+}
+
+.my-profile-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.my-profile-form__grid label,
+.my-profile-form__readonly {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.my-profile-form__grid label span,
+.my-profile-form__readonly span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 18px;
+}
+
+.my-profile-form__grid input,
+.my-profile-form__grid select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.my-profile-form__grid input:disabled {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-tertiary);
+}
+
+.my-profile-form__grid input:focus,
+.my-profile-form__grid select:focus {
+  border-color: #2c4635;
+  outline: 2px solid rgb(44 70 53 / 14%);
+}
+
+.my-profile-form__wide,
+.my-profile-form__readonly {
+  grid-column: 1 / -1;
+}
+
+.my-profile-form__readonly {
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-secondary);
+}
+
+.my-profile-form__readonly strong {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+}
+
+.my-card__title button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .my-empty,
 .my-state {
   display: grid;
@@ -1349,6 +1558,7 @@ onMounted(() => {
   .my-dashboard-grid,
   .my-dashboard--home,
   .my-point-panel__grid,
+  .my-profile-form__grid,
   .my-profile-grid {
     grid-template-columns: 1fr;
   }
