@@ -16,8 +16,9 @@
 - 반대로 **팔로우(POST)는 확인 절차 없이 즉시 반영**한다 — 이번 요청 범위는 "취소" 쪽 확인이고, 팔로우는 되돌리기 쉬운 액션이라 별도 확인이 필요 없다고 판단했다. 다만 이 구분은 BE의 강제 사항이 아니라 제안이므로, FE 판단으로 자유롭게 조정해도 된다.
 - BE의 `DELETE /api/users/{userId}/followers`는 이미 멱등하게 동작한다 — 팔로우 중이 아니었어도 에러 없이 204를 반환한다. 따라서 확인 팝업 이후 호출이든, 네트워크 재시도로 중복 호출되든 안전하며 FE가 별도 방어 로직을 넣을 필요가 없다.
 - 참고로 `POST /api/users/{userId}/followers`(팔로우) 역시 멱등하다 — 이미 팔로우 중이면 에러 없이 현재 상태(`isFollowing=true`, `followerCount`)를 그대로 200으로 반환한다. 두 엔드포인트 모두 재시도에 안전하다.
+- **본인 프로필에서는 예외**: 자기 자신을 대상으로 `POST`하면 멱등 처리 없이 400(`SELF_FOLLOW_NOT_ALLOWED`) 에러를 반환한다. 내 프로필 화면에는 팔로우 버튼을 아예 숨기거나 비활성화해 주세요 — 그렇지 않으면 본인 프로필에서 팔로우 버튼을 눌렀을 때 에러가 뜬다.
 
 ## 4. 관련 자료
 
-- API 스펙: `docs/requests/BE/008-social-notification-contract.md` §3.1(팔로우/언팔로우)
+- API 스펙: `docs/plans/BE/SY024-follow.md` (팔로우/언팔로우 API 설계 — `docs/requests/BE/008-social-notification-contract.md`의 해당 요청은 반영 완료로 문서에서 제거됨)
 - BE 설계 계획(멱등 정책 근거): `docs/plans/BE/SY024-follow.md`

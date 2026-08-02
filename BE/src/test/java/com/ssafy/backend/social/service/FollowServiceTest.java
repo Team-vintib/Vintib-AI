@@ -138,7 +138,7 @@ class FollowServiceTest {
     }
 
     @Test
-    void 비회원이_조회하면_isFollowing이_null이다() {
+    void 비회원이_조회하면_isFollowing이_false다() {
         when(memberRepository.existsById(TARGET_ID)).thenReturn(true);
         when(follower.getId()).thenReturn(FOLLOWER_ID);
         Follow follow = Follow.builder().follower(follower).following(target).build();
@@ -150,7 +150,7 @@ class FollowServiceTest {
 
         PageResponse<FollowUserResponse> response = followService.getFollowers(TARGET_ID, null, pageable);
 
-        assertThat(response.content().get(0).isFollowing()).isNull();
+        assertThat(response.content().get(0).isFollowing()).isFalse();
         verify(followRepository, never()).findFollowingIdsAmong(any(), anyCollection());
     }
 
