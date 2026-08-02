@@ -153,6 +153,12 @@ public class ProductService {
         return PageResponse.from(products.map(ProductResponse::from));
     }
 
+    /** 마이페이지 판매 상품 관리(MY-002) — 본인 소유 상품을 등록일 최신순으로 전부 반환한다(DRAFT 등 비공개 상태 포함). */
+    public PageResponse<ProductResponse> getMyProducts(Long sellerId, Pageable pageable) {
+        Page<Product> products = productRepository.findBySeller_IdOrderByCreatedAtDesc(sellerId, pageable);
+        return PageResponse.from(products.map(ProductResponse::from));
+    }
+
     private Sort buildSort(ProductSortType sortType) {
         return switch (sortType) {
             case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price");

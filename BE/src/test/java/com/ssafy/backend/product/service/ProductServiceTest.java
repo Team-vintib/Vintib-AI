@@ -357,6 +357,19 @@ class ProductServiceTest {
 
         assertThat(response.content()).isEmpty();
         assertThat(response.totalElements()).isZero();
+    }
+
+    @Test
+    void 마이페이지_판매_상품_목록은_DRAFT_상품도_포함해_반환한다() {
+        Product draft = Product.builder().seller(seller).title("등록 중 상품").build();
+        Pageable pageable = PageRequest.of(0, 20);
+        when(productRepository.findBySeller_IdOrderByCreatedAtDesc(SELLER_ID, pageable))
+                .thenReturn(new PageImpl<>(List.of(draft), pageable, 1));
+
+        PageResponse<ProductResponse> response = productService.getMyProducts(SELLER_ID, pageable);
+
+        assertThat(response.content()).hasSize(1);
+        assertThat(response.content().get(0).saleStatus()).isEqualTo(SaleStatus.DRAFT);
         assertThat(response.hasNext()).isFalse();
     }
 

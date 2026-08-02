@@ -40,6 +40,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findBySeller_IdInAndSaleStatusOrderByCreatedAtDesc(
             Collection<Long> sellerIds, SaleStatus saleStatus, Pageable pageable);
 
+    /** 마이페이지 판매 상품 관리(MY-002) — 본인 소유 상품은 DRAFT 등 비공개 상태까지 전부 보여준다. */
+    Page<Product> findBySeller_IdOrderByCreatedAtDesc(Long sellerId, Pageable pageable);
+
     interface SellerProductCount {
         Long getSellerId();
 
