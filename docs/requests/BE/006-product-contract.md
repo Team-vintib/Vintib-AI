@@ -30,51 +30,22 @@
 - 현재 임시 처리 또는 Mock 사용 여부
   - 목록 필터(카테고리/상태등급/판매방식/가격범위/정렬)는 구현 완료 — 아래 3.1 참고. `keyword`
     (검색어)만 아직 미구현이다(SEARCH-002 스코프, PROD-008과 별도).
+  - 상세 응답 보강(판매자 통계/찜/연결 라이브/카테고리·브랜드명)은 구현 완료 — 아래 3.2 참고.
   - 상품 상세의 가격 분포, 유사 상품, AI 품질 분석/가격 추천은 화면 내 mock 또는 임시 데이터 성격이 남아 있다.
 
 ## 3. 추가 구현 요청
 
-### 3.1 상품 목록 필터 구현/문서화 — `keyword` 제외 구현 완료
+### 3.1 상품 목록 필터 구현/문서화 — 구현 완료, 계약은 다르게 확정됨
 
-`GET /api/products`에 `categoryIds`(복수), `conditionGrades`(복수), `saleType`
-(`DIRECT_SALE`/`AUCTION` — 기존 엔티티 enum 그대로, 협의 필요 사항의 "DIRECT vs DIRECT_SALE"
-질문은 이걸로 확정), `minPrice`, `maxPrice`, `sort`(`LATEST`/`PRICE_ASC`/`PRICE_DESC`)를
-요청 그대로의 파라미터명으로 구현했다. 응답도 기존 `PageResponse<ProductResponse>` 그대로다
-(요청한 필드 변경 없음).
+요청 그대로의 파라미터명으로 구현했다. `keyword`(검색어)만 통합 검색(005) 범위로 미룬 상태다.
+확정 계약은 `docs/requests/FE/010-product-list-detail-contract.md` 참고.
 
-**`keyword`(검색어)만 아직 없다** — `PROD-008`(상품 목록 필터·정렬) 계획 범위 밖이고,
-`/search`(SEARCH-001/002, 통합 검색)가 아직 통째로 미구현 상태라 그쪽에서 다룰 문제로 본다.
-FE가 목록 화면에서 검색어까지 당장 필요하면 별도 요청으로 우선순위를 알려달라.
+### 3.2 상품 상세 응답 보강 — 구현 완료, 계약은 다르게 확정됨
 
-### 3.2 상품 상세 응답 보강
-
-- Method / Endpoint: `GET /api/products/{id}`
-- 요청 목적: 상세 화면에서 판매자 요약, 연결 라이브, 상세 치수, 유사 상품을 실제 데이터로 표시한다.
-- FE 사용처: `ProductDetailView.vue`
-- 요청 데이터
-  - Path: `id`
-- 응답 데이터
-  - 기존 상세 필드 유지
-  - 추가 후보: `seller`, `relatedLive`, `measurements`, `similarProducts`, `priceDistribution`
-- 응답 예시
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "sellerNickname": "vintagelover",
-    "images": [],
-    "measurements": {
-      "chest": 52,
-      "length": 68
-    },
-    "relatedLive": null,
-    "similarProducts": []
-  },
-  "error": null
-}
-```
+`categoryName`/`brandName`/`isWished`/`sellerFollowerCount`/`sellerProductCount`/`linkedLive`를
+추가했다. `seller` 중첩 객체 대신 최상위 평탄 필드로 냈고, 요청한 `relatedLive`는 `linkedLive`로
+이름이 다르다. `similarProducts`/`priceDistribution`/이미지 `role`은 이번 범위 밖. 확정 계약은
+`docs/requests/FE/010-product-list-detail-contract.md` 참고.
 
 ### 3.3 AI 품질 분석/가격 추천
 
@@ -89,15 +60,10 @@ FE가 목록 화면에서 검색어까지 당장 필요하면 별도 요청으�
 
 - 기존 요청·응답에서 변경할 내용
   - `GET /api/products` query 필터 반영 — `keyword` 제외 완료(3.1 참고)
-  - `GET /api/products/{id}` 상세 응답 보강
+  - `GET /api/products/{id}` 상세 응답 보강 — `similarProducts`/`priceDistribution` 제외 완료(3.2 참고)
 - 추가할 필드
-  - 이미지 role 정책 필요 시 `images[].role`: `FRONT` | `BACK` | `ADDITIONAL`
-  - 상세 치수 `measurements`
-  - 판매자 요약 `seller`
-  - 연결 라이브 `relatedLive`
+  - 이미지 role 정책 필요 시 `images[].role`: `FRONT` | `BACK` | `ADDITIONAL` — 아직 미반영
 - 변경 영향 범위
-  - 상품 목록 필터/정렬
-  - 상품 상세 정보 섹션
   - 상품 등록 AI 검증 단계
 
 ## 5. 보류 또는 시연 제외 범위
@@ -113,13 +79,12 @@ FE가 목록 화면에서 검색어까지 당장 필요하면 별도 요청으�
 
 ## 6. 협의 필요 사항
 
-- FE·BE 간 결정이 필요한 내용 — 목록 필터 파라미터명·`saleType` enum은 3.1에서 확정돼 제외함
-  - 비회원 목록/상세의 `isWished` 값 정책
+- FE·BE 간 결정이 필요한 내용 — 목록 필터 파라미터명·`saleType` enum(3.1), 비회원 `isWished`
+  정책(3.2, `false`로 확정)은 해소됨
   - 이미지 role 저장 여부
   - AI 품질 분석 endpoint 위치
 - 아직 확정되지 않은 응답 구조나 정책
   - 가격 분포/유사 상품 응답 구조
-  - 상세 치수 필드명
   - 상품 상태 enum 전체 목록
 
 ## 7. 추가 요청 없음

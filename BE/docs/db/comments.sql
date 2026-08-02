@@ -29,9 +29,12 @@ COMMENT ON COLUMN member_social_account.provider         IS 'SSO 공급자. 현�
 COMMENT ON COLUMN member_social_account.provider_user_id IS '공급자 측 고유 ID. provider 와 묶어 유일하다.';
 
 COMMENT ON TABLE member_body_profile IS '전신 사진·신체 정보 (ONBOARD-003, TRYON-001~002). 가상 시착 입력값.';
-COMMENT ON COLUMN member_body_profile.body_photo_url IS '전신 사진 URL. 미등록이면 시착 불가.';
+COMMENT ON COLUMN member_body_profile.body_photo_key IS '전신 사진 S3 key(비공개 버킷). 미등록이면 시착 불가.';
 COMMENT ON COLUMN member_body_profile.height_cm      IS '키(cm).';
 COMMENT ON COLUMN member_body_profile.weight_kg      IS '몸무게(kg).';
+COMMENT ON COLUMN member_body_profile.chest_cm       IS '가슴둘레(cm).';
+COMMENT ON COLUMN member_body_profile.waist_cm       IS '허리둘레(cm).';
+COMMENT ON COLUMN member_body_profile.hip_cm         IS '엉덩이둘레(cm).';
 
 COMMENT ON TABLE business_info IS '사업자 인증 정보 (BIZ-001).';
 COMMENT ON COLUMN business_info.business_number     IS '사업자등록번호.';
@@ -72,9 +75,6 @@ COMMENT ON COLUMN product_defect.content    IS '하자 내용(자유 문자열).
 COMMENT ON COLUMN product_defect.sort_order IS '노출 순서.';
 
 COMMENT ON TABLE wish   IS '찜 (MY-009). 추천(REC-001) 입력.';
-COMMENT ON TABLE follow IS '회원 팔로우 (FOLLOW-001). 팔로잉 콘텐츠 조회(HOME-002)의 기준.';
-COMMENT ON COLUMN follow.follower_id  IS '팔로우를 건 회원.';
-COMMENT ON COLUMN follow.following_id IS '팔로우 당한 회원.';
 
 
 -- ---------- 라이브 ----------
@@ -203,6 +203,9 @@ COMMENT ON COLUMN chat_message.content IS '메시지 본문. 차단되어도 내
 COMMENT ON COLUMN notification.title   IS '알림 제목.';
 COMMENT ON COLUMN notification.body    IS '알림 본문.';
 
+COMMENT ON TABLE  follow              IS '회원 간 팔로우 (FOLLOW-001).';
+COMMENT ON COLUMN follow.follower_id  IS '팔로우를 하는 회원 (구독자).';
+COMMENT ON COLUMN follow.following_id IS '팔로우 대상 회원 (판매자/크리에이터).';
 
 -- ---------- 공통 컬럼 ----------
 -- id·created_at 같은 상용구를 테이블마다 반복해 적으면 정작 중요한 설명이 묻힌다.

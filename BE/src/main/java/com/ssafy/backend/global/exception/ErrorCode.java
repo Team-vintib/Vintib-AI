@@ -25,6 +25,7 @@ public enum ErrorCode {
     EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "U011", "만료된 토큰입니다."),
     NICKNAME_ALREADY_TAKEN(HttpStatus.CONFLICT, "U012", "이미 사용 중인 닉네임입니다."),
     MEMBER_FORBIDDEN(HttpStatus.FORBIDDEN, "U013", "본인의 정보만 수정할 수 있습니다."),
+    ONBOARDING_BASIC_INFO_REQUIRED(HttpStatus.BAD_REQUEST, "U014", "기본 정보를 먼저 등록해주세요."),
 
     // [라이브/채팅]
     LIVE_NOT_FOUND(HttpStatus.NOT_FOUND, "L001", "진행 중이거나 예약된 라이브가 없습니다."),
@@ -57,6 +58,8 @@ public enum ErrorCode {
     TRYON_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "T002", "가상 시착 이미지 생성 중 오류가 발생했습니다."),
     TRYON_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "T003", "존재하지 않는 시착 결과입니다."),
     TRYON_RESULT_NOT_OWNER(HttpStatus.FORBIDDEN, "T004", "본인의 시착 결과만 처리할 수 있습니다."),
+    TRYON_PROFILE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "T005", "업로드가 확인되지 않았습니다. 먼저 사진을 업로드해주세요."),
+    TRYON_PROFILE_NOT_OWNER(HttpStatus.FORBIDDEN, "T006", "본인의 시착 프로필만 처리할 수 있습니다."),
 
     // [상품]
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "존재하지 않는 상품입니다."),
@@ -73,6 +76,7 @@ public enum ErrorCode {
     WISH_ALREADY_EXISTS(HttpStatus.CONFLICT, "S001", "이미 찜한 상품입니다."),
     WISH_NOT_FOUND(HttpStatus.NOT_FOUND, "S002", "찜하지 않은 상품입니다."),
     WISH_FORBIDDEN(HttpStatus.FORBIDDEN, "S003", "본인의 찜만 처리할 수 있습니다."),
+    SELF_FOLLOW_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "S004", "자기 자신은 팔로우할 수 없습니다."),
 
     // [알림]
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "존재하지 않는 알림입니다."),

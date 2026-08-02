@@ -16,6 +16,9 @@ public interface LiveProductRepository extends JpaRepository<LiveProduct, Long> 
 
     Optional<LiveProduct> findByLiveIdAndProductIdAndRemovedAtIsNull(Long liveId, Long productId);
 
+    /** 상품 상세의 "연결된 라이브" 표시용 — 상품이 현재 어느 라이브에 연결돼 있는지 라이브 무관하게 찾는다. */
+    Optional<LiveProduct> findByProductIdAndRemovedAtIsNull(Long productId);
+
     boolean existsByLiveIdAndProductIdAndRemovedAtIsNull(Long liveId, Long productId);
 
     long countByLiveIdAndRemovedAtIsNull(Long liveId);

@@ -175,17 +175,22 @@
 
 ### `follow`
 
-회원 팔로우 (FOLLOW-001). 팔로잉 콘텐츠 조회(HOME-002)의 기준.
+회원 간 팔로우 (FOLLOW-001).
 
 | 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
 | --- | --- | --- | --- | --- | --- |
-| `follower_id` | `bigint` | NOT NULL |  | FK→member, PK | 팔로우를 건 회원. |
-| `following_id` | `bigint` | NOT NULL |  | FK→member, PK | 팔로우 당한 회원. |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `follower_id` | `bigint` | NOT NULL |  | FK→member, UQ | 팔로우를 하는 회원 (구독자). |
+| `following_id` | `bigint` | NOT NULL |  | FK→member, UQ | 팔로우 대상 회원 (판매자/크리에이터). |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
 
 **CHECK 제약**
 
 - `ck_follow_not_self` — `CHECK ((follower_id <> following_id))`
+
+**인덱스**
+
+- `ux_follow` — `CREATE UNIQUE INDEX ux_follow ON public.follow USING btree (follower_id, following_id)`
 
 ---
 
@@ -284,9 +289,12 @@
 | 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
 | --- | --- | --- | --- | --- | --- |
 | `member_id` | `bigint` | NOT NULL |  | FK→member, PK | 대상 회원. |
-| `body_photo_url` | `varchar(500)` |  |  |  | 전신 사진 URL. 미등록이면 시착 불가. |
+| `body_photo_key` | `varchar(500)` |  |  |  | 전신 사진 S3 key(비공개 버킷). 미등록이면 시착 불가. |
 | `height_cm` | `smallint` |  |  |  | 키(cm). |
 | `weight_kg` | `smallint` |  |  |  | 몸무게(kg). |
+| `chest_cm` | `smallint` |  |  |  | 가슴둘레(cm). |
+| `waist_cm` | `smallint` |  |  |  | 허리둘레(cm). |
+| `hip_cm` | `smallint` |  |  |  | 엉덩이둘레(cm). |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
 
 ---

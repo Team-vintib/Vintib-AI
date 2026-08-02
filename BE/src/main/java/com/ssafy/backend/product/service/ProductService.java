@@ -12,11 +12,17 @@ import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.global.response.PageResponse;
+import com.ssafy.backend.product.dto.response.LinkedLiveSummaryResponse;
+import com.ssafy.backend.product.entity.Brand;
+import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductDefect;
 import com.ssafy.backend.product.entity.SaleStatus;
+import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductDefectRepository;
+import com.ssafy.backend.product.port.LiveQueryPort;
+import com.ssafy.backend.product.port.SocialQueryPort;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +44,10 @@ public class ProductService {
     private final MemberRepository memberRepository;
     private final ProductImageService productImageService;
     private final CategoryRepository categoryRepository;
+    private final BrandRepository brandRepository;
     private final ProductDefectRepository productDefectRepository;
+    private final SocialQueryPort socialQueryPort;
+    private final LiveQueryPort liveQueryPort;
 
     @Transactional
     public ProductResponse createProduct(Long sellerId, ProductCreateRequest request) {
@@ -165,7 +174,33 @@ public class ProductService {
         List<String> defects = productDefectRepository.findAllByProductIdOrderBySortOrderAsc(productId).stream()
                 .map(ProductDefect::getContent)
                 .toList();
-        return ProductDetailResponse.from(product, productImageService.getImages(productId), defects);
+
+        String categoryName = product.getCategoryId() == null ? null : categoryRepository.findById(product.getCategoryId())
+                .map(Category::getName)
+                .orElse(null);
+        String brandName = product.getBrandId() == null ? null : brandRepository.findById(product.getBrandId())
+                .map(Brand::getName)
+                .orElse(null);
+
+        Long sellerId = product.getSeller().getId();
+        long sellerProductCount = productRepository.countBySeller_IdAndSaleStatusNot(sellerId, SaleStatus.DRAFT);
+        long sellerFollowerCount = socialQueryPort.countFollowers(sellerId);
+        boolean isWished = socialQueryPort.isWishedBy(productId, viewerId);
+
+        LinkedLiveSummaryResponse linkedLive = liveQueryPort.findLinkedLive(productId)
+                .map(LinkedLiveSummaryResponse::from)
+                .orElse(null);
+
+        return ProductDetailResponse.from(
+                product,
+                categoryName,
+                brandName,
+                productImageService.getImages(productId),
+                defects,
+                isWished,
+                sellerFollowerCount,
+                sellerProductCount,
+                linkedLive);
     }
 
     @Transactional

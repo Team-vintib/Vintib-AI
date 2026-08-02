@@ -2,6 +2,7 @@ package com.ssafy.backend.global.config;
 
 import com.ssafy.backend.auth.jwt.JwtAuthenticationEntryPoint;
 import com.ssafy.backend.auth.jwt.JwtAuthenticationFilter;
+import com.ssafy.backend.auth.jwt.OnboardingRequiredFilter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,6 +50,7 @@ public class SecurityConfig {
     };
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final OnboardingRequiredFilter onboardingRequiredFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
     @Value("${cors.allowed-origins}")
@@ -92,9 +94,14 @@ public class SecurityConfig {
                         // 영상 접속 토큰도 비회원 발급 대상이다. 시청이 열려 있으니 영상도 열어야 한다.
                         // 발행 권한은 토큰 안에서 갈린다 — 호스트 본인일 때만 송출이 허용된다.
                         .requestMatchers(HttpMethod.POST, "/api/lives/{liveId}/video-token").permitAll()
+                        // 팔로워/팔로잉 목록 조회(MY-006)는 공개 프로필이라 비회원도 가능.
+                        // 팔로우/해제(FOLLOW-001)는 인증 필요로 남긴다(anyRequest().authenticated()에 걸림).
+                        .requestMatchers(HttpMethod.GET, "/api/users/{userId}/followers").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/users/{userId}/followings").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(onboardingRequiredFilter, JwtAuthenticationFilter.class)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .build();
     }

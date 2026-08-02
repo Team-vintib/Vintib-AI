@@ -12,7 +12,9 @@ import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveProduct;
 import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
+import com.ssafy.backend.member.entity.Gender;
 import com.ssafy.backend.member.entity.Member;
+import com.ssafy.backend.member.entity.MemberType;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
@@ -79,11 +81,17 @@ class LiveControllerTest {
                 .build();
 
         String email = "live-host-" + UUID.randomUUID() + "@example.com";
-        hostMember = memberRepository.save(Member.builder()
+        Member member = Member.builder()
                 .email(email)
                 .password("encoded")
                 .name("호스트")
-                .build());
+                .build();
+        // SY019 게이트: 온보딩 미완료 회원은 라이브 개설 등 다른 기능을 쓸 수 없다.
+        // 닉네임은 unique 제약이 있어 매 테스트마다 겹치지 않게 만든다.
+        String nickname = "host-" + UUID.randomUUID().toString().substring(0, 8);
+        member.updateBasicInfo(nickname, "01000000000", "서울", "1층", null, Gender.MALE);
+        member.completeOnboarding(MemberType.GENERAL);
+        hostMember = memberRepository.save(member);
         hostToken = jwtTokenProvider.createAccessToken(hostMember.getId(), email);
 
         // 개설 요청에는 판매할 상품이 최소 1개 필요하다(운영 정책 — 편성은 개설 시점에 확정된다).

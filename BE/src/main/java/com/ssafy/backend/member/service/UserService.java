@@ -96,6 +96,7 @@ public class UserService {
      * @return 수정 후 회원 프로필
      * @throws CustomException USER_NOT_FOUND — 대상 회원이 없을 때
      * @throws CustomException MEMBER_FORBIDDEN — 본인 외 타인의 정보를 수정하려 할 때 (403)
+     * @throws CustomException ONBOARDING_BASIC_INFO_REQUIRED — ONBOARD-001을 아직 안 거쳐 닉네임이 없을 때
      */
     @Transactional
     public MemberProfileResponse completeOnboarding(Long requesterId, Long targetId, UpdateMemberTypeRequest request) {
@@ -105,6 +106,12 @@ public class UserService {
 
         Member member = memberRepository.findById(targetId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // 온보딩 순서 보장(SY019) — ONBOARD-001을 건너뛰고 004부터 부르면 닉네임이 null인 채로
+        // onboardingCompleted만 true가 될 수 있어, "완료된 회원은 항상 닉네임이 있다"는 게이트 전제가 깨진다.
+        if (member.getNickname() == null) {
+            throw new CustomException(ErrorCode.ONBOARDING_BASIC_INFO_REQUIRED);
+        }
 
         member.completeOnboarding(request.memberType());
 
