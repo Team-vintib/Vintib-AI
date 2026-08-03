@@ -148,7 +148,7 @@
 > 경매 조건 설정 요청 바디: `{ productId, startPrice, bidUnit, durationSeconds }` → 생성된 경매(`status: "READY"`) 반환.
 > 생성(조건 설정)과 시작(`/start`)은 별개 API로 분리한다. 경매 시작 API는 아직 미구현.
 
-## 포인트 / 출금 (Wallet)
+## 포인트 / 출금 (Point)
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |

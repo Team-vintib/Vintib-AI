@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "라이브 채팅(Chat)", description = "라이브 채팅 이력 조회 API. 실시간 송수신은 STOMP로 처리한다")
+@Tag(name = "라이브 / 채팅(Lives)", description = "라이브 채팅 이력 조회 API. 실시간 송수신은 STOMP로 처리한다")
 @Validated
 @RestController
 @RequestMapping("/api/lives/{liveId}/chat-messages")

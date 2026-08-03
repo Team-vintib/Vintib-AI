@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 // 경로는 APIs.md의 `/users/{id}/tryon`(단수) 스펙을 따른다 — 시착 "결과" 목록인
 // `/users/{userId}/tryons`(복수, TryOnController)와는 다른 리소스다.
 // 사진 업로드는 상품 이미지와 동일한 presigned 2단계(ProductImageService 참고)를 쓴다.
-@Tag(name = "AI 가상 시착 프로필", description = "온보딩·라이브 시착 패널에서 쓰는 전신 사진·신체 치수 프로필 API")
+@Tag(name = "AI 가상 시착(TryOns)", description = "온보딩·라이브 시착 패널에서 쓰는 전신 사진·신체 치수 프로필 API")
 @RestController
 @RequestMapping("/api/users/{userId}/tryon")
 @RequiredArgsConstructor
