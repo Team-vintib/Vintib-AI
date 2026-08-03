@@ -262,9 +262,38 @@ _COLOR_PROMPT_TEMPLATE_V2 = (
     "색상 코드 목록: {codes}"
 )
 
+# v2의 실측 회귀(REPORT.md §12) 진단 결과 추가 — "탁한 황갈색"이라는 KHAKI 앵커 문구가
+# 바랜/옅은 카키 원단을 GRAY로 오분류하게 만들었다(v1은 3/3 KHAKI, v2는 3/3 GRAY로 재현
+# 확인된 회귀). KHAKI vs GRAY는 v2에 없던 쌍이라 새로 추가하고, "탁하다"는 개념적 인상
+# 대신 "옅게라도 색조가 남아있는지"라는 저수준 시각 기준으로 바꿨다(카테고리 v3->v4와
+# 같은 교훈 — 개념적 형용사보다 구조적 기준이 강건하다).
+_COLOR_PROMPT_TEMPLATE_V3 = (
+    "다음은 중고 거래 플랫폼에 올라온 상품 사진이다. 아래 색상 코드 목록 중 이 상품의 주 색상과 "
+    "보조 색상을 하나씩 골라 JSON으로만 답하라. 보조 색상이 뚜렷하지 않으면 null로 두고, "
+    '여러 색이 비슷한 비중으로 섞여 있으면 "MULTI"를 골라도 된다. 다른 설명은 절대 붙이지 마라.\n'
+    "\n"
+    "헷갈리기 쉬운 색상 구분 기준(사진에 실제로 보이는 밝기·색조로만 판단):\n"
+    "- WHITE vs IVORY vs BEIGE: WHITE는 더 밝힐 수 없는 순백. IVORY는 흰색보다 살짝 "
+    "노르스름한 미색(약간 누런 흰색). BEIGE는 IVORY보다 더 진하고 갈색기가 도는 살구/모래색\n"
+    "- BLACK vs NAVY: BLACK은 푸른기 없는 순수 무채색 검정. NAVY는 검정처럼 보여도 자세히 "
+    "보면 푸른기가 도는 아주 짙은 남색\n"
+    "- GRAY vs SILVER: GRAY는 광택 없이 밝지도 어둡지도 않은 중간 회색. SILVER는 GRAY보다 "
+    "밝고 은은한 광택/금속 느낌이 있다\n"
+    "- KHAKI vs GRAY: 바래거나 옅은 카키도 자세히 보면 옅은 노란빛·갈색빛이 남아있다. 색조가 "
+    "조금이라도 보이면 KHAKI, 색조가 전혀 없이 완전히 무채색일 때만 GRAY\n"
+    "- BROWN vs KHAKI: BROWN은 채도 높은 순수 갈색. KHAKI는 갈색과 국방색이 섞인 듯한 탁한 "
+    "황갈색\n"
+    "- SKYBLUE vs BLUE vs NAVY: SKYBLUE는 연하고 밝은 하늘색. BLUE는 그보다 진하고 선명한 "
+    "파랑. NAVY는 그보다 훨씬 어두운 남색\n"
+    "\n"
+    '형식: {{"primary": "코드", "secondary": "코드 또는 null"}}\n'
+    "색상 코드 목록: {codes}"
+)
+
 COLOR_PROMPT_VERSIONS: dict[str, str] = {
     "v1": _COLOR_PROMPT_TEMPLATE,
     "v2_anchored": _COLOR_PROMPT_TEMPLATE_V2,
+    "v3_khaki_gray": _COLOR_PROMPT_TEMPLATE_V3,
 }
 # 카테고리(v4)와 달리 아직 실측 검증 전이라 기본값은 v1 그대로 둔다 — 실측 후 결정.
 ACTIVE_COLOR_PROMPT_VERSION = "v1"
