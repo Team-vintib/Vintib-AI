@@ -11,14 +11,17 @@ import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.point.dto.response.PointBalanceResponse;
 import com.ssafy.backend.point.dto.response.PointChargeReadyResponse;
 import com.ssafy.backend.point.dto.response.PointTransactionResponse;
+import com.ssafy.backend.point.dto.response.WithdrawalAccountResponse;
 import com.ssafy.backend.point.entity.PointAccount;
 import com.ssafy.backend.point.entity.PointCharge;
 import com.ssafy.backend.point.entity.PointChargeStatus;
 import com.ssafy.backend.point.entity.PointTransaction;
 import com.ssafy.backend.point.entity.PointTransactionType;
+import com.ssafy.backend.point.entity.WithdrawalAccount;
 import com.ssafy.backend.point.repository.PointAccountRepository;
 import com.ssafy.backend.point.repository.PointChargeRepository;
 import com.ssafy.backend.point.repository.PointTransactionRepository;
+import com.ssafy.backend.point.repository.WithdrawalAccountRepository;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +49,7 @@ public class PointService {
     private final PointChargeRepository pointChargeRepository;
     private final TossPaymentsClient tossPaymentsClient;
     private final TossPaymentsProperties tossPaymentsProperties;
+    private final WithdrawalAccountRepository withdrawalAccountRepository;
 
     // readOnly=true를 오버라이드한다 — 계정이 없으면 이 조회 안에서 0 잔액 행을 만들어야 하기 때문이다.
     @Transactional
@@ -168,6 +172,10 @@ public class PointService {
 
     @Transactional
     public PointBalanceResponse requestWithdrawal(Long memberId, Long amount) {
+        if (withdrawalAccountRepository.findById(memberId).isEmpty()) {
+            throw new CustomException(ErrorCode.WITHDRAWAL_ACCOUNT_REQUIRED);
+        }
+
         PointAccount account = getOrCreateAccount(memberId);
         if (account.getAvailable() < amount) {
             throw new CustomException(ErrorCode.INSUFFICIENT_POINTS);
@@ -181,6 +189,31 @@ public class PointService {
                 .balanceAfter(account.getAvailable())
                 .build());
         return PointBalanceResponse.from(account);
+    }
+
+    /** 출금 계좌 등록/수정(POINT-003) — upsert. 없으면 새로 만들고, 있으면 갱신한다. */
+    @Transactional
+    public WithdrawalAccountResponse registerWithdrawalAccount(
+            Long memberId, String bankName, String accountNumber, String accountHolderName) {
+        WithdrawalAccount account = withdrawalAccountRepository.findById(memberId).orElse(null);
+        if (account == null) {
+            account = withdrawalAccountRepository.save(WithdrawalAccount.builder()
+                    .member(getOrCreateAccount(memberId).getMember())
+                    .bankName(bankName)
+                    .accountNumber(accountNumber)
+                    .accountHolderName(accountHolderName)
+                    .build());
+        } else {
+            account.updateAccount(bankName, accountNumber, accountHolderName);
+        }
+        return WithdrawalAccountResponse.from(account);
+    }
+
+    /** 출금 계좌 조회(POINT-003). */
+    public WithdrawalAccountResponse getWithdrawalAccount(Long memberId) {
+        WithdrawalAccount account = withdrawalAccountRepository.findById(memberId)
+                .orElseThrow(() -> new CustomException(ErrorCode.WITHDRAWAL_ACCOUNT_NOT_FOUND));
+        return WithdrawalAccountResponse.from(account);
     }
 
     // 별도 회원가입 훅 대신 조회/충전/출금 시점에 없으면 0 잔액으로 만든다 — 가입 경로가

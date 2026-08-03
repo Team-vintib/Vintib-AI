@@ -56,6 +56,8 @@ public enum ErrorCode {
     PAYMENT_ALREADY_PROCESSED(HttpStatus.BAD_REQUEST, "W004", "이미 처리된 결제입니다."),
     PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "W005", "결제 금액이 준비된 금액과 일치하지 않습니다."),
     PAYMENT_CONFIRM_FAILED(HttpStatus.BAD_REQUEST, "W006", "결제 승인에 실패했습니다."),
+    WITHDRAWAL_ACCOUNT_REQUIRED(HttpStatus.BAD_REQUEST, "W007", "등록된 출금 계좌가 없습니다. 먼저 계좌를 등록해주세요."),
+    WITHDRAWAL_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "W008", "등록된 출금 계좌가 없습니다."),
     INVALID_ORDER_STATE(HttpStatus.BAD_REQUEST, "O001", "현재 상태에서는 해당 처리를 할 수 없습니다."),
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "O002", "존재하지 않는 주문입니다."),
     SELF_PURCHASE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "O003", "본인이 등록한 상품은 구매할 수 없습니다."),

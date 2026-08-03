@@ -381,6 +381,16 @@ CREATE TABLE point_charge (
 
 CREATE INDEX ix_point_charge_member ON point_charge (member_id, created_at DESC);
 
+-- 출금(현금화) 계좌 정보(POINT-003). point_account 와 같은 공유 PK 1:1 — 회원당 한 행만 존재한다.
+-- 실제 은행 송금 연동은 범위 밖이라 계좌 정보만 평문으로 남긴다(business_info 와 동일한 전제).
+CREATE TABLE withdrawal_account (
+    member_id           BIGINT      PRIMARY KEY REFERENCES member (id),
+    bank_name           VARCHAR(50) NOT NULL,
+    account_number      VARCHAR(30) NOT NULL,
+    account_holder_name VARCHAR(50) NOT NULL,
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- 입찰 보류 상태. 입찰 내역 ↔ 포인트 보류를 잇는 테이블.
 CREATE TABLE point_hold (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

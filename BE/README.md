@@ -175,7 +175,7 @@ BE/
 │   ├── point/                    # 포인트 잔액/충전/출금(MY-007), 주문 결제·정산(SALE-002/ORDER-002·003) — 서윤
 │   │   ├── controller/
 │   │   ├── service/              # PointService — pay(결제)/settleOrder(정산)/readyCharge·confirmCharge(토스 결제위젯 충전, POINT-001)
-│   │   ├── entity/               # PointAccount(공유 PK 1:1), PointTransaction(원장), PointTransactionType, PointCharge(충전 준비/승인 상태), PointChargeStatus
+│   │   ├── entity/               # PointAccount(공유 PK 1:1), PointTransaction(원장), PointTransactionType, PointCharge(충전 준비/승인 상태), PointChargeStatus, WithdrawalAccount(출금 계좌, 공유 PK 1:1, POINT-003)
 │   │   ├── repository/
 │   │   └── dto/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유

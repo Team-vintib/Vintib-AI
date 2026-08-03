@@ -3,6 +3,7 @@ package com.ssafy.backend.point.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,14 +19,17 @@ import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.point.dto.response.PointBalanceResponse;
 import com.ssafy.backend.point.dto.response.PointChargeReadyResponse;
 import com.ssafy.backend.point.dto.response.PointTransactionResponse;
+import com.ssafy.backend.point.dto.response.WithdrawalAccountResponse;
 import com.ssafy.backend.point.entity.PointAccount;
 import com.ssafy.backend.point.entity.PointCharge;
 import com.ssafy.backend.point.entity.PointChargeStatus;
 import com.ssafy.backend.point.entity.PointTransaction;
 import com.ssafy.backend.point.entity.PointTransactionType;
+import com.ssafy.backend.point.entity.WithdrawalAccount;
 import com.ssafy.backend.point.repository.PointAccountRepository;
 import com.ssafy.backend.point.repository.PointChargeRepository;
 import com.ssafy.backend.point.repository.PointTransactionRepository;
+import com.ssafy.backend.point.repository.WithdrawalAccountRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -61,6 +65,9 @@ class PointServiceTest {
     private TossPaymentsClient tossPaymentsClient;
 
     @Mock
+    private WithdrawalAccountRepository withdrawalAccountRepository;
+
+    @Mock
     private Member member;
 
     private PointService pointService;
@@ -71,7 +78,7 @@ class PointServiceTest {
                 new TossPaymentsProperties("https://api.tosspayments.com", "test_sk", "test_ck",
                         Duration.ofSeconds(1), Duration.ofSeconds(1));
         pointService = new PointService(pointAccountRepository, pointTransactionRepository, memberRepository,
-                pointChargeRepository, tossPaymentsClient, tossPaymentsProperties);
+                pointChargeRepository, tossPaymentsClient, tossPaymentsProperties, withdrawalAccountRepository);
     }
 
     private PointAccount newAccount() {
@@ -113,6 +120,8 @@ class PointServiceTest {
 
     @Test
     void 잔액이_충분하면_출금신청시_available이_줄고_withdrawing이_늘어난다() {
+        when(withdrawalAccountRepository.findById(MEMBER_ID))
+                .thenReturn(Optional.of(mock(WithdrawalAccount.class)));
         PointAccount account = newAccount();
         account.charge(100_000L);
         when(pointAccountRepository.findById(MEMBER_ID)).thenReturn(Optional.of(account));
@@ -125,6 +134,8 @@ class PointServiceTest {
 
     @Test
     void 잔액이_부족하면_출금신청시_예외를_던진다() {
+        when(withdrawalAccountRepository.findById(MEMBER_ID))
+                .thenReturn(Optional.of(mock(WithdrawalAccount.class)));
         PointAccount account = newAccount();
         account.charge(10_000L);
         when(pointAccountRepository.findById(MEMBER_ID)).thenReturn(Optional.of(account));
@@ -132,6 +143,40 @@ class PointServiceTest {
         assertThatThrownBy(() -> pointService.requestWithdrawal(MEMBER_ID, 30_000L))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INSUFFICIENT_POINTS);
+    }
+
+    @Test
+    void 계좌를_등록하면_저장된다() {
+        when(withdrawalAccountRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+        when(pointAccountRepository.findById(MEMBER_ID)).thenReturn(Optional.of(newAccount()));
+        when(withdrawalAccountRepository.save(any(WithdrawalAccount.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        WithdrawalAccountResponse response =
+                pointService.registerWithdrawalAccount(MEMBER_ID, "국민은행", "123-456-789", "홍길동");
+
+        verify(withdrawalAccountRepository).save(any(WithdrawalAccount.class));
+        assertThat(response.bankName()).isEqualTo("국민은행");
+        assertThat(response.accountNumber()).isEqualTo("123-456-789");
+        assertThat(response.accountHolderName()).isEqualTo("홍길동");
+    }
+
+    @Test
+    void 계좌가_없으면_출금신청을_거부한다() {
+        when(withdrawalAccountRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> pointService.requestWithdrawal(MEMBER_ID, 30_000L))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.WITHDRAWAL_ACCOUNT_REQUIRED);
+    }
+
+    @Test
+    void 계좌가_없으면_조회시_예외를_던진다() {
+        when(withdrawalAccountRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> pointService.getWithdrawalAccount(MEMBER_ID))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.WITHDRAWAL_ACCOUNT_NOT_FOUND);
     }
 
     @Test
