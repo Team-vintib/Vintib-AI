@@ -11,38 +11,19 @@ export interface ProductRegistrationMeasurementField {
 export const PRODUCT_REGISTRATION_STEPS: ProductRegistrationStep[] = [
   {
     id: 'photos',
-    label: '사진 등록',
-    description: '상품의 전체 모습과 상세 상태가 잘 보이는 사진을 등록해 주세요.',
-  },
-  {
-    id: 'basic',
     label: '기본 정보',
-    description: '상품명, 브랜드, 색상과 카테고리를 입력합니다.',
-  },
-  {
-    id: 'attributes',
-    label: '사이즈/소재',
-    description: '사이즈와 실측 정보를 입력합니다.',
   },
   {
     id: 'condition',
     label: '상태/하자',
-    description: '판매자 고지 정보와 AI 품질 검증 결과를 확인합니다.',
   },
   {
     id: 'pricing',
     label: '가격',
-    description: 'AI 추천가를 참고해 판매 방식과 가격을 설정합니다.',
-  },
-  {
-    id: 'review',
-    label: '검토',
-    description: '등록 전 입력한 정보를 최종 확인합니다.',
   },
   {
     id: 'complete',
     label: '완료',
-    description: '등록 결과를 확인합니다.',
   },
 ]
 

@@ -30,7 +30,6 @@ import type {
   ProductRegistrationPhotoRole,
   ProductRegistrationRecommendedPrice,
   ProductRegistrationSaleType,
-  ProductRegistrationStepId,
 } from '@/domains/product/types/productRegistration.types'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
@@ -134,10 +133,10 @@ const draft = reactive<ProductRegistrationDraft>(createInitialDraft())
 
 const currentStep = computed(() => PRODUCT_REGISTRATION_STEPS[currentStepIndex.value])
 const isFirstStep = computed(() => currentStepIndex.value === 0)
-const isReviewStep = computed(() => currentStep.value.id === 'review')
 const isCompleteStep = computed(() => currentStep.value.id === 'complete')
+const isSubmitStep = computed(() => currentStep.value.id === 'pricing')
 const nextActionLabel = computed(() =>
-  isReviewStep.value && isSubmittingRegistration.value ? '등록 중' : isReviewStep.value ? '등록 완료' : '다음',
+  isSubmitStep.value && isSubmittingRegistration.value ? '등록 중' : isSubmitStep.value ? '등록 완료' : '다음',
 )
 const frontPhotos = computed(() => draft.photos.filter((photo) => photo.role === 'front'))
 const backPhotos = computed(() => draft.photos.filter((photo) => photo.role === 'back'))
@@ -266,13 +265,6 @@ const selectedSizeLabel = computed(
     PRODUCT_REGISTRATION_SIZE_OPTIONS.find((option) => option.id === draft.size)?.label ||
     '',
 )
-const measurementReviewItems = computed(() =>
-  activeMeasurementFields.value.map((field) => ({
-    id: field.id,
-    label: field.label,
-    value: draft.measurements[field.id] ? `${draft.measurements[field.id]}cm` : '',
-  })),
-)
 const selectedConditionLabel = computed(
   () =>
     PRODUCT_REGISTRATION_CONDITION_OPTIONS.find((option) => option.id === draft.conditionGrade)?.label ||
@@ -381,9 +373,6 @@ const selectedPriceLabel = computed(() => {
 
   return ''
 })
-const selectedAuctionLiveLabel = computed(
-  () => auctionLiveOptions.find((live) => live.id === draft.linkedLiveId)?.label || '',
-)
 const maxPriceBucketCount = computed(() =>
   Math.max(...priceRecommendationBuckets.map((bucket) => bucket.productCount)),
 )
@@ -415,18 +404,17 @@ const isPricingStepValid = computed(
     (draft.saleType !== 'DIRECT' || isPositivePrice(draft.directSalePrice)) &&
     (draft.saleType !== 'AUCTION' || isPositivePrice(draft.auctionStartPrice)),
 )
+const canShowBasicInfoSection = computed(() => isPhotoStepValid.value)
+const canShowAttributesSection = computed(
+  () => isPhotoStepValid.value && isBasicStepValid.value,
+)
+const isIntroStepValid = computed(
+  () => isPhotoStepValid.value && isBasicStepValid.value && isAttributesStepValid.value,
+)
 
 const canMoveCurrentStepNext = computed(() => {
   if (currentStep.value.id === 'photos') {
-    return isPhotoStepValid.value
-  }
-
-  if (currentStep.value.id === 'basic') {
-    return isBasicStepValid.value
-  }
-
-  if (currentStep.value.id === 'attributes') {
-    return isAttributesStepValid.value
+    return isIntroStepValid.value
   }
 
   if (currentStep.value.id === 'condition') {
@@ -654,6 +642,21 @@ const editCurrentAiPhotoResult = () => {
 const markCurrentStepTouched = () => {
   if (currentStep.value.id === 'photos') {
     photoStepTouched.value = true
+
+    if (canShowBasicInfoSection.value) {
+      basicStepTouched.name = true
+      basicStepTouched.brand = true
+      basicStepTouched.color = true
+      basicStepTouched.categoryId = true
+    }
+
+    if (canShowAttributesSection.value) {
+      attributesStepTouched.size = true
+      activeMeasurementFields.value.forEach((field) => {
+        attributesStepTouched.measurements[field.id] = true
+      })
+    }
+
     return
   }
 
@@ -717,7 +720,7 @@ const moveToNextStep = async () => {
     return
   }
 
-  if (isReviewStep.value) {
+  if (isSubmitStep.value) {
     registrationSubmitError.value = ''
     isSubmittingRegistration.value = true
 
@@ -737,17 +740,6 @@ const moveToNextStep = async () => {
   }
 
   currentStepIndex.value += 1
-  scrollToPageTop()
-}
-
-const moveToStep = (stepId: ProductRegistrationStepId) => {
-  const targetStepIndex = PRODUCT_REGISTRATION_STEPS.findIndex((step) => step.id === stepId)
-
-  if (targetStepIndex < 0) {
-    return
-  }
-
-  currentStepIndex.value = targetStepIndex
   scrollToPageTop()
 }
 
@@ -843,11 +835,10 @@ onBeforeUnmount(() => {
 
       <div
         class="product-registration__body"
-        :class="{ 'product-registration__body--centered': isReviewStep || isCompleteStep }"
+        :class="{ 'product-registration__body--centered': isCompleteStep }"
       >
         <section class="product-registration__panel" :aria-labelledby="`${currentStep.id}-title`">
           <h2 :id="`${currentStep.id}-title`">{{ currentStep.label }}</h2>
-          <p>{{ currentStep.description }}</p>
 
           <div v-if="currentStep.id === 'photos'" class="product-registration__photo-step">
             <ProductPhotoUploader
@@ -902,7 +893,7 @@ onBeforeUnmount(() => {
           </div>
 
           <form
-            v-else-if="currentStep.id === 'basic'"
+            v-if="currentStep.id === 'photos' && canShowBasicInfoSection"
             class="product-registration__form"
             aria-label="상품 기본 정보 입력"
           >
@@ -953,6 +944,7 @@ onBeforeUnmount(() => {
             <div class="product-registration__form-grid">
               <label class="product-registration__field" for="product-registration-color">
                 <span>색상</span>
+                <em class="product-registration__field-hint">추후 이미지 기반 AI 자동 입력 예정</em>
                 <select
                   id="product-registration-color"
                   class="product-registration__select"
@@ -982,6 +974,7 @@ onBeforeUnmount(() => {
 
               <label class="product-registration__field" for="product-registration-category">
                 <span>카테고리</span>
+                <em class="product-registration__field-hint">추후 이미지 기반 AI 자동 입력 예정</em>
                 <select
                   id="product-registration-category"
                   class="product-registration__select"
@@ -1065,7 +1058,7 @@ onBeforeUnmount(() => {
           </form>
 
           <form
-            v-else-if="currentStep.id === 'attributes'"
+            v-if="currentStep.id === 'photos' && canShowAttributesSection"
             class="product-registration__form"
             aria-label="상품 사이즈와 소재 입력"
           >
@@ -1574,173 +1567,10 @@ onBeforeUnmount(() => {
             </section>
           </form>
 
-          <section
-            v-else-if="currentStep.id === 'review'"
-            class="product-registration__review"
-            aria-label="상품 등록 검토"
-          >
-            <article class="product-registration__review-section">
-              <div class="product-registration__review-header">
-                <h3>사진</h3>
-                <button type="button" @click="moveToStep('photos')">수정</button>
-              </div>
-              <div class="product-registration__review-hero">
-                <img
-                  v-if="representativePhoto"
-                  :src="representativePhoto.previewUrl"
-                  :alt="representativePhoto.fileName"
-                />
-              </div>
-              <div class="product-registration__review-photos" aria-label="업로드 이미지">
-                <figure
-                  v-for="photo in draft.photos"
-                  :key="photo.id"
-                  :class="{ 'product-registration__review-photo--representative': photo.isRepresentative }"
-                >
-                  <img :src="photo.previewUrl" :alt="photo.fileName" />
-                  <figcaption>
-                    {{
-                      photo.role === 'front'
-                        ? 'Front View'
-                        : photo.role === 'back'
-                          ? 'Back View'
-                          : '추가'
-                    }}
-                  </figcaption>
-                </figure>
-              </div>
-            </article>
-
-            <article class="product-registration__review-section">
-              <div class="product-registration__review-header">
-                <h3>기본 정보</h3>
-                <button type="button" @click="moveToStep('basic')">수정</button>
-              </div>
-              <dl class="product-registration__review-list">
-                <div>
-                  <dt>상품명</dt>
-                  <dd>{{ draft.name.trim() }}</dd>
-                </div>
-                <div>
-                  <dt>브랜드</dt>
-                  <dd>{{ draft.brand.trim() }}</dd>
-                </div>
-                <div>
-                  <dt>색상</dt>
-                  <dd>{{ selectedColorLabel }}</dd>
-                </div>
-                <div>
-                  <dt>카테고리</dt>
-                  <dd>{{ selectedCategoryLabel }}</dd>
-                </div>
-                <div>
-                  <dt>상품 설명</dt>
-                  <dd>{{ draft.description.trim() }}</dd>
-                </div>
-                <div>
-                  <dt>구매 시기</dt>
-                  <dd>{{ draft.purchasedAt }}</dd>
-                </div>
-                <div>
-                  <dt>구매 국가</dt>
-                  <dd>{{ draft.purchasedCountry.trim() }}</dd>
-                </div>
-              </dl>
-            </article>
-
-            <article class="product-registration__review-section">
-              <div class="product-registration__review-header">
-                <h3>사이즈/소재</h3>
-                <button type="button" @click="moveToStep('attributes')">수정</button>
-              </div>
-              <dl class="product-registration__review-list">
-                <div>
-                  <dt>사이즈</dt>
-                  <dd>{{ selectedSizeLabel }}</dd>
-                </div>
-                <div>
-                  <dt>소재</dt>
-                  <dd>{{ draft.material.trim() }}</dd>
-                </div>
-                <div
-                  v-for="item in measurementReviewItems"
-                  :key="item.id"
-                >
-                  <dt>{{ item.label }}</dt>
-                  <dd>{{ item.value }}</dd>
-                </div>
-              </dl>
-            </article>
-
-            <article class="product-registration__review-section">
-              <div class="product-registration__review-header">
-                <h3>상태/하자</h3>
-                <button type="button" @click="moveToStep('condition')">수정</button>
-              </div>
-              <dl class="product-registration__review-list">
-                <div>
-                  <dt>상태</dt>
-                  <dd>{{ selectedConditionLabel }}</dd>
-                </div>
-                <div>
-                  <dt>하자 여부</dt>
-                  <dd>{{ draft.hasDefect === true ? '하자 있음' : '하자 없음' }}</dd>
-                </div>
-                <div>
-                  <dt>하자 설명</dt>
-                  <dd>{{ draft.sellerDefectDescription.trim() }}</dd>
-                </div>
-                <div>
-                  <dt>AI 검증</dt>
-                  <dd>{{ draft.aiPhotoResults.length }}장 저장 완료</dd>
-                </div>
-              </dl>
-            </article>
-
-            <article class="product-registration__review-section">
-              <div class="product-registration__review-header">
-                <h3>가격</h3>
-                <button type="button" @click="moveToStep('pricing')">수정</button>
-              </div>
-              <dl class="product-registration__review-list">
-                <div>
-                  <dt>판매 유형</dt>
-                  <dd>{{ selectedSaleTypeLabel }}</dd>
-                </div>
-                <div>
-                  <dt>가격</dt>
-                  <dd>{{ selectedPriceLabel }}</dd>
-                </div>
-                <div v-if="draft.saleType === 'AUCTION'">
-                  <dt>경매 라이브</dt>
-                  <dd>{{ selectedAuctionLiveLabel }}</dd>
-                </div>
-              </dl>
-            </article>
-          </section>
-
-          <div v-else class="product-registration__complete" role="status">
+          <div v-if="currentStep.id === 'complete'" class="product-registration__complete" role="status">
             <span class="product-registration__complete-icon" aria-hidden="true">✓</span>
             <h3>상품 등록이 완료되었습니다.</h3>
             <p>등록한 상품을 확인하거나 이어서 새 상품을 등록할 수 있습니다.</p>
-            <dl class="product-registration__complete-summary">
-              <div>
-                <dt>등록 상품</dt>
-                <dd>{{ draft.name.trim() }}</dd>
-              </div>
-              <div>
-                <dt>브랜드</dt>
-                <dd>{{ draft.brand.trim() }}</dd>
-              </div>
-              <div>
-                <dt>판매 유형</dt>
-                <dd>{{ selectedSaleTypeLabel }}</dd>
-              </div>
-              <div>
-                <dt>가격</dt>
-                <dd>{{ selectedPriceLabel }}</dd>
-              </div>
-            </dl>
             <div class="product-registration__complete-actions">
               <button
                 class="product-registration__button product-registration__button--primary"
@@ -1795,7 +1625,7 @@ onBeforeUnmount(() => {
         </section>
 
         <aside
-          v-if="!isReviewStep && !isCompleteStep"
+          v-if="!isCompleteStep"
           class="product-registration__summary"
           aria-labelledby="registration-summary-title"
         >
@@ -1863,14 +1693,13 @@ onBeforeUnmount(() => {
   line-height: 48px;
 }
 
-.product-registration__header p,
-.product-registration__panel > p {
+.product-registration__header p {
   color: var(--color-text-secondary);
 }
 
 .product-registration__steps ol {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   list-style: none;
 }
 
@@ -2008,6 +1837,13 @@ onBeforeUnmount(() => {
   font-size: 14px;
   font-weight: var(--font-weight-bold);
   line-height: 20px;
+}
+
+.product-registration__field-hint {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 18px;
 }
 
 .product-registration__field input,
@@ -2578,115 +2414,6 @@ onBeforeUnmount(() => {
   font-weight: var(--font-weight-bold);
 }
 
-.product-registration__review {
-  display: grid;
-  gap: var(--space-4);
-  margin-top: var(--space-4);
-}
-
-.product-registration__review-section {
-  display: grid;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-secondary);
-}
-
-.product-registration__review-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.product-registration__review-header h3 {
-  color: var(--color-text-primary);
-  font-size: 18px;
-  font-weight: var(--font-weight-extrabold);
-}
-
-.product-registration__review-header button {
-  height: var(--button-height-small);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: 13px;
-  font-weight: var(--font-weight-bold);
-}
-
-.product-registration__review-hero {
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-}
-
-.product-registration__review-hero img {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-}
-
-.product-registration__review-photos {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.product-registration__review-photos figure {
-  display: grid;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-}
-
-.product-registration__review-photo--representative {
-  border-color: var(--color-live);
-}
-
-.product-registration__review-photos img {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-}
-
-.product-registration__review-photos figcaption {
-  padding: var(--space-2);
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: var(--font-weight-semibold);
-  text-align: center;
-}
-
-.product-registration__review-list {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.product-registration__review-list div {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.product-registration__review-list dt {
-  flex: 0 0 auto;
-  color: var(--color-text-muted);
-  font-size: 13px;
-}
-
-.product-registration__review-list dd {
-  min-width: 0;
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-bold);
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-
 .product-registration__complete {
   display: grid;
   justify-items: center;
@@ -2722,33 +2449,6 @@ onBeforeUnmount(() => {
   max-width: 520px;
   color: var(--color-text-secondary);
   line-height: var(--line-height-body);
-}
-
-.product-registration__complete-summary {
-  display: grid;
-  width: min(100%, 420px);
-  gap: var(--space-3);
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-}
-
-.product-registration__complete-summary div {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.product-registration__complete-summary dt {
-  color: var(--color-text-muted);
-  font-size: 13px;
-}
-
-.product-registration__complete-summary dd {
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-bold);
-  text-align: right;
 }
 
 .product-registration__complete-actions,
@@ -2859,10 +2559,6 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .product-registration__review-photos {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .product-registration__section-header,
   .product-registration__ai-card {
     flex-direction: column;
@@ -2882,15 +2578,6 @@ onBeforeUnmount(() => {
 
   .product-registration__additional-ai-panel {
     grid-template-columns: 1fr;
-  }
-
-  .product-registration__review-list div {
-    display: grid;
-    gap: var(--space-1);
-  }
-
-  .product-registration__review-list dd {
-    text-align: left;
   }
 }
 </style>

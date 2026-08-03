@@ -25,7 +25,6 @@ export type ProductRegistrationAiCheckStatus =
 export interface ProductRegistrationStep {
   id: ProductRegistrationStepId
   label: string
-  description: string
 }
 
 export interface ProductRegistrationOption {
