@@ -50,5 +50,29 @@ class LiveTest {
         assertThat(live.getThumbnailUrl()).isEqualTo(THUMBNAIL_URL);
         assertThat(live.getPeakViewerCount()).isZero();
         assertThat(live.getOpenviduRoom()).isNull();
+        assertThat(live.getCurrentProductId()).isNull();
+    }
+
+    @Test
+    void 소개_중인_상품을_바꾸고_해제할_수_있다() {
+        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
+
+        live.changeCurrentProduct(2001L);
+        assertThat(live.getCurrentProductId()).isEqualTo(2001L);
+
+        // null 은 "아무것도 소개하지 않는 상태"다 — 잡담 구간 등.
+        live.changeCurrentProduct(null);
+        assertThat(live.getCurrentProductId()).isNull();
+    }
+
+    @Test
+    void 방송이_종료되면_소개_중인_상품이_해제된다() {
+        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
+        live.changeCurrentProduct(2001L);
+
+        live.transitionTo(LiveStatus.ENDED, LocalDateTime.now());
+
+        // 끝난 방송에 NOW 배지가 남아 있으면 종료 화면·다시보기에서 그 상품만 계속 강조된다.
+        assertThat(live.getCurrentProductId()).isNull();
     }
 }

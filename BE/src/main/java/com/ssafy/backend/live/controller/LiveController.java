@@ -4,10 +4,12 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.ApiResponse;
 import com.ssafy.backend.global.response.PageResponse;
+import com.ssafy.backend.live.dto.request.LiveCurrentProductRequest;
 import com.ssafy.backend.live.dto.request.LiveInstantRequest;
 import com.ssafy.backend.live.dto.request.LiveListSort;
 import com.ssafy.backend.live.dto.request.LiveScheduleRequest;
 import com.ssafy.backend.live.dto.request.LiveStatusUpdateRequest;
+import com.ssafy.backend.live.dto.response.CurrentProductResponse;
 import com.ssafy.backend.live.dto.response.LiveDetailResponse;
 import com.ssafy.backend.live.dto.response.LiveListItemResponse;
 import com.ssafy.backend.live.dto.response.LiveResponse;
@@ -25,6 +27,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -44,6 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class LiveController {
 
     private final LiveService liveService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Operation(
             summary = "예약 라이브 개설",
@@ -134,6 +138,40 @@ public class LiveController {
     @GetMapping("/{liveId}")
     public ResponseEntity<ApiResponse<LiveDetailResponse>> getLiveDetail(@PathVariable Long liveId) {
         LiveDetailResponse response = liveService.getLiveDetail(liveId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "지금 소개 중인 상품 변경",
+            description = "라이브에서 지금 소개 중인 상품을 바꾼다(FE `NOW` 배지의 원천). **호스트만 가능하다.** "
+                    + "이 방송에 편성된 상품이어야 하며, `productId`를 `null`로 보내면 해제된다"
+                    + "(잡담 구간 등 아무 상품도 소개하지 않는 상태).\n\n"
+                    + "**상품 편성 변경과 규칙이 다르다.** 편성은 방송이 시작되면 잠기지만, 소개 상품 전환은 "
+                    + "방송 중에 하는 것이 본래 용도라 진행 중에도 허용된다. 종료·취소된 방송에서만 400이다.\n\n"
+                    + "변경은 `/topic/lives/{liveId}/product`로 모든 시청자에게 전파된다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "변경 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "종료·취소된 방송(L007)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 라이브가 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "라이브 없음(L001) 또는 이 방송에 편성되지 않은 상품(L006)")
+    })
+    @PatchMapping("/{liveId}/current-product")
+    public ResponseEntity<ApiResponse<CurrentProductResponse>> changeCurrentProduct(
+            Authentication authentication,
+            @PathVariable Long liveId,
+            @Valid @RequestBody LiveCurrentProductRequest request) {
+        Long hostId = (Long) authentication.getPrincipal();
+        CurrentProductResponse response = liveService.changeCurrentProduct(hostId, liveId, request);
+
+        // 커밋이 끝난 뒤에 나간다 — changeCurrentProduct 의 트랜잭션이 이 시점에 이미 닫혀 있다.
+        // 커밋 전에 쏘면 롤백 시 시청자 화면의 NOW 배지만 옮겨진 채 남는다(설계 판단 2).
+        messagingTemplate.convertAndSend("/topic/lives/" + liveId + "/product", response);
+
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

@@ -205,6 +205,7 @@
 | `ended_at` | `timestamptz` |  |  |  | 방송 종료 시각. |
 | `openvidu_room` | `varchar(100)` |  |  |  | OpenVidu v3 room name. WebRTC 세션·토큰 발급 시 사용. |
 | `peak_viewer_count` | `integer` | NOT NULL | `0` |  | 최고 동시 시청자 수. 통계·발표용. |
+| `current_product_id` | `bigint` |  |  | FK→product | 지금 소개 중인 상품 (LIVE-004, FE NOW 배지). 편성 상품(live_product) 중 하나여야 하며 애플리케이션이 검증한다. 방송 종료 시 NULL. 전환 이력은 남기지 않는다. |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
 

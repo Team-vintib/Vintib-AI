@@ -46,7 +46,13 @@ public record LiveListItemResponse(
                 description = "현재 동시 시청자 수. **실시간 집계 값이다.** 예약 방송은 아직 아무도 "
                         + "보고 있지 않으므로 0이며, 진행 중인데 0이면 실제로 시청자가 없는 것이다",
                 example = "128")
-        int viewerCount
+        int viewerCount,
+
+        @Schema(
+                description = "지금 소개 중인 상품 ID. 목록 카드에서 '지금 이 상품' 배지를 띄울 때 쓴다. "
+                        + "**null이면 소개 중인 상품이 없다**",
+                example = "2001")
+        Long currentProductId
 ) {
 
     public static LiveListItemResponse of(
@@ -61,6 +67,7 @@ public record LiveListItemResponse(
                 categories,
                 live.getScheduledAt(),
                 live.getStartedAt(),
-                viewerCount);
+                viewerCount,
+                live.getCurrentProductId());
     }
 }
