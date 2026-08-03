@@ -247,29 +247,6 @@ const isAttributesStepValid = computed(
       isPositiveMeasurement(draft.measurements[field.id] ?? ''),
     ),
 )
-const selectedColorLabel = computed(
-  () =>
-    draft.color === 'etc'
-      ? draft.customColor.trim()
-      : PRODUCT_REGISTRATION_COLOR_OPTIONS.find((option) => option.id === draft.color)?.label ||
-        draft.color ||
-        '',
-)
-const selectedCategoryLabel = computed(
-  () =>
-    registrationCategoryOptions.value.find((option) => option.id === draft.categoryId)?.label ||
-    '',
-)
-const selectedSizeLabel = computed(
-  () =>
-    PRODUCT_REGISTRATION_SIZE_OPTIONS.find((option) => option.id === draft.size)?.label ||
-    '',
-)
-const selectedConditionLabel = computed(
-  () =>
-    PRODUCT_REGISTRATION_CONDITION_OPTIONS.find((option) => option.id === draft.conditionGrade)?.label ||
-    '',
-)
 const requiredAiSelectablePhotos = computed(() =>
   draft.photos.filter((photo) => photo.role === 'front' || photo.role === 'back'),
 )
@@ -357,22 +334,6 @@ const updateDirectSalePrice = (event: Event) => {
 const updateAuctionStartPrice = (event: Event) => {
   draft.auctionStartPrice = getNumericInputValue(event)
 }
-const selectedSaleTypeLabel = computed(
-  () =>
-    PRODUCT_REGISTRATION_SALE_TYPE_OPTIONS.find((option) => option.id === draft.saleType)?.label ||
-    '',
-)
-const selectedPriceLabel = computed(() => {
-  if (draft.saleType === 'DIRECT' && isPositivePrice(draft.directSalePrice)) {
-    return formatPrice(Number(draft.directSalePrice.trim()))
-  }
-
-  if (draft.saleType === 'AUCTION' && isPositivePrice(draft.auctionStartPrice)) {
-    return formatPrice(Number(draft.auctionStartPrice.trim()))
-  }
-
-  return ''
-})
 const maxPriceBucketCount = computed(() =>
   Math.max(...priceRecommendationBuckets.map((bucket) => bucket.productCount)),
 )
@@ -1624,50 +1585,6 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <aside
-          v-if="!isCompleteStep"
-          class="product-registration__summary"
-          aria-labelledby="registration-summary-title"
-        >
-          <h2 id="registration-summary-title">상품 정보</h2>
-          <div class="product-registration__summary-image">
-            <img v-if="representativePhoto" :src="representativePhoto.previewUrl" :alt="representativePhoto.fileName" />
-          </div>
-          <dl>
-            <div>
-              <dt>상품명</dt>
-              <dd>{{ draft.name.trim() }}</dd>
-            </div>
-            <div>
-              <dt>브랜드</dt>
-              <dd>{{ draft.brand.trim() }}</dd>
-            </div>
-            <div>
-              <dt>색상</dt>
-              <dd>{{ selectedColorLabel }}</dd>
-            </div>
-            <div>
-              <dt>카테고리</dt>
-              <dd>{{ selectedCategoryLabel }}</dd>
-            </div>
-            <div>
-              <dt>사이즈</dt>
-              <dd>{{ selectedSizeLabel }}</dd>
-            </div>
-            <div>
-              <dt>상태</dt>
-              <dd>{{ selectedConditionLabel }}</dd>
-            </div>
-            <div>
-              <dt>판매 유형</dt>
-              <dd>{{ selectedSaleTypeLabel }}</dd>
-            </div>
-            <div>
-              <dt>가격</dt>
-              <dd>{{ selectedPriceLabel }}</dd>
-            </div>
-          </dl>
-        </aside>
       </div>
     </section>
   </DefaultLayout>
@@ -1772,7 +1689,7 @@ onBeforeUnmount(() => {
   display: grid;
   align-items: start;
   gap: var(--space-6);
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .product-registration__body--centered {
@@ -1780,8 +1697,7 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(0, 880px);
 }
 
-.product-registration__panel,
-.product-registration__summary {
+.product-registration__panel {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
@@ -1795,8 +1711,7 @@ onBeforeUnmount(() => {
   padding: var(--space-8);
 }
 
-.product-registration__panel h2,
-.product-registration__summary h2 {
+.product-registration__panel h2 {
   color: var(--color-text-primary);
   font-size: 24px;
   font-weight: var(--font-weight-extrabold);
@@ -2487,53 +2402,6 @@ onBeforeUnmount(() => {
   border-color: var(--color-border);
   background: var(--color-surface-secondary);
   color: var(--color-text-muted);
-}
-
-.product-registration__summary {
-  display: grid;
-  gap: var(--space-6);
-  padding: var(--space-6);
-}
-
-.product-registration__summary-image {
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-secondary);
-  color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: var(--font-weight-semibold);
-}
-
-.product-registration__summary-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.product-registration__summary dl {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.product-registration__summary dl div {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.product-registration__summary dt {
-  color: var(--color-text-muted);
-  font-size: 13px;
-}
-
-.product-registration__summary dd {
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-bold);
 }
 
 @media (max-width: 960px) {
