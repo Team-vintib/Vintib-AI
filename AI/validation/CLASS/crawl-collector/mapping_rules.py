@@ -11,7 +11,7 @@
 
 ## 매칭 규칙 세 가지
 
-1. **가장 긴 키워드가 이긴다.** `"후드집업"`은 `HOODIE`의 `"후드"`(2자)와 `HOODIE_ZIP_UP`의
+1. **가장 긴 키워드가 이긴다.** `"후드집업"`은 `HOODIE`의 `"후드"`(2자)와 `HOOD_ZIPUP`의
    `"후드집업"`(4자)에 동시에 걸리는데, 길이 점수로 후자가 이긴다. 규칙 나열 순서에
    의존하지 않는다 — 순서 의존은 규칙이 늘수록 조용히 깨진다.
 2. **배제어(`exclude`)가 있으면 그 규칙은 아예 후보에서 빠진다.** `"데님자켓"`이 `DENIM`으로
@@ -85,39 +85,45 @@ RULES: tuple[MappingRule, ...] = (
         "JACKET",
         "정장자켓",
         "수트자켓",
-        "패딩",
         "플리스",
         "후리스",
-        exclude=("롱패딩", "패딩조끼", "패딩베스트"),
         ambiguous=True,
-        note="브리핑 §5.4 예시. 패딩/플리스는 점퍼형(JACKET)과 롱코트형(COAT) 둘 다 흔해 "
-        "사진을 봐야 정해진다.",
+        note="브리핑 §5.4 예시. 플리스는 점퍼형(JACKET)과 롱코트형(COAT) 둘 다 흔해 "
+        "사진을 봐야 정해진다. 패딩은 taxonomy v2에서 PADDED_JACKET이 생겨 빠졌다.",
     ),
     _rule(
         "COAT",
         "코트",
         "트렌치",
-        "롱패딩",
         "더플",
         "체스터필드",
         "coat",
         "trench",
-        note="트렌치/더플은 그 자체로 코트 형태가 확정된다.",
+        note="트렌치/더플은 그 자체로 코트 형태가 확정된다. 롱패딩은 taxonomy v2부터 "
+        "PADDED_JACKET이 받는다(충전재 아우터는 기장과 무관하게 그쪽).",
     ),
     _rule("CARDIGAN", "가디건", "카디건", "cardigan"),
+    # VEST(베스트/조끼) 규칙은 2026-08-03 taxonomy v2에서 **삭제**했다 — BE 시드에 해당
+    # 소분류가 없다. 모듈 docstring 정책대로 비슷한 코드에 욱여넣지 않고 `unmapped`으로
+    # 남긴다(taxonomy 확장 논의 근거). 그래서 KNIT/JACKET의 "니트베스트"·"패딩조끼"
+    # 배제어도 그대로 둔다 — 그쪽으로 새는 것보다 unmapped이 낫다.
     _rule(
-        "VEST",
-        "베스트",
-        "조끼",
-        "패딩조끼",
-        "패딩베스트",
-        "vest",
-        exclude=("베스트상품", "베스트아이템", "베스트셀러", "위클리베스트", "월간베스트"),
-        note="쇼핑몰 네비게이션의 '베스트(인기상품)'와 의류 '베스트(조끼)'가 같은 단어라 "
-        "배제어가 필수다.",
+        "PADDED_JACKET",
+        "패딩",
+        "롱패딩",
+        "숏패딩",
+        "패딩점퍼",
+        "다운점퍼",
+        "덕다운",
+        "padding",
+        "puffer",
+        "downjacket",
+        exclude=("패딩조끼", "패딩베스트"),
+        note="taxonomy v2 신설. 예전엔 패딩이 JACKET(ambiguous)/COAT로 갈렸는데 이제 "
+        "전용 코드가 있다 — 길이 무관하게 충전재 아우터는 전부 여기로.",
     ),
     _rule(
-        "HOODIE_ZIP_UP",
+        "HOOD_ZIPUP",
         "후드집업",
         "후디집업",
         "집업후드",
@@ -129,7 +135,7 @@ RULES: tuple[MappingRule, ...] = (
     ),
     # ---------------- TOP ----------------
     _rule(
-        "T_SHIRT",
+        "TSHIRT",
         "티셔츠",
         "반팔티",
         "긴팔티",
@@ -177,6 +183,17 @@ RULES: tuple[MappingRule, ...] = (
         "sweatshirt",
         "crewneck",
     ),
+    _rule(
+        "SLEEVELESS",
+        "민소매",
+        "나시",
+        "슬리브리스",
+        "탱크탑",
+        "캡소매",
+        "sleeveless",
+        "tanktop",
+        note="taxonomy v2 신설.",
+    ),
     # ---------------- BOTTOM ----------------
     _rule(
         "DENIM",
@@ -217,7 +234,7 @@ RULES: tuple[MappingRule, ...] = (
         exclude=("치마바지",),
     ),
     _rule(
-        "SHORTS",
+        "SHORT_PANTS",
         "반바지",
         "숏팬츠",
         "쇼트팬츠",
@@ -227,6 +244,29 @@ RULES: tuple[MappingRule, ...] = (
         "카고반바지",
         "카고숏팬츠",
         "shorts",
+    ),
+    _rule(
+        "JOGGER_PANTS",
+        "조거",
+        "조거팬츠",
+        "트레이닝팬츠",
+        "트레이닝바지",
+        "스웨트팬츠",
+        "츄리닝",
+        "jogger",
+        "sweatpants",
+        "trackpants",
+        note="taxonomy v2 신설. SWEATSHIRT의 '트레이닝상의'와 문자열이 달라 충돌하지 않는다.",
+    ),
+    _rule(
+        "COTTON_PANTS",
+        "코튼팬츠",
+        "면바지",
+        "치노",
+        "치노팬츠",
+        "chino",
+        "cottonpants",
+        note="taxonomy v2 신설. 정장 원단의 주름 잡힌 바지는 SLACKS 쪽이다.",
     ),
     _rule(
         "SLACKS",
@@ -246,16 +286,55 @@ RULES: tuple[MappingRule, ...] = (
             "정장바지",
             "드레스팬츠",
             "치마바지",
+            "조거",
+            "트레이닝",
+            "스웨트팬츠",
+            "코튼팬츠",
+            "면바지",
+            "치노",
+            "멜빵바지",
         ),
         ambiguous=True,
-        note="아이템어 없이 '팬츠/바지'만 있는 카테고리. DENIM/SLACKS/CARGO_PANTS/SHORTS 중 "
-        "무엇이든 될 수 있어 사진 검수로 넘긴다(가장 흔한 SLACKS를 제안값으로만 둔다).",
+        note="아이템어 없이 '팬츠/바지'만 있는 카테고리. 하의 7종 중 무엇이든 될 수 있어 "
+        "사진 검수로 넘긴다(가장 흔한 SLACKS를 제안값으로만 둔다).",
+    ),
+    # ---------------- DRESS_JUMPSUIT (taxonomy v2 신설 대분류) ----------------
+    _rule(
+        "DRESS",
+        "원피스",
+        "드레스",
+        "onepiece",
+        "dress",
+        exclude=("드레스팬츠", "드레스슈즈"),
+        note="taxonomy v2 신설. '드레스팬츠'(SLACKS)·'드레스슈즈'(DRESS_SHOES)와 겹쳐 "
+        "배제어가 필수다.",
+    ),
+    _rule(
+        "JUMPSUIT",
+        "점프슈트",
+        "오버올",
+        "멜빵바지",
+        "살로페트",
+        "jumpsuit",
+        "overall",
+        "dungarees",
+        note="taxonomy v2 신설.",
     ),
     # ---------------- SHOES ----------------
     _rule("SNEAKERS", "스니커즈", "운동화", "sneaker", "trainers"),
     _rule("BOOTS", "부츠", "워커", "첼시부츠", "boots", "bootie"),
-    _rule("LOAFER", "로퍼", "구두", "더비슈즈", "옥스포드슈즈", "loafer"),
-    _rule("SANDALS", "샌들", "슬리퍼", "쪼리", "뮬", "sandal", "slipper", "flipflop"),
+    _rule(
+        "DRESS_SHOES",
+        "로퍼",
+        "구두",
+        "더비슈즈",
+        "옥스포드슈즈",
+        "드레스슈즈",
+        "loafer",
+        "dressshoes",
+        note="taxonomy v2에서 LOAFER -> DRESS_SHOES로 개명 — 구두 전반을 받는 코드가 됐다.",
+    ),
+    _rule("SANDALS_SLIPPERS", "샌들", "슬리퍼", "쪼리", "뮬", "sandal", "slipper", "flipflop"),
     # ---------------- BAG ----------------
     _rule("BACKPACK", "백팩", "배낭", "책가방", "backpack", "rucksack"),
     _rule("SHOULDER_BAG", "숄더백", "숄더", "shoulderbag", "hobo"),

@@ -47,10 +47,10 @@ class TestLongestKeywordWins:
     @pytest.mark.parametrize(
         "text,expected",
         [
-            ("후드집업", "HOODIE_ZIP_UP"),
-            ("후드 집업", "HOODIE_ZIP_UP"),
+            ("후드집업", "HOOD_ZIPUP"),
+            ("후드 집업", "HOOD_ZIPUP"),
             ("후드티", "HOODIE"),
-            ("티셔츠", "T_SHIRT"),
+            ("티셔츠", "TSHIRT"),
             ("셔츠", "SHIRT"),
             ("스웨트셔츠", "SWEATSHIRT"),
             ("맨투맨", "SWEATSHIRT"),
@@ -69,12 +69,14 @@ class TestExclusions:
     def test_denim_skirt_is_skirt(self):
         assert match_text("데님 스커트").subcategory_code == "SKIRT"
 
-    def test_best_seller_nav_is_not_vest(self):
-        """쇼핑몰 네비게이션의 '베스트상품'이 조끼(VEST)로 들어가면 라벨이 오염된다."""
-        assert match_text("베스트상품").subcategory_code != "VEST"
+    def test_vest_has_no_code_after_taxonomy_v2(self):
+        """BE 시드에 조끼가 없어 VEST 규칙을 지웠다(taxonomy v2, 2026-08-03).
 
-    def test_real_vest_still_maps(self):
-        assert match_text("아우터 > 베스트").subcategory_code == "VEST"
+        비슷한 코드(JACKET/KNIT)에 욱여넣지 않고 unmapped으로 남기는 게 정책이다 —
+        브리핑 §5.5. '베스트상품'(쇼핑몰 네비게이션) 오염 걱정도 자동으로 사라진다.
+        """
+        assert map_category("아우터 > 베스트").status == "unmapped"
+        assert map_category("베스트상품").status == "unmapped"
 
 
 class TestAmbiguousGoesToReview:
@@ -89,9 +91,13 @@ class TestAmbiguousGoesToReview:
         result = match_text("정장 자켓")
         assert result.status == "needs_review"
 
-    def test_knit_vest_resolves_to_vest_by_exclusion(self):
-        """'니트 베스트'는 소재(니트)가 아니라 아이템 형태(베스트)가 이겨야 한다."""
-        assert match_text("니트베스트").subcategory_code == "VEST"
+    def test_knit_vest_stays_out_of_knit(self):
+        """'니트 베스트'는 소재(니트)가 아니라 아이템 형태(베스트)가 이겨야 한다.
+
+        VEST 코드가 없어진 뒤에도 KNIT 배제어는 남겨 뒀다 — 갈 곳이 없다고 KNIT으로
+        새면 학습셋이 오염된다. unmapped이 맞다.
+        """
+        assert match_text("니트베스트").subcategory_code != "KNIT"
 
     @pytest.mark.parametrize(
         "raw", ["가방 > 숄더백/토트백", "상의 > 니트/맨투맨", "아우터 > 자켓/코트"]
@@ -111,11 +117,25 @@ class TestAmbiguousGoesToReview:
 class TestUnmappedIsPreserved:
     """우리 taxonomy에 없는 카테고리를 비슷한 코드에 욱여넣지 않는다(브리핑 §5.5)."""
 
-    @pytest.mark.parametrize("text", ["원피스", "여성 > 드레스", "잡화 > 양말", "안경"])
+    @pytest.mark.parametrize("text", ["잡화 > 양말", "안경", "아우터 > 베스트"])
     def test_out_of_taxonomy_is_unmapped(self, text):
         result = map_category(text)
         assert result.subcategory_code is None
         assert result.status == "unmapped"
+
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            ("원피스", "DRESS"),
+            ("여성 > 드레스", "DRESS"),
+            ("여성 > 점프슈트", "JUMPSUIT"),
+            ("멜빵바지", "JUMPSUIT"),
+        ],
+    )
+    def test_dress_jumpsuit_is_now_in_taxonomy(self, text, expected):
+        """taxonomy v2에서 DRESS_JUMPSUIT 대분류가 생겨 더 이상 unmapped이 아니다 —
+        이전에는 이 텍스트들이 unmapped 테스트의 파라미터였다."""
+        assert map_category(text).subcategory_code == expected
 
 
 class TestMapCategory:
@@ -163,7 +183,7 @@ class TestProductNameResolvesReview:
 
     def test_name_picks_one_of_the_merged_candidates(self):
         result = map_category(self.MERGED, product_name="오라리 스무스 소프트 후드집업 블랙")
-        assert result.subcategory_code == "HOODIE_ZIP_UP"
+        assert result.subcategory_code == "HOOD_ZIPUP"
         assert result.status == "mapped"
 
     def test_name_picks_the_other_candidate(self):
@@ -175,21 +195,35 @@ class TestProductNameResolvesReview:
         """상품명이 후보 밖(무지 티셔츠)을 가리키면 채택하지 않는다 — 후보 제한이 안전장치."""
         result = map_category(self.MERGED, product_name="베이직 무지 티셔츠")
         assert result.status == "needs_review"
-        assert result.subcategory_code in ("HOODIE", "HOODIE_ZIP_UP")
+        assert result.subcategory_code in ("HOODIE", "HOOD_ZIPUP")
 
     def test_name_with_no_keyword_leaves_review(self):
         result = map_category(self.MERGED, product_name="정품 급처 팝니다")
         assert result.status == "needs_review"
 
+    def test_padding_is_no_longer_ambiguous(self):
+        """taxonomy v2에서 PADDED_JACKET이 생겨 '패딩'이 모호하지 않게 됐다.
+
+        예전엔 JACKET(ambiguous)/COAT로 갈려 통째로 검수행이었다 — 코드 하나 늘어난 게
+        검수량을 실제로 줄인 사례라 회귀 방지로 고정해 둔다.
+        """
+        result = map_category("남성의류 > 아우터 > 패딩", product_name="겨울 패딩 급처")
+        assert result.subcategory_code == "PADDED_JACKET"
+        assert result.status == "mapped"
+
+    # 예전엔 '패딩'(JACKET/COAT 모호)이 이 두 케이스의 소재였는데 taxonomy v2에서
+    # PADDED_JACKET이 생겨 더 이상 모호하지 않다 — 하의 7종을 다 덮는 '팬츠'로 바꿨다.
+    BARE_PANTS = "남성의류 > 하의 > 팬츠"
+
     def test_ambiguous_category_specified_by_name(self):
-        """'패딩'(JACKET/COAT 모호) + '롱패딩' → COAT."""
-        result = map_category("남성의류 > 아우터 > 패딩", product_name="노스페이스 롱패딩 블랙")
-        assert result.subcategory_code == "COAT"
+        """'팬츠'(하의 7종 모호) + '청바지' → DENIM."""
+        result = map_category(self.BARE_PANTS, product_name="리바이스 청바지 501 블랙")
+        assert result.subcategory_code == "DENIM"
         assert result.status == "mapped"
 
     def test_ambiguous_name_does_not_resolve_ambiguous_category(self):
-        """모호함을 모호함으로 덮지 않는다 — 상품명도 '패딩'뿐이면 그대로 검수."""
-        result = map_category("남성의류 > 아우터 > 패딩", product_name="겨울 패딩 급처")
+        """모호함을 모호함으로 덮지 않는다 — 상품명도 '팬츠'뿐이면 그대로 검수."""
+        result = map_category(self.BARE_PANTS, product_name="블랙 팬츠 급처")
         assert result.status == "needs_review"
 
     def test_resolved_confidence_stays_below_direct_category_match(self):
@@ -200,7 +234,7 @@ class TestProductNameResolvesReview:
 
 class TestRulesCoverTaxonomy:
     def test_every_subcategory_has_a_rule(self):
-        """30종 중 하나라도 규칙이 없으면 그 코드는 영원히 수집되지 않는다."""
+        """35종 중 하나라도 규칙이 없으면 그 코드는 영원히 수집되지 않는다."""
         from mapping_rules import RULES
 
         covered = {rule.code for rule in RULES}

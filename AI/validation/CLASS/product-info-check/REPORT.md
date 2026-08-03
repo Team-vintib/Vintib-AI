@@ -706,3 +706,60 @@ BLACK 2 · GREEN 1 · GRAY 1.
   지시하고 있었다(그대로 두면 팔레트 밖 코드를 생성). 남은 13종 기준으로 다시 썼다.
 - `worker/models/product_classifier/color.py` — 프로덕션 사본 동기화.
 - `crawl-collector/labels.py`·`color_hint.py`·테스트 — 크롤러 팔레트/색상어 사전 동기화.
+
+---
+
+## 20. 카테고리 taxonomy v2 — BE 확정 시드 반영(2026-08-03)
+
+`BE/docs/db/category-taxonomy.md`(원본 `seed.sql`)가 확정돼 taxonomy를 전면 갱신했다.
+이전까지는 시드가 커밋되기 전이라 ID를 역산 공식으로 **추정**하고 있었는데, 실제 표가
+생겼으므로 추정을 버렸다.
+
+### 바뀐 것
+
+| 항목 | v1 | v2 |
+|---|---|---|
+| 소분류 | 30종 | **35종** |
+| 대분류 | 6종 | **7종**(`DRESS_JUMPSUIT` 추가, 여성·공용에만) |
+| depth2 행 | (없음) | 20행(성별 x 대분류, id 4~23) |
+| depth3 행 | 90행 가정 | **103행**(남 33 / 여 35 / 공용 35, id 24~126) |
+
+- **개명 5건**: `T_SHIRT`→`TSHIRT`, `HOODIE_ZIP_UP`→`HOOD_ZIPUP`, `SHORTS`→`SHORT_PANTS`,
+  `LOAFER`→`DRESS_SHOES`, `SANDALS`→`SANDALS_SLIPPERS`
+- **삭제**: `VEST` — 시드에 없다. 크롤러는 비슷한 코드에 욱여넣지 않고 `unmapped`으로 남긴다
+- **추가 6건**: `PADDED_JACKET`, `SLEEVELESS`, `JOGGER_PANTS`, `COTTON_PANTS`, `DRESS`,
+  `JUMPSUIT`
+
+### ID 공식 폐기 — 균등 블록 가정이 깨졌다
+
+v1은 `base_id + gender_idx * 30 + sub_idx`로 성별 블록이 균등하다고 가정했다. **남성엔
+원피스·점프슈트가 없어서 33/35/35로 다르다** — 그대로 뒀으면 여성·공용 ID가 전부 2씩
+밀린 채 조용히 틀렸을 것이다. 지금은 "성별 순 → 대분류 순 → 소분류 순" 삽입 순서를
+그대로 재현하고, 문서 표의 실제 값(JACKET 24/57/92, JUMPSUIT 91/126 등)으로 import 시점에
+assert한다. 회귀 테스트는 `test/worker/product_classifier/test_product_classifier_taxonomy.py`.
+
+### 성별 축은 유지 — AI가 판별하지 않는다
+
+문서의 "사용 방법"은 AI가 성별도 판별하라고 적었지만, 2026-08-01 확정(폼에서 사용자 선택)을
+그대로 유지하기로 했다(사용자 재확인). 근거: (a) 평면 촬영 의류는 원리적으로 남/여 구분이
+안 되는 경우가 많고(UNISEX가 존재하는 이유), (b) 정답셋에 성별 라벨이 0건이라 검증 자체가
+불가능하다. **응답 계약은 그대로다** — 소분류 35-way로 예측 → `major_of()`로 대분류 역산 →
+폼에서 받은 성별과 조합해 depth2 id를 돌려준다. BE 요청서:
+`.claude/requests/be/005-category-gender-stays-in-form.md`.
+
+### 부수 효과 — 검수량이 줄었다
+
+`PADDED_JACKET`이 생기면서 크롤러의 "패딩" 카테고리가 **모호(needs_review) → 자동 확정**으로
+바뀌었다. v1에서는 패딩이 JACKET(ambiguous)/COAT로 갈려 통째로 사람 검수행이었다. 코드 하나
+추가가 실제로 라벨링 비용을 줄인 사례라 회귀 테스트로 고정해 뒀다.
+
+### 반영 범위
+
+`product-info-check/`의 `taxonomy.py`·`vlm_control.py`(프롬프트 코드명)·
+`data/ground_truth.json`(TSHIRT 6건, HOOD_ZIPUP 1건 재라벨링), `crawl-collector/`의
+`labels.py`·`mapping_rules.py`(신설 6종 규칙 + VEST 규칙 삭제)·테스트,
+`worker/models/product_classifier/taxonomy.py`, `test/worker/`의 taxonomy 테스트.
+
+**주의**: v1로 수집한 크롤링 JSONL은 자동 변환되지 않는다(`TAXONOMY_VERSION`이
+`v2-be-seed-2026-08-03`으로 바뀌었다) — 기존 산출물이 있으면 재수집하거나 코드를 손으로
+옮겨야 한다.

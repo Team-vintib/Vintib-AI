@@ -135,9 +135,9 @@ _CATEGORY_PROMPT_TEMPLATE = (
     "목록: {labels}"
 )
 
-# v2 — 2026-08-02 추가. 실측(N=10, en_clip_style 등)에서 반복 확인된 오답 패턴(T_SHIRT↔SHIRT,
+# v2 — 2026-08-02 추가. 실측(N=10, en_clip_style 등)에서 반복 확인된 오답 패턴(TSHIRT↔SHIRT,
 # 3/10)과 taxonomy.py의 CONFUSION_PAIRS(JACKET/COAT 등)를 프롬프트에 구분 기준으로 직접
-# 명시한다. **T_SHIRT↔SHIRT는 CONFUSION_PAIRS에 없던, 이번에 새로 발견된 혼동 쌍이다** —
+# 명시한다. **TSHIRT↔SHIRT는 CONFUSION_PAIRS에 없던, 이번에 새로 발견된 혼동 쌍이다** —
 # taxonomy.py에도 추가할지 검토할 것. 위치를 안 묻는 quality_vlm 프롬프트 관례와 같은 이유로,
 # 기준은 전부 크롭 없이도 사진에서 바로 보이는 시각적 특징(카라 유무·원단 질감·끈 길이)만
 # 썼다 — "캐주얼해서/포멀해서" 같은 주관적 기준은 hallucination 위험이 있어 뺐다.
@@ -146,13 +146,13 @@ _CATEGORY_PROMPT_TEMPLATE_V2 = (
     "가까운 것을 정확히 하나만, 목록에 있는 단어 그대로 답하라. 다른 설명은 절대 붙이지 마라.\n"
     "\n"
     "헷갈리기 쉬운 항목 구분 기준:\n"
-    "- SHIRT vs T_SHIRT: 카라(옷깃)와 세로 단추가 있고 뻣뻣한 원단이면 SHIRT, "
-    "카라 없이 둥근/브이넥이고 신축성 있는 저지 원단이면 T_SHIRT\n"
+    "- SHIRT vs TSHIRT: 카라(옷깃)와 세로 단추가 있고 뻣뻣한 원단이면 SHIRT, "
+    "카라 없이 둥근/브이넥이고 신축성 있는 저지 원단이면 TSHIRT\n"
     "- JACKET vs COAT: 기장이 허벅지를 넘으면 COAT, 엉덩이 정도면 JACKET\n"
-    "- HOODIE vs HOODIE_ZIP_UP: 앞이 막혀 있어 머리로 뒤집어 입으면 HOODIE, "
-    "지퍼로 앞이 열리면 HOODIE_ZIP_UP\n"
-    "- CARDIGAN vs HOODIE_ZIP_UP: 후드가 없고 편물(니트) 질감이면 CARDIGAN, "
-    "후드가 있으면 HOODIE_ZIP_UP\n"
+    "- HOODIE vs HOOD_ZIPUP: 앞이 막혀 있어 머리로 뒤집어 입으면 HOODIE, "
+    "지퍼로 앞이 열리면 HOOD_ZIPUP\n"
+    "- CARDIGAN vs HOOD_ZIPUP: 후드가 없고 편물(니트) 질감이면 CARDIGAN, "
+    "후드가 있으면 HOOD_ZIPUP\n"
     "- KNIT vs SWEATSHIRT: 골지·케이블 같은 짜임 무늬가 보이면 KNIT, "
     "매끈한 원단에 안감이 있으면 SWEATSHIRT\n"
     "- SLACKS vs CARGO_PANTS: 옆에 플랩 달린 큰 주머니가 있으면 CARGO_PANTS, 없으면 SLACKS\n"
@@ -164,7 +164,7 @@ _CATEGORY_PROMPT_TEMPLATE_V2 = (
 
 # v3 — 2026-08-02 추가. v2를 N=10에 실측한 결과 9/10→7/10으로 **오히려 떨어졌다** — v2가
 # 새로 틀린 2건(small_pro.jpg/black_stain.png)이 전부 폴로 셔츠였다. "카라+단추=SHIRT" 규칙을
-# 모델이 문자 그대로 적용해서, 이 정답셋에서 T_SHIRT로 라벨링해 둔 폴로를 SHIRT로 판정해버린
+# 모델이 문자 그대로 적용해서, 이 정답셋에서 TSHIRT로 라벨링해 둔 폴로를 SHIRT로 판정해버린
 # 것 — 규칙 자체가 틀린 게 아니라 **폴로라는 예외를 안 적어서 생긴 문제**다(두 이미지 모두
 # `data/ground_truth.json` 라벨링 당시에도 "SHIRT와 경계 애매"로 직접 표시해 둔 케이스).
 # v2에 폴로 예외 한 줄만 추가한 버전.
@@ -173,14 +173,14 @@ _CATEGORY_PROMPT_TEMPLATE_V3 = (
     "가까운 것을 정확히 하나만, 목록에 있는 단어 그대로 답하라. 다른 설명은 절대 붙이지 마라.\n"
     "\n"
     "헷갈리기 쉬운 항목 구분 기준:\n"
-    "- SHIRT vs T_SHIRT: 카라(옷깃)와 세로 단추가 있고 뻣뻣한 원단이면 SHIRT, "
-    "카라 없이 둥근/브이넥이고 신축성 있는 저지 원단이면 T_SHIRT. "
-    "단, 카라와 단추가 있어도 니트/피케 원단의 반팔 폴로 셔츠는 T_SHIRT로 분류한다\n"
+    "- SHIRT vs TSHIRT: 카라(옷깃)와 세로 단추가 있고 뻣뻣한 원단이면 SHIRT, "
+    "카라 없이 둥근/브이넥이고 신축성 있는 저지 원단이면 TSHIRT. "
+    "단, 카라와 단추가 있어도 니트/피케 원단의 반팔 폴로 셔츠는 TSHIRT로 분류한다\n"
     "- JACKET vs COAT: 기장이 허벅지를 넘으면 COAT, 엉덩이 정도면 JACKET\n"
-    "- HOODIE vs HOODIE_ZIP_UP: 앞이 막혀 있어 머리로 뒤집어 입으면 HOODIE, "
-    "지퍼로 앞이 열리면 HOODIE_ZIP_UP\n"
-    "- CARDIGAN vs HOODIE_ZIP_UP: 후드가 없고 편물(니트) 질감이면 CARDIGAN, "
-    "후드가 있으면 HOODIE_ZIP_UP\n"
+    "- HOODIE vs HOOD_ZIPUP: 앞이 막혀 있어 머리로 뒤집어 입으면 HOODIE, "
+    "지퍼로 앞이 열리면 HOOD_ZIPUP\n"
+    "- CARDIGAN vs HOOD_ZIPUP: 후드가 없고 편물(니트) 질감이면 CARDIGAN, "
+    "후드가 있으면 HOOD_ZIPUP\n"
     "- KNIT vs SWEATSHIRT: 골지·케이블 같은 짜임 무늬가 보이면 KNIT, "
     "매끈한 원단에 안감이 있으면 SWEATSHIRT\n"
     "- SLACKS vs CARGO_PANTS: 옆에 플랩 달린 큰 주머니가 있으면 CARGO_PANTS, 없으면 SLACKS\n"
@@ -202,14 +202,14 @@ _CATEGORY_PROMPT_TEMPLATE_V4 = (
     "가까운 것을 정확히 하나만, 목록에 있는 단어 그대로 답하라. 다른 설명은 절대 붙이지 마라.\n"
     "\n"
     "헷갈리기 쉬운 항목 구분 기준:\n"
-    "- SHIRT vs T_SHIRT: 단추가 목 아래부터 밑단까지 쭉 이어지면 SHIRT. "
-    "카라가 있어도 단추가 목 부근 2~4개에서 끝나고 그 아래는 막혀 있으면(폴로 셔츠) T_SHIRT. "
-    "카라 자체가 없으면(둥근넥·브이넥) 당연히 T_SHIRT\n"
+    "- SHIRT vs TSHIRT: 단추가 목 아래부터 밑단까지 쭉 이어지면 SHIRT. "
+    "카라가 있어도 단추가 목 부근 2~4개에서 끝나고 그 아래는 막혀 있으면(폴로 셔츠) TSHIRT. "
+    "카라 자체가 없으면(둥근넥·브이넥) 당연히 TSHIRT\n"
     "- JACKET vs COAT: 기장이 허벅지를 넘으면 COAT, 엉덩이 정도면 JACKET\n"
-    "- HOODIE vs HOODIE_ZIP_UP: 앞이 막혀 있어 머리로 뒤집어 입으면 HOODIE, "
-    "지퍼로 앞이 열리면 HOODIE_ZIP_UP\n"
-    "- CARDIGAN vs HOODIE_ZIP_UP: 후드가 없고 편물(니트) 질감이면 CARDIGAN, "
-    "후드가 있으면 HOODIE_ZIP_UP\n"
+    "- HOODIE vs HOOD_ZIPUP: 앞이 막혀 있어 머리로 뒤집어 입으면 HOODIE, "
+    "지퍼로 앞이 열리면 HOOD_ZIPUP\n"
+    "- CARDIGAN vs HOOD_ZIPUP: 후드가 없고 편물(니트) 질감이면 CARDIGAN, "
+    "후드가 있으면 HOOD_ZIPUP\n"
     "- KNIT vs SWEATSHIRT: 골지·케이블 같은 짜임 무늬가 보이면 KNIT, "
     "매끈한 원단에 안감이 있으면 SWEATSHIRT\n"
     "- SLACKS vs CARGO_PANTS: 옆에 플랩 달린 큰 주머니가 있으면 CARGO_PANTS, 없으면 SLACKS\n"

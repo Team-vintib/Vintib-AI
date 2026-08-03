@@ -12,7 +12,7 @@
   },
   {
     "image_file": "black_washed.jpg",
-    "subcategory": "T_SHIRT",
+    "subcategory": "TSHIRT",
     "primary_color": "BLACK",
     "secondary_color": "RED",
     "shot_type": "flat",
@@ -45,7 +45,7 @@
   },
   {
     "image_file": "logo_test.jpg",
-    "subcategory": "T_SHIRT",
+    "subcategory": "TSHIRT",
     "primary_color": "WHITE",
     "secondary_color": null,
     "shot_type": "flat",
@@ -78,7 +78,7 @@
   },
   {
     "image_file": "small_pro.jpg",
-    "subcategory": "T_SHIRT",
+    "subcategory": "TSHIRT",
     "primary_color": "WHITE",
     "secondary_color": null,
     "shot_type": "flat",
@@ -89,7 +89,7 @@
   },
   {
     "image_file": "navy_logo.png",
-    "subcategory": "T_SHIRT",
+    "subcategory": "TSHIRT",
     "primary_color": "NAVY",
     "secondary_color": null,
     "shot_type": "flat",
@@ -100,7 +100,7 @@
   },
   {
     "image_file": "vintage_t.png",
-    "subcategory": "T_SHIRT",
+    "subcategory": "TSHIRT",
     "primary_color": "GREEN",
     "secondary_color": "BLACK",
     "shot_type": "hanging",
@@ -111,7 +111,7 @@
   },
   {
     "image_file": "black_stain.png",
-    "subcategory": "T_SHIRT",
+    "subcategory": "TSHIRT",
     "primary_color": "BLACK",
     "secondary_color": null,
     "shot_type": "flat",
@@ -166,7 +166,7 @@
   },
   {
     "image_file": "hzip.png",
-    "subcategory": "HOODIE_ZIP_UP",
+    "subcategory": "HOOD_ZIPUP",
     "primary_color": "NAVY",
     "secondary_color": "WHITE",
     "shot_type": "hanging",
