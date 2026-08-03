@@ -22,12 +22,16 @@ const emit = defineEmits<{
 }>()
 
 const formattedPrice = computed(() => {
+  if (props.product.saleType === 'AUCTION') {
+    return '경매 예정'
+  }
+
   const price = `${props.product.price.toLocaleString('ko-KR')}P`
-  return props.product.saleType === 'AUCTION' ? `시작가 ${price}` : price
+  return price
 })
 
 const saleTypeLabel = computed(() =>
-  props.product.saleType === 'AUCTION' ? '경매 판매' : '상시 판매',
+  props.product.saleType === 'AUCTION' ? '경매 예정' : '정찰제',
 )
 
 const purchaseLabel = computed(() => {
