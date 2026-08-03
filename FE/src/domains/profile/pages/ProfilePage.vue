@@ -73,8 +73,7 @@ const followState = computed(() =>
       })
     : { followerCount: 0, isFollowing: false },
 )
-const profileInitial = computed(() => profile.value?.nickname.slice(0, 1).toUpperCase() ?? 'V')
-const profileDescription = computed(() => profile.value?.description || '소개글이 없습니다.')
+const profileDescription = computed(() => profile.value?.description?.trim() ?? '')
 const productEmptyMessage = computed(() =>
   isSelfProfile.value ? '아직 등록한 상품이 없습니다.' : '판매 중인 상품이 없습니다.',
 )
@@ -352,151 +351,137 @@ watch(
       </div>
 
       <template v-else>
-        <header class="profile-hero">
-          <div class="profile-hero__cover">
-            <img v-if="profile.coverImageUrl" :src="profile.coverImageUrl" :alt="`${profile.nickname} 커버 이미지`" />
-          </div>
-
-          <div class="profile-hero__body">
-            <div class="profile-hero__avatar" aria-hidden="true">
-              <img
-                v-if="profile.profileImageUrl"
-                :src="profile.profileImageUrl"
-                :alt="`${profile.nickname} 프로필 사진`"
-              />
-              <span v-else>{{ profileInitial }}</span>
+        <header class="profile-summary">
+          <div class="profile-summary__top">
+            <div class="profile-summary__identity">
+              <h1 id="profile-title">{{ profile.nickname }}</h1>
+              <p v-if="profileDescription">{{ profileDescription }}</p>
             </div>
 
-            <div class="profile-hero__content">
-              <div class="profile-hero__title">
-                <div>
-                  <h1 id="profile-title">{{ profile.nickname }}</h1>
-                  <p>{{ profileDescription }}</p>
-                </div>
-                <FollowButton
-                  :is-following="followState.isFollowing"
-                  :is-pending="followStore.isPending(profile.id)"
-                  :is-self="isSelfProfile"
-                  @toggle="toggleProfileFollow"
-                />
-              </div>
+            <FollowButton
+              :is-following="followState.isFollowing"
+              :is-pending="followStore.isPending(profile.id)"
+              :is-self="isSelfProfile"
+              @toggle="toggleProfileFollow"
+            />
+          </div>
 
-              <p v-if="profileMessage" class="profile-hero__message" role="status">
-                {{ profileMessage }}
-              </p>
+          <p v-if="profileMessage" class="profile-summary__message" role="status">
+            {{ profileMessage }}
+          </p>
 
-              <div class="profile-stats" aria-label="프로필 통계">
-                <button type="button" @click="goToFollowList('following')">
-                  <strong>{{ profile.followingCount.toLocaleString('ko-KR') }}</strong>
-                  <span>팔로잉</span>
-                </button>
-                <button type="button" @click="goToFollowList('followers')">
-                  <strong>{{ followState.followerCount.toLocaleString('ko-KR') }}</strong>
-                  <span>팔로워</span>
-                </button>
-                <div>
-                  <strong>{{ profile.productCount.toLocaleString('ko-KR') }}</strong>
-                  <span>상품</span>
-                </div>
-              </div>
+          <div class="profile-stats" aria-label="프로필 통계">
+            <button class="profile-stats__item" type="button" @click="goToFollowList('followers')">
+              <strong>{{ followState.followerCount.toLocaleString('ko-KR') }}</strong>
+              <span>팔로워</span>
+            </button>
+            <button class="profile-stats__item" type="button" @click="goToFollowList('following')">
+              <strong>{{ profile.followingCount.toLocaleString('ko-KR') }}</strong>
+              <span>팔로잉</span>
+            </button>
+            <div class="profile-stats__item" aria-label="상품 수">
+              <strong>{{ profile.productCount.toLocaleString('ko-KR') }}</strong>
+              <span>상품</span>
             </div>
           </div>
         </header>
 
-        <div class="profile-tabs" role="tablist" aria-label="프로필 콘텐츠">
-          <button
-            type="button"
-            role="tab"
-            :aria-selected="activeTab === 'products'"
-            :class="{ 'profile-tabs__item--active': activeTab === 'products' }"
-            @click="selectTab('products')"
-          >
-            상품
-          </button>
-          <button
-            type="button"
-            role="tab"
-            :aria-selected="activeTab === 'lives'"
-            :class="{ 'profile-tabs__item--active': activeTab === 'lives' }"
-            @click="selectTab('lives')"
-          >
-            라이브
-          </button>
+        <div class="profile-content-card">
+          <div class="profile-tabs" role="tablist" aria-label="프로필 콘텐츠">
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'products'"
+              :class="{ 'profile-tabs__item--active': activeTab === 'products' }"
+              @click="selectTab('products')"
+            >
+              상품 {{ profile.productCount.toLocaleString('ko-KR') }}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'lives'"
+              :class="{ 'profile-tabs__item--active': activeTab === 'lives' }"
+              @click="selectTab('lives')"
+            >
+              라이브 {{ profile.liveCount.toLocaleString('ko-KR') }}
+            </button>
+          </div>
+
+          <section v-if="activeTab === 'products'" class="profile-section" aria-label="판매 상품">
+            <div v-if="productLoadState === 'loading'" class="profile-state" role="status">
+              상품을 불러오는 중입니다.
+            </div>
+            <div v-else-if="productLoadState === 'error'" class="profile-state" role="alert">
+              <strong>{{ productMessage }}</strong>
+              <button type="button" @click="loadProducts">다시 시도</button>
+            </div>
+            <div v-else-if="products.length" class="profile-product-grid">
+              <ProductCard
+                v-for="product in products"
+                :key="product.id"
+                :product="product"
+                :is-liked="wishStore.isProductWished(product.id, product.isLiked)"
+                @toggle-like="toggleWish"
+              />
+            </div>
+            <p v-else class="profile-empty">{{ productEmptyMessage }}</p>
+
+            <nav v-if="productTotalPages > 1" class="profile-pagination" aria-label="상품 페이지">
+              <button type="button" :disabled="productPage === 1" @click="moveProductPage(productPage - 1)">
+                이전
+              </button>
+              <button
+                v-for="page in visibleProductPages"
+                :key="page"
+                type="button"
+                :class="{ 'profile-pagination__item--active': productPage === page }"
+                @click="moveProductPage(page)"
+              >
+                {{ page }}
+              </button>
+              <button
+                type="button"
+                :disabled="productPage >= productTotalPages"
+                @click="moveProductPage(productPage + 1)"
+              >
+                다음
+              </button>
+            </nav>
+          </section>
+
+          <section v-else class="profile-section" aria-label="라이브">
+            <div v-if="liveLoadState === 'loading'" class="profile-state" role="status">
+              라이브를 불러오는 중입니다.
+            </div>
+            <div v-else-if="liveLoadState === 'error'" class="profile-state" role="alert">
+              <strong>{{ liveMessage }}</strong>
+              <button type="button" @click="loadLives">다시 시도</button>
+            </div>
+            <div v-else-if="lives.length" class="profile-live-grid">
+              <LiveListCard v-for="live in lives" :key="live.id" :live="live" />
+            </div>
+            <p v-else class="profile-empty">{{ liveEmptyMessage }}</p>
+
+            <nav v-if="liveTotalPages > 1" class="profile-pagination" aria-label="라이브 페이지">
+              <button type="button" :disabled="livePage === 1" @click="moveLivePage(livePage - 1)">
+                이전
+              </button>
+              <button
+                v-for="page in visibleLivePages"
+                :key="page"
+                type="button"
+                :class="{ 'profile-pagination__item--active': livePage === page }"
+                @click="moveLivePage(page)"
+              >
+                {{ page }}
+              </button>
+              <button type="button" :disabled="livePage >= liveTotalPages" @click="moveLivePage(livePage + 1)">
+                다음
+              </button>
+            </nav>
+          </section>
         </div>
-
-        <section v-if="activeTab === 'products'" class="profile-section" aria-label="판매 상품">
-          <div v-if="productLoadState === 'loading'" class="profile-state" role="status">
-            상품을 불러오는 중입니다.
-          </div>
-          <div v-else-if="productLoadState === 'error'" class="profile-state" role="alert">
-            <strong>{{ productMessage }}</strong>
-            <button type="button" @click="loadProducts">다시 시도</button>
-          </div>
-          <div v-else-if="products.length" class="profile-product-grid">
-            <ProductCard
-              v-for="product in products"
-              :key="product.id"
-              :product="product"
-              :is-liked="wishStore.isProductWished(product.id, product.isLiked)"
-              @toggle-like="toggleWish"
-            />
-          </div>
-          <p v-else class="profile-empty">{{ productEmptyMessage }}</p>
-
-          <nav v-if="productTotalPages > 1" class="profile-pagination" aria-label="상품 페이지">
-            <button type="button" :disabled="productPage === 1" @click="moveProductPage(productPage - 1)">
-              이전
-            </button>
-            <button
-              v-for="page in visibleProductPages"
-              :key="page"
-              type="button"
-              :class="{ 'profile-pagination__item--active': productPage === page }"
-              @click="moveProductPage(page)"
-            >
-              {{ page }}
-            </button>
-            <button
-              type="button"
-              :disabled="productPage >= productTotalPages"
-              @click="moveProductPage(productPage + 1)"
-            >
-              다음
-            </button>
-          </nav>
-        </section>
-
-        <section v-else class="profile-section" aria-label="라이브">
-          <div v-if="liveLoadState === 'loading'" class="profile-state" role="status">
-            라이브를 불러오는 중입니다.
-          </div>
-          <div v-else-if="liveLoadState === 'error'" class="profile-state" role="alert">
-            <strong>{{ liveMessage }}</strong>
-            <button type="button" @click="loadLives">다시 시도</button>
-          </div>
-          <div v-else-if="lives.length" class="profile-live-grid">
-            <LiveListCard v-for="live in lives" :key="live.id" :live="live" />
-          </div>
-          <p v-else class="profile-empty">{{ liveEmptyMessage }}</p>
-
-          <nav v-if="liveTotalPages > 1" class="profile-pagination" aria-label="라이브 페이지">
-            <button type="button" :disabled="livePage === 1" @click="moveLivePage(livePage - 1)">
-              이전
-            </button>
-            <button
-              v-for="page in visibleLivePages"
-              :key="page"
-              type="button"
-              :class="{ 'profile-pagination__item--active': livePage === page }"
-              @click="moveLivePage(page)"
-            >
-              {{ page }}
-            </button>
-            <button type="button" :disabled="livePage >= liveTotalPages" @click="moveLivePage(livePage + 1)">
-              다음
-            </button>
-          </nav>
-        </section>
       </template>
     </section>
   </DefaultLayout>
@@ -505,7 +490,7 @@ watch(
 <style scoped lang="scss">
 .profile-page {
   display: grid;
-  gap: var(--space-7);
+  gap: var(--space-5);
   width: 100%;
 }
 
@@ -540,144 +525,164 @@ watch(
   font-weight: 700;
 }
 
-.profile-hero {
-  overflow: hidden;
+.profile-summary {
+  display: grid;
+  gap: var(--space-6);
+  padding: var(--space-8);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
+  border-radius: 18px;
   background: var(--color-surface);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-text-primary) 4%, transparent);
 }
 
-.profile-hero__cover {
-  height: 180px;
-  background: linear-gradient(135deg, var(--color-primary-soft), var(--color-surface-secondary));
-}
-
-.profile-hero__cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.profile-hero__body {
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: var(--space-5);
-  padding: 0 var(--space-6) var(--space-6);
-}
-
-.profile-hero__avatar {
-  display: grid;
-  overflow: hidden;
-  place-items: center;
-  width: 120px;
-  height: 120px;
-  margin-top: -44px;
-  border: 4px solid var(--color-surface);
-  border-radius: 50%;
-  background: var(--color-surface-secondary);
-  color: var(--color-text-primary);
-  font-size: 36px;
-  font-weight: 900;
-}
-
-.profile-hero__avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.profile-hero__content {
-  min-width: 0;
-  padding-top: var(--space-5);
-}
-
-.profile-hero__title {
+.profile-summary__top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-5);
 }
 
-.profile-hero__title h1 {
-  color: var(--color-text-primary);
-  font-size: 30px;
-  font-weight: 900;
-  line-height: 38px;
+.profile-summary__top :deep(.follow-button) {
+  min-width: 120px;
+  height: 42px;
 }
 
-.profile-hero__title p,
-.profile-hero__message {
+.profile-summary__identity {
+  min-width: 0;
+}
+
+.profile-summary__identity h1 {
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 42px;
+}
+
+.profile-summary__identity p,
+.profile-summary__message {
   margin-top: var(--space-2);
   color: var(--color-text-secondary);
   font-size: 14px;
   line-height: 22px;
 }
 
-.profile-hero__message {
+.profile-summary__message {
   color: var(--color-danger);
 }
 
 .profile-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-6);
-  margin-top: var(--space-5);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-secondary);
 }
 
-.profile-stats button,
-.profile-stats div {
+.profile-stats__item {
   display: grid;
-  gap: 2px;
-  min-width: 72px;
+  place-items: center;
+  min-height: 76px;
+  gap: var(--space-1);
   padding: 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
-  color: inherit;
-  text-align: left;
-}
-
-.profile-stats button {
-  cursor: pointer;
-}
-
-.profile-stats strong {
   color: var(--color-text-primary);
-  font-size: 20px;
+  text-align: center;
+}
+
+.profile-stats__item + .profile-stats__item {
+  border-left: 1px solid var(--color-border);
+}
+
+.profile-stats button.profile-stats__item {
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.profile-stats__item strong {
+  color: var(--color-text-primary);
+  font-size: 22px;
   font-weight: 900;
   line-height: 28px;
 }
 
-.profile-stats span {
+.profile-stats__item span {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
+  font-size: 14px;
+  font-weight: 700;
   line-height: 20px;
 }
 
+.profile-stats button.profile-stats__item:hover,
+.profile-stats button.profile-stats__item:focus-visible {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.profile-stats button.profile-stats__item:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 3px;
+}
+
+.profile-content-card {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+}
+
 .profile-tabs {
-  display: flex;
-  gap: var(--space-2);
-  border-bottom: 1px solid var(--color-border);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-media);
+  background: var(--color-surface-secondary);
 }
 
 .profile-tabs button {
-  min-width: 96px;
-  height: 44px;
+  min-width: 0;
+  height: 48px;
   border: 0;
   border-bottom: 3px solid transparent;
   background: transparent;
   color: var(--color-text-secondary);
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.profile-tabs button + button {
+  border-left: 1px solid var(--color-border);
+}
+
+.profile-tabs button:hover {
+  background: var(--color-primary-soft);
 }
 
 .profile-tabs__item--active {
   border-bottom-color: var(--color-primary) !important;
+  background: var(--color-surface) !important;
   color: var(--color-text-primary) !important;
 }
 
 .profile-section {
   display: grid;
   gap: var(--space-5);
-  min-height: 360px;
+  min-height: 420px;
 }
 
 .profile-product-grid,
@@ -719,29 +724,61 @@ watch(
 }
 
 @media (max-width: 960px) {
-  .profile-product-grid,
+  .profile-product-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .profile-live-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 640px) {
-  .profile-hero__body {
-    grid-template-columns: 1fr;
+  .profile-summary {
+    gap: var(--space-5);
+    padding: var(--space-5);
+    border-radius: var(--radius-media);
   }
 
-  .profile-hero__content {
-    padding-top: 0;
-  }
-
-  .profile-hero__title {
+  .profile-summary__top {
     flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-4);
   }
 
-  .profile-product-grid,
+  .profile-summary__top :deep(.follow-button) {
+    width: 100%;
+  }
+
+  .profile-summary__identity h1 {
+    font-size: 30px;
+    line-height: 38px;
+  }
+
+  .profile-stats__item {
+    min-height: 78px;
+    border-radius: 0;
+  }
+
+  .profile-stats__item strong {
+    font-size: 20px;
+    line-height: 26px;
+  }
+
+  .profile-content-card {
+    gap: var(--space-5);
+    padding: var(--space-4);
+    border-radius: var(--radius-media);
+  }
+
+  .profile-product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
   .profile-live-grid {
     grid-template-columns: 1fr;
+    gap: var(--space-3);
   }
 }
 </style>
-

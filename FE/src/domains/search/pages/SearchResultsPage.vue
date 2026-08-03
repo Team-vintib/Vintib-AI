@@ -3,8 +3,6 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import { followUser, unfollowUser } from '@/domains/profile/api/profileApi'
-import { useFollowStore } from '@/domains/profile/stores/followStore'
 import { addWish, removeWish } from '@/domains/product/api/productApi'
 import { useWishStore } from '@/domains/product/stores/wishStore'
 import { searchUnified } from '@/domains/search/api/searchApi'
@@ -32,7 +30,6 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const wishStore = useWishStore()
-const followStore = useFollowStore()
 
 const validTabIds: SearchResultTabId[] = ['all', 'product', 'live', 'member']
 const validSortOptionIds: SearchSortOptionId[] = ['LATEST', 'PRICE_ASC', 'PRICE_DESC']
@@ -327,9 +324,7 @@ const visibleMembers = computed(() => {
     return searchResults.value.members
   }
 
-  return EMPTY_SEARCH_RESULTS.members.filter((member) =>
-    matchesKeyword([member.nickname, member.description]),
-  )
+  return EMPTY_SEARCH_RESULTS.members.filter((member) => matchesKeyword([member.nickname]))
 })
 const totalProductCount = computed(() =>
   queryKeyword.value ? searchResults.value.productTotalElements : filteredProducts.value.length,
@@ -739,12 +734,6 @@ const loadSearchResults = async () => {
 
     searchResults.value = results
     wishStore.hydrateProducts(results.products.map((product) => ({ id: product.id, isLiked: product.isLiked })))
-    results.members.forEach((member) => {
-      followStore.setFollowState(member.id, {
-        followerCount: member.followerCount,
-        isFollowing: member.isFollowing === true,
-      })
-    })
   } catch {
     if (requestId !== searchRequestId) return
 
@@ -780,62 +769,6 @@ const toggleLike = async (productId: number) => {
     wishStore.setProductWish(productId, wasLiked)
   }
 }
-
-const toggleFollow = async (memberId: number) => {
-  if (authStore.user?.id === memberId || followStore.isPending(memberId)) {
-    return
-  }
-
-  if (!(await requireAuthenticatedAction())) {
-    return
-  }
-
-  const member = searchResults.value.members.find((item) => item.id === memberId)
-  const previousState = followStore.getFollowState(memberId, {
-    followerCount: member?.followerCount ?? 0,
-    isFollowing: member?.isFollowing === true,
-  })
-  const nextIsFollowing = !previousState.isFollowing
-  const nextFollowerCount = Math.max(
-    previousState.followerCount + (nextIsFollowing ? 1 : -1),
-    0,
-  )
-
-  followStore.setPending(memberId, true)
-  followStore.setFollowState(memberId, {
-    followerCount: nextFollowerCount,
-    isFollowing: nextIsFollowing,
-  })
-
-  try {
-    if (previousState.isFollowing) {
-      await unfollowUser(memberId)
-    } else {
-      const response = await followUser(memberId)
-      followStore.setFollowState(memberId, {
-        followerCount: response.followerCount,
-        isFollowing: response.isFollowing,
-      })
-    }
-  } catch {
-    followStore.setFollowState(memberId, previousState)
-    liveMessage.value = '팔로우 상태를 변경하지 못했습니다.'
-  } finally {
-    followStore.setPending(memberId, false)
-  }
-}
-
-const getMemberFollowerCount = (member: SearchResultsViewModel['members'][number]) =>
-  followStore.getFollowState(member.id, {
-    followerCount: member.followerCount,
-    isFollowing: member.isFollowing === true,
-  }).followerCount
-
-const getMemberIsFollowing = (member: SearchResultsViewModel['members'][number]) =>
-  followStore.getFollowState(member.id, {
-    followerCount: member.followerCount,
-    isFollowing: member.isFollowing === true,
-  }).isFollowing
 
 const formatPrice = (value: number) => `${value.toLocaleString('ko-KR')}P`
 const getSaleTypeLabel = (product: SearchProductResult) =>
@@ -1181,11 +1114,7 @@ watch(
                   <SearchMemberResultCard
                     v-for="member in activeTabId === 'all' ? previewMembers : pagedMembers"
                     :key="member.id"
-                    :member="{ ...member, followerCount: getMemberFollowerCount(member) }"
-                    :is-following="getMemberIsFollowing(member)"
-                    :is-pending="followStore.isPending(member.id)"
-                    :is-self="authStore.user?.id === member.id"
-                    @toggle-follow="toggleFollow"
+                    :member="member"
                   />
                 </div>
               </section>

@@ -198,7 +198,6 @@ const toSearchMemberResult = (user: SearchUserDto): SearchMemberResult => ({
   id: user.id,
   nickname: user.nickname,
   profileImageUrl: user.profileImageUrl,
-  description: '',
   followerCount: user.followerCount,
   productCount: user.productCount,
   isFollowing: user.isFollowing,

@@ -18,7 +18,7 @@ const emit = defineEmits<{
 
 const label = computed(() => {
   if (props.isPending) {
-    return props.isFollowing ? '해제 중' : '팔로우 중'
+    return '처리 중'
   }
 
   return props.isFollowing ? '팔로잉' : '팔로우'
@@ -41,20 +41,37 @@ const label = computed(() => {
 
 <style scoped lang="scss">
 .follow-button {
-  min-width: 88px;
-  height: var(--button-height-small);
+  min-width: 108px;
+  height: 40px;
   padding: 0 var(--space-4);
   border: 1px solid var(--color-primary);
-  border-radius: var(--radius-control);
+  border-radius: 10px;
   background: var(--color-primary);
   color: var(--color-text-inverse);
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.follow-button:hover:not(:disabled) {
+  border-color: var(--color-primary-hover);
+  background: var(--color-primary-hover);
 }
 
 .follow-button--active {
+  border-color: var(--color-primary);
   background: var(--color-surface);
   color: var(--color-primary);
+}
+
+.follow-button--active:hover:not(:disabled) {
+  border-color: var(--color-primary-hover);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-hover);
 }
 
 .follow-button:disabled {
@@ -67,4 +84,3 @@ const label = computed(() => {
   outline-offset: 2px;
 }
 </style>
-

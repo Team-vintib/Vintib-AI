@@ -41,7 +41,16 @@ const kind = computed<FollowListKind>(() =>
   route.name === ROUTE_NAMES.PROFILE_FOLLOWING ? 'following' : 'followers',
 )
 const title = computed(() =>
-  profile.value ? `${profile.value.nickname}님의 ${kind.value === 'followers' ? '팔로워' : '팔로잉'}` : '',
+  profile.value ? profile.value.nickname : '',
+)
+const countLabel = computed(() =>
+  profile.value
+    ? `${kind.value === 'followers' ? '팔로워' : '팔로잉'} ${
+        kind.value === 'followers'
+          ? profile.value.followerCount.toLocaleString('ko-KR')
+          : profile.value.followingCount.toLocaleString('ko-KR')
+      }`
+    : '',
 )
 const emptyMessage = computed(() =>
   kind.value === 'followers' ? '팔로워가 없습니다.' : '팔로잉한 사용자가 없습니다.',
@@ -199,10 +208,12 @@ watch(
 <template>
   <DefaultLayout content-max-width="960px">
     <section class="follow-list-page" aria-labelledby="follow-list-title">
-      <button class="follow-list-page__back" type="button" @click="goToProfile">프로필로 돌아가기</button>
-
       <header class="follow-list-page__header">
-        <h1 id="follow-list-title">{{ title || '팔로우 목록' }}</h1>
+        <button class="follow-list-page__back" type="button" @click="goToProfile">
+          <span aria-hidden="true">←</span>
+          <span id="follow-list-title">{{ title || '프로필' }}</span>
+        </button>
+        <p>{{ countLabel || '팔로우 목록' }}</p>
       </header>
 
       <div v-if="loadState === 'loading'" class="follow-list-page__state" role="status">
@@ -254,28 +265,61 @@ watch(
 .follow-list-page {
   display: grid;
   gap: var(--space-5);
+  width: 100%;
+  max-width: 1040px;
+  margin-inline: auto;
+}
+
+.follow-list-page__header {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-8) 0 var(--space-5);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .follow-list-page__back {
+  display: inline-flex;
+  align-items: center;
   justify-self: start;
-  height: var(--button-height-small);
-  padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--color-text-primary);
-  font-weight: 700;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 38px;
+  text-align: left;
 }
 
-.follow-list-page__header h1 {
-  color: var(--color-text-primary);
-  font-size: 28px;
-  font-weight: 900;
-  line-height: 36px;
+.follow-list-page__back span:first-child {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.follow-list-page__back:hover,
+.follow-list-page__back:focus-visible {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.follow-list-page__back:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 3px;
+}
+
+.follow-list-page__header p {
+  color: var(--color-text-secondary);
+  padding-left: var(--space-8);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 24px;
 }
 
 .follow-list-page__list {
-  border-top: 1px solid var(--color-border);
+  display: grid;
+  gap: var(--space-3);
+  border-top: 0;
 }
 
 .follow-list-page__state {
@@ -322,5 +366,19 @@ watch(
   background: var(--color-primary) !important;
   color: var(--color-text-inverse) !important;
 }
-</style>
 
+@media (max-width: 640px) {
+  .follow-list-page__header {
+    padding: var(--space-6) 0 var(--space-4);
+  }
+
+  .follow-list-page__back {
+    font-size: 28px;
+    line-height: 36px;
+  }
+
+  .follow-list-page__header p {
+    padding-left: calc(var(--space-6) + var(--space-1));
+  }
+}
+</style>

@@ -38,10 +38,8 @@ export interface SearchMemberResult {
   id: number
   nickname: string
   profileImageUrl: string | null
-  description: string
   followerCount: number
   productCount: number
-  liveCount?: number
   isFollowing?: boolean | null
 }
 

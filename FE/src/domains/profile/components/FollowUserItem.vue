@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { useRouter } from 'vue-router'
 
 import FollowButton from '@/domains/profile/components/FollowButton.vue'
 import type { FollowUser } from '@/domains/profile/types/profile.types'
@@ -18,32 +17,35 @@ const emit = defineEmits<{
   toggleFollow: [userId: number]
 }>()
 
-const initial = computed(() => props.user.nickname.slice(0, 1).toUpperCase())
+const router = useRouter()
+
+const goToProfile = () => {
+  void router.push({ name: ROUTE_NAMES.PROFILE, params: { userId: props.user.id } })
+}
 </script>
 
 <template>
-  <article class="follow-user-item">
-    <RouterLink
-      class="follow-user-item__avatar"
-      :to="{ name: ROUTE_NAMES.PROFILE, params: { userId: user.id } }"
-      :aria-label="`${user.nickname} 프로필 보기`"
-    >
-      <img v-if="user.profileImageUrl" :src="user.profileImageUrl" :alt="`${user.nickname} 프로필 사진`" />
-      <span v-else>{{ initial }}</span>
-    </RouterLink>
-
-    <RouterLink
-      class="follow-user-item__body"
-      :to="{ name: ROUTE_NAMES.PROFILE, params: { userId: user.id } }"
-    >
+  <article
+    class="follow-user-item"
+    role="link"
+    tabindex="0"
+    :aria-label="`${user.nickname} 프로필 보기`"
+    @click="goToProfile"
+    @keydown.enter.prevent="goToProfile"
+    @keydown.space.prevent="goToProfile"
+  >
+    <div class="follow-user-item__body">
       <strong>{{ user.nickname }}</strong>
-      <span>팔로워 {{ followerCount.toLocaleString('ko-KR') }}명 · 상품 {{ user.productCount }}개</span>
-    </RouterLink>
+      <span>상품 {{ user.productCount.toLocaleString('ko-KR') }} · 팔로워 {{ followerCount.toLocaleString('ko-KR') }}</span>
+    </div>
+
+    <span class="follow-user-item__arrow" aria-hidden="true">›</span>
 
     <FollowButton
       :is-following="isFollowing"
       :is-pending="isPending"
       :is-self="isSelf"
+      @click.stop
       @toggle="emit('toggleFollow', user.id)"
     />
   </article>
@@ -52,30 +54,29 @@ const initial = computed(() => props.user.nickname.slice(0, 1).toUpperCase())
 <style scoped lang="scss">
 .follow-user-item {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) 0;
-  border-bottom: 1px solid var(--color-border);
+  min-height: 84px;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
-.follow-user-item__avatar {
-  display: grid;
-  overflow: hidden;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--color-surface-secondary);
-  color: var(--color-text-primary);
-  font-weight: 800;
-  text-decoration: none;
+.follow-user-item:hover,
+.follow-user-item:focus-visible {
+  border-color: var(--color-border-strong);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-text-primary) 5%, transparent);
 }
 
-.follow-user-item__avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.follow-user-item:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 3px;
 }
 
 .follow-user-item__body {
@@ -86,33 +87,41 @@ const initial = computed(() => props.user.nickname.slice(0, 1).toUpperCase())
   text-decoration: none;
 }
 
+.follow-user-item:hover .follow-user-item__body strong,
+.follow-user-item:focus-visible .follow-user-item__body strong {
+  color: var(--color-primary);
+}
+
 .follow-user-item__body strong {
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 18px;
+  line-height: 26px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .follow-user-item__body span {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
-  line-height: 20px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.follow-user-item__arrow {
+  color: var(--color-text-muted);
+  font-size: 20px;
+  line-height: 1;
 }
 
 @media (max-width: 520px) {
   .follow-user-item {
-    grid-template-columns: 48px minmax(0, 1fr);
-  }
-
-  .follow-user-item__avatar {
-    width: 48px;
-    height: 48px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-3);
+    padding: var(--space-4);
   }
 
   .follow-user-item .follow-button {
-    grid-column: 2;
+    grid-column: 1 / -1;
     justify-self: start;
   }
 }
