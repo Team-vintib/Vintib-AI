@@ -1,4 +1,4 @@
-"""V3 — 색상 추출 백엔드 4종 비교.
+"""V3 — 색상 추출 백엔드 비교.
 
   (a) kmeans_palette  — 경량 마스크(중앙 크롭+배경색 추정+saturation 필터) + k-means(k=3)
                         + 팔레트 스냅  [설계안, CH012 §6.2 그대로]
@@ -13,6 +13,11 @@
                         1·2번). `EN_COLOR_SYNONYMS`/`_COLOR_ENSEMBLE_TEMPLATES` 참고.
                         **실측 결과 (d)보다 나쁘다(N=10: 0.20 -> 0.10, `REPORT.md` §11)** —
                         코드는 회귀 사례 재현용으로 남겨뒀을 뿐 권장 백엔드가 아니다.
+  (f) *_wb/*_debias/*_wb_debias(예: clip_vit_b32_wb_debias) — (d)에 화이트밸런스
+                        전처리(`gray_world_white_balance`)와 content-free 편향 보정
+                        (`use_debias`, 혼동행렬로 확인된 GRAY/NAVY/SILVER 쏠림 상쇄)을
+                        각각/함께 적용. **실측상 가장 좋은 CLIP 조합**(N=10: 0.20 ->
+                        0.50, `REPORT.md` §17) — 그래도 VLM(0.90)에는 못 미친다.
 
 설계: `.claude/plans/ai/CH012-~2.MD`(파일명이 이렇게 커밋돼 있다 — 원래 의도한 이름은
 `CH012-product-info-classify.md`로 보인다, 정리 필요).
@@ -412,16 +417,39 @@ class ClipZeroShotColorExtractor(ColorExtractor):
     `use_ensemble=True`면 단일 문구 대신 `_COLOR_ENSEMBLE_TEMPLATES` x `EN_COLOR_SYNONYMS`
     조합을 전부 평균해 스코어링한다(색상 개선안 1·2번, `score_label_groups` 위임).
     **실측 결과 회귀했다(N=10: 0.20 -> 0.10, `REPORT.md` §11)** — 권장하지 않는다,
-    재현/참고용으로만 남겨둠."""
+    재현/참고용으로만 남겨둠.
+
+    `use_white_balance=True`면 `gray_world_white_balance()`로 입력을 먼저 보정한다(VLM
+    색상에 크게 도움됐던 전처리, `REPORT.md` §13). CLIP은 개선폭이 작지만(§13: 0.20->0.30)
+    무해하고 카테고리에 부작용도 없었던 전처리라 옵션으로 노출해둔다.
+
+    `use_debias=True`면 content-free 보정(Zhao et al. 2021, "Calibrate Before Use")을
+    적용한다 — 실측 혼동행렬(`REPORT.md` §17)이 GRAY/NAVY/SILVER 같은 특정 라벨로 쏠리는
+    "끌개" 현상을 보여줬는데, 이 라벨들은 실제 이미지 내용과 무관하게 CLIP 텍스트 임베딩
+    자체가 이미지와 잘 맞는(사전 확률이 높은) 라벨일 수 있다. 무채색 중립 이미지로 각
+    라벨의 사전 확률을 구해두고, 실제 이미지 점수를 그 사전 확률로 나눠 편향을 상쇄한다.
+    앙상블(`use_ensemble`)과는 동시에 못 쓴다(단순화, 앙상블은 이미 폐기된 방향)."""
 
     # 2등 후보가 이 정도 확률 이상이어야 보조색상으로 인정한다 — 안 그러면 항상 2등 답까지
     # 억지로 보조색상으로 채워서 정확도를 스스로 깎아먹는다.
     SECONDARY_MIN_SCORE = 0.15
 
-    def __init__(self, model_id: str, name: str = "clip_zeroshot", use_ensemble: bool = False):
+    def __init__(
+        self,
+        model_id: str,
+        name: str = "clip_zeroshot",
+        use_ensemble: bool = False,
+        use_white_balance: bool = False,
+        use_debias: bool = False,
+    ):
+        if use_ensemble and use_debias:
+            raise ValueError("use_ensemble과 use_debias는 동시에 쓸 수 없다")
         self._model_id = model_id
         self.name = name
         self._use_ensemble = use_ensemble
+        self._use_white_balance = use_white_balance
+        self._use_debias = use_debias
+        self._debias_prior: list[float] | None = None
         self._backend = None
 
     def _get_backend(self) -> "EmbeddingZeroShotClassifier":  # noqa: F821 — 지연 import
@@ -433,6 +461,7 @@ class ClipZeroShotColorExtractor(ColorExtractor):
 
     def extract(self, image_path: Path) -> ColorResult:
         codes = list(PALETTE) + [MULTI_LABEL]
+        query_path = self._maybe_white_balance(image_path)
         if self._use_ensemble:
             groups = [
                 [
@@ -442,10 +471,14 @@ class ClipZeroShotColorExtractor(ColorExtractor):
                 ]
                 for code in codes
             ]
-            scores = self._get_backend().score_label_groups(image_path, groups)
+            scores = self._get_backend().score_label_groups(query_path, groups)
         else:
             texts = [f"a photo of {EN_COLOR_LABELS[code]} clothing" for code in codes]
-            scores = self._get_backend().score_labels(image_path, texts)
+            scores = self._get_backend().score_labels(query_path, texts)
+            if self._use_debias:
+                if self._debias_prior is None:
+                    self._debias_prior = self._compute_debias_prior(texts)
+                scores = [s / max(prior, 1e-6) for s, prior in zip(scores, self._debias_prior)]
 
         order = sorted(range(len(codes)), key=lambda i: -scores[i])
         primary_code = codes[order[0]]
@@ -467,6 +500,36 @@ class ClipZeroShotColorExtractor(ColorExtractor):
             },
         )
 
+    def _maybe_white_balance(self, image_path: Path) -> Path:
+        """`use_white_balance=True`면 보정본을 임시 파일로 저장해 그 경로를 반환한다.
+        `classify.EmbeddingZeroShotClassifier.score_labels()`가 경로만 받기 때문에(PIL
+        Image 객체를 직접 못 받음) 임시 파일을 거친다 — 검증 스파이크 범위에서는 이 정도
+        오버헤드가 새 클래스를 만드는 것보다 낫다."""
+        if not self._use_white_balance:
+            return image_path
+        import tempfile
+
+        from PIL import Image
+
+        with Image.open(image_path) as img:
+            corrected = gray_world_white_balance(img.convert("RGB"))
+        tmp_path = Path(tempfile.mkdtemp(prefix="clip_color_wb_")) / Path(image_path).name
+        corrected.save(tmp_path)
+        return tmp_path
+
+    def _compute_debias_prior(self, texts: list[str]) -> list[float]:
+        """content-free 보정의 사전 확률 — 무채색 중립(RGB 128,128,128) 이미지로 같은
+        라벨 문구를 질의해 "이미지 내용과 무관한" 라벨별 기본 점수를 구한다. 프로세스당
+        한 번만 계산해 재사용한다(`self._debias_prior` 캐시)."""
+        import tempfile
+
+        from PIL import Image
+
+        neutral = Image.new("RGB", (224, 224), (128, 128, 128))
+        tmp_path = Path(tempfile.mkdtemp(prefix="clip_color_calib_")) / "neutral.png"
+        neutral.save(tmp_path)
+        return self._get_backend().score_labels(tmp_path, texts)
+
 
 COLOR_BACKENDS: dict[str, "callable[[], ColorExtractor]"] = {
     "mock": MockColorExtractor,
@@ -483,15 +546,39 @@ COLOR_BACKENDS: dict[str, "callable[[], ColorExtractor]"] = {
     "clip_vit_b32_ensemble": lambda: _make_clip_color("clip_vit_b32", ensemble=True),
     "clip_vit_l14_ensemble": lambda: _make_clip_color("clip_vit_l14", ensemble=True),
     "siglip_so400m_ensemble": lambda: _make_clip_color("siglip_so400m", ensemble=True),
+    # 화이트밸런스 전처리(2026-08-03 추가) — VLM 색상엔 크게 도움됐던 전처리를 CLIP에도
+    # 적용해본 버전. REPORT.md §17 참고(0.20 -> 0.30).
+    "clip_vit_b32_wb": lambda: _make_clip_color("clip_vit_b32", white_balance=True),
+    "clip_vit_l14_wb": lambda: _make_clip_color("clip_vit_l14", white_balance=True),
+    "siglip_so400m_wb": lambda: _make_clip_color("siglip_so400m", white_balance=True),
+    # content-free 편향 보정(2026-08-03 추가) — 혼동행렬(REPORT.md §17)에서 확인된
+    # GRAY/NAVY/SILVER 쏠림을 상쇄해본다. 화이트밸런스와 결합한 버전도 같이 등록.
+    "clip_vit_b32_debias": lambda: _make_clip_color("clip_vit_b32", debias=True),
+    "clip_vit_b32_wb_debias": lambda: _make_clip_color(
+        "clip_vit_b32", white_balance=True, debias=True
+    ),
 }
 ACTIVE_COLOR_BACKEND = os.environ.get("PRODUCT_INFO_COLOR_BACKEND", "mock")
 
 
-def _make_clip_color(model_key: str, ensemble: bool = False) -> ClipZeroShotColorExtractor:
+def _make_clip_color(
+    model_key: str,
+    ensemble: bool = False,
+    white_balance: bool = False,
+    debias: bool = False,
+) -> ClipZeroShotColorExtractor:
     from classify import CATEGORY_MODELS  # 지연 import — 무거운 의존성 체인 회피
 
-    name = f"{model_key}_ensemble" if ensemble else model_key
-    return ClipZeroShotColorExtractor(CATEGORY_MODELS[model_key], name=name, use_ensemble=ensemble)
+    suffix = "_ensemble" if ensemble else ""
+    suffix += "_wb" if white_balance else ""
+    suffix += "_debias" if debias else ""
+    return ClipZeroShotColorExtractor(
+        CATEGORY_MODELS[model_key],
+        name=f"{model_key}{suffix}",
+        use_ensemble=ensemble,
+        use_white_balance=white_balance,
+        use_debias=debias,
+    )
 
 
 def get_color_extractor(name: str | None = None) -> ColorExtractor:
