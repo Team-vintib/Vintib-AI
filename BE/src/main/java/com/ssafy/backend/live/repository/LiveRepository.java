@@ -2,7 +2,9 @@ package com.ssafy.backend.live.repository;
 
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveStatus;
+import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -46,6 +48,23 @@ public interface LiveRepository extends JpaRepository<Live, Long> {
 
     /** 공개 프로필(011 §3.3) — 공개 상태(예정/진행 중)의 방송 수. */
     long countByHost_IdAndStatusIn(Long hostId, Collection<LiveStatus> statuses);
+
+    /**
+     * 홈 "지금 라이브" 섹션(HOME-001) — 진행 중인 방송을 최근 시작순으로.
+     *
+     * <p><b>상태를 인자로 받지 않고 조건을 이름에 박은 이유.</b> 홈은 종료된 방송을 절대 보이면
+     * 안 된다 — 실제로 그 버그가 있었다(FE 요청 004 §3.3). 호출부가 상태를 넘기게 두면 다시
+     * 틀릴 수 있어, 여기서 {@code LIVE} 하나로 고정한다.
+     */
+    List<Live> findByStatusOrderByStartedAtDesc(LiveStatus status, Pageable pageable);
+
+    /** 홈 "예정 라이브" 섹션(HOME-001) — 가장 임박한 순. 지난 예정은 호출부가 잘라 낸다. */
+    List<Live> findByStatusAndScheduledAtAfterOrderByScheduledAtAsc(
+            LiveStatus status, LocalDateTime from, Pageable pageable);
+
+    /** 팔로잉 홈(HOME-002) — 팔로우한 판매자들의 진행 중·예정 방송. */
+    List<Live> findByHost_IdInAndStatusInOrderByCreatedAtDesc(
+            Collection<Long> hostIds, Collection<LiveStatus> statuses, Pageable pageable);
 
     /**
      * 최고 시청자 수를 끌어올린다. 지금 값보다 크지 않으면 아무 행도 바뀌지 않는다.

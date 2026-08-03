@@ -96,6 +96,19 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 경매 동시성 정책(`LIVE-004`, `AUCT-004/006/008/009`)은 애플리케이션 검증뿐 아니라 **DB 제약으로도 막혀 있다.** 입찰 로직을 손볼 때는 [`erd.md` §4](./docs/db/erd.md)를 먼저 읽을 것 — 특히 포인트 보류 해제 순서를 잘못 잡으면 제약이 무력화된다.
 
+### 시각 표현 규약 (KST 벽시계)
+
+> [!IMPORTANT]
+> **API의 모든 시각 필드는 오프셋 없는 KST 벽시계다.** (`2026-08-03T21:30:00` — `Z`도 `+09:00`도 붙지 않는다.)
+
+엔티티가 `LocalDateTime`(존 없음), DB 컬럼이 `TIMESTAMPTZ`라 **서버 타임존이 곧 API 계약**이다. 그래서 백엔드 컨테이너의 타임존을 `Asia/Seoul`로 못박아 뒀다 — `docker-compose.yml`의 `TZ`와 `BE/Dockerfile`의 `-Duser.timezone` 두 곳이다.
+
+여기가 UTC로 돌아가면 **모든 시각이 9시간 어긋난다.** 브라우저가 오프셋 없는 문자열을 자기 로컬(KST)로 읽기 때문이다. 실제로 방송 시작 시각이 9시간 전으로 표시되고 경과 방송 시간이 9시간부터 시작하는 버그가 있었다. `@Future` 같은 검증도 같은 축이라, 서버가 UTC면 "KST 기준 과거 9시간 이내" 예약이 통과한다.
+
+- 로컬 개발(Windows/macOS)은 JVM 기본 타임존이 이미 KST라 재현되지 않는다 — **컨테이너에서만 드러난다.**
+- 배포 후 확인: `docker exec vintib-backend date`가 KST인지, 즉시 개설한 라이브의 `startedAt`이 현재 시각과 맞는지.
+- 오프셋을 실어 보내는 방식(`OffsetDateTime`)으로 바꾸려면 BE 전 도메인 DTO와 FE 파싱을 함께 바꿔야 한다. 지금은 위 규약을 지키는 쪽으로 통일한다.
+
 **`live` 테이블에는 카테고리 컬럼이 없다.** 라이브의 카테고리는 편성 상품(`live_product` → `product.category_id`)에서 유도해 대분류로 롤업한다. 같은 사실을 두 군데 저장하면 반드시 어긋나기 때문이다. 그 결과 **라이브 하나가 카테고리를 여러 개 가질 수 있고**(응답이 `categories[]`, 필터가 `categoryIds` 복수인 이유), 편성이 확정되는 시점 = 카테고리가 확정되는 시점이다. 그래서 개설 요청에 `productIds`가 필수이고 방송 시작 후에는 편성을 바꿀 수 없다.
 
 ## 디렉터리 구조
@@ -122,14 +135,20 @@ BE/
 │   │   └── dto/
 │   ├── home/                    # 홈/팔로잉 콘텐츠 조회 (HOME) — 정윤
 │   │   ├── controller/
-│   │   ├── service/              # FollowingService: followedSellers·products는 실데이터(SY024), lives는 아직 Mock 제거 후 빈 배열
-│   │   └── dto/response/        # 카드 DTO(HOME-001 소유, HOME-002 재사용). HOME-001 라이브·상시판매 섹션은 여전히 Mock
-│   ├── live/                    # 라이브 방 개설/조회/상태 전이, 시청자 수, 반응 (LIVE) — 정윤
-│   │   ├── controller/          # LiveController, LiveProductController, LiveReactionStompController(STOMP)
-│   │   ├── service/             # LiveService, LiveProductService, LiveViewerService, LiveReactionService
-│   │   ├── entity/              # Live, LiveStatus, LiveProduct, ReactionType(저장 안 함)
+│   │   ├── service/             # HomeService·FollowingService(전 섹션 실데이터), LiveCardAssembler·ProductCardAssembler(카드 조립 공유)
+│   │   ├── repository/          # HomeProductQueryRepository — 홈 전용 읽기 전용 상품 질의
+│   │   └── dto/response/        # 카드 DTO(HOME-001 소유. HOME-002·SEARCH가 재사용)
+│   ├── search/                  # 상품·라이브·회원 통합 검색 (SEARCH) — 정윤
+│   │   ├── controller/
+│   │   ├── service/             # 카드 조립은 home의 Assembler를 재사용한다
+│   │   ├── repository/          # SearchQueryRepository — 세 도메인 읽기 전용 질의
+│   │   └── dto/
+│   ├── live/                    # 라이브 방 개설/조회/상태 전이, 시청자 수, 반응, 시작 알림 (LIVE) — 정윤
+│   │   ├── controller/          # LiveController, LiveProductController, LiveReminderController, LiveReactionStompController(STOMP)
+│   │   ├── service/             # LiveService, LiveProductService, LiveViewerService, LiveReactionService, LiveReminderService/Scheduler
+│   │   ├── entity/              # Live, LiveStatus, LiveProduct, LiveReminder, ReactionType(저장 안 함)
 │   │   ├── repository/
-│   │   ├── port/                # ProductQueryPort — 상품 도메인 참조를 한 곳으로 격리
+│   │   ├── port/                # ProductQueryPort·NotificationCommandPort — 타 도메인 참조를 한 곳으로 격리
 │   │   ├── websocket/           # LiveSessionEventListener — SUBSCRIBE/DISCONNECT를 시청자 수로
 │   │   └── dto/
 │   ├── chat/                    # 라이브 실시간 채팅 (CHAT) — 정윤

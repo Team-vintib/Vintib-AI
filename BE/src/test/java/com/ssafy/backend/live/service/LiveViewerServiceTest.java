@@ -48,7 +48,7 @@ class LiveViewerServiceTest {
                 .password("encoded")
                 .name("호스트")
                 .build());
-        liveId = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, LocalDateTime.now())).getId();
+        liveId = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, null, LocalDateTime.now())).getId();
 
         // 테스트마다 같은 sessionId 문자열을 재사용한다. 앞선 테스트가 남긴 세션 매핑이 있으면
         // 엉뚱한 방송에서 시청자를 빼게 되므로 시청자·세션 키를 모두 비우고 시작한다.
@@ -115,7 +115,7 @@ class LiveViewerServiceTest {
     @Test
     void 연결이_끊기면_구독하던_모든_방송에서_빠진다() {
         Long otherLiveId = liveRepository.save(
-                        Live.openNow(host, "다른 방송", null, LocalDateTime.now()))
+                        Live.openNow(host, "다른 방송", null, null, LocalDateTime.now()))
                 .getId();
 
         liveViewerService.enter("session-a", "sub-0", liveId);

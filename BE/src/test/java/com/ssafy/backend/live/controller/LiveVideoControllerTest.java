@@ -86,7 +86,7 @@ class LiveVideoControllerTest {
 
     /** room 이 배정된 진행 중 방송. 실제 개설 경로와 같은 방식으로 이름을 넣는다. */
     private Long 진행_중인_방송() {
-        Live live = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, LocalDateTime.now()));
+        Live live = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, null, LocalDateTime.now()));
         live.assignOpenviduRoom(LiveVideoService.newRoomName(live.getId()));
         return liveRepository.save(live).getId();
     }
@@ -124,7 +124,7 @@ class LiveVideoControllerTest {
     @Test
     void 아직_시작되지_않은_방송에는_토큰을_발급하지_않는다() throws Exception {
         Long scheduled = liveRepository.save(
-                        Live.schedule(host, "예약 방송", null, LocalDateTime.now().plusDays(1)))
+                        Live.schedule(host, "예약 방송", null, null, LocalDateTime.now().plusDays(1)))
                 .getId();
 
         // 예정 방송은 room 자체가 없다.

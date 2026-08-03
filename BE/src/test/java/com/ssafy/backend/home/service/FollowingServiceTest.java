@@ -21,6 +21,7 @@ import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductImageRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
+import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.social.entity.Follow;
 import com.ssafy.backend.social.repository.FollowRepository;
 import java.util.List;
@@ -62,6 +63,12 @@ class FollowingServiceTest {
     private S3StorageService s3StorageService;
 
     @Mock
+    private LiveRepository liveRepository;
+
+    @Mock
+    private LiveCardAssembler liveCardAssembler;
+
+    @Mock
     private Member seller;
 
     private FollowingService followingService;
@@ -81,7 +88,9 @@ class FollowingServiceTest {
                 brandRepository,
                 socialQueryPort,
                 s3StorageService,
-                awsProperties);
+                awsProperties,
+                liveRepository,
+                liveCardAssembler);
     }
 
     @Test

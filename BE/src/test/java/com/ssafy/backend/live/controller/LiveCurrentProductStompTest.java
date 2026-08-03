@@ -107,7 +107,7 @@ class LiveCurrentProductStompTest {
                         .build())
                 .getId();
 
-        Live live = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, LocalDateTime.now()));
+        Live live = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, null, LocalDateTime.now()));
         liveProductRepository.save(LiveProduct.link(live, productId, (short) 0, LocalDateTime.now()));
         liveId = live.getId();
     }

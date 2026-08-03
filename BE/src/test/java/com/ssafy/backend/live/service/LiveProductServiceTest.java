@@ -60,7 +60,7 @@ class LiveProductServiceTest {
 
     private Live 예약된_라이브() {
         when(host.getId()).thenReturn(HOST_ID);
-        return Live.schedule(host, "빈티지 데님 라이브", null, LocalDateTime.now().plusDays(1));
+        return Live.schedule(host, "빈티지 데님 라이브", null, null, LocalDateTime.now().plusDays(1));
     }
 
     private LiveProductLinkRequest 연결_요청() {
@@ -96,7 +96,7 @@ class LiveProductServiceTest {
     @Test
     void 상품이_삭제됐어도_연결_목록에서_사라지지_않는다() {
         // 목록 조회는 호스트 검증을 하지 않는다(비회원도 본다) — 호스트 스텁을 두면 불필요 스텁이 된다.
-        Live live = Live.openNow(host, "빈티지 데님 라이브", null, LocalDateTime.now());
+        Live live = Live.openNow(host, "빈티지 데님 라이브", null, null, LocalDateTime.now());
         when(liveRepository.existsById(LIVE_ID)).thenReturn(true);
         when(liveProductRepository.findByLiveIdAndRemovedAtIsNullOrderBySortOrderAsc(LIVE_ID))
                 .thenReturn(List.of(LiveProduct.link(live, PRODUCT_ID, (short) 0, LocalDateTime.now())));
@@ -129,7 +129,7 @@ class LiveProductServiceTest {
     @Test
     void 본인_라이브가_아니면_연결할_수_없다() {
         when(host.getId()).thenReturn(HOST_ID);
-        Live 남의_라이브 = Live.openNow(host, "남의 라이브", null, LocalDateTime.now());
+        Live 남의_라이브 = Live.openNow(host, "남의 라이브", null, null, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(남의_라이브));
         LiveProductLinkRequest request = 연결_요청();
 
@@ -198,7 +198,7 @@ class LiveProductServiceTest {
     void 방송이_시작되면_상품을_추가할_수_없다() {
         // 운영 정책 — 시청자가 보고 있는 판매 목록이 도중에 바뀌면 안 된다.
         when(host.getId()).thenReturn(HOST_ID);
-        Live 진행중인_라이브 = Live.openNow(host, "빈티지 데님 라이브", null, LocalDateTime.now());
+        Live 진행중인_라이브 = Live.openNow(host, "빈티지 데님 라이브", null, null, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(진행중인_라이브));
         LiveProductLinkRequest request = 연결_요청();
 
@@ -211,7 +211,7 @@ class LiveProductServiceTest {
     @Test
     void 방송이_시작되면_상품을_제외할_수_없다() {
         when(host.getId()).thenReturn(HOST_ID);
-        Live 진행중인_라이브 = Live.openNow(host, "빈티지 데님 라이브", null, LocalDateTime.now());
+        Live 진행중인_라이브 = Live.openNow(host, "빈티지 데님 라이브", null, null, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(진행중인_라이브));
 
         assertThatThrownBy(() -> liveProductService.unlinkProduct(HOST_ID, LIVE_ID, PRODUCT_ID))
@@ -221,7 +221,7 @@ class LiveProductServiceTest {
 
     @Test
     void 개설_시_편성한_상품이_순서대로_저장된다() {
-        Live live = Live.schedule(host, "빈티지 데님 라이브", null, LocalDateTime.now().plusDays(1));
+        Live live = Live.schedule(host, "빈티지 데님 라이브", null, null, LocalDateTime.now().plusDays(1));
         when(productQueryPort.findById(2001L))
                 .thenReturn(Optional.of(new ProductSummary(2001L, HOST_ID, "리바이스 501")));
         when(productQueryPort.findById(2002L))
@@ -239,7 +239,7 @@ class LiveProductServiceTest {
     @Test
     void 개설_시_같은_상품을_두_번_담으면_거부된다() {
         // DB 부분 UNIQUE 인덱스에 걸려 500 이 되기 전에 걸러낸다.
-        Live live = Live.schedule(host, "빈티지 데님 라이브", null, LocalDateTime.now().plusDays(1));
+        Live live = Live.schedule(host, "빈티지 데님 라이브", null, null, LocalDateTime.now().plusDays(1));
         List<Long> 중복_편성 = List.of(PRODUCT_ID, PRODUCT_ID);
 
         assertThatThrownBy(() -> liveProductService.linkProductsOnCreate(HOST_ID, live, 중복_편성))
@@ -250,7 +250,7 @@ class LiveProductServiceTest {
 
     @Test
     void 개설_시_남의_상품은_편성할_수_없다() {
-        Live live = Live.schedule(host, "빈티지 데님 라이브", null, LocalDateTime.now().plusDays(1));
+        Live live = Live.schedule(host, "빈티지 데님 라이브", null, null, LocalDateTime.now().plusDays(1));
         when(productQueryPort.findById(PRODUCT_ID))
                 .thenReturn(Optional.of(new ProductSummary(PRODUCT_ID, OTHER_MEMBER_ID, "남의 상품")));
         List<Long> 편성 = List.of(PRODUCT_ID);
