@@ -558,3 +558,45 @@ ClipZeroShotColorExtractor(use_debias=True)`).
 
 **구현**: `evaluate.color_confusion_matrix()`(카테고리 `confusion_matrix()`의 색상 버전),
 `color.ClipZeroShotColorExtractor`에 `use_debias` 옵션 + `_compute_debias_prior()` 추가.
+
+---
+
+## 18. 패션 도메인 특화 체크포인트 후보 선정(2026-08-03) — **실측 대기**
+
+**배경**: §11(앙상블)·§12/§15(색상 프롬프트)·§16(스와치)이 전부 회귀했고, 통한 건
+§13/§17의 전처리·편향 보정뿐이다. 카테고리 대분류 직접 질의 0.35(§14), 색상 0.41~0.50에서
+막혀 있다. **지금까지 안 건드린 축이 하나 남았다 — 체크포인트 자체다.** `CATEGORY_MODELS`의
+기존 후보 4종은 전부 범용(OpenAI CLIP / Google SigLIP)이고, 의류 사진에 특화된 표현을
+배운 적이 없다.
+
+### 후보 4종
+
+| 레지스트리 키 | 체크포인트 | 근거 |
+|---|---|---|
+| `fashion_clip` | `patrickjohncyh/fashion-clip` | FashionCLIP 2.0. LAION CLIP ViT-B/32 + 패션 상품 80만 건. 모델 카드의 zero-shot weighted macro F1: FMNIST 0.78→0.83, KAGL 0.71→0.73, DEEP 0.58→0.62(베이스 LAION CLIP 대비) |
+| `marqo_fashion_clip` | `Marqo/marqo-fashionCLIP` | GCL(카테고리·색상·소재·스타일을 학습 신호로 사용). 자사 벤치마크 recall@1 FashionCLIP 2.0 대비 +22% |
+| `marqo_fashion_siglip` | `Marqo/marqo-fashionSigLIP` | 같은 레시피의 SigLIP(ViT-B-16-SigLIP webli) 판, +57%. 공개된 패션 임베딩 중 보고 성능 최고 |
+| `zooclaw_fashion_siglip2` | `srpone/zooclaw-fashionsiglip2` | SigLIP2-base-384 기반 최신(2026-06, arXiv 2606.27708). 검색 목적 증류라 분류는 부차 용도 — "더 최신/더 큰 게 실제로 더 나은가" 대조군 |
+
+**Marqo 두 모델을 색상에도 거는 이유**: GCL이 색상을 명시적 학습 신호로 썼다고 밝히고
+있다. §17에서 CLIP 색상이 막힌 게 "체크포인트가 색상을 안 배워서"인지 "zero-shot 방식
+자체의 한계"인지 지금은 구분이 안 되는데, 이 후보가 색상에서도 안 오르면 후자 쪽 근거가
+된다(= §9의 파인튜닝/VLM 유지 결론이 굳어진다).
+
+### 실행 방법
+
+`major_category_and_color_check.ipynb` §2-2(카테고리)·§6-1(색상). `RUN_FASHION_SWEEP=True`로
+바꾸고 실행한다. 비교 축을 체크포인트 하나로 고정하려고 정답셋·프롬프트 템플릿
+(`en_clip_style`)·스코어링(코사인 + temperature softmax)은 baseline과 동일하게 뒀다.
+카테고리는 직접 대분류 질의 / 소분류 역산 / 소분류 30-way 세 지표를, 색상은 원본 / `_wb`
+두 조건을 잰다.
+
+**사전 준비**: `pip install open_clip_torch`(Marqo 두 모델이 `trust_remote_code`로 open_clip
+래퍼를 싣는다. 없으면 그 두 개만 스킵되고 나머지는 그대로 돈다) + 체크포인트 다운로드 약 2GB.
+
+**구현**: `classify.CATEGORY_MODEL_LOAD_OPTIONS`(모델별 `trust_remote_code`/`feature_api`/
+`text_padding`) + `make_embedding_classifier()`(레지스트리 키 → 조립). `EmbeddingZeroShotClassifier`는
+`_embed()`로 인코딩 경로를 한 곳에 모으고 forward / `get_*_features()` 두 갈래를 흡수한다 —
+**기본값은 기존 경로와 동일해서 §14의 clip_vit_b32 실측(0.35 / 1.00)이 그대로 재현되는 걸
+확인했다**(리팩터로 인한 회귀 없음). `color.ClipZeroShotColorExtractor`는 model_id 대신
+레지스트리 키를 받도록 바꿨다(로딩 옵션이 두 곳에 갈라지지 않게).
