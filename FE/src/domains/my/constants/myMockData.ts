@@ -26,7 +26,6 @@ export const MY_SECTION_OPTIONS: Array<{ id: MySectionId; label: string }> = [
   { id: 'lives', label: '라이브 관리' },
   { id: 'wishlist', label: '찜한 상품' },
   { id: 'social', label: '팔로워·팔로잉' },
-  { id: 'points', label: '포인트·출금' },
   { id: 'business', label: '사업자 정보' },
 ]
 

@@ -974,6 +974,7 @@ const submitProfileForm = async () => {
         },
       },
     }
+    authStore.updateUser({ nickname: nextProfile.nickname })
     selectedProfileImageFile.value = null
     profileImagePreviewUrl.value = ''
     selectedProfileImageName.value = ''

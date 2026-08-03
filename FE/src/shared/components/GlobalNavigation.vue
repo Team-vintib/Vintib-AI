@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import logoImage from '@/assets/images/logo.png'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { getMyProfile } from '@/domains/my/api/myApi'
 import NotificationPopup from '@/domains/notification/components/NotificationPopup.vue'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import { getPointBalance } from '@/domains/point/api/pointApi'
@@ -35,7 +36,8 @@ authStore.hydrateSession()
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const canShowNotificationAction = computed(() => isAuthenticated.value)
-const displayName = computed(() => authStore.user?.name || authStore.user?.email || '회원')
+const profileNickname = ref('')
+const displayName = computed(() => authStore.user?.nickname || profileNickname.value || '회원')
 const profileInitial = computed(() => displayName.value.slice(0, 1).toUpperCase())
 const pointBalance = ref<PointBalance | null>(null)
 const isLoggingOut = ref(false)
@@ -68,7 +70,7 @@ const profileMenuItems = computed<ProfileMenuItem[]>(() => [
   { label: '구매 내역', path: ROUTE_PATHS.MY, query: { section: 'orders' } },
   { label: '판매 내역', path: ROUTE_PATHS.MY, query: { section: 'sales' } },
   { label: '찜한 상품', path: ROUTE_PATHS.MY, query: { section: 'wishlist' } },
-  { label: '포인트', path: ROUTE_PATHS.POINT },
+  { label: '장바구니', path: ROUTE_PATHS.MY, query: { section: 'cart' } },
 ])
 
 const getRouteSection = () => {
@@ -209,6 +211,31 @@ watch(
     }
 
     void loadPointBalance(userId)
+  },
+  { immediate: true },
+)
+
+watch(
+  currentUserId,
+  async (userId) => {
+    profileNickname.value = authStore.user?.nickname?.trim() || ''
+
+    if (!userId) {
+      profileNickname.value = ''
+      return
+    }
+
+    try {
+      const profile = await getMyProfile(userId)
+      const nickname = profile.nickname.trim()
+
+      if (nickname) {
+        profileNickname.value = nickname
+        authStore.updateUser({ nickname })
+      }
+    } catch {
+      profileNickname.value = authStore.user?.nickname?.trim() || ''
+    }
   },
   { immediate: true },
 )
