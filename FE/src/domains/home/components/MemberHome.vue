@@ -7,7 +7,7 @@ import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
 import LiveCard from '@/domains/home/components/LiveCard.vue'
 import ProductCard from '@/domains/home/components/ProductCard.vue'
-import type { HomeLiveStatus, HomeViewData } from '@/domains/home/types/homeView.types'
+import type { HomeViewData } from '@/domains/home/types/homeView.types'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
 defineProps<{
@@ -26,28 +26,9 @@ const formatCompactNumber = (value: number) => {
   }).format(value)
 }
 
-const formatSchedule = (value?: string) => {
-  if (!value) {
-    return '일정 확인'
-  }
-
-  return new Intl.DateTimeFormat('ko-KR', {
-    month: 'long',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(new Date(value))
-}
-
 const getLivePath = (liveId: number) => `/lives/${liveId}`
 const getProductPath = (productId: number) => `/products/${productId}`
-const getSellerLivePath = (liveId?: number) =>
-  liveId ? getLivePath(liveId) : ROUTE_PATHS.LIVE_LIST
-const getSellerLiveActionQuery = (status?: HomeLiveStatus) =>
-  status === 'SCHEDULED' ? { action: 'notify' } : undefined
-const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
-  status === 'LIVE' ? '라이브 보기' : '방송 알림 받기'
+const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
 </script>
 
 <template>
@@ -80,41 +61,27 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
       empty-message="팔로우한 판매자가 없습니다."
     >
       <div class="seller-grid">
-        <article v-for="seller in homeData.followedSellers" :key="seller.id" class="seller-card">
-          <span class="seller-card__cover">
-            <img class="seller-card__cover-image" :src="seller.coverImageUrl" :alt="seller.name" />
-            <span
-              v-if="seller.liveStatus"
-              class="seller-card__status"
-              :class="{ 'seller-card__status--live': seller.liveStatus === 'LIVE' }"
-            >
-              {{ seller.liveStatus === 'LIVE' ? 'LIVE' : formatSchedule(seller.liveAt) }}
-            </span>
-          </span>
+        <RouterLink
+          v-for="seller in homeData.followedSellers"
+          :key="seller.id"
+          class="seller-card"
+          :to="getSellerProfilePath(seller.id)"
+          :aria-label="`${seller.name} 프로필 보기`"
+        >
           <span class="seller-card__body">
             <span class="seller-card__profile">
-              <img class="seller-card__avatar" :src="seller.profileImageUrl" :alt="seller.name" />
               <span class="seller-card__identity">
                 <strong class="seller-card__name">{{ seller.name }}</strong>
               </span>
             </span>
             <span class="seller-card__stats">
               <span>팔로워 {{ formatCompactNumber(seller.followerCount) }}</span>
-              <span>판매 상품 {{ seller.newProductCount }}개</span>
+              <span>팔로잉 {{ formatCompactNumber(seller.followingCount) }}</span>
+              <span>판매 상품 {{ formatCompactNumber(seller.newProductCount) }}</span>
+              <span>라이브 {{ formatCompactNumber(seller.liveCount) }}</span>
             </span>
-            <strong class="seller-card__live-title">{{ seller.liveTitle }}</strong>
-            <span class="seller-card__time">{{ formatSchedule(seller.liveAt) }}</span>
-            <RouterLink
-              class="seller-card__action"
-              :to="{
-                path: getSellerLivePath(seller.liveId),
-                query: getSellerLiveActionQuery(seller.liveStatus),
-              }"
-            >
-              {{ getSellerLiveActionLabel(seller.liveStatus) }}
-            </RouterLink>
           </span>
-        </article>
+        </RouterLink>
       </div>
     </HomeSection>
 
@@ -253,10 +220,13 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
 .seller-card {
   position: relative;
   overflow: hidden;
+  display: grid;
+  min-height: 132px;
   border: 1px solid #e6e1d8;
   border-radius: 20px;
   background: var(--color-surface);
   box-shadow: 0 8px 24px rgb(18 18 18 / 5%);
+  color: inherit;
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -269,62 +239,10 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   transform: translateY(-2px);
 }
 
-.seller-card {
-  display: grid;
-}
-
-.seller-card__cover {
-  position: relative;
-  display: block;
-  overflow: hidden;
-  background: var(--color-surface-secondary);
-}
-
-.seller-card__cover {
-  aspect-ratio: 16 / 9;
-}
-
-.seller-card__cover::after {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(14, 17, 16, 0.02), rgba(14, 17, 16, 0.42));
-  content: '';
-}
-
-.seller-card__cover-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.seller-card__status {
-  position: absolute;
-  z-index: 1;
-  top: var(--space-3);
-  left: var(--space-3);
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  max-width: calc(100% - var(--space-6));
-  padding: 0 10px;
-  overflow: hidden;
-  border-radius: var(--space-2);
-  background: rgba(14, 17, 16, 0.72);
-  color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.seller-card__status--live {
-  background: var(--color-live);
-}
-
 .seller-card__body {
   display: grid;
-  gap: var(--space-2);
+  align-content: center;
+  gap: var(--space-4);
   padding: var(--space-5);
 }
 
@@ -334,22 +252,13 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   gap: var(--space-3);
 }
 
-.seller-card__avatar {
-  width: 42px;
-  height: 42px;
-  border: 2px solid var(--color-surface);
-  border-radius: 50%;
-  object-fit: cover;
-}
-
 .seller-card__identity {
   display: grid;
   min-width: 0;
   gap: 2px;
 }
 
-.seller-card__name,
-.seller-card__live-title {
+.seller-card__name {
   color: var(--color-text-primary);
   display: -webkit-box;
   overflow: hidden;
@@ -374,33 +283,10 @@ const getSellerLiveActionLabel = (status?: HomeLiveStatus) =>
   line-height: 20px;
 }
 
-.seller-card__time {
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 20px;
-}
-
 .seller-card__stats {
   display: flex;
-  gap: var(--space-3);
   flex-wrap: wrap;
-}
-
-.seller-card__action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  height: 40px;
-  padding: 0 var(--space-4);
-  border-radius: 12px;
-  justify-self: end;
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+  gap: var(--space-2) var(--space-3);
 }
 
 @media (max-width: 768px) {

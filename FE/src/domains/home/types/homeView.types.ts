@@ -43,7 +43,9 @@ export interface HomeFollowedSellerItem {
   coverImageUrl: string
   specialty: string
   followerCount: number
+  followingCount: number
   newProductCount: number
+  liveCount: number
   liveStatus?: HomeLiveStatus
   liveTitle?: string
   liveAt?: string
