@@ -7,6 +7,7 @@ from app.gateway.router import RESULTS_DIR
 from app.gateway.router import router as gateway_router
 from app.measurement.router import router as measurement_router
 from app.pricing.router import router as pricing_router
+from app.product_classifier.router import router as product_classifier_router
 from app.quality.router import router as quality_router
 from app.recommend.personalize.router import router as personalize_router
 from app.recommend.router import router as recommend_router
@@ -19,6 +20,9 @@ app.include_router(chat_router, prefix="/chat", tags=["chat"])
 app.include_router(quality_router, prefix="/quality", tags=["quality"])
 app.include_router(measurement_router, prefix="/measurement", tags=["measurement"])
 app.include_router(pricing_router, prefix="/pricing", tags=["pricing"])
+app.include_router(
+    product_classifier_router, prefix="/product-classifier", tags=["product-classifier"]
+)
 app.include_router(gateway_router, prefix="/ai", tags=["ai-gateway"])
 
 app.mount("/results", StaticFiles(directory=RESULTS_DIR), name="results")
