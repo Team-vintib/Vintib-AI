@@ -77,7 +77,7 @@ class CatVTONPipeline:
                 images=image, clip_input=safety_checker_input.pixel_values.to(self.weight_dtype)
             )
         return image, has_nsfw_concept
-    
+
     def check_inputs(self, image, condition_image, mask, width, height):
         if isinstance(image, torch.Tensor) and isinstance(condition_image, torch.Tensor) and isinstance(mask, torch.Tensor):
             return image, condition_image, mask

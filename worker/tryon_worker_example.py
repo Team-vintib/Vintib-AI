@@ -93,14 +93,29 @@ class TryonWorker(BaseWorker):
         {
             "user_image_url": "https://.../person.jpg",
             "product_image_url": "https://.../cloth.jpg",
-            "fit_type": "regular"   # regular | oversized | cropped
+            "mask_type": "upper",   # upper | lower — 기본값 upper(하위호환)
+            "fit_type": "regular",   # regular | oversized | cropped — 아래 두 값이 있으면 무시됨
+            "body_measurements": {"waist_cm": 80.0},   # 선택
+            "garment_measurements": {"WAIST_WIDTH": 42.0}   # 선택
         }
+
+        `body_measurements`/`garment_measurements`는 둘 다 있고 바지(mask_type="lower")
+        허리 너비 축에 필요한 키(`waist_cm`/`WAIST_WIDTH`)가 있을 때만 적응형 마스킹이
+        켜진다(`model.adaptive_fit.compute_mask_adjustment` 참고) — 그 외에는 `fit_type`
+        고정 3단계로 그대로 동작한다. 기장(길이) 축은 없다 — 마스크를 잘라 기장을 줄이면
+        그 자리에 맨살을 새로 생성해야 해서 AI 가드레일상 정책적으로 뺐다. AI는 이 값들을
+        BE에 재조회하지 않고 payload로 받은 그대로 쓴다.
         """
         self._ensure_loaded()
 
+        mask_type = payload.get("mask_type", "upper")
+        if mask_type not in ("upper", "lower"):
+            raise ValueError(f"지원하지 않는 mask_type: {mask_type}")
         fit_type = payload.get("fit_type", "regular")
         if fit_type not in ("regular", "oversized", "cropped"):
             raise ValueError(f"지원하지 않는 fit_type: {fit_type}")
+        body_measurements = payload.get("body_measurements")
+        garment_measurements = payload.get("garment_measurements")
 
         person_image = download_image(payload["user_image_url"]).convert("RGB")
         cloth_image = download_image(payload["product_image_url"]).convert("RGB")
@@ -110,7 +125,13 @@ class TryonWorker(BaseWorker):
 
         generator = torch.Generator(device="cuda").manual_seed(42)
 
-        mask_result = self._automasker(person_image, mask_type="upper", fit_type=fit_type)
+        mask_result = self._automasker(
+            person_image,
+            mask_type=mask_type,
+            fit_type=fit_type,
+            body_measurements=body_measurements,
+            garment_measurements=garment_measurements,
+        )
         mask = mask_result["mask"]
         mask = self._mask_processor.blur(mask, blur_factor=9)
 
@@ -130,7 +151,12 @@ class TryonWorker(BaseWorker):
         masked_person = vis_mask(person_image, mask)
         mask_url = upload_image(masked_person, prefix="tryon-masks")
 
-        return {"image_url": image_url, "mask_preview_url": mask_url, "fit_type": fit_type}
+        return {
+            "image_url": image_url,
+            "mask_preview_url": mask_url,
+            "fit_type": fit_type,
+            "adaptive_masking_used": bool(body_measurements and garment_measurements),
+        }
 
 
 if __name__ == "__main__":
