@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import type { HomeProductCardItem } from '@/domains/home/types/homeView.types'
 import type { RouteLocationRaw } from 'vue-router'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     product: HomeProductCardItem
     isWished?: boolean
@@ -32,6 +33,7 @@ const emit = defineEmits<{
 
 const fallbackImageUrl =
   'https://images.unsplash.com/photo-1516762689617-e1cffcef479d?auto=format&fit=crop&w=900&q=80'
+const productImageUrl = computed(() => props.product.primaryImageUrl || fallbackImageUrl)
 
 const handleImageError = (event: Event) => {
   if (event.target instanceof HTMLImageElement) {
@@ -57,7 +59,7 @@ const formatPrice = (value?: number) => {
     <span class="product-card__media">
       <img
         class="product-card__image"
-        :src="product.primaryImageUrl"
+        :src="productImageUrl"
         :alt="product.title"
         @error="handleImageError"
       />

@@ -85,6 +85,55 @@ interface GetHomeViewDataOptions {
 
 const FALLBACK_SELLER_NAME = '판매자 정보 확인 중'
 const FOLLOWING_RECOMMENDATION_REASON = '팔로우한 판매자의 상품'
+const CATEGORY_SECTION_PRODUCT_LIMIT = 8
+const MIDDLE_CATEGORY_ORDER = [
+  '아우터',
+  '상의',
+  '하의',
+  '원피스',
+  '신발',
+  '가방',
+  '액세서리',
+] as const
+const MIDDLE_CATEGORY_NAMES = new Set<string>(MIDDLE_CATEGORY_ORDER)
+const SMALL_CATEGORY_TO_MIDDLE_CATEGORY: Record<string, (typeof MIDDLE_CATEGORY_ORDER)[number]> = {
+  자켓: '아우터',
+  코트: '아우터',
+  가디건: '아우터',
+  패딩: '아우터',
+  후드집업: '아우터',
+  티셔츠: '상의',
+  셔츠: '상의',
+  니트: '상의',
+  후드티: '상의',
+  맨투맨: '상의',
+  민소매: '상의',
+  데님: '하의',
+  슬랙스: '하의',
+  카고팬츠: '하의',
+  스커트: '하의',
+  숏팬츠: '하의',
+  '트레이닝/조거': '하의',
+  코튼팬츠: '하의',
+  원피스: '원피스',
+  '원피스 및 점프슈트': '원피스',
+  점프슈트: '원피스',
+  스니커즈: '신발',
+  부츠: '신발',
+  구두: '신발',
+  '샌들/슬리퍼': '신발',
+  백팩: '가방',
+  숄더백: '가방',
+  토트백: '가방',
+  크로스백: '가방',
+  파우치: '가방',
+  모자: '액세서리',
+  벨트: '액세서리',
+  스카프: '액세서리',
+  주얼리: '액세서리',
+  시계: '액세서리',
+  선글라스: '액세서리',
+}
 
 export const getHomeViewData = async ({
   isAuthenticated = false,
@@ -129,7 +178,7 @@ const toHomeViewData = (
 ): HomeViewData => {
   const followingProducts = followingContent?.empty ? [] : (followingContent?.products ?? [])
   const categoryProductSections = homeContent.categoryProductSections?.length
-    ? homeContent.categoryProductSections.map(toHomeCategoryProductSection)
+    ? toMiddleCategoryProductSections(homeContent.categoryProductSections)
     : []
   const followedSellers = followingContent
     ? followingContent.empty
@@ -200,14 +249,62 @@ const toHomeFollowedSellerItem = (
   liveAt: seller.liveAt ?? undefined,
 })
 
-const toHomeCategoryProductSection = (
-  section: HomeCategoryProductSectionResponse,
-): HomeCategoryProductSection => ({
-  id: section.id,
-  title: section.title,
-  categoryName: section.categoryName,
-  products: section.products.map(toHomeProductCardItem),
-})
+const toMiddleCategoryProductSections = (
+  sections: HomeCategoryProductSectionResponse[],
+): HomeCategoryProductSection[] => {
+  const sectionProducts = sections.flatMap((section) =>
+    section.products.map((product) => ({
+      product,
+      categoryName:
+        toMiddleCategoryName(product.categoryName) ?? toMiddleCategoryName(section.categoryName),
+    })),
+  )
+  const seenProductIds = new Set<number>()
+  const productsByCategoryName = new Map<string, HomeProductCardItem[]>()
+
+  sectionProducts.forEach(({ product, categoryName }) => {
+    if (!categoryName || seenProductIds.has(product.productId)) {
+      return
+    }
+
+    seenProductIds.add(product.productId)
+    const products = productsByCategoryName.get(categoryName) ?? []
+
+    if (products.length < CATEGORY_SECTION_PRODUCT_LIMIT) {
+      products.push(toHomeProductCardItem(product))
+      productsByCategoryName.set(categoryName, products)
+    }
+  })
+
+  return MIDDLE_CATEGORY_ORDER.flatMap((categoryName) => {
+    const products = productsByCategoryName.get(categoryName) ?? []
+
+    return {
+      id: toCategorySectionId(categoryName),
+      title: categoryName,
+      categoryName,
+      products,
+    }
+  })
+}
+
+const toMiddleCategoryName = (categoryName?: string | null) => {
+  if (!categoryName) {
+    return null
+  }
+
+  if (MIDDLE_CATEGORY_NAMES.has(categoryName)) {
+    return categoryName
+  }
+
+  return SMALL_CATEGORY_TO_MIDDLE_CATEGORY[categoryName] ?? null
+}
+
+const toCategorySectionId = (categoryName: string) =>
+  categoryName
+    .replace(/\s+/g, '-')
+    .replace(/[^\w가-힣/-]/g, '')
+    .toLowerCase()
 
 const toHomeRecommendedProductItem = (
   product: HomeProductCardResponse,
