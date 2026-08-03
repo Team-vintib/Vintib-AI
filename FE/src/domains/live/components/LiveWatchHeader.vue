@@ -77,6 +77,7 @@ const audienceLabel = computed(() => {
     </div>
 
     <button
+      v-if="!live.isHost"
       class="live-watch-header__follow"
       :class="{ 'live-watch-header__follow--active': isFollowing }"
       type="button"
