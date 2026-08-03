@@ -178,6 +178,7 @@ COMMENT ON COLUMN member.cover_image_url   IS '커버 이미지 URL. 공개 프�
 COMMENT ON COLUMN brand.name    IS '브랜드명. 중복 불가.';
 COMMENT ON COLUMN brand.name_en IS '브랜드 영문명. 없는 브랜드는 NULL.';
 COMMENT ON COLUMN category.name IS '카테고리명.';
+COMMENT ON COLUMN category.name_en IS '카테고리 영문 코드(예: JACKET). AI/FE 연동용.';
 
 COMMENT ON COLUMN business_info.submitted_at IS '인증 서류 제출 시각.';
 COMMENT ON COLUMN business_info.verified_at  IS '인증 승인·거절 처리 시각.';

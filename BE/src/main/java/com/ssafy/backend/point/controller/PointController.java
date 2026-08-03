@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 // 마이페이지 포인트/출금 관리(MY-007). 출금 신청/내역은 별도 리소스라 WithdrawalController가 담당한다
 // (APIs.md 포인트/계좌/출금(Wallet) 섹션 — withdrawals가 points 하위가 아닌 독립 경로로 확정).
 // 충전은 결제 연동 없는 테스트/데모 전용이다.
-@Tag(name = "마이페이지(MyPage)", description = "마이페이지 도메인별 요약/관리 API")
+@Tag(name = "포인트/출금(Wallet)", description = "포인트 잔액/충전, 출금 신청/내역 API")
 @RestController
 @RequestMapping("/api/users/{userId}/points")
 @RequiredArgsConstructor

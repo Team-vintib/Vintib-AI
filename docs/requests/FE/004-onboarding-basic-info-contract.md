@@ -27,7 +27,7 @@
   - `postalCode`만 선택 입력(직접 입력 주소면 `null` 가능), 나머지 5개는 전부 필수(매번 전체 값을 새로
     보내야 한다 — 부분 수정이 아니다). 온보딩 최초 완료든 마이페이지 수정(MY-001)이든 같은 엔드포인트,
     같은 필수 규칙이다.
-  - `phoneNumber`는 숫자만 10~11자리(하이픈 없이).
+  - `phoneNumber`는 숫자만 10~11자리.
   - `gender`는 `MALE`/`FEMALE` 중 하나만 받는다(FE와 동일, `OTHER` 없음).
 - **응답(200)**: `{ "id", "email", "name", "nickname", "phoneNumber", "address", "detailAddress", "postalCode", "gender", "memberType", "status", "onboardingCompleted" }`
 - **에러**: `400`(입력값 오류, `error.code = C001`), `401`(인증 필요), `403`(본인 아닌 회원 수정 시도,

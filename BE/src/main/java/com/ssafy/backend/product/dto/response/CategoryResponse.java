@@ -8,10 +8,11 @@ public record CategoryResponse(
         @Schema(example = "1") Long id,
         @Schema(example = "1") Long parentId,
         @Schema(example = "아우터") String name,
+        @Schema(example = "OUTER") String nameEn,
         @Schema(example = "1") Short depth) {
 
     public static CategoryResponse from(Category category) {
         return new CategoryResponse(
-                category.getId(), category.getParentId(), category.getName(), category.getDepth());
+                category.getId(), category.getParentId(), category.getName(), category.getNameEn(), category.getDepth());
     }
 }
