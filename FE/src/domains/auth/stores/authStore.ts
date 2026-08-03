@@ -193,6 +193,7 @@ function resolveSessionUser(
     id: resolvedUser.id,
     email: resolvedUser.email ?? '',
     name: resolvedUser.name,
+    nickname: resolvedUser.nickname,
     onboardingCompleted: resolvedUser.onboardingCompleted,
   }
 }
