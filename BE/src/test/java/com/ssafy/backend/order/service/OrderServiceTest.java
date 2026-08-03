@@ -15,6 +15,7 @@ import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.order.dto.request.OrderCreateRequest;
 import com.ssafy.backend.order.dto.request.OrderRole;
 import com.ssafy.backend.order.dto.request.OrderShipmentAddressRequest;
+import com.ssafy.backend.order.dto.request.OrderShipmentRegisterRequest;
 import com.ssafy.backend.order.dto.response.OrderListItemResponse;
 import com.ssafy.backend.order.dto.response.OrderShipmentResponse;
 import com.ssafy.backend.order.entity.Order;
@@ -25,6 +26,7 @@ import com.ssafy.backend.order.repository.OrderShipmentRepository;
 import com.ssafy.backend.point.service.PointService;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.ProductRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -211,5 +213,38 @@ class OrderServiceTest {
                 ORDER_ID, BUYER_ID, new OrderShipmentAddressRequest("홍길동", "010-1234-5678", "06134", "테헤란로 1", null));
 
         assertThat(response.recipientName()).isEqualTo("홍길동");
+    }
+
+    @Test
+    void 송장을_등록하면_배송완료까지_반영되고_자동확정_시각이_계산된다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+        OrderShipment shipment = OrderShipment.builder()
+                .order(realOrder).recipientName("홍길동").recipientPhone("010-1234-5678")
+                .zipcode("06134").address1("테헤란로 1").build();
+        when(orderShipmentRepository.findById(ORDER_ID)).thenReturn(Optional.of(shipment));
+
+        OrderShipmentResponse response = orderService.registerShipment(
+                ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest("CJ대한통운", "123456789012"));
+
+        assertThat(response.trackingNumber()).isEqualTo("123456789012");
+        assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
+        assertThat(realOrder.getAutoConfirmAt()).isAfter(LocalDateTime.now().plusDays(6));
+    }
+
+    @Test
+    void 배송지_미등록시_송장등록하면_예외를_던진다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+        when(orderShipmentRepository.findById(ORDER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.registerShipment(
+                ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest("CJ대한통운", "123456789012")))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ORDER_SHIPMENT_ADDRESS_REQUIRED);
     }
 }

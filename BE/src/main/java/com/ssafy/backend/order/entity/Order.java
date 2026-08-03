@@ -78,6 +78,20 @@ public class Order extends BaseTimeEntity {
         return new Order(buyer, seller, product, null, orderPrice, OrderStatus.PAID);
     }
 
+    /** 송장 등록(SHIP-001). 전제조건(PAID 상태)은 서비스가 검증한다. */
+    public void markShipping() {
+        this.status = OrderStatus.SHIPPING;
+    }
+
+    /**
+     * 배송 완료 처리 — 이번 범위에서는 실제 택배 연동이 없어 송장 등록과 같은 시점에 호출된다
+     * ({@code OrderService} 참고). 자동 구매 확정 시각을 여기서 계산해 채운다.
+     */
+    public void markDelivered(LocalDateTime deliveredAt) {
+        this.status = OrderStatus.DELIVERED;
+        this.autoConfirmAt = deliveredAt.plusDays(7);
+    }
+
     /** memberId가 이 주문의 구매자 또는 판매자인지 확인한다. 세금계산서 등 주문 관련 API의 권한 확인에 쓴다. */
     public boolean isPartyOf(Long memberId) {
         return memberId != null && (buyer.getId().equals(memberId) || seller.getId().equals(memberId));
@@ -85,5 +99,9 @@ public class Order extends BaseTimeEntity {
 
     public boolean isBuyer(Long memberId) {
         return memberId != null && buyer.getId().equals(memberId);
+    }
+
+    public boolean isSeller(Long memberId) {
+        return memberId != null && seller.getId().equals(memberId);
     }
 }

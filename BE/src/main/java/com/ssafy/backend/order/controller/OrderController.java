@@ -3,6 +3,7 @@ package com.ssafy.backend.order.controller;
 import com.ssafy.backend.global.response.ApiResponse;
 import com.ssafy.backend.order.dto.request.OrderCreateRequest;
 import com.ssafy.backend.order.dto.request.OrderShipmentAddressRequest;
+import com.ssafy.backend.order.dto.request.OrderShipmentRegisterRequest;
 import com.ssafy.backend.order.dto.response.OrderListItemResponse;
 import com.ssafy.backend.order.dto.response.OrderShipmentResponse;
 import com.ssafy.backend.order.service.OrderService;
@@ -23,8 +24,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 // 주문 리소스(/api/orders). 경로에 userId가 없어 requireSelf 패턴 대신 서비스 내부
-// Order.isPartyOf(principal)/isBuyer에 권한 확인을 위임한다(InvoiceController와 동일한 이유).
-@Tag(name = "주문(Orders)", description = "주문 생성/조회, 배송지 API")
+// Order.isPartyOf(principal)/isBuyer/isSeller에 권한 확인을 위임한다(InvoiceController와 동일한 이유).
+@Tag(name = "주문(Orders)", description = "주문 생성/조회, 배송지·송장 API")
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
@@ -94,6 +95,41 @@ public class OrderController {
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/{orderId}/address")
     public ResponseEntity<ApiResponse<OrderShipmentResponse>> getAddress(
+            Authentication authentication, @PathVariable Long orderId) {
+        Long memberId = (Long) authentication.getPrincipal();
+        return ResponseEntity.ok(ApiResponse.success(orderService.getShipment(orderId, memberId)));
+    }
+
+    @Operation(summary = "송장 등록(SHIP-001)",
+            description = "판매자가 송장 정보를 등록한다. 배송지가 등록된 PAID 상태의 주문만 가능하다. "
+                    + "실제 택배 연동이 없어 등록과 동시에 배송 완료(DELIVERED)까지 반영되고, 7일 뒤 자동 구매 확정 시각이 계산된다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "등록 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "PAID 상태가 아니거나 배송지 미등록"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "판매자가 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않는 주문")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping("/{orderId}/shipment")
+    public ResponseEntity<ApiResponse<OrderShipmentResponse>> registerShipment(
+            Authentication authentication, @PathVariable Long orderId,
+            @Valid @RequestBody OrderShipmentRegisterRequest request) {
+        Long memberId = (Long) authentication.getPrincipal();
+        return ResponseEntity.ok(ApiResponse.success(orderService.registerShipment(orderId, memberId, request)));
+    }
+
+    @Operation(summary = "송장 정보 조회(SHIP-002)",
+            description = "구매자·판매자 모두 조회할 수 있다. 아직 등록 전이면 404.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "해당 주문의 거래 당사자가 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않는 주문 또는 미등록 송장")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @GetMapping("/{orderId}/shipment")
+    public ResponseEntity<ApiResponse<OrderShipmentResponse>> getShipment(
             Authentication authentication, @PathVariable Long orderId) {
         Long memberId = (Long) authentication.getPrincipal();
         return ResponseEntity.ok(ApiResponse.success(orderService.getShipment(orderId, memberId)));

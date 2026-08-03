@@ -57,6 +57,8 @@ public enum ErrorCode {
     SELF_PURCHASE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "O003", "본인이 등록한 상품은 구매할 수 없습니다."),
     PRODUCT_NOT_AVAILABLE_FOR_PURCHASE(HttpStatus.BAD_REQUEST, "O004", "구매할 수 없는 상품입니다."),
     ORDER_BUYER_ONLY(HttpStatus.FORBIDDEN, "O005", "구매자만 처리할 수 있습니다."),
+    ORDER_SELLER_ONLY(HttpStatus.FORBIDDEN, "O006", "판매자만 처리할 수 있습니다."),
+    ORDER_SHIPMENT_ADDRESS_REQUIRED(HttpStatus.BAD_REQUEST, "O007", "배송지가 아직 등록되지 않았습니다."),
     ORDER_SHIPMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "O008", "등록된 배송지/송장 정보가 없습니다."),
 
     // [사업자]

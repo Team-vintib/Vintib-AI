@@ -8,6 +8,7 @@ import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.order.dto.request.OrderCreateRequest;
 import com.ssafy.backend.order.dto.request.OrderRole;
 import com.ssafy.backend.order.dto.request.OrderShipmentAddressRequest;
+import com.ssafy.backend.order.dto.request.OrderShipmentRegisterRequest;
 import com.ssafy.backend.order.dto.response.OrderListItemResponse;
 import com.ssafy.backend.order.dto.response.OrderShipmentResponse;
 import com.ssafy.backend.order.entity.Order;
@@ -18,6 +19,7 @@ import com.ssafy.backend.order.repository.OrderShipmentRepository;
 import com.ssafy.backend.point.service.PointService;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.ProductRepository;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,7 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 주문 조회(MY-003/004), 상시 판매 주문 생성(SALE-002), 배송지(ORDER-001).
+ * 주문 조회(MY-003/004), 상시 판매 주문 생성(SALE-002), 배송지·송장(ORDER-001, SHIP-001/002).
  * 세금계산서 발행은 {@code InvoiceService}가 담당한다.
  */
 @Service
@@ -116,6 +118,30 @@ public class OrderService {
         findOrder(orderId, memberId);
         OrderShipment shipment = orderShipmentRepository.findById(orderId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_SHIPMENT_NOT_FOUND));
+        return OrderShipmentResponse.from(shipment);
+    }
+
+    /**
+     * 송장 등록(SHIP-001) — 판매자만, PAID 상태 + 배송지 등록 완료 후에만 가능하다.
+     * 실제 택배 연동이 없어 등록과 동시에 배송 시작~완료까지 반영한다({@link Order#markDelivered} 참고).
+     */
+    @Transactional
+    public OrderShipmentResponse registerShipment(Long orderId, Long sellerId, OrderShipmentRegisterRequest request) {
+        Order order = findOrder(orderId, sellerId);
+        if (!order.isSeller(sellerId)) {
+            throw new CustomException(ErrorCode.ORDER_SELLER_ONLY);
+        }
+        if (order.getStatus() != OrderStatus.PAID) {
+            throw new CustomException(ErrorCode.INVALID_ORDER_STATE);
+        }
+        OrderShipment shipment = orderShipmentRepository.findById(orderId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ORDER_SHIPMENT_ADDRESS_REQUIRED));
+
+        LocalDateTime now = LocalDateTime.now();
+        shipment.registerTracking(request.courier(), request.trackingNumber(), now, now);
+        order.markShipping();
+        order.markDelivered(now);
+
         return OrderShipmentResponse.from(shipment);
     }
 
