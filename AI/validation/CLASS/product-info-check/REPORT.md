@@ -618,3 +618,49 @@ VLM 대조군"이고 Qwen3-VL 로드가 전제라 GPU가 필요한데, 이 비�
 **기본값은 기존 경로와 동일해서 §14의 clip_vit_b32 실측(0.35 / 1.00)이 그대로 재현되는 걸
 확인했다**(리팩터로 인한 회귀 없음). `color.ClipZeroShotColorExtractor`는 model_id 대신
 레지스트리 키를 받도록 바꿨다(로딩 옵션이 두 곳에 갈라지지 않게).
+
+### 18-1. 로딩 실패 2건 + "정확도 0.00" 오독 사고(2026-08-03)
+
+**Marqo 두 모델은 모델 카드의 transformers 경로로는 안 실린다.** 실행 환경
+(transformers 5.14.1)에서 둘 다 로드 단계에서 예외가 난다:
+
+| 백엔드 | 예외 | 원인 |
+|---|---|---|
+| `marqo_fashion_clip` | `ValueError: Unrecognized image processor` | 리포의 `preprocessor_config.json`이 5.x에서 없어진 `CLIPFeatureExtractor`를 가리키고, auto_map이 지목한 `MarqoFashionImageProcessor`가 원격 코드 파일에 아예 없다. 캐시에 가중치 파일도 안 받아진다 |
+| `marqo_fashion_siglip` | `NotImplementedError: Cannot copy out of meta tensor` | 원격 코드가 `__init__`에서 `self.model.to(self.device)`를 하는데 5.x는 모듈을 meta 디바이스에 lazy 초기화한다 |
+
+원격 코드가 transformers 4.x 시절 작성됐고, 이 저장소는 Qwen3-VL 때문에 5.x가 필요해
+downgrade로는 못 푼다. **Marqo가 함께 문서화한 `open_clip` 경로로 교체**했다
+(`classify.OpenClipZeroShotClassifier`, 레지스트리 옵션 `{"loader": "open_clip"}`).
+교체 후 4종 전부 정상 동작을 확인했다(폴로 사진 vs t-shirt/dog/car/mountain 프로브에서
+t-shirt 확률 clip_vit_b32 0.9998 / fashion_clip 0.9992 / marqo_fashion_clip 0.9999 /
+marqo_fashion_siglip 0.9995).
+
+**더 중요한 건 이게 조용히 지나갔다는 것이다.** `evaluate_category`/`evaluate_color`는
+샘플 단위로 예외를 삼키는데(실패 격리), 백엔드 로딩은 첫 `extract()` 안에서 일어난다 →
+매 샘플에서 터지고 → 전 행이 오답 처리되어 **`primary_acc=0.00`이 정상 측정값처럼 표에
+찍혔다.** 로딩이 실패하면 `_load()`가 캐시를 못 채워 **이미지 수만큼 로드를 재시도**하므로
+"같은 경고가 17번 반복 + 정확도 0.00"이 증상이었다.
+
+대책: `evaluate.all_failed()`(전 행 실패면 대표 에러 메시지 반환) + `error_count()`를
+추가하고, 노트북 §3·§4가 숫자를 표에 싣기 전에 이걸로 거른다 — 실패한 런은 `0.00`이
+아니라 **`NaN` + `[SKIP]`** 으로 표시된다(0.00은 실측, NaN은 못 돌았음). 회귀 테스트는
+`test_class_evaluate_failure.py`.
+
+### 18-2. 부분 실측 — 색상(2026-08-03, N=17)
+
+marqo 로딩 수정 전에 돌아간 두 모델의 색상 결과. **`fashion_clip`이 §17의 CLIP 최고
+조합(wb+debias 0.50)을 체크포인트 교체만으로 넘었다.**
+
+| 백엔드 | primary_acc |
+|---|---|
+| `clip_vit_b32` | 0.41 (§17 기준선과 일치 — 리팩터 회귀 없음) |
+| `clip_vit_b32_wb` | 0.47 |
+| **`fashion_clip`** | **0.65** |
+| `fashion_clip_wb` | 0.65 |
+
+프롬프트 앙상블(§11)·색상 프롬프트(§12·§15)·스와치(§16)가 전부 회귀했던 걸 감안하면,
+**색상에서 실제로 통한 두 번째 축이 "체크포인트 교체"라는 근거**다. 화이트밸런스가
+`fashion_clip`에선 무효(0.65→0.65)인 것도 시사적이다 — §13/§17에서 wb가 준 이득이
+전처리 고유의 것이 아니라 **범용 체크포인트의 편향을 일부 상쇄한 것**이었을 수 있다.
+marqo 2종 수치는 재실행 후 채울 것. (N=17, `MIN_N_FOR_CONFIDENCE` 미달은 그대로 유효.)
