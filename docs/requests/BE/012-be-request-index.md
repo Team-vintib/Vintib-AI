@@ -41,7 +41,6 @@
 | 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API 연동 완료. 알림 seed 제거 후 실제 생성 데이터 없음 | 알림 type/ref 문서화, 실제 알림 생성 이벤트, 예약 라이브 알림 신청/스케줄러, 탭별 bulk read |
 | 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수, 경매 조건 설정 연결 완료 | 경매 snapshot/start/bid/close/STOMP |
 | 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | FE 화면 없음, BE controller 없음 | 주문 생성/배송/환불/포인트 전체(세금계산서 발행/조회는 구현 완료 — `docs/requests/FE/011-business-invoice-contract.md` §4~5, 단 주문 생성 API가 없어 아직 실호출 불가) |
-| 011 | `011-user-mypage-contract.md` | User/MyPage | FE 화면 없음 | 공개 프로필, 마이페이지 요약(`docs/requests/FE/012-mypage-contract.md` 참고) |
 | 013 | `013-live-seller-control.md` | Live | 방송 종료 연결 완료(PATCH .../status로) | 현재 소개 상품 전환 트리거, 종료 시청자 실시간 전파 |
 
 ## 4. 기존 API 변경 요청

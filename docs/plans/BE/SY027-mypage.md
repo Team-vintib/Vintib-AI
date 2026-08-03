@@ -98,16 +98,17 @@
 
 ## 구현 목록
 
-- [ ] MY-001: `MemberProfileResponse`에 `businessVerificationStatus` 추가, `UserService.getProfile`, `UserController GET /{id}`
-- [ ] MY-002: `MyProductController`, `ProductRepository.findBySeller_Id`, 서비스 메서드
-- [ ] MY-003: `OrderListItemResponse`, `OrderRepository.findByBuyer_Id`, `OrderService`, `OrderController`
-- [ ] MY-004: `OrderRepository.findBySeller_Id`, `OrderService` 판매 내역 메서드, `OrderController` sales 엔드포인트
-- [ ] MY-005: `LiveRepository.findByHost_Id`, `LiveService.getMyLives`, `LiveController GET /api/users/{userId}/lives`
-- [ ] MY-007: `point/` 패키지 전체(entity 3개, repository 2개, service, controller) — 잔액/내역/충전/출금
-- [ ] 보너스: `MypageSummaryResponse`, 각 레포지토리 count 메서드, `UserController GET /{userId}/mypage`
-- [ ] 각 서비스 Mockito 테스트
-- [ ] `./gradlew build` 통과, 로컬 `bootRun` E2E 검증
-- [ ] 커밋 6~7개로 분리(MY-006/008/009는 이미 완료라 커밋 없음)
+계획 대비 실제 구현은 일부 경로/구조가 바뀌었다 — 확정된 최종 계약은 `docs/requests/FE/012-mypage-contract.md`와 `docs/APIs.md` 참고.
+
+- [x] MY-001: `MemberProfileResponse`에 `businessVerificationStatus` 추가, `UserService.getProfile`, `UserController GET /{id}`
+- [x] MY-002: `MyProductController`, `ProductRepository.findBySeller_Id`, 서비스 메서드
+- [x] MY-003/004: 계획은 `orders/purchases`+`orders/sales` 두 엔드포인트였으나, 실제로는 `GET /users/{id}/orders?role=BUYER|SELLER` 하나로 통합(`MyOrderController`)하고 `GET /orders/{orderId}` 상세 조회를 추가했다. `OrderListItemResponse`, `OrderRepository.findByBuyer_Id`/`findBySeller_Id`, `OrderService`
+- [x] MY-005: 계획은 신규 `GET /api/users/{userId}/lives` 엔드포인트였으나, 실제로는 기존 `GET /lives`에 `hostId` 쿼리 파라미터를 추가하는 방식으로 구현(`LiveController`/`LiveService.getLives`) — 신규 엔드포인트/`LiveRepository.findByHost_Id`는 만들지 않았다
+- [x] MY-007: `point/` 패키지 전체(entity 3개, repository 2개, service, controller) — 잔액/내역/충전. 경로는 계획의 `point`(단수)가 아니라 `points`(복수)로 확정했고, 내역 명칭도 `transactions`가 아니라 `logs`로 확정했다. 출금은 계획대로 `point` 하위가 아니라 `WithdrawalController`(`/users/{id}/withdrawals`) 독립 리소스로 만들었고, 계획엔 없던 출금 내역 조회(`GET /users/{id}/withdrawals`)도 추가했다
+- [x] 보너스: `MypageSummaryResponse`, 각 레포지토리 count 메서드, `UserController GET /{userId}/mypage` — 최초 구현 때는 범위 제외(`docs/requests/FE/012`에 명시)했다가 이후 요청으로 추가 구현했다
+- [x] 각 서비스 Mockito 테스트
+- [x] `./gradlew build` 통과 확인(로컬 `bootRun` E2E 검증은 각 커밋 시점에 curl로 수행)
+- [x] 커밋 6~7개로 분리(MY-006/008/009는 이미 완료라 커밋 없음)
 
 ## 테스트
 

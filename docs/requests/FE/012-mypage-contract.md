@@ -1,40 +1,47 @@
-# 마이페이지(MY-001~007) 확정 계약
+# 마이페이지 API 계약
 
-**요청자 파트**: BE
-**대상 파트**: FE
-
-## 배경
-
-마이페이지 API를 구현했다. `docs/requests/BE/011-user-mypage-contract.md`가 요청한 `/api/me`는 이 프로젝트 전례대로 `/api/users/{id}`로 확정했다. MY-006(찜/팔로우)·MY-008(사업자)·MY-009(찜/해제)는 이미 완료돼 있어 이번엔 다루지 않는다(각각 `docs/requests/FE/002`, `011`, `009` 참고).
+**요청자**: BE → **대상**: FE
 
 ## API 목록
 
 | 기능 | Method | Endpoint | 비고 |
 | --- | --- | --- | --- |
-| 내 정보 조회 | GET | `/users/{id}` | `businessVerificationStatus` 포함 |
-| 내 정보 수정 | PATCH | `/users/{id}` | 기존 API(온보딩과 겸용) |
-| 판매 상품 관리 | GET | `/users/{id}/products` | 본인 전용, DRAFT 등 비공개 상태 포함 |
+| 내 정보 조회 | GET | `/users/{id}` | `businessVerificationStatus`/`profileImageUrl`/`description`/`coverImageUrl` 포함 |
+| 내 정보 수정 | PATCH | `/users/{id}` | 온보딩과 겸용, 전체 교체(부분 수정 아님) |
+| 소개글 수정 | PATCH | `/users/{id}/bio` | `{description}`만(선택), 전체 교체 |
+| 프로필 이미지 업로드/삭제 | POST·PUT·DELETE | `/users/{id}/profile-image`(`/upload-url`) | 아래 이미지 업로드 참고 |
+| 커버 이미지 업로드/삭제 | POST·PUT·DELETE | `/users/{id}/cover-image`(`/upload-url`) | 위와 동일 흐름 |
+| 판매 상품 관리 | GET | `/users/{id}/products` | 본인 전용, 비공개 상태 포함 |
 | 구매/판매 내역 | GET | `/users/{id}/orders?role=BUYER\|SELLER` | `role` 필수 |
 | 주문 상세 | GET | `/orders/{orderId}` | 당사자만 |
-| 라이브 관리 | GET | `/lives?hostId={id}` | 기존 목록 API 재사용. 본인 hostId면 종료·취소 이력까지 조회 |
-| 포인트 잔액 | GET | `/users/{id}/points` | 없으면 0으로 자동 생성 |
-| 포인트 사용 내역 | GET | `/users/{id}/points/logs` | 전체 원장 |
-| 포인트 충전 | POST | `/users/{id}/points/charges` | **실결제 없는 테스트/데모 전용** |
-| 출금 신청 | POST | `/users/{id}/withdrawals` | 신청까지만(관리자 승인 없음) |
-| 출금 내역 | GET | `/users/{id}/withdrawals` | WITHDRAW만 필터링된 내역 |
+| 라이브 관리 | GET | `/lives?hostId={id}` | 본인이면 종료·취소 이력까지 |
+| 포인트 잔액 / 내역 / 충전 | GET·GET·POST | `/users/{id}/points`, `/points/logs`, `/points/charges` | 충전은 테스트 전용 |
+| 출금 신청 / 내역 | POST·GET | `/users/{id}/withdrawals` | 신청까지만(승인 없음) |
+| 마이페이지 요약 | GET | `/users/{id}/mypage` | 카운터 + 포인트 잔액 |
 
-모든 엔드포인트는 인증 필요(본인만), `products`/`orders`/`points`/`withdrawals`는 실패 시 403.
+전부 인증 필요(본인만), 실패 시 403.
 
-## 주의할 것
+## 이미지 업로드 (presigned 2단계, 상품 이미지 `FE/001`과 동일)
 
-- **주문 데이터가 없다**: 주문 생성 API가 아직 없어(`docs/requests/BE/010-commerce-wallet-contract.md`), `orders`/판매 정산 화면은 실제 데이터가 없다.
-- **공개 프로필용 아님**: `products`/`lives`는 본인 조회 시에만 전체 정보를 준다 — 판매자 공개 프로필(011 §3.3/§3.5)엔 못 쓴다.
-- 마이페이지 요약(`GET /users/{id}/mypage`, 011 §3.4)은 이번 범위에서 제외했다.
+1. `POST .../profile-image/upload-url`(또는 `cover-image/upload-url`) — `{contentType}`(jpeg/png/webp) → `{key, uploadUrl, expiresInSeconds}`
+2. 받은 `uploadUrl`로 브라우저가 직접 PUT
+3. `PUT .../profile-image`(또는 `cover-image`) — `{key}` → 확정, 최종 공개 URL이 회원 정보에 저장됨
+4. `DELETE .../profile-image`(또는 `cover-image`) — 삭제
 
-## 관련 자료
+## 마이페이지 요약 응답 예시
 
-- Swagger: `/swagger-ui/index.html` — "마이페이지(MyPage)", "주문(Orders)" 태그
-- `docs/APIs.md` — 회원/상품/주문/라이브/포인트 섹션에 반영됨
+```json
+{
+  "user": { "id": 1, "nickname": "vintagelover", "profileImageUrl": null, "memberType": "GENERAL", "businessVerificationStatus": "NONE" },
+  "counts": { "orders": 0, "sales": 0, "wishes": 3, "followers": 12, "unreadNotifications": 1 },
+  "pointBalance": 10000
+}
+```
+
+## 주의
+
+- 주문 생성 API가 아직 없어 `orders`, `counts.orders`/`counts.sales`는 항상 빈 값/0이다.
+- `bio`에서 `coverImageUrl` 필드는 제거됐다 — 커버 이미지는 이제 업로드 API로만 설정한다.
 
 ## 처리 결과
 
