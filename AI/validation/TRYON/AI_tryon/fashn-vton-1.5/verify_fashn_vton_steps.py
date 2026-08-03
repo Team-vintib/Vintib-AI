@@ -58,7 +58,9 @@ for steps in STEP_COUNTS:
 summary_path = os.path.join(_RESULTS_DIR, "summary.md")
 with open(summary_path, "w", encoding="utf-8") as f:
     f.write("# 스텝 수별 속도/VRAM 비교 (alpha1 상의 케이스)\n\n")
-    f.write("기준(30스텝): 추론 884.9s, Peak VRAM 3.17GB — `../../alpha1_person_shirt_tops_result.png`\n\n")
+    f.write(
+        "기준(30스텝): 추론 884.9s, Peak VRAM 3.17GB — `../../alpha1_person_shirt_tops_result.png`\n\n"
+    )
     f.write("| steps | elapsed(s) | peak VRAM(GB) |\n|---|---|---|\n")
     for row in summary_rows[1:]:
         f.write(f"| {row[0]} | {row[1]} | {row[2]} |\n")

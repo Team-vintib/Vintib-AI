@@ -11,6 +11,7 @@ target-version = "py312"
 extend-exclude = [
 "validation/TRYON/AI_tryon/tryondiffusion",
 "validation/TRYON/AI_tryon/CatVTON",
+"validation/TRYON/AI_tryon/fashn-vton-1.5/fashn-vton-1.5",
 "validation/garment-landmark-check",
 ]
 
@@ -26,6 +27,7 @@ extend-exclude = '''
 (
   validation/TRYON/AI_tryon/tryondiffusion
   | validation/TRYON/AI_tryon/CatVTON
+  | validation/TRYON/AI_tryon/fashn-vton-1.5/fashn-vton-1.5
   | validation/garment-landmark-check
 )
 '''

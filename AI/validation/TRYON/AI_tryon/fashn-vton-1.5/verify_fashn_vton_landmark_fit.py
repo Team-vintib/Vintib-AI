@@ -31,7 +31,11 @@ from garment_measurement.contracts import GarmentCategory, LandmarkType  # noqa:
 from garment_measurement.landmark_detector import HRNetLandmarkDetector  # noqa: E402
 
 _HRNET_CHECKPOINT = os.path.join(
-    _REPO_ROOT, "AI", "validation", "garment-landmark-check", "models",
+    _REPO_ROOT,
+    "AI",
+    "validation",
+    "garment-landmark-check",
+    "models",
     "pose_hrnet-w48_384x288-deepfashion2_mAP_0.7017.pth",
 )
 
@@ -54,7 +58,11 @@ def warp_local_width(image: Image.Image, y_center_frac: float, scale: float) -> 
     img_np = np.array(image)
     h, w = img_np.shape[:2]
     band_half = BAND_HALF_HEIGHT_FRAC * h
-    y_start, y_end, taper = y_center_frac * h - band_half, y_center_frac * h + band_half, TAPER_FRAC * h
+    y_start, y_end, taper = (
+        y_center_frac * h - band_half,
+        y_center_frac * h + band_half,
+        TAPER_FRAC * h,
+    )
 
     ys = np.arange(h, dtype=np.float32)
     weight = np.zeros(h, dtype=np.float32)
@@ -71,8 +79,12 @@ def warp_local_width(image: Image.Image, y_center_frac: float, scale: float) -> 
     map_y = np.tile(ys.reshape(h, 1), (1, w)).astype(np.float32)
 
     warped = cv2.remap(
-        img_np, map_x, map_y, interpolation=cv2.INTER_LINEAR,
-        borderMode=cv2.BORDER_CONSTANT, borderValue=(255, 255, 255),
+        img_np,
+        map_x,
+        map_y,
+        interpolation=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=(255, 255, 255),
     )
     return Image.fromarray(warped)
 
@@ -100,7 +112,9 @@ if torch.cuda.is_available():
 shirt_img = Image.open(SHIRT_PATH).convert("RGB")
 h = shirt_img.height
 
-shoulder_y = (by_type[LandmarkType.shoulder_left].pixel_y + by_type[LandmarkType.shoulder_right].pixel_y) / 2
+shoulder_y = (
+    by_type[LandmarkType.shoulder_left].pixel_y + by_type[LandmarkType.shoulder_right].pixel_y
+) / 2
 hem_y = (
     by_type[LandmarkType.hem_left].pixel_y
     + by_type[LandmarkType.hem_center].pixel_y
@@ -159,7 +173,9 @@ for name, garment in garment_variants.items():
 summary_path = os.path.join(_RESULTS_DIR, "summary.md")
 with open(summary_path, "w", encoding="utf-8") as f:
     f.write("# 랜드마크 기반 부위별 핏 조절 테스트 (alpha1 상의)\n\n")
-    f.write(f"tight={TIGHT}, loose={LOOSE}, band_half_height={BAND_HALF_HEIGHT_FRAC}, taper={TAPER_FRAC}\n\n")
+    f.write(
+        f"tight={TIGHT}, loose={LOOSE}, band_half_height={BAND_HALF_HEIGHT_FRAC}, taper={TAPER_FRAC}\n\n"
+    )
     f.write(f"밴드 중심(랜드마크 기반): {band_centers_frac}\n\n")
     f.write("| case | elapsed(s) | peak VRAM(GB) |\n|---|---|---|\n")
     for row in log:

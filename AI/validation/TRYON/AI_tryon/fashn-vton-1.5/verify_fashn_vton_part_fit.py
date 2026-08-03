@@ -51,7 +51,9 @@ BOTTOMS_PARTS = {
 }
 
 
-def warp_local_width(image: Image.Image, y_start_frac: float, y_end_frac: float, scale: float) -> Image.Image:
+def warp_local_width(
+    image: Image.Image, y_start_frac: float, y_end_frac: float, scale: float
+) -> Image.Image:
     """이미지의 [y_start_frac, y_end_frac] 구간만 가로로 scale배, 위아래로 부드럽게 전이."""
     img_np = np.array(image)
     h, w = img_np.shape[:2]
@@ -73,8 +75,12 @@ def warp_local_width(image: Image.Image, y_start_frac: float, y_end_frac: float,
     map_y = np.tile(ys.reshape(h, 1), (1, w)).astype(np.float32)
 
     warped = cv2.remap(
-        img_np, map_x, map_y, interpolation=cv2.INTER_LINEAR,
-        borderMode=cv2.BORDER_CONSTANT, borderValue=(255, 255, 255),
+        img_np,
+        map_x,
+        map_y,
+        interpolation=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=(255, 255, 255),
     )
     return Image.fromarray(warped)
 

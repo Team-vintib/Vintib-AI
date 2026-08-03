@@ -15,7 +15,9 @@ from PIL import Image
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", ".."))
 _ALPHA_DIR = os.path.join(_REPO_ROOT, "AI", "validation", "TRYON", "AI_tryon", "CatVTON", "image")
-_MODELS_DIR = os.path.join(_REPO_ROOT, "AI", "validation", "TRYON", "AI_tryon", "models_ai_generated")
+_MODELS_DIR = os.path.join(
+    _REPO_ROOT, "AI", "validation", "TRYON", "AI_tryon", "models_ai_generated"
+)
 _WEIGHTS_DIR = os.path.join(os.path.dirname(__file__), "fashn-vton-1.5", "weights")
 _RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results", "ai_models_test")
 os.makedirs(_RESULTS_DIR, exist_ok=True)
