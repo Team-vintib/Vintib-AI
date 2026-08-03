@@ -6,9 +6,11 @@ import logoImage from '@/assets/images/logo.png'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import NotificationPopup from '@/domains/notification/components/NotificationPopup.vue'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
+import { getPointBalance } from '@/domains/point/api/pointApi'
 import { ROUTE_NAMES, ROUTE_PATHS, type RoutePath } from '@/shared/constants/routes'
 
 import type { NotificationItem } from '@/domains/notification/types/notification.types'
+import type { PointBalance } from '@/domains/point/types/point.types'
 
 interface UserActionItem {
   label: string
@@ -36,8 +38,15 @@ const canShowNotificationAction = computed(() => isAuthenticated.value)
 const displayName = computed(() => authStore.user?.name || authStore.user?.email || '회원')
 const profileInitial = computed(() => displayName.value.slice(0, 1).toUpperCase())
 const cartItemCount = computed<number | null>(() => null)
+const pointBalance = ref<PointBalance | null>(null)
 const isLoggingOut = ref(false)
 const isNotificationPopupOpen = ref(false)
+let pointBalanceRequestId = 0
+
+const currentUserId = computed(() => authStore.user?.id ?? null)
+const pointLabel = computed(() =>
+  pointBalance.value ? `${pointBalance.value.available.toLocaleString('ko-KR')}P` : '0P',
+)
 
 const primaryMenuItems = [
   { label: '라이브', path: ROUTE_PATHS.LIVE_LIST, authRequired: false },
@@ -139,6 +148,22 @@ const handleLogout = async () => {
   }
 }
 
+const loadPointBalance = async (userId: number) => {
+  const requestId = ++pointBalanceRequestId
+
+  try {
+    const balance = await getPointBalance(userId)
+
+    if (requestId === pointBalanceRequestId) {
+      pointBalance.value = balance
+    }
+  } catch {
+    if (requestId === pointBalanceRequestId) {
+      pointBalance.value = null
+    }
+  }
+}
+
 const handleNotificationButtonClick = async () => {
   isNotificationPopupOpen.value = !isNotificationPopupOpen.value
 
@@ -181,6 +206,21 @@ watch(
   },
   { immediate: true },
 )
+
+watch(
+  currentUserId,
+  (userId) => {
+    pointBalanceRequestId += 1
+
+    if (!userId) {
+      pointBalance.value = null
+      return
+    }
+
+    void loadPointBalance(userId)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -210,10 +250,10 @@ watch(
           class="global-nav__points"
           :class="{ 'global-nav__points--active': isActivePath(ROUTE_PATHS.POINT) }"
           type="button"
-          aria-label="포인트"
+          :aria-label="`보유 포인트 ${pointLabel}`"
           @click="goToPath(ROUTE_PATHS.POINT, { authRequired: true })"
         >
-          포인트
+          {{ pointLabel }}
         </button>
       </nav>
 
@@ -385,7 +425,6 @@ watch(
       </div>
     </div>
   </header>
-
 </template>
 
 <style scoped lang="scss">
