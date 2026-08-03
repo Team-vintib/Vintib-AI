@@ -100,6 +100,10 @@ interface ProductCreateRequest {
   brandId: number | null
   conditionGrade: ProductConditionGrade | ''
   sizeLabel: string
+  color: string | null
+  material: string | null
+  measurements: Record<string, number> | null
+  defects: string[] | null
 }
 
 interface ProductCreateResponse extends Partial<ProductListDto> {
@@ -238,6 +242,10 @@ export const submitProduct = async (
     brandId: findBrandId(draft.brand, brands),
     conditionGrade: draft.conditionGrade,
     sizeLabel: draft.size,
+    color: resolveRegistrationColor(draft),
+    material: draft.material.trim() || null,
+    measurements: resolveRegistrationMeasurements(draft),
+    defects: resolveRegistrationDefects(draft),
   } satisfies ProductCreateRequest)
   const createdProduct = unwrapApiData(createResponse.data)
   const createdProductId = getCreatedProductId(createdProduct)
@@ -477,6 +485,41 @@ const findCategoryId = (draft: ProductRegistrationDraft, categories: CategoryDto
   )
 
   return matchedCategory?.id ?? null
+}
+
+const resolveRegistrationColor = (draft: ProductRegistrationDraft) => {
+  if (draft.color === 'etc') {
+    return draft.customColor.trim() || null
+  }
+
+  return draft.color || null
+}
+
+const resolveRegistrationMeasurements = (draft: ProductRegistrationDraft) => {
+  const measurements = Object.entries(draft.measurements).reduce<Record<string, number>>(
+    (result, [key, value]) => {
+      const parsedValue = Number(String(value).trim())
+
+      if (Number.isFinite(parsedValue) && parsedValue > 0) {
+        result[key] = Math.round(parsedValue)
+      }
+
+      return result
+    },
+    {},
+  )
+
+  return Object.keys(measurements).length ? measurements : null
+}
+
+const resolveRegistrationDefects = (draft: ProductRegistrationDraft) => {
+  if (!draft.hasDefect) {
+    return []
+  }
+
+  const description = draft.sellerDefectDescription.trim()
+
+  return description ? [description] : []
 }
 
 export const getCategoryCode = (categoryName: string) => {

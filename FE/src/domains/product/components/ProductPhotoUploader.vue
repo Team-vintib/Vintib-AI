@@ -12,6 +12,7 @@ interface Props {
   photos: ProductRegistrationPhotoDraft[]
   representativePhotoId: string
   multiple?: boolean
+  required?: boolean
   error?: string
   requirementLabel?: string
   requirementMet?: boolean
@@ -19,6 +20,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   multiple: false,
+  required: false,
   error: '',
   requirementLabel: '',
   requirementMet: true,
@@ -47,7 +49,9 @@ const handleFileChange = (event: Event) => {
     <div class="product-photo-uploader__header">
       <div>
         <h3 :id="`${id}-title`">
-          <span>{{ title }}</span>
+          <span class="product-photo-uploader__title-text">{{ title }}</span>
+          <span v-if="required" class="product-photo-uploader__required" aria-hidden="true"> * </span>
+          <span v-if="required" class="product-photo-uploader__required-text"> 필수 입력 </span>
           <em
             v-if="requirementLabel"
             :class="{ 'product-photo-uploader__requirement--unmet': !requirementMet }"
@@ -114,32 +118,59 @@ const handleFileChange = (event: Event) => {
 }
 
 .product-photo-uploader__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
 }
 
 .product-photo-uploader__header div {
   display: grid;
   gap: var(--space-1);
+  min-width: 0;
 }
 
 .product-photo-uploader__header h3 {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  min-width: 0;
+  gap: 4px;
   color: var(--color-text-primary);
   font-size: 18px;
   font-weight: var(--font-weight-bold);
   line-height: 26px;
 }
 
+.product-photo-uploader__title-text {
+  min-width: 0;
+  white-space: nowrap;
+}
+
 .product-photo-uploader__header h3 em {
+  flex: 0 0 auto;
   color: var(--color-text-primary);
   font-size: 14px;
   font-style: normal;
   font-weight: var(--font-weight-bold);
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.product-photo-uploader__required {
+  flex: 0 0 auto;
+  margin-left: 2px;
+  color: var(--color-error);
+  line-height: 20px;
+}
+
+.product-photo-uploader__required-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  margin: -1px;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .product-photo-uploader__header h3 .product-photo-uploader__requirement--unmet {
@@ -150,6 +181,7 @@ const handleFileChange = (event: Event) => {
   color: var(--color-text-secondary);
   font-size: 14px;
   line-height: 20px;
+  white-space: pre-line;
 }
 
 .product-photo-uploader__trigger {
@@ -157,15 +189,14 @@ const handleFileChange = (event: Event) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 96px;
-  height: var(--button-height-small);
+  width: 100%;
+  min-height: var(--button-height-standard);
   padding: 0 var(--space-4);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
   cursor: pointer;
-  flex: 0 0 auto;
   font-size: 13px;
   font-weight: var(--font-weight-bold);
 }
@@ -214,19 +245,20 @@ const handleFileChange = (event: Event) => {
   display: grid;
   gap: var(--space-2);
   padding: 0 var(--space-2) var(--space-3);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.4fr) minmax(64px, 0.8fr);
 }
 
 .product-photo-uploader__item-actions button {
   min-width: 0;
-  height: var(--button-height-small);
-  padding: 0 var(--space-2);
+  min-height: var(--button-height-standard);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: var(--font-weight-bold);
+  line-height: 18px;
   white-space: nowrap;
 }
 
@@ -260,6 +292,10 @@ const handleFileChange = (event: Event) => {
 
   .product-photo-uploader__trigger {
     width: 100%;
+  }
+
+  .product-photo-uploader__title-text {
+    white-space: normal;
   }
 
   .product-photo-uploader__grid {
