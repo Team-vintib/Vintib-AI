@@ -118,12 +118,28 @@ $COMPOSE up -d
 # Caddy 는 기동 시 한 번만 설정을 읽으므로, 그대로 두면 새 라우팅이 반영되지 않은 채
 # 배포가 "성공"으로 끝난다 — 실제로 -448 에서 /rtc 라우팅이 이 이유로 누락됐다.
 # reload 는 무중단이고, 설정이 잘못되면 기존 설정을 유지한 채 실패한다.
+# ⚠️ reload 가 "성공"해도 옛 설정일 수 있다 — 이게 -514 의 핵심이다.
+#    리눅스에서 파일 단위 bind mount 는 inode 에 묶이는데, rsync 가 rename 으로 파일을
+#    갈아치우면 컨테이너는 옛 inode 를 계속 본다. reload 는 그 옛 파일을 성실히 다시 읽고
+#    성공을 보고한다. 그래서 종료 코드만으로는 반영 여부를 알 수 없다.
+#
+#    마운트를 디렉터리로 바꿔(-514) 원인은 없앴지만, 확인 없이 믿지 않는다.
+#    **호스트 파일과 컨테이너가 보는 파일을 직접 대조**하고, 어긋나면 재시작한다.
 log "Caddy 설정 반영"
-if docker exec vintib-caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
+HOST_SUM=$(md5sum "$DEPLOY_DIR/infra/caddy/Caddyfile" 2>/dev/null | cut -d' ' -f1)
+CTR_SUM=$(docker exec vintib-caddy md5sum /etc/caddy/Caddyfile 2>/dev/null | cut -d' ' -f1)
+
+if [ -n "$HOST_SUM" ] && [ "$HOST_SUM" != "$CTR_SUM" ]; then
+    # 컨테이너가 옛 파일을 보고 있다. reload 로는 못 고친다 — 재시작해야 다시 마운트된다.
+    log "  컨테이너가 옛 Caddyfile 을 보고 있다 (host=$HOST_SUM ctr=$CTR_SUM) — 재시작"
+    docker restart vintib-caddy >/dev/null && log "  Caddy 재시작 완료" \
+        || log "  !! Caddy 재시작 실패 — 라우팅이 옛 설정이다. 수동 확인 필요"
+elif docker exec vintib-caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
+    # 파일은 최신이다. reload 는 무중단이라 이쪽을 우선한다.
     log "  Caddy reload 완료"
 else
-    # 배포 자체를 실패시키지는 않는다 — 백엔드는 이미 새 버전으로 떴고,
-    # Caddy 는 옛 설정으로라도 서비스를 계속하는 편이 낫다.
+    # 문법 오류 등으로 reload 가 거부됐다. 재시작하면 Caddy 가 아예 못 뜰 수 있으므로
+    # 옛 설정으로 서비스를 계속하게 두고 경고만 남긴다.
     log "  !! Caddy reload 실패 — 라우팅이 옛 설정일 수 있다. Caddyfile 문법을 확인할 것"
 fi
 
