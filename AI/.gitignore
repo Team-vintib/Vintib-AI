@@ -36,8 +36,19 @@ app/chat/artifacts/
 validation/QUAL/sam3-condition-check/sample_images/
 validation/QUAL/sam3-condition-check/outputs/
 validation/QUAL/clipseg-condition-check/outputs/
+validation/QUAL/clipseg-sam3tracker-hybrid-check/outputs/
 # SAM 3D 스파이크 산출물(.ply splat + 턴테이블 GIF). splat 은 장당 수십 MB 라 커밋 금지.
 validation/TRYON/sam3d-condition-check/outputs/
 # 의류 파인튜닝 스캐폴드의 산출물 — 더미 데이터·캐시·체크포인트·렌더·리포트 전부 재생성 가능하다.
 validation/TRYON/sam3d-garment-finetune-check/artifacts/
+
+# 상품 정보 분류 스파이크 산출물 — evaluate.py 리포트(JSON/MD)와 ONNX 변환 캐시, 전부 재생성 가능하다.
+validation/CLASS/product-info-check/outputs/
+validation/CLASS/product-info-check/inputs/
+validation/CLASS/product-info-check/.onnx_cache/
+
+# VLM 카테고리 분류용 크롤링 수집물(상품 사진 + JSONL 라벨). 크롤러로 재수집 가능하고,
+# 남의 쇼핑몰 이미지라 저장소에 커밋하지 않는다. 수집기 코드/사이트 스펙은 커밋한다.
+validation/CLASS/crawl-collector/out/
+validation/CLASS/crawl-collector/**/out/
 

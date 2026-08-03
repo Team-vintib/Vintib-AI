@@ -116,7 +116,12 @@ class MockCompsSource(CompsSource):
 
 
 class LlmWebSearchCompsSource(CompsSource):
-    """LLM 서버사이드 웹검색으로 중고 매물을 모은다(CH002 V1에서 동작 확인).
+    """LLM 웹검색(Gemini `google_search` 그라운딩)으로 중고 매물을 모은다.
+
+    2026-07-31부로 Claude(Anthropic Messages API)에서 Gemini(`generateContent`)로
+    전환했다 — GMS가 그라운딩을 통과시키는 것은 LAB-47(웹검색 테스트) V1에서 확인됐다.
+    Anthropic 쪽처럼 날짜 버저닝된 툴 규격 폴백이 없다 — `google_search` 선언 하나로
+    끝이라 규격 폴백 루프가 필요 없다.
 
     ⚠️ **호출마다 과금된다.** 검색 라운드당 비용 + 결과 본문이 입력 토큰으로 들어온다.
     """
@@ -137,40 +142,39 @@ class LlmWebSearchCompsSource(CompsSource):
         from app.pricing import gms
 
         model = self._config["model_id"] or ""
-        last_error: gms.GmsError | None = None
-        for tool_type in self._config["tool_types"]:
-            try:
-                response = gms.messages_create(
-                    api_key=api_key,
-                    model=model,
-                    prompt=_comps_prompt(query),
-                    tools=[{"type": tool_type, "name": "web_search"}],
-                    timeout=self._config["timeout_seconds"],
-                )
-            except gms.GmsError as exc:
-                # 400은 "이 모델이 그 툴 규격을 못 쓴다"는 뜻 — 구형 규격으로 폴백한다.
-                # 그 외(401/5xx/타임아웃)는 폴백해도 같은 결과라 즉시 포기한다.
-                last_error = exc
-                if exc.status == 400:
-                    continue
-                raise CompsUnavailable(str(exc)) from exc
-            return self._parse(response)
+        try:
+            response = gms.generate_content(
+                api_key=api_key,
+                model=model,
+                prompt=_comps_prompt(query),
+                timeout=self._config["timeout_seconds"],
+            )
+        except gms.GmsError as exc:
+            raise CompsUnavailable(str(exc)) from exc
+        return self._parse(response)
 
-        raise CompsUnavailable(f"지원되는 웹검색 규격이 없습니다: {last_error or '후보 없음'}")
+    def _parse(self, response: dict) -> CompsFetch:
+        candidates = response.get("candidates") or []
+        if not candidates:
+            return CompsFetch(
+                items=[],
+                notes=["응답에 candidates가 없습니다."],
+                reason=ReasonCode.no_search_performed,
+            )
 
-    def _parse(self, response: object) -> CompsFetch:
-        blocks = getattr(response, "content", []) or []
-        searched = any(getattr(b, "type", "") == "server_tool_use" for b in blocks)
+        grounding = candidates[0].get("groundingMetadata") or {}
+        searched = bool(grounding.get("groundingChunks") or grounding.get("webSearchQueries"))
         if not searched:
-            # 툴은 통과했는데 모델이 호출하지 않았다 — 검색 없이 지어낸 가격일 수 있으므로
-            # 응답을 통째로 버린다. 근거 없는 시세가 comps로 섞이는 것이 최악이다.
+            # 그라운딩이 안 일어났다 — 검색 없이 지어낸 가격일 수 있으므로 응답을 통째로
+            # 버린다. 근거 없는 시세가 comps로 섞이는 것이 최악이다.
             return CompsFetch(
                 items=[],
                 notes=["모델이 웹검색을 수행하지 않아 응답을 사용하지 않았습니다."],
                 reason=ReasonCode.no_search_performed,
             )
 
-        text = "".join(getattr(b, "text", "") for b in blocks if getattr(b, "type", "") == "text")
+        parts = candidates[0].get("content", {}).get("parts", [])
+        text = "".join(p.get("text", "") for p in parts)
         rows = _extract_json_array(text)
         if not rows:
             return CompsFetch(

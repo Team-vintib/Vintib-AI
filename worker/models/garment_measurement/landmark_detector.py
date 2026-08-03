@@ -5,7 +5,7 @@
 
 `hrnet_deepfashion2`: DeepFashion2 사전학습 HRNet(`svip-lab/HRNet-for-Fashion-Landmark-
 Estimation.PyTorch`). `AI/validation/garment-landmark-check/`에서 실제 사진 + 공식 랜드마크
-정의도로 눈으로 대조 검증한 뒤에 여기로 승격했다(CatVTON/CLIPSeg와 같은 "PoC 먼저" 원칙) —
+정의도로 눈으로 대조 검증한 뒤에 여기로 승격했다(CatVTON/SAM3와 같은 "PoC 먼저" 원칙) —
 그 PoC의 `verify_hrnet_landmarks.py`와 추론 로직은 동일하고, 이 파일은 `registry`의 카테고리별
 매핑(`DF2_CATEGORY_RANGES`/`DF2_LANDMARK_MAPPING`)을 적용해 294개 원시 출력을 `LandmarkType`이
 붙은 목록으로 바꾸는 부분만 다르다.

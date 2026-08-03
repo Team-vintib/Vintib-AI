@@ -48,10 +48,14 @@
   sentence-transformers, FlagEmbedding, datasets 등)이 모여 있는데, **CI에는 설치되지 않는다**
   (아래 CI 섹션 참고) — 로컬에서 별도로 `pip install -r validation/requirements-test.txt`가 필요하다.
 - `pyproject.toml` — `ruff`/`black`(`line-length=100`, `target-version=py312`) 설정과
-  `pytest` 설정. `validation/TRYON/AI_tryon/{tryondiffusion,catvton}`, `validation/**/*.ipynb`는
-  외부/서드파티 코드·노트북이라 lint/format 대상에서 제외되어 있다.
+  `pytest` 설정. `extend-exclude`에 있는 건 `validation/TRYON/AI_tryon/{tryondiffusion,CatVTON}`
+  **뿐이다**(외부/서드파티 코드).
   `per-file-ignores`(`E402`/`BLE001`/`F401` 완화)는 **`validation/**` 에만** 걸려 있다 —
   `test/`에 같이 걸면 테스트 코드의 미사용 import가 그냥 통과한다.
+- **노트북(`.ipynb`)은 ruff 검사 대상이다.** 제외 설정이 없다 — 실제로 새 노트북에서 F541이
+  잡힌 적이 있다(2026-07-30). `black`만 노트북을 건너뛰는데 그것도 설정이 아니라
+  `black[jupyter]` 미설치 때문이고("Skipping .ipynb files as Jupyter dependencies are not
+  installed") CI도 같은 상태다. **노트북을 추가·수정했으면 `ruff check .`를 반드시 돌릴 것.**
 
 ### 추론 코드는 `AI/`에 두지 않는다
 

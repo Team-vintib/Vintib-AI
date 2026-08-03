@@ -15,7 +15,7 @@ from app.pricing.comps import (
     build_comps_source,
     build_query,
 )
-from app.pricing.schemas import GarmentCategory
+from app.pricing.schemas import GarmentCategory, ReasonCode
 
 # --- 쿼리 조립 --------------------------------------------------------------
 
@@ -139,7 +139,53 @@ def test_llm_source_fails_before_touching_network_without_key(monkeypatch):
 
     from app.pricing import gms
 
-    monkeypatch.setattr(gms, "messages_create", _explode)
+    monkeypatch.setattr(gms, "generate_content", _explode)
 
     with pytest.raises(CompsUnavailable, match="GMS_API_KEY"):
         LlmWebSearchCompsSource().fetch("리바이스 501")
+
+
+# --- Gemini 응답 파싱 (네트워크 미접촉, dict를 직접 조립) ----------------------------
+
+
+def test_parse_drops_response_without_candidates():
+    result = LlmWebSearchCompsSource()._parse({})
+    assert result.items == []
+    assert result.reason == ReasonCode.no_search_performed
+
+
+def test_parse_drops_response_without_grounding():
+    """그라운딩(웹검색) 흔적이 없으면 검색 없이 지어낸 답일 수 있으므로 버린다."""
+    response = {"candidates": [{"content": {"parts": [{"text": "[]"}]}}]}
+    result = LlmWebSearchCompsSource()._parse(response)
+    assert result.items == []
+    assert result.reason == ReasonCode.no_search_performed
+
+
+def test_parse_extracts_items_from_grounded_response():
+    response = {
+        "candidates": [
+            {
+                "groundingMetadata": {"webSearchQueries": ["리바이스 501"]},
+                "content": {"parts": [{"text": '[{"title": "리바이스 501", "price": 45000}]'}]},
+            }
+        ]
+    }
+    result = LlmWebSearchCompsSource()._parse(response)
+    assert result.reason is None
+    assert result.items[0].price == 45_000
+    assert result.items[0].source == "llm_web_search"
+
+
+def test_parse_reports_parse_failed_when_grounded_but_unstructured():
+    response = {
+        "candidates": [
+            {
+                "groundingMetadata": {"groundingChunks": [{}]},
+                "content": {"parts": [{"text": "검색은 했지만 표로 못 만들었습니다."}]},
+            }
+        ]
+    }
+    result = LlmWebSearchCompsSource()._parse(response)
+    assert result.items == []
+    assert result.reason == ReasonCode.parse_failed

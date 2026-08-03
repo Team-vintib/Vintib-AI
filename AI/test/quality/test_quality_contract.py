@@ -1,8 +1,8 @@
 """게이트웨이 스키마 ↔ 워커 계약 사본의 일치 검증.
 
-품질 검수 판정은 워커(`worker/models/clipseg/`)가 하고, 그 결과 JSON을 BE가 받는다. 워커는
+품질 검수 판정은 워커(`worker/models/sam3/`)가 하고, 그 결과 JSON을 BE가 받는다. 워커는
 게이트웨이와 배포 단위가 달라(팀원 노트북에서 git clone으로 실행) `app/` 코드를 import할 수
-없어서, 계약을 `worker/models/clipseg/contracts.py`에 **복제**해 두었다.
+없어서, 계약을 `worker/models/sam3/contracts.py`에 **복제**해 두었다.
 
 **복제본은 조용히 어긋난다.** 한쪽에서 enum 값을 바꾸거나 필드를 추가하면 BE가 받는 JSON이
 말없이 달라지고, 그걸 알아채는 건 통합 시점이다. 이 파일이 그걸 막는 유일한 장치다.
@@ -14,8 +14,8 @@
 import ast
 from pathlib import Path
 
-import contracts
 import pytest
+from sam3 import contracts
 
 from app.quality import schemas
 
@@ -35,6 +35,7 @@ _MODEL_PAIRS = [
     (schemas.Finding, contracts.Finding),
     (schemas.SectionScore, contracts.SectionScore),
     (schemas.AttentionMap, contracts.AttentionMap),
+    (schemas.AnnotatedImage, contracts.AnnotatedImage),
 ]
 
 
@@ -68,6 +69,8 @@ def test_worker_dataclasses_serialize_to_plain_json_types():
         matched_prompt="a stain on fabric",
         statement_required=True,
         needs_seller_review=False,
+        no=1,
+        label="오염",
     )
     dumped = finding.to_dict()
 
@@ -76,6 +79,9 @@ def test_worker_dataclasses_serialize_to_plain_json_types():
     assert dumped["severity"] == "MODERATE"
     assert dumped["section"] == "CHEST_CENTER"
     assert dumped["bbox"] == [0.42, 0.35, 0.55, 0.47]  # 튜플이 아니라 리스트
+    assert dumped["no"] == 1
+    assert dumped["label"] == "오염"
+    assert dumped["description"] is None  # sVLM 미연동 상태의 기본값
     assert all(not isinstance(v, tuple) for v in dumped.values())
 
 
@@ -90,9 +96,31 @@ def test_worker_output_validates_against_gateway_schema():
     attention = contracts.AttentionMap(
         image_index=0, defect_type=contracts.DefectType.stain, url="https://x/y.png"
     )
+    annotated = contracts.AnnotatedImage(image_index=0, url="https://x/annotated.png")
+    finding = contracts.Finding(
+        key="stain_0_5_1",
+        defect_type=contracts.DefectType.stain,
+        status=contracts.FindingStatus.detected,
+        image_index=0,
+        section_no=5,
+        section=contracts.GarmentSection.chest_center,
+        confidence=0.81,
+        area_ratio=0.031,
+        bbox=(0.42, 0.35, 0.55, 0.47),
+        severity=contracts.Severity.moderate,
+        matched_prompt="a stain on fabric",
+        statement_required=True,
+        needs_seller_review=False,
+        no=1,
+        label="오염",
+    )
 
     assert schemas.SectionScore(**section.to_dict()).section is schemas.GarmentSection.chest_center
     assert schemas.AttentionMap(**attention.to_dict()).defect_type is schemas.DefectType.stain
+    assert schemas.AnnotatedImage(**annotated.to_dict()).image_index == 0
+    gateway_finding = schemas.Finding(**finding.to_dict())
+    assert gateway_finding.no == 1
+    assert gateway_finding.label == "오염"
 
 
 def test_worker_contract_imports_stay_lightweight():
