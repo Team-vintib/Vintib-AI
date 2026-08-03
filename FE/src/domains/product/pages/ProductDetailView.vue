@@ -86,6 +86,10 @@ const loadProductDetail = async () => {
   }
 
   try {
+    await authStore.validateStoredSession()
+
+    if (requestId !== loadRequestId) return
+
     const nextProduct = await getProductDetailViewData(productId)
 
     if (requestId !== loadRequestId) return

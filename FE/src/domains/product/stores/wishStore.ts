@@ -47,8 +47,19 @@ export const useWishStore = defineStore('wish', () => {
     knownProductIds.value = nextKnownProductIds
   }
 
+  const hydrateWishedProductIds = (productIds: number[]) => {
+    const nextKnownProductIds = new Set(knownProductIds.value)
+
+    productIds.forEach((productId) => {
+      nextKnownProductIds.add(productId)
+    })
+
+    wishedProductIds.value = new Set(productIds)
+    knownProductIds.value = nextKnownProductIds
+  }
+
   const isProductWished = (productId: number, fallback = false) =>
-    knownProductIds.value.has(productId) ? wishedProductIds.value.has(productId) : fallback
+    knownProductIds.value.has(productId) ? wishedProductIds.value.has(productId) : Boolean(fallback)
 
   const clear = () => {
     wishedProductIds.value = new Set()
@@ -60,6 +71,7 @@ export const useWishStore = defineStore('wish', () => {
     wishedCount,
     clear,
     hydrateProducts,
+    hydrateWishedProductIds,
     isProductWished,
     setProductWish,
   }

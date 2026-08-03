@@ -7,6 +7,7 @@ import {
   addWish,
   getCategories,
   getProductList,
+  getWishProductIds,
   removeWish,
 } from '@/domains/product/api/productApi'
 import ProductCard from '@/domains/product/components/ProductCard.vue'
@@ -139,6 +140,7 @@ const loadProducts = async () => {
     totalProductCount.value = response.meta.totalElements
     totalPageCount.value = Math.max(response.meta.totalPages, 1)
     wishStore.hydrateProducts(response.items)
+    await hydrateVisibleProductWishes(response.items)
     filterStatusMessage.value =
       selectedFilterCount.value > 0
         ? `선택한 필터를 적용해 상품 ${response.meta.totalElements}개를 찾았습니다.`
@@ -156,6 +158,32 @@ const loadProducts = async () => {
 
   } finally {
     isLoadingProducts.value = false
+  }
+}
+
+const hydrateVisibleProductWishes = async (visibleProducts: ProductListItem[]) => {
+  if (!authStore.isAuthenticated || !authStore.user?.id) {
+    wishStore.hydrateProducts(
+      visibleProducts.map((product) => ({
+        id: product.id,
+        isLiked: false,
+      })),
+    )
+    return
+  }
+
+  try {
+    const wishedProductIds = new Set(await getWishProductIds(authStore.user.id))
+
+    wishStore.hydrateWishedProductIds([...wishedProductIds])
+    wishStore.hydrateProducts(
+      visibleProducts.map((product) => ({
+        id: product.id,
+        isLiked: wishedProductIds.has(product.id),
+      })),
+    )
+  } catch {
+    // 상품 목록 조회 자체는 유지하고, 기존 스토어 상태로 찜 표시를 계속 시도한다.
   }
 }
 

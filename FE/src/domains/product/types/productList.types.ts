@@ -25,7 +25,7 @@ export interface ProductListItem {
   categoryName?: string | null
   imageUrl: string
   imageAlt: string
-  isLiked: boolean
+  isLiked?: boolean
 }
 
 export interface ProductFilterOption {

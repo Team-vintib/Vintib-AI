@@ -67,6 +67,11 @@ interface ProductListDto {
   createdAt: string
 }
 
+interface ProductWishDto {
+  product: Pick<ProductListDto, 'id'>
+  wishedAt: string
+}
+
 interface BackendPageResponse<T> {
   content: T[]
   page: number
@@ -174,7 +179,6 @@ export const getProductList = async ({
       maxPrice: maxPrice ?? undefined,
       saleType: toSaleTypeParam(saleType),
     },
-    skipAuth: true,
   })
   const pageResponse = normalizePageResponse(unwrapApiData(response.data))
   const items = await Promise.all(pageResponse.items.map(toProductListItem))
@@ -186,9 +190,7 @@ export const getProductList = async ({
 }
 
 export const getProductDetail = async (productId: number): Promise<ProductDetailViewData> => {
-  const response = await http.get<ApiResponse<ProductDetailDto>>(`/products/${productId}`, {
-    skipAuth: true,
-  })
+  const response = await http.get<ApiResponse<ProductDetailDto>>(`/products/${productId}`)
 
   return toProductDetailViewData(unwrapApiData(response.data))
 }
@@ -235,6 +237,30 @@ export const addWish = async (userId: number, productId: number) => {
 
 export const removeWish = async (userId: number, productId: number) => {
   await http.delete(`/users/${userId}/wishes/${productId}`)
+}
+
+export const getWishProductIds = async (userId: number) => {
+  const productIds: number[] = []
+  let page = 0
+  let totalPages = 1
+
+  do {
+    const response = await http.get<
+      ApiResponse<PageResponse<ProductWishDto> | BackendPageResponse<ProductWishDto>>
+    >(`/users/${userId}/wishes`, {
+      params: {
+        page,
+        size: 100,
+      },
+    })
+    const pageResponse = normalizePageResponse(unwrapApiData(response.data))
+
+    productIds.push(...pageResponse.items.map((wish) => wish.product.id))
+    totalPages = pageResponse.meta.totalPages
+    page += 1
+  } while (page < totalPages)
+
+  return productIds
 }
 
 export const submitProduct = async (
@@ -370,7 +396,7 @@ const toProductListItem = async (product: ProductListDto): Promise<ProductListIt
     categoryName: product.categoryName ?? fallbackCategoryLabel(product.categoryId),
     imageUrl,
     imageAlt: `${product.title} 상품 이미지`,
-    isLiked: product.isWished ?? product.isLiked ?? false,
+    isLiked: product.isWished ?? product.isLiked,
   }
 }
 
