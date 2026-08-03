@@ -14,6 +14,7 @@ import type {
   ProductRegistrationPhotoDraft,
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
+import { buildMockAiQualityAnalysis } from '@/domains/product/constants/aiQualityAnalysisMockData'
 import { http } from '@/shared/api/http'
 import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.types'
 
@@ -146,17 +147,6 @@ interface ProductSubmitOptions {
   brands?: BrandDto[]
   categories?: CategoryDto[]
 }
-
-const EMPTY_AI_QUALITY_ANALYSIS = {
-  status: 'NOT_REQUESTED',
-  originalImageUrl: '',
-  originalImageAlt: '',
-  analyzedImageUrl: '',
-  analyzedImageAlt: '',
-  summary: '',
-  findings: [],
-  disclaimer: '',
-} satisfies ProductDetailViewData['aiQualityAnalysis']
 
 export const getProductList = async ({
   categoryIds = [],
@@ -442,10 +432,9 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
       title: defect,
       description: '',
     })),
-    aiQualityAnalysis: {
-      ...EMPTY_AI_QUALITY_ANALYSIS,
-      findings: [],
-    },
+    // ⚠️ Mock 전용 · BE/AI 확인 필요 — 실제 AI 검수(다중 이미지) 계약 전까지 데모용.
+    //   → docs/requests/BE/019-product-quality-multi-image.md
+    aiQualityAnalysis: buildMockAiQualityAnalysis(images),
   }
 }
 
