@@ -53,9 +53,13 @@ const audienceLabel = computed(() => {
     </span>
 
     <div class="live-watch-header__identity">
+      <span class="live-watch-header__avatar" aria-hidden="true">
+        <img v-if="live.hostProfileImageUrl" :src="live.hostProfileImageUrl" alt="" />
+        <template v-else>{{ live.hostNickname.charAt(0) }}</template>
+      </span>
       <strong>{{ live.hostNickname }}</strong>
       <span aria-hidden="true">—</span>
-      <h1>{{ live.title }}</h1>
+      <h1 :title="live.description || undefined">{{ live.title }}</h1>
     </div>
 
     <div class="live-watch-header__meta">
@@ -161,6 +165,28 @@ const audienceLabel = computed(() => {
   align-items: baseline;
   min-width: 0;
   gap: 6px;
+}
+
+.live-watch-header__avatar {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-live-surface-raised);
+  color: var(--color-live-text-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.live-watch-header__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .live-watch-header__identity strong,

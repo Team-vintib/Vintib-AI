@@ -11,9 +11,11 @@ import {
   LiveRealtimeClient,
 } from '@/domains/live/api/liveRealtimeClient'
 import {
+  cancelLiveReminder,
   getLiveWatchViewData,
   isLiveWatchApiEnabled,
   LiveWatchNotFoundError,
+  registerLiveReminder,
 } from '@/domains/live/api/liveWatchApi'
 import LiveProductQueue from '@/domains/live/components/LiveProductQueue.vue'
 import LiveSelectedProduct from '@/domains/live/components/LiveSelectedProduct.vue'
@@ -58,6 +60,24 @@ const isTryOnOpen = ref(false)
 const now = ref(Date.now())
 const videoConnectionLabel = ref('')
 const apiEnabled = isLiveWatchApiEnabled()
+
+const handleToggleReminder = async () => {
+  if (!live.value) {
+    return
+  }
+
+  const next = !live.value.isReminderSet
+  live.value.isReminderSet = next
+
+  try {
+    const result = next
+      ? await registerLiveReminder(live.value.id)
+      : await cancelLiveReminder(live.value.id)
+    live.value.isReminderSet = result.isReminderSet
+  } catch {
+    live.value.isReminderSet = !next
+  }
+}
 const realtimeEnabled = isLiveRealtimeApiEnabled()
 let loadRequestId = 0
 let realtimeClient: LiveRealtimeClient | null = null
@@ -406,7 +426,10 @@ onBeforeUnmount(() => {
               :connection-label="videoConnectionLabel"
               :try-on-disabled="!isTryOnAvailable"
               :try-on-open="isTryOnOpen"
+              :show-reminder="live.status === 'SCHEDULED'"
+              :reminder-active="live.isReminderSet"
               @open-try-on="openTryOn"
+              @toggle-reminder="handleToggleReminder"
             >
               <template #overlay>
                 <LiveChatOverlay
