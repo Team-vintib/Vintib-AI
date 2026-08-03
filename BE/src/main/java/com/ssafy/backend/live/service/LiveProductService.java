@@ -8,6 +8,7 @@ import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveProduct;
 import com.ssafy.backend.live.port.ProductQueryPort;
 import com.ssafy.backend.live.port.ProductQueryPort.CategorySummary;
+import com.ssafy.backend.live.port.ProductQueryPort.ProductCard;
 import com.ssafy.backend.live.port.ProductQueryPort.ProductSummary;
 import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
@@ -84,7 +85,7 @@ public class LiveProductService {
         LiveProduct linked = liveProductRepository.save(
                 LiveProduct.link(live, product.id(), request.sortOrderOrDefault(), LocalDateTime.now()));
 
-        return LiveProductResponse.of(linked, product.title());
+        return LiveProductResponse.of(linked, productQueryPort.findCards(List.of(product.id())).get(product.id()));
     }
 
     /**
@@ -147,15 +148,32 @@ public class LiveProductService {
                                         .toList())));
     }
 
-    /** 현재 연결 중인 상품 목록. 제외된 건은 빠진다. */
+    /**
+     * 현재 연결 중인 상품 목록. 제외된 건은 빠진다.
+     *
+     * <p>상품 정보는 <b>한 번에</b> 가져온다. 편성 상품마다 조회하면 상품 수만큼 쿼리가 나가는데,
+     * 시청 화면은 시청자가 들어올 때마다 열려서 그 비용이 그대로 쌓인다.
+     */
     public List<LiveProductResponse> getLinkedProducts(Long liveId) {
         if (!liveRepository.existsById(liveId)) {
             throw new CustomException(ErrorCode.LIVE_NOT_FOUND);
         }
 
-        return liveProductRepository.findByLiveIdAndRemovedAtIsNullOrderBySortOrderAsc(liveId).stream()
-                .map(liveProduct -> LiveProductResponse.of(liveProduct, productTitleOf(liveProduct.getProductId())))
+        List<LiveProduct> linked =
+                liveProductRepository.findByLiveIdAndRemovedAtIsNullOrderBySortOrderAsc(liveId);
+        Map<Long, ProductCard> cards =
+                productQueryPort.findCards(linked.stream().map(LiveProduct::getProductId).toList());
+
+        // 연결 당시 있던 상품이 이후 삭제될 수 있다. 그때는 카드가 없어 상품 필드만 비고
+        // 연결 자체는 목록에 남는다 — 조용히 사라지면 호스트가 이유를 알 수 없다.
+        return linked.stream()
+                .map(liveProduct -> LiveProductResponse.of(liveProduct, cards.get(liveProduct.getProductId())))
                 .toList();
+    }
+
+    /** 이 방송에 편성돼 있는 상품인지. 제외된 건은 편성으로 보지 않는다. */
+    public boolean isLinked(Long liveId, Long productId) {
+        return liveProductRepository.existsByLiveIdAndProductIdAndRemovedAtIsNull(liveId, productId);
     }
 
     private Live findEditableLive(Long hostId, Long liveId) {
@@ -177,8 +195,4 @@ public class LiveProductService {
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
     }
 
-    // 연결 당시 존재하던 상품이 이후 삭제될 수 있다. 목록 조회가 통째로 실패하지 않도록 제목만 비운다.
-    private String productTitleOf(Long productId) {
-        return productQueryPort.findById(productId).map(ProductSummary::title).orElse(null);
-    }
 }
