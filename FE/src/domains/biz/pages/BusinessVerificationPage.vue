@@ -7,6 +7,7 @@ import BusinessCertificateUploader from '@/domains/biz/components/BusinessCertif
 import { BUSINESS_REGISTRATION_NUMBER_LENGTH } from '@/domains/biz/constants/businessVerification'
 import { useBusinessVerificationStore } from '@/domains/biz/stores/businessVerificationStore'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import BaseButton from '@/domains/onboard/components/BaseButton.vue'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 
@@ -128,6 +129,16 @@ const handleCertificateUpdate = (file: File | null) => {
   touched.certificateFile = true
   certificateSelectionError.value = ''
   submitError.value = ''
+}
+
+const goBack = () => {
+  if (window.history.length > 1) {
+    router.back()
+    return
+  }
+
+  // 직접 진입(히스토리 없음) 시엔 온보딩 전 단계(회원 유형 선택)로 돌아간다.
+  void router.push({ name: ROUTE_NAMES.ONBOARD_MEMBER_TYPE })
 }
 
 const handleSubmit = async () => {
@@ -332,14 +343,28 @@ const handleSubmit = async () => {
           {{ submitError }}
         </p>
 
-        <button
-          type="submit"
-          class="business-form__submit"
-          :disabled="!isFormValid || isSubmitting"
-          aria-describedby="business-submit-description"
-        >
-          {{ isSubmitting ? '제출 중' : '사업자 인증하기' }}
-        </button>
+        <div class="business-form__actions">
+          <BaseButton
+            class="business-form__action"
+            type="button"
+            variant="secondary"
+            size="major"
+            :disabled="isSubmitting"
+            @click="goBack"
+          >
+            이전 단계
+          </BaseButton>
+
+          <BaseButton
+            class="business-form__action"
+            type="submit"
+            size="major"
+            :disabled="!isFormValid || isSubmitting"
+            aria-describedby="business-submit-description"
+          >
+            {{ isSubmitting ? '제출 중' : '사업자 인증하기' }}
+          </BaseButton>
+        </div>
         <p id="business-submit-description" class="business-form__submit-description">
           {{ submitDescription }}
         </p>
@@ -564,17 +589,16 @@ const handleSubmit = async () => {
   line-height: 20px;
 }
 
-.business-form__submit {
-  width: 100%;
-  height: var(--button-height-major);
-  border: 0;
-  border-radius: var(--radius-control);
+.business-form__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
   margin-top: var(--space-6);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  font: inherit;
-  font-size: 15px;
-  font-weight: 600;
+}
+
+.business-form__action {
+  min-width: 160px;
 }
 
 .business-form__submit-error {
@@ -588,14 +612,8 @@ const handleSubmit = async () => {
   line-height: 20px;
 }
 
-.business-form__submit-error + .business-form__submit {
+.business-form__submit-error + .business-form__actions {
   margin-top: var(--space-4);
-}
-
-.business-form__submit:disabled {
-  background: var(--color-border-strong);
-  color: var(--color-text-muted);
-  cursor: not-allowed;
 }
 
 .business-form__submit-description {
@@ -621,6 +639,15 @@ const handleSubmit = async () => {
 
   .business-field--full {
     grid-column: auto;
+  }
+
+  .business-form__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .business-form__action {
+    width: 100%;
   }
 }
 </style>
