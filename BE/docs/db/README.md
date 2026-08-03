@@ -9,7 +9,7 @@
 | 구조와 **설계 이유**를 알고 싶다 | [`erd.md`](./erd.md) — ERD, 상태 전이, 정책→제약 매핑, 미확인 가정 |
 | 컬럼 하나의 타입·제약을 찾고 싶다 | [`data-dictionary.md`](./data-dictionary.md) — 테이블 25개 전체 |
 | 테이블을 직접 만들어 보고 싶다 | [`schema.sql`](./schema.sql) |
-| 카테고리 id가 실제로 뭘 가리키는지 찾고 싶다 | [`category-taxonomy.md`](./category-taxonomy.md) — 성별·대분류·소분류 111개 시드 값 |
+| 카테고리 id가 실제로 뭘 가리키는지 찾고 싶다 | [`../../../docs/category-taxonomy.md`](../../../docs/category-taxonomy.md) — 성별·대분류·소분류 126개 시드 값 |
 
 ## 파일 구성
 
@@ -21,7 +21,6 @@ BE/docs/db/
 ├── gen-data-dictionary.sql      ← 데이터 사전 생성 쿼리
 ├── data-dictionary.header.md    ← 데이터 사전 머리말 (수동 작성)
 ├── data-dictionary.md           ← 🤖 자동 생성 — 직접 고치지 말 것
-├── category-taxonomy.md         ← 카테고리 시드 값 정리 (수동 작성, seed.sql 바뀌면 같이 갱신)
 ├── erd.md                       ← ERD·상태 설계 (mermaid 원본)
 ├── img/                         ← 🤖 자동 생성 — erd.md 에서 뽑은 SVG·PNG
 ├── regen.sh                     ← 데이터 사전 재생성
