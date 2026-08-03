@@ -71,24 +71,27 @@ CATEGORY_MODELS: dict[str, str] = {
 # 경로와 동일) — 새 후보를 추가하면서 이미 실측이 끝난 백엔드의 숫자가 바뀌면 비교가
 # 무의미해지므로, 차이가 나는 모델만 여기에 명시한다.
 #
-# - `trust_remote_code`: Marqo 두 모델은 open_clip 래퍼를 원격 코드로 싣는다(별도로
-#   `pip install open_clip_torch` 필요).
-# - `feature_api`: forward가 image_embeds/text_embeds를 안 주고
-#   `get_image_features()`/`get_text_features()`로만 노출하는 모델(Marqo 래퍼).
+# - `loader`: `"transformers"`(기본) 또는 `"open_clip"`. 아래 Marqo 항목 주석 참고.
+# - `trust_remote_code`: HF 원격 코드를 신뢰할지(transformers 로더 전용).
 # - `text_padding`: SigLIP 계열 토크나이저는 고정 길이(max_length) 패딩이 학습 조건이다.
 #   기존 `siglip_so400m`은 `padding=True`로 이미 실측이 끝나 그대로 두지만(§V2a),
 #   새 SigLIP 후보는 처음부터 모델 카드대로 맞춘다.
+#
+# **Marqo 두 모델을 open_clip으로 싣는 이유(2026-08-03)**: 모델 카드가 제시하는
+# `AutoModel.from_pretrained(..., trust_remote_code=True)` 경로는 **transformers 5.x에서
+# 두 모델 모두 로드 자체가 실패한다**(실측: 5.14.1).
+#   - marqo-fashionCLIP: `ValueError: Unrecognized image processor` — 리포의
+#     `preprocessor_config.json`이 5.x에서 없어진 `CLIPFeatureExtractor`를 가리키고,
+#     auto_map이 지목한 `MarqoFashionImageProcessor` 클래스는 원격 코드 파일에 없다.
+#   - marqo-fashionSigLIP: `NotImplementedError: Cannot copy out of meta tensor` —
+#     원격 코드가 `__init__`에서 `self.model.to(self.device)`를 하는데 5.x는 모듈을
+#     meta 디바이스에 lazy 초기화한다.
+# 원격 코드가 transformers 4.x 시절 작성됐고, 이 저장소의 실행 환경은 Qwen3-VL 때문에
+# 5.x가 필요해서 downgrade로는 못 푼다. Marqo가 함께 문서화한 open_clip 경로는 원격
+# 코드를 아예 안 타므로 이 충돌을 우회한다. `pip install open_clip_torch` 필요.
 CATEGORY_MODEL_LOAD_OPTIONS: dict[str, dict] = {
-    "marqo_fashion_clip": {
-        "trust_remote_code": True,
-        "feature_api": True,
-        "text_padding": "max_length",
-    },
-    "marqo_fashion_siglip": {
-        "trust_remote_code": True,
-        "feature_api": True,
-        "text_padding": "max_length",
-    },
+    "marqo_fashion_clip": {"loader": "open_clip"},
+    "marqo_fashion_siglip": {"loader": "open_clip"},
     "zooclaw_fashion_siglip2": {"text_padding": "max_length"},
 }
 
@@ -170,15 +173,13 @@ class EmbeddingZeroShotClassifier(CategoryClassifier):
         self,
         model_id: str,
         trust_remote_code: bool = False,
-        feature_api: bool = False,
         text_padding: bool | str = True,
     ):
-        """옵션 3개의 기본값은 기존(openai CLIP / google SigLIP) 경로와 동일하다 —
+        """옵션 2개의 기본값은 기존(openai CLIP / google SigLIP) 경로와 동일하다 —
         의미는 `CATEGORY_MODEL_LOAD_OPTIONS` 주석 참고. 직접 넘기기보다
         `make_embedding_classifier(model_key)`로 레지스트리에서 받아 쓰는 걸 권장한다."""
         self.model_id = model_id
         self._trust_remote_code = trust_remote_code
-        self._feature_api = feature_api
         self._text_padding = text_padding
         self._model = None
         self._processor = None
@@ -201,10 +202,8 @@ class EmbeddingZeroShotClassifier(CategoryClassifier):
     def _embed(self, image_path: Path, texts: list[str]):
         """이미지 1장 + 텍스트 N개를 L2 정규화된 임베딩 쌍으로 인코딩한다.
 
-        `feature_api=True`면 forward 대신 `get_image_features()`/`get_text_features()`를
-        쓴다 — Marqo의 open_clip 래퍼는 `__call__` 결과에 image_embeds/text_embeds를
-        노출하지 않는다. 정규화는 여기서 직접 한다(래퍼의 `normalize=True` 인자에
-        의존하지 않는다 — 순정 HF 모델에는 그 인자가 없어서 경로가 갈린다)."""
+        서브클래스(`OpenClipZeroShotClassifier`)가 이 메서드만 갈아끼우면 로딩 스택
+        전체가 바뀐다 — `score_labels`/`score_label_groups`는 여기만 호출한다."""
         import torch
         from PIL import Image
 
@@ -216,12 +215,8 @@ class EmbeddingZeroShotClassifier(CategoryClassifier):
             text=texts, images=image, return_tensors="pt", padding=self._text_padding
         )
         with torch.no_grad():
-            if self._feature_api:
-                image_embeds = self._model.get_image_features(inputs["pixel_values"])
-                text_embeds = self._model.get_text_features(inputs["input_ids"])
-            else:
-                out = self._model(**inputs)
-                image_embeds, text_embeds = out.image_embeds, out.text_embeds
+            out = self._model(**inputs)
+            image_embeds, text_embeds = out.image_embeds, out.text_embeds
 
         image_embeds = image_embeds / image_embeds.norm(dim=-1, keepdim=True)
         text_embeds = text_embeds / text_embeds.norm(dim=-1, keepdim=True)
@@ -261,14 +256,69 @@ class EmbeddingZeroShotClassifier(CategoryClassifier):
         return probs.tolist()
 
 
-def make_embedding_classifier(model_key: str) -> EmbeddingZeroShotClassifier:
-    """레지스트리 키 하나로 체크포인트 + 로딩 옵션을 함께 조립한다.
+class OpenClipZeroShotClassifier(EmbeddingZeroShotClassifier):
+    """transformers 대신 `open_clip`으로 직접 싣는 버전(2026-08-03 추가).
 
-    `color.py`도 같은 함수를 쓴다 — 옵션(`trust_remote_code`/`feature_api`/`text_padding`)이
-    두 곳에 따로 적히면 카테고리에선 되고 색상에선 안 뜨는 식으로 어긋난다."""
-    classifier = EmbeddingZeroShotClassifier(
-        CATEGORY_MODELS[model_key], **CATEGORY_MODEL_LOAD_OPTIONS.get(model_key, {})
-    )
+    왜 필요한지는 `CATEGORY_MODEL_LOAD_OPTIONS`의 Marqo 주석 참고 — 요약하면 Marqo의
+    HF 원격 코드가 transformers 5.x에서 깨지는데, 같은 체크포인트를 open_clip으로
+    받으면 그 경로를 안 탄다.
+
+    `model_id`는 `"hf-hub:<org>/<repo>"` 형식이다(`make_embedding_classifier`가 붙여 준다).
+    `_load`/`_embed`만 덮어쓰고 스코어링(`score_labels`/`score_label_groups`)은 부모
+    구현을 그대로 쓴다."""
+
+    def __init__(self, model_id: str):
+        super().__init__(model_id)
+        self._preprocess = None
+        self._tokenizer = None
+
+    def _load(self):
+        if self._model is not None:
+            return
+        import open_clip
+
+        # create_model_and_transforms는 (model, preprocess_train, preprocess_val)을 준다 —
+        # 추론에는 항상 세 번째(val)를 쓴다. 학습용 전처리에는 랜덤 크롭/플립이 섞여 있어
+        # 그걸 쓰면 같은 이미지가 호출마다 다른 점수를 낸다.
+        model, _preprocess_train, preprocess_val = open_clip.create_model_and_transforms(
+            self.model_id
+        )
+        model.eval()
+        self._model = model
+        self._preprocess = preprocess_val
+        self._tokenizer = open_clip.get_tokenizer(self.model_id)
+
+    def _embed(self, image_path: Path, texts: list[str]):
+        import torch
+        from PIL import Image
+
+        self._load()
+        with Image.open(image_path) as img:
+            image = self._preprocess(img.convert("RGB")).unsqueeze(0)
+        tokens = self._tokenizer(texts)
+        with torch.no_grad():
+            image_embeds = self._model.encode_image(image, normalize=True)
+            text_embeds = self._model.encode_text(tokens, normalize=True)
+        return image_embeds, text_embeds
+
+
+def make_embedding_classifier(model_key: str) -> EmbeddingZeroShotClassifier:
+    """레지스트리 키 하나로 체크포인트 + 로더 + 로딩 옵션을 함께 조립한다.
+
+    `color.py`도 같은 함수를 쓴다 — 로더 선택이 두 곳에 따로 적히면 카테고리에선 되고
+    색상에선 안 뜨는 식으로 어긋난다."""
+    options = dict(CATEGORY_MODEL_LOAD_OPTIONS.get(model_key, {}))
+    loader = options.pop("loader", "transformers")
+    model_id = CATEGORY_MODELS[model_key]
+
+    if loader == "open_clip":
+        # open_clip은 HF 허브 체크포인트를 "hf-hub:" 접두어로 식별한다.
+        classifier: EmbeddingZeroShotClassifier = OpenClipZeroShotClassifier(f"hf-hub:{model_id}")
+    elif loader == "transformers":
+        classifier = EmbeddingZeroShotClassifier(model_id, **options)
+    else:
+        raise ValueError(f"unknown loader: {loader!r} (choices: transformers, open_clip)")
+
     classifier.name = model_key
     return classifier
 
