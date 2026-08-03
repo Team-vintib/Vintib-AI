@@ -48,6 +48,10 @@ public enum ErrorCode {
     BID_LOWER_THAN_CURRENT(HttpStatus.BAD_REQUEST, "A002", "입찰 금액이 현재 최고가보다 낮습니다."),
     AUCTION_ALREADY_CLOSED(HttpStatus.BAD_REQUEST, "A003", "이미 종료된 경매입니다."),
     AUCTION_ALREADY_CONFIGURED(HttpStatus.CONFLICT, "A004", "해당 상품에 이미 설정된 경매가 있습니다."),
+    AUCTION_NOT_FOUND(HttpStatus.NOT_FOUND, "A005", "존재하지 않는 경매입니다."),
+    AUCTION_NOT_STARTABLE(HttpStatus.BAD_REQUEST, "A006", "시작할 수 있는 상태의 경매가 아닙니다."),
+    // 한 라이브에서 동시에 진행 중인 경매는 1개다 (LIVE-004).
+    AUCTION_ALREADY_RUNNING(HttpStatus.CONFLICT, "A007", "이 방송에 이미 진행 중인 경매가 있습니다."),
 
     // [지갑/주문]
     INSUFFICIENT_POINTS(HttpStatus.BAD_REQUEST, "W001", "포인트 잔액이 부족합니다."),
