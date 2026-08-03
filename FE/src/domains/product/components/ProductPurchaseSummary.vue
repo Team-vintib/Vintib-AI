@@ -39,11 +39,11 @@ const purchaseLabel = computed(() => {
 })
 
 const isPurchaseDisabled = computed(() =>
-  ['DRAFT', 'SOLD', 'PRIVATE', 'AUCTION_FAILED'].includes(props.product.saleStatus),
+  ['DRAFT', 'SOLD', 'AUCTION_FAILED'].includes(props.product.saleStatus),
 )
 
 const isCartDisabled = computed(() =>
-  ['DRAFT', 'SOLD', 'PRIVATE'].includes(props.product.saleStatus),
+  ['DRAFT', 'SOLD'].includes(props.product.saleStatus),
 )
 
 const sellerNickname = computed(() => props.seller.nickname?.trim() || '판매자')
@@ -75,9 +75,9 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
         <dt>상품 상태</dt>
         <dd>{{ product.conditionLabel }}</dd>
       </div>
-      <div>
+      <div v-if="product.sizeLabel">
         <dt>사이즈</dt>
-        <dd>{{ product.sizeLabel }} (105)</dd>
+        <dd>{{ product.sizeLabel }}</dd>
       </div>
       <div>
         <dt>색상</dt>

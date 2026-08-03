@@ -11,38 +11,19 @@ export interface ProductRegistrationMeasurementField {
 export const PRODUCT_REGISTRATION_STEPS: ProductRegistrationStep[] = [
   {
     id: 'photos',
-    label: '사진 등록',
-    description: '상품의 전체 모습과 상세 상태가 잘 보이는 사진을 등록해 주세요.',
-  },
-  {
-    id: 'basic',
     label: '기본 정보',
-    description: '상품명, 브랜드, 색상과 카테고리를 입력합니다.',
-  },
-  {
-    id: 'attributes',
-    label: '사이즈/소재',
-    description: '사이즈와 실측 정보를 입력합니다.',
   },
   {
     id: 'condition',
     label: '상태/하자',
-    description: '판매자 고지 정보와 AI 품질 검증 결과를 확인합니다.',
   },
   {
     id: 'pricing',
     label: '가격',
-    description: 'AI 추천가를 참고해 판매 방식과 가격을 설정합니다.',
-  },
-  {
-    id: 'review',
-    label: '검토',
-    description: '등록 전 입력한 정보를 최종 확인합니다.',
   },
   {
     id: 'complete',
     label: '완료',
-    description: '등록 결과를 확인합니다.',
   },
 ]
 
@@ -69,27 +50,20 @@ export const PRODUCT_REGISTRATION_SALE_TYPE_OPTIONS: ProductRegistrationOption[]
 ]
 
 export const PRODUCT_REGISTRATION_COLOR_OPTIONS: ProductRegistrationOption[] = [
-  { id: 'indigo', label: '인디고' },
-  { id: 'black', label: '블랙' },
-  { id: 'white', label: '화이트' },
-  { id: 'ivory', label: '아이보리' },
+  { id: 'black', label: '검정' },
+  { id: 'white', label: '흰색' },
+  { id: 'gray', label: '회색' },
+  { id: 'red', label: '빨강' },
+  { id: 'orange', label: '주황' },
+  { id: 'pink', label: '분홍' },
+  { id: 'yellow', label: '노랑' },
+  { id: 'brown', label: '갈색' },
+  { id: 'green', label: '초록' },
+  { id: 'blue', label: '파랑' },
+  { id: 'purple', label: '보라' },
   { id: 'beige', label: '베이지' },
-  { id: 'camel', label: '카멜' },
-  { id: 'gray', label: '그레이' },
-  { id: 'brown', label: '브라운' },
   { id: 'navy', label: '네이비' },
-  { id: 'blue', label: '블루' },
-  { id: 'sky-blue', label: '스카이블루' },
-  { id: 'green', label: '그린' },
-  { id: 'khaki', label: '카키' },
-  { id: 'red', label: '레드' },
-  { id: 'pink', label: '핑크' },
-  { id: 'yellow', label: '옐로우' },
-  { id: 'orange', label: '오렌지' },
-  { id: 'purple', label: '퍼플' },
-  { id: 'silver', label: '실버' },
-  { id: 'gold', label: '골드' },
-  { id: 'multi', label: '멀티컬러' },
+  { id: 'mixed', label: '혼합' },
   { id: 'etc', label: '기타' },
 ]
 
@@ -157,6 +131,7 @@ export const PRODUCT_REGISTRATION_VALIDATION_MESSAGES = {
   sellerDefectDescriptionRequired: '판매자가 확인한 하자 설명을 입력해 주세요.',
   aiPhotoRequired: 'AI 품질 검증에 사용할 Front View와 Back View 사진을 선택해 주세요.',
   aiPhotoConfirmationRequired: '품질 검증 사진별 확인을 완료해 주세요.',
+  aiModelGenderRequired: 'AI 모델을 선택해 주세요.',
   saleTypeRequired: '판매 방식을 선택해 주세요.',
   directSalePriceRequired: '판매가를 입력해 주세요.',
   auctionStartPriceRequired: '시작가를 입력해 주세요.',

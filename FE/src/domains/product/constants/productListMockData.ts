@@ -12,15 +12,6 @@ import type {
   ProductSortItem,
 } from '../types/productList.types'
 
-export const PRODUCT_CATEGORY_OPTIONS: ProductFilterOption[] = [
-  { id: 'outer', label: '아우터' },
-  { id: 'top', label: '상의' },
-  { id: 'bottom', label: '하의' },
-  { id: 'dress', label: '원피스' },
-  { id: 'shoes', label: '신발' },
-  { id: 'accessory', label: '액세서리' },
-]
-
 export const PRODUCT_CONDITION_OPTIONS: ProductFilterOption[] = [
   { id: 'S', label: 'S급 (최상)' },
   { id: 'A', label: 'A급 (상)' },

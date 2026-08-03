@@ -24,7 +24,6 @@ type ProductSaleStatusDto =
   | 'AUCTION_IN_PROGRESS'
   | 'AUCTION_FAILED'
   | 'SOLD'
-  | 'PRIVATE'
 
 export interface BrandDto {
   id: number
@@ -76,9 +75,21 @@ interface BackendPageResponse<T> {
 
 interface ProductDetailDto extends ProductListDto {
   sellerNickname?: string | null
+  sellerFollowerCount?: number
+  sellerProductCount?: number
   images: ProductImageDto[]
   color?: string | null
   material?: string | null
+  defects?: string[]
+  measurements?: Record<string, number>
+  linkedLive?: {
+    liveId: number
+    title: string
+    status: string
+    scheduledAt: string | null
+    startedAt: string | null
+    thumbnailUrl: string
+  } | null
   updatedAt: string
 }
 
@@ -89,6 +100,10 @@ interface ProductCreateRequest {
   brandId: number | null
   conditionGrade: ProductConditionGrade | ''
   sizeLabel: string
+  color: string | null
+  material: string | null
+  measurements: Record<string, number> | null
+  defects: string[] | null
 }
 
 interface ProductCreateResponse extends Partial<ProductListDto> {
@@ -108,7 +123,7 @@ interface ProductImageRegisterRequest {
 }
 
 interface ProductListParams {
-  categoryIds?: string[]
+  categoryIds?: number[]
   conditionGrades?: string[]
   maxPrice?: number | null
   minPrice?: number | null
@@ -154,7 +169,7 @@ export const getProductList = async ({
       conditionGrades: conditionGrades.length ? conditionGrades.join(',') : undefined,
       minPrice: minPrice ?? undefined,
       maxPrice: maxPrice ?? undefined,
-      saleType: saleType === 'ALL' ? undefined : saleType,
+      saleType: toSaleTypeParam(saleType),
     },
   })
   const pageResponse = normalizePageResponse(unwrapApiData(response.data))
@@ -227,6 +242,10 @@ export const submitProduct = async (
     brandId: findBrandId(draft.brand, brands),
     conditionGrade: draft.conditionGrade,
     sizeLabel: draft.size,
+    color: resolveRegistrationColor(draft),
+    material: draft.material.trim() || null,
+    measurements: resolveRegistrationMeasurements(draft),
+    defects: resolveRegistrationDefects(draft),
   } satisfies ProductCreateRequest)
   const createdProduct = unwrapApiData(createResponse.data)
   const createdProductId = getCreatedProductId(createdProduct)
@@ -375,12 +394,16 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
     seller: {
       id: product.sellerId,
       nickname: product.sellerNickname?.trim() || '',
-      followerCount: 0,
-      productCount: 0,
+      followerCount: product.sellerFollowerCount ?? 0,
+      productCount: product.sellerProductCount ?? 0,
     },
-    linkedLive: null,
+    linkedLive: toLinkedLive(product.linkedLive),
+    measurements: product.measurements ?? {},
     similarProducts: [],
-    sellerDisclosedDefects: [],
+    sellerDisclosedDefects: (product.defects ?? []).map((defect) => ({
+      title: defect,
+      description: '',
+    })),
     aiQualityAnalysis: {
       ...EMPTY_AI_QUALITY_ANALYSIS,
       findings: [],
@@ -388,8 +411,38 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
   }
 }
 
+// BE 상세 계약(010)의 linkedLive를 FE 뷰 타입(ProductLinkedLive)으로 변환한다.
+// startedAt이 있으면 방송 중(LIVE), 없으면 방송 예정(SCHEDULED)으로 본다.
+const toLinkedLive = (
+  linkedLive: ProductDetailDto['linkedLive'],
+): ProductDetailViewData['linkedLive'] => {
+  if (!linkedLive) {
+    return null
+  }
+
+  return {
+    id: linkedLive.liveId,
+    title: linkedLive.title,
+    startsAt: linkedLive.startedAt ?? linkedLive.scheduledAt ?? '',
+    status: linkedLive.startedAt ? 'LIVE' : 'SCHEDULED',
+    thumbnailUrl: linkedLive.thumbnailUrl,
+  }
+}
+
 const toProductSaleType = (saleType: ProductSaleTypeDto): ProductSaleType =>
   saleType === 'AUCTION' ? 'AUCTION' : 'DIRECT'
+
+// 목록 필터 탭 id(FE 표시용 'DIRECT')를 BE 계약(010)의 saleType 값으로 변환한다.
+// 'ALL'은 전체 조회라 파라미터를 보내지 않는다.
+const toSaleTypeParam = (
+  saleType: ProductSaleTypeTab['id'],
+): ProductSaleTypeDto | undefined => {
+  if (saleType === 'ALL') {
+    return undefined
+  }
+
+  return saleType === 'DIRECT' ? 'DIRECT_SALE' : 'AUCTION'
+}
 
 const getPrimaryImageUrl = (product: ProductDetailDto) =>
   getSortedProductImages(product)[0]?.url ?? ''
@@ -432,6 +485,41 @@ const findCategoryId = (draft: ProductRegistrationDraft, categories: CategoryDto
   )
 
   return matchedCategory?.id ?? null
+}
+
+const resolveRegistrationColor = (draft: ProductRegistrationDraft) => {
+  if (draft.color === 'etc') {
+    return draft.customColor.trim() || null
+  }
+
+  return draft.color || null
+}
+
+const resolveRegistrationMeasurements = (draft: ProductRegistrationDraft) => {
+  const measurements = Object.entries(draft.measurements).reduce<Record<string, number>>(
+    (result, [key, value]) => {
+      const parsedValue = Number(String(value).trim())
+
+      if (Number.isFinite(parsedValue) && parsedValue > 0) {
+        result[key] = Math.round(parsedValue)
+      }
+
+      return result
+    },
+    {},
+  )
+
+  return Object.keys(measurements).length ? measurements : null
+}
+
+const resolveRegistrationDefects = (draft: ProductRegistrationDraft) => {
+  if (!draft.hasDefect) {
+    return []
+  }
+
+  const description = draft.sellerDefectDescription.trim()
+
+  return description ? [description] : []
 }
 
 export const getCategoryCode = (categoryName: string) => {

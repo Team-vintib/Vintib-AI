@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import {
   addWish,
+  getCategories,
   getProductList,
   removeWish,
 } from '@/domains/product/api/productApi'
@@ -15,6 +16,7 @@ import {
   PRODUCT_SORT_OPTIONS,
 } from '@/domains/product/constants/productListMockData'
 import type {
+  ProductCategoryOption,
   ProductListItem,
   ProductSaleTypeTab,
   ProductSortOption,
@@ -26,7 +28,8 @@ import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const selectedCategoryIds = ref<string[]>([])
+const categoryOptions = ref<ProductCategoryOption[]>([])
+const selectedCategoryIds = ref<number[]>([])
 const selectedConditionIds = ref<string[]>([])
 const selectedSaleType = ref<ProductSaleTypeTab['id']>('ALL')
 const selectedSortOption = ref<ProductSortOption>('LATEST')
@@ -53,7 +56,6 @@ const selectedFilterCount = computed(
     Number(Boolean(maximumPrice.value)),
 )
 
-const filteredProducts = computed(() => products.value)
 const visiblePageNumbers = computed(() =>
   Array.from({ length: totalPageCount.value }, (_, index) => index + 1),
 )
@@ -211,7 +213,20 @@ const moveToPage = (page: number) => {
   void loadProducts()
 }
 
+const loadCategoryOptions = async () => {
+  try {
+    const categories = await getCategories()
+
+    categoryOptions.value = categories
+      .filter((category) => category.depth <= 2)
+      .map((category) => ({ id: category.id, label: category.name }))
+  } catch {
+    categoryOptions.value = []
+  }
+}
+
 onMounted(() => {
+  void loadCategoryOptions()
   void loadProducts()
 })
 </script>
@@ -233,6 +248,7 @@ onMounted(() => {
 
       <div class="product-list-page__content">
         <ProductFilterPanel
+          :category-options="categoryOptions"
           v-model:selected-category-ids="selectedCategoryIds"
           v-model:selected-condition-ids="selectedConditionIds"
           v-model:minimum-price="minimumPrice"
@@ -281,12 +297,12 @@ onMounted(() => {
           </p>
 
           <div
-            v-if="!isLoadingProducts && filteredProducts.length"
+            v-if="!isLoadingProducts && products.length"
             class="product-list-page__grid"
             aria-label="상품 목록"
           >
             <ProductCard
-              v-for="product in filteredProducts"
+              v-for="product in products"
               :key="product.id"
               :product="product"
               :is-liked="likedProductIds.has(product.id)"
@@ -309,11 +325,16 @@ onMounted(() => {
           </div>
 
           <nav
-            v-if="filteredProducts.length"
+            v-if="products.length"
             class="product-list-page__pagination"
             aria-label="상품 목록 페이지"
           >
-            <button type="button" aria-label="이전 페이지" disabled>
+            <button
+              type="button"
+              aria-label="이전 페이지"
+              :disabled="selectedPage <= 1"
+              @click="moveToPage(selectedPage - 1)"
+            >
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="m15 18-6-6 6-6" />
               </svg>
@@ -328,7 +349,12 @@ onMounted(() => {
             >
               {{ page }}
             </button>
-            <button type="button" aria-label="다음 페이지">
+            <button
+              type="button"
+              aria-label="다음 페이지"
+              :disabled="selectedPage >= totalPageCount"
+              @click="moveToPage(selectedPage + 1)"
+            >
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="m9 18 6-6-6-6" />
               </svg>
