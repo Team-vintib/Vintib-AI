@@ -65,7 +65,7 @@ class ChatMessageControllerTest {
                 .build());
 
         liveId = liveRepository.save(
-                        Live.openNow(speaker, "빈티지 데님 라이브", null, LocalDateTime.now()))
+                        Live.openNow(speaker, "빈티지 데님 라이브", null, null, LocalDateTime.now()))
                 .getId();
     }
 

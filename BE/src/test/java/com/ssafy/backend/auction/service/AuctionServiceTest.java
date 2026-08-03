@@ -57,7 +57,7 @@ class AuctionServiceTest {
 
     private Live 진행중인_라이브() {
         when(host.getId()).thenReturn(HOST_ID);
-        return Live.openNow(host, "빈티지 데님 라이브", null, LocalDateTime.now());
+        return Live.openNow(host, "빈티지 데님 라이브", null, null, LocalDateTime.now());
     }
 
     private AuctionConfigRequest 설정_요청() {
@@ -123,7 +123,7 @@ class AuctionServiceTest {
     @Test
     void 본인_라이브가_아니면_경매를_설정할_수_없다() {
         when(host.getId()).thenReturn(HOST_ID);
-        Live 남의_라이브 = Live.openNow(host, "남의 라이브", null, LocalDateTime.now());
+        Live 남의_라이브 = Live.openNow(host, "남의 라이브", null, null, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(남의_라이브));
         AuctionConfigRequest request = 설정_요청();
 

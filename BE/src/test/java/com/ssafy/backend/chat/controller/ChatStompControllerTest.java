@@ -76,7 +76,7 @@ class ChatStompControllerTest {
         Member viewer = saveMember("시청자");
         viewerToken = jwtTokenProvider.createAccessToken(viewer.getId(), viewer.getEmail());
 
-        liveId = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, LocalDateTime.now())).getId();
+        liveId = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, null, LocalDateTime.now())).getId();
     }
 
     @AfterEach
@@ -186,7 +186,7 @@ class ChatStompControllerTest {
 
     @Test
     void 종료된_방송에는_발언할_수_없다() throws Exception {
-        Live ended = liveRepository.save(Live.openNow(host, "끝난 방송", null, LocalDateTime.now()));
+        Live ended = liveRepository.save(Live.openNow(host, "끝난 방송", null, null, LocalDateTime.now()));
         ended.transitionTo(LiveStatus.ENDED, LocalDateTime.now());
         liveRepository.save(ended);
 

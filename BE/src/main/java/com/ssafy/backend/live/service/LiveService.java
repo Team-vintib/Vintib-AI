@@ -69,7 +69,12 @@ public class LiveService {
         Member host = findHost(hostId);
 
         Live live = liveRepository.save(
-                Live.schedule(host, request.title(), request.thumbnailUrl(), request.scheduledAt()));
+                Live.schedule(
+                        host,
+                        request.title(),
+                        request.thumbnailUrl(),
+                        request.description(),
+                        request.scheduledAt()));
         liveProductService.linkProductsOnCreate(hostId, live, request.productIds());
 
         return LiveResponse.from(live);
@@ -89,7 +94,12 @@ public class LiveService {
         Member host = findHost(hostId);
 
         Live live = liveRepository.save(
-                Live.openNow(host, request.title(), request.thumbnailUrl(), LocalDateTime.now()));
+                Live.openNow(
+                        host,
+                        request.title(),
+                        request.thumbnailUrl(),
+                        request.description(),
+                        LocalDateTime.now()));
         liveProductService.linkProductsOnCreate(hostId, live, request.productIds());
 
         // 즉시 개설은 생성 시점에 이미 LIVE 라 여기서 room 을 배정한다. 이름에 ID 가 들어가므로
@@ -104,8 +114,12 @@ public class LiveService {
      *
      * <p>편성 상품을 함께 담아 시청 화면 진입 시 왕복을 늘리지 않는다. 상품 조회는
      * {@link LiveProductService}에 위임해 연결 조회 규칙(제외된 건 제외)을 한 곳에만 둔다.
+     *
+     * @param viewerId 조회한 회원 ID. <b>비회원이면 null</b>. 호스트 여부({@code isHost})를 서버가
+     *                 계산해 내려주기 위해 받는다 — FE 가 {@code hostId}를 직접 비교하면 재입장 시
+     *                 회원 정보 복원이 렌더보다 늦어 "내 방송인데 팔로우 버튼이 뜨는" 문제가 생긴다
      */
-    public LiveDetailResponse getLiveDetail(Long liveId) {
+    public LiveDetailResponse getLiveDetail(Long liveId, Long viewerId) {
         Live live = liveRepository.findById(liveId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LIVE_NOT_FOUND));
 
@@ -118,7 +132,8 @@ public class LiveService {
                 liveProductService.getLinkedProducts(liveId),
                 categories,
                 // 화면 진입 시 초기값. 이후 변화는 /topic/lives/{liveId}/viewers 로 간다.
-                liveViewerService.getViewerCount(liveId));
+                liveViewerService.getViewerCount(liveId),
+                viewerId);
     }
 
     /**

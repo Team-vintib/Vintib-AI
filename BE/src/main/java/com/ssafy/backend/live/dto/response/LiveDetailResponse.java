@@ -24,11 +24,26 @@ public record LiveDetailResponse(
         @Schema(description = "호스트 닉네임", example = "빈티지장인")
         String hostNickname,
 
+        @Schema(
+                description = "호스트 프로필 이미지 URL. 등록하지 않았으면 null",
+                example = "https://i15a108.p.ssafy.io/vintib-public/profile/1.jpg")
+        String hostProfileImageUrl,
+
+        @Schema(
+                description = "**요청자가 이 방송의 호스트인지.** 비회원이거나 토큰이 없으면 false. "
+                        + "판매자 전용 UI(종료·상품 전환 버튼)와 팔로우 버튼 노출을 이 값으로 가른다 — "
+                        + "`hostId`를 클라이언트에서 직접 비교하면 회원 정보 복원이 늦을 때 판정이 뒤집힌다",
+                example = "false")
+        boolean isHost,
+
         @Schema(description = "방송명", example = "빈티지 데님 라이브")
         String title,
 
         @Schema(description = "썸네일 URL", example = "https://cdn.example.com/live/101.jpg")
         String thumbnailUrl,
+
+        @Schema(description = "방송 설명. 없으면 null", example = "90년대 리바이스 위주로 소개합니다")
+        String description,
 
         @Schema(description = "방송 상태", example = "LIVE")
         LiveStatus status,
@@ -70,17 +85,25 @@ public record LiveDetailResponse(
         List<LiveCategoryResponse> categories
 ) {
 
+    /**
+     * @param viewerId 조회한 회원 ID. <b>비회원이면 {@code null}</b>이며 이때 {@code isHost}는 false다.
+     *                 시청 조회는 공개 엔드포인트라 토큰이 없을 수 있다
+     */
     public static LiveDetailResponse of(
             Live live,
             List<LiveProductResponse> products,
             List<LiveCategoryResponse> categories,
-            int currentViewerCount) {
+            int currentViewerCount,
+            Long viewerId) {
         return new LiveDetailResponse(
                 live.getId(),
                 live.getHost().getId(),
                 live.getHost().getNickname(),
+                live.getHost().getProfileImageUrl(),
+                live.isHostedBy(viewerId),
                 live.getTitle(),
                 live.getThumbnailUrl(),
+                live.getDescription(),
                 live.getStatus(),
                 live.getScheduledAt(),
                 live.getStartedAt(),

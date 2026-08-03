@@ -208,6 +208,7 @@ CREATE TABLE live (
     host_id           BIGINT       NOT NULL REFERENCES member (id),
     title             VARCHAR(200) NOT NULL,
     thumbnail_url     VARCHAR(500),
+    description       VARCHAR(1000),                  -- 방송 설명(선택). 시청 화면 헤더 표시용
     status            VARCHAR(20)  NOT NULL DEFAULT 'SCHEDULED',
     scheduled_at      TIMESTAMPTZ,                    -- 예약 라이브만. 즉시 라이브는 NULL
     started_at        TIMESTAMPTZ,
