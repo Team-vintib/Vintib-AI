@@ -69,6 +69,29 @@ def _hex_to_rgb(hex_code: str) -> tuple[int, int, int]:
     return tuple(int(hex_code[i : i + 2], 16) for i in (0, 2, 4))  # type: ignore[return-value]
 
 
+def gray_world_white_balance(image: "object") -> "object":
+    """gray-world 가정 화이트밸런스 보정: 이미지 평균이 중성회색이 되도록 채널별로
+    스케일링한다(입력·반환 모두 PIL.Image, RGB로 변환됨).
+
+    실측(2026-08-03, N=10, `REPORT.md` §13): VLM 색상 primary 정확도를 0.60~0.70 ->
+    **0.90**(3회 반복 다수결)으로 올렸다 — 프롬프트 엔지니어링(§10~§12)이 못 올린 걸
+    입력 전처리가 해결했다. 조명의 색 편향(warm/cool cast)이 WHITE->IVORY, BLACK->GRAY/NAVY
+    같은 오답의 실제 원인이었다는 뜻이다. 카테고리(§10 v4, 10/10 유지)엔 부작용이 없었다.
+    한계: 장면 전체 평균이 실제로 무채색에 가깝다는 가정이 전제라, 어둡고 단일 색이 화면
+    대부분을 차지하는 사진(예: `black_stain.png`)에서는 가정이 깨져 여전히 오답이 남는다."""
+    import numpy as np
+
+    arr = np.asarray(image.convert("RGB"), dtype=np.float64)
+    channel_means = arr.reshape(-1, 3).mean(axis=0)
+    gray = channel_means.mean()
+    scale = gray / np.clip(channel_means, 1e-6, None)
+    corrected = np.clip(arr * scale, 0, 255).astype(np.uint8)
+
+    from PIL import Image
+
+    return Image.fromarray(corrected)
+
+
 def nearest_palette_color_with_distance(rgb: tuple[float, float, float]) -> tuple[str, float]:
     """가장 가까운 팔레트 색 코드 + 정규화된 거리(0~1, 0이면 정확히 일치)."""
     best_code, best_dist = None, float("inf")
