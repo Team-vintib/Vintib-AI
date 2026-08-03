@@ -11,11 +11,11 @@ import {
 import ProductCard from '@/domains/product/components/ProductCard.vue'
 import ProductFilterPanel from '@/domains/product/components/ProductFilterPanel.vue'
 import {
-  PRODUCT_LIST_MOCK_DATA,
   PRODUCT_SALE_TYPE_TABS,
   PRODUCT_SORT_OPTIONS,
 } from '@/domains/product/constants/productListMockData'
 import type {
+  ProductListItem,
   ProductSaleTypeTab,
   ProductSortOption,
 } from '@/domains/product/types/productList.types'
@@ -37,12 +37,12 @@ const maximumPrice = ref('')
 const appliedMinimumPrice = ref<number | null>(null)
 const appliedMaximumPrice = ref<number | null>(null)
 const priceError = ref('')
-const products = ref(PRODUCT_LIST_MOCK_DATA)
-const totalProductCount = ref(PRODUCT_LIST_MOCK_DATA.length)
+const products = ref<ProductListItem[]>([])
+const totalProductCount = ref(0)
 const totalPageCount = ref(1)
 const isLoadingProducts = ref(false)
 const productLoadError = ref('')
-const likedProductIds = ref(new Set(PRODUCT_LIST_MOCK_DATA.filter((product) => product.isLiked).map((product) => product.id)))
+const likedProductIds = ref(new Set<number>())
 const filterStatusMessage = ref('')
 
 const selectedFilterCount = computed(

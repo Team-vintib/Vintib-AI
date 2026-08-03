@@ -93,7 +93,12 @@ const handleComplete = async () => {
   submitError.value = ''
 
   try {
-    const response = await completeOnboarding({ memberType })
+    const response = await completeOnboarding(
+      { memberType },
+      {
+        userId: authStore.user?.id,
+      },
+    )
 
     if (!response.success) {
       applyApiError(response.error ?? null)

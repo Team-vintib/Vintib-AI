@@ -33,7 +33,7 @@ authStore.hydrateSession()
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const canShowNotificationAction = computed(() => isAuthenticated.value)
-const displayName = computed(() => authStore.user?.name || '회원')
+const displayName = computed(() => authStore.user?.name || authStore.user?.email || '회원')
 const profileInitial = computed(() => displayName.value.slice(0, 1).toUpperCase())
 const cartItemCount = computed<number | null>(() => null)
 const isLoggingOut = ref(false)
@@ -63,6 +63,7 @@ const userActionItems = computed<UserActionItem[]>(() => [
 
 const profileMenuItems = computed<ProfileMenuItem[]>(() => [
   { label: '마이페이지', path: ROUTE_PATHS.MY },
+  { label: 'AI 시착', path: ROUTE_PATHS.MY, query: { section: 'tryon' } },
   { label: '구매 내역', path: ROUTE_PATHS.MY, query: { section: 'orders' } },
   { label: '판매 내역', path: ROUTE_PATHS.MY, query: { section: 'sales' } },
   { label: '찜한 상품', path: ROUTE_PATHS.MY, query: { section: 'wishlist' } },

@@ -1,9 +1,6 @@
 import { http } from '@/shared/api/http'
-import {
-  readImageFileAsDataUrl,
-  saveMockDefaultTryOnImage,
-} from '@/shared/api/mockProfileMediaStorage'
-import { saveMockUserInterests, type UserInterests } from '@/shared/api/mockInterestStorage'
+
+import { saveMyTryOnProfile } from '@/domains/tryon/api/tryOnProfileApi'
 
 import type { ApiResponse } from '@/shared/types/api.types'
 
@@ -24,6 +21,10 @@ export interface SaveBasicInfoRequest {
   postalCode: string | null
   address: string
   detailAddress: string
+}
+
+export interface SaveBasicInfoOptions {
+  userId?: number | null
 }
 
 export interface SaveOnboardingInterestsRequest {
@@ -56,12 +57,23 @@ export interface CompleteOnboardingRequest {
   memberType: OnboardingMemberType
 }
 
-export const saveOnboardingBasicInfo = async (request: SaveBasicInfoRequest) => {
-  if (!ONBOARDING_API_ENABLED) {
-    return ONBOARDING_SUCCESS_RESPONSE
+export interface CompleteOnboardingOptions {
+  userId?: number | null
+}
+
+export const saveOnboardingBasicInfo = async (
+  request: SaveBasicInfoRequest,
+  options: SaveBasicInfoOptions = {},
+) => {
+  if (!options.userId) {
+    if (!ONBOARDING_API_ENABLED) {
+      return ONBOARDING_SUCCESS_RESPONSE
+    }
+
+    throw new Error('기본 정보를 저장할 회원 ID가 없습니다.')
   }
 
-  const { data } = await http.patch<ApiResponse<null>>('/me/onboarding', request)
+  const { data } = await http.patch<ApiResponse<null>>(`/users/${options.userId}`, request)
 
   return data
 }
@@ -69,20 +81,17 @@ export const saveOnboardingBasicInfo = async (request: SaveBasicInfoRequest) => 
 export const saveOnboardingInterests = async (
   request: SaveOnboardingInterestsRequest,
   options: SaveOnboardingInterestsOptions = {},
-): Promise<ApiResponse<UserInterests | null>> => {
-  if (!ONBOARDING_API_ENABLED) {
-    return {
-      success: true,
-      data: saveMockUserInterests(options.userId, request.brandIds, request.categoryIds),
-      error: null,
-    }
-  }
-
+): Promise<ApiResponse<null>> => {
   if (!options.userId) {
+    if (!ONBOARDING_API_ENABLED) {
+      void request
+      return ONBOARDING_SUCCESS_RESPONSE
+    }
+
     throw new Error('관심 정보를 저장할 회원 ID가 없습니다.')
   }
 
-  const { data } = await http.put<ApiResponse<UserInterests>>(
+  const { data } = await http.put<ApiResponse<null>>(
     `/users/${options.userId}/interests`,
     request,
   )
@@ -94,50 +103,33 @@ export const saveOnboardingTryOnProfile = async (
   request: SaveOnboardingTryOnProfileRequest,
   options: SaveOnboardingTryOnProfileOptions = {},
 ): Promise<ApiResponse<SaveOnboardingTryOnProfileResponse | null>> => {
-  if (!ONBOARDING_API_ENABLED) {
-    if (!request.bodyPhoto) {
+  const profile = await saveMyTryOnProfile(request, options.userId)
+
+  return {
+    success: true,
+    data: {
+      defaultTryOnImageUrl: profile.bodyPhotoUrl,
+    },
+    error: null,
+  }
+}
+
+export const completeOnboarding = async (
+  request: CompleteOnboardingRequest,
+  options: CompleteOnboardingOptions = {},
+) => {
+  if (!options.userId) {
+    if (!ONBOARDING_API_ENABLED) {
       return ONBOARDING_SUCCESS_RESPONSE
     }
 
-    const defaultTryOnImageUrl = await readImageFileAsDataUrl(
-      request.bodyPhoto,
-      'AI 시착용 사진을 읽지 못했습니다.',
-    )
-
-    saveMockDefaultTryOnImage(options.userId, defaultTryOnImageUrl)
-
-    return {
-      success: true,
-      data: {
-        defaultTryOnImageUrl,
-      },
-      error: null,
-    }
+    throw new Error('온보딩을 완료할 회원 ID가 없습니다.')
   }
 
-  const formData = new FormData()
-
-  Object.entries(request).forEach(([field, value]) => {
-    if (value !== undefined) {
-      formData.append(field, value)
-    }
-  })
-
-  const { data } = await http.put<ApiResponse<SaveOnboardingTryOnProfileResponse | null>>('/me/tryon', formData, {
-    headers: {
-      'Content-Type': undefined,
-    },
-  })
-
-  return data
-}
-
-export const completeOnboarding = async (request: CompleteOnboardingRequest) => {
-  if (!ONBOARDING_API_ENABLED) {
-    return ONBOARDING_SUCCESS_RESPONSE
-  }
-
-  const { data } = await http.post<ApiResponse<null>>('/me/onboarding/complete', request)
+  const { data } = await http.patch<ApiResponse<null>>(
+    `/users/${options.userId}/member-type`,
+    request,
+  )
 
   return data
 }

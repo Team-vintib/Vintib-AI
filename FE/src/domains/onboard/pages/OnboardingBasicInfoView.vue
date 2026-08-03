@@ -3,6 +3,7 @@ import axios from 'axios'
 import { nextTick, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { openPostcodeSearch } from '@/domains/onboard/api/postcode'
 import { saveOnboardingBasicInfo } from '@/domains/onboard/api/onboarding'
 import BaseButton from '@/domains/onboard/components/BaseButton.vue'
@@ -58,6 +59,7 @@ const isSubmitting = ref(false)
 const submitError = ref('')
 const detailAddressInput = ref<InstanceType<typeof BaseInput> | null>(null)
 const router = useRouter()
+const authStore = useAuthStore()
 
 const genderOptions: { value: Exclude<Gender, ''>; label: string }[] = [
   { value: 'MALE', label: '남성' },
@@ -268,6 +270,8 @@ const handleSubmit = async () => {
       postalCode: form.zonecode || null,
       address: form.address,
       detailAddress: form.detailAddress,
+    }, {
+      userId: authStore.user?.id,
     })
 
     if (!response.success) {
