@@ -59,7 +59,7 @@ const tryOnProduct = computed<LiveWatchProduct | null>(() => {
     brandName: detail.brand,
     price: detail.price,
     thumbnailUrl: detail.images[0]?.url ?? null,
-    saleType: detail.saleType === 'AUCTION' ? 'AUCTION' : 'FIXED_PRICE',
+    saleType: detail.saleType === 'AUCTION' ? 'AUCTION' : 'DIRECT_SALE',
     material: detail.material,
     condition: detail.conditionLabel,
     measurements: detail.sizeLabel,
