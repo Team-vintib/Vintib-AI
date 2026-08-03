@@ -381,7 +381,7 @@ docs/
 - `App.vue`는 `RouterView`만 렌더링합니다.
 - 기능 ID prefix 기준 도메인 폴더와 공통 폴더가 생성되어 있습니다.
 - `domains/auth`에는 회원가입 방식 선택 화면, 이메일 회원가입 화면, 이메일 로그인 화면, 이메일 인증 UI, SSAFY 로그인/가입 시작 화면, SSO callback 화면, 계정 연결 화면, 인증 API 호출 함수와 타입, 인증 store가 구현되어 있습니다.
-- `domains/onboard`에는 기본 정보, 관심 정보, AI 시착 정보 입력·저장 화면과 ONBOARD-004 이동 확인용 임시 화면 및 관련 API·컴포넌트가 구현되어 있습니다.
+- `domains/onboard`에는 기본 정보, 관심 정보, AI 시착 정보 입력·저장 화면과 ONBOARD-004 이동 확인용 임시 화면 및 관련 API·컴포넌트가 구현되어 있습니다. AI 시착 정보 저장은 `domains/tryon` 사용자 프로필 adapter를 사용합니다.
 - `domains/biz`에는 BIZ-001 사업자 정보 입력·검증 화면, 사업자등록증 이미지 선택
   컴포넌트, FE 더미 제출 상태 store와 BIZ-001-2 인증 대기 화면이 구현되어 있습니다.
   BIZ-001-2의 메인 이동은 HOME route로 연결되어 있으며, 실제 인증 API는 후속 작업 대기 중입니다.

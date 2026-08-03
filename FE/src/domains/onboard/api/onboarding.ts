@@ -1,5 +1,7 @@
 import { http } from '@/shared/api/http'
 
+import { saveMyTryOnProfile } from '@/domains/tryon/api/tryOnProfileApi'
+
 import type { ApiResponse } from '@/shared/types/api.types'
 
 const ONBOARDING_API_ENABLED = import.meta.env.VITE_ONBOARDING_API_ENABLED === 'true'
@@ -101,9 +103,15 @@ export const saveOnboardingTryOnProfile = async (
   request: SaveOnboardingTryOnProfileRequest,
   options: SaveOnboardingTryOnProfileOptions = {},
 ): Promise<ApiResponse<SaveOnboardingTryOnProfileResponse | null>> => {
-  void request
-  void options
-  return ONBOARDING_SUCCESS_RESPONSE
+  const profile = await saveMyTryOnProfile(request, options.userId)
+
+  return {
+    success: true,
+    data: {
+      defaultTryOnImageUrl: profile.bodyPhotoUrl,
+    },
+    error: null,
+  }
 }
 
 export const completeOnboarding = async (
