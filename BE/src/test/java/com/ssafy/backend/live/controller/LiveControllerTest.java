@@ -395,6 +395,122 @@ class LiveControllerTest {
                 .andExpect(jsonPath("$.error").doesNotExist());
     }
 
+    /** 진행 중 라이브 + 그 방송에 편성된 상품 하나. 소개 상품 전환 테스트용. */
+    private Long 편성까지_끝난_라이브_ID() {
+        Live live = liveRepository.save(
+                Live.openNow(hostMember, "빈티지 데님 라이브", null, LocalDateTime.now()));
+        liveProductRepository.save(LiveProduct.link(live, productId, (short) 0, LocalDateTime.now()));
+        return live.getId();
+    }
+
+    private String currentProductBody(String productIdValue) {
+        return "{\"productId\":%s}".formatted(productIdValue);
+    }
+
+    @Test
+    void 호스트가_소개_상품을_바꾸면_상세에_반영된다() throws Exception {
+        Long liveId = 편성까지_끝난_라이브_ID();
+
+        mockMvc.perform(patch("/api/lives/{liveId}/current-product", liveId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(currentProductBody(String.valueOf(productId))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.liveId").value(liveId))
+                .andExpect(jsonPath("$.data.currentProductId").value(productId));
+
+        // 시청 화면 진입 시 초기값이 되어야 하므로 상세 응답에도 실려야 한다.
+        mockMvc.perform(get("/api/lives/{liveId}", liveId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.currentProductId").value(productId));
+    }
+
+    @Test
+    void 상품_ID를_null로_보내면_소개_상품이_해제된다() throws Exception {
+        Long liveId = 편성까지_끝난_라이브_ID();
+        mockMvc.perform(patch("/api/lives/{liveId}/current-product", liveId)
+                .header("Authorization", "Bearer " + hostToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(currentProductBody(String.valueOf(productId))));
+
+        mockMvc.perform(patch("/api/lives/{liveId}/current-product", liveId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(currentProductBody("null")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.currentProductId").doesNotExist());
+    }
+
+    @Test
+    void 편성되지_않은_상품은_소개할_수_없다() throws Exception {
+        Long liveId = 편성까지_끝난_라이브_ID();
+        Long 편성_안_된_상품 = productRepository.save(Product.builder()
+                        .seller(hostMember)
+                        .categoryId(categoryRepository.findAll().get(0).getId())
+                        .title("편성하지 않은 상품")
+                        .build())
+                .getId();
+
+        mockMvc.perform(patch("/api/lives/{liveId}/current-product", liveId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(currentProductBody(String.valueOf(편성_안_된_상품))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("L006"));
+    }
+
+    @Test
+    void 호스트가_아니면_소개_상품을_바꿀_수_없다() throws Exception {
+        Long liveId = 편성까지_끝난_라이브_ID();
+        // 온보딩 게이트(-475)를 통과해야 컨트롤러까지 온다. 안 그러면 L004 대신 U004 가 나온다.
+        Member 남 = Member.builder()
+                .email("other-" + UUID.randomUUID() + "@example.com")
+                .password("encoded")
+                .name("남")
+                .build();
+        남.updateBasicInfo(
+                "other-" + UUID.randomUUID().toString().substring(0, 8),
+                "01000000001", "서울", "2층", null, Gender.MALE);
+        남.completeOnboarding(MemberType.GENERAL);
+        memberRepository.save(남);
+        String 남의_토큰 = jwtTokenProvider.createAccessToken(남.getId(), 남.getEmail());
+
+        mockMvc.perform(patch("/api/lives/{liveId}/current-product", liveId)
+                        .header("Authorization", "Bearer " + 남의_토큰)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(currentProductBody(String.valueOf(productId))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("L004"));
+    }
+
+    @Test
+    void 종료된_방송은_소개_상품을_바꿀_수_없다() throws Exception {
+        Long liveId = 편성까지_끝난_라이브_ID();
+        mockMvc.perform(patch("/api/lives/{liveId}/status", liveId)
+                .header("Authorization", "Bearer " + hostToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"ENDED\"}"));
+
+        mockMvc.perform(patch("/api/lives/{liveId}/current-product", liveId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(currentProductBody(String.valueOf(productId))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("L007"));
+    }
+
+    @Test
+    void 편성_상품_응답에_브랜드_가격_썸네일이_담긴다() throws Exception {
+        // 시청 화면 상품 패널이 이 응답만으로 그려져야 한다(FE 요청 006).
+        Long liveId = 편성까지_끝난_라이브_ID();
+
+        mockMvc.perform(get("/api/lives/{liveId}", liveId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.products[0].productTitle").value("리바이스 501 빈티지"))
+                // 필드가 응답 스키마에 존재하는지를 본다. 값은 상품 등록 내용에 따라 null 일 수 있다.
+                .andExpect(jsonPath("$.data.products[0].productId").value(productId));
+    }
+
     @Test
     void 존재하지_않는_라이브를_조회하면_404를_반환한다() throws Exception {
         mockMvc.perform(get("/api/lives/{liveId}", 99_999_999L))

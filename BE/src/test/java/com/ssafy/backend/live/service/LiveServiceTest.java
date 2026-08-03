@@ -10,9 +10,11 @@ import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import com.ssafy.backend.live.dto.request.LiveCurrentProductRequest;
 import com.ssafy.backend.live.dto.request.LiveInstantRequest;
 import com.ssafy.backend.live.dto.request.LiveScheduleRequest;
 import com.ssafy.backend.live.dto.request.LiveStatusUpdateRequest;
+import com.ssafy.backend.live.dto.response.CurrentProductResponse;
 import com.ssafy.backend.live.dto.response.LiveDetailResponse;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
@@ -205,5 +207,86 @@ class LiveServiceTest {
 
         assertThatThrownBy(() -> liveService.scheduleLive(HOST_ID, request))
                 .isInstanceOf(CustomException.class);
+    }
+
+    private Live 진행_중인_라이브() {
+        when(host.getId()).thenReturn(HOST_ID);
+        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        return live;
+    }
+
+    @Test
+    void 편성된_상품으로_소개_상품을_바꾼다() {
+        Live live = 진행_중인_라이브();
+        when(liveProductService.isLinked(LIVE_ID, 2001L)).thenReturn(true);
+
+        CurrentProductResponse response =
+                liveService.changeCurrentProduct(HOST_ID, LIVE_ID, new LiveCurrentProductRequest(2001L));
+
+        assertThat(response.liveId()).isEqualTo(LIVE_ID);
+        assertThat(response.currentProductId()).isEqualTo(2001L);
+        assertThat(live.getCurrentProductId()).isEqualTo(2001L);
+    }
+
+    @Test
+    void 상품_ID가_null이면_소개_상품이_해제된다() {
+        Live live = 진행_중인_라이브();
+        live.changeCurrentProduct(2001L);
+
+        CurrentProductResponse response =
+                liveService.changeCurrentProduct(HOST_ID, LIVE_ID, new LiveCurrentProductRequest(null));
+
+        // 해제는 정상 동작이라 편성 검증을 타지 않는다.
+        assertThat(response.currentProductId()).isNull();
+        assertThat(live.getCurrentProductId()).isNull();
+        verify(liveProductService, never()).isLinked(any(), any());
+    }
+
+    @Test
+    void 편성되지_않은_상품은_소개할_수_없다() {
+        진행_중인_라이브();
+        when(liveProductService.isLinked(LIVE_ID, 9999L)).thenReturn(false);
+        LiveCurrentProductRequest request = new LiveCurrentProductRequest(9999L);
+
+        // 편성 목록에 없는 상품을 NOW 로 두면 시청자가 목록에 없는 상품의 배지를 보게 된다.
+        assertThatThrownBy(() -> liveService.changeCurrentProduct(HOST_ID, LIVE_ID, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.LIVE_PRODUCT_NOT_FOUND);
+    }
+
+    @Test
+    void 호스트가_아니면_소개_상품을_바꿀_수_없다() {
+        진행_중인_라이브();
+        LiveCurrentProductRequest request = new LiveCurrentProductRequest(2001L);
+
+        assertThatThrownBy(() -> liveService.changeCurrentProduct(OTHER_MEMBER_ID, LIVE_ID, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_LIVE_HOST);
+    }
+
+    @Test
+    void 종료된_방송은_소개_상품을_바꿀_수_없다() {
+        when(host.getId()).thenReturn(HOST_ID);
+        Live 종료된_방송 = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
+        종료된_방송.transitionTo(LiveStatus.ENDED, LocalDateTime.now());
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(종료된_방송));
+        LiveCurrentProductRequest request = new LiveCurrentProductRequest(2001L);
+
+        assertThatThrownBy(() -> liveService.changeCurrentProduct(HOST_ID, LIVE_ID, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_LIVE_STATE);
+    }
+
+    @Test
+    void 방송_중에도_소개_상품을_바꿀_수_있다() {
+        // 편성 변경은 방송이 시작되면 잠기지만, 소개 상품 전환은 방송 중에 하는 것이 본래 용도다.
+        Live live = 진행_중인_라이브();
+        when(liveProductService.isLinked(LIVE_ID, 2001L)).thenReturn(true);
+
+        liveService.changeCurrentProduct(HOST_ID, LIVE_ID, new LiveCurrentProductRequest(2001L));
+
+        assertThat(live.getStatus()).isEqualTo(LiveStatus.LIVE);
+        assertThat(live.getCurrentProductId()).isEqualTo(2001L);
     }
 }

@@ -48,6 +48,7 @@ erDiagram
     member ||--o{ live : hosts
     live ||--o{ live_product : lists
     product ||--o{ live_product : listed
+    product |o--o{ live : "now showing"
 
     live ||--o{ auction : holds
     product ||--o{ auction : "sold via"
@@ -261,6 +262,7 @@ stateDiagram-v2
 | 금액은 `BIGINT`(원 단위 정수) | KRW는 소수점이 없다. `NUMERIC`은 불필요한 비용 |
 | 시각은 전부 `TIMESTAMPTZ` | 경매 종료 판정이 서버 시각 기준이라 타임존 모호성을 남기면 안 된다 |
 | `live_product` 제외를 `removed_at` soft delete | 방송 중 제외해도 "그 시점에 연결돼 있었다"는 사실이 남아야 다시보기 타임라인(LIVE-008)을 만들 수 있다 |
+| `live.current_product_id` 컬럼 보유 (LIVE-004) | 라이브 카테고리는 편성 상품에서 **유도**하지만 "지금 소개 중"은 **호스트의 현재 의도라 파생할 근거가 없다.** 전환 이력은 남기지 않는다 — `shown_at` 한 컬럼으로 현재와 이력을 겸하려 하면 상품을 되돌아갈 때 둘 다 깨진다. 이력이 필요해지면(LIVE-008) 별도 테이블을 만든다 |
 | `auction.current_price` / `top_bidder_id` 비정규화 | AUCT-011 최고 입찰자 실시간 표시가 초당 수십 회 조회된다. 매번 `bid` 집계는 부담 |
 | `auction.extension_count` 보유 | 5초 연장은 횟수 제한이 없지만, 이상 동작 검증과 발표용 통계에 필요 |
 | `orders` 테이블명 | `order`는 SQL 예약어 |

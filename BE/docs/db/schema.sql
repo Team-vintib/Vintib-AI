@@ -208,6 +208,10 @@ CREATE TABLE live (
     ended_at          TIMESTAMPTZ,
     openvidu_room     VARCHAR(100),                   -- OpenVidu v3 room name
     peak_viewer_count INTEGER      NOT NULL DEFAULT 0,
+    -- 지금 소개 중인 상품(LIVE-004). FE NOW 배지의 원천.
+    -- 카테고리는 편성 상품에서 유도하지만 "지금 소개 중"은 호스트의 현재 의도라 파생할 근거가
+    -- 없어 컬럼으로 둔다. 편성된 상품인지는 애플리케이션이 live_product 로 검증한다.
+    current_product_id BIGINT      REFERENCES product (id),
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT ck_live_status CHECK (status IN (

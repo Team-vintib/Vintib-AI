@@ -44,6 +44,16 @@ public interface ProductQueryPort {
     List<Long> findProductIdsInCategories(Collection<Long> categoryIds);
 
     /**
+     * 시청 화면 상품 카드에 필요한 정보를 한 번에.
+     *
+     * <p>편성 상품 하나하나에 대해 상품·브랜드·이미지를 따로 조회하면 상품 수만큼 쿼리가 나간다.
+     * 시청 화면은 진입할 때마다 열리므로 그 비용이 그대로 쌓인다.
+     *
+     * @param productIds 비어 있으면 빈 map
+     */
+    Map<Long, ProductCard> findCards(Collection<Long> productIds);
+
+    /**
      * 라이브가 상품에 대해 알아야 하는 최소 정보.
      *
      * @param id        상품 ID
@@ -51,6 +61,29 @@ public interface ProductQueryPort {
      * @param title     상품명 — 시청 화면·연결 목록 표시용
      */
     record ProductSummary(Long id, Long sellerId, String title) {
+    }
+
+    /**
+     * 시청 화면 상품 카드 한 장(FE 요청 {@code docs/requests/FE/006}).
+     *
+     * <p><b>{@code saleType}을 문자열로 받는 이유.</b> 이 포트는 라이브가 상품의 내부 구조를 모르게
+     * 하려고 둔 것이라 상품 도메인 enum을 그대로 노출하지 않는다. 값은 FE로 그대로 흘러갈 뿐
+     * 라이브 쪽에서 분기하지 않는다.
+     *
+     * @param brandName      브랜드명. 브랜드 미지정 상품은 {@code null}
+     * @param price          상시 판매가. 경매 예정 상품은 아직 가격이 없어 {@code null}
+     * @param saleType       {@code DIRECT_SALE} / {@code AUCTION}. 판매 방식 미정이면 {@code null}
+     * @param conditionGrade 중고 상태 등급. 등급 체계가 미확정이라 자유 문자열이다
+     * @param thumbnailUrl   대표 이미지 URL. 등록된 이미지가 없으면 {@code null}
+     */
+    record ProductCard(
+            Long id,
+            String title,
+            String brandName,
+            Long price,
+            String saleType,
+            String conditionGrade,
+            String thumbnailUrl) {
     }
 
     /** 카테고리 표시용 최소 정보. */

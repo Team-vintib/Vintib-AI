@@ -15,12 +15,14 @@ import com.ssafy.backend.live.dto.request.LiveProductLinkRequest;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveProduct;
 import com.ssafy.backend.live.port.ProductQueryPort;
+import com.ssafy.backend.live.port.ProductQueryPort.ProductCard;
 import com.ssafy.backend.live.port.ProductQueryPort.ProductSummary;
 import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,11 +77,39 @@ class LiveProductServiceTest {
                 .thenReturn(false);
         when(liveProductRepository.save(any(LiveProduct.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        // 응답에 상품 카드(브랜드·가격·썸네일)까지 실리므로 연결 직후에도 카드를 조회한다.
+        when(productQueryPort.findCards(List.of(PRODUCT_ID))).thenReturn(Map.of(
+                PRODUCT_ID,
+                new ProductCard(PRODUCT_ID, "리바이스 501 빈티지", "Levi's", 45000L,
+                        "DIRECT_SALE", "A", "https://cdn.example.com/p/2001.jpg")));
 
         var response = liveProductService.linkProduct(HOST_ID, LIVE_ID, 연결_요청());
 
         assertThat(response.productId()).isEqualTo(PRODUCT_ID);
         assertThat(response.productTitle()).isEqualTo("리바이스 501 빈티지");
+        assertThat(response.brandName()).isEqualTo("Levi's");
+        assertThat(response.price()).isEqualTo(45000L);
+        assertThat(response.saleType()).isEqualTo("DIRECT_SALE");
+        assertThat(response.thumbnailUrl()).isEqualTo("https://cdn.example.com/p/2001.jpg");
+    }
+
+    @Test
+    void 상품이_삭제됐어도_연결_목록에서_사라지지_않는다() {
+        // 목록 조회는 호스트 검증을 하지 않는다(비회원도 본다) — 호스트 스텁을 두면 불필요 스텁이 된다.
+        Live live = Live.openNow(host, "빈티지 데님 라이브", null, LocalDateTime.now());
+        when(liveRepository.existsById(LIVE_ID)).thenReturn(true);
+        when(liveProductRepository.findByLiveIdAndRemovedAtIsNullOrderBySortOrderAsc(LIVE_ID))
+                .thenReturn(List.of(LiveProduct.link(live, PRODUCT_ID, (short) 0, LocalDateTime.now())));
+        // 연결 당시 있던 상품이 이후 삭제된 상황 — 카드가 없다.
+        when(productQueryPort.findCards(List.of(PRODUCT_ID))).thenReturn(Map.of());
+
+        var products = liveProductService.getLinkedProducts(LIVE_ID);
+
+        // 조용히 사라지면 호스트가 왜 하나가 없어졌는지 알 수 없다. 상품 필드만 빈다.
+        assertThat(products).hasSize(1);
+        assertThat(products.get(0).productId()).isEqualTo(PRODUCT_ID);
+        assertThat(products.get(0).productTitle()).isNull();
+        assertThat(products.get(0).brandName()).isNull();
     }
 
     @Test
