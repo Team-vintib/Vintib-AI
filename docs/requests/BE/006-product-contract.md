@@ -30,6 +30,7 @@
 - 현재 임시 처리 또는 Mock 사용 여부
   - 목록 필터(카테고리/상태등급/판매방식/가격범위/정렬)는 구현 완료 — 아래 3.1 참고. `keyword`
     (검색어)만 아직 미구현이다(SEARCH-002 스코프, PROD-008과 별도).
+  - 상세 응답 보강(판매자 통계/찜/연결 라이브/카테고리·브랜드명)은 구현 완료 — 아래 3.2 참고.
   - 상품 상세의 가격 분포, 유사 상품, AI 품질 분석/가격 추천은 화면 내 mock 또는 임시 데이터 성격이 남아 있다.
 
 ## 3. 추가 구현 요청
@@ -46,16 +47,24 @@
 `/search`(SEARCH-001/002, 통합 검색)가 아직 통째로 미구현 상태라 그쪽에서 다룰 문제로 본다.
 FE가 목록 화면에서 검색어까지 당장 필요하면 별도 요청으로 우선순위를 알려달라.
 
-### 3.2 상품 상세 응답 보강
+### 3.2 상품 상세 응답 보강 — `similarProducts`/`priceDistribution` 제외 구현 완료
 
-- Method / Endpoint: `GET /api/products/{id}`
-- 요청 목적: 상세 화면에서 판매자 요약, 연결 라이브, 상세 치수, 유사 상품을 실제 데이터로 표시한다.
-- FE 사용처: `ProductDetailView.vue`
-- 요청 데이터
-  - Path: `id`
-- 응답 데이터
-  - 기존 상세 필드 유지
-  - 추가 후보: `seller`, `relatedLive`, `measurements`, `similarProducts`, `priceDistribution`
+`GET /api/products/{id}`(`ProductDetailResponse`)에 다음을 추가했다:
+
+- `categoryName`, `brandName` — 카테고리/브랜드 표시명(각각 없으면 `null`)
+- `isWished` — 찜 여부. **비회원은 `null`이 아니라 `false`로 확정**(협의 필요 사항의 "비회원
+  isWished 정책" 질문 해소). 로그인 회원은 실제 찜 여부.
+- `sellerFollowerCount`, `sellerProductCount` — 판매자 팔로워 수, 판매 중인 상품 수(DRAFT 제외).
+  요청 문서의 `seller` 중첩 객체 대신 최상위 평탄 필드로 냈다 — 기존 `sellerNickname`과 같은
+  레벨에 두는 게 일관적이라고 판단했다.
+- `linkedLive` — 연결된 라이브 요약(`liveId`, `title`, `status`, `scheduledAt`, `startedAt`,
+  `thumbnailUrl`), 없으면 `null`. 요청한 `relatedLive`와 이름만 다르다.
+- `measurements`는 이미 반영돼 있었다(SY015).
+
+**아직 없는 것**: `similarProducts`(유사 상품), `priceDistribution`(가격 분포) — 이번 스코프
+밖(`docs/plans/BE/SY017-product-detail-social-live.md`), 응답 구조 자체가 미확정이라 별도
+계획으로 다뤄야 한다. 이미지 `role`(FRONT/BACK/ADDITIONAL)도 아직 없다.
+
 - 응답 예시
 
 ```json
@@ -64,13 +73,17 @@ FE가 목록 화면에서 검색어까지 당장 필요하면 별도 요청으�
   "data": {
     "id": 1,
     "sellerNickname": "vintagelover",
+    "categoryName": "자켓",
+    "brandName": "리바이스",
     "images": [],
     "measurements": {
       "chest": 52,
       "length": 68
     },
-    "relatedLive": null,
-    "similarProducts": []
+    "isWished": false,
+    "sellerFollowerCount": 120,
+    "sellerProductCount": 45,
+    "linkedLive": null
   },
   "error": null
 }
@@ -89,15 +102,10 @@ FE가 목록 화면에서 검색어까지 당장 필요하면 별도 요청으�
 
 - 기존 요청·응답에서 변경할 내용
   - `GET /api/products` query 필터 반영 — `keyword` 제외 완료(3.1 참고)
-  - `GET /api/products/{id}` 상세 응답 보강
+  - `GET /api/products/{id}` 상세 응답 보강 — `similarProducts`/`priceDistribution` 제외 완료(3.2 참고)
 - 추가할 필드
-  - 이미지 role 정책 필요 시 `images[].role`: `FRONT` | `BACK` | `ADDITIONAL`
-  - 상세 치수 `measurements`
-  - 판매자 요약 `seller`
-  - 연결 라이브 `relatedLive`
+  - 이미지 role 정책 필요 시 `images[].role`: `FRONT` | `BACK` | `ADDITIONAL` — 아직 미반영
 - 변경 영향 범위
-  - 상품 목록 필터/정렬
-  - 상품 상세 정보 섹션
   - 상품 등록 AI 검증 단계
 
 ## 5. 보류 또는 시연 제외 범위
@@ -113,13 +121,12 @@ FE가 목록 화면에서 검색어까지 당장 필요하면 별도 요청으�
 
 ## 6. 협의 필요 사항
 
-- FE·BE 간 결정이 필요한 내용 — 목록 필터 파라미터명·`saleType` enum은 3.1에서 확정돼 제외함
-  - 비회원 목록/상세의 `isWished` 값 정책
+- FE·BE 간 결정이 필요한 내용 — 목록 필터 파라미터명·`saleType` enum(3.1), 비회원 `isWished`
+  정책(3.2, `false`로 확정)은 해소됨
   - 이미지 role 저장 여부
   - AI 품질 분석 endpoint 위치
 - 아직 확정되지 않은 응답 구조나 정책
   - 가격 분포/유사 상품 응답 구조
-  - 상세 치수 필드명
   - 상품 상태 enum 전체 목록
 
 ## 7. 추가 요청 없음

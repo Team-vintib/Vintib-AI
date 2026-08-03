@@ -17,6 +17,7 @@
   - Live: `/api/lives`, `/api/lives/schedule`, `/api/lives/{liveId}`
   - Chat/STOMP: `/api/lives/{liveId}/chat-messages`, `/ws`, `/topic/lives/{liveId}/chat`, `/topic/lives/{liveId}/reactions`, `/topic/lives/{liveId}/viewers`
   - Notification: `/api/users/{userId}/alerts`, `/api/users/{userId}/alerts/{id}`, `/api/users/{userId}/alerts/read-all`
+  - Social(Follow): `/api/users/{userId}/followers`(POST/DELETE/GET), `/api/users/{userId}/followings`(GET)
 - FE 구현 완료 범위
   - Auth, Home, Product 일부, Live 일부, Chat realtime 일부는 실제 API 연결 완료
   - Onboarding, Business, Search, Auction, Commerce, MyPage는 mock 또는 미구현 범위가 남아 있음
@@ -47,7 +48,7 @@
 | 005 | `005-search-contract.md` | Search | FE 화면/adapter 있음, BE `/api/search` 없음 | 통합 검색 API |
 | 006 | `006-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | 목록 필터 query 구현, 상세 응답 보강, AI 분석/가격 추천 |
 | 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성 연결 완료 | 생성용 상품 조회, 영상 token, AI 시착 생성, `/api/me/tryon` |
-| 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 알림 목록/읽음 API 재검증 완료. 알림 seed 제거 후 실제 생성 데이터 없음 | 팔로우 API, 알림 type/ref 문서화, 실제 알림 생성 이벤트, 예약 라이브 알림 신청/스케줄러, 탭별 bulk read |
+| 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API 연동 완료. 알림 seed 제거 후 실제 생성 데이터 없음 | 알림 type/ref 문서화, 실제 알림 생성 이벤트, 예약 라이브 알림 신청/스케줄러, 탭별 bulk read |
 | 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수 연결 완료 | 경매 snapshot/start/bid/close/STOMP |
 | 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | FE 화면 없음, BE controller 없음 | 주문/배송/환불/포인트 전체 |
 | 011 | `011-user-mypage-contract.md` | User/MyPage | FE 화면 없음, BE API 없음 | `/api/me`, 공개 프로필, 마이페이지 요약 |
@@ -83,7 +84,6 @@
 - FE·BE 간 결정이 필요한 내용
   - FE axios `baseURL`은 `/api`이므로 FE API 함수에서는 `/auth/...`, `/home`처럼 `/api`를 제외하고 호출한다.
   - BE `PageResponse<T>`는 `content/page/size/totalElements/totalPages/hasNext` 구조다. FE adapter에서 `items/meta`로 변환한다.
-  - 비회원 요청에서 `isWished`, `isFollowing`을 `false`로 줄지 `null`로 줄지 endpoint별 문서화가 필요하다.
   - FE 화면이 없는 API는 임의로 UI를 새로 만들지 않고 FE 설계 후 연결한다.
 - 아직 확정되지 않은 응답 구조나 정책
   - 각 도메인 문서의 6번 섹션을 따른다.
@@ -96,5 +96,6 @@
   - Chat/Reaction/Viewer realtime
   - Product 등록 기본 흐름과 찜 토글
   - Notification 목록/읽음 처리
+  - Social 팔로우/팔로우 해제, 팔로워/팔로잉 목록 조회
 - 기존 규격을 유지하면 되는 기능
   - BE에는 있지만 FE 화면/진입점이 없어 아직 미연결인 API는 각 도메인 화면 설계 후 연결한다.

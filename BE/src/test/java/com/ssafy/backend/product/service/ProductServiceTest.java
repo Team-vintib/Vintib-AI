@@ -21,10 +21,16 @@ import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
+import com.ssafy.backend.product.entity.Brand;
+import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductDefect;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.entity.SaleType;
+import com.ssafy.backend.product.port.LiveQueryPort;
+import com.ssafy.backend.product.port.SocialQueryPort;
+import com.ssafy.backend.product.port.dto.LinkedLiveSummary;
+import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductDefectRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
@@ -64,7 +70,16 @@ class ProductServiceTest {
     private CategoryRepository categoryRepository;
 
     @Mock
+    private BrandRepository brandRepository;
+
+    @Mock
     private ProductDefectRepository productDefectRepository;
+
+    @Mock
+    private SocialQueryPort socialQueryPort;
+
+    @Mock
+    private LiveQueryPort liveQueryPort;
 
     @Mock
     private Member seller;
@@ -74,7 +89,8 @@ class ProductServiceTest {
     @BeforeEach
     void setUp() {
         productService = new ProductService(
-                productRepository, memberRepository, productImageService, categoryRepository, productDefectRepository);
+                productRepository, memberRepository, productImageService, categoryRepository,
+                brandRepository, productDefectRepository, socialQueryPort, liveQueryPort);
     }
 
     @Test
@@ -654,4 +670,45 @@ class ProductServiceTest {
         assertThat(captured.getSort().getOrderFor("createdAt").getDirection())
                 .isEqualTo(org.springframework.data.domain.Sort.Direction.DESC);
     }
-}
+
+    @Test
+    void 상품_상세조회시_연결라이브_찜_판매자통계를_함께_반환한다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(seller.getNickname()).thenReturn("판매자");
+        Product product = Product.builder()
+                .seller(seller)
+                .categoryId(CATEGORY_ID)
+                .brandId(2L)
+                .title("빈티지 자켓")
+                .build();
+        product.registerDirectSale(50000L);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(productRepository.countBySeller_IdAndSaleStatusNot(SELLER_ID, SaleStatus.DRAFT)).thenReturn(45L);
+        when(socialQueryPort.countFollowers(SELLER_ID)).thenReturn(120L);
+        when(socialQueryPort.isWishedBy(1L, 2L)).thenReturn(true);
+
+        Category category = org.mockito.Mockito.mock(Category.class);
+        when(category.getName()).thenReturn("자켓");
+        when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
+
+        Brand brand = org.mockito.Mockito.mock(Brand.class);
+        when(brand.getName()).thenReturn("리바이스");
+        when(brandRepository.findById(2L)).thenReturn(Optional.of(brand));
+
+        LinkedLiveSummary liveSummary = LinkedLiveSummary.builder()
+                .liveId(10L).title("빈티지 특가").status("SCHEDULED").build();
+        when(liveQueryPort.findLinkedLive(1L)).thenReturn(Optional.of(liveSummary));
+
+        ProductDetailResponse response = productService.getProductDetail(2L, 1L);
+
+        assertThat(response.categoryName()).isEqualTo("자켓");
+        assertThat(response.brandName()).isEqualTo("리바이스");
+        assertThat(response.isWished()).isTrue();
+        assertThat(response.sellerFollowerCount()).isEqualTo(120L);
+        assertThat(response.sellerProductCount()).isEqualTo(45L);
+        assertThat(response.linkedLive()).isNotNull();
+        assertThat(response.linkedLive().liveId()).isEqualTo(10L);
+        assertThat(response.linkedLive().title()).isEqualTo("빈티지 특가");
+        assertThat(response.linkedLive().status()).isEqualTo("SCHEDULED");
+    }
+}

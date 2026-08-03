@@ -7,7 +7,9 @@ import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveProduct;
 import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
+import com.ssafy.backend.member.entity.Gender;
 import com.ssafy.backend.member.entity.Member;
+import com.ssafy.backend.member.entity.MemberType;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.CategoryRepository;
@@ -85,11 +87,17 @@ class LiveCurrentProductStompTest {
         stompClient = new WebSocketStompClient(new StandardWebSocketClient());
         stompClient.setMessageConverter(new JacksonJsonMessageConverter());
 
-        Member host = memberRepository.save(Member.builder()
+        // 온보딩 게이트(-475)를 통과해야 API 가 열린다. 미완료 회원은 U004 로 막힌다.
+        Member host = Member.builder()
                 .email("curation-" + UUID.randomUUID() + "@example.com")
                 .password("encoded")
                 .name("호스트")
-                .build());
+                .build();
+        host.updateBasicInfo(
+                "curation-" + UUID.randomUUID().toString().substring(0, 8),
+                "01000000002", "서울", "3층", null, Gender.MALE);
+        host.completeOnboarding(MemberType.GENERAL);
+        memberRepository.save(host);
         hostToken = jwtTokenProvider.createAccessToken(host.getId(), host.getEmail());
 
         productId = productRepository.save(Product.builder()
