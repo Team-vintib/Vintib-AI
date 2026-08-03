@@ -18,27 +18,11 @@ import ProductPurchaseSummary from '@/domains/product/components/ProductPurchase
 import ProductSellerLivePanel from '@/domains/product/components/ProductSellerLivePanel.vue'
 import LiveTryOnPanel from '@/domains/tryon/components/LiveTryOnPanel.vue'
 import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
-import type {
-  ProductDetailMockScenario,
-  ProductDetailViewData,
-} from '@/domains/product/types/productDetail.types'
+import type { ProductDetailViewData } from '@/domains/product/types/productDetail.types'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 type ProductDetailLoadState = 'loading' | 'success' | 'error' | 'not-found'
-
-const PRODUCT_DETAIL_MOCK_SCENARIOS: ProductDetailMockScenario[] = [
-  'default',
-  'mock',
-  'loading',
-  'error',
-  'not-found',
-  'sold',
-  'ai-not-requested',
-  'ai-analyzing',
-  'ai-no-findings',
-  'ai-failed',
-]
 
 const route = useRoute()
 const router = useRouter()
@@ -83,18 +67,9 @@ const tryOnProduct = computed<LiveWatchProduct | null>(() => {
   }
 })
 
-const getMockScenario = (): ProductDetailMockScenario => {
-  const queryValue = Array.isArray(route.query.mock) ? route.query.mock[0] : route.query.mock
-
-  return PRODUCT_DETAIL_MOCK_SCENARIOS.includes(queryValue as ProductDetailMockScenario)
-    ? (queryValue as ProductDetailMockScenario)
-    : 'default'
-}
-
 const loadProductDetail = async () => {
   const productId = Number(route.params.productId)
   const requestId = ++loadRequestId
-  const scenario = getMockScenario()
 
   product.value = null
   loadState.value = 'loading'
@@ -106,10 +81,8 @@ const loadProductDetail = async () => {
     return
   }
 
-  if (scenario === 'loading') return
-
   try {
-    const nextProduct = await getProductDetailViewData(productId, scenario)
+    const nextProduct = await getProductDetailViewData(productId)
 
     if (requestId !== loadRequestId) return
 
@@ -207,8 +180,17 @@ const handleGoToProductList = () => {
   void router.push({ name: ROUTE_NAMES.PRODUCT_LIST })
 }
 
+const goBack = () => {
+  if (window.history.length > 1) {
+    router.back()
+    return
+  }
+
+  void router.push({ name: ROUTE_NAMES.PRODUCT_LIST })
+}
+
 watch(
-  () => [route.params.productId, route.query.mock],
+  () => route.params.productId,
   () => {
     void loadProductDetail()
   },
@@ -232,6 +214,13 @@ onBeforeUnmount(() => {
 
 <template>
   <DefaultLayout>
+    <button class="product-detail__back" type="button" @click="goBack">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m15 18-6-6 6-6" />
+      </svg>
+      뒤로가기
+    </button>
+
     <ProductDetailSkeleton v-if="loadState === 'loading'" />
 
     <ProductDetailStatePanel
@@ -300,6 +289,7 @@ onBeforeUnmount(() => {
 
       <ProductSellerLivePanel
         :linked-live="product.linkedLive"
+        :seller-nickname="product.seller.nickname"
         :is-reminder-set="isReminderSet"
         @toggle-reminder="handleToggleReminder"
         @view-live="handleViewLive"
@@ -339,6 +329,45 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped lang="scss">
+.product-detail__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  margin-bottom: var(--space-4);
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.product-detail__back:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.product-detail__back svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.product-detail__back:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 2px;
+}
+
 .product-detail__hero {
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(390px, 0.92fr);

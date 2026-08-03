@@ -24,7 +24,6 @@ type ProductSaleStatusDto =
   | 'AUCTION_IN_PROGRESS'
   | 'AUCTION_FAILED'
   | 'SOLD'
-  | 'PRIVATE'
 
 export interface BrandDto {
   id: number
@@ -76,9 +75,21 @@ interface BackendPageResponse<T> {
 
 interface ProductDetailDto extends ProductListDto {
   sellerNickname?: string | null
+  sellerFollowerCount?: number
+  sellerProductCount?: number
   images: ProductImageDto[]
   color?: string | null
   material?: string | null
+  defects?: string[]
+  measurements?: Record<string, number>
+  linkedLive?: {
+    liveId: number
+    title: string
+    status: string
+    scheduledAt: string | null
+    startedAt: string | null
+    thumbnailUrl: string
+  } | null
   updatedAt: string
 }
 
@@ -375,16 +386,38 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
     seller: {
       id: product.sellerId,
       nickname: product.sellerNickname?.trim() || '',
-      followerCount: 0,
-      productCount: 0,
+      followerCount: product.sellerFollowerCount ?? 0,
+      productCount: product.sellerProductCount ?? 0,
     },
-    linkedLive: null,
+    linkedLive: toLinkedLive(product.linkedLive),
+    measurements: product.measurements ?? {},
     similarProducts: [],
-    sellerDisclosedDefects: [],
+    sellerDisclosedDefects: (product.defects ?? []).map((defect) => ({
+      title: defect,
+      description: '',
+    })),
     aiQualityAnalysis: {
       ...EMPTY_AI_QUALITY_ANALYSIS,
       findings: [],
     },
+  }
+}
+
+// BE 상세 계약(010)의 linkedLive를 FE 뷰 타입(ProductLinkedLive)으로 변환한다.
+// startedAt이 있으면 방송 중(LIVE), 없으면 방송 예정(SCHEDULED)으로 본다.
+const toLinkedLive = (
+  linkedLive: ProductDetailDto['linkedLive'],
+): ProductDetailViewData['linkedLive'] => {
+  if (!linkedLive) {
+    return null
+  }
+
+  return {
+    id: linkedLive.liveId,
+    title: linkedLive.title,
+    startsAt: linkedLive.startedAt ?? linkedLive.scheduledAt ?? '',
+    status: linkedLive.startedAt ? 'LIVE' : 'SCHEDULED',
+    thumbnailUrl: linkedLive.thumbnailUrl,
   }
 }
 
