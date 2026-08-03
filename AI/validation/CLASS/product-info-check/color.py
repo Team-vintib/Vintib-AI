@@ -92,6 +92,46 @@ def gray_world_white_balance(image: "object") -> "object":
     return Image.fromarray(corrected)
 
 
+def build_swatch_reference(
+    product_image: "object", codes: list[str], swatch_size: int = 64, cols: int = 5
+) -> "object":
+    """상품 사진 아래에 팔레트 스와치(hex 사각형 + 코드 라벨) 그리드를 합성한 이미지를
+    만든다(색상 개선안 4번, 2026-08-03). 색 이름을 텍스트로만 지시하면 VLM이 자기 내부
+    "색 이름 감각"에 의존하게 되는데(예: IVORY라는 단어가 실제로 어떤 hex를 가리키는지는
+    프롬프트에 전혀 안 알려줌), 실제 hex 사각형을 같은 이미지에 넣어주면 VLM이 이미지 대
+    이미지로 비교 판단할 수 있다. `MULTI_LABEL`은 특정 hex가 없어 스와치를 그리지 않는다
+    (프롬프트 쪽에서 "스와치는 없지만 코드로는 답할 수 있다"고 안내).
+
+    입력·반환 모두 PIL.Image(RGB)."""
+    from PIL import Image, ImageDraw
+
+    label_h = 20
+    cell = swatch_size + label_h
+    rows = -(-len(codes) // cols)  # ceil division
+    grid_w = cols * swatch_size
+    grid_h = rows * cell
+
+    product_resized = product_image.copy()
+    product_resized.thumbnail((grid_w, grid_w * 2))
+
+    canvas_w = max(grid_w, product_resized.width)
+    canvas = Image.new("RGB", (canvas_w, product_resized.height + grid_h + 10), "white")
+    canvas.paste(product_resized, (0, 0))
+
+    draw = ImageDraw.Draw(canvas)
+    grid_top = product_resized.height + 10
+    for i, code in enumerate(codes):
+        col, row = i % cols, i // cols
+        x = col * swatch_size
+        y = grid_top + row * cell
+        hex_code = PALETTE[code]
+        draw.rectangle(
+            [x + 2, y + 2, x + swatch_size - 2, y + swatch_size - 2], fill=hex_code, outline="black"
+        )
+        draw.text((x + 2, y + swatch_size + 2), code, fill="black")
+    return canvas
+
+
 def nearest_palette_color_with_distance(rgb: tuple[float, float, float]) -> tuple[str, float]:
     """가장 가까운 팔레트 색 코드 + 정규화된 거리(0~1, 0이면 정확히 일치)."""
     best_code, best_dist = None, float("inf")

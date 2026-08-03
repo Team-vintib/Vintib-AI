@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from color import MULTI_LABEL, PALETTE
+from color import MULTI_LABEL, PALETTE, build_swatch_reference
 from taxonomy import ALL_SUBCATEGORIES, MAJOR_CATEGORIES
 
 VLM_MODELS: dict[str, str] = {
@@ -395,18 +395,59 @@ def query_color(
     template = COLOR_PROMPT_VERSIONS[prompt_version]
     prompt = template.format(codes=", ".join(valid_codes))
     raw_text = generate_from_image(bundle, image, prompt)
+    primary, secondary = _parse_primary_secondary_json(raw_text, valid_codes)
+    return primary, secondary, {"raw_text": raw_text}
 
+
+def _parse_primary_secondary_json(raw_text: str, valid_codes: list[str]) -> tuple[str, str | None]:
+    """`{"primary": ..., "secondary": ...}` 형태 응답을 파싱한다. `query_color()`와
+    `query_color_with_swatches()`가 공유하는 로직 — 실패 시 예외 대신 ("UNKNOWN", None)."""
     match = re.search(r"\{.*\}", raw_text, re.DOTALL)
     if not match:
-        return "UNKNOWN", None, {"raw_text": raw_text, "parse_error": "no JSON object found"}
+        return "UNKNOWN", None
     try:
         parsed = json.loads(match.group(0))
-    except json.JSONDecodeError as exc:
-        return "UNKNOWN", None, {"raw_text": raw_text, "parse_error": str(exc)}
+    except json.JSONDecodeError:
+        return "UNKNOWN", None
 
     primary = _match_label(str(parsed.get("primary", "")), valid_codes) or "UNKNOWN"
     secondary_raw = parsed.get("secondary")
     secondary = _match_label(str(secondary_raw), valid_codes) if secondary_raw else None
+    return primary, secondary
+
+
+# 색상 개선안 4번(팔레트 스와치를 실제 이미지로 합성, 2026-08-03) — 색 이름을 텍스트로만
+# 지시하는 대신, hex 스와치를 상품 사진과 같은 이미지에 합성해 VLM이 "이름 기억"이 아니라
+# "이미지 대 이미지 비교"로 판단하게 유도한다. `color.build_swatch_reference()` 참고.
+_COLOR_SWATCH_PROMPT_TEMPLATE = (
+    "다음 이미지는 위쪽에 중고 거래 상품 사진이, 아래쪽에 색상 참고용 스와치(사각형)와 그 "
+    "밑에 색상 코드 라벨이 함께 있다. 상품의 주 색상과 가장 비슷한 스와치를 찾아 그 라벨로 "
+    "답하고, 보조 색상이 뚜렷하면 두 번째로 비슷한 스와치의 라벨도 골라라. 보조 색상이 "
+    "뚜렷하지 않으면 null로 두고, 여러 색이 비슷한 비중으로 섞여 있으면 스와치에는 없지만 "
+    '"MULTI"로 답해도 된다. 다른 설명은 절대 붙이지 마라.\n'
+    '형식: {{"primary": "코드", "secondary": "코드 또는 null"}}'
+)
+
+
+def query_color_with_swatches(
+    image_path: Path, model_key: str = ACTIVE_VLM, apply_white_balance: bool = True
+) -> tuple[str, str | None, dict]:
+    """상품 사진 + 팔레트 스와치 합성 이미지를 한 번에 보여주고 색상을 묻는다
+    (색상 개선안 4번). `query_color()`와 달리 프롬프트 버전이 없다 — 스와치 자체가
+    시각적 기준이라 별도 텍스트 앵커가 필요 없다는 게 이 방법의 취지다."""
+    from PIL import Image
+
+    from color import gray_world_white_balance
+
+    bundle = _get_bundle()
+    with Image.open(image_path) as img:
+        product_image = img.convert("RGB")
+    if apply_white_balance:
+        product_image = gray_world_white_balance(product_image)
+    valid_codes = list(PALETTE) + [MULTI_LABEL]
+    composite = build_swatch_reference(product_image, list(PALETTE))
+    raw_text = generate_from_image(bundle, composite, _COLOR_SWATCH_PROMPT_TEMPLATE)
+    primary, secondary = _parse_primary_secondary_json(raw_text, valid_codes)
     return primary, secondary, {"raw_text": raw_text}
 
 
