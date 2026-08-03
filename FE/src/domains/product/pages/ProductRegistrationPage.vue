@@ -31,6 +31,7 @@ import type {
   ProductRegistrationPhotoRole,
   ProductRegistrationRecommendedPrice,
   ProductRegistrationSaleType,
+  ProductRegistrationStepId,
 } from '@/domains/product/types/productRegistration.types'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
@@ -69,9 +70,10 @@ const isAdditionalAiPhotoPickerOpen = ref(false)
 const registeredProductId = ref('')
 const isSubmittingRegistration = ref(false)
 const registrationSubmitError = ref('')
+const isCompletenessPromptOpen = ref(false)
 const brands = ref<BrandDto[]>([])
 const categories = ref<CategoryDto[]>([])
-const categoryMiddleId = ref('')
+const categoryMajorId = ref('')
 interface CategorySelectOption {
   id: string
   label: string
@@ -92,57 +94,85 @@ const dedupeCategoryOptionsByLabel = (options: CategorySelectOption[]) => {
   return [...optionMap.values()]
 }
 
-const middleCategoryOptions = computed<CategorySelectOption[]>(() => {
-  if (!categories.value.length) {
-    return PRODUCT_REGISTRATION_CATEGORY_OPTIONS.map((option) => ({
-      id: option.id,
-      label: option.label,
-      parentId: '',
-    }))
+const ensureEtcCategoryOption = (options: CategorySelectOption[]) => {
+  if (options.some((option) => option.id === 'etc' || option.label === '기타')) {
+    return options
   }
 
-  return dedupeCategoryOptionsByLabel(
-    categories.value
-      .filter((category) => category.depth === 2)
-      .map((category) => ({
-        id: String(category.id),
-        label: category.name,
-        parentId: String(category.parentId ?? ''),
+  return [...options, { id: 'etc', label: '기타', parentId: '' }]
+}
+
+const majorCategoryOptions = computed<CategorySelectOption[]>(() => {
+  if (!categories.value.length) {
+    return ensureEtcCategoryOption(
+      PRODUCT_REGISTRATION_CATEGORY_OPTIONS.map((option) => ({
+        id: option.id,
+        label: option.label,
+        parentId: '',
       })),
+    )
+  }
+
+  return ensureEtcCategoryOption(
+    dedupeCategoryOptionsByLabel(
+      categories.value
+        .filter((category) => category.depth === 2)
+        .map((category) => ({
+          id: String(category.id),
+          label: category.name,
+          parentId: String(category.parentId ?? ''),
+        })),
+    ),
   )
 })
 const minorCategoryOptions = computed<CategorySelectOption[]>(() => {
-  const selectedMiddleCategory = middleCategoryOptions.value.find(
-    (option) => option.id === categoryMiddleId.value,
-  )
-
-  if (!selectedMiddleCategory) {
+  if (!categories.value.length || !categoryMajorId.value || categoryMajorId.value === 'etc') {
     return []
   }
 
-  const matchingMiddleCategoryIds = categories.value
+  const selectedCategory = majorCategoryOptions.value.find(
+    (option) => option.id === categoryMajorId.value,
+  )
+
+  if (!selectedCategory) {
+    return []
+  }
+
+  const middleCategoryIds = categories.value
     .filter(
       (category) =>
         category.depth === 2 &&
-        category.name.trim() === selectedMiddleCategory.label.trim(),
+        category.name.trim() === selectedCategory.label.trim(),
     )
     .map((category) => String(category.id))
 
-  return dedupeCategoryOptionsByLabel(
-    categories.value
-      .filter(
-        (category) =>
-          category.depth === 3 && matchingMiddleCategoryIds.includes(String(category.parentId)),
-      )
-      .map((category) => ({
-        id: String(category.id),
-        label: category.name,
-        parentId: String(category.parentId ?? ''),
-      })),
+  return ensureEtcCategoryOption(
+    dedupeCategoryOptionsByLabel(
+      categories.value
+        .filter(
+          (category) =>
+            category.depth === 3 && middleCategoryIds.includes(String(category.parentId)),
+        )
+        .map((category) => ({
+          id: String(category.id),
+          label: category.name,
+          parentId: String(category.parentId ?? ''),
+        })),
+    ),
   )
 })
-const updateMiddleCategory = () => {
-  draft.categoryId = categoryMiddleId.value
+const updateMajorCategory = () => {
+  draft.categoryId = categoryMajorId.value
+
+  if (categoryMajorId.value !== 'etc') {
+    draft.customCategory = ''
+  }
+}
+
+const updateMinorCategory = () => {
+  if (draft.categoryId !== 'etc') {
+    draft.customCategory = ''
+  }
 }
 
 const priceRecommendationBuckets: ProductRegistrationPriceBucket[] = [
@@ -175,6 +205,7 @@ const createInitialDraft = (): ProductRegistrationDraft => ({
   color: '',
   customColor: '',
   categoryId: '',
+  customCategory: '',
   description: '',
   purchasedAt: '',
   purchasedCountry: '',
@@ -200,6 +231,9 @@ const currentStep = computed(() => PRODUCT_REGISTRATION_STEPS[currentStepIndex.v
 const isFirstStep = computed(() => currentStepIndex.value === 0)
 const isCompleteStep = computed(() => currentStep.value.id === 'complete')
 const isSubmitStep = computed(() => currentStep.value.id === 'pricing')
+const canShowCompletenessPanel = computed(() =>
+  ['photos', 'condition', 'pricing'].includes(currentStep.value.id),
+)
 const nextActionLabel = computed(() =>
   isSubmitStep.value && isSubmittingRegistration.value ? '등록 중' : isSubmitStep.value ? '등록 완료' : '다음',
 )
@@ -428,6 +462,276 @@ const canMoveCurrentStepNext = computed(() => {
 
   return true
 })
+
+type ProductInfoCompletenessPriority = 'strong' | 'recommended'
+
+interface ProductInfoCompletenessItem {
+  id: string
+  label: string
+  stepId: ProductRegistrationStepId
+  priority: ProductInfoCompletenessPriority
+  targetId: string
+  isCompleted: () => boolean
+}
+
+const isDefectInfoCompleted = () => {
+  if (draft.hasDefect === false) {
+    return true
+  }
+
+  return draft.hasDefect === true && Boolean(draft.sellerDefectDescription.trim())
+}
+
+const isMeasurementInfoCompleted = () => {
+  if (!activeMeasurementFields.value.length) {
+    return Boolean(draft.categoryId)
+  }
+
+  return activeMeasurementFields.value.every((field) =>
+    isPositiveMeasurement(draft.measurements[field.id] ?? ''),
+  )
+}
+
+const completenessItems: ProductInfoCompletenessItem[] = [
+  {
+    id: 'front-photo',
+    label: 'Front View 이미지',
+    stepId: 'photos',
+    priority: 'strong',
+    targetId: 'product-front-photo',
+    isCompleted: () => frontPhotos.value.length > 0,
+  },
+  {
+    id: 'back-photo',
+    label: 'Back View 이미지',
+    stepId: 'photos',
+    priority: 'strong',
+    targetId: 'product-back-photo',
+    isCompleted: () => backPhotos.value.length > 0,
+  },
+  {
+    id: 'name',
+    label: '상품명',
+    stepId: 'photos',
+    priority: 'strong',
+    targetId: 'product-registration-name',
+    isCompleted: () => Boolean(draft.name.trim()),
+  },
+  {
+    id: 'ai-quality-photos',
+    label: '품질 확인 사진',
+    stepId: 'condition',
+    priority: 'strong',
+    targetId: 'ai-quality-title',
+    isCompleted: () => hasRequiredAiPhotos.value,
+  },
+  {
+    id: 'ai-quality-confirmation',
+    label: '품질 확인',
+    stepId: 'condition',
+    priority: 'strong',
+    targetId: 'ai-quality-title',
+    isCompleted: () => areAllAiPhotosConfirmed.value,
+  },
+  {
+    id: 'sale-type',
+    label: '판매 방식',
+    stepId: 'pricing',
+    priority: 'strong',
+    targetId: 'sale-type-title',
+    isCompleted: () => Boolean(draft.saleType),
+  },
+  {
+    id: 'price',
+    label: '가격',
+    stepId: 'pricing',
+    priority: 'strong',
+    targetId: 'sale-type-title',
+    isCompleted: () =>
+      draft.saleType === 'DIRECT'
+        ? isPositivePrice(draft.directSalePrice)
+        : draft.saleType === 'AUCTION'
+          ? isPositivePrice(draft.auctionStartPrice)
+          : false,
+  },
+  {
+    id: 'description',
+    label: '상품 설명',
+    stepId: 'photos',
+    priority: 'strong',
+    targetId: 'product-registration-description',
+    isCompleted: () => Boolean(draft.description.trim()),
+  },
+  {
+    id: 'category',
+    label: '카테고리',
+    stepId: 'photos',
+    priority: 'strong',
+    targetId: 'product-registration-category-major',
+    isCompleted: () => Boolean(draft.categoryId && (draft.categoryId !== 'etc' || draft.customCategory.trim())),
+  },
+  {
+    id: 'size',
+    label: '사이즈',
+    stepId: 'photos',
+    priority: 'strong',
+    targetId: 'product-registration-size',
+    isCompleted: () => Boolean(draft.size),
+  },
+  {
+    id: 'measurements',
+    label: '실측 정보',
+    stepId: 'photos',
+    priority: 'strong',
+    targetId: 'product-registration-measurements',
+    isCompleted: isMeasurementInfoCompleted,
+  },
+  {
+    id: 'condition-grade',
+    label: '상품 상태',
+    stepId: 'condition',
+    priority: 'strong',
+    targetId: 'condition-grade-title',
+    isCompleted: () => Boolean(draft.conditionGrade),
+  },
+  {
+    id: 'defect-info',
+    label: '하자 정보',
+    stepId: 'condition',
+    priority: 'strong',
+    targetId: 'seller-defect-title',
+    isCompleted: isDefectInfoCompleted,
+  },
+  {
+    id: 'color',
+    label: '색상',
+    stepId: 'photos',
+    priority: 'recommended',
+    targetId: 'product-registration-color',
+    isCompleted: () => Boolean(draft.color && (draft.color !== 'etc' || draft.customColor.trim())),
+  },
+  {
+    id: 'brand',
+    label: '브랜드',
+    stepId: 'photos',
+    priority: 'recommended',
+    targetId: 'product-registration-brand',
+    isCompleted: () => Boolean(draft.brand.trim()),
+  },
+  {
+    id: 'material',
+    label: '소재',
+    stepId: 'photos',
+    priority: 'recommended',
+    targetId: 'product-registration-material',
+    isCompleted: () => Boolean(draft.material.trim()),
+  },
+]
+
+const completenessItemLabels: Record<string, string> = {
+  name: '상품명',
+  description: '상품 설명',
+  color: '색상',
+  brand: '브랜드',
+  category: '카테고리',
+  size: '사이즈',
+  material: '소재',
+  measurements: '실측',
+}
+
+const productInfoCompletenessItems = computed<ProductInfoCompletenessItem[]>(() => [
+  {
+    id: 'photos',
+    label: '이미지',
+    stepId: 'photos',
+    priority: 'strong',
+    targetId: 'product-front-photo',
+    isCompleted: () => isPhotoStepValid.value,
+  },
+  ...Object.entries(completenessItemLabels).map(([id, label]) => {
+    const item = completenessItems.find((completenessItem) => completenessItem.id === id)
+
+    return {
+      ...item,
+      id,
+      label,
+      isCompleted: item?.isCompleted ?? (() => false),
+      priority: item?.priority ?? 'recommended',
+      stepId: item?.stepId ?? 'photos',
+      targetId: item?.targetId ?? '',
+    } satisfies ProductInfoCompletenessItem
+  }),
+  {
+    id: 'quality-result',
+    label: '품질 검증',
+    stepId: 'condition',
+    priority: 'strong',
+    targetId: 'ai-quality-title',
+    isCompleted: () => areAllAiPhotosConfirmed.value,
+  },
+  {
+    id: 'price',
+    label: '가격',
+    stepId: 'pricing',
+    priority: 'strong',
+    targetId: 'sale-type-title',
+    isCompleted: () =>
+      draft.saleType === 'DIRECT'
+        ? isPositivePrice(draft.directSalePrice)
+        : draft.saleType === 'AUCTION'
+          ? isPositivePrice(draft.auctionStartPrice)
+          : false,
+  },
+])
+
+const basicInfoCompletenessItems = computed(() =>
+  productInfoCompletenessItems.value.filter((item) =>
+    [
+      'photos',
+      'name',
+      'description',
+      'color',
+      'brand',
+      'category',
+      'size',
+      'material',
+      'measurements',
+    ].includes(item.id),
+  ),
+)
+const isBasicInfoCompletenessComplete = computed(() =>
+  basicInfoCompletenessItems.value.every((item) => item.isCompleted()),
+)
+
+const completedCompletenessItems = computed(() =>
+  productInfoCompletenessItems.value.filter((item) => item.isCompleted()),
+)
+const incompleteCompletenessItems = computed(() =>
+  productInfoCompletenessItems.value.filter((item) => !item.isCompleted()),
+)
+const productInfoCompletenessPercent = computed(() =>
+  Math.round((completedCompletenessItems.value.length / productInfoCompletenessItems.value.length) * 100),
+)
+const productInfoCompletenessMessage = computed(() => {
+  const percent = productInfoCompletenessPercent.value
+
+  if (percent < 40) {
+    return '상품을 이해할 수 있도록 정보를 조금 더 추가해 보세요.'
+  }
+
+  if (percent < 70) {
+    return '상품 정보가 차근차근 채워지고 있어요.'
+  }
+
+  if (percent < 100) {
+    return '거의 완성됐어요. 몇 가지 정보만 더 추가해 보세요.'
+  }
+
+  return '상품 정보가 충분히 작성됐어요.'
+})
+const visibleCompletenessItems = computed(() =>
+  [...completedCompletenessItems.value, ...incompleteCompletenessItems.value],
+)
 
 const revokePhotoPreviewUrl = (photo: ProductRegistrationPhotoDraft) => {
   if (photo.previewUrl) {
@@ -739,7 +1043,7 @@ const moveToPreviousStep = () => {
   scrollToPageTop()
 }
 
-const moveToNextStep = async () => {
+const proceedToNextStep = async (skipCompletenessPrompt = false) => {
   if (isSubmittingRegistration.value) {
     return
   }
@@ -751,6 +1055,15 @@ const moveToNextStep = async () => {
   }
 
   if (!canMoveCurrentStepNext.value) {
+    return
+  }
+
+  if (
+    !skipCompletenessPrompt &&
+    currentStep.value.id === 'photos' &&
+    !isBasicInfoCompletenessComplete.value
+  ) {
+    isCompletenessPromptOpen.value = true
     return
   }
 
@@ -775,6 +1088,19 @@ const moveToNextStep = async () => {
 
   currentStepIndex.value += 1
   scrollToPageTop()
+}
+
+const moveToNextStep = () => {
+  void proceedToNextStep()
+}
+
+const continueCompletenessInput = () => {
+  isCompletenessPromptOpen.value = false
+}
+
+const skipCompletenessInput = () => {
+  isCompletenessPromptOpen.value = false
+  void proceedToNextStep(true)
 }
 
 const cancelRegistration = () => {
@@ -808,6 +1134,7 @@ const resetRegistrationDraft = () => {
   registeredProductId.value = ''
   isSubmittingRegistration.value = false
   registrationSubmitError.value = ''
+  isCompletenessPromptOpen.value = false
 }
 
 const continueRegistration = () => {
@@ -844,7 +1171,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <DefaultLayout content-max-width="1120px">
+  <DefaultLayout content-max-width="1280px">
     <section class="product-registration" aria-labelledby="product-registration-title">
       <header class="product-registration__header">
         <h1 id="product-registration-title">상품 등록</h1>
@@ -875,13 +1202,41 @@ onBeforeUnmount(() => {
         <section class="product-registration__panel" :aria-labelledby="`${currentStep.id}-title`">
           <h2 :id="`${currentStep.id}-title`">{{ currentStep.label }}</h2>
 
+          <aside
+            v-if="canShowCompletenessPanel"
+            class="product-registration__completeness product-registration__completeness--mobile"
+            aria-labelledby="product-info-completeness-mobile-title"
+          >
+            <div class="product-registration__completeness-header">
+              <h3 id="product-info-completeness-mobile-title">상품 정보 완성도</h3>
+              <strong>{{ productInfoCompletenessPercent }}%</strong>
+            </div>
+            <div class="product-registration__progress" aria-hidden="true">
+              <span :style="{ width: `${productInfoCompletenessPercent}%` }" />
+            </div>
+            <p>{{ productInfoCompletenessMessage }}</p>
+            <div class="product-registration__completeness-list">
+              <strong>입력 현황</strong>
+              <ul>
+                <li
+                  v-for="item in visibleCompletenessItems"
+                  :key="item.id"
+                  :class="{ 'product-registration__completeness-item--done': item.isCompleted() }"
+                >
+                  <span aria-hidden="true">{{ item.isCompleted() ? '✓' : '○' }}</span>
+                  {{ item.label }}
+                </li>
+              </ul>
+            </div>
+          </aside>
+
           <div v-if="currentStep.id === 'photos'" class="product-registration__photo-step">
             <div class="product-registration__photo-required-row">
               <ProductPhotoUploader
                 id="product-front-photo"
                 class="product-registration__photo-uploader"
                 title="Front View 이미지 업로드"
-                description="옷의 Front View가 잘 보이는 사진을 등록해 주세요."
+                description="옷의 앞면이 잘 보이는 사진을 등록해 주세요."
                 required
                 :requirement-label="frontPhotoCountLabel"
                 :requirement-met="frontPhotos.length > 0"
@@ -898,7 +1253,7 @@ onBeforeUnmount(() => {
                 id="product-back-photo"
                 class="product-registration__photo-uploader"
                 title="Back View 이미지 업로드"
-                description="옷의 Back View가 잘 보이는 사진을 등록해 주세요."
+                description="옷의 뒷면이 잘 보이는 사진을 등록해 주세요."
                 required
                 :requirement-label="backPhotoCountLabel"
                 :requirement-met="backPhotos.length > 0"
@@ -1026,6 +1381,10 @@ onBeforeUnmount(() => {
             class="product-registration__form"
             aria-label="상품 기본 정보 입력"
           >
+            <p class="product-registration__optional-note">
+              모든 항목은 선택 사항이에요. 정보가 많을수록 구매자가 상품을 쉽게 찾고 판단하는 데 도움이 돼요.
+            </p>
+
             <label class="product-registration__field" for="product-registration-name">
               <span>
                 상품명
@@ -1054,7 +1413,12 @@ onBeforeUnmount(() => {
             </label>
 
             <label class="product-registration__field" for="product-registration-description">
-              <span>상품 설명</span>
+              <span>
+                상품 설명
+              </span>
+              <p class="product-registration__field-hint">
+                상품의 특징과 착용감 등을 알려주면 구매자가 상품을 이해하는 데 도움이 돼요.
+              </p>
               <textarea
                 id="product-registration-description"
                 v-model="draft.description"
@@ -1066,7 +1430,12 @@ onBeforeUnmount(() => {
 
             <div class="product-registration__form-grid">
               <label class="product-registration__field" for="product-registration-color">
-                <span>색상</span>
+                <span>
+                  색상
+                </span>
+                <p class="product-registration__field-hint">
+                  구매자가 색상 필터로 상품을 찾는 데 활용돼요.
+                </p>
                 <select
                   id="product-registration-color"
                   class="product-registration__select"
@@ -1095,7 +1464,12 @@ onBeforeUnmount(() => {
               </label>
 
               <label class="product-registration__field" for="product-registration-brand">
-                <span>브랜드</span>
+                <span>
+                  브랜드
+                </span>
+                <p class="product-registration__field-hint">
+                  브랜드 검색과 필터에 활용돼요.
+                </p>
                 <input
                   id="product-registration-brand"
                   v-model="draft.brand"
@@ -1136,18 +1510,23 @@ onBeforeUnmount(() => {
             </label>
 
             <div class="product-registration__form-grid">
-              <label class="product-registration__field" for="product-registration-category-middle">
-                <span>카테고리 대분류</span>
+              <label class="product-registration__field" for="product-registration-category-major">
+                <span>
+                  카테고리 대분류
+                </span>
+                <p class="product-registration__field-hint">
+                  정확한 카테고리는 구매자가 상품을 쉽게 찾는 데 도움이 돼요.
+                </p>
                 <select
-                  id="product-registration-category-middle"
+                  id="product-registration-category-major"
                   class="product-registration__select"
-                  v-model="categoryMiddleId"
-                  :disabled="middleCategoryOptions.length === 0"
-                  @change="updateMiddleCategory"
+                  v-model="categoryMajorId"
+                  :disabled="majorCategoryOptions.length === 0"
+                  @change="updateMajorCategory"
                 >
-                  <option value="">중분류 선택</option>
+                  <option value="">대분류 선택</option>
                   <option
-                    v-for="option in middleCategoryOptions"
+                    v-for="option in majorCategoryOptions"
                     :key="option.id"
                     :value="option.id"
                   >
@@ -1158,11 +1537,15 @@ onBeforeUnmount(() => {
 
               <label class="product-registration__field" for="product-registration-category-minor">
                 <span>카테고리 소분류</span>
+                <p class="product-registration__field-hint product-registration__field-hint--spacer" aria-hidden="true">
+                  정확한 카테고리는 구매자가 상품을 쉽게 찾는 데 도움이 돼요.
+                </p>
                 <select
                   id="product-registration-category-minor"
                   class="product-registration__select"
                   v-model="draft.categoryId"
-                  :disabled="!categoryMiddleId || minorCategoryOptions.length === 0"
+                  :disabled="!categoryMajorId || categoryMajorId === 'etc' || minorCategoryOptions.length === 0"
+                  @change="updateMinorCategory"
                   @blur="basicStepTouched.categoryId = true"
                 >
                   <option value="">소분류 선택</option>
@@ -1176,6 +1559,22 @@ onBeforeUnmount(() => {
                 </select>
               </label>
             </div>
+
+            <label
+              v-if="draft.categoryId === 'etc'"
+              class="product-registration__field"
+              for="product-registration-custom-category"
+            >
+              <span>기타 카테고리</span>
+              <input
+                id="product-registration-custom-category"
+                v-model="draft.customCategory"
+                type="text"
+                maxlength="40"
+                placeholder="카테고리를 직접 입력해 주세요"
+                @blur="basicStepTouched.categoryId = true"
+              />
+            </label>
           </form>
 
           <form
@@ -1185,7 +1584,12 @@ onBeforeUnmount(() => {
           >
             <div class="product-registration__form-grid">
               <label class="product-registration__field" for="product-registration-size">
-                <span>사이즈</span>
+                <span>
+                  사이즈
+                </span>
+                <p class="product-registration__field-hint">
+                  구매자가 상품의 착용 크기를 판단하는 데 도움이 돼요.
+                </p>
                 <select
                   id="product-registration-size"
                   class="product-registration__select"
@@ -1214,7 +1618,12 @@ onBeforeUnmount(() => {
               </label>
 
               <label class="product-registration__field" for="product-registration-material">
-                <span>소재</span>
+                <span>
+                  소재
+                </span>
+                <p class="product-registration__field-hint">
+                  구매자가 계절감과 착용감을 판단하는 데 도움이 돼요.
+                </p>
                 <input
                   id="product-registration-material"
                   v-model="draft.material"
@@ -1225,9 +1634,16 @@ onBeforeUnmount(() => {
               </label>
             </div>
 
-            <fieldset class="product-registration__fieldset">
-              <legend>실측 정보</legend>
-              <p>cm 기준의 단면 길이를 0보다 큰 숫자로 입력해 주세요.</p>
+            <fieldset
+              id="product-registration-measurements"
+              class="product-registration__fieldset"
+            >
+              <legend>
+                실측 정보
+              </legend>
+              <p>
+                실제 크기를 알려주면 사이즈 문의와 구매 후 불일치를 줄이는 데 도움이 돼요.
+              </p>
 
               <div v-if="activeMeasurementFields.length" class="product-registration__form-grid">
                 <label
@@ -1270,8 +1686,17 @@ onBeforeUnmount(() => {
             class="product-registration__form"
             aria-label="상품 상태와 하자 입력"
           >
+            <p class="product-registration__optional-note">
+              모든 항목은 선택 사항이에요. 정보가 많을수록 구매자가 상품을 쉽게 찾고 판단하는 데 도움이 돼요.
+            </p>
+
             <section class="product-registration__section" aria-labelledby="condition-grade-title">
-              <h3 id="condition-grade-title">상품 상태</h3>
+              <h3 id="condition-grade-title">
+                상품 상태
+              </h3>
+              <p class="product-registration__field-hint">
+                현재 상품 상태를 정확하게 알려주면 구매 판단에 도움이 돼요.
+              </p>
               <div class="product-registration__option-grid" role="radiogroup" aria-label="상품 상태 선택">
                 <button
                   v-for="option in PRODUCT_REGISTRATION_CONDITION_OPTIONS"
@@ -1295,7 +1720,12 @@ onBeforeUnmount(() => {
             </section>
 
             <section class="product-registration__section" aria-labelledby="seller-defect-title">
-              <h3 id="seller-defect-title">판매자 고지 하자</h3>
+              <h3 id="seller-defect-title">
+                판매자 고지 하자
+              </h3>
+              <p class="product-registration__field-hint">
+                오염이나 손상 정보를 미리 알려주면 거래 과정의 오해를 줄일 수 있어요.
+              </p>
               <div class="product-registration__option-grid" role="radiogroup" aria-label="하자 여부 선택">
                 <button
                   class="product-registration__option"
@@ -1767,7 +2197,72 @@ onBeforeUnmount(() => {
               {{ nextActionLabel }}
             </button>
           </div>
+
+          <div
+            v-if="isCompletenessPromptOpen"
+            class="product-registration__prompt-backdrop"
+            role="presentation"
+          >
+            <section
+              class="product-registration__prompt"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="product-registration-completeness-prompt-title"
+            >
+              <h3 id="product-registration-completeness-prompt-title">
+                상품 정보를 더 채워볼까요?
+              </h3>
+              <p>
+                사진, 설명, 색상, 브랜드, 카테고리, 사이즈, 소재, 실측 정보가 충분하면
+                구매자가 상품을 더 쉽게 판단할 수 있어요.
+              </p>
+              <div class="product-registration__prompt-actions">
+                <button
+                  class="product-registration__button product-registration__button--secondary"
+                  type="button"
+                  @click="continueCompletenessInput"
+                >
+                  정보 입력 이어하기
+                </button>
+                <button
+                  class="product-registration__button product-registration__button--primary"
+                  type="button"
+                  @click="skipCompletenessInput"
+                >
+                  다음
+                </button>
+              </div>
+            </section>
+          </div>
         </section>
+
+        <aside
+          v-if="canShowCompletenessPanel"
+          class="product-registration__completeness product-registration__completeness--desktop"
+          aria-labelledby="product-info-completeness-desktop-title"
+        >
+          <div class="product-registration__completeness-header">
+            <h3 id="product-info-completeness-desktop-title">상품 정보 완성도</h3>
+            <strong>{{ productInfoCompletenessPercent }}%</strong>
+          </div>
+          <div class="product-registration__progress" aria-hidden="true">
+            <span :style="{ width: `${productInfoCompletenessPercent}%` }" />
+          </div>
+          <p>{{ productInfoCompletenessMessage }}</p>
+          <div class="product-registration__completeness-list">
+            <strong>입력 현황</strong>
+            <ul>
+              <li
+                v-for="item in visibleCompletenessItems"
+                :key="item.id"
+                :class="{ 'product-registration__completeness-item--done': item.isCompleted() }"
+              >
+                <span aria-hidden="true">{{ item.isCompleted() ? '✓' : '○' }}</span>
+                {{ item.label }}
+              </li>
+            </ul>
+          </div>
+        </aside>
 
       </div>
     </section>
@@ -1873,7 +2368,7 @@ onBeforeUnmount(() => {
   display: grid;
   align-items: start;
   gap: var(--space-6);
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
 }
 
 .product-registration__body--centered {
@@ -1902,6 +2397,112 @@ onBeforeUnmount(() => {
   line-height: 32px;
 }
 
+.product-registration__completeness {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.product-registration__completeness--desktop {
+  position: sticky;
+  top: var(--space-6);
+}
+
+.product-registration__completeness--mobile {
+  display: none;
+}
+
+.product-registration__completeness-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.product-registration__completeness-header h3 {
+  color: var(--color-text-primary);
+  font-size: 18px;
+  font-weight: var(--font-weight-bold);
+  line-height: 26px;
+}
+
+.product-registration__completeness-header strong {
+  color: var(--color-primary);
+  font-size: 28px;
+  font-weight: var(--font-weight-extrabold);
+  line-height: 34px;
+}
+
+.product-registration__progress {
+  overflow: hidden;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-surface-secondary);
+}
+
+.product-registration__progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+  transition: width 180ms ease;
+}
+
+.product-registration__completeness > p {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.product-registration__completeness-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.product-registration__completeness-list > strong {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.product-registration__completeness-list ul {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.product-registration__completeness-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.product-registration__completeness-list li span {
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-bold);
+}
+
+.product-registration__completeness-item--done {
+  color: var(--color-text-primary);
+}
+
+.product-registration__completeness-item--done span {
+  color: var(--color-primary);
+}
+
+.product-registration__completeness .product-registration__button {
+  width: 100%;
+}
+
 .product-registration__photo-step {
   display: grid;
   gap: var(--space-5);
@@ -1920,6 +2521,10 @@ onBeforeUnmount(() => {
 
 .product-registration__photo-uploader :deep(.product-photo-uploader__grid) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.product-registration__photo-required-row .product-registration__photo-uploader :deep(.product-photo-uploader__grid) {
+  grid-template-columns: 1fr;
 }
 
 .product-registration__photo-uploader :deep(.product-photo-uploader__item img) {
@@ -1984,6 +2589,26 @@ onBeforeUnmount(() => {
   font-size: 12px;
   font-style: normal;
   line-height: 18px;
+}
+
+.product-registration__field-hint--spacer {
+  visibility: hidden;
+}
+
+@media (min-width: 961px) {
+  .product-registration__field-hint {
+    white-space: nowrap;
+  }
+}
+
+.product-registration__optional-note {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .product-registration__field input,
@@ -2675,6 +3300,46 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 
+.product-registration__prompt-backdrop {
+  position: fixed;
+  z-index: 30;
+  display: grid;
+  background: rgb(0 0 0 / 28%);
+  inset: 0;
+  place-items: center;
+  padding: var(--space-5);
+}
+
+.product-registration__prompt {
+  display: grid;
+  width: min(100%, 420px);
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 16%);
+}
+
+.product-registration__prompt h3 {
+  color: var(--color-text-primary);
+  font-size: 20px;
+  font-weight: var(--font-weight-bold);
+  line-height: 28px;
+}
+
+.product-registration__prompt p {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.product-registration__prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
 .product-registration__button {
   min-width: 104px;
   height: var(--button-height-standard);
@@ -2706,6 +3371,14 @@ onBeforeUnmount(() => {
   .product-registration__steps ol,
   .product-registration__body {
     grid-template-columns: 1fr;
+  }
+
+  .product-registration__completeness--desktop {
+    display: none;
+  }
+
+  .product-registration__completeness--mobile {
+    display: grid;
   }
 
   .product-registration__actions {
