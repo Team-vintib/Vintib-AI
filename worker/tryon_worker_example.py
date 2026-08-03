@@ -93,6 +93,7 @@ class TryonWorker(BaseWorker):
         {
             "user_image_url": "https://.../person.jpg",
             "product_image_url": "https://.../cloth.jpg",
+            "mask_type": "upper",   # upper | lower — 기본값 upper(하위호환)
             "fit_type": "regular",   # regular | oversized | cropped — 아래 두 값이 있으면 무시됨
             "body_measurements": {"waist_cm": 80.0},   # 선택
             "garment_measurements": {"WAIST_WIDTH": 42.0}   # 선택
@@ -107,6 +108,9 @@ class TryonWorker(BaseWorker):
         """
         self._ensure_loaded()
 
+        mask_type = payload.get("mask_type", "upper")
+        if mask_type not in ("upper", "lower"):
+            raise ValueError(f"지원하지 않는 mask_type: {mask_type}")
         fit_type = payload.get("fit_type", "regular")
         if fit_type not in ("regular", "oversized", "cropped"):
             raise ValueError(f"지원하지 않는 fit_type: {fit_type}")
@@ -123,7 +127,7 @@ class TryonWorker(BaseWorker):
 
         mask_result = self._automasker(
             person_image,
-            mask_type="upper",
+            mask_type=mask_type,
             fit_type=fit_type,
             body_measurements=body_measurements,
             garment_measurements=garment_measurements,

@@ -8,6 +8,7 @@ import torch
 
 from model.SCHP import SCHP  # type: ignore
 from model.DensePose import DensePose  # type: ignore
+from model.adaptive_fit import compute_mask_adjustment
 
 DENSE_INDEX_MAP = {
     "background": [0],
@@ -76,26 +77,21 @@ PROTECT_CLOTH_PARTS = {
     'outer': {
         'ATR': ['Dress', 'Pants', 'Skirt'],
         'LIP': ['Upper-clothes', 'Dress', 'Pants', 'Skirt', 'Jumpsuits']
-    },
+    }
 }
-# 'hat'/'shoes'는 이 딕셔너리들을 쓰지 않는다 — 둘 다 다른 옷(상의/바지)을 보호할 방법이
-# PROTECT_CLOTH_PARTS에 없어서, 일반 로직(strong/weak mask 조합)을 타면 몸통까지 통째로 마스크에
-# 잡히는 문제가 실측으로 확인됐다(S15P11A108-367). 대신 `_hat_mask()`/`_shoes_mask()`(각각 Hair
-# 라벨, DensePose 'feet' 기반 기하학적 추정)로 완전히 별도 처리한다 — `cloth_agnostic_mask()`의
-# `if part == 'hat'/'shoes':` 분기 참고.
 MASK_CLOTH_PARTS = {
     'upper': ['Upper-clothes', 'Coat', 'Dress', 'Jumpsuits'],
     'lower': ['Pants', 'Skirt', 'Dress', 'Jumpsuits'],
     'overall': ['Upper-clothes', 'Dress', 'Pants', 'Skirt', 'Coat', 'Jumpsuits'],
     'inner': ['Upper-clothes'],
-    'outer': ['Coat',],
+    'outer': ['Coat',]
 }
 MASK_DENSE_PARTS = {
     'upper': ['torso', 'big arms', 'forearms'],
     'lower': ['thighs', 'legs'],
     'overall': ['torso', 'thighs', 'legs', 'big arms', 'forearms'],
     'inner': ['torso'],
-    'outer': ['torso', 'big arms', 'forearms'],
+    'outer': ['torso', 'big arms', 'forearms']
 }
     
 schp_public_protect_parts = ['Hat', 'Hair', 'Sunglasses', 'Left-shoe', 'Right-shoe', 'Bag', 'Glove', 'Scarf']
@@ -204,6 +200,46 @@ def adjust_mask_for_fit(
     return mask_area
 
 
+# =========================================================
+# [신규] 체형-의류 스펙 차이 기반 적응형 마스킹
+#    body_measurements/garment_measurements가 둘 다 있고 대응하는 축이 있을 때만 fit_type
+#    고정 3단계를 대체한다 — 하나라도 없으면 위 adjust_mask_for_fit()로 그대로 폴백한다.
+#    "어느 측정값 쌍을 쓸지" 고르는 로직(compute_mask_adjustment)은 cv2가 필요 없어서
+#    adaptive_fit.py에 있다(CI에서 바로 테스트됨). 여기는 계산된 값을 실제 마스크 배열에
+#    적용하는 부분(distance transform, cv2 필요)만 담당한다.
+#
+#    **길이(기장) 축은 의도적으로 없다.** 마스크 하단을 잘라 기장을 줄이면 그 자리에
+#    diffusion이 맨살을 새로 생성해야 하는데, 이건 AI 가드레일상 정책적으로 피해야 해서
+#    폭(스키니/배기) 조절만 남겼다 — `adaptive_fit.py` 모듈 docstring 참고.
+# =========================================================
+
+
+def apply_adaptive_adjustment(mask_area: np.ndarray, dilation_px: float) -> np.ndarray:
+    """`compute_mask_adjustment()`가 계산한 `dilation_px`를 실제 마스크 배열에 적용한다.
+
+    `adjust_mask_for_fit()`의 고정 커널 dilate(오버사이즈)를 대체하는 연속 버전 — 고정
+    커널 반복 대신 distance transform을 재threshold해서 팽창/수축 폭을 픽셀 단위로 정밀하게
+    조절한다(신체가 덮이는 범위 자체는 안 바뀐다 — 폭만 조절).
+    """
+    mask_area = mask_area.astype(np.uint8)
+    if dilation_px != 0.0:
+        mask_area = _resize_by_distance_transform(mask_area, dilation_px)
+    return mask_area
+
+
+def _resize_by_distance_transform(mask_area: np.ndarray, dilation_px: float) -> np.ndarray:
+    """`dilation_px`만큼 마스크를 연속적으로 팽창(양수)하거나 수축(음수)한다."""
+    if dilation_px > 0:
+        # 배경 픽셀마다 "마스크까지 거리"를 구해서, 그 거리가 dilation_px 이내인 픽셀까지
+        # 새로 포함시킨다 — 고정 커널 dilate보다 부드럽고 연속적으로 조절 가능하다.
+        outside_distance = cv2.distanceTransform((1 - mask_area).astype(np.uint8), cv2.DIST_L2, 5)
+        return (outside_distance <= dilation_px).astype(np.uint8)
+
+    # 마스크 픽셀마다 "경계까지 거리"를 구해서, |dilation_px|보다 안쪽(먼) 픽셀만 남긴다.
+    inside_distance = cv2.distanceTransform(mask_area, cv2.DIST_L2, 5)
+    return (inside_distance > abs(dilation_px)).astype(np.uint8)
+
+
 class AutoMasker:
     def __init__(
         self, 
@@ -237,120 +273,17 @@ class AutoMasker:
         }
     
     @staticmethod
-    def _hat_mask(
-        schp_lip_mask: np.ndarray,
-        schp_atr_mask: np.ndarray,
-        dilate_kernel: np.ndarray,
-    ) -> Image.Image:
-        """머리카락(+기존에 쓰고 있던 모자) 바운딩 박스를 위쪽으로 확장해 모자 자리를 추정한다.
-
-        DensePose엔 머리 인덱스가 없어서(SMPL 몸 표면 모델에 두피/모발이 없음) 못 쓰고,
-        SCHP 'Hair'/'Hat' 라벨 + 기하학적 확장으로 대체한다. 얼굴은 무조건 보존한다.
-
-        **얼굴 보호 방식**: 처음엔 모자 영역을 먼저 통째로 잡고 거기서 얼굴 모양 구멍을
-        빼는 방식(`& ~face_protect_area`)이었는데, 그러면 마스크 경계가 얼굴 윤곽을 피해
-        울퉁불퉁하게 파여서 diffusion이 그 경계를 따라 모자를 어색하게 뭉개 그리는 문제가
-        실측으로 확인됐다. 대신 **얼굴 영역이 시작되는 행(row) 위쪽만 깨끗하게 잘라서** 쓴다
-        — 얼굴을 "피해서" 그리는 게 아니라 애초에 얼굴 자리까지 마스크가 내려가지 않으니,
-        경계가 항상 수평선 하나뿐이라 자연스럽게 이어진다.
-        """
-        hair_area = part_mask_of(['Hair'], schp_lip_mask, LIP_MAPPING) | \
-            part_mask_of(['Hair'], schp_atr_mask, ATR_MAPPING)
-        existing_hat_area = part_mask_of(['Hat'], schp_lip_mask, LIP_MAPPING) | \
-            part_mask_of(['Hat'], schp_atr_mask, ATR_MAPPING)
-        face_protect_area = part_mask_of('Face', schp_lip_mask, LIP_MAPPING).astype(bool)
-
-        head_area = (hair_area | existing_hat_area).astype(np.uint8)
-        rows, cols = np.where(head_area > 0)
-        face_rows = np.where(face_protect_area.any(axis=1))[0]
-
-        if len(rows) == 0:
-            # 머리카락조차 인식하지 못하면(대머리, 인식 실패 등) 무리하게 추정하지 않고 빈 마스크를 돌려준다.
-            mask_area = np.zeros_like(head_area)
-        else:
-            top, bottom = int(rows.min()), int(rows.max())
-            left, right = int(cols.min()), int(cols.max())
-            head_height = bottom - top
-            head_width = right - left
-
-            # 실측 결과 머리카락 bbox에 딱 맞춰버리면 챙 있는 모자가 옆으로 잘리고 위로도 부족했다.
-            # 모자는 사람 몸 실루엣(머리) 범위를 넘어서 나오는 게 정상이라, 위/좌우 전부 여유를
-            # 크게 두고 background 영역까지 마스크에 포함시킨다 — 임시값, 결과 보고 계속 조정.
-            extend_top = max(0, top - int(head_height * 0.9))
-            width_margin = int(head_width * 0.4)
-            extend_left = max(0, left - width_margin)
-            extend_right = min(head_area.shape[1] - 1, right + width_margin)
-
-            # 얼굴이 시작되는 행(윗눈썹~이마 경계쯤) 바로 위까지만 채운다 — 얼굴 라벨을 못
-            # 찾으면(선글라스로 가려짐 등) 기존처럼 머리카락 bbox 하단까지로 폴백한다.
-            cutoff_row = int(face_rows.min()) if len(face_rows) > 0 else bottom + 1
-
-            mask_area = np.zeros_like(head_area)
-            mask_area[extend_top:cutoff_row, extend_left:extend_right + 1] = 1
-
-            mask_area = cv2.dilate(mask_area.astype(np.uint8), dilate_kernel, iterations=1)
-
-        return Image.fromarray((mask_area * 255).astype(np.uint8))
-
-    @staticmethod
-    def _shoes_mask(
-        densepose_mask: np.ndarray,
-        schp_lip_mask: np.ndarray,
-        schp_atr_mask: np.ndarray,
-        dilate_kernel: np.ndarray,
-    ) -> Image.Image:
-        """발(DensePose 'feet') + 기존에 신고 있던 신발 라벨을 발목 위쪽(바지 밑단 근처)까지 확장한다.
-
-        'hat'과 같은 이유로 upper/lower 등 일반 로직을 못 탄다 — 'shoes'는 다른 옷(상의/바지)을
-        보호할 PROTECT_CLOTH_PARTS 정의가 없어서, 일반 로직을 타면 몸통까지 통째로 마스크에
-        잡혀버리는 문제가 실측으로 확인됐다(S15P11A108-367).
-
-        **확장 방식**: 처음엔 bbox 전체를 사각형으로 채우는 방식이었는데, 사진 프레임 하단에
-        발이 살짝 걸쳐서 잘린 경우(발 실루엣 자체가 작게 잡힘) 뻣뻣한 직사각형 블록이 되고,
-        결과물도 신발이 아니라 각진 덩어리로 나오는 문제가 실측으로 확인됐다. 대신 실제 발/신발
-        모양(`shoe_area`)을 세로로 긴 커널로 dilate해서 위쪽(발목 방향)으로만 자연스럽게 늘린다
-        — 사각형으로 뭉개지 않고 발 윤곽을 그대로 살린 채로 범위만 넓힌다.
-        """
-        feet_area = part_mask_of(['feet'], densepose_mask, DENSE_INDEX_MAP)
-        existing_shoes_area = part_mask_of(['Left-shoe', 'Right-shoe'], schp_lip_mask, LIP_MAPPING) | \
-            part_mask_of(['Left-shoe', 'Right-shoe'], schp_atr_mask, ATR_MAPPING)
-
-        shoe_area = (feet_area.astype(bool) | existing_shoes_area.astype(bool)).astype(np.uint8)
-        rows, cols = np.where(shoe_area > 0)
-
-        if len(rows) == 0:
-            mask_area = np.zeros_like(shoe_area)
-        else:
-            top, bottom = int(rows.min()), int(rows.max())
-            left, right = int(cols.min()), int(cols.max())
-            foot_height = max(1, bottom - top)
-            foot_width = max(1, right - left)
-
-            # 발목 위쪽(바지 밑단과 겹치는 지점)까지 확장 — 부츠처럼 발목을 덮는 신발 대응.
-            # 세로로 긴 커널(가로는 좁게)로 dilate해서, 실제 발 윤곽을 유지한 채 위쪽으로만
-            # 자연스럽게 늘어나게 한다(사각형 bbox 채우기 대신). cv2.dilate는 커널 중심 기준
-            # 대칭으로 늘어나므로(위/아래 둘 다) 아래쪽 성장분은 원래 발 하단(bottom) 아래로
-            # 잘라내 위쪽으로만 늘어난 것처럼 만든다 — 발바닥 너머 바닥까지 마스크가 안 내려간다.
-            extend_up_px = int(foot_height * 0.8)
-            side_margin_px = max(1, int(foot_width * 0.15))
-            vertical_kernel = np.ones((extend_up_px * 2 + 1, side_margin_px * 2 + 1), np.uint8)
-
-            mask_area = cv2.dilate(shoe_area, vertical_kernel, iterations=1)
-            mask_area[bottom + 1 :, :] = 0
-            mask_area = cv2.dilate(mask_area, dilate_kernel, iterations=1)
-
-        return Image.fromarray((mask_area * 255).astype(np.uint8))
-
-    @staticmethod
     def cloth_agnostic_mask(
         densepose_mask: Image.Image,
         schp_lip_mask: Image.Image,
         schp_atr_mask: Image.Image,
         part: str='overall',
         fit_type: str='regular',
+        body_measurements: dict | None = None,
+        garment_measurements: dict | None = None,
         **kwargs
     ):
-        assert part in ['upper', 'lower', 'overall', 'inner', 'outer', 'hat', 'shoes'], f"part should be one of ['upper', 'lower', 'overall', 'inner', 'outer', 'hat', 'shoes'], but got {part}"
+        assert part in ['upper', 'lower', 'overall', 'inner', 'outer'], f"part should be one of ['upper', 'lower', 'overall', 'inner', 'outer'], but got {part}"
         assert fit_type in ['regular', 'oversized', 'cropped'], f"fit_type should be one of ['regular', 'oversized', 'cropped'], but got {fit_type}"
         w, h = densepose_mask.size
         
@@ -364,30 +297,10 @@ class AutoMasker:
         densepose_mask = np.array(densepose_mask)
         schp_lip_mask = np.array(schp_lip_mask)
         schp_atr_mask = np.array(schp_atr_mask)
-
-        if part == 'hat':
-            # 'hat'은 아래 upper/lower 등과 같은 일반 로직(=MASK_CLOTH_PARTS/MASK_DENSE_PARTS 둘 다
-            # 채워져 있다고 가정)을 못 탄다 — DensePose엔 머리 인덱스가 없고(MASK_DENSE_PARTS['hat']=[]),
-            # 사람이 이미 모자를 쓰고 있지 않으면 SCHP 'Hat' 라벨도 비어 있다
-            # (MASK_CLOTH_PARTS['hat']=['Hat']가 빈 마스크가 됨). 그 상태로 일반 로직을 그대로 타면
-            # "보호 대상이 아닌 모든 영역"이 마스크로 잡혀버려서(사실상 전신) 완전히 잘못된 결과가 나온다.
-            # 그래서 SCHP 'Hair' 라벨(+ 기존에 모자를 쓰고 있었다면 그 'Hat' 라벨)의 바운딩 박스를
-            # 구해 위쪽으로 확장하는 방식으로 별도 처리한다.
-            return AutoMasker._hat_mask(schp_lip_mask, schp_atr_mask, dilate_kernel)
-
-        if part == 'shoes':
-            # 'shoes'도 같은 이유로 일반 로직을 못 탄다(PROTECT_CLOTH_PARTS['shoes']가 상의/바지를
-            # 보호할 방법이 없어서, 일반 로직을 타면 몸통까지 통째로 마스크에 잡힌다 — 실측으로 확인됨).
-            # DensePose 'feet' 인덱스(+ 기존에 신고 있었다면 신발 라벨)를 발목 위쪽까지 확장한다.
-            return AutoMasker._shoes_mask(densepose_mask, schp_lip_mask, schp_atr_mask, dilate_kernel)
-
+        
         # Strong Protect Area (Hands, Face, Accessory, Feet)
         hands_protect_area = part_mask_of(['hands', 'feet'], densepose_mask, DENSE_INDEX_MAP)
-        # 손 보호 팽창은 dilate_kernel(다른 용도들과 공용)보다 작게 별도로 쓴다 — 실측에서
-        # 손이 주머니에 들어간 지점 주변 원단까지 같이 보호돼 버려(원본이 안 지워지는 문제,
-        # S15P11A108-367) 폭을 줄였다. 손가락 경계 자체는 여전히 보호하되, 그 여백만 좁힌다.
-        hands_dilate_kernel = np.ones((max(1, dilate_kernel.shape[0] // 2), max(1, dilate_kernel.shape[1] // 2)), np.uint8)
-        hands_protect_area = cv2.dilate(hands_protect_area, hands_dilate_kernel, iterations=1)
+        hands_protect_area = cv2.dilate(hands_protect_area, dilate_kernel, iterations=1)
         hands_protect_area = hands_protect_area & \
             (part_mask_of(['Left-arm', 'Right-arm', 'Left-leg', 'Right-leg'], schp_atr_mask, ATR_MAPPING) | \
              part_mask_of(['Left-arm', 'Right-arm', 'Left-leg', 'Right-leg'], schp_lip_mask, LIP_MAPPING))
@@ -401,15 +314,8 @@ class AutoMasker:
             part_mask_of(['Hair'], schp_atr_mask, ATR_MAPPING)
         cloth_protect_area = part_mask_of(PROTECT_CLOTH_PARTS[part]['LIP'], schp_lip_mask, LIP_MAPPING) | \
             part_mask_of(PROTECT_CLOTH_PARTS[part]['ATR'], schp_atr_mask, ATR_MAPPING)
-        # hat/shoes는 위에서 이미 별도 분기로 빠지므로 여기 도달하는 part는 항상
-        # upper/lower/overall/inner/outer다 — MASK_CLOTH_PARTS.get(part, [])는 그 경우 전부 빈
-        # 리스트를 주므로 accessory_parts는 원래 목록 그대로 유지된다(기존 동작과 동일).
-        accessory_parts = [
-            p for p in ['Hat', 'Glove', 'Sunglasses', 'Bag', 'Left-shoe', 'Right-shoe', 'Scarf', 'Socks']
-            if p not in MASK_CLOTH_PARTS.get(part, [])
-        ]
-        accessory_protect_area = part_mask_of(accessory_parts, schp_lip_mask, LIP_MAPPING) | \
-            part_mask_of(accessory_parts, schp_atr_mask, ATR_MAPPING)
+        accessory_protect_area = part_mask_of((accessory_parts := ['Hat', 'Glove', 'Sunglasses', 'Bag', 'Left-shoe', 'Right-shoe', 'Scarf', 'Socks']), schp_lip_mask, LIP_MAPPING) | \
+            part_mask_of(accessory_parts, schp_atr_mask, ATR_MAPPING) 
         weak_protect_area = body_protect_area | cloth_protect_area | hair_protect_area | strong_protect_area | accessory_protect_area
         
         # Mask Area
@@ -433,9 +339,14 @@ class AutoMasker:
         mask_area = (mask_area | strong_mask_area) & (~strong_protect_area) 
         mask_area = cv2.dilate(mask_area, dilate_kernel, iterations=1)
 
-        # [신규] fit_type에 따른 마스크 조정 (strong_protect_area는 이미 제외된 상태이므로
-        # 얼굴/손/발은 이 단계와 무관하게 항상 보존된다)
-        mask_area = adjust_mask_for_fit(mask_area, densepose_mask, fit_type)
+        # [신규] 체형-의류 스펙 차이 기반 적응형 조정 우선, 측정값이 없으면 fit_type 고정
+        # 3단계로 폴백한다(strong_protect_area는 이미 제외된 상태이므로 얼굴/손/발은 이
+        # 단계와 무관하게 항상 보존된다)
+        dilation_px = compute_mask_adjustment(part, body_measurements, garment_measurements)
+        if dilation_px is not None:
+            mask_area = apply_adaptive_adjustment(mask_area, dilation_px)
+        else:
+            mask_area = adjust_mask_for_fit(mask_area, densepose_mask, fit_type)
         mask_area = mask_area & (~strong_protect_area)  # 안전을 위해 재확인
 
         return Image.fromarray((mask_area * 255).astype(np.uint8))
@@ -445,16 +356,20 @@ class AutoMasker:
         image: Union[str, Image.Image],
         mask_type: str = "upper",
         fit_type: str = "regular",
+        body_measurements: dict | None = None,
+        garment_measurements: dict | None = None,
     ):
-        assert mask_type in ['upper', 'lower', 'overall', 'inner', 'outer', 'hat', 'shoes'], f"mask_type should be one of ['upper', 'lower', 'overall', 'inner', 'outer', 'hat', 'shoes'], but got {mask_type}"
+        assert mask_type in ['upper', 'lower', 'overall', 'inner', 'outer'], f"mask_type should be one of ['upper', 'lower', 'overall', 'inner', 'outer'], but got {mask_type}"
         assert fit_type in ['regular', 'oversized', 'cropped'], f"fit_type should be one of ['regular', 'oversized', 'cropped'], but got {fit_type}"
         preprocess_results = self.preprocess_image(image)
         mask = self.cloth_agnostic_mask(
-            preprocess_results['densepose'], 
-            preprocess_results['schp_lip'], 
-            preprocess_results['schp_atr'], 
+            preprocess_results['densepose'],
+            preprocess_results['schp_lip'],
+            preprocess_results['schp_atr'],
             part=mask_type,
             fit_type=fit_type,
+            body_measurements=body_measurements,
+            garment_measurements=garment_measurements,
         )
         return {
             'mask': mask,
