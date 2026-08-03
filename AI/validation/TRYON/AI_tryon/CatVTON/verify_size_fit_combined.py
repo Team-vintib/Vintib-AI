@@ -44,10 +44,12 @@ BOOST_LOGIT = 6.0
 GARMENT_WAIST_WIDTH_CM = 38.0  # 반바지 레퍼런스의 평편 원단 폭(가정값)
 
 PEOPLE = {
-    # (person_image, worn_reference, 가정 허리둘레cm) -- 허리둘레만 다르고 옷은 동일
+    # (person_image, worn_reference, 가정 허리둘레cm) -- 허리둘레만 다르고 옷은 동일.
+    # 둘리는 마스크 침식(폭 축)만으로는 타이트함이 육안상 약해서, 레퍼런스 자체도
+    # "타이트하게 입은" 버전(pants_worn_reference_dooly_tight.png)으로 바꿔 신호를 강화한다.
     "younghee_loose": ("younghee.png", "pants_worn_reference_younghee.png", 65.0),
     "cheolsu_regular": ("cheolsu.png", "pants_worn_reference_cheolsu.png", 75.0),
-    "dooly_tight": ("dooly.png", "pants_worn_reference_dooly.png", 110.0),
+    "dooly_tight": ("dooly.png", "pants_worn_reference_dooly_tight.png", 110.0),
 }
 PANTS_PATH = os.path.join("image", "alpha_2", "pants.png")
 
@@ -173,7 +175,11 @@ for case_name, (person_file, worn_ref_file, waist_cm) in PEOPLE.items():
         body_measurements={"waist_cm": waist_cm},
         garment_measurements={"WAIST_WIDTH": GARMENT_WAIST_WIDTH_CM},
     )["mask"]
-    lower_mask = mask_processor.blur(lower_mask, blur_factor=9)
+    # blur_factor=9(기존값)는 조정 안 된 고정 마스크 경계를 부드럽게 하려는 용도였는데,
+    # dilation/erosion으로 경계 자체가 이동하면 diffusion이 실제로 그린 경계와 blur
+    # 전이구간 중심이 어긋나서 반투명 "고스트" 윤곽이 생긴다(§9.3). 경계를 덜 흐릿하게
+    # 해서 그 전이구간 폭 자체를 줄인다.
+    lower_mask = mask_processor.blur(lower_mask, blur_factor=2)
 
     print(f"\n=== 생성: {case_name} (허리 {waist_cm}cm, 옷 폭 {GARMENT_WAIST_WIDTH_CM}cm) ===")
     result_image = pipeline(
