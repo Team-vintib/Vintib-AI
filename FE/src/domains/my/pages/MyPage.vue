@@ -29,7 +29,6 @@ import {
 } from '@/domains/tryon/api/tryOnProfileApi'
 import {
   TRYON_BODY_FIELD_OPTIONS,
-  TRYON_PROFILE_STATUS_LABELS,
 } from '@/domains/tryon/constants/tryOnProfileMockData'
 import type {
   MyLiveStatus,
@@ -43,7 +42,6 @@ import type {
   SaveTryOnProfileRequest,
   TryOnBodyFieldId,
   TryOnProfile,
-  TryOnProfileAvailability,
 } from '@/domains/tryon/types/tryOnProfile.types'
 import { normalizeApiError } from '@/shared/api/http'
 import type { InterestBrand, InterestCategory } from '@/shared/api/mockInterestStorage'
@@ -166,31 +164,6 @@ const tryOnImageDisplayUrl = computed(() => {
   }
 
   return tryOnImagePreviewUrl.value || tryOnProfile.value?.bodyPhotoUrl || profile.value?.defaultTryOnImageUrl || ''
-})
-const completedTryOnMeasurementCount = computed(
-  () => TRYON_BODY_FIELD_OPTIONS.filter((field) => tryOnBodyForm.value[field.id].trim()).length,
-)
-const tryOnProfileAvailability = computed<TryOnProfileAvailability>(() => {
-  if (!tryOnImageDisplayUrl.value) {
-    return 'MISSING_PHOTO'
-  }
-
-  if (completedTryOnMeasurementCount.value < TRYON_BODY_FIELD_OPTIONS.length) {
-    return 'NEEDS_MEASUREMENTS'
-  }
-
-  return 'READY'
-})
-const tryOnProfileDescription = computed(() => {
-  if (tryOnProfileAvailability.value === 'READY') {
-    return '상품 상세와 라이브에서 AI 시착을 바로 사용할 수 있습니다.'
-  }
-
-  if (tryOnProfileAvailability.value === 'NEEDS_MEASUREMENTS') {
-    return '전신 사진이 있어 AI 시착은 가능하지만, 신체 정보를 보강하면 결과 기준이 더 명확해집니다.'
-  }
-
-  return '전신 사진을 등록해야 상품 상세와 라이브에서 AI 시착을 사용할 수 있습니다.'
 })
 const filteredInterestBrands = computed(() => {
   const normalizedQuery = interestBrandSearchQuery.value.trim().toLowerCase()
@@ -1580,23 +1553,6 @@ onMounted(() => {
                 >
                   {{ tryOnProfileMessage }}
                 </p>
-
-                <section class="my-tryon-status" aria-label="AI 시착 사용 상태">
-                  <div>
-                    <span>{{ TRYON_PROFILE_STATUS_LABELS[tryOnProfileAvailability] }}</span>
-                    <strong>{{ tryOnProfileDescription }}</strong>
-                  </div>
-                  <dl>
-                    <div>
-                      <dt>전신 사진</dt>
-                      <dd>{{ tryOnImageDisplayUrl ? '등록됨' : '미등록' }}</dd>
-                    </div>
-                    <div>
-                      <dt>신체 정보</dt>
-                      <dd>{{ completedTryOnMeasurementCount }} / {{ TRYON_BODY_FIELD_OPTIONS.length }}</dd>
-                    </div>
-                  </dl>
-                </section>
 
                 <div v-if="tryOnProfileLoadState === 'loading'" class="my-state">
                   AI 시착 정보를 불러오는 중입니다.
@@ -3415,68 +3371,6 @@ onMounted(() => {
   display: none;
 }
 
-.my-tryon-status {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-4);
-  align-items: center;
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-secondary);
-}
-
-.my-tryon-status > div {
-  display: grid;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.my-tryon-status span {
-  display: inline-flex;
-  justify-self: start;
-  min-height: 24px;
-  padding: 2px 10px;
-  border-radius: var(--radius-badge);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  font-size: 12px;
-  font-weight: var(--font-weight-bold);
-  line-height: 18px;
-}
-
-.my-tryon-status strong {
-  color: var(--color-text-primary);
-  font-size: 16px;
-  font-weight: var(--font-weight-extrabold);
-  line-height: 24px;
-}
-
-.my-tryon-status dl {
-  display: grid;
-  min-width: 180px;
-  gap: var(--space-2);
-}
-
-.my-tryon-status dl div {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.my-tryon-status dt {
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.my-tryon-status dd {
-  color: var(--color-text-primary);
-  font-size: 13px;
-  font-weight: var(--font-weight-bold);
-  line-height: 20px;
-}
-
 .my-tryon-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3786,8 +3680,7 @@ onMounted(() => {
   .my-point-panel__grid,
   .my-profile-form__grid,
   .my-profile-grid,
-  .my-tryon-fields,
-  .my-tryon-status {
+  .my-tryon-fields {
     grid-template-columns: 1fr;
   }
 
