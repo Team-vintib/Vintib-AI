@@ -184,21 +184,22 @@ BE/
 │   │   ├── entity/               # BusinessInfo, BusinessVerificationStatus
 │   │   ├── repository/
 │   │   └── dto/
-│   ├── order/                    # 주문 FK 대상 엔티티(생성 API 없음) + 세금계산서(BIZ-002) + 구매/판매 내역(MY-003/004) — 서윤
-│   │   ├── controller/           # InvoiceController, OrderController(구매/판매 내역)
+│   ├── order/                    # 주문 생성(SALE-002)·배송지/송장(ORDER-001, SHIP-001/002)·구매확정/정산(ORDER-002/003)·세금계산서(BIZ-002)·구매/판매 내역(MY-003/004) — 서윤
+│   │   ├── controller/           # InvoiceController, OrderController(생성/조회/배송지/송장/확정), MyOrderController(구매/판매 내역)
 │   │   ├── service/              # InvoiceService, OrderService
-│   │   ├── entity/               # Order(package-private 빌더), OrderStatus, Invoice
-│   │   ├── repository/           # OrderRepository, InvoiceRepository
-│   │   └── dto/response/
-│   ├── point/                    # 포인트 잔액/충전/출금 (MY-007) — 서윤
+│   │   ├── entity/               # Order, OrderStatus, OrderShipment(배송지+송장, 공유 PK 1:1), Invoice
+│   │   ├── repository/           # OrderRepository, OrderShipmentRepository, InvoiceRepository
+│   │   ├── scheduler/            # OrderAutoConfirmScheduler(ORDER-003, 배송완료 7일 후 자동 구매확정)
+│   │   └── dto/
+│   ├── point/                    # 포인트 잔액/충전/출금(MY-007), 주문 결제·정산(SALE-002/ORDER-002·003) — 서윤
 │   │   ├── controller/
-│   │   ├── service/
+│   │   ├── service/              # PointService — pay(결제)/settleOrder(정산)
 │   │   ├── entity/               # PointAccount(공유 PK 1:1), PointTransaction(원장), PointTransactionType
 │   │   ├── repository/
 │   │   └── dto/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
-│       ├── client/              # AiClient — Spring → FastAPI
-│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig
+│       ├── client/              # AiClient(Spring → FastAPI), DeliveryTrackingClient(deliveryapi.co.kr 배송 조회 웹훅)
+│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig, SchedulingConfig, DeliveryApiConfig
 │       ├── entity/              # BaseTimeEntity 등 공통 베이스 엔티티
 │       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
 │       ├── health/              # HealthController

@@ -35,6 +35,8 @@ public class SecurityConfig {
             "/api/auth/reissue",
             "/api/auth/email/**",
             "/api/health",
+            // deliveryapi.co.kr이 호출하는 배송 조회 웹훅(SHIP-002) — JWT가 아니라 X-Webhook-Signature로 검증한다.
+            "/api/webhooks/delivery",
             // 홈 콘텐츠 조회는 비회원도 가능(HOME-001). 정확 경로만 열어 /api/home/following(HOME-002)은 인증 필요로 남긴다.
             "/api/home",
             // 카테고리/브랜드 마스터 조회는 비회원도 가능(SY007)

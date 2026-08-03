@@ -5,6 +5,13 @@
 - **관련 이슈**: FE `S15P11A108-440`(미낙찰 상품 처리), 스토리 `-103`[AUCT-014], 에픽 `-209`[AUCT]
 - **관련 기능**: AUCT-014(미낙찰 상품 복원), PROD-005(판매 방식)
 - **상태**: FE는 기존 상품 API로 처리를 **연결 완료**. 아래 두 가지 **의미 확인**만 필요.
+- **2026-08-03 확인**: `PATCH /products/{id}/status`, `/auction-schedule`, `GET /products/{id}`,
+  전체수정(`PATCH /products/{id}`) 자체는 모두 존재한다. 다만 질문 1(미낙찰 상품에도 그대로 호출
+  가능한지)은 **아직 답할 수 없다** — 경매 입찰·종료(AUCT-002~014)가 통째로 미구현이라 상품이
+  실제로 "미낙찰" 상태가 되는 경로 자체가 없다(`SaleStatus`에 경매종료/유찰 값도 없음:
+  `DRAFT/ON_SALE/AUCTION_SCHEDULED/AUCTION_IN_PROGRESS/SOLD`뿐). 경매 진행/종료(AUCT-002 이후)가
+  구현되면 그때 실제로 검증해서 답해야 한다. 질문 2(`/status`가 DIRECT_SALE 전환이 맞는지)는 맞다
+  (`Product.registerDirectSale`).
 
 ## 배경
 
