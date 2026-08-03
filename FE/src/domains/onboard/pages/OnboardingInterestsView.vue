@@ -58,6 +58,18 @@ const handlePrevious = async () => {
 }
 
 const applyApiError = (apiError: ApiError | null) => {
+  if (apiError?.code === 'P008') {
+    submitError.value =
+      '선택한 브랜드 중 더 이상 존재하지 않는 항목이 있습니다. 목록을 새로고침한 뒤 다시 선택해 주세요.'
+    return
+  }
+
+  if (apiError?.code === 'P009') {
+    submitError.value =
+      '선택한 카테고리 중 더 이상 존재하지 않는 항목이 있습니다. 목록을 새로고침한 뒤 다시 선택해 주세요.'
+    return
+  }
+
   submitError.value =
     apiError?.message || '관심 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
 }
