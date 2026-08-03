@@ -195,6 +195,21 @@ def evaluate_color(samples: list[Sample], backend_key: str) -> list[ColorPredict
     return out
 
 
+def color_confusion_matrix(preds: list[ColorPrediction]) -> dict[str, dict[str, int]]:
+    """`confusion_matrix()`의 색상 버전(2026-08-03 추가) — 지금까지 없었다(`REPORT.md` 및
+    사용자 확인). `truth_primary` -> `predicted_primary` 카운트. 팔레트 코드 + `MULTI_LABEL`
+    전체를 행으로 깔아둔다(카테고리 버전과 동일한 관례) — 정답셋에 없는 색은 빈 dict로 남는다."""
+    all_codes = list(PALETTE) + [MULTI_LABEL]
+    matrix: dict[str, dict[str, int]] = {code: {} for code in all_codes}
+    for p in preds:
+        if p.predicted_primary not in all_codes or p.truth_primary not in all_codes:
+            continue
+        matrix[p.truth_primary][p.predicted_primary] = (
+            matrix[p.truth_primary].get(p.predicted_primary, 0) + 1
+        )
+    return matrix
+
+
 # --------------------------------------------------------------------------
 # V4 — score 분포 / 캘리브레이션
 # --------------------------------------------------------------------------
