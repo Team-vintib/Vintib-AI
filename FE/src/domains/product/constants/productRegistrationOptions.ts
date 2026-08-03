@@ -138,6 +138,7 @@ export const PRODUCT_REGISTRATION_VALIDATION_MESSAGES = {
   sellerDefectDescriptionRequired: '판매자가 확인한 하자 설명을 입력해 주세요.',
   aiPhotoRequired: 'AI 품질 검증에 사용할 Front View와 Back View 사진을 선택해 주세요.',
   aiPhotoConfirmationRequired: '품질 검증 사진별 확인을 완료해 주세요.',
+  aiModelGenderRequired: 'AI 모델을 선택해 주세요.',
   saleTypeRequired: '판매 방식을 선택해 주세요.',
   directSalePriceRequired: '판매가를 입력해 주세요.',
   auctionStartPriceRequired: '시작가를 입력해 주세요.',

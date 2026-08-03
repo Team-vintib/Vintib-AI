@@ -13,6 +13,8 @@ export type ProductRegistrationPhotoRole = 'front' | 'back' | 'additional'
 
 export type ProductRegistrationSaleType = 'DIRECT' | 'AUCTION'
 
+export type ProductRegistrationAiModelGender = 'FEMALE' | 'MALE'
+
 export type ProductRegistrationAiCheckStatus =
   | 'idle'
   | 'analyzing'
@@ -95,6 +97,8 @@ export interface ProductRegistrationDraft {
   sellerDefectDescription: string
   aiCheckPhotoIds: string[]
   aiPhotoResults: ProductRegistrationAiPhotoResult[]
+  aiModelEnabled: boolean
+  aiModelGender: ProductRegistrationAiModelGender | null
   saleType: ProductRegistrationSaleType | ''
   directSalePrice: string
   auctionStartPrice: string

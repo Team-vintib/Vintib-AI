@@ -23,6 +23,7 @@ import {
 } from '@/domains/product/constants/productRegistrationOptions'
 import type {
   ProductRegistrationDraft,
+  ProductRegistrationAiModelGender,
   ProductRegistrationAiDefectCandidate,
   ProductRegistrationAiPhotoResult,
   ProductRegistrationPriceBucket,
@@ -39,6 +40,7 @@ const PRODUCT_REGISTRATION_MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
 const router = useRouter()
 const currentStepIndex = ref(0)
 const photoStepTouched = ref(false)
+const aiModelStepTouched = ref(false)
 const photoUploadError = ref('')
 const basicStepTouched = reactive({
   name: false,
@@ -69,18 +71,79 @@ const isSubmittingRegistration = ref(false)
 const registrationSubmitError = ref('')
 const brands = ref<BrandDto[]>([])
 const categories = ref<CategoryDto[]>([])
-const registrationCategoryOptions = computed(() => {
+const categoryMiddleId = ref('')
+interface CategorySelectOption {
+  id: string
+  label: string
+  parentId: string
+}
+
+const dedupeCategoryOptionsByLabel = (options: CategorySelectOption[]) => {
+  const optionMap = new Map<string, CategorySelectOption>()
+
+  options.forEach((option) => {
+    const key = option.label.trim()
+
+    if (!optionMap.has(key)) {
+      optionMap.set(key, option)
+    }
+  })
+
+  return [...optionMap.values()]
+}
+
+const middleCategoryOptions = computed<CategorySelectOption[]>(() => {
   if (!categories.value.length) {
-    return PRODUCT_REGISTRATION_CATEGORY_OPTIONS
+    return PRODUCT_REGISTRATION_CATEGORY_OPTIONS.map((option) => ({
+      id: option.id,
+      label: option.label,
+      parentId: '',
+    }))
   }
 
-  return categories.value
-    .filter((category) => category.depth <= 2)
-    .map((category) => ({
-      id: String(category.id),
-      label: category.name,
-    }))
+  return dedupeCategoryOptionsByLabel(
+    categories.value
+      .filter((category) => category.depth === 2)
+      .map((category) => ({
+        id: String(category.id),
+        label: category.name,
+        parentId: String(category.parentId ?? ''),
+      })),
+  )
 })
+const minorCategoryOptions = computed<CategorySelectOption[]>(() => {
+  const selectedMiddleCategory = middleCategoryOptions.value.find(
+    (option) => option.id === categoryMiddleId.value,
+  )
+
+  if (!selectedMiddleCategory) {
+    return []
+  }
+
+  const matchingMiddleCategoryIds = categories.value
+    .filter(
+      (category) =>
+        category.depth === 2 &&
+        category.name.trim() === selectedMiddleCategory.label.trim(),
+    )
+    .map((category) => String(category.id))
+
+  return dedupeCategoryOptionsByLabel(
+    categories.value
+      .filter(
+        (category) =>
+          category.depth === 3 && matchingMiddleCategoryIds.includes(String(category.parentId)),
+      )
+      .map((category) => ({
+        id: String(category.id),
+        label: category.name,
+        parentId: String(category.parentId ?? ''),
+      })),
+  )
+})
+const updateMiddleCategory = () => {
+  draft.categoryId = categoryMiddleId.value
+}
 
 const priceRecommendationBuckets: ProductRegistrationPriceBucket[] = [
   { id: 'under-30', label: '~3만', productCount: 6 },
@@ -123,7 +186,9 @@ const createInitialDraft = (): ProductRegistrationDraft => ({
   sellerDefectDescription: '',
   aiCheckPhotoIds: [],
   aiPhotoResults: [],
-  saleType: '',
+  aiModelEnabled: false,
+  aiModelGender: null,
+  saleType: 'DIRECT',
   directSalePrice: '',
   auctionStartPrice: '',
   linkedLiveId: '',
@@ -145,9 +210,6 @@ const additionalPhotos = computed(() =>
 )
 const frontPhotoCountLabel = computed(() => `(${Math.min(frontPhotos.value.length, 1)}/1)`)
 const backPhotoCountLabel = computed(() => `(${Math.min(backPhotos.value.length, 1)}/1)`)
-const representativePhoto = computed(
-  () => draft.photos.find((photo) => photo.id === draft.representativePhotoId) ?? null,
-)
 const photoStepErrors = computed(() => ({
   front: photoStepTouched.value && frontPhotos.value.length === 0
     ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.frontPhotoRequired
@@ -155,29 +217,15 @@ const photoStepErrors = computed(() => ({
   back: photoStepTouched.value && backPhotos.value.length === 0
     ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.backPhotoRequired
     : '',
-  representative: photoStepTouched.value && !draft.representativePhotoId
-    ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.representativePhotoRequired
-    : '',
 }))
 const basicStepErrors = computed(() => ({
   name:
     basicStepTouched.name && !draft.name.trim()
       ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.nameRequired
       : '',
-  brand:
-    basicStepTouched.brand && !draft.brand.trim()
-      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.brandRequired
-      : '',
-  color:
-    basicStepTouched.color && !draft.color
-      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.colorRequired
-      : basicStepTouched.color && draft.color === 'etc' && !draft.customColor.trim()
-        ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.customColorRequired
-        : '',
-  categoryId:
-    basicStepTouched.categoryId && !draft.categoryId
-      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.categoryRequired
-      : '',
+  brand: '',
+  color: '',
+  categoryId: '',
 }))
 const normalizeMeasurementValue = (value: string | number) => String(value ?? '').trim()
 
@@ -193,9 +241,7 @@ const getMeasurementError = (fieldId: string, value: string | number) => {
     return ''
   }
 
-  if (!normalizeMeasurementValue(value)) {
-    return PRODUCT_REGISTRATION_VALIDATION_MESSAGES.measurementRequired
-  }
+  if (!normalizeMeasurementValue(value)) return ''
 
   return isPositiveMeasurement(value)
     ? ''
@@ -215,10 +261,7 @@ const activeMeasurementFields = computed(
   () => PRODUCT_REGISTRATION_MEASUREMENT_FIELDS_BY_CATEGORY[selectedCategoryCode.value] ?? [],
 )
 const attributesStepErrors = computed(() => ({
-  size:
-    attributesStepTouched.size && !draft.size
-      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.sizeRequired
-      : '',
+  size: '',
   measurements: Object.fromEntries(
     activeMeasurementFields.value.map((field) => [
       field.id,
@@ -229,21 +272,28 @@ const attributesStepErrors = computed(() => ({
 const isPhotoStepValid = computed(
   () =>
     frontPhotos.value.length > 0 &&
-    backPhotos.value.length > 0 &&
-    Boolean(draft.representativePhotoId),
+    backPhotos.value.length > 0,
 )
-const isBasicStepValid = computed(
-  () =>
-    Boolean(draft.name.trim()) &&
-    Boolean(draft.brand.trim()) &&
-    Boolean(draft.color) &&
-    (draft.color !== 'etc' || Boolean(draft.customColor.trim())) &&
-    Boolean(draft.categoryId),
+const isAiModelSettingsAvailable = computed(() => isPhotoStepValid.value)
+const isAiModelStepValid = computed(
+  () => !draft.aiModelEnabled || Boolean(draft.aiModelGender),
 )
+const aiModelStepError = computed(() =>
+  aiModelStepTouched.value && draft.aiModelEnabled && !draft.aiModelGender
+    ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.aiModelGenderRequired
+    : '',
+)
+const aiModelGenderLabel = computed(() => {
+  if (draft.aiModelGender === 'FEMALE') return '여성'
+  if (draft.aiModelGender === 'MALE') return '남성'
+
+  return ''
+})
+const isBasicStepValid = computed(() => Boolean(draft.name.trim()))
 const isAttributesStepValid = computed(
   () =>
-    Boolean(draft.size) &&
     activeMeasurementFields.value.every((field) =>
+      !normalizeMeasurementValue(draft.measurements[field.id] ?? '') ||
       isPositiveMeasurement(draft.measurements[field.id] ?? ''),
     ),
 )
@@ -280,20 +330,9 @@ const areAllAiPhotosConfirmed = computed(
     ),
 )
 const conditionStepErrors = computed(() => ({
-  conditionGrade:
-    conditionStepTouched.conditionGrade && !draft.conditionGrade
-      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.conditionRequired
-      : '',
-  hasDefect:
-    conditionStepTouched.hasDefect && draft.hasDefect === null
-      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.defectRequired
-      : '',
-  sellerDefectDescription:
-    conditionStepTouched.sellerDefectDescription &&
-    draft.hasDefect === true &&
-    !draft.sellerDefectDescription.trim()
-      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.sellerDefectDescriptionRequired
-      : '',
+  conditionGrade: '',
+  hasDefect: '',
+  sellerDefectDescription: '',
   aiPhotos:
     conditionStepTouched.aiPhotos && !hasRequiredAiPhotos.value
       ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.aiPhotoRequired
@@ -305,9 +344,6 @@ const conditionStepErrors = computed(() => ({
 }))
 const isConditionStepValid = computed(
   () =>
-    Boolean(draft.conditionGrade) &&
-    draft.hasDefect !== null &&
-    (draft.hasDefect !== true || Boolean(draft.sellerDefectDescription.trim())) &&
     hasRequiredAiPhotos.value &&
     areAllAiPhotosConfirmed.value,
 )
@@ -370,7 +406,11 @@ const canShowAttributesSection = computed(
   () => isPhotoStepValid.value && isBasicStepValid.value,
 )
 const isIntroStepValid = computed(
-  () => isPhotoStepValid.value && isBasicStepValid.value && isAttributesStepValid.value,
+  () =>
+    isPhotoStepValid.value &&
+    isAiModelStepValid.value &&
+    isBasicStepValid.value &&
+    isAttributesStepValid.value,
 )
 
 const canMoveCurrentStepNext = computed(() => {
@@ -417,6 +457,34 @@ const validateImageFile = (file: File) => {
   }
 
   return ''
+}
+
+const resetAiModelSettings = () => {
+  draft.aiModelEnabled = false
+  draft.aiModelGender = null
+  aiModelStepTouched.value = false
+}
+
+const selectAiModelUsage = (enabled: boolean) => {
+  if (enabled && !isAiModelSettingsAvailable.value) {
+    return
+  }
+
+  draft.aiModelEnabled = enabled
+  aiModelStepTouched.value = true
+
+  if (!enabled) {
+    draft.aiModelGender = null
+  }
+}
+
+const selectAiModelGender = (gender: ProductRegistrationAiModelGender) => {
+  if (!draft.aiModelEnabled || !isAiModelSettingsAvailable.value) {
+    return
+  }
+
+  draft.aiModelGender = gender
+  aiModelStepTouched.value = true
 }
 
 const addPhotos = (role: ProductRegistrationPhotoRole, files: File[]) => {
@@ -472,6 +540,10 @@ const removePhoto = (photoId: string) => {
 
   if (draft.representativePhotoId === photoId) {
     draft.representativePhotoId = ''
+  }
+
+  if (!isAiModelSettingsAvailable.value) {
+    resetAiModelSettings()
   }
 }
 
@@ -603,6 +675,7 @@ const editCurrentAiPhotoResult = () => {
 const markCurrentStepTouched = () => {
   if (currentStep.value.id === 'photos') {
     photoStepTouched.value = true
+    aiModelStepTouched.value = draft.aiModelEnabled
 
     if (canShowBasicInfoSection.value) {
       basicStepTouched.name = true
@@ -714,6 +787,7 @@ const resetRegistrationDraft = () => {
   })
   Object.assign(draft, createInitialDraft())
   photoStepTouched.value = false
+  aiModelStepTouched.value = false
   photoUploadError.value = ''
   basicStepTouched.name = false
   basicStepTouched.brand = false
@@ -802,38 +876,45 @@ onBeforeUnmount(() => {
           <h2 :id="`${currentStep.id}-title`">{{ currentStep.label }}</h2>
 
           <div v-if="currentStep.id === 'photos'" class="product-registration__photo-step">
-            <ProductPhotoUploader
-              id="product-front-photo"
-              title="Front View 이미지 업로드"
-              description="옷의 Front View가 잘 보이는 사진을 등록해 주세요."
-              :requirement-label="frontPhotoCountLabel"
-              :requirement-met="frontPhotos.length > 0"
-              role="front"
-              :photos="frontPhotos"
-              :representative-photo-id="draft.representativePhotoId"
-              :error="photoStepErrors.front"
-              @upload="addPhotos"
-              @remove="removePhoto"
-              @select-representative="selectRepresentativePhoto"
-            />
+            <div class="product-registration__photo-required-row">
+              <ProductPhotoUploader
+                id="product-front-photo"
+                class="product-registration__photo-uploader"
+                title="Front View 이미지 업로드"
+                description="옷의 Front View가 잘 보이는 사진을 등록해 주세요."
+                required
+                :requirement-label="frontPhotoCountLabel"
+                :requirement-met="frontPhotos.length > 0"
+                role="front"
+                :photos="frontPhotos"
+                :representative-photo-id="draft.representativePhotoId"
+                :error="photoStepErrors.front"
+                @upload="addPhotos"
+                @remove="removePhoto"
+                @select-representative="selectRepresentativePhoto"
+              />
 
-            <ProductPhotoUploader
-              id="product-back-photo"
-              title="Back View 이미지 업로드"
-              description="옷의 Back View가 잘 보이는 사진을 등록해 주세요."
-              :requirement-label="backPhotoCountLabel"
-              :requirement-met="backPhotos.length > 0"
-              role="back"
-              :photos="backPhotos"
-              :representative-photo-id="draft.representativePhotoId"
-              :error="photoStepErrors.back"
-              @upload="addPhotos"
-              @remove="removePhoto"
-              @select-representative="selectRepresentativePhoto"
-            />
+              <ProductPhotoUploader
+                id="product-back-photo"
+                class="product-registration__photo-uploader"
+                title="Back View 이미지 업로드"
+                description="옷의 Back View가 잘 보이는 사진을 등록해 주세요."
+                required
+                :requirement-label="backPhotoCountLabel"
+                :requirement-met="backPhotos.length > 0"
+                role="back"
+                :photos="backPhotos"
+                :representative-photo-id="draft.representativePhotoId"
+                :error="photoStepErrors.back"
+                @upload="addPhotos"
+                @remove="removePhoto"
+                @select-representative="selectRepresentativePhoto"
+              />
+            </div>
 
             <ProductPhotoUploader
               id="product-additional-photo"
+              class="product-registration__photo-uploader"
               title="추가 사진"
               description="디테일, 라벨, 착용감이 드러나는 사진을 더 등록할 수 있습니다."
               role="additional"
@@ -845,13 +926,100 @@ onBeforeUnmount(() => {
               @select-representative="selectRepresentativePhoto"
             />
 
-            <p v-if="photoStepErrors.representative" class="product-registration__field-error" role="alert">
-              {{ photoStepErrors.representative }}
-            </p>
             <p v-if="photoUploadError" class="product-registration__field-error" role="alert">
               {{ photoUploadError }}
             </p>
           </div>
+
+          <section
+            v-if="currentStep.id === 'photos'"
+            class="product-registration__section product-registration__ai-model"
+            :class="{ 'product-registration__ai-model--disabled': !isAiModelSettingsAvailable }"
+            aria-labelledby="product-registration-ai-model-title"
+          >
+            <div class="product-registration__section-header">
+              <div>
+                <h3 id="product-registration-ai-model-title">AI 착용컷 설정</h3>
+                <p>
+                  업로드한 상품 사진을 바탕으로 AI 마네킹 착용 이미지를 생성해
+                  상품 상세 페이지에 추가로 보여줄 수 있어요.
+                </p>
+              </div>
+            </div>
+
+            <p
+              v-if="!isAiModelSettingsAvailable"
+              class="product-registration__ai-model-disabled-message"
+            >
+              앞면과 뒷면 이미지를 모두 등록하면 AI 착용컷을 설정할 수 있어요.
+            </p>
+
+            <div
+              class="product-registration__segmented"
+              role="radiogroup"
+              aria-label="AI 착용컷 사용 여부"
+            >
+              <button
+                type="button"
+                class="product-registration__option"
+                :class="{ 'product-registration__option--selected': !draft.aiModelEnabled }"
+                :disabled="!isAiModelSettingsAvailable"
+                :aria-pressed="!draft.aiModelEnabled"
+                @click="selectAiModelUsage(false)"
+              >
+                사용 안 함
+              </button>
+              <button
+                type="button"
+                class="product-registration__option"
+                :class="{ 'product-registration__option--selected': draft.aiModelEnabled }"
+                :disabled="!isAiModelSettingsAvailable"
+                :aria-pressed="draft.aiModelEnabled"
+                @click="selectAiModelUsage(true)"
+              >
+                사용함
+              </button>
+            </div>
+
+            <div v-if="draft.aiModelEnabled" class="product-registration__ai-model-choice">
+              <span>AI 모델 선택</span>
+              <div
+                class="product-registration__segmented"
+                role="radiogroup"
+                aria-label="AI 모델 선택"
+              >
+                <button
+                  type="button"
+                  class="product-registration__option"
+                  :class="{ 'product-registration__option--selected': draft.aiModelGender === 'FEMALE' }"
+                  :aria-pressed="draft.aiModelGender === 'FEMALE'"
+                  @click="selectAiModelGender('FEMALE')"
+                >
+                  여성
+                </button>
+                <button
+                  type="button"
+                  class="product-registration__option"
+                  :class="{ 'product-registration__option--selected': draft.aiModelGender === 'MALE' }"
+                  :aria-pressed="draft.aiModelGender === 'MALE'"
+                  @click="selectAiModelGender('MALE')"
+                >
+                  남성
+                </button>
+              </div>
+              <span
+                v-if="aiModelStepError"
+                class="product-registration__field-error"
+                role="alert"
+              >
+                {{ aiModelStepError }}
+              </span>
+              <p class="product-registration__field-hint">
+                AI 착용컷은 실제 착용 사진이 아닌 AI 생성 예시 이미지이며,
+                상품 상세 페이지에서 보조 이미지로 표시돼요.
+              </p>
+            </div>
+          </section>
 
           <form
             v-if="currentStep.id === 'photos' && canShowBasicInfoSection"
@@ -859,13 +1027,18 @@ onBeforeUnmount(() => {
             aria-label="상품 기본 정보 입력"
           >
             <label class="product-registration__field" for="product-registration-name">
-              <span>상품명</span>
+              <span>
+                상품명
+                <span class="product-registration__required" aria-hidden="true"> * </span>
+                <span class="product-registration__required-text"> 필수 입력 </span>
+              </span>
               <input
                 id="product-registration-name"
                 v-model="draft.name"
                 type="text"
                 maxlength="60"
                 placeholder="예: 90s 오버핏 데님 재킷"
+                required
                 :aria-invalid="basicStepErrors.name ? 'true' : 'false'"
                 aria-describedby="product-registration-name-error"
                 @blur="basicStepTouched.name = true"
@@ -876,36 +1049,24 @@ onBeforeUnmount(() => {
                 class="product-registration__field-error"
                 role="alert"
               >
-                {{ basicStepErrors.name }}
+              {{ basicStepErrors.name }}
               </span>
             </label>
 
-            <label class="product-registration__field" for="product-registration-brand">
-              <span>브랜드</span>
-              <input
-                id="product-registration-brand"
-                v-model="draft.brand"
-                type="text"
-                maxlength="40"
-                placeholder="예: Levi's, Burberry"
-                :aria-invalid="basicStepErrors.brand ? 'true' : 'false'"
-                aria-describedby="product-registration-brand-error"
-                @blur="basicStepTouched.brand = true"
+            <label class="product-registration__field" for="product-registration-description">
+              <span>상품 설명</span>
+              <textarea
+                id="product-registration-description"
+                v-model="draft.description"
+                maxlength="500"
+                rows="4"
+                placeholder="상품의 특징, 착용감, 구매자에게 알리고 싶은 내용을 입력해 주세요."
               />
-              <span
-                v-if="basicStepErrors.brand"
-                id="product-registration-brand-error"
-                class="product-registration__field-error"
-                role="alert"
-              >
-                {{ basicStepErrors.brand }}
-              </span>
             </label>
 
             <div class="product-registration__form-grid">
               <label class="product-registration__field" for="product-registration-color">
                 <span>색상</span>
-                <em class="product-registration__field-hint">추후 이미지 기반 AI 자동 입력 예정</em>
                 <select
                   id="product-registration-color"
                   class="product-registration__select"
@@ -933,33 +1094,25 @@ onBeforeUnmount(() => {
                 </span>
               </label>
 
-              <label class="product-registration__field" for="product-registration-category">
-                <span>카테고리</span>
-                <em class="product-registration__field-hint">추후 이미지 기반 AI 자동 입력 예정</em>
-                <select
-                  id="product-registration-category"
-                  class="product-registration__select"
-                  v-model="draft.categoryId"
-                  :aria-invalid="basicStepErrors.categoryId ? 'true' : 'false'"
-                  aria-describedby="product-registration-category-error"
-                  @blur="basicStepTouched.categoryId = true"
-                >
-                  <option value="">카테고리 선택</option>
-                  <option
-                    v-for="option in registrationCategoryOptions"
-                    :key="option.id"
-                    :value="option.id"
-                  >
-                    {{ option.label }}
-                  </option>
-                </select>
+              <label class="product-registration__field" for="product-registration-brand">
+                <span>브랜드</span>
+                <input
+                  id="product-registration-brand"
+                  v-model="draft.brand"
+                  type="text"
+                  maxlength="40"
+                  placeholder="예: Levi's, Burberry"
+                  :aria-invalid="basicStepErrors.brand ? 'true' : 'false'"
+                  aria-describedby="product-registration-brand-error"
+                  @blur="basicStepTouched.brand = true"
+                />
                 <span
-                  v-if="basicStepErrors.categoryId"
-                  id="product-registration-category-error"
+                  v-if="basicStepErrors.brand"
+                  id="product-registration-brand-error"
                   class="product-registration__field-error"
                   role="alert"
                 >
-                  {{ basicStepErrors.categoryId }}
+                  {{ basicStepErrors.brand }}
                 </span>
               </label>
             </div>
@@ -982,38 +1135,45 @@ onBeforeUnmount(() => {
               />
             </label>
 
-            <label class="product-registration__field" for="product-registration-description">
-              <span>상품 설명</span>
-              <textarea
-                id="product-registration-description"
-                v-model="draft.description"
-                maxlength="500"
-                rows="4"
-                placeholder="상품의 특징, 착용감, 구매자에게 알리고 싶은 내용을 입력해 주세요."
-              />
-            </label>
-
             <div class="product-registration__form-grid">
-              <label class="product-registration__field" for="product-registration-purchased-at">
-                <span>구매 시기</span>
-                <input
-                  id="product-registration-purchased-at"
-                  v-model="draft.purchasedAt"
-                  type="text"
-                  maxlength="40"
-                  placeholder="예: 1990년대, 2005년"
-                />
+              <label class="product-registration__field" for="product-registration-category-middle">
+                <span>카테고리 대분류</span>
+                <select
+                  id="product-registration-category-middle"
+                  class="product-registration__select"
+                  v-model="categoryMiddleId"
+                  :disabled="middleCategoryOptions.length === 0"
+                  @change="updateMiddleCategory"
+                >
+                  <option value="">중분류 선택</option>
+                  <option
+                    v-for="option in middleCategoryOptions"
+                    :key="option.id"
+                    :value="option.id"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
               </label>
 
-              <label class="product-registration__field" for="product-registration-purchased-country">
-                <span>구매 국가</span>
-                <input
-                  id="product-registration-purchased-country"
-                  v-model="draft.purchasedCountry"
-                  type="text"
-                  maxlength="40"
-                  placeholder="예: 미국, 일본, 영국"
-                />
+              <label class="product-registration__field" for="product-registration-category-minor">
+                <span>카테고리 소분류</span>
+                <select
+                  id="product-registration-category-minor"
+                  class="product-registration__select"
+                  v-model="draft.categoryId"
+                  :disabled="!categoryMiddleId || minorCategoryOptions.length === 0"
+                  @blur="basicStepTouched.categoryId = true"
+                >
+                  <option value="">소분류 선택</option>
+                  <option
+                    v-for="option in minorCategoryOptions"
+                    :key="option.id"
+                    :value="option.id"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
               </label>
             </div>
           </form>
@@ -1194,7 +1354,11 @@ onBeforeUnmount(() => {
             <section class="product-registration__section" aria-labelledby="ai-quality-title">
               <div class="product-registration__section-header">
                 <div>
-                  <h3 id="ai-quality-title">AI 품질 검증</h3>
+                  <h3 id="ai-quality-title">
+                    AI 품질 검증
+                    <span class="product-registration__required" aria-hidden="true"> * </span>
+                    <span class="product-registration__required-text"> 필수 입력 </span>
+                  </h3>
                   <p>AI 품질 검증에 사용할 사진을 선택해 주세요. Front View와 Back View는 필수입니다.</p>
                 </div>
               </div>
@@ -1467,13 +1631,18 @@ onBeforeUnmount(() => {
               </p>
 
               <label v-if="draft.saleType === 'DIRECT'" class="product-registration__field">
-                <span>판매가</span>
+                <span>
+                  판매가
+                  <span class="product-registration__required" aria-hidden="true"> * </span>
+                  <span class="product-registration__required-text"> 필수 입력 </span>
+                </span>
                 <span class="product-registration__price-input">
                   <input
                     :value="draft.directSalePrice"
                     inputmode="numeric"
                     pattern="[0-9]*"
                     placeholder="판매가를 입력해 주세요"
+                    required
                     @input="updateDirectSalePrice"
                     @blur="pricingStepTouched.directSalePrice = true"
                   />
@@ -1490,13 +1659,18 @@ onBeforeUnmount(() => {
 
               <div v-if="draft.saleType === 'AUCTION'" class="product-registration__form-grid">
                 <label class="product-registration__field">
-                  <span>시작가</span>
+                  <span>
+                    시작가
+                    <span class="product-registration__required" aria-hidden="true"> * </span>
+                    <span class="product-registration__required-text"> 필수 입력 </span>
+                  </span>
                   <span class="product-registration__price-input">
                     <input
                       :value="draft.auctionStartPrice"
                       inputmode="numeric"
                       pattern="[0-9]*"
                       placeholder="시작가를 입력해 주세요"
+                      required
                       @input="updateAuctionStartPrice"
                       @blur="pricingStepTouched.auctionStartPrice = true"
                     />
@@ -1532,6 +1706,16 @@ onBeforeUnmount(() => {
             <span class="product-registration__complete-icon" aria-hidden="true">✓</span>
             <h3>상품 등록이 완료되었습니다.</h3>
             <p>등록한 상품을 확인하거나 이어서 새 상품을 등록할 수 있습니다.</p>
+            <dl class="product-registration__complete-summary">
+              <div>
+                <dt>AI 착용컷</dt>
+                <dd>{{ draft.aiModelEnabled ? '사용함' : '사용 안 함' }}</dd>
+              </div>
+              <div v-if="draft.aiModelEnabled">
+                <dt>AI 모델</dt>
+                <dd>{{ aiModelGenderLabel }}</dd>
+              </div>
+            </dl>
             <div class="product-registration__complete-actions">
               <button
                 class="product-registration__button product-registration__button--primary"
@@ -1724,6 +1908,29 @@ onBeforeUnmount(() => {
   margin-top: var(--space-4);
 }
 
+.product-registration__photo-required-row {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.product-registration__photo-uploader {
+  padding: var(--space-4);
+}
+
+.product-registration__photo-uploader :deep(.product-photo-uploader__grid) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.product-registration__photo-uploader :deep(.product-photo-uploader__item img) {
+  aspect-ratio: 4 / 3;
+}
+
+.product-registration__photo-uploader :deep(.product-photo-uploader__empty) {
+  min-height: 104px;
+  padding: var(--space-4);
+}
+
 .product-registration__field-error {
   color: var(--color-error);
   font-size: 13px;
@@ -1752,6 +1959,24 @@ onBeforeUnmount(() => {
   font-size: 14px;
   font-weight: var(--font-weight-bold);
   line-height: 20px;
+}
+
+.product-registration__field .product-registration__required,
+.product-registration__section h3 .product-registration__required {
+  margin-left: 2px;
+  color: var(--color-error);
+}
+
+.product-registration__required-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  margin: -1px;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .product-registration__field-hint {
@@ -1905,6 +2130,41 @@ onBeforeUnmount(() => {
   line-height: 20px;
 }
 
+.product-registration__ai-model {
+  margin-top: var(--space-1);
+}
+
+.product-registration__ai-model--disabled {
+  background: var(--color-surface-secondary);
+}
+
+.product-registration__ai-model-disabled-message {
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.product-registration__segmented {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.product-registration__ai-model-choice {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.product-registration__ai-model-choice > span:first-child {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  line-height: 20px;
+}
+
 .product-registration__option-grid {
   display: grid;
   gap: var(--space-3);
@@ -1925,6 +2185,13 @@ onBeforeUnmount(() => {
   border-color: var(--color-primary);
   background: var(--color-primary-soft);
   color: var(--color-primary);
+}
+
+.product-registration__option:disabled {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
 }
 
 .product-registration__ai-photo-list {
@@ -2366,6 +2633,37 @@ onBeforeUnmount(() => {
   line-height: var(--line-height-body);
 }
 
+.product-registration__complete-summary {
+  display: grid;
+  width: min(100%, 360px);
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  text-align: left;
+}
+
+.product-registration__complete-summary div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.product-registration__complete-summary dt {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.product-registration__complete-summary dd {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  line-height: 20px;
+}
+
 .product-registration__complete-actions,
 .product-registration__actions {
   display: flex;
@@ -2414,11 +2712,13 @@ onBeforeUnmount(() => {
     flex-wrap: wrap;
   }
 
+  .product-registration__photo-required-row,
   .product-registration__form-grid {
     grid-template-columns: 1fr;
   }
 
   .product-registration__option-grid,
+  .product-registration__segmented,
   .product-registration__ai-photo-list {
     grid-template-columns: 1fr;
   }

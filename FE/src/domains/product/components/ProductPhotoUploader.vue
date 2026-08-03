@@ -12,6 +12,7 @@ interface Props {
   photos: ProductRegistrationPhotoDraft[]
   representativePhotoId: string
   multiple?: boolean
+  required?: boolean
   error?: string
   requirementLabel?: string
   requirementMet?: boolean
@@ -19,6 +20,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   multiple: false,
+  required: false,
   error: '',
   requirementLabel: '',
   requirementMet: true,
@@ -48,6 +50,8 @@ const handleFileChange = (event: Event) => {
       <div>
         <h3 :id="`${id}-title`">
           <span>{{ title }}</span>
+          <span v-if="required" class="product-photo-uploader__required" aria-hidden="true"> * </span>
+          <span v-if="required" class="product-photo-uploader__required-text"> 필수 입력 </span>
           <em
             v-if="requirementLabel"
             :class="{ 'product-photo-uploader__requirement--unmet': !requirementMet }"
@@ -140,6 +144,23 @@ const handleFileChange = (event: Event) => {
   font-size: 14px;
   font-style: normal;
   font-weight: var(--font-weight-bold);
+}
+
+.product-photo-uploader__required {
+  margin-left: 2px;
+  color: var(--color-error);
+}
+
+.product-photo-uploader__required-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  margin: -1px;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .product-photo-uploader__header h3 .product-photo-uploader__requirement--unmet {
