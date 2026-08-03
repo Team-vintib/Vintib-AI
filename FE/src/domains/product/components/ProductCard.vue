@@ -15,10 +15,13 @@ const emit = defineEmits<{
   toggleLike: [productId: number]
 }>()
 
-const formattedPrice = computed(() => `${props.product.price.toLocaleString('ko-KR')}P`)
-const pricePrefix = computed(() => (props.product.saleType === 'AUCTION' ? '시작 ' : ''))
+const formattedPrice = computed(() =>
+  props.product.saleType === 'AUCTION'
+    ? '경매 예정'
+    : `${props.product.price.toLocaleString('ko-KR')}P`,
+)
 const saleTypeLabel = computed(() =>
-  props.product.saleType === 'AUCTION' ? '경매 예정' : '상시 판매',
+  props.product.saleType === 'AUCTION' ? '경매 예정' : '정찰제',
 )
 </script>
 
@@ -64,7 +67,6 @@ const saleTypeLabel = computed(() =>
 
       <div class="product-card__meta">
         <p class="product-card__price">
-          <span v-if="pricePrefix" class="product-card__price-prefix">{{ pricePrefix }}</span>
           {{ formattedPrice }}
         </p>
         <span
