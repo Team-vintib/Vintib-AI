@@ -21,6 +21,11 @@ export interface ProductFilterOption {
   label: string
 }
 
+export interface ProductCategoryOption {
+  id: number
+  label: string
+}
+
 export interface ProductSaleTypeTab {
   id: 'ALL' | ProductSaleType
   label: string

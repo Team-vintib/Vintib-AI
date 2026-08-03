@@ -1,9 +1,6 @@
 import { getProductDetail } from '@/domains/product/api/productApi'
 
-import type {
-  ProductDetailMockScenario,
-  ProductDetailViewData,
-} from '@/domains/product/types/productDetail.types'
+import type { ProductDetailViewData } from '@/domains/product/types/productDetail.types'
 
 export class ProductDetailNotFoundError extends Error {
   constructor() {
@@ -14,9 +11,4 @@ export class ProductDetailNotFoundError extends Error {
 
 export const getProductDetailViewData = async (
   productId: number,
-  _scenario: ProductDetailMockScenario = 'default',
-): Promise<ProductDetailViewData> => {
-  void _scenario
-
-  return getProductDetail(productId)
-}
+): Promise<ProductDetailViewData> => getProductDetail(productId)

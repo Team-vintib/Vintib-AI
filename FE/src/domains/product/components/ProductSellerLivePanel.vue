@@ -3,6 +3,7 @@ import type { ProductLinkedLive } from '@/domains/product/types/productDetail.ty
 
 const props = defineProps<{
   linkedLive: ProductLinkedLive | null
+  sellerNickname: string
   isReminderSet: boolean
 }>()
 
@@ -31,7 +32,7 @@ const formatLiveDate = (date: string) =>
           {{ linkedLive.status === 'LIVE' ? '방송 중' : '방송 예정' }}
         </span>
         <h3>{{ linkedLive.title }}</h3>
-        <p>Vintage Hunter</p>
+        <p v-if="props.sellerNickname">{{ props.sellerNickname }}</p>
         <p>{{ formatLiveDate(linkedLive.startsAt) }}</p>
       </div>
       <div class="seller-live__actions">
