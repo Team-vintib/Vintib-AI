@@ -1,0 +1,5 @@
+layer: up_blocks.1.attentions.0.transformer_blocks.0.attn1.processor
+step: 40/50
+query(ankle) pixel: (384, 942)
+attention weight sum -- person(original) half: 0.8989
+attention weight sum -- garment(reference) half: 0.1011
