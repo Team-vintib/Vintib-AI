@@ -4,6 +4,9 @@ import type {
   FollowResponse,
   FollowUser,
   FollowUserPage,
+  ProfileImageKind,
+  ProfileImageUploadUrl,
+  ProfileMutationResult,
   PublicProfile,
 } from '@/domains/profile/types/profile.types'
 import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.types'
@@ -31,6 +34,67 @@ export const followUser = async (userId: number): Promise<FollowResponse> => {
 
 export const unfollowUser = async (userId: number) => {
   await http.delete(`/users/${userId}/followers`)
+}
+
+export const updateProfileBio = async (
+  userId: number,
+  description: string,
+): Promise<ProfileMutationResult> => {
+  const response = await http.patch<ApiResponse<ProfileMutationResult>>(`/users/${userId}/bio`, {
+    description,
+  })
+
+  return unwrapApiData(response.data, '소개글을 저장하지 못했습니다.')
+}
+
+export const uploadProfileImage = async (
+  userId: number,
+  kind: ProfileImageKind,
+  file: File,
+): Promise<ProfileMutationResult> => {
+  const contentType = file.type || 'application/octet-stream'
+  const resourceName = kind === 'profile' ? 'profile-image' : 'cover-image'
+  const uploadUrlResponse = await http.post<ApiResponse<ProfileImageUploadUrl>>(
+    `/users/${userId}/${resourceName}/upload-url`,
+    { contentType },
+  )
+  const uploadUrl = unwrapApiData(
+    uploadUrlResponse.data,
+    kind === 'profile'
+      ? '프로필 이미지 업로드 URL을 발급하지 못했습니다.'
+      : '커버 이미지 업로드 URL을 발급하지 못했습니다.',
+  )
+
+  const uploadResponse = await fetch(uploadUrl.uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': contentType,
+    },
+    body: file,
+  })
+
+  if (!uploadResponse.ok) {
+    throw new Error(kind === 'profile' ? '프로필 이미지를 업로드하지 못했습니다.' : '커버 이미지를 업로드하지 못했습니다.')
+  }
+
+  const confirmResponse = await http.put<ApiResponse<ProfileMutationResult>>(
+    `/users/${userId}/${resourceName}`,
+    { key: uploadUrl.key },
+  )
+
+  return unwrapApiData(
+    confirmResponse.data,
+    kind === 'profile' ? '프로필 이미지를 저장하지 못했습니다.' : '커버 이미지를 저장하지 못했습니다.',
+  )
+}
+
+export const deleteProfileImage = async (
+  userId: number,
+  kind: ProfileImageKind,
+) => {
+  const resourceName = kind === 'profile' ? 'profile-image' : 'cover-image'
+
+  await http.delete(`/users/${userId}/${resourceName}`)
 }
 
 export const getFollowers = async (
@@ -92,4 +156,3 @@ const normalizePageResponse = <T>(
     } satisfies PageMeta,
   }
 }
-

@@ -36,3 +36,18 @@ export interface FollowUserPage {
 
 export type FollowListKind = 'followers' | 'following'
 
+export type ProfileImageKind = 'profile' | 'cover'
+
+export interface ProfileImageUploadUrl {
+  key: string
+  uploadUrl: string
+  expiresInSeconds: number
+}
+
+export interface ProfileMutationResult {
+  id: number
+  nickname: string
+  profileImageUrl: string | null
+  description: string | null
+  coverImageUrl: string | null
+}

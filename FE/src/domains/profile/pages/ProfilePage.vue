@@ -6,10 +6,21 @@ import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { getLiveListViewData } from '@/domains/live/api/liveListApi'
 import LiveListCard from '@/domains/live/components/LiveListCard.vue'
 import type { LiveListItem } from '@/domains/live/types/liveList.types'
-import { getPublicProfile, followUser, unfollowUser } from '@/domains/profile/api/profileApi'
+import {
+  deleteProfileImage,
+  getPublicProfile,
+  followUser,
+  unfollowUser,
+  updateProfileBio,
+  uploadProfileImage,
+} from '@/domains/profile/api/profileApi'
 import FollowButton from '@/domains/profile/components/FollowButton.vue'
 import { useFollowStore } from '@/domains/profile/stores/followStore'
-import type { PublicProfile } from '@/domains/profile/types/profile.types'
+import type {
+  ProfileImageKind,
+  ProfileMutationResult,
+  PublicProfile,
+} from '@/domains/profile/types/profile.types'
 import {
   addWish,
   getProductList,
@@ -48,6 +59,12 @@ const productLoadState = ref<ListLoadState>('idle')
 const liveLoadState = ref<ListLoadState>('idle')
 const productMessage = ref('')
 const liveMessage = ref('')
+const isEditPanelOpen = ref(false)
+const bioDraft = ref('')
+const editMessage = ref('')
+const editLoadState = ref<'idle' | 'saving' | 'uploading-profile' | 'uploading-cover' | 'deleting-profile' | 'deleting-cover'>('idle')
+const profileImageInput = ref<HTMLInputElement | null>(null)
+const coverImageInput = ref<HTMLInputElement | null>(null)
 let profileRequestId = 0
 let productRequestId = 0
 let liveRequestId = 0
@@ -74,6 +91,7 @@ const followState = computed(() =>
     : { followerCount: 0, isFollowing: false },
 )
 const profileDescription = computed(() => profile.value?.description?.trim() ?? '')
+const isProfileEditBusy = computed(() => editLoadState.value !== 'idle')
 const productEmptyMessage = computed(() =>
   isSelfProfile.value ? '아직 등록한 상품이 없습니다.' : '판매 중인 상품이 없습니다.',
 )
@@ -118,6 +136,8 @@ const loadProfile = async () => {
     if (requestId !== profileRequestId) return
 
     profile.value = nextProfile
+    bioDraft.value = nextProfile.description?.trim() ?? ''
+    editMessage.value = ''
     followStore.setFollowState(nextProfile.id, {
       followerCount: nextProfile.followerCount,
       isFollowing: nextProfile.isFollowing,
@@ -132,6 +152,19 @@ const loadProfile = async () => {
     profileLoadState.value = 'not-found'
     profileMessage.value = '프로필을 찾을 수 없습니다.'
   }
+}
+
+const applyProfileMutation = (result: ProfileMutationResult) => {
+  if (!profile.value) return
+
+  profile.value = {
+    ...profile.value,
+    nickname: result.nickname,
+    profileImageUrl: result.profileImageUrl,
+    description: result.description ?? '',
+    coverImageUrl: result.coverImageUrl,
+  }
+  bioDraft.value = result.description?.trim() ?? ''
 }
 
 const loadProducts = async () => {
@@ -271,6 +304,92 @@ const toggleProfileFollow = async () => {
   }
 }
 
+const openProfileEditPanel = () => {
+  if (!profile.value || !isSelfProfile.value) return
+
+  bioDraft.value = profile.value.description?.trim() ?? ''
+  editMessage.value = ''
+  isEditPanelOpen.value = !isEditPanelOpen.value
+}
+
+const saveProfileBio = async () => {
+  if (!profile.value || !isSelfProfile.value || isProfileEditBusy.value) return
+
+  editLoadState.value = 'saving'
+  editMessage.value = ''
+
+  try {
+    const result = await updateProfileBio(profile.value.id, bioDraft.value.trim())
+    applyProfileMutation(result)
+    editMessage.value = '소개글을 저장했습니다.'
+  } catch {
+    editMessage.value = '소개글을 저장하지 못했습니다.'
+  } finally {
+    editLoadState.value = 'idle'
+  }
+}
+
+const chooseProfileImage = (kind: ProfileImageKind) => {
+  if (isProfileEditBusy.value) return
+
+  if (kind === 'profile') {
+    profileImageInput.value?.click()
+    return
+  }
+
+  coverImageInput.value?.click()
+}
+
+const handleProfileImageChange = async (kind: ProfileImageKind, event: Event) => {
+  if (!profile.value || !isSelfProfile.value || isProfileEditBusy.value) return
+
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+
+  if (!file) return
+
+  if (!file.type.startsWith('image/')) {
+    editMessage.value = '이미지 파일만 업로드할 수 있습니다.'
+    return
+  }
+
+  editLoadState.value = kind === 'profile' ? 'uploading-profile' : 'uploading-cover'
+  editMessage.value = ''
+
+  try {
+    const result = await uploadProfileImage(profile.value.id, kind, file)
+    applyProfileMutation(result)
+    editMessage.value = kind === 'profile' ? '프로필 이미지를 저장했습니다.' : '커버 이미지를 저장했습니다.'
+  } catch {
+    editMessage.value = kind === 'profile' ? '프로필 이미지를 저장하지 못했습니다.' : '커버 이미지를 저장하지 못했습니다.'
+  } finally {
+    editLoadState.value = 'idle'
+  }
+}
+
+const removeProfileImage = async (kind: ProfileImageKind) => {
+  if (!profile.value || !isSelfProfile.value || isProfileEditBusy.value) return
+
+  editLoadState.value = kind === 'profile' ? 'deleting-profile' : 'deleting-cover'
+  editMessage.value = ''
+
+  try {
+    await deleteProfileImage(profile.value.id, kind)
+
+    profile.value = {
+      ...profile.value,
+      profileImageUrl: kind === 'profile' ? null : profile.value.profileImageUrl,
+      coverImageUrl: kind === 'cover' ? null : profile.value.coverImageUrl,
+    }
+    editMessage.value = kind === 'profile' ? '프로필 이미지를 삭제했습니다.' : '커버 이미지를 삭제했습니다.'
+  } catch {
+    editMessage.value = kind === 'profile' ? '프로필 이미지를 삭제하지 못했습니다.' : '커버 이미지를 삭제하지 못했습니다.'
+  } finally {
+    editLoadState.value = 'idle'
+  }
+}
+
 const toggleWish = async (productId: number) => {
   if (!(await requireAuthenticatedAction())) {
     return
@@ -355,23 +474,108 @@ watch(
 
       <template v-else>
         <header class="profile-summary">
+          <div v-if="profile.coverImageUrl" class="profile-summary__cover">
+            <img :src="profile.coverImageUrl" :alt="`${profile.nickname} 커버 이미지`" />
+          </div>
+
           <div class="profile-summary__top">
-            <div class="profile-summary__identity">
-              <h1 id="profile-title">{{ profile.nickname }}</h1>
-              <p v-if="profileDescription">{{ profileDescription }}</p>
+            <div class="profile-summary__main">
+              <img
+                v-if="profile.profileImageUrl"
+                class="profile-summary__image"
+                :src="profile.profileImageUrl"
+                :alt="`${profile.nickname} 프로필 이미지`"
+              />
+              <div class="profile-summary__identity">
+                <h1 id="profile-title">{{ profile.nickname }}</h1>
+                <p v-if="profileDescription">{{ profileDescription }}</p>
+              </div>
             </div>
 
-            <FollowButton
-              :is-following="followState.isFollowing"
-              :is-pending="followStore.isPending(profile.id)"
-              :is-self="isSelfProfile"
-              @toggle="toggleProfileFollow"
-            />
+            <div class="profile-summary__actions">
+              <button
+                v-if="isSelfProfile"
+                class="profile-summary__edit"
+                type="button"
+                :aria-expanded="isEditPanelOpen"
+                @click="openProfileEditPanel"
+              >
+                프로필 편집
+              </button>
+              <FollowButton
+                :is-following="followState.isFollowing"
+                :is-pending="followStore.isPending(profile.id)"
+                :is-self="isSelfProfile"
+                @toggle="toggleProfileFollow"
+              />
+            </div>
           </div>
 
           <p v-if="profileMessage" class="profile-summary__message" role="status">
             {{ profileMessage }}
           </p>
+
+          <div v-if="isSelfProfile && isEditPanelOpen" class="profile-editor">
+            <div class="profile-editor__field">
+              <label for="profile-bio">소개글</label>
+              <textarea
+                id="profile-bio"
+                v-model="bioDraft"
+                maxlength="500"
+                rows="3"
+                :disabled="isProfileEditBusy"
+                placeholder="상점을 소개해 주세요"
+              ></textarea>
+              <span>{{ bioDraft.length }}/500</span>
+            </div>
+
+            <div class="profile-editor__media-actions">
+              <input
+                ref="profileImageInput"
+                class="sr-only"
+                type="file"
+                accept="image/*"
+                @change="handleProfileImageChange('profile', $event)"
+              />
+              <input
+                ref="coverImageInput"
+                class="sr-only"
+                type="file"
+                accept="image/*"
+                @change="handleProfileImageChange('cover', $event)"
+              />
+
+              <button type="button" :disabled="isProfileEditBusy" @click="saveProfileBio">
+                {{ editLoadState === 'saving' ? '저장 중' : '소개글 저장' }}
+              </button>
+              <button type="button" :disabled="isProfileEditBusy" @click="chooseProfileImage('profile')">
+                {{ editLoadState === 'uploading-profile' ? '업로드 중' : '프로필 이미지 변경' }}
+              </button>
+              <button type="button" :disabled="isProfileEditBusy" @click="chooseProfileImage('cover')">
+                {{ editLoadState === 'uploading-cover' ? '업로드 중' : '커버 이미지 변경' }}
+              </button>
+              <button
+                v-if="profile.profileImageUrl"
+                type="button"
+                :disabled="isProfileEditBusy"
+                @click="removeProfileImage('profile')"
+              >
+                {{ editLoadState === 'deleting-profile' ? '삭제 중' : '프로필 이미지 삭제' }}
+              </button>
+              <button
+                v-if="profile.coverImageUrl"
+                type="button"
+                :disabled="isProfileEditBusy"
+                @click="removeProfileImage('cover')"
+              >
+                {{ editLoadState === 'deleting-cover' ? '삭제 중' : '커버 이미지 삭제' }}
+              </button>
+            </div>
+
+            <p v-if="editMessage" class="profile-editor__message" role="status">
+              {{ editMessage }}
+            </p>
+          </div>
 
           <div class="profile-stats" aria-label="프로필 통계">
             <button class="profile-stats__item" type="button" @click="goToFollowList('followers')">
@@ -529,6 +733,7 @@ watch(
 }
 
 .profile-summary {
+  overflow: hidden;
   display: grid;
   gap: var(--space-6);
   padding: var(--space-8);
@@ -538,6 +743,20 @@ watch(
   box-shadow: 0 2px 8px color-mix(in srgb, var(--color-text-primary) 4%, transparent);
 }
 
+.profile-summary__cover {
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 5 / 1;
+  margin: calc(var(--space-8) * -1) calc(var(--space-8) * -1) 0;
+  background: var(--color-surface-secondary);
+}
+
+.profile-summary__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .profile-summary__top {
   display: flex;
   align-items: center;
@@ -545,9 +764,50 @@ watch(
   gap: var(--space-5);
 }
 
+.profile-summary__main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-5);
+}
+
+.profile-summary__image {
+  flex: 0 0 auto;
+  width: 88px;
+  height: 88px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-media);
+  object-fit: cover;
+}
+
 .profile-summary__top :deep(.follow-button) {
   min-width: 120px;
   height: 42px;
+}
+
+.profile-summary__actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--space-3);
+}
+
+.profile-summary__edit {
+  min-width: 112px;
+  height: 42px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+}
+
+.profile-summary__edit:hover,
+.profile-summary__edit:focus-visible {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .profile-summary__identity {
@@ -572,6 +832,95 @@ watch(
 
 .profile-summary__message {
   color: var(--color-danger);
+}
+
+.profile-editor {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-secondary);
+}
+
+.profile-editor__field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.profile-editor__field label {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 20px;
+}
+
+.profile-editor__field textarea {
+  width: 100%;
+  resize: vertical;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  line-height: var(--line-height-body);
+}
+
+.profile-editor__field textarea:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.profile-editor__field span,
+.profile-editor__message {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: 20px;
+}
+
+.profile-editor__media-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.profile-editor__media-actions button {
+  min-height: 38px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+}
+
+.profile-editor__media-actions button:first-child {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.profile-editor__media-actions button:hover:not(:disabled),
+.profile-editor__media-actions button:focus-visible {
+  border-color: var(--color-primary);
+}
+
+.profile-editor__media-actions button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  white-space: nowrap;
 }
 
 .profile-stats {
@@ -743,10 +1092,35 @@ watch(
     border-radius: var(--radius-media);
   }
 
+  .profile-summary__cover {
+    aspect-ratio: 16 / 7;
+    margin: calc(var(--space-5) * -1) calc(var(--space-5) * -1) 0;
+  }
+
   .profile-summary__top {
     flex-direction: column;
     align-items: flex-start;
     gap: var(--space-4);
+  }
+
+  .profile-summary__main {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .profile-summary__image {
+    width: 72px;
+    height: 72px;
+  }
+
+  .profile-summary__actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .profile-summary__edit {
+    width: 100%;
   }
 
   .profile-summary__top :deep(.follow-button) {
