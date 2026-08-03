@@ -44,7 +44,62 @@ CATEGORY_MODELS: dict[str, str] = {
     # 스파이크 범위를 넘어선다) — CPU 지연이 가장 급한 건 어차피 큰 모델이 아니라 상시
     # 후보인 ViT-B/32라서 이걸 골랐다.
     "clip_vit_b32_onnx": "openai/clip-vit-base-patch32",
+    # --- 패션 도메인 특화 후보(2026-08-03 추가) ---
+    # 위 4종은 전부 범용 체크포인트다. §14 실측에서 대분류 직접 질의가 0.35까지 떨어진 게
+    # "CLIP은 의류 사진에서 아우터/상의 같은 도메인 구분을 애초에 못 배웠다"는 가설로
+    # 이어져서, 패션 상품 이미지로 파인튜닝된 체크포인트를 같은 정답셋에 돌려본다.
+    #
+    # fashion_clip: FashionCLIP 2.0. LAION CLIP ViT-B/32 위에 패션 상품 80만 건으로
+    #   파인튜닝. 모델 카드 기준 zero-shot 분류 weighted macro F1이 베이스 LAION CLIP보다
+    #   FMNIST 0.78->0.83 / KAGL 0.71->0.73 / DEEP 0.58->0.62. 순정 CLIP 아키텍처라
+    #   기존 로딩 경로(AutoModel forward -> image_embeds/text_embeds)를 그대로 탄다.
+    # marqo_fashion_clip / marqo_fashion_siglip: Marqo가 GCL(카테고리·색상·소재까지 학습
+    #   신호로 쓰는 대조학습)로 파인튜닝한 검색용 임베딩 모델. 자사 벤치마크 기준
+    #   FashionCLIP 2.0 대비 recall@1 +22% / +57%. **색상을 명시적 학습 신호로 썼다는 게
+    #   이 스파이크에 특히 맞는다** — 카테고리뿐 아니라 §17에서 막혀 있는 색상 쪽에도
+    #   후보로 넣는 이유다(color.py의 COLOR_BACKENDS 참고).
+    # zooclaw_fashion_siglip2: SigLIP2-base-patch16-384 기반 최신(2026-06) 후보. 검색
+    #   목적으로 증류 파인튜닝됐고 zero-shot 분류는 부차 용도라 기대치는 낮게 잡는다 —
+    #   "더 최신/더 큰 게 실제로 더 나은가"를 확인하는 대조군.
+    "fashion_clip": "patrickjohncyh/fashion-clip",
+    "marqo_fashion_clip": "Marqo/marqo-fashionCLIP",
+    "marqo_fashion_siglip": "Marqo/marqo-fashionSigLIP",
+    "zooclaw_fashion_siglip2": "srpone/zooclaw-fashionsiglip2",
 }
+
+# 모델별 로딩/스코어링 옵션. **여기 없는 키는 기존 동작 그대로다**(기본값이 기존 3종의
+# 경로와 동일) — 새 후보를 추가하면서 이미 실측이 끝난 백엔드의 숫자가 바뀌면 비교가
+# 무의미해지므로, 차이가 나는 모델만 여기에 명시한다.
+#
+# - `trust_remote_code`: Marqo 두 모델은 open_clip 래퍼를 원격 코드로 싣는다(별도로
+#   `pip install open_clip_torch` 필요).
+# - `feature_api`: forward가 image_embeds/text_embeds를 안 주고
+#   `get_image_features()`/`get_text_features()`로만 노출하는 모델(Marqo 래퍼).
+# - `text_padding`: SigLIP 계열 토크나이저는 고정 길이(max_length) 패딩이 학습 조건이다.
+#   기존 `siglip_so400m`은 `padding=True`로 이미 실측이 끝나 그대로 두지만(§V2a),
+#   새 SigLIP 후보는 처음부터 모델 카드대로 맞춘다.
+CATEGORY_MODEL_LOAD_OPTIONS: dict[str, dict] = {
+    "marqo_fashion_clip": {
+        "trust_remote_code": True,
+        "feature_api": True,
+        "text_padding": "max_length",
+    },
+    "marqo_fashion_siglip": {
+        "trust_remote_code": True,
+        "feature_api": True,
+        "text_padding": "max_length",
+    },
+    "zooclaw_fashion_siglip2": {"text_padding": "max_length"},
+}
+
+# 패션 특화 후보만 모아둔 목록 — 노트북이 "범용 baseline vs 패션 특화" 스윕을 돌 때 쓴다.
+FASHION_CATEGORY_BACKENDS: tuple[str, ...] = (
+    "fashion_clip",
+    "marqo_fashion_clip",
+    "marqo_fashion_siglip",
+    "zooclaw_fashion_siglip2",
+)
+
 ACTIVE_CATEGORY_BACKEND = os.environ.get("PRODUCT_INFO_BACKEND", "mock")
 
 
@@ -111,8 +166,20 @@ class EmbeddingZeroShotClassifier(CategoryClassifier):
 
     TEMPERATURE = 100.0  # CLIP의 학습된 logit_scale(~100)과 비슷한 값으로 고정
 
-    def __init__(self, model_id: str):
+    def __init__(
+        self,
+        model_id: str,
+        trust_remote_code: bool = False,
+        feature_api: bool = False,
+        text_padding: bool | str = True,
+    ):
+        """옵션 3개의 기본값은 기존(openai CLIP / google SigLIP) 경로와 동일하다 —
+        의미는 `CATEGORY_MODEL_LOAD_OPTIONS` 주석 참고. 직접 넘기기보다
+        `make_embedding_classifier(model_key)`로 레지스트리에서 받아 쓰는 걸 권장한다."""
         self.model_id = model_id
+        self._trust_remote_code = trust_remote_code
+        self._feature_api = feature_api
+        self._text_padding = text_padding
         self._model = None
         self._processor = None
 
@@ -122,12 +189,22 @@ class EmbeddingZeroShotClassifier(CategoryClassifier):
         import torch
         from transformers import AutoModel, AutoProcessor
 
-        self._processor = AutoProcessor.from_pretrained(self.model_id)
-        self._model = AutoModel.from_pretrained(self.model_id)
+        self._processor = AutoProcessor.from_pretrained(
+            self.model_id, trust_remote_code=self._trust_remote_code
+        )
+        self._model = AutoModel.from_pretrained(
+            self.model_id, trust_remote_code=self._trust_remote_code
+        )
         self._model.eval()
         self._torch = torch
 
-    def score_labels(self, image_path: Path, label_texts: list[str]) -> list[float]:
+    def _embed(self, image_path: Path, texts: list[str]):
+        """이미지 1장 + 텍스트 N개를 L2 정규화된 임베딩 쌍으로 인코딩한다.
+
+        `feature_api=True`면 forward 대신 `get_image_features()`/`get_text_features()`를
+        쓴다 — Marqo의 open_clip 래퍼는 `__call__` 결과에 image_embeds/text_embeds를
+        노출하지 않는다. 정규화는 여기서 직접 한다(래퍼의 `normalize=True` 인자에
+        의존하지 않는다 — 순정 HF 모델에는 그 인자가 없어서 경로가 갈린다)."""
         import torch
         from PIL import Image
 
@@ -135,12 +212,25 @@ class EmbeddingZeroShotClassifier(CategoryClassifier):
         with Image.open(image_path) as img:
             image = img.convert("RGB")
 
-        inputs = self._processor(text=label_texts, images=image, return_tensors="pt", padding=True)
+        inputs = self._processor(
+            text=texts, images=image, return_tensors="pt", padding=self._text_padding
+        )
         with torch.no_grad():
-            out = self._model(**inputs)
+            if self._feature_api:
+                image_embeds = self._model.get_image_features(inputs["pixel_values"])
+                text_embeds = self._model.get_text_features(inputs["input_ids"])
+            else:
+                out = self._model(**inputs)
+                image_embeds, text_embeds = out.image_embeds, out.text_embeds
 
-        image_embeds = out.image_embeds / out.image_embeds.norm(dim=-1, keepdim=True)
-        text_embeds = out.text_embeds / out.text_embeds.norm(dim=-1, keepdim=True)
+        image_embeds = image_embeds / image_embeds.norm(dim=-1, keepdim=True)
+        text_embeds = text_embeds / text_embeds.norm(dim=-1, keepdim=True)
+        return image_embeds, text_embeds
+
+    def score_labels(self, image_path: Path, label_texts: list[str]) -> list[float]:
+        import torch
+
+        image_embeds, text_embeds = self._embed(image_path, label_texts)
         sims = (image_embeds @ text_embeds.T).squeeze(0) * self.TEMPERATURE
         probs = torch.softmax(sims, dim=-1)
         return probs.tolist()
@@ -153,19 +243,9 @@ class EmbeddingZeroShotClassifier(CategoryClassifier):
         재정규화)로 라벨당 대표 임베딩 하나를 만든 뒤 코사인 유사도 + softmax를 낸다.
         단일 문구의 어휘 노이즈를 줄이려는 목적 — `color.py`의 색상 프롬프트 개선안 1·2번."""
         import torch
-        from PIL import Image
-
-        self._load()
-        with Image.open(image_path) as img:
-            image = img.convert("RGB")
 
         flat_texts = [text for group in label_prompt_groups for text in group]
-        inputs = self._processor(text=flat_texts, images=image, return_tensors="pt", padding=True)
-        with torch.no_grad():
-            out = self._model(**inputs)
-
-        image_embeds = out.image_embeds / out.image_embeds.norm(dim=-1, keepdim=True)
-        text_embeds = out.text_embeds / out.text_embeds.norm(dim=-1, keepdim=True)
+        image_embeds, text_embeds = self._embed(image_path, flat_texts)
 
         group_embeds = []
         offset = 0
@@ -181,19 +261,16 @@ class EmbeddingZeroShotClassifier(CategoryClassifier):
         return probs.tolist()
 
 
-class ClipCategoryClassifier(EmbeddingZeroShotClassifier):
-    name = "clip"
+def make_embedding_classifier(model_key: str) -> EmbeddingZeroShotClassifier:
+    """레지스트리 키 하나로 체크포인트 + 로딩 옵션을 함께 조립한다.
 
-    def __init__(self, model_key: str):
-        super().__init__(CATEGORY_MODELS[model_key])
-        self.name = model_key
-
-
-class SiglipCategoryClassifier(EmbeddingZeroShotClassifier):
-    name = "siglip_so400m"
-
-    def __init__(self):
-        super().__init__(CATEGORY_MODELS["siglip_so400m"])
+    `color.py`도 같은 함수를 쓴다 — 옵션(`trust_remote_code`/`feature_api`/`text_padding`)이
+    두 곳에 따로 적히면 카테고리에선 되고 색상에선 안 뜨는 식으로 어긋난다."""
+    classifier = EmbeddingZeroShotClassifier(
+        CATEGORY_MODELS[model_key], **CATEGORY_MODEL_LOAD_OPTIONS.get(model_key, {})
+    )
+    classifier.name = model_key
+    return classifier
 
 
 # --------------------------------------------------------------------------
@@ -246,10 +323,12 @@ class OnnxClipCategoryClassifier(CategoryClassifier):
 
 CATEGORY_BACKENDS: dict[str, "callable[[], CategoryClassifier]"] = {
     "mock": MockCategoryClassifier,
-    "clip_vit_b32": lambda: ClipCategoryClassifier("clip_vit_b32"),
-    "clip_vit_l14": lambda: ClipCategoryClassifier("clip_vit_l14"),
-    "siglip_so400m": SiglipCategoryClassifier,
+    "clip_vit_b32": lambda: make_embedding_classifier("clip_vit_b32"),
+    "clip_vit_l14": lambda: make_embedding_classifier("clip_vit_l14"),
+    "siglip_so400m": lambda: make_embedding_classifier("siglip_so400m"),
     "clip_vit_b32_onnx": OnnxClipCategoryClassifier,
+    # 패션 도메인 특화 후보 — CATEGORY_MODELS 주석 참고.
+    **{key: (lambda k=key: make_embedding_classifier(k)) for key in FASHION_CATEGORY_BACKENDS},
 }
 
 

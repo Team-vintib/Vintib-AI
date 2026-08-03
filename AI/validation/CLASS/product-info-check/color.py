@@ -18,6 +18,11 @@
                         (`use_debias`, 혼동행렬로 확인된 GRAY/NAVY/SILVER 쏠림 상쇄)을
                         각각/함께 적용. **실측상 가장 좋은 CLIP 조합**(N=10: 0.20 ->
                         0.50, `REPORT.md` §17) — 그래도 VLM(0.90)에는 못 미친다.
+  (g) fashion_clip/marqo_fashion_*/zooclaw_fashion_siglip2(+ `_wb`) — (d)와 메커니즘은
+                        같고 **체크포인트만 패션 상품 이미지로 파인튜닝된 것**으로 바꾼
+                        버전(2026-08-03 추가). 프롬프트(e)·전처리(f)·스와치를 다 돌려본
+                        결과 남은 축이 체크포인트뿐이라 시도한다. 후보 선정 근거는
+                        `classify.CATEGORY_MODELS`의 주석 참고.
 
 설계: `.claude/plans/ai/CH012-~2.MD`(파일명이 이렇게 커밋돼 있다 — 원래 의도한 이름은
 `CH012-product-info-classify.md`로 보인다, 정리 필요).
@@ -436,7 +441,7 @@ class ClipZeroShotColorExtractor(ColorExtractor):
 
     def __init__(
         self,
-        model_id: str,
+        model_key: str,
         name: str = "clip_zeroshot",
         use_ensemble: bool = False,
         use_white_balance: bool = False,
@@ -444,7 +449,10 @@ class ClipZeroShotColorExtractor(ColorExtractor):
     ):
         if use_ensemble and use_debias:
             raise ValueError("use_ensemble과 use_debias는 동시에 쓸 수 없다")
-        self._model_id = model_id
+        # 체크포인트 경로가 아니라 `classify.CATEGORY_MODELS`의 **키**를 받는다 — 패션 특화
+        # 후보(Marqo 등)는 model_id만으로는 못 싣고 로딩 옵션이 함께 필요해서, 조립은
+        # `classify.make_embedding_classifier()` 한 곳에만 둔다.
+        self._model_key = model_key
         self.name = name
         self._use_ensemble = use_ensemble
         self._use_white_balance = use_white_balance
@@ -454,9 +462,9 @@ class ClipZeroShotColorExtractor(ColorExtractor):
 
     def _get_backend(self) -> "EmbeddingZeroShotClassifier":  # noqa: F821 — 지연 import
         if self._backend is None:
-            from classify import EmbeddingZeroShotClassifier
+            from classify import make_embedding_classifier
 
-            self._backend = EmbeddingZeroShotClassifier(self._model_id)
+            self._backend = make_embedding_classifier(self._model_key)
         return self._backend
 
     def extract(self, image_path: Path) -> ColorResult:
@@ -557,6 +565,21 @@ COLOR_BACKENDS: dict[str, "callable[[], ColorExtractor]"] = {
     "clip_vit_b32_wb_debias": lambda: _make_clip_color(
         "clip_vit_b32", white_balance=True, debias=True
     ),
+    # (g) 패션 도메인 특화 체크포인트(2026-08-03 추가) — classify.CATEGORY_MODELS 주석 참고.
+    # 색상은 §17 시점에 CLIP zero-shot 0.41에서 막혀 있고, 프롬프트·앙상블·스와치는 전부
+    # 회귀했다. 남은 축은 "체크포인트를 바꾼다"뿐이라 카테고리와 같은 후보를 색상에도 건다
+    # (Marqo 두 모델은 색상을 명시적 학습 신호로 썼다고 밝히고 있어 특히 기대치가 있다).
+    # 화이트밸런스는 §13/§17에서 유일하게 재현된 개선이라 _wb 변형도 같이 등록한다.
+    **{
+        name: (lambda k=key, wb=white_balance: _make_clip_color(k, white_balance=wb))
+        for key in (
+            "fashion_clip",
+            "marqo_fashion_clip",
+            "marqo_fashion_siglip",
+            "zooclaw_fashion_siglip2",
+        )
+        for name, white_balance in ((key, False), (f"{key}_wb", True))
+    },
 }
 ACTIVE_COLOR_BACKEND = os.environ.get("PRODUCT_INFO_COLOR_BACKEND", "mock")
 
@@ -567,13 +590,11 @@ def _make_clip_color(
     white_balance: bool = False,
     debias: bool = False,
 ) -> ClipZeroShotColorExtractor:
-    from classify import CATEGORY_MODELS  # 지연 import — 무거운 의존성 체인 회피
-
     suffix = "_ensemble" if ensemble else ""
     suffix += "_wb" if white_balance else ""
     suffix += "_debias" if debias else ""
     return ClipZeroShotColorExtractor(
-        CATEGORY_MODELS[model_key],
+        model_key,
         name=f"{model_key}{suffix}",
         use_ensemble=ensemble,
         use_white_balance=white_balance,
