@@ -44,3 +44,9 @@
 ## 처리 결과
 
 - 2026-07-30: FE 문서(`api-index.md` 등) 반영 완료로 기록됐으나, **실제 코드엔 자동 선택 로직이 없다**(확인일 2026-08-03) — `ProductRegistrationPage.vue`의 `isRepresentative`는 항상 `false`로 시작하고 사용자가 클릭해야만 대표로 바뀐다. `aiCheckPhotoIds`도 빈 배열로 시작해 클릭으로만 채워진다. 두 자동 선택 항목 다 미반영 상태로 되돌림.
+- 2026-08-03: 상품 등록 화면 자동 선택 로직 반영 완료.
+  - `FE/src/domains/product/pages/ProductRegistrationPage.vue`
+  - 상품 이미지 1(front)을 업로드하면 대표 이미지로 자동 선택된다.
+  - AI 품질 검증 사진은 상품 이미지 1(front)과 상품 이미지 2(back)가 자동 선택된다.
+  - front/back 이미지는 품질 검증 필수 사진으로 유지하고, 추가 이미지는 사용자가 추가로 선택/해제할 수 있다.
+  - front/back 이미지 삭제 또는 교체 시 AI 품질 검증 선택값과 기존 검증 결과를 현재 이미지 기준으로 동기화한다.

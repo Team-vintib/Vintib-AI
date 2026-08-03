@@ -897,10 +897,13 @@ const addPhotos = (role: ProductRegistrationPhotoRole, files: File[]) => {
     draft.photos = draft.photos.filter((photo) => photo.role !== role)
     draft.photos.push(validPhotos[0])
 
-    if (draft.representativePhotoId && !draft.photos.some((photo) => photo.id === draft.representativePhotoId)) {
+    if (role === 'front') {
+      selectRepresentativePhoto(validPhotos[0].id)
+    } else if (draft.representativePhotoId && !draft.photos.some((photo) => photo.id === draft.representativePhotoId)) {
       draft.representativePhotoId = ''
     }
 
+    syncDefaultAiCheckPhotos()
     return
   }
 
@@ -921,6 +924,8 @@ const removePhoto = (photoId: string) => {
     draft.representativePhotoId = ''
   }
 
+  syncDefaultAiCheckPhotos()
+
   if (!isAiModelSettingsAvailable.value) {
     resetAiModelSettings()
   }
@@ -932,6 +937,21 @@ const selectRepresentativePhoto = (photoId: string) => {
     ...photo,
     isRepresentative: photo.id === photoId,
   }))
+}
+
+const syncDefaultAiCheckPhotos = () => {
+  const requiredPhotoIds = draft.photos
+    .filter((photo) => photo.role === 'front' || photo.role === 'back')
+    .map((photo) => photo.id)
+  const additionalSelectedPhotoIds = draft.aiCheckPhotoIds.filter((photoId) =>
+    draft.photos.some((photo) => photo.id === photoId && photo.role === 'additional'),
+  )
+
+  draft.aiCheckPhotoIds = [...requiredPhotoIds, ...additionalSelectedPhotoIds]
+  draft.aiPhotoResults = draft.aiPhotoResults.filter((result) =>
+    draft.aiCheckPhotoIds.includes(result.photoId),
+  )
+  currentAiResultIndex.value = Math.min(currentAiResultIndex.value, Math.max(draft.aiPhotoResults.length - 1, 0))
 }
 
 const selectConditionGrade = (conditionGrade: string) => {
@@ -1879,7 +1899,7 @@ onBeforeUnmount(() => {
                   :class="{ 'product-registration__ai-photo--selected': draft.aiCheckPhotoIds.includes(photo.id) }"
                   type="button"
                   :aria-pressed="draft.aiCheckPhotoIds.includes(photo.id)"
-                  @click="toggleAiCheckPhoto(photo.id)"
+                  aria-disabled="true"
                 >
                   <img
                     :src="photo.previewUrl"
