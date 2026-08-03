@@ -34,7 +34,8 @@ extend-exclude = '''
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-# validation/TRYON/AI_tryon/CatVTON 안 서드파티 코드(detectron2/densepose)에 test_*.py 이름의 비-테스트
-# 모듈이 있어 pytest가 그대로 수집하려다 torch 미설치로 깨진다(CI엔 validation/requirements-test.txt
-# 설치 안 함) — ruff/black처럼 pytest도 이 폴더를 수집 대상에서 제외한다.
-addopts = "--ignore=validation/TRYON/AI_tryon/CatVTON"
+# validation/TRYON/AI_tryon/CatVTON, validation/TRYON/AI_tryon/fashn-vton-1.5/fashn-vton-1.5
+# 안 서드파티 코드(detectron2/densepose, fashn_vton)에 test_*.py 이름의 비-테스트 모듈이 있어
+# pytest가 그대로 수집하려다 torch 미설치로 깨진다(CI엔 validation/requirements-test.txt
+# 설치 안 함) — ruff/black처럼 pytest도 이 폴더들을 수집 대상에서 제외한다.
+addopts = "--ignore=validation/TRYON/AI_tryon/CatVTON --ignore=validation/TRYON/AI_tryon/fashn-vton-1.5/fashn-vton-1.5"
