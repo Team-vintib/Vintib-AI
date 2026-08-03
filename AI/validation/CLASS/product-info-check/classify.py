@@ -288,6 +288,25 @@ def classify_one_stage(
     )
 
 
+def classify_major_only(
+    classifier: CategoryClassifier, image_path: Path, template_key: str, top_k: int = 3
+) -> ClassificationResult:
+    """대분류(depth 2) 6종만 물어본다 — `classify_two_stage()`의 1차 질의를 단독으로 떼어
+    쓰고 싶을 때(예: 대분류만 필요한 실험) 이 함수를 쓴다. `top_k`는 6종 중에서 뽑으므로
+    `classify_one_stage`보다 후보 폭이 좁다."""
+    template = MAJOR_PROMPT_TEMPLATES[template_key]
+    labels = list(MAJOR_CATEGORIES)
+    texts = [template(code) for code in labels]
+    scores = classifier.score_labels(image_path, texts)
+    candidates = _top_candidates(labels, scores, top_k)
+    return ClassificationResult(
+        predicted=candidates[0].code,
+        score=candidates[0].score,
+        candidates=candidates,
+        backend=classifier.name,
+    )
+
+
 def classify_two_stage(
     classifier: CategoryClassifier, image_path: Path, template_key: str, top_k: int = 3
 ) -> ClassificationResult:

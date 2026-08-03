@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from color import MULTI_LABEL, PALETTE
-from taxonomy import ALL_SUBCATEGORIES
+from taxonomy import ALL_SUBCATEGORIES, MAJOR_CATEGORIES
 
 VLM_MODELS: dict[str, str] = {
     # QUAL/vlm-description-check/model_registry.py와 동일 후보 — 하자 설명 sVLM 검증 때
@@ -330,6 +330,38 @@ def query_category(
     prompt = template.format(labels=", ".join(ALL_SUBCATEGORIES))
     raw = generate_from_image(bundle, image, prompt)
     return _match_label(raw, list(ALL_SUBCATEGORIES)), raw
+
+
+# 대분류(depth 2) 6-way 단독 분류(2026-08-03 추가) — 소분류 v4의 교훈(구조적/관찰 가능한
+# 기준만 쓴다)을 처음부터 반영했다. 대분류 레벨에서 실제로 헷갈릴 법한 두 쌍만 짚는다 —
+# OUTER/TOP(가디건·조끼처럼 단독으로도 입을 수 있는 겉옷)과 BAG/ACCESSORY(작은 파우치 vs
+# 장신구). SHOES/BOTTOM 등은 착용 부위 자체가 달라 구조적으로 헷갈릴 여지가 거의 없다고
+# 보고 기준을 추가하지 않았다(실측에서 틀리면 그때 추가).
+_MAJOR_CATEGORY_PROMPT_TEMPLATE = (
+    "다음은 중고 거래 플랫폼에 올라온 상품 사진이다. 아래 대분류 목록 중 이 상품에 가장 "
+    "가까운 것을 정확히 하나만, 목록에 있는 단어 그대로 답하라. 다른 설명은 절대 붙이지 마라.\n"
+    "\n"
+    "헷갈리기 쉬운 대분류 구분 기준:\n"
+    "- OUTER vs TOP: 다른 옷 위에 겹쳐 입는 겉옷(자켓/코트/가디건/조끼/집업류)이면 OUTER, "
+    "맨 안쪽에 입는 옷(티셔츠/셔츠/니트/후드/맨투맨류)이면 TOP\n"
+    "- BAG vs ACCESSORY: 물건을 넣고 여닫는 수납 공간이 있으면 BAG, 몸에 걸치거나 착용하는 "
+    "장신구(모자/벨트/스카프/주얼리/시계/선글라스)면 ACCESSORY\n"
+    "\n"
+    "대분류 목록: {labels}"
+)
+
+
+def query_major_category(image_path: Path, model_key: str = ACTIVE_VLM) -> tuple[str | None, str]:
+    """대분류(OUTER/TOP/BOTTOM/SHOES/BAG/ACCESSORY) 6종 중 하나를 VLM에게 직접 고르게
+    한다. `query_category()`의 소분류 30-way 버전과 별개 — 대분류만 필요한 실험용."""
+    from PIL import Image
+
+    bundle = _get_bundle()
+    with Image.open(image_path) as img:
+        image = img.convert("RGB")
+    prompt = _MAJOR_CATEGORY_PROMPT_TEMPLATE.format(labels=", ".join(MAJOR_CATEGORIES))
+    raw = generate_from_image(bundle, image, prompt)
+    return _match_label(raw, list(MAJOR_CATEGORIES)), raw
 
 
 def query_color(
