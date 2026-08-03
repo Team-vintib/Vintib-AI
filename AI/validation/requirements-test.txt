@@ -55,6 +55,10 @@ scikit-learn>=1.5
 # classify.py의 CLIP/SigLIP zero-shot 후보 자체는 transformers(위에 이미 있음)로 충분하다.
 # "+ ONNX 변환본" 후보(V1 지연 비교용)만 추가로 필요 — optimum이 변환+onnxruntime 추론을 묶어 준다.
 optimum[onnxruntime]>=1.23
+# 패션 도메인 특화 후보(classify.CATEGORY_MODELS의 marqo_fashion_*) 전용. Marqo의 HF 리포는
+# open_clip 래퍼를 trust_remote_code로 싣기 때문에 transformers만으로는 로드가 실패한다.
+# fashion_clip / zooclaw_fashion_siglip2는 순정 아키텍처라 이게 없어도 돌아간다.
+open_clip_torch>=2.24
 # vlm_control.py — QUAL/vlm-description-check와 동일 이유(RTX 4070 Laptop 8GB, bf16 풀로드 불가)로
 # 4bit 양자화 필수. transformers>=5.0이 필요해 위 Kanana 핀(<5)과 충돌한다 — 이 스파이크의
 # vlm_control.py를 실행하려면 QUAL/vlm-description-check와 같은 별도 환경(예: conda env "qual")에

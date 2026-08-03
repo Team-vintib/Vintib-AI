@@ -15,19 +15,39 @@ taxonomy 기준인지 추적이 안 된다.
 from __future__ import annotations
 
 # 정본(taxonomy.py)과 같은 값이어야 한다. 수집 산출물 JSONL 각 행에 기록된다.
-TAXONOMY_VERSION = "v1-chat-confirmed-2026-08-01"
+# **v1으로 수집한 JSONL은 이 값으로 자동 변환되지 않는다** — 코드가 5개 개명되고
+# VEST가 없어졌으므로, 기존 산출물이 있으면 재수집하거나 코드를 손으로 옮겨야 한다.
+TAXONOMY_VERSION = "v2-be-seed-2026-08-03"
 
-# depth 2(대분류) — 순서 고정.
-MAJOR_CATEGORIES: tuple[str, ...] = ("OUTER", "TOP", "BOTTOM", "SHOES", "BAG", "ACCESSORY")
+# depth 2(대분류) — 순서 고정. BE 시드 기준 7종(DRESS_JUMPSUIT는 여성·공용에만 존재하지만
+# 코드 집합 자체는 성별과 무관하다).
+MAJOR_CATEGORIES: tuple[str, ...] = (
+    "OUTER",
+    "TOP",
+    "BOTTOM",
+    "SHOES",
+    "BAG",
+    "ACCESSORY",
+    "DRESS_JUMPSUIT",
+)
 
-# depth 3(소분류) — 대분류별 순서 고정. 총 30종. 모델이 예측하는 유일한 축이다.
+# depth 3(소분류) — 대분류별 순서 고정. 총 35종. 모델이 예측하는 유일한 축이다.
 SUBCATEGORIES: dict[str, tuple[str, ...]] = {
-    "OUTER": ("JACKET", "COAT", "CARDIGAN", "VEST", "HOODIE_ZIP_UP"),
-    "TOP": ("T_SHIRT", "SHIRT", "KNIT", "HOODIE", "SWEATSHIRT"),
-    "BOTTOM": ("DENIM", "SLACKS", "CARGO_PANTS", "SKIRT", "SHORTS"),
-    "SHOES": ("SNEAKERS", "BOOTS", "LOAFER", "SANDALS"),
+    "OUTER": ("JACKET", "COAT", "CARDIGAN", "PADDED_JACKET", "HOOD_ZIPUP"),
+    "TOP": ("TSHIRT", "SHIRT", "KNIT", "HOODIE", "SWEATSHIRT", "SLEEVELESS"),
+    "BOTTOM": (
+        "DENIM",
+        "SLACKS",
+        "CARGO_PANTS",
+        "SKIRT",
+        "SHORT_PANTS",
+        "JOGGER_PANTS",
+        "COTTON_PANTS",
+    ),
+    "SHOES": ("SNEAKERS", "BOOTS", "DRESS_SHOES", "SANDALS_SLIPPERS"),
     "BAG": ("BACKPACK", "SHOULDER_BAG", "TOTE_BAG", "CROSS_BAG", "POUCH"),
     "ACCESSORY": ("HAT", "BELT", "SCARF", "JEWELRY", "WATCH", "SUNGLASSES"),
+    "DRESS_JUMPSUIT": ("DRESS", "JUMPSUIT"),
 }
 
 ALL_SUBCATEGORIES: tuple[str, ...] = tuple(
@@ -52,11 +72,16 @@ def is_valid_subcategory(code: str) -> bool:
 # 이 쌍들의 수집 건수를 따로 보여준다.
 CONFUSION_PAIRS: tuple[tuple[str, str], ...] = (
     ("JACKET", "COAT"),
-    ("CARDIGAN", "HOODIE_ZIP_UP"),
-    ("HOODIE", "HOODIE_ZIP_UP"),
+    ("JACKET", "PADDED_JACKET"),
+    ("CARDIGAN", "HOOD_ZIPUP"),
+    ("HOODIE", "HOOD_ZIPUP"),
     ("KNIT", "SWEATSHIRT"),
-    ("T_SHIRT", "SWEATSHIRT"),
+    ("TSHIRT", "SWEATSHIRT"),
+    ("TSHIRT", "SHIRT"),
     ("SLACKS", "CARGO_PANTS"),
+    ("SLACKS", "COTTON_PANTS"),
+    ("CARGO_PANTS", "JOGGER_PANTS"),
+    ("SKIRT", "DRESS"),
     ("SHOULDER_BAG", "CROSS_BAG"),
     ("SHOULDER_BAG", "TOTE_BAG"),
     ("CROSS_BAG", "TOTE_BAG"),
@@ -64,29 +89,25 @@ CONFUSION_PAIRS: tuple[tuple[str, str], ...] = (
 
 # 색상 팔레트 코드 — color.py의 PALETTE 키 집합과 같아야 한다(hex는 크롤러가 안 쓴다).
 # **잠정값**: BE/FE 확정 전이라 바뀔 수 있다(브리핑 §1).
+# 13종 + MIXED로 사용자 확정(2026-08-03). 근거·은퇴 코드 매핑은
+# `../product-info-check/color.py`의 PALETTE 주석 참고 — 값은 항상 그쪽과 일치시킨다.
 PALETTE_CODES: tuple[str, ...] = (
     "BLACK",
     "WHITE",
     "GRAY",
-    "IVORY",
-    "BEIGE",
-    "BROWN",
-    "KHAKI",
-    "NAVY",
-    "BLUE",
-    "SKYBLUE",
-    "GREEN",
-    "YELLOW",
-    "ORANGE",
     "RED",
+    "ORANGE",
     "PINK",
+    "YELLOW",
+    "BROWN",
+    "GREEN",
+    "BLUE",
     "PURPLE",
-    "WINE",
-    "SILVER",
-    "GOLD",
+    "BEIGE",
+    "NAVY",
 )
 
-MULTI_LABEL = "MULTI"
+MIXED_LABEL = "MIXED"
 
 # 브리핑 §4.1 — 촬영유형. 크롤링만으로는 판별할 수 없어서 사이트 스펙의 기본값 선언이나
 # 사후 라벨링으로 채운다.

@@ -12,7 +12,7 @@
   },
   {
     "image_file": "black_washed.jpg",
-    "subcategory": "T_SHIRT",
+    "subcategory": "TSHIRT",
     "primary_color": "BLACK",
     "secondary_color": "RED",
     "shot_type": "flat",
@@ -36,7 +36,7 @@
     "image_file": "levis_patch.jpg",
     "subcategory": "DENIM",
     "primary_color": "BLUE",
-    "secondary_color": "MULTI",
+    "secondary_color": "MIXED",
     "shot_type": "flat",
     "labeler": "ChoeHyeongSoo",
     "needs_human_review": false,
@@ -45,7 +45,7 @@
   },
   {
     "image_file": "logo_test.jpg",
-    "subcategory": "T_SHIRT",
+    "subcategory": "TSHIRT",
     "primary_color": "WHITE",
     "secondary_color": null,
     "shot_type": "flat",
@@ -78,7 +78,7 @@
   },
   {
     "image_file": "small_pro.jpg",
-    "subcategory": "T_SHIRT",
+    "subcategory": "TSHIRT",
     "primary_color": "WHITE",
     "secondary_color": null,
     "shot_type": "flat",
@@ -89,7 +89,7 @@
   },
   {
     "image_file": "navy_logo.png",
-    "subcategory": "T_SHIRT",
+    "subcategory": "TSHIRT",
     "primary_color": "NAVY",
     "secondary_color": null,
     "shot_type": "flat",
@@ -100,8 +100,8 @@
   },
   {
     "image_file": "vintage_t.png",
-    "subcategory": "T_SHIRT",
-    "primary_color": "KHAKI",
+    "subcategory": "TSHIRT",
+    "primary_color": "GREEN",
     "secondary_color": "BLACK",
     "shot_type": "hanging",
     "labeler": "ChoeHyeongSoo",
@@ -111,7 +111,7 @@
   },
   {
     "image_file": "black_stain.png",
-    "subcategory": "T_SHIRT",
+    "subcategory": "TSHIRT",
     "primary_color": "BLACK",
     "secondary_color": null,
     "shot_type": "flat",
@@ -140,18 +140,18 @@
     "labeler": "ChoeHyeongSoo",
     "needs_human_review": false,
     "synthetic": false,
-    "notes": "오프화이트 데님 트러커 재킷(카라+앞단추+가슴 플랩 포켓 2개+사이드 포켓), 흰 배경 평면샷. WHITE/IVORY 경계 케이스로 의도적으로 골랐을 가능성 — 사람 재검증 필요."
+    "notes": "오프화이트 데님 트러커 재킷(카라+앞단추+가슴 플랩 포켓 2개+사이드 포켓), 흰 배경 평면샷. WHITE/BEIGE 경계 케이스(팔레트 13종 개편 전에는 IVORY 후보였음) — 사람 재검증 필요."
   },
   {
     "image_file": "skyblue_shirt.webp",
     "subcategory": "SHIRT",
-    "primary_color": "SKYBLUE",
+    "primary_color": "BLUE",
     "secondary_color": null,
     "shot_type": "flat",
     "labeler": "ChoeHyeongSoo",
     "needs_human_review": false,
     "synthetic": false,
-    "notes": "연한 하늘색 셔츠(카라+단추가 목~밑단까지 쭉 이어짐, 얇은 세로 줄무늬 원단), 흰 배경 평면샷. 줄무늬가 아주 옅은 흰색이라 보조색으로 잡지 않았으나 경계 판단 — 사람 재검증 필요. SKYBLUE/WHITE/BLUE 경계 케이스로 의도적으로 골랐을 가능성."
+    "notes": "연한 하늘색 셔츠(카라+단추가 목~밑단까지 쭉 이어짐, 얇은 세로 줄무늬 원단), 흰 배경 평면샷. 줄무늬가 아주 옅은 흰색이라 보조색으로 잡지 않았으나 경계 판단 — 사람 재검증 필요. 팔레트 13종 개편(2026-08-03)으로 SKYBLUE가 없어져 BLUE로 재라벨링했다 — 하늘색은 이제 BLUE가 받는다."
   },
   {
     "image_file": "greyp.png",
@@ -166,7 +166,7 @@
   },
   {
     "image_file": "hzip.png",
-    "subcategory": "HOODIE_ZIP_UP",
+    "subcategory": "HOOD_ZIPUP",
     "primary_color": "NAVY",
     "secondary_color": "WHITE",
     "shot_type": "hanging",

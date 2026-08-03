@@ -27,7 +27,7 @@ from classify import (
     classify_two_stage,
     get_category_classifier,
 )
-from color import ColorExtractor, MULTI_LABEL, PALETTE, get_color_extractor
+from color import ColorExtractor, MIXED_LABEL, PALETTE, get_color_extractor
 from dataset import LoadResult, Sample, load_ground_truth
 from taxonomy import ALL_SUBCATEGORIES, PROMPT_TEMPLATES, major_of
 
@@ -100,6 +100,34 @@ def evaluate_category(
     return out
 
 
+def all_failed(preds: list) -> str | None:
+    """전 행이 실패했으면 대표 에러 메시지를, 아니면 `None`을 반환한다.
+
+    **왜 필요한가(2026-08-03에 실제로 물린 함정)**: `evaluate_category`/`evaluate_color`는
+    샘플 단위로 예외를 삼킨다(위 "실패 격리"). 그래서 **백엔드 로딩 자체가 깨져도**
+    호출부는 예외를 못 보고, 전 행이 오답 처리된 "정확도 0.00"이라는 **정상 결과처럼
+    생긴 값**을 받는다. marqo 백엔드가 transformers 5.x 비호환으로 한 번도 못 돌았는데
+    스윕 표에 `primary_acc=0.00`이 측정값처럼 찍힌 사고가 있었다.
+
+    로딩이 실패하면 `_load()`가 캐시를 못 채워 **샘플마다 로드를 재시도**하므로, 증상은
+    "같은 경고가 이미지 수만큼 반복 출력 + 정확도 0.00"으로 나타난다. 스윕 표에 숫자를
+    싣기 전에 이 함수로 걸러야 0.00을 실측치로 오독하지 않는다.
+
+    `CategoryPrediction`/`ColorPrediction` 둘 다 `.error`를 갖고 있어 그대로 받는다.
+    """
+    if not preds:
+        return "no predictions"
+    errored = [p for p in preds if p.error]
+    if len(errored) != len(preds):
+        return None  # 일부만 실패 — 남은 행의 정확도는 (표본은 줄지만) 유효하다
+    return errored[0].error
+
+
+def error_count(preds: list) -> int:
+    """실패한 행 수. 일부만 실패한 경우를 스윕 표에 드러내려고 쓴다."""
+    return sum(1 for p in preds if p.error)
+
+
 def majority_baseline_accuracy(samples: list[Sample]) -> tuple[str, float]:
     """항상 최빈 소분류를 답하는 더미 분류기의 top-1 정확도. (최빈 코드, 정확도)."""
     real = [s for s in samples if not s.synthetic]
@@ -148,14 +176,14 @@ class ColorPrediction:
     confidence: float
     correct_primary: bool
     correct_secondary: bool
-    off_palette: bool  # 예측값이 PALETTE에도 MULTI_LABEL에도 없음(예: VLM 파싱 실패 UNKNOWN)
+    off_palette: bool  # 예측값이 PALETTE에도 MIXED_LABEL에도 없음(예: VLM 파싱 실패 UNKNOWN)
     major: str
     error: str | None = None
 
 
 def evaluate_color(samples: list[Sample], backend_key: str) -> list[ColorPrediction]:
     extractor = get_color_extractor(backend_key)
-    valid = set(PALETTE) | {MULTI_LABEL}
+    valid = set(PALETTE) | {MIXED_LABEL}
     out: list[ColorPrediction] = []
     for s in samples:
         if s.synthetic:
@@ -197,9 +225,9 @@ def evaluate_color(samples: list[Sample], backend_key: str) -> list[ColorPredict
 
 def color_confusion_matrix(preds: list[ColorPrediction]) -> dict[str, dict[str, int]]:
     """`confusion_matrix()`의 색상 버전(2026-08-03 추가) — 지금까지 없었다(`REPORT.md` 및
-    사용자 확인). `truth_primary` -> `predicted_primary` 카운트. 팔레트 코드 + `MULTI_LABEL`
+    사용자 확인). `truth_primary` -> `predicted_primary` 카운트. 팔레트 코드 + `MIXED_LABEL`
     전체를 행으로 깔아둔다(카테고리 버전과 동일한 관례) — 정답셋에 없는 색은 빈 dict로 남는다."""
-    all_codes = list(PALETTE) + [MULTI_LABEL]
+    all_codes = list(PALETTE) + [MIXED_LABEL]
     matrix: dict[str, dict[str, int]] = {code: {} for code in all_codes}
     for p in preds:
         if p.predicted_primary not in all_codes or p.truth_primary not in all_codes:

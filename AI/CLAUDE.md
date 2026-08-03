@@ -101,6 +101,13 @@ Dockerfile은 그것만 설치하므로, `app/` 안에 실모델 경로를 만�
 - 테스트에서 목업 데이터를 읽을 때 `Path(__file__)` 상대경로를 쓰지 않는다 — 데이터는 프로덕션
   패키지(`app/<도메인>/data/`)에 있고 테스트는 `test/` 아래라 경로가 어긋난다. 프로덕션 모듈의
   경로 상수를 재사용한다(예: `test/chat/test_chat_service.py`가 `app.chat.faq._DATA_DIR`를 씀).
+- **`validation/<어떤 폴더>/`에 테스트 파일을 새로 추가하면 그 폴더가 통째로 `sys.path`에 올라간다**
+  (pytest 기본 `prepend` import 모드). 그래서 **테스트 파일 이름뿐 아니라 그 폴더의 형제 모듈
+  이름도** 다른 스파이크 폴더와 충돌하면 안 된다. 실제로 `CLASS/product-info-check/`에 테스트를
+  하나 넣었더니 그 폴더의 `dataset.py`가 `REC/recommendation-embedding-finetune/dataset.py`를
+  가려서 그쪽 `test_dataset.py`가 수집 단계에서 깨졌다(2026-08-03). 스파이크 폴더에 테스트를
+  넣기 전에 `dataset.py`·`evaluate.py`처럼 흔한 이름이 다른 폴더와 겹치는지 먼저 확인할 것 —
+  겹치면 테스트를 포기하거나(스파이크 코드면 그래도 된다) 모듈 이름을 먼저 정리한다.
 
 ## CI 규칙 — 커밋 전 반드시 로컬에서 통과시킬 것
 

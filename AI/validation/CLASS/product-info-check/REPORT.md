@@ -558,3 +558,208 @@ ClipZeroShotColorExtractor(use_debias=True)`).
 
 **구현**: `evaluate.color_confusion_matrix()`(카테고리 `confusion_matrix()`의 색상 버전),
 `color.ClipZeroShotColorExtractor`에 `use_debias` 옵션 + `_compute_debias_prior()` 추가.
+
+---
+
+## 18. 패션 도메인 특화 체크포인트 후보 선정(2026-08-03) — **실측 대기**
+
+**배경**: §11(앙상블)·§12/§15(색상 프롬프트)·§16(스와치)이 전부 회귀했고, 통한 건
+§13/§17의 전처리·편향 보정뿐이다. 카테고리 대분류 직접 질의 0.35(§14), 색상 0.41~0.50에서
+막혀 있다. **지금까지 안 건드린 축이 하나 남았다 — 체크포인트 자체다.** `CATEGORY_MODELS`의
+기존 후보 4종은 전부 범용(OpenAI CLIP / Google SigLIP)이고, 의류 사진에 특화된 표현을
+배운 적이 없다.
+
+### 비교 후보 — 범용 대조군 1 + 패션 특화 3
+
+| 레지스트리 키 | 체크포인트 | 근거 |
+|---|---|---|
+| `clip_vit_b32` | `openai/clip-vit-base-patch32` | **범용 대조군.** §V2a~§17 모든 실측의 기준선. 없으면 "패션 파인튜닝이 실제로 움직였는가"를 판정할 수 없다 |
+| `fashion_clip` | `patrickjohncyh/fashion-clip` | FashionCLIP 2.0. LAION CLIP ViT-B/32 + 패션 상품 80만 건. 모델 카드의 zero-shot weighted macro F1: FMNIST 0.78→0.83, KAGL 0.71→0.73, DEEP 0.58→0.62(베이스 LAION CLIP 대비) |
+| `marqo_fashion_clip` | `Marqo/marqo-fashionCLIP` | GCL(카테고리·색상·소재·스타일을 학습 신호로 사용). 자사 벤치마크 recall@1 FashionCLIP 2.0 대비 +22% |
+| `marqo_fashion_siglip` | `Marqo/marqo-fashionSigLIP` | 같은 레시피의 SigLIP(ViT-B-16-SigLIP webli) 판, +57%. 공개된 패션 임베딩 중 보고 성능 최고 |
+| ~~`zooclaw_fashion_siglip2`~~ | `srpone/zooclaw-fashionsiglip2` | **이번 비교 제외**(사용자 결정). 레지스트리에는 등록해 뒀고 노트북 §2에 주석으로 남아 있어 한 줄만 풀면 켜진다. SigLIP2-base-384 기반 최신(2026-06, arXiv 2606.27708)이지만 검색 목적 증류라 분류는 부차 용도 |
+
+**Marqo 두 모델을 색상에도 거는 이유**: GCL이 색상을 명시적 학습 신호로 썼다고 밝히고
+있다. §17에서 CLIP 색상이 막힌 게 "체크포인트가 색상을 안 배워서"인지 "zero-shot 방식
+자체의 한계"인지 지금은 구분이 안 되는데, 이 후보가 색상에서도 안 오르면 후자 쪽 근거가
+된다(= §9의 파인튜닝/VLM 유지 결론이 굳어진다).
+
+### 실행 방법
+
+**전용 노트북 `fashion_model_compare.ipynb`** 를 위에서부터 실행한다(§14 실측이 끝난
+`major_category_and_color_check.ipynb`와 분리했다 — 그쪽은 축이 "대분류 6종 + 색상 기법 +
+VLM 대조군"이고 Qwen3-VL 로드가 전제라 GPU가 필요한데, 이 비교는 CLIP 계열만 써서 VLM
+없이 돈다).
+
+비교 축을 체크포인트 하나로 고정하려고 정답셋·프롬프트 템플릿(`en_clip_style`)·분류
+모드(`one_stage`)·스코어링(코사인 + temperature softmax)은 전 모델 동일하게 뒀다.
+재는 것은 세 가지 + 지연:
+
+| # | 테스트 | 지표 |
+|---|---|---|
+| 1 | 중분류(소분류) 30-way 추론 | `sub_top1` / `sub_top3` |
+| 2 | 중분류 → 대분류 역산 | `major_inverted`. **추가 추론 없음** — 테스트 1의 예측을 `major_of()`로 접는다 |
+| 3 | 색상 추론 | `color_acc` / `color_acc_wb` (모델당 원본 / 화이트밸런스 2조건) |
+| + | 지연 | `benchmark_backend(template_key=en_clip_style, stress="idle")`의 p50/p95/load |
+
+§6 스코어보드가 모델당 한 줄로 정리하고 baseline 대비 `_Δ` 컬럼을 붙인다. §7이
+`outputs/report_fashion_compare.json`으로 ECE·임계값 추천·혼동행렬까지 떨군다.
+
+**대분류 6-way 직접 질의는 재지 않는다** — §14에서 범용 CLIP이 0.35로 무너지고 17장 중
+12장이 OUTER로 쏠리는 게 확인됐고, 역산(1.00)이 같은 비용에 더 정확해서 직접 질의를 쓸
+이유가 없다.
+
+**사전 준비**: `pip install open_clip_torch`(Marqo 두 모델이 `trust_remote_code`로 open_clip
+래퍼를 싣는다. 없으면 그 두 개만 스킵되고 나머지는 그대로 돈다) + 체크포인트 다운로드 약 1.5GB.
+
+**구현**: `classify.CATEGORY_MODEL_LOAD_OPTIONS`(모델별 `trust_remote_code`/`feature_api`/
+`text_padding`) + `make_embedding_classifier()`(레지스트리 키 → 조립). `EmbeddingZeroShotClassifier`는
+`_embed()`로 인코딩 경로를 한 곳에 모으고 forward / `get_*_features()` 두 갈래를 흡수한다 —
+**기본값은 기존 경로와 동일해서 §14의 clip_vit_b32 실측(0.35 / 1.00)이 그대로 재현되는 걸
+확인했다**(리팩터로 인한 회귀 없음). `color.ClipZeroShotColorExtractor`는 model_id 대신
+레지스트리 키를 받도록 바꿨다(로딩 옵션이 두 곳에 갈라지지 않게).
+
+### 18-1. 로딩 실패 2건 + "정확도 0.00" 오독 사고(2026-08-03)
+
+**Marqo 두 모델은 모델 카드의 transformers 경로로는 안 실린다.** 실행 환경
+(transformers 5.14.1)에서 둘 다 로드 단계에서 예외가 난다:
+
+| 백엔드 | 예외 | 원인 |
+|---|---|---|
+| `marqo_fashion_clip` | `ValueError: Unrecognized image processor` | 리포의 `preprocessor_config.json`이 5.x에서 없어진 `CLIPFeatureExtractor`를 가리키고, auto_map이 지목한 `MarqoFashionImageProcessor`가 원격 코드 파일에 아예 없다. 캐시에 가중치 파일도 안 받아진다 |
+| `marqo_fashion_siglip` | `NotImplementedError: Cannot copy out of meta tensor` | 원격 코드가 `__init__`에서 `self.model.to(self.device)`를 하는데 5.x는 모듈을 meta 디바이스에 lazy 초기화한다 |
+
+원격 코드가 transformers 4.x 시절 작성됐고, 이 저장소는 Qwen3-VL 때문에 5.x가 필요해
+downgrade로는 못 푼다. **Marqo가 함께 문서화한 `open_clip` 경로로 교체**했다
+(`classify.OpenClipZeroShotClassifier`, 레지스트리 옵션 `{"loader": "open_clip"}`).
+교체 후 4종 전부 정상 동작을 확인했다(폴로 사진 vs t-shirt/dog/car/mountain 프로브에서
+t-shirt 확률 clip_vit_b32 0.9998 / fashion_clip 0.9992 / marqo_fashion_clip 0.9999 /
+marqo_fashion_siglip 0.9995).
+
+**더 중요한 건 이게 조용히 지나갔다는 것이다.** `evaluate_category`/`evaluate_color`는
+샘플 단위로 예외를 삼키는데(실패 격리), 백엔드 로딩은 첫 `extract()` 안에서 일어난다 →
+매 샘플에서 터지고 → 전 행이 오답 처리되어 **`primary_acc=0.00`이 정상 측정값처럼 표에
+찍혔다.** 로딩이 실패하면 `_load()`가 캐시를 못 채워 **이미지 수만큼 로드를 재시도**하므로
+"같은 경고가 17번 반복 + 정확도 0.00"이 증상이었다.
+
+대책: `evaluate.all_failed()`(전 행 실패면 대표 에러 메시지 반환) + `error_count()`를
+추가하고, 노트북 §3·§4가 숫자를 표에 싣기 전에 이걸로 거른다 — 실패한 런은 `0.00`이
+아니라 **`NaN` + `[SKIP]`** 으로 표시된다(0.00은 실측, NaN은 못 돌았음). 회귀 테스트는
+`test_class_evaluate_failure.py`.
+
+### 18-2. 부분 실측 — 색상(2026-08-03, N=17)
+
+marqo 로딩 수정 전에 돌아간 두 모델의 색상 결과. **`fashion_clip`이 §17의 CLIP 최고
+조합(wb+debias 0.50)을 체크포인트 교체만으로 넘었다.**
+
+| 백엔드 | primary_acc |
+|---|---|
+| `clip_vit_b32` | 0.41 (§17 기준선과 일치 — 리팩터 회귀 없음) |
+| `clip_vit_b32_wb` | 0.47 |
+| **`fashion_clip`** | **0.65** |
+| `fashion_clip_wb` | 0.65 |
+
+프롬프트 앙상블(§11)·색상 프롬프트(§12·§15)·스와치(§16)가 전부 회귀했던 걸 감안하면,
+**색상에서 실제로 통한 두 번째 축이 "체크포인트 교체"라는 근거**다. 화이트밸런스가
+`fashion_clip`에선 무효(0.65→0.65)인 것도 시사적이다 — §13/§17에서 wb가 준 이득이
+전처리 고유의 것이 아니라 **범용 체크포인트의 편향을 일부 상쇄한 것**이었을 수 있다.
+marqo 2종 수치는 재실행 후 채울 것. (N=17, `MIN_N_FOR_CONFIDENCE` 미달은 그대로 유효.)
+
+---
+
+## 19. 색상 팔레트 13종 + MIXED로 축소(2026-08-03, 사용자 확정)
+
+기존 19종에서 **IVORY·KHAKI·SKYBLUE·WINE·SILVER·GOLD 6종을 제거**했다. 남은 13종
+(Black, White, Gray, Red, Orange, Pink, Yellow, Brown, Green, Blue, Purple, Beige, Navy)
++ `MIXED`. 특수 라벨은 `MULTI` → `MIXED`로 개명해 확정 목록의 "Mixed"와 맞췄다.
+
+AI-Hub "의류 통합 데이터"의 색상 라벨 체계(13종)와 **Navy 하나만 다른** 구성이다 — Navy를
+남긴 건 §17 혼동행렬에서 BLUE↔NAVY가 최대 오답원이었고 정답셋의 59%가 파랑 계열이기 때문.
+
+### ⚠️ 이 시점 이전 색상 수치와 비교하지 말 것
+
+라벨이 20 → 14로 줄면 (a) 무작위 기준선이 5% → 7%로 오르고 (b) 병합은 정답을 뺏지 않고
+더하기만 하므로 정확도가 **단조 증가**한다. §8~§18-2의 모든 색상 수치는 19종 기준이라
+새 수치와 직접 비교가 성립하지 않는다. 재측정이 필요하다.
+
+### 은퇴 코드 매핑 (`color.RETIRED_COLOR_MAP`)
+
+| 은퇴 | 흡수 | 비고 |
+|---|---|---|
+| IVORY | WHITE | |
+| KHAKI | **GREEN** | 정답셋의 유일한 KHAKI(`vintage_t.png`)가 올리브색 빈티지 티 — 육안 확인 후 결정(BROWN/BEIGE 아님) |
+| SKYBLUE | BLUE | |
+| WINE | RED | |
+| SILVER | GRAY | |
+| GOLD | YELLOW | |
+
+정답셋 재라벨링: `vintage_t.png` KHAKI→GREEN, `skyblue_shirt.webp` SKYBLUE→BLUE,
+`levis_patch.jpg` 보조색 MULTI→MIXED. 실제 사진 17장 새 분포: BLUE 6 · NAVY 4 · WHITE 3 ·
+BLACK 2 · GREEN 1 · GRAY 1.
+
+### 반영 범위
+
+- `product-info-check/color.py` — `PALETTE`, `EN_COLOR_LABELS`, `EN_COLOR_SYNONYMS`,
+  `RETIRED_COLOR_MAP` 신설. **동의어는 흡수 대상으로 옮겼다**(ivory/cream → WHITE,
+  khaki/olive → GREEN 등) — 지우면 병합 이득이 프롬프트 단계에서 샌다.
+- `product-info-check/vlm_control.py` — 색상 프롬프트 v2/v3가 은퇴 코드를 구분하라고
+  지시하고 있었다(그대로 두면 팔레트 밖 코드를 생성). 남은 13종 기준으로 다시 썼다.
+- `worker/models/product_classifier/color.py` — 프로덕션 사본 동기화.
+- `crawl-collector/labels.py`·`color_hint.py`·테스트 — 크롤러 팔레트/색상어 사전 동기화.
+
+---
+
+## 20. 카테고리 taxonomy v2 — BE 확정 시드 반영(2026-08-03)
+
+`BE/docs/db/category-taxonomy.md`(원본 `seed.sql`)가 확정돼 taxonomy를 전면 갱신했다.
+이전까지는 시드가 커밋되기 전이라 ID를 역산 공식으로 **추정**하고 있었는데, 실제 표가
+생겼으므로 추정을 버렸다.
+
+### 바뀐 것
+
+| 항목 | v1 | v2 |
+|---|---|---|
+| 소분류 | 30종 | **35종** |
+| 대분류 | 6종 | **7종**(`DRESS_JUMPSUIT` 추가, 여성·공용에만) |
+| depth2 행 | (없음) | 20행(성별 x 대분류, id 4~23) |
+| depth3 행 | 90행 가정 | **103행**(남 33 / 여 35 / 공용 35, id 24~126) |
+
+- **개명 5건**: `T_SHIRT`→`TSHIRT`, `HOODIE_ZIP_UP`→`HOOD_ZIPUP`, `SHORTS`→`SHORT_PANTS`,
+  `LOAFER`→`DRESS_SHOES`, `SANDALS`→`SANDALS_SLIPPERS`
+- **삭제**: `VEST` — 시드에 없다. 크롤러는 비슷한 코드에 욱여넣지 않고 `unmapped`으로 남긴다
+- **추가 6건**: `PADDED_JACKET`, `SLEEVELESS`, `JOGGER_PANTS`, `COTTON_PANTS`, `DRESS`,
+  `JUMPSUIT`
+
+### ID 공식 폐기 — 균등 블록 가정이 깨졌다
+
+v1은 `base_id + gender_idx * 30 + sub_idx`로 성별 블록이 균등하다고 가정했다. **남성엔
+원피스·점프슈트가 없어서 33/35/35로 다르다** — 그대로 뒀으면 여성·공용 ID가 전부 2씩
+밀린 채 조용히 틀렸을 것이다. 지금은 "성별 순 → 대분류 순 → 소분류 순" 삽입 순서를
+그대로 재현하고, 문서 표의 실제 값(JACKET 24/57/92, JUMPSUIT 91/126 등)으로 import 시점에
+assert한다. 회귀 테스트는 `test/worker/product_classifier/test_product_classifier_taxonomy.py`.
+
+### 성별 축은 유지 — AI가 판별하지 않는다
+
+문서의 "사용 방법"은 AI가 성별도 판별하라고 적었지만, 2026-08-01 확정(폼에서 사용자 선택)을
+그대로 유지하기로 했다(사용자 재확인). 근거: (a) 평면 촬영 의류는 원리적으로 남/여 구분이
+안 되는 경우가 많고(UNISEX가 존재하는 이유), (b) 정답셋에 성별 라벨이 0건이라 검증 자체가
+불가능하다. **응답 계약은 그대로다** — 소분류 35-way로 예측 → `major_of()`로 대분류 역산 →
+폼에서 받은 성별과 조합해 depth2 id를 돌려준다. BE 요청서:
+`.claude/requests/be/005-category-gender-stays-in-form.md`.
+
+### 부수 효과 — 검수량이 줄었다
+
+`PADDED_JACKET`이 생기면서 크롤러의 "패딩" 카테고리가 **모호(needs_review) → 자동 확정**으로
+바뀌었다. v1에서는 패딩이 JACKET(ambiguous)/COAT로 갈려 통째로 사람 검수행이었다. 코드 하나
+추가가 실제로 라벨링 비용을 줄인 사례라 회귀 테스트로 고정해 뒀다.
+
+### 반영 범위
+
+`product-info-check/`의 `taxonomy.py`·`vlm_control.py`(프롬프트 코드명)·
+`data/ground_truth.json`(TSHIRT 6건, HOOD_ZIPUP 1건 재라벨링), `crawl-collector/`의
+`labels.py`·`mapping_rules.py`(신설 6종 규칙 + VEST 규칙 삭제)·테스트,
+`worker/models/product_classifier/taxonomy.py`, `test/worker/`의 taxonomy 테스트.
+
+**주의**: v1로 수집한 크롤링 JSONL은 자동 변환되지 않는다(`TAXONOMY_VERSION`이
+`v2-be-seed-2026-08-03`으로 바뀌었다) — 기존 산출물이 있으면 재수집하거나 코드를 손으로
+옮겨야 한다.
