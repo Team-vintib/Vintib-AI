@@ -32,6 +32,10 @@ interface MyDefaultTryOnImageResponse {
   defaultTryOnImageUrl: string | null
 }
 
+interface MyProfileApiDto extends Omit<MyProfile, 'defaultTryOnImageUrl'> {
+  defaultTryOnImageUrl?: string | null
+}
+
 interface UpdateMyInterestsRequest {
   brandIds: number[]
   categoryIds: number[]
@@ -166,14 +170,16 @@ const createEmptyMyPageViewData = (userId: number): MyPageViewData => ({
 export const getMyPageViewData = async (userId: number): Promise<MyPageViewData> => {
   const baseViewData = createEmptyMyPageViewData(userId)
 
-  const [wishesResult, productsResult, livesResult, notificationCountResult] =
+  const [profileResult, wishesResult, productsResult, livesResult, notificationCountResult] =
     await Promise.allSettled([
+      MY_API_ENABLED ? getMyProfile(userId) : Promise.resolve(null),
       MY_API_ENABLED ? getMyWishList(userId) : Promise.resolve(null),
       MY_API_ENABLED ? getMySellerProducts(userId) : Promise.resolve(null),
       MY_LIVE_API_ENABLED ? getMyHostLives(userId) : Promise.resolve(null),
       MY_API_ENABLED ? getUnreadNotificationCount(userId) : Promise.resolve(null),
     ])
 
+  const profile = getSettledValue(profileResult)
   const wishes = getSettledValue(wishesResult)
   const products = getSettledValue(productsResult)
   const lives = getSettledValue(livesResult)
@@ -187,6 +193,7 @@ export const getMyPageViewData = async (userId: number): Promise<MyPageViewData>
     wishMeta: wishes?.meta ?? EMPTY_PAGE_META,
     summary: {
       ...baseViewData.summary,
+      profile: profile ?? baseViewData.summary.profile,
       counts: {
         ...baseViewData.summary.counts,
         wishes: wishes?.items.length ?? 0,
@@ -201,7 +208,19 @@ export const getMyPageViewData = async (userId: number): Promise<MyPageViewData>
   }
 }
 
-export const getMyProfile = async (userId: number): Promise<MyProfile> => createEmptyProfile(userId)
+export const getMyProfile = async (userId: number): Promise<MyProfile> => {
+  if (!MY_API_ENABLED) {
+    return createEmptyProfile(userId)
+  }
+
+  const response = await http.get<ApiResponse<MyProfileApiDto>>(`/users/${userId}`)
+  const profile = unwrapApiData(response.data, '회원 정보를 불러오지 못했습니다.')
+
+  return {
+    ...profile,
+    defaultTryOnImageUrl: profile.defaultTryOnImageUrl ?? null,
+  }
+}
 
 const getMyWishList = async (userId: number) => {
   const response = await http.get<
