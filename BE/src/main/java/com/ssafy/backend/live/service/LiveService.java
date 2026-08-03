@@ -43,7 +43,10 @@ public class LiveService {
     private final List<LiveCleanupHook> cleanupHooks;
 
     // 공개 목록에는 예정·진행 중만 나온다. 종료·취소는 결과에서도 상태 필터에서도 빠진다.
-    private static final List<LiveStatus> PUBLIC_STATUSES = List.of(LiveStatus.SCHEDULED, LiveStatus.LIVE);
+    public static final List<LiveStatus> PUBLIC_STATUSES = List.of(LiveStatus.SCHEDULED, LiveStatus.LIVE);
+
+    // 마이페이지 라이브 관리(MY-005) — 본인 조회일 때는 종료·취소 이력까지 전부 본다.
+    public static final List<LiveStatus> ALL_STATUSES = List.of(LiveStatus.values());
 
     /**
      * 시청자 수 정렬에서 한 번에 고려하는 방송 수의 상한.
@@ -119,19 +122,18 @@ public class LiveService {
     }
 
     /**
-     * 공개 라이브 목록(LIVE-005). <b>비회원도 조회할 수 있다.</b>
-     *
-     * <p>공개 목록에는 예정·진행 중만 나온다 — 끝났거나 취소된 방송은 상태 필터 허용값에서도,
-     * 결과에서도 빠진다. 카테고리 필터는 편성 상품을 통해 걸리며, 대분류를 고르면 하위 소분류
-     * 상품을 건 방송까지 잡힌다.
+     * 라이브 목록(LIVE-005). <b>비회원도 조회할 수 있다.</b> {@code hostId}를 넘기면 그 호스트의
+     * 라이브만 걸러 마이페이지 라이브 관리(MY-005)로도 쓴다 — 허용 상태 범위(공개는 예정·진행
+     * 중만, 본인 조회는 종료·취소 포함 전체)는 호출부(컨트롤러)가 판단해 {@code statuses}로 확정해
+     * 넘긴다. 카테고리 필터는 편성 상품을 통해 걸리며, 대분류를 고르면 하위 소분류 상품을 건
+     * 방송까지 잡힌다.
      *
      * @param categoryIds 비어 있으면 카테고리 필터를 걸지 않는다
-     * @param status      null이면 예정·진행 중 모두
+     * @param hostId      null이면 호스트 필터를 걸지 않는다
+     * @param statuses    조회 대상 상태 목록(컨트롤러가 이미 공개/본인 조회 여부에 맞게 확정한 값)
      */
-    public PageResponse<LiveListItemResponse> getPublicLives(
-            List<Long> categoryIds, LiveStatus status, LiveListSort sort, int page, int size) {
-        List<LiveStatus> statuses = status == null ? PUBLIC_STATUSES : List.of(status);
-
+    public PageResponse<LiveListItemResponse> getLives(
+            List<Long> categoryIds, Long hostId, List<LiveStatus> statuses, LiveListSort sort, int page, int size) {
         boolean filterByCategory = categoryIds != null && !categoryIds.isEmpty();
         List<Long> productIds = filterByCategory
                 ? liveProductService.findProductIdsInCategories(categoryIds)
@@ -141,12 +143,15 @@ public class LiveService {
             return PageResponse.from(Page.empty(PageRequest.of(page, size)));
         }
 
+        boolean filterByHost = hostId != null;
+
         if (sort.isInMemory()) {
-            return getPublicLivesByViewerCount(statuses, filterByCategory, productIds, page, size);
+            return getLivesByViewerCount(statuses, filterByCategory, productIds, filterByHost, hostId, page, size);
         }
 
         Page<Live> lives = liveRepository.findPublicLives(
-                statuses, filterByCategory, productIds, PageRequest.of(page, size, sort.toSort()));
+                statuses, filterByCategory, productIds, filterByHost, hostId,
+                PageRequest.of(page, size, sort.toSort()));
 
         List<Long> liveIds = idsOf(lives.getContent());
         Map<Long, List<CategorySummary>> categoriesByLiveId =
@@ -166,12 +171,15 @@ public class LiveService {
      * 전체 개수가 아니라 <b>실제로 정렬 대상이 된 수</b>다 — 전체 개수를 내려보내면 도달할 수 없는
      * 페이지가 있다고 알려주는 셈이 된다.
      */
-    private PageResponse<LiveListItemResponse> getPublicLivesByViewerCount(
-            List<LiveStatus> statuses, boolean filterByCategory, List<Long> productIds, int page, int size) {
+    private PageResponse<LiveListItemResponse> getLivesByViewerCount(
+            List<LiveStatus> statuses, boolean filterByCategory, List<Long> productIds,
+            boolean filterByHost, Long hostId, int page, int size) {
         List<Live> candidates = liveRepository.findPublicLives(
                         statuses,
                         filterByCategory,
                         productIds,
+                        filterByHost,
+                        hostId,
                         PageRequest.of(0, MAX_VIEWERS_SORT_CANDIDATES, LiveListSort.VIEWERS_DESC.toSort()))
                 .getContent();
 

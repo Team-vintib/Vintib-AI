@@ -83,7 +83,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-                        // 상품 상세 조회(PROD-006)는 비회원도 가능. POST /api/products(등록)는 인증 필요로 남긴다.
+                        // 상품 목록·상세 조회(PROD-006, PROD-008)는 비회원도 가능. 목록은 sellerId 필터로
+                        // 공개 프로필의 판매자 상품 목록에도 쓰인다(011 §3.5). POST /api/products(등록)는
+                        // 인증 필요로 남긴다.
+                        .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/{id}").permitAll()
                         // 라이브 목록·시청 조회(LIVE-005)는 비회원도 가능. 개설·상태 전이는 인증 필요로 남긴다.
                         .requestMatchers(HttpMethod.GET, "/api/lives").permitAll()
@@ -98,6 +101,9 @@ public class SecurityConfig {
                         // 팔로우/해제(FOLLOW-001)는 인증 필요로 남긴다(anyRequest().authenticated()에 걸림).
                         .requestMatchers(HttpMethod.GET, "/api/users/{userId}/followers").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/users/{userId}/followings").permitAll()
+                        // 공개 회원/판매자 프로필 조회(011 §3.3)도 비회원 가능. 본인 전용 조회인
+                        // GET /api/users/{id}(MY-001)와는 별개 경로라 이 규칙에 영향 없다.
+                        .requestMatchers(HttpMethod.GET, "/api/users/{userId}/profile").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

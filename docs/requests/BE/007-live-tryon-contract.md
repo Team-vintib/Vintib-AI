@@ -10,12 +10,6 @@
 
 ## 2. 현재 연동 상태
 
-- 연동 완료 API
-  - `GET /api/lives`
-  - `GET /api/lives/{liveId}`
-  - `POST /api/lives`
-  - `POST /api/lives/schedule`
-  - `GET`/`PUT`/`DELETE /api/users/{userId}/tryon`, `POST /api/users/{userId}/tryon/upload-url`(시착 프로필)
 - FE 구현 완료 범위
   - 라이브 목록 화면
   - 라이브 상세/시청 화면
@@ -56,33 +50,6 @@
     "totalElements": 1,
     "totalPages": 1,
     "hasNext": false
-  },
-  "error": null
-}
-```
-
-### 3.2 영상 token 발급
-
-- Method / Endpoint: `POST /api/lives/{liveId}/video-token`
-- 요청 목적: 호스트 방송 송출 또는 시청 권한에 필요한 영상 서비스 토큰을 발급한다.
-- FE 사용처: `LiveCreatePage.vue`, `LiveWatchPage.vue`
-- 요청 데이터
-  - Header: `Authorization: Bearer {accessToken}`
-  - Path: `liveId`
-  - Body: role 정책 필요 시 `role`: `HOST` | `VIEWER`
-- 응답 데이터
-  - `token`: string
-  - `expiresAt`: string(datetime)
-  - `roomId` 또는 `channelName`: string
-- 응답 예시
-
-```json
-{
-  "success": true,
-  "data": {
-    "token": "video-token",
-    "roomId": "live-1",
-    "expiresAt": "2026-07-31T13:00:00"
   },
   "error": null
 }
@@ -169,8 +136,6 @@
 ## 6. 협의 필요 사항
 
 - FE·BE 간 결정이 필요한 내용
-  - 영상 token provider와 응답 필드명
-  - 호스트/시청자 token 발급 정책
   - 생성용 상품 조회 필터 기준
   - AI 시착 결과 polling 또는 STOMP push 방식
 - 아직 확정되지 않은 응답 구조나 정책
@@ -180,12 +145,5 @@
 
 ## 7. 추가 요청 없음
 
-- 이미 정상 연동된 API
-  - `GET /api/lives`
-  - `GET /api/lives/{liveId}`
-  - `POST /api/lives`
-  - `POST /api/lives/schedule`
-  - 시착 프로필 조회/등록·수정/삭제, 업로드 URL 발급
-- 기존 규격을 유지하면 되는 기능
-  - 라이브 목록/상세 기본 렌더링
-  - 시착 프로필 API — `docs/requests/FE/009-tryon-profile-presigned-upload.md` 기준 유지
+- 이미 정상 연동된 API: 없음
+- 기존 규격을 유지하면 되는 기능: 없음

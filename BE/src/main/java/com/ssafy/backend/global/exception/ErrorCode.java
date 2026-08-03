@@ -26,6 +26,7 @@ public enum ErrorCode {
     NICKNAME_ALREADY_TAKEN(HttpStatus.CONFLICT, "U012", "이미 사용 중인 닉네임입니다."),
     MEMBER_FORBIDDEN(HttpStatus.FORBIDDEN, "U013", "본인의 정보만 수정할 수 있습니다."),
     ONBOARDING_BASIC_INFO_REQUIRED(HttpStatus.BAD_REQUEST, "U014", "기본 정보를 먼저 등록해주세요."),
+    MEMBER_IMAGE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "U015", "업로드가 확인되지 않았습니다. 먼저 이미지를 업로드해주세요."),
 
     // [라이브/채팅]
     LIVE_NOT_FOUND(HttpStatus.NOT_FOUND, "L001", "진행 중이거나 예약된 라이브가 없습니다."),
@@ -52,6 +53,18 @@ public enum ErrorCode {
     INSUFFICIENT_POINTS(HttpStatus.BAD_REQUEST, "W001", "포인트 잔액이 부족합니다."),
     WITHDRAWAL_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "W002", "출금 가능 금액을 초과했습니다."),
     INVALID_ORDER_STATE(HttpStatus.BAD_REQUEST, "O001", "현재 상태에서는 해당 처리를 할 수 없습니다."),
+    ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "O002", "존재하지 않는 주문입니다."),
+
+    // [사업자]
+    BUSINESS_CERTIFICATE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "B001", "업로드가 확인되지 않았습니다. 먼저 사업자등록증을 업로드해주세요."),
+    BUSINESS_INFO_FORBIDDEN(HttpStatus.FORBIDDEN, "B002", "본인의 사업자 정보만 처리할 수 있습니다."),
+    BUSINESS_INFO_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "B003", "이미 제출했거나 승인된 사업자 정보입니다."),
+
+    // [세금계산서]
+    INVOICE_ALREADY_ISSUED(HttpStatus.CONFLICT, "I001", "이미 발행된 세금계산서입니다."),
+    INVOICE_NOT_FOUND(HttpStatus.NOT_FOUND, "I002", "발행된 세금계산서가 없습니다."),
+    INVOICE_ISSUER_NOT_APPROVED_BUSINESS(HttpStatus.BAD_REQUEST, "I003", "판매자가 사업자 인증을 완료해야 세금계산서를 발행할 수 있습니다."),
+    INVOICE_FORBIDDEN(HttpStatus.FORBIDDEN, "I004", "본인이 거래 당사자인 주문만 처리할 수 있습니다."),
 
     // [AI 가상 시착]
     TRYON_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "T001", "가상 시착 프로필이 등록되지 않았습니다."),

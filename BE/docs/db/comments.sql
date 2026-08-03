@@ -38,7 +38,9 @@ COMMENT ON COLUMN member_body_profile.hip_cm         IS '엉덩이둘레(cm).';
 
 COMMENT ON TABLE business_info IS '사업자 인증 정보 (BIZ-001).';
 COMMENT ON COLUMN business_info.business_number     IS '사업자등록번호.';
-COMMENT ON COLUMN business_info.certificate_url     IS '사업자등록증 사본 URL.';
+COMMENT ON COLUMN business_info.business_name       IS '상호명.';
+COMMENT ON COLUMN business_info.representative_name IS '대표자명.';
+COMMENT ON COLUMN business_info.certificate_key     IS '사업자등록증 사본 S3 key(비공개 버킷).';
 COMMENT ON COLUMN business_info.verification_status IS 'PENDING | APPROVED | REJECTED';
 
 
@@ -141,6 +143,14 @@ COMMENT ON COLUMN orders.auto_confirm_at IS '자동 구매 확정 예정 시각(
 COMMENT ON TABLE order_shipment IS '배송지·송장 정보 (SHIP-*). 주문 1건당 1행.';
 COMMENT ON COLUMN order_shipment.courier         IS '택배사. 송장 등록 전에는 NULL.';
 COMMENT ON COLUMN order_shipment.tracking_number IS '운송장 번호. 판매자가 등록한다.';
+
+COMMENT ON TABLE invoice IS '세금계산서 (BIZ-002). 주문당 1건, 발행 시점 사업자 정보를 스냅샷으로 저장.';
+COMMENT ON COLUMN invoice.business_number      IS '발행 시점 판매자 사업자등록번호(스냅샷).';
+COMMENT ON COLUMN invoice.business_name        IS '발행 시점 판매자 상호명(스냅샷).';
+COMMENT ON COLUMN invoice.representative_name  IS '발행 시점 판매자 대표자명(스냅샷).';
+COMMENT ON COLUMN invoice.supply_amount        IS '공급가액. round(orders.order_price / 1.1).';
+COMMENT ON COLUMN invoice.tax_amount           IS '부가세. orders.order_price - supply_amount.';
+COMMENT ON COLUMN invoice.total_amount         IS '합계금액. orders.order_price와 동일.';
 COMMENT ON COLUMN order_shipment.delivered_at    IS '배송 완료 시각. orders.auto_confirm_at 계산 기준.';
 
 
@@ -162,6 +172,8 @@ COMMENT ON COLUMN notification.is_read  IS '읽음 여부. 알림함 기본 조�
 -- ---------- 나머지 컬럼 ----------
 COMMENT ON COLUMN member.phone_number      IS '연락처. 배송·정산 확인용이며 외부 노출 금지.';
 COMMENT ON COLUMN member.profile_image_url IS '프로필 이미지 URL.';
+COMMENT ON COLUMN member.description       IS '소개글. 공개 프로필에 노출된다.';
+COMMENT ON COLUMN member.cover_image_url   IS '커버 이미지 URL. 공개 프로필에 노출된다.';
 
 COMMENT ON COLUMN brand.name    IS '브랜드명. 중복 불가.';
 COMMENT ON COLUMN brand.name_en IS '브랜드 영문명. 없는 브랜드는 NULL.';
