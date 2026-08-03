@@ -6,9 +6,11 @@ import logoImage from '@/assets/images/logo.png'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import NotificationPopup from '@/domains/notification/components/NotificationPopup.vue'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
+import { getPointBalance } from '@/domains/point/api/pointApi'
 import { ROUTE_NAMES, ROUTE_PATHS, type RoutePath } from '@/shared/constants/routes'
 
 import type { NotificationItem } from '@/domains/notification/types/notification.types'
+import type { PointBalance } from '@/domains/point/types/point.types'
 
 interface UserActionItem {
   label: string
@@ -35,9 +37,15 @@ const isAuthenticated = computed(() => authStore.isAuthenticated)
 const canShowNotificationAction = computed(() => isAuthenticated.value)
 const displayName = computed(() => authStore.user?.name || authStore.user?.email || '회원')
 const profileInitial = computed(() => displayName.value.slice(0, 1).toUpperCase())
-const cartItemCount = computed<number | null>(() => null)
+const pointBalance = ref<PointBalance | null>(null)
 const isLoggingOut = ref(false)
 const isNotificationPopupOpen = ref(false)
+let pointBalanceRequestId = 0
+
+const currentUserId = computed(() => authStore.user?.id ?? null)
+const pointLabel = computed(() =>
+  pointBalance.value ? `${pointBalance.value.available.toLocaleString('ko-KR')}P` : '0P',
+)
 
 const primaryMenuItems = [
   { label: '라이브', path: ROUTE_PATHS.LIVE_LIST, authRequired: false },
@@ -52,22 +60,14 @@ const primaryMenuItems = [
 
 const userActionItems = computed<UserActionItem[]>(() => [
   { label: '찜', icon: 'heart', path: ROUTE_PATHS.MY, query: { section: 'wishlist' }, badge: '' },
-  {
-    label: '장바구니',
-    icon: 'cart',
-    path: ROUTE_PATHS.MY,
-    query: { section: 'cart' },
-    badge: cartItemCount.value ?? '',
-  },
 ])
 
 const profileMenuItems = computed<ProfileMenuItem[]>(() => [
   { label: '마이페이지', path: ROUTE_PATHS.MY },
-  { label: 'AI 시착', path: ROUTE_PATHS.MY, query: { section: 'tryon' } },
+  { label: '시착 정보', path: ROUTE_PATHS.MY, query: { section: 'tryon' } },
   { label: '구매 내역', path: ROUTE_PATHS.MY, query: { section: 'orders' } },
   { label: '판매 내역', path: ROUTE_PATHS.MY, query: { section: 'sales' } },
   { label: '찜한 상품', path: ROUTE_PATHS.MY, query: { section: 'wishlist' } },
-  { label: '장바구니', path: ROUTE_PATHS.MY, query: { section: 'cart' } },
   { label: '포인트', path: ROUTE_PATHS.POINT },
 ])
 
@@ -139,6 +139,22 @@ const handleLogout = async () => {
   }
 }
 
+const loadPointBalance = async (userId: number) => {
+  const requestId = ++pointBalanceRequestId
+
+  try {
+    const balance = await getPointBalance(userId)
+
+    if (requestId === pointBalanceRequestId) {
+      pointBalance.value = balance
+    }
+  } catch {
+    if (requestId === pointBalanceRequestId) {
+      pointBalance.value = null
+    }
+  }
+}
+
 const handleNotificationButtonClick = async () => {
   isNotificationPopupOpen.value = !isNotificationPopupOpen.value
 
@@ -181,6 +197,21 @@ watch(
   },
   { immediate: true },
 )
+
+watch(
+  currentUserId,
+  (userId) => {
+    pointBalanceRequestId += 1
+
+    if (!userId) {
+      pointBalance.value = null
+      return
+    }
+
+    void loadPointBalance(userId)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -207,13 +238,23 @@ watch(
 
         <button
           v-if="isAuthenticated"
+          class="global-nav__menu-item"
+          :class="{ 'global-nav__menu-item--active': isActivePath(ROUTE_PATHS.TRYON) }"
+          type="button"
+          @click="goToPath(ROUTE_PATHS.TRYON, { authRequired: true })"
+        >
+          AI 시착
+        </button>
+
+        <button
+          v-if="isAuthenticated"
           class="global-nav__points"
           :class="{ 'global-nav__points--active': isActivePath(ROUTE_PATHS.POINT) }"
           type="button"
-          aria-label="포인트"
+          :aria-label="`보유 포인트 ${pointLabel}`"
           @click="goToPath(ROUTE_PATHS.POINT, { authRequired: true })"
         >
-          포인트
+          {{ pointLabel }}
         </button>
       </nav>
 
@@ -241,33 +282,6 @@ watch(
                   stroke-width="1.8"
                   stroke-linecap="round"
                   stroke-linejoin="round"
-                />
-              </svg>
-              <svg
-                v-else-if="item.icon === 'cart'"
-                class="global-nav__icon-svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M6.2 6.4h15.1l-1.7 8.1H8L6.2 6.4Z"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  stroke-linejoin="round"
-                />
-                <path
-                  d="M3 4.5h2.3l.9 1.9"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-                <path
-                  d="M9.2 18.8h.1M18.2 18.8h.1"
-                  stroke="currentColor"
-                  stroke-width="2.8"
-                  stroke-linecap="round"
                 />
               </svg>
               <template v-else>{{ item.icon }}</template>
@@ -385,7 +399,6 @@ watch(
       </div>
     </div>
   </header>
-
 </template>
 
 <style scoped lang="scss">

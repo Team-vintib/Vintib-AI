@@ -23,7 +23,7 @@ import type {
 } from '@/domains/product/types/productList.types'
 import { normalizeApiError } from '@/shared/api/http'
 import AppSearchBar from '@/shared/components/AppSearchBar.vue'
-import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
+import { ROUTE_NAMES } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const router = useRouter()
@@ -123,19 +123,6 @@ const loadProducts = async () => {
 
   try {
     await authStore.validateStoredSession()
-
-    if (!authStore.isAuthenticated) {
-      products.value = []
-      totalProductCount.value = 0
-      totalPageCount.value = 1
-      likedProductIds.value = new Set()
-      productLoadError.value = '상품 목록을 보려면 로그인이 필요합니다.'
-      await router.push({
-        name: ROUTE_NAMES.AUTH_LOGIN,
-        query: { redirect: ROUTE_PATHS.PRODUCT_LIST },
-      })
-      return
-    }
 
     const response = await getProductList({
       categoryIds: selectedCategoryIds.value,

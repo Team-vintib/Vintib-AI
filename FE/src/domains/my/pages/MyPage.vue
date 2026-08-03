@@ -753,13 +753,13 @@ const handleTryOnImageChange = async (event: Event) => {
 
   if (file.size > 5 * 1024 * 1024) {
     tryOnProfileSaveState.value = 'error'
-    tryOnProfileMessage.value = 'AI 시착용 사진은 5MB 이하로 선택해 주세요.'
+    tryOnProfileMessage.value = '시착용 사진은 5MB 이하로 선택해 주세요.'
     input.value = ''
     return
   }
 
   try {
-    tryOnImagePreviewUrl.value = await readImageFileAsDataUrl(file, 'AI 시착용 사진을 읽지 못했습니다.')
+    tryOnImagePreviewUrl.value = await readImageFileAsDataUrl(file, '시착용 사진을 읽지 못했습니다.')
     selectedTryOnImageFile.value = file
     isTryOnImageRemoved.value = false
     selectedTryOnImageName.value = file.name
@@ -885,7 +885,7 @@ const submitTryOnProfileForm = async () => {
     selectedTryOnImageName.value = ''
     isTryOnImageRemoved.value = false
     tryOnProfileSaveState.value = 'success'
-    tryOnProfileMessage.value = 'AI 시착 정보가 저장되었습니다.'
+    tryOnProfileMessage.value = '시착 정보가 저장되었습니다.'
   } catch (error) {
     tryOnProfileSaveState.value = 'error'
     tryOnProfileMessage.value = normalizeApiError(error).message
@@ -916,7 +916,7 @@ const deleteTryOnProfile = async () => {
     }
     syncTryOnProfileForm()
     tryOnProfileSaveState.value = 'success'
-    tryOnProfileMessage.value = 'AI 시착 정보를 삭제했습니다.'
+    tryOnProfileMessage.value = '시착 정보를 삭제했습니다.'
   } catch (error) {
     tryOnProfileSaveState.value = 'error'
     tryOnProfileMessage.value = normalizeApiError(error).message
@@ -1402,7 +1402,7 @@ onMounted(() => {
                   </div>
                   <div class="my-profile-photo__body">
                     <strong>프로필 사진</strong>
-                    <p>마이페이지와 판매자 정보에 표시되는 사진입니다. AI 시착용 사진과 별도로 관리됩니다.</p>
+                    <p>마이페이지와 판매자 정보에 표시되는 사진입니다. 시착용 사진과 별도로 관리됩니다.</p>
                     <p v-if="selectedProfileImageName" class="my-profile-photo__file">
                       {{ selectedProfileImageName }}
                     </p>
@@ -1538,11 +1538,11 @@ onMounted(() => {
               <form class="my-profile-form" @submit.prevent="submitTryOnProfileForm">
                 <div class="my-card__title">
                   <div>
-                    <h2>AI 시착 정보</h2>
-                    <p>상품 상세와 라이브 AI 시착에서 사용할 전신 사진과 신체 기준입니다.</p>
+                    <h2>시착 정보</h2>
+                    <p>상품 상세와 라이브 시착에서 사용할 전신 사진과 신체 기준입니다.</p>
                   </div>
                   <button type="submit" :disabled="isTryOnProfileSaving">
-                    {{ isTryOnProfileSaving ? '저장 중' : 'AI 시착 정보 저장' }}
+                    {{ isTryOnProfileSaving ? '저장 중' : '시착 정보 저장' }}
                   </button>
                 </div>
 
@@ -1555,7 +1555,7 @@ onMounted(() => {
                 </p>
 
                 <div v-if="tryOnProfileLoadState === 'loading'" class="my-state">
-                  AI 시착 정보를 불러오는 중입니다.
+                  시착 정보를 불러오는 중입니다.
                 </div>
 
                 <div class="my-tryon-photo">
@@ -1563,13 +1563,13 @@ onMounted(() => {
                     <img
                       v-if="tryOnImageDisplayUrl"
                       :src="tryOnImageDisplayUrl"
-                      :alt="`${profile.name} AI 시착용 사진 미리보기`"
+                      :alt="`${profile.name} 시착용 사진 미리보기`"
                     />
                     <span v-else>{{ profileInitial }}</span>
                   </div>
                   <div class="my-tryon-photo__body">
                     <strong>전신 사진</strong>
-                    <p>상품과 라이브의 AI 시착 합성에 사용하는 기준 사진입니다. JPG, PNG, WebP 이미지를 5MB 이하로 업로드할 수 있습니다.</p>
+                    <p>상품과 라이브 시착 합성에 사용하는 기준 사진입니다. JPG, PNG, WebP 이미지를 5MB 이하로 업로드할 수 있습니다.</p>
                     <p v-if="selectedTryOnImageName" class="my-tryon-photo__file">
                       {{ selectedTryOnImageName }}
                     </p>
@@ -1592,7 +1592,7 @@ onMounted(() => {
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     class="my-tryon-photo__input"
-                    aria-label="AI 시착용 전신 사진 선택"
+                    aria-label="시착용 전신 사진 선택"
                     @change="handleTryOnImageChange"
                   />
                 </div>

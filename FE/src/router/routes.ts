@@ -153,6 +153,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: '알림센터' },
   },
   {
+    path: ROUTE_PATHS.TRYON,
+    name: ROUTE_NAMES.TRYON,
+    component: () => import('@/domains/tryon/pages/TryOnPage.vue'),
+    meta: { requiresAuth: true, title: 'AI 시착' },
+  },
+  {
     path: ROUTE_PATHS.MY,
     name: ROUTE_NAMES.MY,
     component: () => import('@/domains/my/pages/MyPage.vue'),
