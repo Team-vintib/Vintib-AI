@@ -1,29 +1,50 @@
 package com.ssafy.backend.order.controller;
 
 import com.ssafy.backend.global.response.ApiResponse;
+import com.ssafy.backend.order.dto.request.OrderCreateRequest;
 import com.ssafy.backend.order.dto.response.OrderListItemResponse;
 import com.ssafy.backend.order.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-// 주문 단건 리소스(MY-003 상세). 경로에 userId가 없어 requireSelf 패턴 대신 서비스 내부
+// 주문 리소스(/api/orders). 경로에 userId가 없어 requireSelf 패턴 대신 서비스 내부
 // Order.isPartyOf(principal)에 권한 확인을 위임한다(InvoiceController와 동일한 이유).
-@Tag(name = "주문(Orders)", description = "주문 조회 API")
+@Tag(name = "주문(Orders)", description = "주문 생성/조회 API")
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
 public class OrderController {
 
     private final OrderService orderService;
+
+    @Operation(summary = "상시 판매 즉시구매(SALE-002)",
+            description = "상시 판매(ON_SALE) 상품을 즉시 구매한다. 결제는 포인트로만 처리되며, "
+                    + "결제 금액은 즉시 tradeEscrow(거래 대금 보관)로 옮겨진다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "주문 생성 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잔액 부족, 구매 불가 상품, 자기 상품 구매 등"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않는 상품")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping
+    public ResponseEntity<ApiResponse<OrderListItemResponse>> createOrder(
+            Authentication authentication, @Valid @RequestBody OrderCreateRequest request) {
+        Long memberId = (Long) authentication.getPrincipal();
+        return ResponseEntity.ok(ApiResponse.success(orderService.createOrder(memberId, request)));
+    }
 
     @Operation(summary = "주문 상세 조회",
             description = "주문 1건을 상세 조회한다(MY-003). 해당 주문의 구매자/판매자만 조회할 수 있다.")

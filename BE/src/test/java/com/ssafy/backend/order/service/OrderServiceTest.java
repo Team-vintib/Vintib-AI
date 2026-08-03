@@ -2,18 +2,25 @@ package com.ssafy.backend.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
+import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.order.dto.request.OrderCreateRequest;
 import com.ssafy.backend.order.dto.request.OrderRole;
 import com.ssafy.backend.order.dto.response.OrderListItemResponse;
 import com.ssafy.backend.order.entity.Order;
 import com.ssafy.backend.order.entity.OrderStatus;
 import com.ssafy.backend.order.repository.OrderRepository;
+import com.ssafy.backend.point.service.PointService;
 import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,9 +38,19 @@ class OrderServiceTest {
     private static final Long BUYER_ID = 1L;
     private static final Long SELLER_ID = 2L;
     private static final Long ORDER_ID = 10L;
+    private static final Long PRODUCT_ID = 20L;
 
     @Mock
     private OrderRepository orderRepository;
+
+    @Mock
+    private ProductRepository productRepository;
+
+    @Mock
+    private MemberRepository memberRepository;
+
+    @Mock
+    private PointService pointService;
 
     @Mock
     private Order order;
@@ -51,7 +68,13 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository);
+        orderService = new OrderService(orderRepository, productRepository, memberRepository, pointService);
+    }
+
+    private Product realDirectSaleProduct() {
+        Product real = Product.builder().seller(seller).categoryId(1L).title("빈티지 자켓").build();
+        real.registerDirectSale(50_000L);
+        return real;
     }
 
     private void stubOrderFields() {
@@ -138,5 +161,33 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.getOrderDetail(ORDER_ID, outsiderId))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVOICE_FORBIDDEN);
+    }
+
+    @Test
+    void 상시_판매_상품을_구매하면_주문이_생성되고_결제된다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        Product realProduct = realDirectSaleProduct();
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(realProduct));
+        when(memberRepository.findById(BUYER_ID)).thenReturn(Optional.of(buyer));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderListItemResponse response = orderService.createOrder(BUYER_ID, new OrderCreateRequest(PRODUCT_ID));
+
+        assertThat(response.orderPrice()).isEqualTo(50_000L);
+        assertThat(response.status()).isEqualTo("PAID");
+        assertThat(realProduct.getSaleStatus().name()).isEqualTo("SOLD");
+        verify(pointService).pay(eq(BUYER_ID), eq(50_000L), any());
+    }
+
+    @Test
+    void 본인_상품은_구매할_수_없다() {
+        when(seller.getId()).thenReturn(BUYER_ID);
+        Product realProduct = realDirectSaleProduct();
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(realProduct));
+
+        assertThatThrownBy(() -> orderService.createOrder(BUYER_ID, new OrderCreateRequest(PRODUCT_ID)))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SELF_PURCHASE_NOT_ALLOWED);
     }
 }

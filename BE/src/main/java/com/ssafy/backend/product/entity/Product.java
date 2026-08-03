@@ -179,6 +179,16 @@ public class Product extends BaseTimeEntity {
         this.deletedAt = LocalDateTime.now();
     }
 
+    /** 상시 판매 즉시구매 대상인지 확인한다(SALE-002). 경매 상품이나 품절 상품은 구매할 수 없다. */
+    public boolean isAvailableForDirectPurchase() {
+        return saleType == SaleType.DIRECT_SALE && saleStatus == SaleStatus.ON_SALE;
+    }
+
+    /** 즉시구매 완료 처리(SALE-002). 재고가 1개뿐인 중고 상품이라 판매 완료로 바로 넘어간다. */
+    public void markSold() {
+        this.saleStatus = SaleStatus.SOLD;
+    }
+
     public boolean isOwnedBy(Long memberId) {
         return memberId != null && seller.getId().equals(memberId);
     }

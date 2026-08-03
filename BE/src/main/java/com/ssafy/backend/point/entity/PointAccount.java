@@ -21,9 +21,8 @@ import lombok.NoArgsConstructor;
  *
  * <p>잔액을 상태 컬럼이 아니라 버킷별로 나눠 들고 있다({@code available/bidHeld/tradeEscrow/
  * settling/withdrawing}) — 기능정의서 §4.9 포인트 상태 6종을 잔액 버킷으로 구현한 것이다.
- * 입찰 보류(bidHeld)·거래 대금 보관(tradeEscrow)·정산 대기(settling)는 경매/주문 트랜잭션이
- * 실제로 발생해야 채워지는데, 이번 범위(MY-007)에는 그 트리거가 없어 항상 0이다 —
- * {@link #charge}(충전)/{@link #withdraw}(출금)로 {@code available}만 오간다.
+ * 입찰 보류(bidHeld)는 경매 입찰이 아직 없어(AUCT-003 이후) 항상 0이다. 거래 대금 보관(tradeEscrow)은
+ * {@link #pay}(주문 결제)로 채워진다.
  */
 @Entity
 @Table(name = "point_account")
@@ -78,6 +77,13 @@ public class PointAccount {
     public void withdraw(long amount) {
         this.available -= amount;
         this.withdrawing += amount;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /** 주문 결제(SALE-002) — 잔액 검증은 서비스가 미리 한다. available을 줄이고 tradeEscrow로 옮겨 보관한다. */
+    public void pay(long amount) {
+        this.available -= amount;
+        this.tradeEscrow += amount;
         this.updatedAt = LocalDateTime.now();
     }
 }
