@@ -19,7 +19,16 @@ services:
       - "443:443"
       - "443:443/udp"   # HTTP/3
     volumes:
-      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # ⚠️ 파일 하나가 아니라 **디렉터리**를 마운트한다.
+      #
+      # 리눅스에서 파일 단위 bind mount 는 그 시점의 inode 에 묶인다. 배포 때 rsync 가
+      # 임시 파일에 쓴 뒤 rename 하면 **새 inode** 가 되는데, 컨테이너는 여전히 옛 inode 를
+      # 보고 있어서 `caddy reload` 를 해도 옛 설정을 다시 읽는다. 그래서 Caddyfile 을 고쳐
+      # 배포해도 반영되지 않았다(-514).
+      #
+      # 디렉터리를 마운트하면 파일은 열 때마다 새로 해석되므로 rename 교체가 그대로 보인다.
+      # Caddy 의 기본 설정 경로가 /etc/caddy/Caddyfile 이라 command 는 바꿀 필요가 없다.
+      - ./infra/caddy:/etc/caddy:ro
       - caddy-data:/data      # 발급받은 인증서 영속화 (Let's Encrypt 레이트리밋 회피)
       - caddy-config:/config
     depends_on:

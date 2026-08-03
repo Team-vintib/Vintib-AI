@@ -69,10 +69,13 @@ CREATE TABLE member_body_profile (
 );
 
 -- 사업자 정보 (BIZ-001)
+-- certificate_key: 비공개(private) 버킷 S3 key. presigned GET으로만 열림 — member_body_profile.body_photo_key와 동일한 이유.
 CREATE TABLE business_info (
     member_id            BIGINT PRIMARY KEY REFERENCES member (id),
     business_number      VARCHAR(20)  NOT NULL,
-    certificate_url      VARCHAR(500) NOT NULL,
+    business_name        VARCHAR(100) NOT NULL,
+    representative_name  VARCHAR(50)  NOT NULL,
+    certificate_key      VARCHAR(500) NOT NULL,
     verification_status  VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
     submitted_at         TIMESTAMPTZ  NOT NULL DEFAULT now(),
     verified_at          TIMESTAMPTZ,
@@ -436,6 +439,22 @@ CREATE TABLE order_shipment (
     tracking_number VARCHAR(50),
     shipped_at      TIMESTAMPTZ,
     delivered_at    TIMESTAMPTZ
+);
+
+-- 세금계산서 (BIZ-002). 법적 문서라 발행 시점 사업자 정보를 스냅샷으로 저장한다 —
+-- 이후 판매자가 business_info를 바꿔도 이미 발행된 계산서는 바뀌지 않는다.
+-- 주문당 1건만 허용(uq_invoice_order) — 취소/재발행은 범위 밖.
+CREATE TABLE invoice (
+    id                   BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    order_id             BIGINT      NOT NULL REFERENCES orders (id),
+    business_number      VARCHAR(20)  NOT NULL,
+    business_name        VARCHAR(100) NOT NULL,
+    representative_name  VARCHAR(50)  NOT NULL,
+    supply_amount        BIGINT      NOT NULL,  -- 공급가액
+    tax_amount           BIGINT      NOT NULL,  -- 부가세
+    total_amount         BIGINT      NOT NULL,  -- 합계금액 (= order.order_price)
+    issued_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_invoice_order UNIQUE (order_id)
 );
 
 

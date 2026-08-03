@@ -201,6 +201,28 @@ bash infra/ec2/setup-udp-buffer.sh
 sudo docker restart vintib-livekit
 ```
 
+### ⚠️ Caddyfile은 **디렉터리**로 마운트한다 (S15P11A108-514)
+
+`docker-compose.prod.yml`이 `./infra/caddy:/etc/caddy:ro`로 **디렉터리 전체**를 마운트한다. 파일 하나(`./infra/caddy/Caddyfile:/etc/caddy/Caddyfile`)를 마운트하면 안 된다.
+
+**리눅스에서 파일 단위 bind mount는 그 시점의 inode에 묶인다.** 배포 때 `rsync`가 임시 파일에 쓴 뒤 rename하면 **새 inode**가 되는데, 컨테이너는 여전히 옛 inode를 본다. 그래서 Caddyfile을 고쳐 배포해도 반영되지 않는다.
+
+**증상이 고약하다** — `caddy reload`가 그 옛 파일을 성실히 다시 읽고 **성공을 보고한다.** 종료 코드만 보면 정상이라 배포가 "성공"으로 끝나는데 라우팅은 옛 설정이다. FE 첫 배포 때 이 문제로 수동 `docker restart vintib-caddy`가 필요했다.
+
+디렉터리를 마운트하면 파일이 열 때마다 새로 해석되므로 rename 교체가 그대로 보인다.
+
+> Docker Desktop for Windows에서는 파일 공유가 경로 기반이라 **이 문제가 재현되지 않는다.** 로컬에서 잘 된다고 EC2에서 된다고 믿으면 안 된다.
+
+### 배포 스크립트가 반영 여부를 직접 대조한다
+
+`deploy.sh`는 reload 종료 코드를 믿지 않고 **호스트 파일과 컨테이너가 보는 파일의 md5를 비교**한다.
+
+| 상황 | 동작 |
+| --- | --- |
+| md5 일치 | `caddy reload` (무중단) |
+| **md5 불일치** | `docker restart vintib-caddy` — reload로는 못 고친다 |
+| reload 실패(문법 오류 등) | 경고만. 재시작하면 Caddy가 아예 못 뜰 수 있어 옛 설정으로 서비스를 계속한다 |
+
 ### `.env`는 `ubuntu` 계정으로 읽을 수 없다
 
 배포 스크립트가 `umask 077`(600)로 만들고 **GitLab 러너 사용자 소유**다. 시크릿이 들어 있어 의도한 것이다. `docker compose` 명령은 `.env`를 읽으므로 **`sudo`를 붙여야 한다.**
