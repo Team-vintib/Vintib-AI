@@ -2,18 +2,20 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import {
-  LIVE_AUCTION_MOCK_RESULT,
-  LIVE_AUCTION_MOCK_STATES,
-} from '@/domains/auction/constants/liveAuctionMockData'
+import { LIVE_AUCTION_MOCK_STATES } from '@/domains/auction/constants/liveAuctionMockData'
 import LiveAuctionPanel from '@/domains/auction/components/LiveAuctionPanel.vue'
-import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import { issueLiveVideoToken } from '@/domains/live/api/liveControlApi'
 import {
+  isLiveRealtimeApiEnabled,
+  LiveRealtimeClient,
+} from '@/domains/live/api/liveRealtimeClient'
+import {
+  cancelLiveReminder,
   getLiveWatchViewData,
   isLiveWatchApiEnabled,
   LiveWatchNotFoundError,
+  registerLiveReminder,
 } from '@/domains/live/api/liveWatchApi'
 import LiveProductQueue from '@/domains/live/components/LiveProductQueue.vue'
 import LiveSelectedProduct from '@/domains/live/components/LiveSelectedProduct.vue'
@@ -28,6 +30,8 @@ import LiveLayout from '@/shared/layouts/LiveLayout.vue'
 
 import type { LiveAuctionMockState } from '@/domains/auction/types/liveAuction.types'
 import type {
+  CurrentProductMessage,
+  LiveStatusMessage,
   LiveWatchLoadState,
   LiveWatchMockScenario,
   LiveWatchViewData,
@@ -53,11 +57,30 @@ const selectedProductId = ref<number | null>(null)
 const isFollowing = ref(false)
 const wishedProductIds = ref<number[]>([])
 const isTryOnOpen = ref(false)
-const isAuctionResultDismissed = ref(false)
 const now = ref(Date.now())
 const videoConnectionLabel = ref('')
 const apiEnabled = isLiveWatchApiEnabled()
+
+const handleToggleReminder = async () => {
+  if (!live.value) {
+    return
+  }
+
+  const next = !live.value.isReminderSet
+  live.value.isReminderSet = next
+
+  try {
+    const result = next
+      ? await registerLiveReminder(live.value.id)
+      : await cancelLiveReminder(live.value.id)
+    live.value.isReminderSet = result.isReminderSet
+  } catch {
+    live.value.isReminderSet = !next
+  }
+}
+const realtimeEnabled = isLiveRealtimeApiEnabled()
 let loadRequestId = 0
+let realtimeClient: LiveRealtimeClient | null = null
 
 const getRouteLiveId = () => {
   const routeValue = Array.isArray(route.params.liveId) ? route.params.liveId[0] : route.params.liveId
@@ -83,16 +106,6 @@ const auctionMockState = computed<LiveAuctionMockState>(() => {
     ? (queryValue as LiveAuctionMockState)
     : 'BIDDABLE'
 })
-
-// 경매 종료 후 낙찰 축하 연출(AUCT-013). 지금은 mock 트리거(?auction=won).
-// 실제 낙찰 확정/실시간 트리거는 BE 낙찰 결과·STOMP 연결 후 대체 → docs/requests/BE/009.
-const isAuctionResultVisible = computed(
-  () => false,
-)
-
-const dismissAuctionResult = () => {
-  isAuctionResultDismissed.value = true
-}
 
 const tryOnMockScenario = computed<LiveTryOnMockScenario>(() => {
   const queryValue = Array.isArray(route.query.tryon)
@@ -147,10 +160,10 @@ const loadLiveWatch = async () => {
   const liveId = getRouteLiveId()
   const scenario = getMockScenario()
 
+  disconnectRealtime()
   live.value = null
   selectedProductId.value = null
   isTryOnOpen.value = false
-  isAuctionResultDismissed.value = false
   loadState.value = 'loading'
   errorMessage.value = ''
   videoConnectionLabel.value = ''
@@ -177,6 +190,7 @@ const loadLiveWatch = async () => {
 
     if (response.status === 'LIVE') {
       void loadVideoToken(response.id)
+      connectRealtime(response.id)
     }
   } catch (error) {
     if (requestId !== loadRequestId) return
@@ -249,6 +263,80 @@ const loadVideoToken = async (liveId: number) => {
   }
 }
 
+// 방송 상태·현재 상품 전파 구독. 채팅/반응/시청자수는 LiveChatOverlay가 별도 클라이언트로
+// 관리하므로 여기서 건드리지 않는다.
+const connectRealtime = (liveId: number) => {
+  disconnectRealtime()
+
+  if (!realtimeEnabled) return
+
+  realtimeClient = new LiveRealtimeClient({
+    onConnect: () => subscribeRealtime(liveId),
+  })
+  realtimeClient.connect()
+}
+
+const subscribeRealtime = (liveId: number) => {
+  if (!realtimeClient) return
+
+  realtimeClient.subscribe(`/topic/lives/${liveId}/status`, (body) => {
+    if (isLiveStatusMessage(body)) {
+      applyStatusMessage(body)
+    }
+  })
+
+  realtimeClient.subscribe(`/topic/lives/${liveId}/product`, (body) => {
+    if (isCurrentProductMessage(body)) {
+      applyCurrentProductMessage(body)
+    }
+  })
+}
+
+const disconnectRealtime = () => {
+  realtimeClient?.disconnect()
+  realtimeClient = null
+}
+
+// ENDED·CANCELED면 status만 갱신해 기존 종료 상태 UI(헤더 배지·영상 안내)로 전환한다.
+const applyStatusMessage = (message: LiveStatusMessage) => {
+  if (!live.value || message.liveId !== live.value.id) return
+
+  if (message.status === 'ENDED' || message.status === 'CANCELED') {
+    live.value = {
+      ...live.value,
+      status: message.status,
+      endedAt: message.endedAt ?? live.value.endedAt,
+    }
+    disconnectRealtime()
+  }
+}
+
+// 현재 소개 상품 ID만 갱신 → 상품 큐 NOW 배지가 이동한다. 사용자의 선택은 바꾸지 않는다.
+const applyCurrentProductMessage = (message: CurrentProductMessage) => {
+  if (!live.value || message.liveId !== live.value.id) return
+
+  live.value = {
+    ...live.value,
+    currentProductId: message.currentProductId,
+  }
+}
+
+function isLiveStatusMessage(body: unknown): body is LiveStatusMessage {
+  return Boolean(
+    body &&
+      typeof body === 'object' &&
+      'liveId' in body &&
+      'status' in body &&
+      typeof (body as LiveStatusMessage).status === 'string',
+  )
+}
+
+function isCurrentProductMessage(body: unknown): body is CurrentProductMessage {
+  return Boolean(
+    body && typeof body === 'object' && 'liveId' in body && 'currentProductId' in body,
+  )
+}
+
 watch(
   () => [route.params.liveId, route.query.mock],
   () => {
@@ -263,10 +351,6 @@ watch(isTryOnAvailable, (isAvailable) => {
   }
 })
 
-watch(auctionMockState, () => {
-  isAuctionResultDismissed.value = false
-})
-
 const elapsedTimer = window.setInterval(() => {
   now.value = Date.now()
 }, 1000)
@@ -274,6 +358,7 @@ const elapsedTimer = window.setInterval(() => {
 onBeforeUnmount(() => {
   loadRequestId += 1
   window.clearInterval(elapsedTimer)
+  disconnectRealtime()
 })
 </script>
 
@@ -341,7 +426,10 @@ onBeforeUnmount(() => {
               :connection-label="videoConnectionLabel"
               :try-on-disabled="!isTryOnAvailable"
               :try-on-open="isTryOnOpen"
+              :show-reminder="live.status === 'SCHEDULED'"
+              :reminder-active="live.isReminderSet"
               @open-try-on="openTryOn"
+              @toggle-reminder="handleToggleReminder"
             >
               <template #overlay>
                 <LiveChatOverlay
@@ -360,14 +448,6 @@ onBeforeUnmount(() => {
               :product="selectedProduct"
               :mock-scenario="tryOnMockScenario"
               @close="isTryOnOpen = false"
-            />
-
-            <LiveAuctionResultOverlay
-              v-if="isAuctionResultVisible"
-              :winner-nickname="LIVE_AUCTION_MOCK_RESULT.winnerNickname"
-              :winning-bid="LIVE_AUCTION_MOCK_RESULT.winningBid"
-              :product-title="selectedProduct?.title ?? null"
-              @close="dismissAuctionResult"
             />
           </div>
 

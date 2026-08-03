@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { registerLiveReminder } from '@/domains/live/api/liveWatchApi'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 
 import type { LiveListItem } from '@/domains/live/types/liveList.types'
@@ -9,6 +11,13 @@ import type { LiveListItem } from '@/domains/live/types/liveList.types'
 const props = defineProps<{
   live: LiveListItem
 }>()
+
+const router = useRouter()
+const route = useRoute()
+const authStore = useAuthStore()
+const isReminderPending = ref(false)
+const isReminderSet = ref(false)
+const actionMessage = ref('')
 
 const statusLabel = computed(() => {
   if (props.live.status === 'LIVE') {
@@ -47,13 +56,80 @@ const broadcastLabel = computed(() => {
 
   return `${formattedDate} 종료`
 })
+
+const canEnterLive = computed(() => props.live.status === 'LIVE')
+const isScheduledLive = computed(() => props.live.status === 'SCHEDULED')
+const isEndedLive = computed(() => props.live.status === 'ENDED')
+const actionLabel = computed(() => {
+  if (canEnterLive.value) return '입장하기'
+  if (isScheduledLive.value) return isReminderSet.value ? '예약 완료' : '예약하기'
+  return '종료된 라이브'
+})
+
+const goToLive = async () => {
+  if (!canEnterLive.value) {
+    return
+  }
+
+  await router.push({ name: ROUTE_NAMES.LIVE_WATCH, params: { liveId: props.live.id } })
+}
+
+const reserveLive = async () => {
+  if (!isScheduledLive.value || isReminderPending.value || isReminderSet.value) {
+    return
+  }
+
+  await authStore.validateStoredSession()
+
+  if (!authStore.isAuthenticated) {
+    await router.push({
+      name: ROUTE_NAMES.AUTH_LOGIN,
+      query: { redirect: route.fullPath },
+    })
+    return
+  }
+
+  isReminderPending.value = true
+  actionMessage.value = ''
+
+  try {
+    const result = await registerLiveReminder(props.live.id)
+    isReminderSet.value = result.isReminderSet
+    actionMessage.value = '예약 알림을 신청했습니다.'
+  } catch {
+    actionMessage.value = '예약하지 못했습니다.'
+  } finally {
+    isReminderPending.value = false
+  }
+}
+
+const handleCardClick = () => {
+  void goToLive()
+}
+
+const handleActionClick = () => {
+  if (canEnterLive.value) {
+    void goToLive()
+    return
+  }
+
+  void reserveLive()
+}
 </script>
 
 <template>
-  <RouterLink
+  <article
     class="live-list-card"
-    :to="{ name: ROUTE_NAMES.LIVE_WATCH, params: { liveId: live.id } }"
-    :aria-label="`${live.title}, ${statusLabel} 방송 보기`"
+    :class="{
+      'live-list-card--clickable': canEnterLive,
+      'live-list-card--ended': isEndedLive,
+    }"
+    :role="canEnterLive ? 'link' : undefined"
+    :tabindex="canEnterLive ? 0 : undefined"
+    :aria-label="canEnterLive ? `${live.title}, ${statusLabel} 방송 입장` : undefined"
+    @click="handleCardClick"
+    @keydown.enter.prevent="handleCardClick"
+    @keydown.space.prevent="handleCardClick"
   >
     <span class="live-list-card__media">
       <img class="live-list-card__image" :src="live.thumbnailUrl" :alt="`${live.title} 썸네일`" />
@@ -70,8 +146,23 @@ const broadcastLabel = computed(() => {
         <span aria-hidden="true">●</span>
         시청자 {{ live.viewerCount.toLocaleString('ko-KR') }}명
       </span>
+      <button
+        class="live-list-card__action"
+        type="button"
+        :class="{
+          'live-list-card__action--outline': isScheduledLive,
+          'live-list-card__action--disabled': isEndedLive,
+        }"
+        :disabled="isEndedLive || isReminderPending || isReminderSet"
+        @click.stop="handleActionClick"
+      >
+        {{ isReminderPending ? '처리 중' : actionLabel }}
+      </button>
+      <span v-if="actionMessage" class="live-list-card__message" role="status">
+        {{ actionMessage }}
+      </span>
     </span>
-  </RouterLink>
+  </article>
 </template>
 
 <style scoped lang="scss">
@@ -88,15 +179,23 @@ const broadcastLabel = computed(() => {
     transform 160ms ease;
 }
 
-.live-list-card:hover {
+.live-list-card--clickable {
+  cursor: pointer;
+}
+
+.live-list-card--clickable:hover {
   border-color: var(--color-border-strong);
   box-shadow: 0 10px 26px rgb(18 18 18 / 8%);
   transform: translateY(-2px);
 }
 
-.live-list-card:focus-visible {
+.live-list-card--clickable:focus-visible {
   outline: 3px solid var(--color-primary);
   outline-offset: 4px;
+}
+
+.live-list-card--ended {
+  opacity: 0.86;
 }
 
 .live-list-card__media {
@@ -114,7 +213,7 @@ const broadcastLabel = computed(() => {
   transition: transform 220ms ease;
 }
 
-.live-list-card:hover .live-list-card__image {
+.live-list-card--clickable:hover .live-list-card__image {
   transform: scale(1.02);
 }
 
@@ -194,6 +293,39 @@ const broadcastLabel = computed(() => {
 .live-list-card__viewer span {
   color: var(--color-live);
   font-size: 8px;
+}
+
+.live-list-card__action {
+  justify-self: start;
+  min-width: 104px;
+  height: 40px;
+  margin-top: var(--space-2);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-primary);
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+}
+
+.live-list-card__action--outline {
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+
+.live-list-card__action--disabled,
+.live-list-card__action:disabled {
+  border-color: var(--color-border);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.live-list-card__message {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: 20px;
 }
 
 @media (max-width: 640px) {

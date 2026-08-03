@@ -98,11 +98,13 @@ export const routes: RouteRecordRaw[] = [
     path: ROUTE_PATHS.BIZ_VERIFY,
     name: ROUTE_NAMES.BIZ_VERIFY,
     component: () => import('@/domains/biz/pages/BusinessVerificationPage.vue'),
+    meta: { requiresAuth: true, title: '사업자 인증' },
   },
   {
     path: ROUTE_PATHS.BIZ_VERIFY_PENDING,
     name: ROUTE_NAMES.BIZ_VERIFY_PENDING,
     component: () => import('@/domains/biz/pages/BusinessVerificationPendingPage.vue'),
+    meta: { requiresAuth: true, title: '사업자 인증 대기' },
   },
   {
     path: ROUTE_PATHS.LIVE_LIST,
@@ -129,6 +131,36 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: '상품 등록' },
   },
   {
+    path: ROUTE_PATHS.PROFILE_ME,
+    name: ROUTE_NAMES.PROFILE_ME,
+    component: () => import('@/domains/profile/pages/ProfilePage.vue'),
+    meta: { requiresAuth: true, title: '프로필' },
+  },
+  {
+    path: ROUTE_PATHS.PROFILE_FOLLOWERS,
+    name: ROUTE_NAMES.PROFILE_FOLLOWERS,
+    component: () => import('@/domains/profile/pages/FollowListPage.vue'),
+    meta: { title: '팔로워' },
+  },
+  {
+    path: ROUTE_PATHS.PROFILE_FOLLOWING,
+    name: ROUTE_NAMES.PROFILE_FOLLOWING,
+    component: () => import('@/domains/profile/pages/FollowListPage.vue'),
+    meta: { title: '팔로잉' },
+  },
+  {
+    path: ROUTE_PATHS.PROFILE,
+    name: ROUTE_NAMES.PROFILE,
+    component: () => import('@/domains/profile/pages/ProfilePage.vue'),
+    meta: { title: '프로필' },
+  },
+  {
+    path: ROUTE_PATHS.WISHLIST,
+    name: ROUTE_NAMES.WISHLIST,
+    component: () => import('@/domains/my/pages/WishlistPage.vue'),
+    meta: { requiresAuth: true, title: '찜한 상품' },
+  },
+  {
     path: ROUTE_PATHS.LIVE_CREATE,
     name: ROUTE_NAMES.LIVE_CREATE,
     component: () => import('@/domains/live/pages/LiveCreatePage.vue'),
@@ -153,10 +185,23 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: '알림센터' },
   },
   {
+    path: ROUTE_PATHS.TRYON,
+    name: ROUTE_NAMES.TRYON,
+    component: () => import('@/domains/tryon/pages/TryOnPage.vue'),
+    meta: { requiresAuth: true, title: 'AI 시착' },
+  },
+  {
     path: ROUTE_PATHS.MY,
     name: ROUTE_NAMES.MY,
     component: () => import('@/domains/my/pages/MyPage.vue'),
-    meta: { requiresAuth: true, title: '마이페이지' },
+    beforeEnter: (to) => {
+      if (!to.query.section) {
+        return { name: ROUTE_NAMES.PROFILE_ME }
+      }
+
+      return true
+    },
+    meta: { requiresAuth: true, title: '프로필 관리' },
   },
   {
     path: ROUTE_PATHS.MY_ORDER_DETAIL,

@@ -1,5 +1,14 @@
 export type ProductSaleType = 'DIRECT' | 'AUCTION'
 
+export type ProductSaleStatus =
+  | 'DRAFT'
+  | 'ON_SALE'
+  | 'AUCTION_SCHEDULED'
+  | 'AUCTION_IN_PROGRESS'
+  | 'AUCTION_FAILED'
+  | 'SOLD'
+  | 'PRIVATE'
+
 export type ProductSortOption = 'LATEST' | 'PRICE_ASC' | 'PRICE_DESC'
 
 export type ProductConditionGrade = 'S' | 'A' | 'B' | 'C'
@@ -11,9 +20,12 @@ export interface ProductListItem {
   price: number
   conditionGrade: ProductConditionGrade
   saleType: ProductSaleType
+  saleStatus?: ProductSaleStatus
+  categoryId?: number | null
+  categoryName?: string | null
   imageUrl: string
   imageAlt: string
-  isLiked: boolean
+  isLiked?: boolean
 }
 
 export interface ProductFilterOption {

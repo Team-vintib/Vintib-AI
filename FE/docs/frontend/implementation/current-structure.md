@@ -1,6 +1,6 @@
 # 현재 프로젝트 구조
 
-확인일: 2026-07-30
+확인일: 2026-08-03
 
 ## 기술 스택
 
@@ -144,6 +144,19 @@ src/
       constants/
       pages/
       types/
+    profile/
+      api/
+        profileApi.ts
+      components/
+        FollowButton.vue
+        FollowUserItem.vue
+      pages/
+        FollowListPage.vue
+        ProfilePage.vue
+      stores/
+        followStore.ts
+      types/
+        profile.types.ts
     notification/
       api/
         notificationApi.ts
@@ -161,6 +174,7 @@ src/
         notification.types.ts
     product/
       api/
+        productApi.ts
         productDetailApi.ts
         productRegistrationApi.ts
       components/
@@ -182,6 +196,8 @@ src/
         ProductDetailView.vue
         ProductListView.vue
         ProductRegistrationPage.vue
+      stores/
+        wishStore.ts
       types/
         productDetail.types.ts
         productList.types.ts
@@ -281,6 +297,7 @@ src/
         myMockData.ts
       pages/
         MyPage.vue
+        WishlistPage.vue
       types/
         my.types.ts
   router/
@@ -376,7 +393,7 @@ docs/
 
 - 라우터는 `router/routes.ts`로 route 배열을 분리했으며 AUTH-001~AUTH-004 후보,
   ONBOARD-001~ONBOARD-004, BIZ-001·BIZ-001-2, HOME, FOLLOWING_HOME placeholder,
-  LIVE_LIST·LIVE_CREATE·LIVE_WATCH 실제 화면, 공개 PROD-008 route가 등록되어 있습니다.
+  LIVE_LIST·LIVE_CREATE·LIVE_WATCH 실제 화면, 공개 PROD-008 route, 찜 목록 `/wishlist` route가 등록되어 있습니다.
 - `router/index.ts`에는 `requiresAuth`, `guestOnly` 메타 기반 인증 guard가 구현되어 있습니다.
 - `App.vue`는 `RouterView`만 렌더링합니다.
 - 기능 ID prefix 기준 도메인 폴더와 공통 폴더가 생성되어 있습니다.
@@ -389,7 +406,7 @@ docs/
   분기, 공통 검색바 기반 홈 검색 패널, 섹션 shell, 공통 홈 hero/content 카드, 라이브 카드, 상품 카드,
   화면 확인용 mock 데이터와 `HomeViewData` view model 타입이 구현되어 있습니다.
   `homeViewApi.ts`는 현재 mock 데이터를 반환하는 adapter 자리이며, `HomePage`는
-  loading/error/retry 상태를 처리합니다.
+  loading/error/retry 상태와 wish API 기반 상품 찜 토글을 처리합니다.
   실제 HOME API 계약이 확정되면 adapter 내부를 HTTP 호출과 응답 매핑으로 교체합니다.
 - `domains/product`에는 PROD-008 상품 목록 View, S15P11A108-408·410·412 상품 상세 UI,
   S15P11A108-409·411·414 상품 등록 화면이 구현되어 있습니다. 상품 목록은 실사형 로컬 WebP를
@@ -403,9 +420,15 @@ docs/
   상태를 구분하며 mock adapter에서 데이터를 받습니다. 상품 등록은 `/products/new`에서 사진 등록,
   기본 정보, 사이즈/소재, 상태/하자와 AI 품질 검증, 가격, 검토, 완료 7단계를 제공하고 단계별
   필수값·이미지·가격·등록 실패 상태를 처리합니다. 등록 완료는 `productRegistrationApi.ts` mock
-  adapter를 통해 확인합니다. 상품 이미지 presigned 업로드와 찜 API 계약은 FE API 문서에 반영됐고,
+  adapter를 통해 확인합니다. `productApi.ts`는 상품 목록/카테고리/브랜드/찜 등록·해제와 상품 카드
+  목록 모델 매핑을 담당합니다. `wishStore.ts`는 상품 목록·홈·검색·상세·찜 목록에서 공유하는 찜 여부
+  상태를 관리합니다. 상품 이미지 presigned 업로드와 찜 API 계약은 FE API 문서에 반영됐고,
   실제 상품 등록 확장·이미지 역할·AI 품질 검증·가격 추천·경매 등록 계약은
   `.codex/requests/be/006-product-contract.md` 확정 후 adapter 내부를 교체합니다.
+- `domains/my`에는 마이페이지와 독립 찜 목록 페이지가 구현되어 있습니다. `WishlistPage.vue`는
+  `GET /api/users/{userId}/wishes`를 직접 조회해 상품명/브랜드 검색, 카테고리·상태·가격 필터,
+  `전체 / 즉시 구매 / 경매 예정` 탭, 찜 해제를 제공하며 이미지 URL이 비어 있으면 상품 상세 API에서
+  등록된 대표 이미지를 보조 조회합니다.
 - `domains/live`에는 S15P11A108-413·415·418 공개 라이브 목록 View, 진행 중·예정 상태 카드,
   로컬 이미지 기반 mock 데이터와 라이브 시청 route 연결, 카테고리·방송 상태 필터,
   최신 방송·시청자·제목 정렬과 초기화가 구현되어 있습니다. 라이브 목록 검색바는 통합 검색
@@ -449,6 +472,8 @@ docs/
 - `domains/my`에는 마이페이지 요약, 프로필, AI 시착, 판매 상품, 주문/판매 내역, 라이브, 찜/팔로우, 사업자 섹션을 표시하는 1차 화면이 구현되어 있습니다.
   `/my`에서 `section` query를 기준으로 섹션을 전환하고, 실제 마이페이지 API 계약 확정 전까지 `VITE_MY_API_ENABLED=false` 기본값으로 mock fallback을 사용합니다.
   단, 라이브 섹션은 라이브 목록과 동일하게 `VITE_LIVE_LIST_API_ENABLED`가 `false`가 아니면 `/lives`를 조회한 뒤 현재 사용자 `hostId` 기준으로 필터링합니다.
+- `domains/profile`에는 공개 프로필 화면, 팔로워·팔로잉 목록 화면, 공통 팔로우 버튼과 팔로우 상태 store가 구현되어 있습니다.
+  `/profile/me`, `/profile/:userId`, `/profile/:userId/followers`, `/profile/:userId/following`에서 공개 프로필·팔로우 API를 사용합니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.
 - `shared/api/authTokenStorage.ts`에는 local/session storage 기반 인증 토큰 저장 유틸이 구현되어 있습니다.
 - `shared/api/mockInterestStorage.ts`와 `mockProfileMediaStorage.ts`에는 온보딩·마이페이지 mock fallback에서 공유하는 관심 정보와 프로필/AI 시착용 사진 저장 유틸이 구현되어 있습니다.
@@ -457,9 +482,9 @@ docs/
 
 ### 2026-07-28 검색 화면 반영
 
-- `domains/search`는 SEARCH-001/002 공개 route, 검색 결과 탭, 상품/라이브/회원 mock 결과 카드,
+- `domains/search`는 SEARCH-001/002 공개 route, 검색 결과 탭, 상품/라이브/사용자 결과 카드,
   카테고리·상태·가격·판매 유형 필터, loading/error/empty/filter-empty/price-error 상태 화면을 구현했습니다.
-- 검색어·탭·필터는 `/search` query 기반으로 동작하며, 실제 통합 검색 API 계약 확정 전까지
-  `searchMockData.ts`에서 클라이언트 필터링합니다.
+- 검색어·탭·필터는 `/search` query 기반으로 동작하며, 실제 `GET /api/search`의 `products/lives/users`
+  응답을 사용합니다. 사용자 결과는 공개 프로필 이동과 공통 팔로우 버튼을 제공합니다.
 - `src/assets/main.scss`에는 상품 목록과 검색 화면이 공유하는 필터 패널 폭, 본문/캡션/버튼 글자 크기,
   font-weight, line-height 토큰을 추가했습니다.

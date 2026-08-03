@@ -279,6 +279,8 @@ const handleSubmit = async () => {
       return
     }
 
+    authStore.updateUser({ nickname: form.nickname })
+
     await router.push({ name: ROUTE_NAMES.ONBOARD_INTERESTS })
   } catch (error: unknown) {
     if (axios.isAxiosError<ApiResponse<unknown>>(error)) {

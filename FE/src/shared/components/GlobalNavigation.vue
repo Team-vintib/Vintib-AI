@@ -4,11 +4,14 @@ import { useRoute, useRouter } from 'vue-router'
 
 import logoImage from '@/assets/images/logo.png'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { getMyProfile } from '@/domains/my/api/myApi'
 import NotificationPopup from '@/domains/notification/components/NotificationPopup.vue'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
+import { getPointBalance } from '@/domains/point/api/pointApi'
 import { ROUTE_NAMES, ROUTE_PATHS, type RoutePath } from '@/shared/constants/routes'
 
 import type { NotificationItem } from '@/domains/notification/types/notification.types'
+import type { PointBalance } from '@/domains/point/types/point.types'
 
 interface UserActionItem {
   label: string
@@ -33,11 +36,19 @@ authStore.hydrateSession()
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const canShowNotificationAction = computed(() => isAuthenticated.value)
-const displayName = computed(() => authStore.user?.name || authStore.user?.email || '회원')
+const profileNickname = ref('')
+const displayName = computed(() => authStore.user?.nickname || profileNickname.value || '회원')
 const profileInitial = computed(() => displayName.value.slice(0, 1).toUpperCase())
+const pointBalance = ref<PointBalance | null>(null)
 const cartItemCount = computed<number | null>(() => null)
 const isLoggingOut = ref(false)
 const isNotificationPopupOpen = ref(false)
+let pointBalanceRequestId = 0
+
+const currentUserId = computed(() => authStore.user?.id ?? null)
+const pointLabel = computed(() =>
+  pointBalance.value ? `${pointBalance.value.available.toLocaleString('ko-KR')}P` : '0P',
+)
 
 const primaryMenuItems = [
   { label: '라이브', path: ROUTE_PATHS.LIVE_LIST, authRequired: false },
@@ -51,7 +62,7 @@ const primaryMenuItems = [
 }>
 
 const userActionItems = computed<UserActionItem[]>(() => [
-  { label: '찜', icon: 'heart', path: ROUTE_PATHS.MY, query: { section: 'wishlist' }, badge: '' },
+  { label: '찜', icon: 'heart', path: ROUTE_PATHS.WISHLIST, badge: '' },
   {
     label: '장바구니',
     icon: 'cart',
@@ -62,13 +73,13 @@ const userActionItems = computed<UserActionItem[]>(() => [
 ])
 
 const profileMenuItems = computed<ProfileMenuItem[]>(() => [
-  { label: '마이페이지', path: ROUTE_PATHS.MY },
-  { label: 'AI 시착', path: ROUTE_PATHS.MY, query: { section: 'tryon' } },
+  { label: '프로필', path: ROUTE_PATHS.PROFILE_ME },
+  { label: '마이페이지', path: ROUTE_PATHS.MY, query: { section: 'dashboard' } },
+  { label: '시착 정보', path: ROUTE_PATHS.MY, query: { section: 'tryon' } },
   { label: '구매 내역', path: ROUTE_PATHS.MY, query: { section: 'orders' } },
   { label: '판매 내역', path: ROUTE_PATHS.MY, query: { section: 'sales' } },
-  { label: '찜한 상품', path: ROUTE_PATHS.MY, query: { section: 'wishlist' } },
+  { label: '라이브 관리', path: ROUTE_PATHS.MY, query: { section: 'lives' } },
   { label: '장바구니', path: ROUTE_PATHS.MY, query: { section: 'cart' } },
-  { label: '포인트', path: ROUTE_PATHS.POINT },
 ])
 
 const getRouteSection = () => {
@@ -139,6 +150,22 @@ const handleLogout = async () => {
   }
 }
 
+const loadPointBalance = async (userId: number) => {
+  const requestId = ++pointBalanceRequestId
+
+  try {
+    const balance = await getPointBalance(userId)
+
+    if (requestId === pointBalanceRequestId) {
+      pointBalance.value = balance
+    }
+  } catch {
+    if (requestId === pointBalanceRequestId) {
+      pointBalance.value = null
+    }
+  }
+}
+
 const handleNotificationButtonClick = async () => {
   isNotificationPopupOpen.value = !isNotificationPopupOpen.value
 
@@ -181,6 +208,46 @@ watch(
   },
   { immediate: true },
 )
+
+watch(
+  currentUserId,
+  (userId) => {
+    pointBalanceRequestId += 1
+
+    if (!userId) {
+      pointBalance.value = null
+      return
+    }
+
+    void loadPointBalance(userId)
+  },
+  { immediate: true },
+)
+
+watch(
+  currentUserId,
+  async (userId) => {
+    profileNickname.value = authStore.user?.nickname?.trim() || ''
+
+    if (!userId) {
+      profileNickname.value = ''
+      return
+    }
+
+    try {
+      const profile = await getMyProfile(userId)
+      const nickname = profile.nickname.trim()
+
+      if (nickname) {
+        profileNickname.value = nickname
+        authStore.updateUser({ nickname })
+      }
+    } catch {
+      profileNickname.value = authStore.user?.nickname?.trim() || ''
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -207,13 +274,23 @@ watch(
 
         <button
           v-if="isAuthenticated"
+          class="global-nav__menu-item"
+          :class="{ 'global-nav__menu-item--active': isActivePath(ROUTE_PATHS.TRYON) }"
+          type="button"
+          @click="goToPath(ROUTE_PATHS.TRYON, { authRequired: true })"
+        >
+          AI 시착
+        </button>
+
+        <button
+          v-if="isAuthenticated"
           class="global-nav__points"
           :class="{ 'global-nav__points--active': isActivePath(ROUTE_PATHS.POINT) }"
           type="button"
-          aria-label="포인트"
+          :aria-label="`보유 포인트 ${pointLabel}`"
           @click="goToPath(ROUTE_PATHS.POINT, { authRequired: true })"
         >
-          포인트
+          {{ pointLabel }}
         </button>
       </nav>
 
@@ -385,7 +462,6 @@ watch(
       </div>
     </div>
   </header>
-
 </template>
 
 <style scoped lang="scss">

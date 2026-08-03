@@ -63,7 +63,6 @@ const conditionStepTouched = reactive({
 const pricingStepTouched = reactive({
   saleType: false,
   directSalePrice: false,
-  auctionStartPrice: false,
 })
 const currentAiResultIndex = ref(0)
 const isAdditionalAiPhotoPickerOpen = ref(false)
@@ -215,7 +214,6 @@ const createInitialDraft = (): ProductRegistrationDraft => ({
   aiModelGender: null,
   saleType: 'DIRECT',
   directSalePrice: '',
-  auctionStartPrice: '',
   linkedLiveId: '',
 })
 
@@ -408,9 +406,6 @@ const getNumericInputValue = (event: Event) => {
 const updateDirectSalePrice = (event: Event) => {
   draft.directSalePrice = getNumericInputValue(event)
 }
-const updateAuctionStartPrice = (event: Event) => {
-  draft.auctionStartPrice = getNumericInputValue(event)
-}
 const maxPriceBucketCount = computed(() =>
   Math.max(...priceRecommendationBuckets.map((bucket) => bucket.productCount)),
 )
@@ -427,20 +422,11 @@ const pricingStepErrors = computed(() => ({
           ? ''
           : PRODUCT_REGISTRATION_VALIDATION_MESSAGES.priceInvalid
       : '',
-  auctionStartPrice:
-    pricingStepTouched.auctionStartPrice && draft.saleType === 'AUCTION'
-      ? !draft.auctionStartPrice.trim()
-        ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.auctionStartPriceRequired
-        : isPositivePrice(draft.auctionStartPrice)
-          ? ''
-          : PRODUCT_REGISTRATION_VALIDATION_MESSAGES.priceInvalid
-      : '',
 }))
 const isPricingStepValid = computed(
   () =>
     Boolean(draft.saleType) &&
-    (draft.saleType !== 'DIRECT' || isPositivePrice(draft.directSalePrice)) &&
-    (draft.saleType !== 'AUCTION' || isPositivePrice(draft.auctionStartPrice)),
+    (draft.saleType !== 'DIRECT' || isPositivePrice(draft.directSalePrice)),
 )
 const canShowBasicInfoSection = computed(() => isPhotoStepValid.value)
 const canShowAttributesSection = computed(
@@ -557,9 +543,7 @@ const completenessItems: ProductInfoCompletenessItem[] = [
     isCompleted: () =>
       draft.saleType === 'DIRECT'
         ? isPositivePrice(draft.directSalePrice)
-        : draft.saleType === 'AUCTION'
-          ? isPositivePrice(draft.auctionStartPrice)
-          : false,
+        : draft.saleType === 'AUCTION',
   },
   {
     id: 'description',
@@ -693,9 +677,7 @@ const productInfoCompletenessItems = computed<ProductInfoCompletenessItem[]>(() 
     isCompleted: () =>
       draft.saleType === 'DIRECT'
         ? isPositivePrice(draft.directSalePrice)
-        : draft.saleType === 'AUCTION'
-          ? isPositivePrice(draft.auctionStartPrice)
-          : false,
+        : draft.saleType === 'AUCTION',
   },
 ])
 
@@ -785,8 +767,8 @@ const selectedPriceLabel = computed(() => {
     return formatPrice(Number(draft.directSalePrice))
   }
 
-  if (draft.saleType === 'AUCTION' && isPositivePrice(draft.auctionStartPrice)) {
-    return formatPrice(Number(draft.auctionStartPrice))
+  if (draft.saleType === 'AUCTION') {
+    return '경매 예정'
   }
 
   return '-'
@@ -915,10 +897,13 @@ const addPhotos = (role: ProductRegistrationPhotoRole, files: File[]) => {
     draft.photos = draft.photos.filter((photo) => photo.role !== role)
     draft.photos.push(validPhotos[0])
 
-    if (draft.representativePhotoId && !draft.photos.some((photo) => photo.id === draft.representativePhotoId)) {
+    if (role === 'front') {
+      selectRepresentativePhoto(validPhotos[0].id)
+    } else if (draft.representativePhotoId && !draft.photos.some((photo) => photo.id === draft.representativePhotoId)) {
       draft.representativePhotoId = ''
     }
 
+    syncDefaultAiCheckPhotos()
     return
   }
 
@@ -939,6 +924,8 @@ const removePhoto = (photoId: string) => {
     draft.representativePhotoId = ''
   }
 
+  syncDefaultAiCheckPhotos()
+
   if (!isAiModelSettingsAvailable.value) {
     resetAiModelSettings()
   }
@@ -950,6 +937,21 @@ const selectRepresentativePhoto = (photoId: string) => {
     ...photo,
     isRepresentative: photo.id === photoId,
   }))
+}
+
+const syncDefaultAiCheckPhotos = () => {
+  const requiredPhotoIds = draft.photos
+    .filter((photo) => photo.role === 'front' || photo.role === 'back')
+    .map((photo) => photo.id)
+  const additionalSelectedPhotoIds = draft.aiCheckPhotoIds.filter((photoId) =>
+    draft.photos.some((photo) => photo.id === photoId && photo.role === 'additional'),
+  )
+
+  draft.aiCheckPhotoIds = [...requiredPhotoIds, ...additionalSelectedPhotoIds]
+  draft.aiPhotoResults = draft.aiPhotoResults.filter((result) =>
+    draft.aiCheckPhotoIds.includes(result.photoId),
+  )
+  currentAiResultIndex.value = Math.min(currentAiResultIndex.value, Math.max(draft.aiPhotoResults.length - 1, 0))
 }
 
 const selectConditionGrade = (conditionGrade: string) => {
@@ -1119,7 +1121,6 @@ const markCurrentStepTouched = () => {
   if (currentStep.value.id === 'pricing') {
     pricingStepTouched.saleType = true
     pricingStepTouched.directSalePrice = true
-    pricingStepTouched.auctionStartPrice = true
   }
 }
 
@@ -1226,7 +1227,6 @@ const resetRegistrationDraft = () => {
   conditionStepTouched.aiConfirmation = false
   pricingStepTouched.saleType = false
   pricingStepTouched.directSalePrice = false
-  pricingStepTouched.auctionStartPrice = false
   currentAiResultIndex.value = 0
   isAdditionalAiPhotoPickerOpen.value = false
   registeredProductId.value = ''
@@ -1899,7 +1899,7 @@ onBeforeUnmount(() => {
                   :class="{ 'product-registration__ai-photo--selected': draft.aiCheckPhotoIds.includes(photo.id) }"
                   type="button"
                   :aria-pressed="draft.aiCheckPhotoIds.includes(photo.id)"
-                  @click="toggleAiCheckPhoto(photo.id)"
+                  aria-disabled="true"
                 >
                   <img
                     :src="photo.previewUrl"
@@ -2185,35 +2185,7 @@ onBeforeUnmount(() => {
                 </span>
               </label>
 
-              <div v-if="draft.saleType === 'AUCTION'" class="product-registration__form-grid">
-                <label class="product-registration__field">
-                  <span>
-                    시작가
-                    <span class="product-registration__required" aria-hidden="true"> * </span>
-                    <span class="product-registration__required-text"> 필수 입력 </span>
-                  </span>
-                  <span class="product-registration__price-input">
-                    <input
-                      :value="draft.auctionStartPrice"
-                      inputmode="numeric"
-                      pattern="[0-9]*"
-                      placeholder="시작가를 입력해 주세요"
-                      required
-                      @input="updateAuctionStartPrice"
-                      @blur="pricingStepTouched.auctionStartPrice = true"
-                    />
-                    <span>P</span>
-                  </span>
-                  <span
-                    v-if="pricingStepErrors.auctionStartPrice"
-                    class="product-registration__field-error"
-                    role="alert"
-                  >
-                    {{ pricingStepErrors.auctionStartPrice }}
-                  </span>
-                </label>
 
-              </div>
             </section>
           </form>
 

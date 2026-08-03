@@ -102,7 +102,6 @@ export interface ProductRegistrationDraft {
   aiModelGender: ProductRegistrationAiModelGender | null
   saleType: ProductRegistrationSaleType | ''
   directSalePrice: string
-  auctionStartPrice: string
   linkedLiveId: string
 }
 

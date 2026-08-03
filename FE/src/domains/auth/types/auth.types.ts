@@ -35,6 +35,7 @@ export interface AuthUser {
   id: number
   email: string
   name?: string
+  nickname?: string
   onboardingCompleted?: boolean
 }
 

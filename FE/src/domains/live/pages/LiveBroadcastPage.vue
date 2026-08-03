@@ -6,7 +6,11 @@ import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionRe
 import SellerAuctionPanel from '@/domains/auction/components/SellerAuctionPanel.vue'
 import { LIVE_AUCTION_MOCK_RESULT } from '@/domains/auction/constants/liveAuctionMockData'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
-import { issueLiveVideoToken, updateLiveStatus } from '@/domains/live/api/liveControlApi'
+import {
+  issueLiveVideoToken,
+  patchCurrentProduct,
+  updateLiveStatus,
+} from '@/domains/live/api/liveControlApi'
 import {
   getLiveWatchViewData,
   isLiveWatchApiEnabled,
@@ -57,8 +61,9 @@ const endView = ref<'dashboard' | 'manage'>('dashboard')
 const now = ref(Date.now())
 const videoConnectionLabel = ref('')
 // 방송 상세는 시청자와 같은 GET /lives/{liveId} 실 API를 재사용한다(VITE_LIVE_WATCH_API_ENABLED).
-// 판매자 전용 상태(방송 소유자 여부·currentProductId 등)는 BE 미제공 → liveWatchApi에서 null/fallback.
-// (BE 확인 필요: docs/requests/BE/007 3.5, docs/requests/BE/013)
+// 소유자 판정(isHost)·현재 소개 상품(currentProductId)은 BE 016 §2.1·§2.5에서 제공된다.
+// isHost는 로그인 토큰이 실려야 채워지므로(비회원/비로그인은 false), host가 아니면 시청 페이지로 보낸다.
+// apiEnabled가 false인 mock 프리뷰에서는 isHost가 항상 false라 판매자 화면 가드/실 API 호출을 건너뛴다.
 const apiEnabled = isLiveWatchApiEnabled()
 let loadRequestId = 0
 
@@ -137,6 +142,13 @@ const loadLiveBroadcast = async () => {
 
     if (requestId !== loadRequestId) return
 
+    // 판매자 전용 화면. host가 아니면(로그인 안 됨 포함) 시청 페이지로 돌려보낸다(BE 016 §2.2).
+    // mock 프리뷰(apiEnabled=false)는 isHost가 항상 false이므로 가드를 건너뛴다.
+    if (apiEnabled && !response.isHost) {
+      void router.replace({ name: ROUTE_NAMES.LIVE_WATCH, params: { liveId } })
+      return
+    }
+
     live.value = response
     selectedProductId.value = response.currentProductId ?? response.products.at(0)?.id ?? null
     now.value = Date.now()
@@ -181,10 +193,10 @@ const goBack = () => {
   void router.push({ name: ROUTE_NAMES.LIVE_LIST })
 }
 
-// 판매자 제어(437/439). 서버 반영 계약이 아직 없어 로컬 상태(Mock 전용)만 바꾼다. — BE 확인 필요
-//   · 방송 종료: POST /lives/{liveId}/end
-//   · 현재 상품 전환: PATCH /lives/{liveId}/current-product
-// 실제 엔드포인트·시청자 전파(STOMP)는 docs/requests/BE/013 확정 후 연결한다.
+// 판매자 제어(437/439). BE 013/016으로 확정된 실 API에 연결한다.
+//   · 방송 종료: PATCH /lives/{liveId}/status (status ENDED) — 시청자 전파 /topic/lives/{id}/status
+//   · 현재 상품 전환: PATCH /lives/{liveId}/current-product — 시청자 전파 /topic/lives/{id}/product
+// mock 프리뷰(apiEnabled=false)에서는 로컬 상태만 바꾼다(BE 없음).
 const isEndConfirmOpen = ref(false)
 const transitionNotice = ref('')
 let transitionNoticeTimer: number | undefined
@@ -196,23 +208,51 @@ const canTransition = computed(
     selectedProductId.value !== live.value?.currentProductId,
 )
 
-const transitionToSelectedProduct = () => {
-  if (!live.value || !canTransition.value || selectedProductId.value === null) return
-
-  const nextProduct = live.value.products.find(
-    (product) => product.id === selectedProductId.value,
-  )
-
-  live.value = { ...live.value, currentProductId: selectedProductId.value }
-
-  transitionNotice.value = nextProduct
-    ? `‘${nextProduct.title}’(으)로 넘어갔습니다`
-    : '현재 상품을 전환했습니다'
+const showTransitionNotice = (message: string) => {
+  transitionNotice.value = message
 
   window.clearTimeout(transitionNoticeTimer)
   transitionNoticeTimer = window.setTimeout(() => {
     transitionNotice.value = ''
   }, 2600)
+}
+
+const transitionToSelectedProduct = async () => {
+  if (!live.value || !canTransition.value || selectedProductId.value === null) return
+  // 판매자 전용 액션. 실 API 모드에서는 host만 허용(비host는 이미 시청 화면으로 리다이렉트됨).
+  if (apiEnabled && !live.value.isHost) return
+
+  const liveId = live.value.id
+  const nextProductId = selectedProductId.value
+  const previousProductId = live.value.currentProductId
+  const nextProduct = live.value.products.find((product) => product.id === nextProductId)
+
+  // 낙관적 업데이트 — 성공하면 /topic/lives/{id}/product로도 같은 값이 되돌아온다.
+  live.value = { ...live.value, currentProductId: nextProductId }
+  showTransitionNotice(
+    nextProduct ? `‘${nextProduct.title}’(으)로 넘어갔습니다` : '현재 상품을 전환했습니다',
+  )
+
+  // mock 프리뷰에서는 BE가 없으므로 로컬 전환만 하고 끝낸다.
+  if (!apiEnabled) return
+
+  try {
+    const response = await patchCurrentProduct(liveId, nextProductId)
+
+    // 서버가 확정한 값으로 맞춘다(로드가 다시 돌아 live가 교체됐으면 건드리지 않는다).
+    if (live.value && live.value.id === liveId) {
+      live.value = { ...live.value, currentProductId: response.currentProductId }
+    }
+  } catch (error) {
+    // 실패하면 이전 소개 상품으로 되돌린다.
+    if (live.value && live.value.id === liveId) {
+      live.value = { ...live.value, currentProductId: previousProductId }
+    }
+
+    showTransitionNotice(
+      error instanceof Error ? error.message : '상품을 전환하지 못했습니다.',
+    )
+  }
 }
 
 const requestEndBroadcast = () => {
@@ -227,6 +267,8 @@ const cancelEndBroadcast = () => {
 
 const confirmEndBroadcast = async () => {
   if (!live.value) return
+  // 판매자 전용 액션. 실 API 모드에서는 host만 허용.
+  if (apiEnabled && !live.value.isHost) return
 
   try {
     const response = await updateLiveStatus(live.value.id, 'ENDED')
@@ -234,17 +276,22 @@ const confirmEndBroadcast = async () => {
     live.value = {
       ...live.value,
       status: response.status,
-      endedAt: new Date(now.value).toISOString(),
+      // 종료 응답의 endedAt(오프셋 없는 KST 벽시계)을 그대로 쓴다 — toISOString 왕복 금지(BE 016 §1).
+      endedAt: response.endedAt,
     }
     isEndConfirmOpen.value = false
   } catch (error) {
-    transitionNotice.value =
-      error instanceof Error ? error.message : '방송을 종료하지 못했습니다.'
+    // 종료는 멱등이 아니다 — 이미 종료·취소된 방송이면 L007(400)이 온다(BE 013 #3).
+    // 이 경우 에러가 아니라 '이미 끝난 것'으로 보고 종료 대시보드 흐름으로 넘어간다.
+    if (normalizeApiError(error).code === 'L007') {
+      live.value = { ...live.value, status: 'ENDED' }
+      isEndConfirmOpen.value = false
+      return
+    }
 
-    window.clearTimeout(transitionNoticeTimer)
-    transitionNoticeTimer = window.setTimeout(() => {
-      transitionNotice.value = ''
-    }, 2600)
+    showTransitionNotice(
+      error instanceof Error ? error.message : '방송을 종료하지 못했습니다.',
+    )
   }
 }
 

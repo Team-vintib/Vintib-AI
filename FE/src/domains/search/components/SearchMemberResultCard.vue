@@ -1,133 +1,81 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router'
+
 import type { SearchMemberResult } from '@/domains/search/types/search.types'
+import { ROUTE_NAMES } from '@/shared/constants/routes'
 
 defineProps<{
   member: SearchMemberResult
-  isFollowing: boolean
-}>()
-
-const emit = defineEmits<{
-  toggleFollow: [memberId: number]
 }>()
 </script>
 
 <template>
-  <article class="search-member-card">
-    <img class="search-member-card__avatar" :src="member.profileImageUrl" :alt="member.nickname" />
-
-    <div class="search-member-card__body">
-      <div class="search-member-card__header">
-        <div>
-          <h3 class="search-member-card__name">{{ member.nickname }}</h3>
-          <p class="search-member-card__stats">
-            팔로워 {{ member.followerCount.toLocaleString('ko-KR') }}명 · 상품
-            {{ member.productCount }}개 · 라이브 {{ member.liveCount }}회
-          </p>
-        </div>
-
-        <button
-          class="search-member-card__follow"
-          :class="{ 'search-member-card__follow--active': isFollowing }"
-          type="button"
-          :aria-pressed="isFollowing"
-          @click="emit('toggleFollow', member.id)"
-        >
-          {{ isFollowing ? '팔로잉' : '팔로우' }}
-        </button>
-      </div>
-
-      <p class="search-member-card__description">{{ member.description }}</p>
-    </div>
-  </article>
+  <RouterLink
+    class="search-member-card"
+    :to="{ name: ROUTE_NAMES.PROFILE, params: { userId: member.id } }"
+    :aria-label="`${member.nickname} 프로필 보기`"
+  >
+    <span class="search-member-card__body">
+      <strong class="search-member-card__name">{{ member.nickname }}</strong>
+      <span class="search-member-card__stats">
+        상품 {{ member.productCount.toLocaleString('ko-KR') }} · 팔로워
+        {{ member.followerCount.toLocaleString('ko-KR') }}
+      </span>
+    </span>
+    <span class="search-member-card__arrow" aria-hidden="true">›</span>
+  </RouterLink>
 </template>
 
 <style scoped lang="scss">
 .search-member-card {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  gap: var(--space-4);
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 68px;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
-}
-
-.search-member-card__avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: var(--color-surface-secondary);
+  color: inherit;
+  text-decoration: none;
 }
 
 .search-member-card__body {
+  display: grid;
   min-width: 0;
-}
-
-.search-member-card__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
+  gap: 2px;
 }
 
 .search-member-card__name {
+  overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
-  line-height: 26px;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.search-member-card__stats,
-.search-member-card__description {
+.search-member-card__stats {
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
   line-height: 20px;
 }
 
-.search-member-card__description {
-  display: -webkit-box;
-  overflow: hidden;
-  margin-top: var(--space-3);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+.search-member-card__arrow {
+  color: var(--color-text-muted);
+  font-size: 24px;
+  line-height: 1;
 }
 
-.search-member-card__follow {
-  flex: 0 0 auto;
-  min-width: 76px;
-  height: var(--button-height-small);
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius-control);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  font-size: var(--font-size-button-small);
-  font-weight: var(--font-weight-bold);
-}
-
-.search-member-card__follow--active {
-  background: var(--color-surface);
+.search-member-card:hover .search-member-card__name,
+.search-member-card:focus-visible .search-member-card__name {
   color: var(--color-primary);
+  text-decoration: underline;
 }
 
-.search-member-card__follow:focus-visible {
+.search-member-card:focus-visible {
   outline: 3px solid var(--color-primary-soft);
-  outline-offset: 2px;
-}
-
-@media (max-width: 520px) {
-  .search-member-card {
-    grid-template-columns: 56px minmax(0, 1fr);
-    padding: var(--space-4);
-  }
-
-  .search-member-card__avatar {
-    width: 56px;
-    height: 56px;
-  }
-
-  .search-member-card__header {
-    flex-direction: column;
-  }
+  outline-offset: 3px;
 }
 </style>
