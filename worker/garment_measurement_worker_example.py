@@ -29,11 +29,12 @@ from base_worker import BaseWorker
 
 # 처리 로직(worker/models/garment_measurement)을 import 할 수 있도록 경로 추가.
 # **부모 디렉터리(worker/models)를 추가한다** — CatVTON의 `model.` 네임스페이스 방식과 같은
-# 이유다. clipseg는 contracts.py/registry.py/scenarios.py/segmenter.py를 flat하게 sys.path
-# 최상단에 두는데, garment_measurement도 같은 이름의 파일이 있어서(둘 다 같은 pytest 세션에서
-# sys.path에 동시에 들어감) flat 삽입을 그대로 따라 하면 `import contracts`가 어느 쪽을
-# 가져올지 꼬인다(먼저 import된 모듈이 캐시됨). 그래서 garment_measurement는 진짜 서브패키지로
-# 만들고 `from garment_measurement.xxx import ...` 형태로만 접근한다.
+# 이유다. garment_measurement는 다른 워커 패키지(models/sam3 등)와 같은 이름의 파일
+# (contracts.py/registry.py/...)을 갖고 있어서, 전부 같은 pytest 세션에서 sys.path에 동시에
+# 들어가는 상황에 flat 삽입을 쓰면 `import contracts`가 어느 쪽을 가져올지 꼬인다(먼저
+# import된 모듈이 캐시됨 — `S15P11A108-339` 구현 중 삭제 전 `models/clipseg/`와 실제로 겪은
+# 버그). 그래서 garment_measurement는 진짜 서브패키지로 만들고
+# `from garment_measurement.xxx import ...` 형태로만 접근한다.
 MEASUREMENT_CODE_PATH = os.getenv(
     "MEASUREMENT_CODE_PATH",
     os.path.join(os.path.dirname(__file__), "models"),

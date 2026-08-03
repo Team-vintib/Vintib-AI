@@ -24,7 +24,9 @@ class CompsSourceConfig(TypedDict):
     """comps 백엔드 하나의 모델 ID + 그 백엔드 기준으로 잡은 임계치."""
 
     model_id: str | None
-    tool_types: tuple[str, ...]  # 웹검색 서버툴 규격. 앞에서부터 시도하고 400이면 폴백
+    tool_types: tuple[
+        str, ...
+    ]  # Anthropic류 날짜 버저닝 웹검색 툴 규격 폴백 목록. Gemini는 불필요(빈 튜플)
     timeout_seconds: float
     max_comps: int  # 이보다 많이 오면 잘라낸다(토큰·응답 크기 방어)
     min_comps_for_pricing: int  # 이 미만이면 가격을 내지 않는다
@@ -39,17 +41,18 @@ COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
         "max_comps": 5,
         "min_comps_for_pricing": 3,
     },
-    # CH002 V1에서 실동작이 확인된 조합. 평균 comps 1.7건이라 최소 표본을 1로 둔다 —
-    # 3으로 잡으면 사실상 모든 요청이 INSUFFICIENT_COMPS가 된다.
+    # 2026-07-31: 메인 시세 검색 모델을 Claude(haiku)에서 Gemini로 전환. LAB-47(웹검색
+    # 테스트) V1에서 GMS가 `google_search` 그라운딩을 통과시키는 것까지만 확인했고(쿼리 1건,
+    # grounding 9건), Claude haiku처럼 여러 쿼리로 평균 comps 건수·중고 비율을 잰 적은 없다.
+    # 그래서 min_comps_for_pricing은 근거 있는 값이 아니라 haiku 실측치(평균 1.7건)를 그대로
+    # 보수적으로 물려받은 것이다 — Gemini 자체의 커버리지 실측이 아직 없다는 걸 잊지 말 것.
     #
-    # ⚠️ 상위 모델(sonnet 등)을 여기 추가하지 말 것. 같은 질문에도 검색 라운드를 훨씬 많이
-    #    돌아 비용이 급증한다(CH002 V1 실측: haiku 20건 vs sonnet 81건). 바꿔야 하면
-    #    사용자가 직접 model_id를 교체한다 — AI/CLAUDE.md 하드 룰.
+    # ⚠️ 상위 모델(gemini-*-pro 등)을 여기 추가하지 말 것. 검색 라운드가 늘어날수록 비용이
+    #    급증한다(CH002 V1 실측: haiku 20건 vs sonnet 81건 — 모델 등급이 오르면 검색도 깊어짐).
+    #    바꿔야 하면 사용자가 직접 model_id를 교체한다 — AI/CLAUDE.md 하드 룰.
     "llm_web_search": {
-        "model_id": "claude-haiku-4-5-20251001",
-        # haiku는 web_search_20260209(dynamic filtering)를 지원하지 않아 400이 난다.
-        # 이 폴백이 없으면 "웹검색 미지원"으로 오판한다(CH002 V1 실측).
-        "tool_types": ("web_search_20260209", "web_search_20250305"),
+        "model_id": "gemini-3.5-flash",
+        "tool_types": (),  # Gemini는 `google_search` 선언 하나뿐 — 날짜 버저닝 폴백이 없다
         "timeout_seconds": 90.0,
         "max_comps": 10,
         "min_comps_for_pricing": 1,

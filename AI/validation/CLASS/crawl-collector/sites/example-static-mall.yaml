@@ -1,0 +1,32 @@
+# 예시 1 — 정적(SSR) 쇼핑몰, 목록 페이지만 긁는 구성.
+#
+# ⚠️ 구조 설명용 예시다. 실제 사이트 DOM으로 검증되지 않았다 — 대상 쇼핑몰이 정해지면
+#    이 파일을 복사해 셀렉터를 실제 값으로 바꾸고 `--dry-run`으로 확인할 것.
+#
+# 이 구성이 기본값으로 삼을 만한 이유: 상세 페이지를 열지 않아 요청 수가 상품 수만큼 줄고,
+# 목록 URL이 곧 카테고리라 라벨이 흔들리지 않는다(브리핑 §5의 매핑 신뢰도 관점에서도 최선).
+
+site: example-static-mall
+render: static
+follow_detail: false
+shot_type_default: flat
+delay_seconds: 1.5
+
+listing:
+  item_selector: "ul.goods-list > li"
+  image_selector: "img"
+  image_attr: ""
+  name_selector: ".goods-name"
+  link_selector: "a"
+  # 목록 URL이 카테고리 그 자체 — 이 문자열이 source_category_raw로 기록되고 매핑에 쓰인다.
+  category: "아우터 > 코트"
+  page_url_template: "https://example-static-mall.com/category/outer/coat?page={page}"
+  max_pages: 3
+
+category_map:
+  "아우터 > 코트": COAT
+
+notes: |
+  카테고리별로 이 파일을 복사해 category/page_url_template만 바꿔 쓰는 방식.
+  대분류 6종·소분류 30종을 고루 채우려면 결국 카테고리 수만큼 스펙이 필요하다
+  (브리핑 §4.3 커버리지 요구).

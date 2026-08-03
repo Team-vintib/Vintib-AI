@@ -3,7 +3,7 @@
 **워커 공용 `storage_utils.download_image`를 쓰지 않는다.** `worker/models/garment_measurement/`는
 AI의 pytest 세션에도 import된다(순수 로직 커버용, `AI/test/conftest.py` 참고). `storage_utils`는
 `worker/` 최상단에 있어서 그 경로가 sys.path에 없는 테스트 환경에서는 import가 깨진다 —
-`worker/models/clipseg/segmenter.py`의 `load_source_image()`가 같은 이유로 독자 구현해 둔 선례를
+`worker/models/sam3/segmenter.py`의 `load_source_image()`가 같은 이유로 독자 구현해 둔 선례를
 그대로 따른다(다만 이쪽은 기준물체 검출/원단 분할/랜드마크 검출 세 단계가 전부 이 로더를 쓰므로
 중복하지 않고 공용 모듈로 뺐다).
 """
