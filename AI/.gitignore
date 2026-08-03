@@ -52,3 +52,6 @@ validation/CLASS/product-info-check/.onnx_cache/
 validation/CLASS/crawl-collector/out/
 validation/CLASS/crawl-collector/**/out/
 
+
+# 분류 헤드 학습 스파이크 산출물(임베딩 캐시·헤드 체크포인트) — 재생성 가능
+validation/CLASS/product-info-finetune/artifacts/
