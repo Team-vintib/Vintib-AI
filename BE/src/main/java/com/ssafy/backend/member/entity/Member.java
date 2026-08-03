@@ -81,6 +81,12 @@ public class Member extends BaseTimeEntity {
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
 
+    @Column(length = 500)
+    private String description;
+
+    @Column(name = "cover_image_url", length = 500)
+    private String coverImageUrl;
+
     @Builder
     public Member(String email, String password, String name) {
         this.email = email;
@@ -111,6 +117,25 @@ public class Member extends BaseTimeEntity {
         this.detailAddress = detailAddress;
         this.postalCode = postalCode;
         this.gender = gender;
+    }
+
+    /**
+     * 소개글을 저장한다(011 §5). {@link #updateBasicInfo}와 같은 방식으로 매번 전체를 새로 받는다
+     * — 값이 없으면 {@code null}로 지워진다. 커버 이미지는 {@link #updateCoverImage}로 별도
+     * 관리한다(SY030 — presigned 업로드 확정 시점에만 바뀐다).
+     */
+    public void updateBio(String description) {
+        this.description = description;
+    }
+
+    /** 프로필 이미지 업로드 확정(SY030). presigned key 확인 후 최종 공개 URL을 저장한다. */
+    public void updateProfileImage(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
+    }
+
+    /** 커버 이미지 업로드 확정(SY030). presigned key 확인 후 최종 공개 URL을 저장한다. */
+    public void updateCoverImage(String coverImageUrl) {
+        this.coverImageUrl = coverImageUrl;
     }
 
     /**

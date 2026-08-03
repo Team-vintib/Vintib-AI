@@ -34,6 +34,8 @@ CREATE TABLE member (
     member_type       VARCHAR(20)  NOT NULL DEFAULT 'GENERAL',
     status            VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
     profile_image_url VARCHAR(500),
+    description       VARCHAR(500),                    -- 소개글
+    cover_image_url   VARCHAR(500),                     -- 커버 이미지 URL
     onboarding_done   BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),

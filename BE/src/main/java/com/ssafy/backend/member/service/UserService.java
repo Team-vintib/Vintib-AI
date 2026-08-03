@@ -1,25 +1,39 @@
 package com.ssafy.backend.member.service;
 
+import com.ssafy.backend.business.entity.BusinessVerificationStatus;
 import com.ssafy.backend.business.repository.BusinessInfoRepository;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import com.ssafy.backend.live.repository.LiveRepository;
+import com.ssafy.backend.live.service.LiveService;
+import com.ssafy.backend.member.dto.request.UpdateBioRequest;
 import com.ssafy.backend.member.dto.request.UpdateInterestsRequest;
 import com.ssafy.backend.member.dto.request.UpdateMemberRequest;
 import com.ssafy.backend.member.dto.request.UpdateMemberTypeRequest;
 import com.ssafy.backend.member.dto.response.InterestsResponse;
 import com.ssafy.backend.member.dto.response.MemberProfileResponse;
+import com.ssafy.backend.member.dto.response.MypageSummaryResponse;
+import com.ssafy.backend.member.dto.response.PublicProfileResponse;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.entity.MemberInterestBrand;
 import com.ssafy.backend.member.entity.MemberInterestCategory;
 import com.ssafy.backend.member.repository.MemberInterestBrandRepository;
 import com.ssafy.backend.member.repository.MemberInterestCategoryRepository;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.notification.repository.NotificationRepository;
+import com.ssafy.backend.order.repository.OrderRepository;
+import com.ssafy.backend.point.entity.PointAccount;
+import com.ssafy.backend.point.repository.PointAccountRepository;
 import com.ssafy.backend.product.dto.response.BrandResponse;
 import com.ssafy.backend.product.dto.response.CategoryResponse;
 import com.ssafy.backend.product.entity.Brand;
 import com.ssafy.backend.product.entity.Category;
+import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
+import com.ssafy.backend.product.repository.ProductRepository;
+import com.ssafy.backend.social.repository.FollowRepository;
+import com.ssafy.backend.social.repository.WishRepository;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +56,13 @@ public class UserService {
     private final BrandRepository brandRepository;
     private final CategoryRepository categoryRepository;
     private final BusinessInfoRepository businessInfoRepository;
+    private final OrderRepository orderRepository;
+    private final WishRepository wishRepository;
+    private final FollowRepository followRepository;
+    private final NotificationRepository notificationRepository;
+    private final PointAccountRepository pointAccountRepository;
+    private final LiveRepository liveRepository;
+    private final ProductRepository productRepository;
 
     /**
      * ONBOARD-001 / MY-001: 닉네임·전화번호·주소·상세주소·우편번호·성별을 저장하고 회원 프로필을 반환한다.
@@ -83,6 +104,28 @@ public class UserService {
             // unique 제약(닉네임 중복) 위반을 도메인 예외로 변환
             throw new CustomException(ErrorCode.NICKNAME_ALREADY_TAKEN);
         }
+
+        return MemberProfileResponse.from(member, businessVerificationStatusOf(targetId));
+    }
+
+    /**
+     * 소개글을 저장한다(011 §5). {@link #updateBasicInfo}와 마찬가지로 매번 전체를 새로 받는다
+     * (부분 수정 아님) — 값을 안 보내면 지워진다. 커버 이미지는 {@link MemberImageService}가
+     * 별도로 관리한다(SY030).
+     *
+     * @throws CustomException USER_NOT_FOUND — 대상 회원이 없을 때
+     * @throws CustomException MEMBER_FORBIDDEN — 본인 외 타인의 정보를 수정하려 할 때 (403)
+     */
+    @Transactional
+    public MemberProfileResponse updateBio(Long requesterId, Long targetId, UpdateBioRequest request) {
+        if (!requesterId.equals(targetId)) {
+            throw new CustomException(ErrorCode.MEMBER_FORBIDDEN);
+        }
+
+        Member member = memberRepository.findById(targetId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        member.updateBio(request.description());
 
         return MemberProfileResponse.from(member, businessVerificationStatusOf(targetId));
     }
@@ -135,6 +178,64 @@ public class UserService {
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         return MemberProfileResponse.from(member, businessVerificationStatusOf(targetId));
+    }
+
+    /**
+     * 에픽 S15P11A108-207 보너스: 마이페이지 첫 화면 카운터(구매/판매/찜/팔로워/안읽은 알림)와
+     * 포인트 잔액을 한 번에 조회한다. 포인트 계좌가 아직 없는 회원은 0으로 본다(계좌 생성은
+     * {@code PointService} 조회/충전/출금 경로에서만 일어난다 — 이 요약 조회가 부수효과로
+     * 계좌를 만들지는 않는다).
+     *
+     * @throws CustomException USER_NOT_FOUND — 대상 회원이 없을 때
+     * @throws CustomException MEMBER_FORBIDDEN — 본인 외 타인의 요약을 조회하려 할 때 (403)
+     */
+    public MypageSummaryResponse getMypageSummary(Long requesterId, Long targetId) {
+        if (!requesterId.equals(targetId)) {
+            throw new CustomException(ErrorCode.MEMBER_FORBIDDEN);
+        }
+
+        Member member = memberRepository.findById(targetId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        long pointBalance = pointAccountRepository.findById(targetId)
+                .map(PointAccount::getAvailable)
+                .orElse(0L);
+
+        return MypageSummaryResponse.of(
+                member,
+                businessVerificationStatusOf(targetId),
+                orderRepository.countByBuyer_Id(targetId),
+                orderRepository.countBySeller_Id(targetId),
+                wishRepository.countByMember_Id(targetId),
+                followRepository.countByFollowing_Id(targetId),
+                notificationRepository.countByMember_IdAndReadFalse(targetId),
+                pointBalance);
+    }
+
+    /**
+     * 공개 회원/판매자 프로필 조회(011 §3.3). 비회원도 조회 가능해 {@code viewerId}가 {@code null}일
+     * 수 있다 — 그때 {@code isFollowing}은 항상 {@code false}다(팔로워/팔로잉 목록 조회와 동일 정책).
+     *
+     * @throws CustomException USER_NOT_FOUND — 대상 회원이 없을 때
+     */
+    public PublicProfileResponse getPublicProfile(Long viewerId, Long targetId) {
+        Member member = memberRepository.findById(targetId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        boolean isFollowing = viewerId != null
+                && followRepository.existsByFollower_IdAndFollowing_Id(viewerId, targetId);
+        boolean businessVerified = businessInfoRepository.findById(targetId)
+                .map(businessInfo -> businessInfo.getVerificationStatus() == BusinessVerificationStatus.APPROVED)
+                .orElse(false);
+
+        return PublicProfileResponse.of(
+                member,
+                followRepository.countByFollowing_Id(targetId),
+                followRepository.countByFollower_Id(targetId),
+                productRepository.countBySeller_IdAndSaleStatusNot(targetId, SaleStatus.DRAFT),
+                liveRepository.countByHost_IdAndStatusIn(targetId, LiveService.PUBLIC_STATUSES),
+                isFollowing,
+                businessVerified);
     }
 
     private String businessVerificationStatusOf(Long memberId) {

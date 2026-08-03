@@ -26,7 +26,10 @@ public record ProductListFilterParams(
         Long maxPrice,
 
         @Schema(description = "정렬 기준. LATEST(기본값) / PRICE_ASC / PRICE_DESC", example = "LATEST")
-        ProductSortType sort
+        ProductSortType sort,
+
+        @Schema(description = "판매자 회원 ID. 특정 판매자의 상품만 본다(공개 프로필용, 011 §3.5). 미입력 시 전체", example = "10")
+        Long sellerId
 ) {
     /**
      * 각 파라미터가 필터로 활성화됐는지 판단하는 헬퍼들.
@@ -34,6 +37,10 @@ public record ProductListFilterParams(
      */
     public boolean hasCategoryFilter() {
         return categoryIds != null && !categoryIds.isEmpty();
+    }
+
+    public boolean hasSellerFilter() {
+        return sellerId != null;
     }
 
     public boolean hasConditionFilter() {

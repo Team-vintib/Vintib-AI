@@ -55,7 +55,7 @@ class ProductServiceTest {
     private static final Long SELLER_ID = 1L;
     private static final Long CATEGORY_ID = 10L;
     private static final ProductListFilterParams NO_FILTER =
-            new ProductListFilterParams(null, null, null, null, null, null);
+            new ProductListFilterParams(null, null, null, null, null, null, null);
 
     @Mock
     private ProductRepository productRepository;
@@ -318,7 +318,7 @@ class ProductServiceTest {
         Pageable pageable = PageRequest.of(0, 20);
         when(productRepository.findWithFilter(
                 anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
-                anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(onSale), pageable, 1));
 
         PageResponse<ProductResponse> response = productService.getProductList(NO_FILTER, pageable);
@@ -333,7 +333,7 @@ class ProductServiceTest {
         Pageable pageable = PageRequest.of(0, 2);
         when(productRepository.findWithFilter(
                 anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
-                anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(product, product), pageable, 5));
 
         PageResponse<ProductResponse> response = productService.getProductList(NO_FILTER, pageable);
@@ -350,7 +350,7 @@ class ProductServiceTest {
         Pageable pageable = PageRequest.of(0, 20);
         when(productRepository.findWithFilter(
                 anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
-                anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
         PageResponse<ProductResponse> response = productService.getProductList(NO_FILTER, pageable);
@@ -582,11 +582,11 @@ class ProductServiceTest {
         Page<Product> emptyPage = new PageImpl<>(List.of());
         when(productRepository.findWithFilter(
                 eq(false), any(), eq(false), any(), eq(false), any(),
-                eq(false), any(), eq(false), any(), any(Pageable.class)))
+                eq(false), any(), eq(false), any(), eq(false), any(), any(Pageable.class)))
                 .thenReturn(emptyPage);
 
         ProductListFilterParams filter =
-                new ProductListFilterParams(null, null, null, null, null, null);
+                new ProductListFilterParams(null, null, null, null, null, null, null);
 
         // when
         PageResponse<ProductResponse> response =
@@ -603,17 +603,58 @@ class ProductServiceTest {
         ArgumentCaptor<Boolean> flagCaptor = ArgumentCaptor.forClass(Boolean.class);
         when(productRepository.findWithFilter(
                 flagCaptor.capture(), any(), anyBoolean(), any(), anyBoolean(), any(),
-                anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
                 .thenReturn(emptyPage);
 
         ProductListFilterParams filter =
-                new ProductListFilterParams(List.of(1L, 2L), null, null, null, null, null);
+                new ProductListFilterParams(List.of(1L, 2L), null, null, null, null, null, null);
 
         // when
         productService.getProductList(filter, PageRequest.of(0, 20));
 
         // then: 첫 번째 캡처 = hasCategoryFilter
         assertThat(flagCaptor.getValue()).isTrue();
+    }
+
+    @Test
+    void 판매자_필터를_주면_hasSellerFilter가_true로_전달되고_sellerId가_그대로_넘어간다() {
+        // given: 공개 프로필(011 §3.5)에서 특정 판매자 상품만 조회할 때 쓴다.
+        Page<Product> emptyPage = new PageImpl<>(List.of());
+        ArgumentCaptor<Boolean> flagCaptor = ArgumentCaptor.forClass(Boolean.class);
+        ArgumentCaptor<Long> sellerIdCaptor = ArgumentCaptor.forClass(Long.class);
+        when(productRepository.findWithFilter(
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
+                anyBoolean(), any(), anyBoolean(), any(),
+                flagCaptor.capture(), sellerIdCaptor.capture(), any(Pageable.class)))
+                .thenReturn(emptyPage);
+
+        ProductListFilterParams filter =
+                new ProductListFilterParams(null, null, null, null, null, null, SELLER_ID);
+
+        // when
+        productService.getProductList(filter, PageRequest.of(0, 20));
+
+        // then
+        assertThat(flagCaptor.getValue()).isTrue();
+        assertThat(sellerIdCaptor.getValue()).isEqualTo(SELLER_ID);
+    }
+
+    @Test
+    void 판매자_필터가_없으면_hasSellerFilter가_false로_전달된다() {
+        // given
+        Page<Product> emptyPage = new PageImpl<>(List.of());
+        when(productRepository.findWithFilter(
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
+                anyBoolean(), any(), anyBoolean(), any(), eq(false), any(), any(Pageable.class)))
+                .thenReturn(emptyPage);
+
+        // when
+        productService.getProductList(NO_FILTER, PageRequest.of(0, 20));
+
+        // then: eq(false)로 스텁된 호출이 실제로 매치됐다면(즉 예외 없이) 통과
+        verify(productRepository).findWithFilter(
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
+                anyBoolean(), any(), anyBoolean(), any(), eq(false), any(), any(Pageable.class));
     }
 
     @Test
@@ -624,11 +665,11 @@ class ProductServiceTest {
         ArgumentCaptor<Boolean> captors = ArgumentCaptor.forClass(Boolean.class);
         when(productRepository.findWithFilter(
                 anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
-                captors.capture(), any(), captors.capture(), any(), any(Pageable.class)))
+                captors.capture(), any(), captors.capture(), any(), anyBoolean(), any(), any(Pageable.class)))
                 .thenReturn(emptyPage);
 
         ProductListFilterParams filter =
-                new ProductListFilterParams(null, null, null, 10_000L, 50_000L, null);
+                new ProductListFilterParams(null, null, null, 10_000L, 50_000L, null, null);
 
         // when
         productService.getProductList(filter, PageRequest.of(0, 20));
@@ -644,11 +685,11 @@ class ProductServiceTest {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         when(productRepository.findWithFilter(
                 anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
-                anyBoolean(), any(), anyBoolean(), any(), pageableCaptor.capture()))
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(), pageableCaptor.capture()))
                 .thenReturn(emptyPage);
 
         ProductListFilterParams filter =
-                new ProductListFilterParams(null, null, null, null, null, ProductSortType.PRICE_ASC);
+                new ProductListFilterParams(null, null, null, null, null, ProductSortType.PRICE_ASC, null);
 
         // when
         productService.getProductList(filter, PageRequest.of(0, 20));
@@ -667,12 +708,12 @@ class ProductServiceTest {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         when(productRepository.findWithFilter(
                 anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(),
-                anyBoolean(), any(), anyBoolean(), any(), pageableCaptor.capture()))
+                anyBoolean(), any(), anyBoolean(), any(), anyBoolean(), any(), pageableCaptor.capture()))
                 .thenReturn(emptyPage);
 
         // sort=null → resolvedSort()=LATEST
         ProductListFilterParams filter =
-                new ProductListFilterParams(null, null, null, null, null, null);
+                new ProductListFilterParams(null, null, null, null, null, null, null);
 
         // when
         productService.getProductList(filter, PageRequest.of(0, 20));

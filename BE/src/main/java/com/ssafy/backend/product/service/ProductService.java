@@ -148,6 +148,7 @@ public class ProductService {
                 filter.hasSaleTypeFilter(), filter.saleType(),
                 filter.hasMinPriceFilter(), filter.minPrice(),
                 filter.hasMaxPriceFilter(), filter.maxPrice(),
+                filter.hasSellerFilter(), filter.sellerId(),
                 sortedPageable);
 
         return PageResponse.from(products.map(ProductResponse::from));

@@ -44,6 +44,9 @@ public interface LiveRepository extends JpaRepository<Live, Long> {
             @Param("hostId") Long hostId,
             Pageable pageable);
 
+    /** 공개 프로필(011 §3.3) — 공개 상태(예정/진행 중)의 방송 수. */
+    long countByHost_IdAndStatusIn(Long hostId, Collection<LiveStatus> statuses);
+
     /**
      * 최고 시청자 수를 끌어올린다. 지금 값보다 크지 않으면 아무 행도 바뀌지 않는다.
      *

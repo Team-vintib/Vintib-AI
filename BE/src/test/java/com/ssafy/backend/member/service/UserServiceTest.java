@@ -12,11 +12,16 @@ import com.ssafy.backend.business.entity.BusinessVerificationStatus;
 import com.ssafy.backend.business.repository.BusinessInfoRepository;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import com.ssafy.backend.live.repository.LiveRepository;
+import com.ssafy.backend.live.service.LiveService;
+import com.ssafy.backend.member.dto.request.UpdateBioRequest;
 import com.ssafy.backend.member.dto.request.UpdateInterestsRequest;
 import com.ssafy.backend.member.dto.request.UpdateMemberRequest;
 import com.ssafy.backend.member.dto.request.UpdateMemberTypeRequest;
 import com.ssafy.backend.member.dto.response.InterestsResponse;
 import com.ssafy.backend.member.dto.response.MemberProfileResponse;
+import com.ssafy.backend.member.dto.response.MypageSummaryResponse;
+import com.ssafy.backend.member.dto.response.PublicProfileResponse;
 import com.ssafy.backend.member.entity.Gender;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.entity.MemberInterestBrand;
@@ -25,10 +30,18 @@ import com.ssafy.backend.member.entity.MemberType;
 import com.ssafy.backend.member.repository.MemberInterestBrandRepository;
 import com.ssafy.backend.member.repository.MemberInterestCategoryRepository;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.notification.repository.NotificationRepository;
+import com.ssafy.backend.order.repository.OrderRepository;
+import com.ssafy.backend.point.entity.PointAccount;
+import com.ssafy.backend.point.repository.PointAccountRepository;
 import com.ssafy.backend.product.entity.Brand;
 import com.ssafy.backend.product.entity.Category;
+import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
+import com.ssafy.backend.product.repository.ProductRepository;
+import com.ssafy.backend.social.repository.FollowRepository;
+import com.ssafy.backend.social.repository.WishRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +76,27 @@ class UserServiceTest {
     private BusinessInfoRepository businessInfoRepository;
 
     @Mock
+    private OrderRepository orderRepository;
+
+    @Mock
+    private WishRepository wishRepository;
+
+    @Mock
+    private FollowRepository followRepository;
+
+    @Mock
+    private NotificationRepository notificationRepository;
+
+    @Mock
+    private PointAccountRepository pointAccountRepository;
+
+    @Mock
+    private LiveRepository liveRepository;
+
+    @Mock
+    private ProductRepository productRepository;
+
+    @Mock
     private Brand nike;
 
     @Mock
@@ -78,7 +112,14 @@ class UserServiceTest {
                 memberInterestCategoryRepository,
                 brandRepository,
                 categoryRepository,
-                businessInfoRepository);
+                businessInfoRepository,
+                orderRepository,
+                wishRepository,
+                followRepository,
+                notificationRepository,
+                pointAccountRepository,
+                liveRepository,
+                productRepository);
     }
 
     private Member createMember() {
@@ -375,6 +416,194 @@ class UserServiceTest {
         when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> userService.getProfile(MEMBER_ID, MEMBER_ID))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
+    }
+
+    @Test
+    void 마이페이지_요약을_카운터와_포인트_잔액과_함께_반환한다() {
+        // given
+        Member member = createMember();
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(businessInfoRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+        when(orderRepository.countByBuyer_Id(MEMBER_ID)).thenReturn(2L);
+        when(orderRepository.countBySeller_Id(MEMBER_ID)).thenReturn(5L);
+        when(wishRepository.countByMember_Id(MEMBER_ID)).thenReturn(3L);
+        when(followRepository.countByFollowing_Id(MEMBER_ID)).thenReturn(12L);
+        when(notificationRepository.countByMember_IdAndReadFalse(MEMBER_ID)).thenReturn(1L);
+        PointAccount account = mock(PointAccount.class);
+        when(account.getAvailable()).thenReturn(10000L);
+        when(pointAccountRepository.findById(MEMBER_ID)).thenReturn(Optional.of(account));
+
+        // when
+        MypageSummaryResponse response = userService.getMypageSummary(MEMBER_ID, MEMBER_ID);
+
+        // then
+        assertThat(response.counts().orders()).isEqualTo(2L);
+        assertThat(response.counts().sales()).isEqualTo(5L);
+        assertThat(response.counts().wishes()).isEqualTo(3L);
+        assertThat(response.counts().followers()).isEqualTo(12L);
+        assertThat(response.counts().unreadNotifications()).isEqualTo(1L);
+        assertThat(response.pointBalance()).isEqualTo(10000L);
+        assertThat(response.user().businessVerificationStatus()).isEqualTo("NONE");
+    }
+
+    @Test
+    void 포인트_계좌가_없으면_마이페이지_요약의_잔액은_0이다() {
+        // given: 요약 조회는 부수효과로 포인트 계좌를 만들지 않는다.
+        Member member = createMember();
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(businessInfoRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+        when(pointAccountRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+
+        // when
+        MypageSummaryResponse response = userService.getMypageSummary(MEMBER_ID, MEMBER_ID);
+
+        // then
+        assertThat(response.pointBalance()).isEqualTo(0L);
+        verify(pointAccountRepository, org.mockito.Mockito.never()).save(org.mockito.Mockito.any());
+    }
+
+    @Test
+    void 본인이_아닌_타인의_마이페이지_요약을_조회하면_FORBIDDEN_예외가_발생한다() {
+        Long otherMemberId = 999L;
+
+        assertThatThrownBy(() -> userService.getMypageSummary(MEMBER_ID, otherMemberId))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MEMBER_FORBIDDEN);
+    }
+
+    @Test
+    void 비회원이_공개_프로필을_조회하면_isFollowing이_false다() {
+        // given
+        Member member = createMember();
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(businessInfoRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+        when(followRepository.countByFollowing_Id(MEMBER_ID)).thenReturn(124L);
+        when(followRepository.countByFollower_Id(MEMBER_ID)).thenReturn(20L);
+        when(productRepository.countBySeller_IdAndSaleStatusNot(MEMBER_ID, SaleStatus.DRAFT)).thenReturn(8L);
+        when(liveRepository.countByHost_IdAndStatusIn(MEMBER_ID, LiveService.PUBLIC_STATUSES)).thenReturn(3L);
+
+        // when
+        PublicProfileResponse response = userService.getPublicProfile(null, MEMBER_ID);
+
+        // then
+        assertThat(response.isFollowing()).isFalse();
+        assertThat(response.followerCount()).isEqualTo(124L);
+        assertThat(response.followingCount()).isEqualTo(20L);
+        assertThat(response.productCount()).isEqualTo(8L);
+        assertThat(response.liveCount()).isEqualTo(3L);
+        assertThat(response.businessVerified()).isFalse();
+        verify(followRepository, org.mockito.Mockito.never())
+                .existsByFollower_IdAndFollowing_Id(org.mockito.Mockito.any(), org.mockito.Mockito.any());
+    }
+
+    @Test
+    void 로그인한_조회자가_팔로우_중이면_공개_프로필의_isFollowing이_true다() {
+        // given
+        Long viewerId = 42L;
+        Member member = createMember();
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(businessInfoRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+        when(followRepository.existsByFollower_IdAndFollowing_Id(viewerId, MEMBER_ID)).thenReturn(true);
+
+        // when
+        PublicProfileResponse response = userService.getPublicProfile(viewerId, MEMBER_ID);
+
+        // then
+        assertThat(response.isFollowing()).isTrue();
+    }
+
+    @Test
+    void 사업자_인증이_승인된_회원의_공개_프로필은_businessVerified가_true다() {
+        // given
+        Member member = createMember();
+        BusinessInfo businessInfo = mock(BusinessInfo.class);
+        when(businessInfo.getVerificationStatus()).thenReturn(BusinessVerificationStatus.APPROVED);
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(businessInfoRepository.findById(MEMBER_ID)).thenReturn(Optional.of(businessInfo));
+
+        // when
+        PublicProfileResponse response = userService.getPublicProfile(null, MEMBER_ID);
+
+        // then
+        assertThat(response.businessVerified()).isTrue();
+    }
+
+    @Test
+    void 사업자_인증이_대기중인_회원의_공개_프로필은_businessVerified가_false다() {
+        // given: PENDING/REJECTED/NONE 전부 공개 프로필에선 미인증(false)으로 뭉뚱그린다.
+        Member member = createMember();
+        BusinessInfo businessInfo = mock(BusinessInfo.class);
+        when(businessInfo.getVerificationStatus()).thenReturn(BusinessVerificationStatus.PENDING);
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(businessInfoRepository.findById(MEMBER_ID)).thenReturn(Optional.of(businessInfo));
+
+        // when
+        PublicProfileResponse response = userService.getPublicProfile(null, MEMBER_ID);
+
+        // then
+        assertThat(response.businessVerified()).isFalse();
+    }
+
+    @Test
+    void 존재하지_않는_회원의_공개_프로필을_조회하면_USER_NOT_FOUND_예외가_발생한다() {
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.getPublicProfile(null, MEMBER_ID))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
+    }
+
+    @Test
+    void 소개글과_커버_이미지를_정상_저장한다() {
+        // given
+        Member member = createMember();
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(businessInfoRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+
+        UpdateBioRequest request = new UpdateBioRequest("빈티지 셀러입니다.");
+
+        // when
+        MemberProfileResponse response = userService.updateBio(MEMBER_ID, MEMBER_ID, request);
+
+        // then
+        assertThat(response.description()).isEqualTo("빈티지 셀러입니다.");
+    }
+
+    @Test
+    void 소개글을_비우면_null로_저장된다() {
+        // given: 부분 수정이 아니라 매번 전체를 새로 받으므로, 값을 안 보내면 지워진다.
+        Member member = createMember();
+        member.updateBio("이전 소개글");
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(businessInfoRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+
+        UpdateBioRequest request = new UpdateBioRequest(null);
+
+        // when
+        MemberProfileResponse response = userService.updateBio(MEMBER_ID, MEMBER_ID, request);
+
+        // then
+        assertThat(response.description()).isNull();
+    }
+
+    @Test
+    void 본인이_아닌_타인의_소개글을_수정하면_FORBIDDEN_예외가_발생한다() {
+        Long otherMemberId = 999L;
+        UpdateBioRequest request = new UpdateBioRequest("소개글");
+
+        assertThatThrownBy(() -> userService.updateBio(MEMBER_ID, otherMemberId, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MEMBER_FORBIDDEN);
+    }
+
+    @Test
+    void 존재하지_않는_회원의_소개글을_수정하면_USER_NOT_FOUND_예외가_발생한다() {
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+        UpdateBioRequest request = new UpdateBioRequest("소개글");
+
+        assertThatThrownBy(() -> userService.updateBio(MEMBER_ID, MEMBER_ID, request))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
     }

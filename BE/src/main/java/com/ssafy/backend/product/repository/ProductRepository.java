@@ -69,6 +69,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
               AND (:hasSaleTypeFilter = false OR p.saleType = :saleType)
               AND (:hasMinPrice = false OR p.price >= :minPrice)
               AND (:hasMaxPrice = false OR p.price <= :maxPrice)
+              AND (:hasSellerFilter = false OR p.seller.id = :sellerId)
             """)
     Page<Product> findWithFilter(
             @Param("hasCategoryFilter") boolean hasCategoryFilter,
@@ -81,5 +82,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             @Param("minPrice") Long minPrice,
             @Param("hasMaxPrice") boolean hasMaxPrice,
             @Param("maxPrice") Long maxPrice,
+            @Param("hasSellerFilter") boolean hasSellerFilter,
+            @Param("sellerId") Long sellerId,
             Pageable pageable);
 }
