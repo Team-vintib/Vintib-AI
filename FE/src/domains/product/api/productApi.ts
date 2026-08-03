@@ -171,6 +171,7 @@ export const getProductList = async ({
       maxPrice: maxPrice ?? undefined,
       saleType: toSaleTypeParam(saleType),
     },
+    skipAuth: true,
   })
   const pageResponse = normalizePageResponse(unwrapApiData(response.data))
   const items = await Promise.all(pageResponse.items.map(toProductListItem))
@@ -182,7 +183,9 @@ export const getProductList = async ({
 }
 
 export const getProductDetail = async (productId: number): Promise<ProductDetailViewData> => {
-  const response = await http.get<ApiResponse<ProductDetailDto>>(`/products/${productId}`)
+  const response = await http.get<ApiResponse<ProductDetailDto>>(`/products/${productId}`, {
+    skipAuth: true,
+  })
 
   return toProductDetailViewData(unwrapApiData(response.data))
 }
