@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 // 주문 리소스(/api/orders). 경로에 userId가 없어 requireSelf 패턴 대신 서비스 내부
 // Order.isPartyOf(principal)/isBuyer/isSeller에 권한 확인을 위임한다(InvoiceController와 동일한 이유).
-@Tag(name = "주문(Orders)", description = "주문 생성/조회, 배송지·송장 API")
+@Tag(name = "주문(Orders)", description = "주문 생성/조회, 배송지·송장, 구매 확정 API")
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
@@ -117,6 +117,24 @@ public class OrderController {
             @Valid @RequestBody OrderShipmentRegisterRequest request) {
         Long memberId = (Long) authentication.getPrincipal();
         return ResponseEntity.ok(ApiResponse.success(orderService.registerShipment(orderId, memberId, request)));
+    }
+
+    @Operation(summary = "구매 확정 처리(ORDER-002/003)",
+            description = "구매자가 구매를 확정한다. DELIVERED 상태의 주문만 가능하며, tradeEscrow에 보관된 대금이 "
+                    + "판매자에게 정산되고 주문 상태가 SETTLED로 바뀐다(거래 완료). 배송 완료 후 7일이 지나면 자동으로도 처리된다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "확정 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "DELIVERED 상태가 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "구매자가 아님"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않는 주문")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping("/{orderId}/confirmation")
+    public ResponseEntity<ApiResponse<OrderListItemResponse>> confirmOrder(
+            Authentication authentication, @PathVariable Long orderId) {
+        Long memberId = (Long) authentication.getPrincipal();
+        return ResponseEntity.ok(ApiResponse.success(orderService.confirmOrder(orderId, memberId)));
     }
 
     @Operation(summary = "송장 정보 조회(SHIP-002)",

@@ -26,6 +26,8 @@ import lombok.NoArgsConstructor;
  *
  * <p>생성은 {@link #createDirectSale}(SALE-002, 상시 판매 즉시구매)로만 한다 — 경매 낙찰(AUCT)
  * 주문은 입찰 자체가 아직 없어 이번 범위에서 다루지 않는다({@code auction}은 항상 NULL).
+ * 상태 전이 메서드는 전제조건을 검증하지 않는다 — 검증은 {@code OrderService}가 한다
+ * (다른 엔티티의 상태 전이와 같은 패턴).
  */
 @Entity
 @Table(name = "orders")
@@ -90,6 +92,15 @@ public class Order extends BaseTimeEntity {
     public void markDelivered(LocalDateTime deliveredAt) {
         this.status = OrderStatus.DELIVERED;
         this.autoConfirmAt = deliveredAt.plusDays(7);
+    }
+
+    /**
+     * 구매 확정 처리(ORDER-002/003). 전제조건(DELIVERED 상태)은 서비스가 검증한다.
+     * 정산 대기 절차가 없어 CONFIRMED를 거쳐 곧바로 SETTLED로 끝난다.
+     */
+    public void confirmAndSettle() {
+        this.status = OrderStatus.CONFIRMED;
+        this.status = OrderStatus.SETTLED;
     }
 
     /** memberId가 이 주문의 구매자 또는 판매자인지 확인한다. 세금계산서 등 주문 관련 API의 권한 확인에 쓴다. */

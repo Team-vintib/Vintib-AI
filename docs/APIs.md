@@ -161,18 +161,20 @@
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
 | 주문 목록 조회 | GET | `/users/{id}/orders` | ✓ | MY-003, MY-004 | ✓ |
-| 상시 판매 주문 생성 | POST | `/orders` |  | SALE-001, SALE-002 |  |
+| 상시 판매 주문 생성 | POST | `/orders` | ✓ | SALE-001, SALE-002 | ✓ |
 | 주문 상세 조회 | GET | `/orders/{id}` | ✓ | MY-003 | ✓ |
-| 주문 배송지 조회 | GET | `/orders/{id}/address` |  | ORDER-001 |  |
-| 주문 배송지 등록, 수정 | PATCH | `/orders/{id}/address` |  | ORDER-001 |  |
-| 구매 확정 처리 | POST | `/orders/{id}/confirmation` |  | ORDER-002, ORDER-003 |  |
-| 송장 정보 조회 | GET | `/orders/{id}/shipment` |  | SHIP-002 |  |
-| 송장 정보 등록 | POST | `/orders/{id}/shipment` |  | SHIP-001 |  |
+| 주문 배송지 조회 | GET | `/orders/{id}/address` | ✓ | ORDER-001 | ✓ |
+| 주문 배송지 등록, 수정 | PATCH | `/orders/{id}/address` | ✓ | ORDER-001 | ✓ |
+| 구매 확정 처리 | POST | `/orders/{id}/confirmation` | ✓ | ORDER-002, ORDER-003 | ✓ |
+| 송장 정보 조회 | GET | `/orders/{id}/shipment` | ✓ | SHIP-002 | ✓ |
+| 송장 정보 등록 | POST | `/orders/{id}/shipment` | ✓ | SHIP-001 | ✓ |
 | 환불 요청 목록 조회 | GET | `/orders/{id}/refunds` |  | REFUND-001 |  |
 | 환불 요청 등록 | POST | `/orders/{id}/refunds` |  | REFUND-001 |  |
 | 환불 승인, 거절 처리 | PATCH | `/refunds/{id}` |  | REFUND-002 |  |
 
-> 주문 목록 조회는 `role` 쿼리 파라미터(`BUYER`/`SELLER`, 필수)로 구매 내역(MY-003)/판매·정산 내역(MY-004)을 구분한다. 정산 완료 여부는 주문 상태가 `SETTLED`인지로 판단하며, 정산액은 수수료 없이 주문 금액 그대로다. 주문 생성 API가 아직 없어(위 상시 판매 주문 생성 등) 실제 주문 데이터는 DB에 직접 심어야 확인할 수 있다.
+> 주문 목록 조회는 `role` 쿼리 파라미터(`BUYER`/`SELLER`, 필수)로 구매 내역(MY-003)/판매·정산 내역(MY-004)을 구분한다. 정산 완료 여부는 주문 상태가 `SETTLED`인지로 판단하며, 정산액은 수수료 없이 주문 금액 그대로다.
+>
+> 상시 판매 즉시구매(`POST /orders`)로 주문을 생성하면 결제 금액이 구매자 포인트 `available`에서 `tradeEscrow`(거래 대금 보관)로 옮겨진다. 송장 등록(`POST /orders/{id}/shipment`)은 실제 택배 연동이 없어 등록 시점에 배송 시작~완료(`DELIVERED`)까지 함께 반영하고, 이때 배송 완료 7일 뒤로 자동 구매 확정 시각을 계산해 둔다. 구매 확정(`POST /orders/{id}/confirmation`)은 수동 호출 또는 7일 경과 시 스케줄러가 자동으로 처리하며, `tradeEscrow`를 판매자 `available`로 정산하고 주문 상태를 `SETTLED`로 바꾼다(거래 완료). 환불(REFUND-001/002)과 경매 낙찰 주문(AUCT 연동)은 아직 범위 밖이다.
 
 ## AI 가상 시착 (TryOns)
 

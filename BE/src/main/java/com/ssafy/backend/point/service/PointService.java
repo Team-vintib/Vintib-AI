@@ -18,11 +18,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 포인트 잔액 조회/충전/출금 신청(MY-007), 주문 결제({@link #pay}, SALE-002).
+ * 포인트 잔액 조회/충전/출금 신청(MY-007), 주문 결제·정산({@link #pay}/{@link #settleOrder}, SALE-002/ORDER-002/003).
  *
  * <p>입찰 보류(bidHeld)는 경매 입찰 자체가 아직 없어(AUCT-003 이후) 이번 범위에서도 항상 0이다.
- * 충전은 결제 연동 없는 테스트/데모 전용이고, 출금은 신청까지만 처리한다 — 완료(관리자 승인)는
- * BIZ-001의 사업자 승인과 동일하게 범위 밖이라 DB를 직접 조작해야만 완료 처리된다.
+ * 정산 대기(settling)도 관리자 승인·정산 주기 절차가 정의되지 않아 쓰지 않는다 — 구매 확정 시
+ * 판매자 available로 바로 정산한다. 충전은 결제 연동 없는 테스트/데모 전용이고, 출금은 신청까지만
+ * 처리한다 — 완료(관리자 승인)는 BIZ-001의 사업자 승인과 동일하게 범위 밖이라 DB를 직접 조작해야만
+ * 완료 처리된다.
  */
 @Service
 @RequiredArgsConstructor
@@ -80,6 +82,25 @@ public class PointService {
                 .type(PointTransactionType.PAYMENT)
                 .amount(-amount)
                 .balanceAfter(account.getAvailable())
+                .refType("ORDER")
+                .refId(orderId)
+                .build());
+    }
+
+    /**
+     * 구매 확정 정산(ORDER-002/003) — 구매자의 보관 잔액을 내보내고 판매자에게 바로 정산한다.
+     * 정산 대기(settling) 절차가 없어 판매자 원장만 남긴다(구매자 측은 결제 시점 PAYMENT 기록으로 충분).
+     */
+    @Transactional
+    public void settleOrder(Long buyerId, Long sellerId, Long amount, Long orderId) {
+        getOrCreateAccount(buyerId).releaseEscrow(amount);
+        PointAccount sellerAccount = getOrCreateAccount(sellerId);
+        sellerAccount.settle(amount);
+        pointTransactionRepository.save(PointTransaction.builder()
+                .member(sellerAccount.getMember())
+                .type(PointTransactionType.SETTLEMENT)
+                .amount(amount)
+                .balanceAfter(sellerAccount.getAvailable())
                 .refType("ORDER")
                 .refId(orderId)
                 .build());

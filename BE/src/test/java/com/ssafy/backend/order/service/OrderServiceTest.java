@@ -247,4 +247,46 @@ class OrderServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ORDER_SHIPMENT_ADDRESS_REQUIRED);
     }
+
+    @Test
+    void 배송완료_상태에서_구매확정하면_정산되고_SETTLED로_바뀐다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        realOrder.markShipping();
+        realOrder.markDelivered(LocalDateTime.now());
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+
+        OrderListItemResponse response = orderService.confirmOrder(ORDER_ID, BUYER_ID);
+
+        assertThat(response.status()).isEqualTo(OrderStatus.SETTLED.name());
+        verify(pointService).settleOrder(BUYER_ID, SELLER_ID, 50_000L, realOrder.getId());
+    }
+
+    @Test
+    void 배송완료_전에는_구매확정할_수_없다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+
+        assertThatThrownBy(() -> orderService.confirmOrder(ORDER_ID, BUYER_ID))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_ORDER_STATE);
+    }
+
+    @Test
+    void 배송완료_경과일이_지난_주문은_자동으로_구매확정된다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        realOrder.markShipping();
+        realOrder.markDelivered(LocalDateTime.now().minusDays(8));
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(orderRepository.findByStatusAndAutoConfirmAtLessThanEqual(eq(OrderStatus.DELIVERED), any()))
+                .thenReturn(List.of(realOrder));
+
+        orderService.autoConfirmDueOrders();
+
+        assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.SETTLED);
+        verify(pointService).settleOrder(BUYER_ID, SELLER_ID, 50_000L, realOrder.getId());
+    }
 }

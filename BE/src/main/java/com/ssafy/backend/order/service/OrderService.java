@@ -20,6 +20,7 @@ import com.ssafy.backend.point.service.PointService;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,7 +28,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 주문 조회(MY-003/004), 상시 판매 주문 생성(SALE-002), 배송지·송장(ORDER-001, SHIP-001/002).
+ * 주문 조회(MY-003/004), 상시 판매 주문 생성(SALE-002), 배송지·송장(ORDER-001, SHIP-001/002),
+ * 구매 확정·정산(ORDER-002/003, {@link #confirmOrder}/{@link #autoConfirmDueOrders}).
  * 세금계산서 발행은 {@code InvoiceService}가 담당한다.
  */
 @Service
@@ -44,7 +46,7 @@ public class OrderService {
     /**
      * {@code role}로 구매자/판매자 관점을 구분해 본인 주문 목록을 최신순으로 조회한다(MY-003/004).
      * 정산 완료 여부는 {@code order.status}가 SETTLED인지로 판단하며, 정산액은 수수료 없이
-     * orderPrice 그대로다.
+     * orderPrice 그대로다(구매 확정 시 {@link #confirmOrder}가 실제로 이 상태를 만든다).
      */
     public PageResponse<OrderListItemResponse> getOrders(Long memberId, OrderRole role, Pageable pageable) {
         Page<Order> orders = role == OrderRole.BUYER
@@ -143,6 +145,35 @@ public class OrderService {
         order.markDelivered(now);
 
         return OrderShipmentResponse.from(shipment);
+    }
+
+    /** 구매 확정 처리(ORDER-002) — 구매자만, DELIVERED 상태에서만 가능하다. */
+    @Transactional
+    public OrderListItemResponse confirmOrder(Long orderId, Long buyerId) {
+        Order order = findOrder(orderId, buyerId);
+        if (!order.isBuyer(buyerId)) {
+            throw new CustomException(ErrorCode.ORDER_BUYER_ONLY);
+        }
+        settle(order);
+        return OrderListItemResponse.from(order);
+    }
+
+    /** 자동 구매 확정 배치(ORDER-003) — 배송 완료 후 7일이 지난 주문을 같은 확정 로직으로 처리한다. */
+    @Transactional
+    public void autoConfirmDueOrders() {
+        List<Order> dueOrders = orderRepository.findByStatusAndAutoConfirmAtLessThanEqual(
+                OrderStatus.DELIVERED, LocalDateTime.now());
+        dueOrders.forEach(this::settle);
+    }
+
+    /** tradeEscrow → 판매자 정산 + 상태 전이(거래 완료). 수동 확정/자동 배치가 공유한다. */
+    private void settle(Order order) {
+        if (order.getStatus() != OrderStatus.DELIVERED) {
+            throw new CustomException(ErrorCode.INVALID_ORDER_STATE);
+        }
+        pointService.settleOrder(
+                order.getBuyer().getId(), order.getSeller().getId(), order.getOrderPrice(), order.getId());
+        order.confirmAndSettle();
     }
 
     private Order findOrder(Long orderId, Long memberId) {
