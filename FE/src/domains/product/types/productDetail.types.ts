@@ -7,7 +7,6 @@ export type ProductDetailSaleStatus =
   | 'AUCTION_IN_PROGRESS'
   | 'AUCTION_FAILED'
   | 'SOLD'
-  | 'PRIVATE'
 
 export type AiQualityAnalysisStatus =
   | 'NOT_REQUESTED'
@@ -15,18 +14,6 @@ export type AiQualityAnalysisStatus =
   | 'COMPLETED'
   | 'NO_FINDINGS'
   | 'FAILED'
-
-export type ProductDetailMockScenario =
-  | 'default'
-  | 'mock'
-  | 'loading'
-  | 'error'
-  | 'not-found'
-  | 'sold'
-  | 'ai-not-requested'
-  | 'ai-analyzing'
-  | 'ai-no-findings'
-  | 'ai-failed'
 
 export interface ProductDetailImage {
   id: string
@@ -96,6 +83,7 @@ export interface ProductDetailViewData {
   images: ProductDetailImage[]
   seller: ProductSellerSummary
   linkedLive: ProductLinkedLive | null
+  measurements: Record<string, number>
   similarProducts: SimilarProductPricePoint[]
   sellerDisclosedDefects: SellerDisclosedDefect[]
   aiQualityAnalysis: AiQualityAnalysis

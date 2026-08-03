@@ -1,5 +1,6 @@
 package com.ssafy.backend.auction.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -98,7 +99,7 @@ class AuctionControllerTest {
                 .build());
         linkedProductId = product.getId();
 
-        Live live = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, LocalDateTime.now()));
+        Live live = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, null, LocalDateTime.now()));
         liveId = live.getId();
         liveProductRepository.save(LiveProduct.link(live, linkedProductId, (short) 0, LocalDateTime.now()));
     }
@@ -159,5 +160,124 @@ class AuctionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(configRequestBody(linkedProductId, 10_000L, 1_000L, 60)))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ---------- 현황 조회·시작 (AUCT-002) ----------
+
+    /** 조건을 설정하고 만들어진 경매 ID 를 돌려준다. */
+    private Long 설정된_경매_ID() throws Exception {
+        String body = mockMvc.perform(post("/api/lives/{liveId}/auctions", liveId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configRequestBody(linkedProductId, 10_000L, 1_000L, 60)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        // ObjectMapper 빈이 테스트 컨텍스트에 없어(모듈러 스타터) 필요한 값만 뽑아 쓴다.
+        return Long.parseLong(body.replaceAll(".*\"id\":(\\d+).*", "$1"));
+    }
+
+    @Test
+    void 경매가_없는_라이브의_현황은_200과_null이다() throws Exception {
+        // 아직 경매를 걸지 않은 방송이 정상이다. 404 로 만들면 시청자 진입마다 에러가 뜬다.
+        mockMvc.perform(get("/api/lives/{liveId}/auctions/current", liveId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @Test
+    void 비회원도_경매_현황을_조회할_수_있다() throws Exception {
+        설정된_경매_ID();
+
+        mockMvc.perform(get("/api/lives/{liveId}/auctions/current", liveId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("READY"))
+                .andExpect(jsonPath("$.data.productTitle").value("리바이스 501 빈티지"))
+                // 첫 입찰은 시작가 그대로다.
+                .andExpect(jsonPath("$.data.nextBidPrice").value(10_000))
+                .andExpect(jsonPath("$.data.bidCount").value(0))
+                .andExpect(jsonPath("$.data.serverNow").isNotEmpty());
+    }
+
+    @Test
+    void 호스트가_경매를_시작하면_RUNNING과_종료_예정_시각이_내려온다() throws Exception {
+        Long auctionId = 설정된_경매_ID();
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/start", auctionId)
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("RUNNING"))
+                .andExpect(jsonPath("$.data.startedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.endsAt").isNotEmpty());
+    }
+
+    @Test
+    void 시작한_경매는_현황_조회에서_준비_중_경매보다_먼저_나온다() throws Exception {
+        Long first = 설정된_경매_ID();
+        mockMvc.perform(post("/api/auctions/{auctionId}/start", first)
+                .header("Authorization", "Bearer " + hostToken)).andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/lives/{liveId}/auctions/current", liveId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.auctionId").value(first.intValue()))
+                .andExpect(jsonPath("$.data.status").value("RUNNING"));
+    }
+
+    @Test
+    void 이미_시작한_경매를_다시_시작하면_400이다() throws Exception {
+        Long auctionId = 설정된_경매_ID();
+        mockMvc.perform(post("/api/auctions/{auctionId}/start", auctionId)
+                .header("Authorization", "Bearer " + hostToken)).andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/start", auctionId)
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("A006"));
+    }
+
+    @Test
+    void 진행_중인_경매가_있으면_다른_경매를_시작할_수_없다() throws Exception {
+        // 한 라이브에서 동시에 진행 중인 경매는 1개다(LIVE-004).
+        Long first = 설정된_경매_ID();
+        mockMvc.perform(post("/api/auctions/{auctionId}/start", first)
+                .header("Authorization", "Bearer " + hostToken)).andExpect(status().isOk());
+
+        Product another = productRepository.save(Product.builder()
+                .seller(memberRepository.findAll().get(0))
+                .categoryId(categoryRepository.findAll().get(0).getId())
+                .title("두 번째 상품")
+                .build());
+        liveProductRepository.save(LiveProduct.link(
+                liveRepository.findById(liveId).orElseThrow(), another.getId(), (short) 1, LocalDateTime.now()));
+
+        String body = mockMvc.perform(post("/api/lives/{liveId}/auctions", liveId)
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configRequestBody(another.getId(), 5_000L, 500L, 30)))
+                .andReturn().getResponse().getContentAsString();
+        Long second = Long.parseLong(body.replaceAll(".*\"id\":(\\d+).*", "$1"));
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/start", second)
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("A007"));
+    }
+
+    @Test
+    void 경매_시작은_미인증이면_401이다() throws Exception {
+        Long auctionId = 설정된_경매_ID();
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/start", auctionId))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 존재하지_않는_경매를_시작하면_404다() throws Exception {
+        mockMvc.perform(post("/api/auctions/{auctionId}/start", 999_999_999L)
+                        .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("A005"));
     }
 }

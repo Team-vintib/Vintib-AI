@@ -42,6 +42,10 @@ public class Live extends BaseTimeEntity {
     @Column(name = "thumbnail_url", length = 500)
     private String thumbnailUrl;
 
+    /** 방송 설명(FE 요청 007 §3.5). 시청 화면 헤더에 접어서 보여 준다. 없어도 화면은 동작한다. */
+    @Column(length = 1000)
+    private String description;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private LiveStatus status;
@@ -82,12 +86,14 @@ public class Live extends BaseTimeEntity {
             Member host,
             String title,
             String thumbnailUrl,
+            String description,
             LiveStatus status,
             LocalDateTime scheduledAt,
             LocalDateTime startedAt) {
         this.host = host;
         this.title = title;
         this.thumbnailUrl = thumbnailUrl;
+        this.description = description;
         this.status = status;
         this.scheduledAt = scheduledAt;
         this.startedAt = startedAt;
@@ -96,14 +102,23 @@ public class Live extends BaseTimeEntity {
 
     /** 예약 개설(LIVE-001). 방송 예정 시각이 미래인지는 서비스에서 검증한다. */
     public static Live schedule(
-            Member host, String title, String thumbnailUrl, LocalDateTime scheduledAt) {
-        return new Live(host, title, thumbnailUrl, LiveStatus.SCHEDULED, scheduledAt, null);
+            Member host,
+            String title,
+            String thumbnailUrl,
+            String description,
+            LocalDateTime scheduledAt) {
+        return new Live(
+                host, title, thumbnailUrl, description, LiveStatus.SCHEDULED, scheduledAt, null);
     }
 
     /** 즉시 개설(LIVE-002). 예약 없이 곧바로 진행 중 상태로 만들어진다. */
     public static Live openNow(
-            Member host, String title, String thumbnailUrl, LocalDateTime startedAt) {
-        return new Live(host, title, thumbnailUrl, LiveStatus.LIVE, null, startedAt);
+            Member host,
+            String title,
+            String thumbnailUrl,
+            String description,
+            LocalDateTime startedAt) {
+        return new Live(host, title, thumbnailUrl, description, LiveStatus.LIVE, null, startedAt);
     }
 
     public boolean isHostedBy(Long memberId) {

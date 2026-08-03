@@ -325,17 +325,37 @@ FE `NOW` 배지와 진입 시 기본 선택 상품의 원천이다. 지금은 �
 **`productId: null`은 오류가 아니라 해제다.** `@NotNull`을 걸지 않은 이유 — 호스트가 잡담 구간으로
 넘어가면 아무 상품도 소개하지 않는 상태가 필요한데, 필수로 막으면 한번 지정한 뒤 되돌릴 방법이 없다.
 
-### Phase 6 — 경매 조회·시작 · `-96`(AUCT-002) 신규 작업 · 브랜치 `feat/209-auction-start`
+### Phase 6 — 경매 조회·시작 · `-460` `-461`(AUCT-002) · 브랜치 `feat/209-auction-start` ✅ 완료 (2026-08-03)
 
-- [ ] `GET /api/lives/{liveId}/auctions/current` — snapshot. 없으면 200 + `null` (설계 판단 5)
-- [ ] snapshot 필드 — `auctionId`, `productId`, `status`, `startPrice`, `bidUnit`, `currentPrice`, **`nextBidPrice`**, `topBidderId`, `topBidderNickname`, `scheduledEndAt`, `extensionCount`
-- [ ] `POST /api/lives/{liveId}/auctions/{auctionId}/start` — `READY → RUNNING`, `scheduled_end_at` 계산
-- [ ] `ux_auction_live_running` 위반을 400으로 변환 — 한 라이브에 진행 중 경매는 1개
-- [ ] `/topic/lives/{liveId}/auction` 시작 이벤트
-- [ ] **`ProductCommandPort` 신설** — 경매가 상품 상태를 바꾸는 통로. `product`는 서윤 영역이라 `ProductQueryPort`와 같은 방식으로 격리한다 (설계 판단 11)
-- [ ] **경매 시작 시 `AUCTION_SCHEDULED → AUCTION_IN_PROGRESS`** (설계 판단 10)
-- [ ] **`-394` 보완 — 경매 조건 설정 시 `AUCTION_SCHEDULED`로 전이.** 이미 머지된 코드에 빠져 있어 지금은 상품이 `DRAFT`·`ON_SALE`에 머문다
-- [ ] Swagger + 테스트 (상태 전이 검증 포함)
+- [x] `GET /api/lives/{liveId}/auctions/current` — snapshot. 없으면 200 + `null` (설계 판단 5). 비회원 공개
+- [x] snapshot 필드 — FE 요청 009 §3.1 이름을 그대로 따랐다(`highestBidderId`/`highestBidderNickname`/`endsAt`/`serverNow`) + `nextBidPrice`·`extensionCount`·`durationSeconds`
+- [x] `POST /api/auctions/{auctionId}/start` — `READY → RUNNING`, `endsAt` 계산
+- [x] 한 라이브에 진행 중 경매는 1개 — 앱에서 409(`A007`)로 막고, 부분 UNIQUE 인덱스가 최후 방어선
+- [x] `/topic/lives/{liveId}/auctions` 시작 이벤트 (`AUCTION_STARTED` + 현황 전체)
+- [x] **`ProductCommandPort` 신설** (설계 판단 11)
+- [x] **경매 시작 시 → `AUCTION_IN_PROGRESS`** (설계 판단 10)
+- [x] **`-394` 보완 — 조건 설정 시 `AUCTION_SCHEDULED`로 전이**
+- [x] Swagger + 테스트 (서비스 16건, 컨트롤러 15건, STOMP 2건)
+
+**계획과 달라진 것**
+
+| 항목 | 계획 | 실제 | 이유 |
+| --- | --- | --- | --- |
+| 시작 엔드포인트 | `POST /api/lives/{liveId}/auctions/{auctionId}/start` | `POST /api/auctions/{auctionId}/start` | `auctionId`만으로 유일하게 정해지고, **FE 요청서(009 §3.2)가 이 형태로 요청**했다 |
+| 토픽 | `/topic/lives/{liveId}/auction` | `/topic/lives/{liveId}/auctions` | FE 요청서 표기를 따랐다 |
+| snapshot 필드명 | `topBidderId`·`scheduledEndAt` | `highestBidderId`·`endsAt` | 같은 이유 |
+| `Bid` 엔티티 | Phase 7 | **Phase 6에서 생성**(읽기만) | snapshot 의 `bidCount`를 0으로 하드코딩하면 그대로 남는다. 쓰기 경로는 Phase 7 그대로 |
+
+**Phase 6에서 새로 드러난 문제 — 부분 인덱스가 실제 DB에 없었다**
+
+`schema.sql`이 동시성 안전망으로 선언한 부분 UNIQUE 인덱스 세 개(`ux_auction_live_running`,
+`ux_bid_auction_price`, `ux_live_product_active`)가 **운영·로컬 DB에 존재하지 않았다.** JPA는
+`WHERE` 절이 붙은 인덱스를 표현할 수 없는데 우리는 `ddl-auto`로 엔티티에서 스키마를 만들기
+때문이다. 즉 "락이 실패했을 때의 최후 방어선"이 통째로 비어 있었다 — **Phase 7 입찰 동시성
+설계가 이 인덱스를 전제로 하고 있어 그대로 갔으면 안전망 없이 갔을 것이다.**
+
+`PartialIndexInitializer`(`ApplicationRunner`)가 기동 시 `CREATE ... IF NOT EXISTS`로 만든다.
+나중에 Flyway를 도입하면 `schema.sql`이 그대로 기준이 되므로 이 클래스는 지운다.
 
 ### Phase 7 — 입찰 · `-97`(AUCT-003) `-98`(AUCT-004~006) 신규 작업 · 브랜치 `feat/209-auction-bid`
 

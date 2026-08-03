@@ -70,7 +70,7 @@ class LiveViewerCountStompTest {
                 .password("encoded")
                 .name("호스트")
                 .build());
-        liveId = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, LocalDateTime.now())).getId();
+        liveId = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, null, LocalDateTime.now())).getId();
     }
 
     @AfterEach

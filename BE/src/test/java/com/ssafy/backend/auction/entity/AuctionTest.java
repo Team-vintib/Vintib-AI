@@ -15,6 +15,7 @@ class AuctionTest {
             Member.builder().email("host@example.com").password("encoded").name("호스트").build(),
             "빈티지 데님 라이브",
             null,
+            null,
             LocalDateTime.of(2026, 7, 27, 21, 30));
 
     @Test

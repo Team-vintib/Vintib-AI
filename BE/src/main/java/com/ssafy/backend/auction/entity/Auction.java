@@ -127,4 +127,45 @@ public class Auction extends BaseTimeEntity {
             Live live, Long productId, Long startPrice, Long bidUnit, Integer durationSeconds) {
         return new Auction(live, productId, startPrice, bidUnit, durationSeconds);
     }
+
+    /**
+     * 경매를 시작한다(AUCT-002). {@code READY → RUNNING}이며 종료 예정 시각이 이때 확정된다.
+     *
+     * <p><b>시각은 서버가 준다.</b> 종료 판정도 서버 시각 기준이라 시간 축이 둘로 갈리면
+     * "브라우저에서는 아직 남았는데 서버는 이미 끝난" 구간이 생긴다(erd.md §6).
+     *
+     * <p>전이 가능 여부는 {@link #isReady()}로 미리 확인해야 한다 — 왜 안 되는지를 에러 코드로
+     * 구분해 돌려주는 책임은 서비스에 있다.
+     */
+    public void start(LocalDateTime at) {
+        this.status = AuctionStatus.RUNNING;
+        this.startedAt = at;
+        this.scheduledEndAt = at.plusSeconds(durationSeconds);
+    }
+
+    public boolean isReady() {
+        return status == AuctionStatus.READY;
+    }
+
+    public boolean isRunning() {
+        return status == AuctionStatus.RUNNING;
+    }
+
+    /**
+     * 다음에 넣어야 하는 최소 입찰가.
+     *
+     * <p><b>첫 입찰은 시작가 그대로다.</b> 시작가에 증액 단위를 더해 버리면 시작가로는 아무도
+     * 살 수 없게 되어 "시작가"라는 말이 무의미해진다. 두 번째부터 현재가 + 증액 단위다.
+     *
+     * <p>FE 입찰 버튼이 이 값을 그대로 눌러 보내면 되도록 서버가 계산해 내려준다 — 클라이언트가
+     * 같은 계산을 다시 하면 정책이 바뀔 때 두 곳이 어긋난다.
+     */
+    public long nextBidPrice() {
+        return hasBid() ? currentPrice + bidUnit : startPrice;
+    }
+
+    /** 입찰이 한 번이라도 들어왔는지. 현재가가 아니라 최고 입찰자 유무로 판정한다 — 시작가가 0일 수 있다. */
+    public boolean hasBid() {
+        return topBidderId != null;
+    }
 }
