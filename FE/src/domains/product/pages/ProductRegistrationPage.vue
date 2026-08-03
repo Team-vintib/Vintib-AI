@@ -191,12 +191,6 @@ const recommendedPrices: ProductRegistrationRecommendedPrice[] = [
   { grade: 'C', label: 'C급', price: 56000 },
 ]
 
-const auctionLiveOptions = [
-  { id: 'live-20260730-1', label: '7월 30일 21:00 빈티지 아우터 라이브' },
-  { id: 'live-20260731-1', label: '7월 31일 20:00 데일리 셀렉션 라이브' },
-  { id: 'live-20260801-1', label: '8월 1일 19:30 주말 경매 라이브' },
-]
-
 const createInitialDraft = (): ProductRegistrationDraft => ({
   photos: [],
   representativePhotoId: '',
@@ -230,12 +224,13 @@ const draft = reactive<ProductRegistrationDraft>(createInitialDraft())
 const currentStep = computed(() => PRODUCT_REGISTRATION_STEPS[currentStepIndex.value])
 const isFirstStep = computed(() => currentStepIndex.value === 0)
 const isCompleteStep = computed(() => currentStep.value.id === 'complete')
-const isSubmitStep = computed(() => currentStep.value.id === 'pricing')
+const hasRegistrationSubmitted = computed(() => Boolean(registeredProductId.value))
+const isSubmitStep = computed(() => isCompleteStep.value && !hasRegistrationSubmitted.value)
 const canShowCompletenessPanel = computed(() =>
   ['photos', 'condition', 'pricing'].includes(currentStep.value.id),
 )
 const nextActionLabel = computed(() =>
-  isSubmitStep.value && isSubmittingRegistration.value ? '등록 중' : isSubmitStep.value ? '등록 완료' : '다음',
+  isSubmitStep.value && isSubmittingRegistration.value ? '등록 중' : isSubmitStep.value ? '등록' : '다음',
 )
 const frontPhotos = computed(() => draft.photos.filter((photo) => photo.role === 'front'))
 const backPhotos = computed(() => draft.photos.filter((photo) => photo.role === 'back'))
@@ -283,6 +278,18 @@ const getMeasurementError = (fieldId: string, value: string | number) => {
 }
 
 const selectedCategoryCode = computed(() => {
+  if (PRODUCT_REGISTRATION_MEASUREMENT_FIELDS_BY_CATEGORY[categoryMajorId.value]) {
+    return categoryMajorId.value
+  }
+
+  const selectedMajorCategory = categories.value.find(
+    (category) => String(category.id) === categoryMajorId.value,
+  )
+
+  if (selectedMajorCategory) {
+    return getCategoryCode(selectedMajorCategory.name)
+  }
+
   if (PRODUCT_REGISTRATION_MEASUREMENT_FIELDS_BY_CATEGORY[draft.categoryId]) {
     return draft.categoryId
   }
@@ -662,8 +669,16 @@ const productInfoCompletenessItems = computed<ProductInfoCompletenessItem[]>(() 
     } satisfies ProductInfoCompletenessItem
   }),
   {
-    id: 'quality-result',
-    label: '품질 검증',
+    id: 'condition-grade',
+    label: '상품 상태',
+    stepId: 'condition',
+    priority: 'strong',
+    targetId: 'condition-grade-title',
+    isCompleted: () => Boolean(draft.conditionGrade),
+  },
+  {
+    id: 'ai-quality',
+    label: 'AI 품질 검증',
     stepId: 'condition',
     priority: 'strong',
     targetId: 'ai-quality-title',
@@ -732,6 +747,84 @@ const productInfoCompletenessMessage = computed(() => {
 const visibleCompletenessItems = computed(() =>
   [...completedCompletenessItems.value, ...incompleteCompletenessItems.value],
 )
+
+const findOptionLabel = (options: { id: string; label: string }[], id: string) =>
+  options.find((option) => option.id === id)?.label ?? ''
+
+const selectedColorLabel = computed(() => {
+  if (draft.color === 'etc') {
+    return draft.customColor.trim() || '기타'
+  }
+
+  return findOptionLabel(PRODUCT_REGISTRATION_COLOR_OPTIONS, draft.color) || '-'
+})
+
+const selectedCategoryLabel = computed(() => {
+  if (draft.categoryId === 'etc') {
+    return draft.customCategory.trim() || '기타'
+  }
+
+  const selectedOption = [...majorCategoryOptions.value, ...minorCategoryOptions.value].find(
+    (option) => option.id === draft.categoryId,
+  )
+  const selectedCategory = categories.value.find((category) => String(category.id) === draft.categoryId)
+
+  return selectedOption?.label || selectedCategory?.name || '-'
+})
+
+const selectedConditionGradeLabel = computed(() =>
+  findOptionLabel(PRODUCT_REGISTRATION_CONDITION_OPTIONS, draft.conditionGrade) || '-',
+)
+
+const selectedSaleTypeLabel = computed(() =>
+  findOptionLabel(PRODUCT_REGISTRATION_SALE_TYPE_OPTIONS, draft.saleType) || '-',
+)
+
+const selectedPriceLabel = computed(() => {
+  if (draft.saleType === 'DIRECT' && isPositivePrice(draft.directSalePrice)) {
+    return formatPrice(Number(draft.directSalePrice))
+  }
+
+  if (draft.saleType === 'AUCTION' && isPositivePrice(draft.auctionStartPrice)) {
+    return formatPrice(Number(draft.auctionStartPrice))
+  }
+
+  return '-'
+})
+
+const selectedMeasurementSummary = computed(() => {
+  const values = activeMeasurementFields.value
+    .map((field) => {
+      const value = normalizeMeasurementValue(draft.measurements[field.id] ?? '')
+
+      return value ? `${field.label} ${value}cm` : ''
+    })
+    .filter(Boolean)
+
+  return values.length ? values.join(', ') : '-'
+})
+
+const selectedDefectSummary = computed(() => {
+  if (draft.hasDefect === false) return '하자 없음'
+  if (draft.hasDefect === true) return draft.sellerDefectDescription.trim() || '하자 있음'
+
+  return '-'
+})
+
+const selectedAiQualitySummary = computed(() =>
+  areAllAiPhotosConfirmed.value ? `${draft.aiPhotoResults.length}개 사진 확인 완료` : '-',
+)
+
+const editRegistrationStep = (stepId: ProductRegistrationStepId) => {
+  const stepIndex = PRODUCT_REGISTRATION_STEPS.findIndex((step) => step.id === stepId)
+
+  if (stepIndex < 0) {
+    return
+  }
+
+  currentStepIndex.value = stepIndex
+  scrollToPageTop()
+}
 
 const revokePhotoPreviewUrl = (photo: ProductRegistrationPhotoDraft) => {
   if (photo.previewUrl) {
@@ -1035,7 +1128,7 @@ const scrollToPageTop = () => {
 }
 
 const moveToPreviousStep = () => {
-  if (isFirstStep.value || isCompleteStep.value) {
+  if (isFirstStep.value || hasRegistrationSubmitted.value) {
     return
   }
 
@@ -1050,7 +1143,7 @@ const proceedToNextStep = async (skipCompletenessPrompt = false) => {
 
   markCurrentStepTouched()
 
-  if (isCompleteStep.value) {
+  if (isCompleteStep.value && hasRegistrationSubmitted.value) {
     return
   }
 
@@ -1084,6 +1177,11 @@ const proceedToNextStep = async (skipCompletenessPrompt = false) => {
     }
 
     isSubmittingRegistration.value = false
+
+    if (isCompleteStep.value) {
+      scrollToPageTop()
+      return
+    }
   }
 
   currentStepIndex.value += 1
@@ -1235,8 +1333,8 @@ onBeforeUnmount(() => {
               <ProductPhotoUploader
                 id="product-front-photo"
                 class="product-registration__photo-uploader"
-                title="Front View 이미지 업로드"
-                description="옷의 앞면이 잘 보이는 사진을 등록해 주세요."
+                title="상품 이미지 1"
+                :description="'의류는 앞면을,\n그 외 상품은 전체 형태가 잘 보이도록 촬영해 주세요.'"
                 required
                 :requirement-label="frontPhotoCountLabel"
                 :requirement-met="frontPhotos.length > 0"
@@ -1252,8 +1350,8 @@ onBeforeUnmount(() => {
               <ProductPhotoUploader
                 id="product-back-photo"
                 class="product-registration__photo-uploader"
-                title="Back View 이미지 업로드"
-                description="옷의 뒷면이 잘 보이는 사진을 등록해 주세요."
+                title="상품 이미지 2"
+                :description="'의류는 뒷면을,\n그 외 상품은 다른 각도에서 촬영해 주세요.'"
                 required
                 :requirement-label="backPhotoCountLabel"
                 :requirement-met="backPhotos.length > 0"
@@ -2115,37 +2213,170 @@ onBeforeUnmount(() => {
                   </span>
                 </label>
 
-                <label class="product-registration__field">
-                  <span>경매 라이브</span>
-                  <select class="product-registration__select" v-model="draft.linkedLiveId">
-                    <option value="">선택 안 함</option>
-                    <option
-                      v-for="live in auctionLiveOptions"
-                      :key="live.id"
-                      :value="live.id"
-                    >
-                      {{ live.label }}
-                    </option>
-                  </select>
-                </label>
               </div>
             </section>
           </form>
 
-          <div v-if="currentStep.id === 'complete'" class="product-registration__complete" role="status">
+          <section
+            v-else-if="currentStep.id === 'complete' && !hasRegistrationSubmitted"
+            class="product-registration__review"
+            aria-labelledby="registration-review-title"
+          >
+            <div class="product-registration__section-header">
+              <div>
+                <h3 id="registration-review-title">입력 정보 검증</h3>
+                <p>등록 전에 입력한 상품 정보를 한 번 더 확인해 주세요.</p>
+              </div>
+            </div>
+
+            <article class="product-registration__review-card">
+              <div class="product-registration__review-card-header">
+                <h4>기본 정보</h4>
+                <button
+                  class="product-registration__button product-registration__button--secondary"
+                  type="button"
+                  @click="editRegistrationStep('photos')"
+                >
+                  정보 수정하기
+                </button>
+              </div>
+              <dl class="product-registration__review-list">
+                <div>
+                  <dt>이미지</dt>
+                  <dd>앞면 {{ frontPhotos.length }}장 / 뒷면 {{ backPhotos.length }}장 / 추가 {{ additionalPhotos.length }}장</dd>
+                </div>
+                <div>
+                  <dt>상품명</dt>
+                  <dd>{{ draft.name || '-' }}</dd>
+                </div>
+                <div>
+                  <dt>상품 설명</dt>
+                  <dd>{{ draft.description || '-' }}</dd>
+                </div>
+                <div>
+                  <dt>색상</dt>
+                  <dd>{{ selectedColorLabel }}</dd>
+                </div>
+                <div>
+                  <dt>브랜드</dt>
+                  <dd>{{ draft.brand || '-' }}</dd>
+                </div>
+                <div>
+                  <dt>카테고리</dt>
+                  <dd>{{ selectedCategoryLabel }}</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article class="product-registration__review-card">
+              <div class="product-registration__review-card-header">
+                <h4>사이즈 / 소재</h4>
+                <button
+                  class="product-registration__button product-registration__button--secondary"
+                  type="button"
+                  @click="editRegistrationStep('photos')"
+                >
+                  정보 수정하기
+                </button>
+              </div>
+              <dl class="product-registration__review-list">
+                <div>
+                  <dt>사이즈</dt>
+                  <dd>{{ draft.size || '-' }}</dd>
+                </div>
+                <div>
+                  <dt>소재</dt>
+                  <dd>{{ draft.material || '-' }}</dd>
+                </div>
+                <div>
+                  <dt>실측</dt>
+                  <dd>{{ selectedMeasurementSummary }}</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article class="product-registration__review-card">
+              <div class="product-registration__review-card-header">
+                <h4>품질</h4>
+                <button
+                  class="product-registration__button product-registration__button--secondary"
+                  type="button"
+                  @click="editRegistrationStep('condition')"
+                >
+                  정보 수정하기
+                </button>
+              </div>
+              <dl class="product-registration__review-list">
+                <div>
+                  <dt>상품 상태</dt>
+                  <dd>{{ selectedConditionGradeLabel }}</dd>
+                </div>
+                <div>
+                  <dt>하자 정보</dt>
+                  <dd>{{ selectedDefectSummary }}</dd>
+                </div>
+                <div>
+                  <dt>AI 품질 검증</dt>
+                  <dd>{{ selectedAiQualitySummary }}</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article class="product-registration__review-card">
+              <div class="product-registration__review-card-header">
+                <h4>가격</h4>
+                <button
+                  class="product-registration__button product-registration__button--secondary"
+                  type="button"
+                  @click="editRegistrationStep('pricing')"
+                >
+                  정보 수정하기
+                </button>
+              </div>
+              <dl class="product-registration__review-list">
+                <div>
+                  <dt>판매 방식</dt>
+                  <dd>{{ selectedSaleTypeLabel }}</dd>
+                </div>
+                <div>
+                  <dt>가격</dt>
+                  <dd>{{ selectedPriceLabel }}</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article class="product-registration__review-card">
+              <div class="product-registration__review-card-header">
+                <h4>AI 착용컷</h4>
+                <button
+                  class="product-registration__button product-registration__button--secondary"
+                  type="button"
+                  @click="editRegistrationStep('photos')"
+                >
+                  정보 수정하기
+                </button>
+              </div>
+              <dl class="product-registration__review-list">
+                <div>
+                  <dt>사용 여부</dt>
+                  <dd>{{ draft.aiModelEnabled ? '사용함' : '사용 안 함' }}</dd>
+                </div>
+                <div v-if="draft.aiModelEnabled">
+                  <dt>AI 모델</dt>
+                  <dd>{{ aiModelGenderLabel }}</dd>
+                </div>
+              </dl>
+            </article>
+          </section>
+
+          <div
+            v-if="currentStep.id === 'complete' && hasRegistrationSubmitted"
+            class="product-registration__complete"
+            role="status"
+          >
             <span class="product-registration__complete-icon" aria-hidden="true">✓</span>
             <h3>상품 등록이 완료되었습니다.</h3>
             <p>등록한 상품을 확인하거나 이어서 새 상품을 등록할 수 있습니다.</p>
-            <dl class="product-registration__complete-summary">
-              <div>
-                <dt>AI 착용컷</dt>
-                <dd>{{ draft.aiModelEnabled ? '사용함' : '사용 안 함' }}</dd>
-              </div>
-              <div v-if="draft.aiModelEnabled">
-                <dt>AI 모델</dt>
-                <dd>{{ aiModelGenderLabel }}</dd>
-              </div>
-            </dl>
             <div class="product-registration__complete-actions">
               <button
                 class="product-registration__button product-registration__button--primary"
@@ -2172,7 +2403,7 @@ onBeforeUnmount(() => {
             {{ registrationSubmitError }}
           </p>
 
-          <div v-if="!isCompleteStep" class="product-registration__actions">
+          <div v-if="!hasRegistrationSubmitted" class="product-registration__actions">
             <button
               class="product-registration__button product-registration__button--ghost"
               type="button"
@@ -2183,7 +2414,7 @@ onBeforeUnmount(() => {
             <button
               class="product-registration__button product-registration__button--secondary"
               type="button"
-              :disabled="isFirstStep || isSubmittingRegistration"
+              :disabled="isFirstStep || isSubmittingRegistration || hasRegistrationSubmitted"
               @click="moveToPreviousStep"
             >
               이전
@@ -2373,7 +2604,7 @@ onBeforeUnmount(() => {
 
 .product-registration__body--centered {
   justify-content: center;
-  grid-template-columns: minmax(0, 880px);
+  grid-template-columns: minmax(0, 1120px);
 }
 
 .product-registration__panel {
@@ -2409,7 +2640,7 @@ onBeforeUnmount(() => {
 
 .product-registration__completeness--desktop {
   position: sticky;
-  top: var(--space-6);
+  top: calc(72px + var(--space-6));
 }
 
 .product-registration__completeness--mobile {
@@ -3221,6 +3452,68 @@ onBeforeUnmount(() => {
   font-weight: var(--font-weight-bold);
 }
 
+.product-registration__review {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.product-registration__review-card {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.product-registration__review-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.product-registration__review-card-header h4 {
+  color: var(--color-text-primary);
+  font-size: 18px;
+  font-weight: var(--font-weight-bold);
+  line-height: 26px;
+}
+
+.product-registration__review-card-header .product-registration__button {
+  min-width: 120px;
+  height: var(--button-height-small);
+  padding: 0 var(--space-3);
+  font-size: 13px;
+}
+
+.product-registration__review-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.product-registration__review-list div {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 112px minmax(0, 1fr);
+}
+
+.product-registration__review-list dt {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.product-registration__review-list dd {
+  min-width: 0;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
 .product-registration__complete {
   display: grid;
   justify-items: center;
@@ -3256,37 +3549,6 @@ onBeforeUnmount(() => {
   max-width: 520px;
   color: var(--color-text-secondary);
   line-height: var(--line-height-body);
-}
-
-.product-registration__complete-summary {
-  display: grid;
-  width: min(100%, 360px);
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-  text-align: left;
-}
-
-.product-registration__complete-summary div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.product-registration__complete-summary dt {
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
-}
-
-.product-registration__complete-summary dd {
-  color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: var(--font-weight-bold);
-  line-height: 20px;
 }
 
 .product-registration__complete-actions,
@@ -3401,9 +3663,18 @@ onBeforeUnmount(() => {
   }
 
   .product-registration__section-header,
-  .product-registration__ai-card {
+  .product-registration__ai-card,
+  .product-registration__review-card-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .product-registration__review-card-header .product-registration__button {
+    width: 100%;
+  }
+
+  .product-registration__review-list div {
+    grid-template-columns: 1fr;
   }
 }
 

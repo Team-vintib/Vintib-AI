@@ -181,7 +181,7 @@ const handleFileChange = (event: Event) => {
   color: var(--color-text-secondary);
   font-size: 14px;
   line-height: 20px;
-  white-space: nowrap;
+  white-space: pre-line;
 }
 
 .product-photo-uploader__trigger {
@@ -292,10 +292,6 @@ const handleFileChange = (event: Event) => {
 
   .product-photo-uploader__trigger {
     width: 100%;
-  }
-
-  .product-photo-uploader__header p {
-    white-space: normal;
   }
 
   .product-photo-uploader__title-text {
