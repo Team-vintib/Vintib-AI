@@ -64,29 +64,25 @@ CONFUSION_PAIRS: tuple[tuple[str, str], ...] = (
 
 # 색상 팔레트 코드 — color.py의 PALETTE 키 집합과 같아야 한다(hex는 크롤러가 안 쓴다).
 # **잠정값**: BE/FE 확정 전이라 바뀔 수 있다(브리핑 §1).
+# 13종 + MIXED로 사용자 확정(2026-08-03). 근거·은퇴 코드 매핑은
+# `../product-info-check/color.py`의 PALETTE 주석 참고 — 값은 항상 그쪽과 일치시킨다.
 PALETTE_CODES: tuple[str, ...] = (
     "BLACK",
     "WHITE",
     "GRAY",
-    "IVORY",
-    "BEIGE",
-    "BROWN",
-    "KHAKI",
-    "NAVY",
-    "BLUE",
-    "SKYBLUE",
-    "GREEN",
-    "YELLOW",
-    "ORANGE",
     "RED",
+    "ORANGE",
     "PINK",
+    "YELLOW",
+    "BROWN",
+    "GREEN",
+    "BLUE",
     "PURPLE",
-    "WINE",
-    "SILVER",
-    "GOLD",
+    "BEIGE",
+    "NAVY",
 )
 
-MULTI_LABEL = "MULTI"
+MIXED_LABEL = "MIXED"
 
 # 브리핑 §4.1 — 촬영유형. 크롤링만으로는 판별할 수 없어서 사이트 스펙의 기본값 선언이나
 # 사후 라벨링으로 채운다.

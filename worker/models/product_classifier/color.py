@@ -26,31 +26,26 @@ class ColorExtractorNotReady(Exception):
     """활성 백엔드가 준비되지 않음(라이브러리 미설치 등)."""
 
 
-# 잠정 색상 팔레트(코드 -> hex). BE/FE 확정 전 placeholder — CH012 §12 "색상 팔레트 정의
-# 주체" 미결정 사항 참고. `AI/validation/CLASS/product-info-check/color.py`와 동일한 값을
-# 쓴다. FE가 실제 팔레트를 확정하면 이 dict만 갱신하면 된다.
+# 색상 팔레트(코드 -> hex). **13종 + MIXED로 사용자가 확정했다(2026-08-03)** — 이전 19종에서
+# IVORY·KHAKI·SKYBLUE·WINE·SILVER·GOLD를 뺐다. 선정 근거와 은퇴 코드 매핑은
+# `AI/validation/CLASS/product-info-check/color.py`의 주석 참고 — 두 파일은 항상 같은 값을
+# 쓴다(한쪽만 고치면 워커와 검증 스파이크의 라벨 집합이 갈린다).
 PALETTE: dict[str, str] = {
     "BLACK": "#1A1A1A",
     "WHITE": "#FFFFFF",
     "GRAY": "#9B9B9B",
-    "IVORY": "#F1EEE3",
-    "BEIGE": "#D8C7A8",
-    "BROWN": "#7B5B3A",
-    "KHAKI": "#8C8560",
-    "NAVY": "#22304A",
-    "BLUE": "#3B6FB6",
-    "SKYBLUE": "#8FC1E3",
-    "GREEN": "#4F7942",
-    "YELLOW": "#E8D44D",
-    "ORANGE": "#E08A2E",
     "RED": "#C43D3D",
+    "ORANGE": "#E08A2E",
     "PINK": "#E6A9C0",
+    "YELLOW": "#E8D44D",
+    "BROWN": "#7B5B3A",
+    "GREEN": "#4F7942",
+    "BLUE": "#3B6FB6",
     "PURPLE": "#7D5BA6",
-    "WINE": "#6E2A3A",
-    "SILVER": "#C7C9CC",
-    "GOLD": "#C9A646",
+    "BEIGE": "#D8C7A8",
+    "NAVY": "#22304A",
 }
-MULTI_LABEL = "MULTI"  # 팔레트 색 하나로 스냅하기 어려운 패턴/멀티컬러용 특수 라벨
+MIXED_LABEL = "MIXED"  # 팔레트 색 하나로 스냅하기 어려운 패턴/멀티컬러용 특수 라벨
 
 
 @dataclass

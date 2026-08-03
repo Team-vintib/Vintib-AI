@@ -5,7 +5,7 @@
 
 - 쇼핑몰 상품명의 색상은 **대표 이미지의 색이 아니라 옵션 전체**를 나열하는 경우가 많다
   ("[3color] 오버핏 니트" / "블랙/아이보리/차콜").
-- "차콜", "멜란지그레이", "인디고"처럼 팔레트 19종에 1:1로 안 떨어지는 표현이 흔하다.
+- "차콜", "멜란지그레이", "인디고"처럼 팔레트 13종에 1:1로 안 떨어지는 표현이 흔하다.
 
 그래서 이 모듈의 결과는 `CollectedItem.color_hints`에만 들어가고 `primary_color`는 `None`으로
 남는다. 나중에 사람이 검수하거나 VLM으로 채울 때 **후보를 좁혀주는 용도**다.
@@ -15,35 +15,70 @@
 
 from __future__ import annotations
 
-from labels import MULTI_LABEL, PALETTE_CODES
+from labels import MIXED_LABEL, PALETTE_CODES
 from mapping import normalize
 
 # 팔레트 코드 -> 한국어/영어 표기 변형. 정규화(공백 제거·소문자)된 형태로 적는다.
+# 팔레트가 13종으로 줄면서(2026-08-03) 은퇴한 6종(IVORY/KHAKI/SKYBLUE/WINE/SILVER/GOLD)의
+# 어휘는 **버리지 않고 흡수 대상 코드로 옮겼다** — 상품명에 "아이보리"가 있으면 이제
+# WHITE 후보로, "카키/올리브"는 GREEN 후보로 잡혀야 한다. 지우면 그 상품들이 색상 힌트
+# 없이 수집된다.
 _COLOR_TERMS: dict[str, tuple[str, ...]] = {
     "BLACK": ("블랙", "검정", "검은", "먹색", "black"),
-    "WHITE": ("화이트", "흰색", "백색", "white"),
-    "GRAY": ("그레이", "회색", "차콜", "챠콜", "멜란지", "gray", "grey", "charcoal"),
-    "IVORY": ("아이보리", "오트밀", "크림", "ivory", "cream", "oatmeal"),
-    "BEIGE": ("베이지", "샌드", "카멜", "beige", "sand", "camel"),
-    "BROWN": ("브라운", "갈색", "초코", "모카", "brown", "choco", "mocha"),
-    "KHAKI": ("카키", "올리브", "khaki", "olive"),
+    "WHITE": ("화이트", "흰색", "백색", "아이보리", "오트밀", "크림", "white", "ivory", "cream"),
+    "GRAY": (
+        "그레이",
+        "회색",
+        "차콜",
+        "챠콜",
+        "멜란지",
+        "실버",
+        "은색",
+        "gray",
+        "grey",
+        "charcoal",
+        "silver",
+    ),
+    "BEIGE": ("베이지", "샌드", "beige", "sand"),
+    "BROWN": ("브라운", "갈색", "초코", "모카", "카멜", "brown", "choco", "mocha", "camel"),
     "NAVY": ("네이비", "감청", "navy"),
-    "BLUE": ("블루", "파랑", "파란", "인디고", "코발트", "blue", "indigo", "cobalt"),
-    "SKYBLUE": ("스카이블루", "하늘색", "라이트블루", "skyblue", "lightblue"),
-    "GREEN": ("그린", "초록", "민트", "green", "mint"),
-    "YELLOW": ("옐로우", "옐로", "노랑", "노란", "머스타드", "yellow", "mustard"),
+    "BLUE": (
+        "블루",
+        "파랑",
+        "파란",
+        "인디고",
+        "코발트",
+        "스카이블루",
+        "하늘색",
+        "라이트블루",
+        "blue",
+        "indigo",
+        "cobalt",
+        "skyblue",
+        "lightblue",
+    ),
+    "GREEN": ("그린", "초록", "민트", "카키", "올리브", "green", "mint", "khaki", "olive"),
+    "YELLOW": (
+        "옐로우",
+        "옐로",
+        "노랑",
+        "노란",
+        "머스타드",
+        "골드",
+        "금색",
+        "yellow",
+        "mustard",
+        "gold",
+    ),
     "ORANGE": ("오렌지", "주황", "코랄", "orange", "coral"),
-    "RED": ("레드", "빨강", "빨간", "red"),
+    "RED": ("레드", "빨강", "빨간", "와인", "버건디", "마룬", "red", "wine", "burgundy", "maroon"),
     "PINK": ("핑크", "분홍", "로즈", "pink", "rose"),
     "PURPLE": ("퍼플", "보라", "라벤더", "바이올렛", "purple", "lavender", "violet"),
-    "WINE": ("와인", "버건디", "마룬", "wine", "burgundy", "maroon"),
-    "SILVER": ("실버", "은색", "silver"),
-    "GOLD": ("골드", "금색", "gold"),
 }
 
 assert set(_COLOR_TERMS) == set(PALETTE_CODES), "색상어 사전이 팔레트 코드 집합과 어긋난다"
 
-# 이 단어들이 있으면 단색 스냅이 오히려 틀린다 — MULTI 후보로 표시한다(브리핑 §1의 특수값).
+# 이 단어들이 있으면 단색 스냅이 오히려 틀린다 — MIXED 후보로 표시한다(브리핑 §1의 특수값).
 _MULTI_TERMS: tuple[str, ...] = (
     "체크",
     "스트라이프",
@@ -76,7 +111,7 @@ _MULTI_OPTION_TERMS: tuple[str, ...] = ("color", "컬러", "colors")
 def extract_color_hints(*texts: str) -> list[str]:
     """상품명·옵션 텍스트에서 팔레트 코드 후보를 등장 순서대로 뽑는다(중복 제거).
 
-    패턴/프린트 단어가 있으면 `MULTI`도 후보에 넣는다. 아무것도 못 찾으면 빈 리스트.
+    패턴/프린트 단어가 있으면 `MIXED`도 후보에 넣는다. 아무것도 못 찾으면 빈 리스트.
     """
     joined = normalize(" ".join(t for t in texts if t))
     if not joined:
@@ -92,7 +127,7 @@ def extract_color_hints(*texts: str) -> list[str]:
     hints = [code for _, code in sorted(found)]
 
     if any(term in joined for term in _MULTI_TERMS):
-        hints.append(MULTI_LABEL)
+        hints.append(MIXED_LABEL)
     return list(dict.fromkeys(hints))
 
 

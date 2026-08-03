@@ -220,11 +220,20 @@ class TestColorHints:
         assert extract_color_hints("차콜 맨투맨") == ["GRAY"]
 
     def test_multiple_options_are_all_kept(self):
+        # 팔레트 13종 개편(2026-08-03)으로 IVORY가 없어졌다 — "아이보리"는 이제 WHITE가 받는다.
         hints = extract_color_hints("[3color] 니트 (블랙/아이보리)")
-        assert set(hints) == {"BLACK", "IVORY"}
+        assert set(hints) == {"BLACK", "WHITE"}
+
+    def test_retired_color_terms_map_to_survivors(self):
+        """은퇴한 6종의 어휘를 지우지 않고 흡수 대상 코드로 옮겼는지 고정한다 —
+        지우면 그 상품들이 색상 힌트 없이 수집된다."""
+        assert extract_color_hints("카키 카고팬츠") == ["GREEN"]
+        assert extract_color_hints("스카이블루 셔츠") == ["BLUE"]
+        assert extract_color_hints("버건디 니트") == ["RED"]
+        assert extract_color_hints("실버 자켓") == ["GRAY"]
 
     def test_pattern_adds_multi(self):
-        assert "MULTI" in extract_color_hints("체크 셔츠")
+        assert "MIXED" in extract_color_hints("체크 셔츠")
 
     def test_ambiguous_when_multiple_or_option_marker(self):
         assert is_color_ambiguous(["BLACK", "IVORY"], "니트")

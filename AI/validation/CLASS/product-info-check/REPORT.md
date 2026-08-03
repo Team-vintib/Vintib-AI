@@ -664,3 +664,45 @@ marqo 로딩 수정 전에 돌아간 두 모델의 색상 결과. **`fashion_cli
 `fashion_clip`에선 무효(0.65→0.65)인 것도 시사적이다 — §13/§17에서 wb가 준 이득이
 전처리 고유의 것이 아니라 **범용 체크포인트의 편향을 일부 상쇄한 것**이었을 수 있다.
 marqo 2종 수치는 재실행 후 채울 것. (N=17, `MIN_N_FOR_CONFIDENCE` 미달은 그대로 유효.)
+
+---
+
+## 19. 색상 팔레트 13종 + MIXED로 축소(2026-08-03, 사용자 확정)
+
+기존 19종에서 **IVORY·KHAKI·SKYBLUE·WINE·SILVER·GOLD 6종을 제거**했다. 남은 13종
+(Black, White, Gray, Red, Orange, Pink, Yellow, Brown, Green, Blue, Purple, Beige, Navy)
++ `MIXED`. 특수 라벨은 `MULTI` → `MIXED`로 개명해 확정 목록의 "Mixed"와 맞췄다.
+
+AI-Hub "의류 통합 데이터"의 색상 라벨 체계(13종)와 **Navy 하나만 다른** 구성이다 — Navy를
+남긴 건 §17 혼동행렬에서 BLUE↔NAVY가 최대 오답원이었고 정답셋의 59%가 파랑 계열이기 때문.
+
+### ⚠️ 이 시점 이전 색상 수치와 비교하지 말 것
+
+라벨이 20 → 14로 줄면 (a) 무작위 기준선이 5% → 7%로 오르고 (b) 병합은 정답을 뺏지 않고
+더하기만 하므로 정확도가 **단조 증가**한다. §8~§18-2의 모든 색상 수치는 19종 기준이라
+새 수치와 직접 비교가 성립하지 않는다. 재측정이 필요하다.
+
+### 은퇴 코드 매핑 (`color.RETIRED_COLOR_MAP`)
+
+| 은퇴 | 흡수 | 비고 |
+|---|---|---|
+| IVORY | WHITE | |
+| KHAKI | **GREEN** | 정답셋의 유일한 KHAKI(`vintage_t.png`)가 올리브색 빈티지 티 — 육안 확인 후 결정(BROWN/BEIGE 아님) |
+| SKYBLUE | BLUE | |
+| WINE | RED | |
+| SILVER | GRAY | |
+| GOLD | YELLOW | |
+
+정답셋 재라벨링: `vintage_t.png` KHAKI→GREEN, `skyblue_shirt.webp` SKYBLUE→BLUE,
+`levis_patch.jpg` 보조색 MULTI→MIXED. 실제 사진 17장 새 분포: BLUE 6 · NAVY 4 · WHITE 3 ·
+BLACK 2 · GREEN 1 · GRAY 1.
+
+### 반영 범위
+
+- `product-info-check/color.py` — `PALETTE`, `EN_COLOR_LABELS`, `EN_COLOR_SYNONYMS`,
+  `RETIRED_COLOR_MAP` 신설. **동의어는 흡수 대상으로 옮겼다**(ivory/cream → WHITE,
+  khaki/olive → GREEN 등) — 지우면 병합 이득이 프롬프트 단계에서 샌다.
+- `product-info-check/vlm_control.py` — 색상 프롬프트 v2/v3가 은퇴 코드를 구분하라고
+  지시하고 있었다(그대로 두면 팔레트 밖 코드를 생성). 남은 13종 기준으로 다시 썼다.
+- `worker/models/product_classifier/color.py` — 프로덕션 사본 동기화.
+- `crawl-collector/labels.py`·`color_hint.py`·테스트 — 크롤러 팔레트/색상어 사전 동기화.

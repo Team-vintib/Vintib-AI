@@ -45,33 +45,50 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 # --------------------------------------------------------------------------
-# 잠정 색상 팔레트 (코드 -> hex). FE 확정 전 placeholder.
+# 색상 팔레트 (코드 -> hex). **13종 + MIXED로 사용자가 확정했다(2026-08-03).**
+#
+# 이전 19종에서 IVORY·KHAKI·SKYBLUE·WINE·SILVER·GOLD 6종을 뺐다. 나머지 13종은 AI-Hub
+# "의류 통합 데이터"의 색상 라벨 체계(Black/White/Gray/Red/Orange/Pink/Yellow/Brown/
+# Green/Blue/Purple/Beige/Mixed)와 **Navy 하나만 더한** 구성이다 — Navy를 남긴 건
+# 데님·아우터가 많은 중고 의류에서 BLUE와 NAVY 구분이 실제 오답의 최대 원인이었기
+# 때문이다(`REPORT.md` §17 혼동행렬).
+#
+# **팔레트를 바꾸면 이전 정확도와 비교할 수 없다.** 라벨 수가 20 -> 14로 줄면 무작위
+# 기준선이 5% -> 7%로 오르고, 병합은 정답을 뺏지 않고 더하기만 하므로 숫자가 단조
+# 증가한다. §8~§18의 기록치와 직접 비교하지 말 것.
 # --------------------------------------------------------------------------
 PALETTE: dict[str, str] = {
     "BLACK": "#1A1A1A",
     "WHITE": "#FFFFFF",
     "GRAY": "#9B9B9B",
-    "IVORY": "#F1EEE3",
-    "BEIGE": "#D8C7A8",
-    "BROWN": "#7B5B3A",
-    "KHAKI": "#8C8560",
-    "NAVY": "#22304A",
-    "BLUE": "#3B6FB6",
-    "SKYBLUE": "#8FC1E3",
-    "GREEN": "#4F7942",
-    "YELLOW": "#E8D44D",
-    "ORANGE": "#E08A2E",
     "RED": "#C43D3D",
+    "ORANGE": "#E08A2E",
     "PINK": "#E6A9C0",
+    "YELLOW": "#E8D44D",
+    "BROWN": "#7B5B3A",
+    "GREEN": "#4F7942",
+    "BLUE": "#3B6FB6",
     "PURPLE": "#7D5BA6",
-    "WINE": "#6E2A3A",
-    "SILVER": "#C7C9CC",
-    "GOLD": "#C9A646",
+    "BEIGE": "#D8C7A8",
+    "NAVY": "#22304A",
 }
 
 # 팔레트 색 하나로 스냅하면 오히려 오도하는 경우(프린트/멀티컬러)를 위한 특수 라벨.
 # 정답셋에는 쓸 수 있지만, PALETTE의 실제 hex 항목은 아니다 — 평가 시 별도 취급한다.
-MULTI_LABEL = "MULTI"
+# 사용자 확정 목록의 "Mixed"에 대응한다(2026-08-03에 `MULTI` -> `MIXED`로 개명).
+MIXED_LABEL = "MIXED"
+
+# 팔레트에서 빠진 코드 -> 남은 코드 매핑. 정답셋 재라벨링과 과거 산출물 해석에 쓴다.
+# KHAKI는 GREEN으로 보냈다 — 정답셋의 유일한 KHAKI 샘플(`vintage_t.png`)이 올리브색
+# 빈티지 티라 육안 확인 후 결정했다(BROWN/BEIGE 쪽이 아니다).
+RETIRED_COLOR_MAP: dict[str, str] = {
+    "IVORY": "WHITE",
+    "KHAKI": "GREEN",
+    "SKYBLUE": "BLUE",
+    "WINE": "RED",
+    "SILVER": "GRAY",
+    "GOLD": "YELLOW",
+}
 
 
 def _hex_to_rgb(hex_code: str) -> tuple[int, int, int]:
@@ -109,7 +126,7 @@ def build_swatch_reference(
     만든다(색상 개선안 4번, 2026-08-03). 색 이름을 텍스트로만 지시하면 VLM이 자기 내부
     "색 이름 감각"에 의존하게 되는데(예: IVORY라는 단어가 실제로 어떤 hex를 가리키는지는
     프롬프트에 전혀 안 알려줌), 실제 hex 사각형을 같은 이미지에 넣어주면 VLM이 이미지 대
-    이미지로 비교 판단할 수 있다. `MULTI_LABEL`은 특정 hex가 없어 스와치를 그리지 않는다
+    이미지로 비교 판단할 수 있다. `MIXED_LABEL`은 특정 hex가 없어 스와치를 그리지 않는다
     (프롬프트 쪽에서 "스와치는 없지만 코드로는 답할 수 있다"고 안내).
 
     입력·반환 모두 PIL.Image(RGB)."""
@@ -362,25 +379,19 @@ EN_COLOR_LABELS: dict[str, str] = {
     "BLACK": "black",
     "WHITE": "white",
     "GRAY": "gray",
-    "IVORY": "ivory",
-    "BEIGE": "beige",
-    "BROWN": "brown",
-    "KHAKI": "khaki",
-    "NAVY": "navy blue",
-    "BLUE": "blue",
-    "SKYBLUE": "sky blue",
-    "GREEN": "green",
-    "YELLOW": "yellow",
-    "ORANGE": "orange",
     "RED": "red",
+    "ORANGE": "orange",
     "PINK": "pink",
+    "YELLOW": "yellow",
+    "BROWN": "brown",
+    "GREEN": "green",
+    "BLUE": "blue",
     "PURPLE": "purple",
-    "WINE": "wine red",
-    "SILVER": "silver",
-    "GOLD": "gold",
-    MULTI_LABEL: "multicolored patterned",
+    "BEIGE": "beige",
+    "NAVY": "navy blue",
+    MIXED_LABEL: "multicolored patterned",
 }
-assert set(EN_COLOR_LABELS) == set(PALETTE) | {MULTI_LABEL}
+assert set(EN_COLOR_LABELS) == set(PALETTE) | {MIXED_LABEL}
 
 # --------------------------------------------------------------------------
 # 프롬프트 앙상블(색상 개선안 1·2번, 2026-08-03 추가) — 단일 템플릿/단일 단어의 어휘
@@ -399,16 +410,21 @@ _COLOR_ENSEMBLE_TEMPLATES: tuple[str, ...] = (
 EN_COLOR_SYNONYMS: dict[str, tuple[str, ...]] = {
     code: (word,) for code, word in EN_COLOR_LABELS.items()
 }
+# 팔레트가 13종으로 줄면서(2026-08-03) 없어진 코드의 동의어는 **남은 코드로 흡수시킨다** —
+# 예전엔 IVORY/SKYBLUE가 독립 라벨이라 WHITE/BLUE와 경쟁했지만, 이제 아이보리색 옷은
+# WHITE가, 하늘색 옷은 BLUE가 받아야 한다. 그 어휘를 해당 코드의 동의어에 넣어 두지 않으면
+# 병합의 이득이 프롬프트 단계에서 새어 나간다.
 EN_COLOR_SYNONYMS.update(
     {
-        "IVORY": ("ivory", "off-white", "cream"),
+        "WHITE": ("white", "off-white", "ivory", "cream"),
         "BEIGE": ("beige", "tan", "sand"),
         "NAVY": ("navy blue", "dark blue", "deep blue"),
-        "GRAY": ("gray", "grey"),
-        "SILVER": ("silver", "metallic gray"),
-        "BROWN": ("brown", "chocolate brown"),
-        "KHAKI": ("khaki", "olive tan"),
-        "SKYBLUE": ("sky blue", "light blue"),
+        "GRAY": ("gray", "grey", "silver", "metallic gray"),
+        "BROWN": ("brown", "chocolate brown", "camel"),
+        "GREEN": ("green", "olive", "khaki"),
+        "BLUE": ("blue", "sky blue", "light blue"),
+        "RED": ("red", "wine red", "burgundy"),
+        "YELLOW": ("yellow", "gold", "mustard"),
     }
 )
 assert set(EN_COLOR_SYNONYMS) == set(EN_COLOR_LABELS)
@@ -468,7 +484,7 @@ class ClipZeroShotColorExtractor(ColorExtractor):
         return self._backend
 
     def extract(self, image_path: Path) -> ColorResult:
-        codes = list(PALETTE) + [MULTI_LABEL]
+        codes = list(PALETTE) + [MIXED_LABEL]
         query_path = self._maybe_white_balance(image_path)
         if self._use_ensemble:
             groups = [
@@ -500,7 +516,7 @@ class ClipZeroShotColorExtractor(ColorExtractor):
         return ColorResult(
             primary=primary_code,
             secondary=secondary_code,
-            is_multicolor=primary_code == MULTI_LABEL,
+            is_multicolor=primary_code == MIXED_LABEL,
             confidence=float(primary_score),
             backend=self.name,
             raw={

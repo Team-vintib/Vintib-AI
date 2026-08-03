@@ -96,7 +96,7 @@ class LoadResult:
 
 def _validate_row(index: int, row: dict) -> list[str]:
     """best-effort 검증 — 문제를 리스트로 모아 반환한다(하나 걸려도 전체를 죽이지 않음)."""
-    from color import MULTI_LABEL, PALETTE
+    from color import MIXED_LABEL, PALETTE
 
     problems: list[str] = []
     required = ("image_file", "subcategory", "primary_color", "shot_type", "labeler")
@@ -109,7 +109,7 @@ def _validate_row(index: int, row: dict) -> list[str]:
     if row["subcategory"] not in ALL_SUBCATEGORIES:
         problems.append(f"알 수 없는 subcategory: {row['subcategory']!r}")
 
-    valid_colors = set(PALETTE) | {MULTI_LABEL}
+    valid_colors = set(PALETTE) | {MIXED_LABEL}
     if row["primary_color"] not in valid_colors:
         problems.append(f"알 수 없는 primary_color: {row['primary_color']!r}")
     secondary = row.get("secondary_color")

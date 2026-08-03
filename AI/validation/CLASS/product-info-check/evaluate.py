@@ -27,7 +27,7 @@ from classify import (
     classify_two_stage,
     get_category_classifier,
 )
-from color import ColorExtractor, MULTI_LABEL, PALETTE, get_color_extractor
+from color import ColorExtractor, MIXED_LABEL, PALETTE, get_color_extractor
 from dataset import LoadResult, Sample, load_ground_truth
 from taxonomy import ALL_SUBCATEGORIES, PROMPT_TEMPLATES, major_of
 
@@ -176,14 +176,14 @@ class ColorPrediction:
     confidence: float
     correct_primary: bool
     correct_secondary: bool
-    off_palette: bool  # 예측값이 PALETTE에도 MULTI_LABEL에도 없음(예: VLM 파싱 실패 UNKNOWN)
+    off_palette: bool  # 예측값이 PALETTE에도 MIXED_LABEL에도 없음(예: VLM 파싱 실패 UNKNOWN)
     major: str
     error: str | None = None
 
 
 def evaluate_color(samples: list[Sample], backend_key: str) -> list[ColorPrediction]:
     extractor = get_color_extractor(backend_key)
-    valid = set(PALETTE) | {MULTI_LABEL}
+    valid = set(PALETTE) | {MIXED_LABEL}
     out: list[ColorPrediction] = []
     for s in samples:
         if s.synthetic:
@@ -225,9 +225,9 @@ def evaluate_color(samples: list[Sample], backend_key: str) -> list[ColorPredict
 
 def color_confusion_matrix(preds: list[ColorPrediction]) -> dict[str, dict[str, int]]:
     """`confusion_matrix()`의 색상 버전(2026-08-03 추가) — 지금까지 없었다(`REPORT.md` 및
-    사용자 확인). `truth_primary` -> `predicted_primary` 카운트. 팔레트 코드 + `MULTI_LABEL`
+    사용자 확인). `truth_primary` -> `predicted_primary` 카운트. 팔레트 코드 + `MIXED_LABEL`
     전체를 행으로 깔아둔다(카테고리 버전과 동일한 관례) — 정답셋에 없는 색은 빈 dict로 남는다."""
-    all_codes = list(PALETTE) + [MULTI_LABEL]
+    all_codes = list(PALETTE) + [MIXED_LABEL]
     matrix: dict[str, dict[str, int]] = {code: {} for code in all_codes}
     for p in preds:
         if p.predicted_primary not in all_codes or p.truth_primary not in all_codes:
