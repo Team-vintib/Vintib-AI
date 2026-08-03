@@ -5,6 +5,7 @@ import {
   saveMockDefaultTryOnImage,
 } from '@/shared/api/mockProfileMediaStorage'
 import { http } from '@/shared/api/http'
+import axios from 'axios'
 
 import { EMPTY_TRYON_PROFILE } from '@/domains/tryon/constants/tryOnProfileMockData'
 import type { SaveTryOnProfileRequest, TryOnProfile } from '@/domains/tryon/types/tryOnProfile.types'
@@ -16,6 +17,21 @@ const FALLBACK_USER_KEY = 'current'
 
 type TryOnProfileMap = Record<string, Partial<TryOnProfile>>
 
+interface TryOnProfileUpdateRequest {
+  bodyPhotoKey?: string
+  heightCm?: number
+  weightKg?: number
+  chest?: number
+  waist?: number
+  hip?: number
+}
+
+interface TryOnProfileUploadUrlResponse {
+  key: string
+  uploadUrl: string
+  expiresInSeconds: number
+}
+
 const getUserKey = (userId?: number | null) => (userId ? String(userId) : FALLBACK_USER_KEY)
 
 export const getMyTryOnProfile = async (userId?: number | null): Promise<TryOnProfile> => {
@@ -23,8 +39,18 @@ export const getMyTryOnProfile = async (userId?: number | null): Promise<TryOnPr
     return readMockTryOnProfile(userId)
   }
 
-  const response = await http.get<ApiResponse<TryOnProfile>>('/me/tryon')
-  return unwrapApiData(response.data, 'AI 시착 정보를 불러오지 못했습니다.')
+  const requiredUserId = getRequiredUserId(userId)
+
+  try {
+    const response = await http.get<ApiResponse<Omit<TryOnProfile, 'id'>>>(`/users/${requiredUserId}/tryon`)
+    return toTryOnProfile(unwrapApiData(response.data, 'AI 시착 정보를 불러오지 못했습니다.'))
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return { ...EMPTY_TRYON_PROFILE }
+    }
+
+    throw error
+  }
 }
 
 export const saveMyTryOnProfile = async (
@@ -35,21 +61,22 @@ export const saveMyTryOnProfile = async (
     return saveMockTryOnProfile(request, userId)
   }
 
-  const formData = new FormData()
-
+  const requiredUserId = getRequiredUserId(userId)
+  const body: TryOnProfileUpdateRequest = {}
+  
   if (request.bodyPhoto) {
-    formData.append('bodyPhoto', request.bodyPhoto)
+    body.bodyPhotoKey = await uploadTryOnBodyPhoto(requiredUserId, request.bodyPhoto)
   }
 
-  appendOptionalFormValue(formData, 'heightCm', request.heightCm)
-  appendOptionalFormValue(formData, 'weightKg', request.weightKg)
-  appendOptionalFormValue(formData, 'chest', request.chest)
-  appendOptionalFormValue(formData, 'waist', request.waist)
-  appendOptionalFormValue(formData, 'hip', request.hip)
+  appendOptionalNumber(body, 'heightCm', request.heightCm)
+  appendOptionalNumber(body, 'weightKg', request.weightKg)
+  appendOptionalNumber(body, 'chest', request.chest)
+  appendOptionalNumber(body, 'waist', request.waist)
+  appendOptionalNumber(body, 'hip', request.hip)
 
-  const response = await http.put<ApiResponse<TryOnProfile>>('/me/tryon', formData)
+  const response = await http.put<ApiResponse<Omit<TryOnProfile, 'id'>>>(`/users/${requiredUserId}/tryon`, body)
 
-  return unwrapApiData(response.data, 'AI 시착 정보를 저장하지 못했습니다.')
+  return toTryOnProfile(unwrapApiData(response.data, 'AI 시착 정보를 저장하지 못했습니다.'))
 }
 
 export const deleteMyTryOnProfile = async (userId?: number | null): Promise<TryOnProfile> => {
@@ -59,19 +86,68 @@ export const deleteMyTryOnProfile = async (userId?: number | null): Promise<TryO
     return readMockTryOnProfile(userId)
   }
 
-  const response = await http.delete<ApiResponse<TryOnProfile>>('/me/tryon')
-  return response.data.data ?? { ...EMPTY_TRYON_PROFILE, updatedAt: new Date().toISOString() }
+  const requiredUserId = getRequiredUserId(userId)
+  try {
+    await http.delete(`/users/${requiredUserId}/tryon`)
+  } catch (error) {
+    if (!isNotFoundError(error)) {
+      throw error
+    }
+  }
+  return { ...EMPTY_TRYON_PROFILE, updatedAt: new Date().toISOString() }
 }
 
 export const isTryOnApiEnabled = () => TRYON_API_ENABLED
 
-const appendOptionalFormValue = (formData: FormData, key: string, value?: string) => {
+const uploadTryOnBodyPhoto = async (userId: number, file: File) => {
+  const uploadUrlResponse = await http.post<ApiResponse<TryOnProfileUploadUrlResponse>>(
+    `/users/${userId}/tryon/upload-url`,
+    { contentType: file.type || 'application/octet-stream' },
+  )
+  const uploadUrl = unwrapApiData(uploadUrlResponse.data, 'AI 시착용 사진 업로드 URL을 발급하지 못했습니다.')
+
+  const uploadResponse = await fetch(uploadUrl.uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream',
+    },
+    body: file,
+  })
+
+  if (!uploadResponse.ok) {
+    throw new Error('AI 시착용 사진을 업로드하지 못했습니다.')
+  }
+
+  return uploadUrl.key
+}
+
+const appendOptionalNumber = (
+  body: TryOnProfileUpdateRequest,
+  key: keyof Omit<TryOnProfileUpdateRequest, 'bodyPhotoKey'>,
+  value?: string,
+) => {
   const trimmedValue = value?.trim()
 
   if (trimmedValue) {
-    formData.append(key, trimmedValue)
+    body[key] = Number(trimmedValue)
   }
 }
+
+const getRequiredUserId = (userId?: number | null) => {
+  if (!userId) {
+    throw new Error('AI 시착 정보를 저장할 회원 ID가 없습니다.')
+  }
+
+  return userId
+}
+
+const toTryOnProfile = (response: Omit<TryOnProfile, 'id'>): TryOnProfile => ({
+  ...response,
+  id: null,
+})
+
+const isNotFoundError = (error: unknown) =>
+  axios.isAxiosError(error) && error.response?.status === 404
 
 const saveMockTryOnProfile = async (
   request: SaveTryOnProfileRequest,

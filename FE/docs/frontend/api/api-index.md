@@ -153,7 +153,10 @@ Content-Type: application/json
 | 내 정보 조회            | GET      | `/api/me`                     | 후보                        |
 | 기본 정보 저장          | PATCH    | `/api/me/onboarding`          | S15P11A108-241 FE 선행 계약 |
 | 관심 정보 저장·건너뛰기 | PUT      | `/api/me/interests`           | S15P11A108-250 FE 선행 계약 |
-| AI 시착 정보 저장       | PUT      | `/api/me/tryon`               | S15P11A108-254 FE 선행 계약 |
+| AI 시착 사진 업로드 URL | POST     | `/api/users/{userId}/tryon/upload-url` | Swagger 확정 |
+| AI 시착 정보 조회       | GET      | `/api/users/{userId}/tryon`   | Swagger 확정 |
+| AI 시착 정보 저장       | PUT      | `/api/users/{userId}/tryon`   | Swagger 확정 |
+| AI 시착 정보 삭제       | DELETE   | `/api/users/{userId}/tryon`   | Swagger 확정 |
 | 회원 유형·온보딩 완료   | POST     | `/api/me/onboarding/complete` | S15P11A108-261 FE 선행 계약 |
 | 내 정보 수정            | PATCH    | `/api/me`                     | 후보                        |
 | 주소 조회/저장          | GET/POST | `/api/addresses`              | 후보                        |
@@ -246,31 +249,44 @@ Content-Type: application/json
 
 ### AI 시착 정보 저장
 
-BE 구현 전 FE가 선행 정의한 임시 계약입니다. 전신 사진과 신체 정보는 모두 선택 사항이며,
-값이 있는 항목만 multipart form-data에 포함합니다.
+Swagger 확정 계약입니다. 전신 사진은 presigned URL로 먼저 S3에 업로드하고, 발급받은
+`bodyPhotoKey`와 신체 정보를 JSON으로 저장합니다. 값을 보내지 않은 필드는 기존 값을
+유지합니다.
 
 ```http
-PUT /api/me/tryon
+POST /api/users/{userId}/tryon/upload-url
 Authorization: Bearer {accessToken}
-Content-Type: multipart/form-data
+Content-Type: application/json
 ```
 
-| multipart 필드 | 타입           | 필수 | 설명                         |
-| -------------- | -------------- | ---- | ---------------------------- |
-| `bodyPhoto`    | image file     | 선택 | AI 시착용 정면 전신 사진     |
-| `heightCm`     | integer string | 선택 | 키(cm)                       |
-| `weightKg`     | integer string | 선택 | 몸무게(kg)                   |
-| `chest`        | integer string | 선택 | 가슴 치수, 단위 미확정       |
-| `waist`        | integer string | 선택 | 허리 치수, 단위 미확정       |
-| `hip`          | integer string | 선택 | 엉덩이 치수, 단위 미확정     |
+```json
+{
+  "contentType": "image/jpeg"
+}
+```
+
+응답의 `uploadUrl`에 파일을 `PUT` 업로드한 뒤, 응답의 `key`를 저장 요청에 사용합니다.
+
+```http
+PUT /api/users/{userId}/tryon
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+| JSON 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `bodyPhotoKey` | string | 선택 | 업로드 URL 발급 응답의 `key`. 사진을 바꾸지 않으면 생략 |
+| `heightCm` | integer | 선택 | 키(cm) |
+| `weightKg` | integer | 선택 | 몸무게(kg) |
+| `chest` | integer | 선택 | 가슴 치수 |
+| `waist` | integer | 선택 | 허리 치수 |
+| `hip` | integer | 선택 | 엉덩이 치수 |
 
 - 숫자 필드는 현재 FE에서 빈 값 또는 0보다 큰 정수만 허용합니다.
 - 건너뛰기는 이 API를 호출하지 않고 다음 온보딩 화면으로 이동합니다.
 - 사진과 숫자가 모두 비어 있는 `다음 단계`도 저장할 값이 없으므로 API를 호출하지 않습니다.
 - 사진이나 숫자가 하나라도 있으면 API 저장 성공 후에만 다음 화면으로 이동합니다.
-- 브라우저가 multipart boundary를 생성하도록 FE는 `Content-Type` 값을 직접 고정하지 않습니다.
-- 검증 실패의 `error.errors[].field`는 위 multipart 필드명을 사용한다고 임시 정의합니다.
-- BE Swagger가 제공되면 endpoint, 필드명, 파일 제한, 단위와 숫자 범위를 갱신해야 합니다.
+- 조회는 `GET /api/users/{userId}/tryon`, 삭제는 `DELETE /api/users/{userId}/tryon`을 사용합니다.
 
 ### 회원 유형 저장·온보딩 완료
 
