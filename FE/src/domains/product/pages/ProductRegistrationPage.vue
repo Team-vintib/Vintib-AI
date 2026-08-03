@@ -731,7 +731,7 @@ const productInfoCompletenessMessage = computed(() => {
   const percent = productInfoCompletenessPercent.value
 
   if (percent < 40) {
-    return '상품을 이해할 수 있도록 정보를 조금 더 추가해 보세요.'
+    return '상품을 더 믿고 선택할 수 있도록 정보를 추가해 주세요.'
   }
 
   if (percent < 70) {
