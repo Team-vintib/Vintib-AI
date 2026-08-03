@@ -63,7 +63,7 @@ const selectedImage = computed(() =>
 const isSold = computed(() => product.value?.saleStatus === 'SOLD')
 
 // 상품 상세 상품을 AI 시착 패널(LiveTryOnPanel)이 받는 형태로 어댑트.
-// LiveTryOnPanel(TRYON-004)은 수정하지 않고 그대로 재사용한다.
+// LiveTryOnPanel(TRYON-004)은 mock 생성 흐름을 유지한 채 재사용한다.
 const tryOnProduct = computed<LiveWatchProduct | null>(() => {
   if (!product.value) return null
 

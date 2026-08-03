@@ -5,13 +5,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useBusinessVerificationStore } from '@/domains/biz/stores/businessVerificationStore'
 import {
-  deleteMyDefaultTryOnImage,
   deleteMyProfileImage,
   getMyPageViewData,
   getMyInterestOptions,
   getMyInterests,
   removeMyWish,
-  updateMyDefaultTryOnImage,
   updateMyInterests,
   updateMyProfile,
   updateMyProfileImage,
@@ -24,6 +22,14 @@ import {
   MY_SECTION_OPTIONS,
   MY_SETTLEMENT_STATUS_LABELS,
 } from '@/domains/my/constants/myMockData'
+import {
+  deleteMyTryOnProfile,
+  getMyTryOnProfile,
+  saveMyTryOnProfile,
+} from '@/domains/tryon/api/tryOnProfileApi'
+import {
+  TRYON_BODY_FIELD_OPTIONS,
+} from '@/domains/tryon/constants/tryOnProfileMockData'
 import type {
   MyLiveStatus,
   MyOrderStatus,
@@ -32,6 +38,11 @@ import type {
   MyProfileUpdateRequest,
   MySectionId,
 } from '@/domains/my/types/my.types'
+import type {
+  SaveTryOnProfileRequest,
+  TryOnBodyFieldId,
+  TryOnProfile,
+} from '@/domains/tryon/types/tryOnProfile.types'
 import { normalizeApiError } from '@/shared/api/http'
 import type { InterestBrand, InterestCategory } from '@/shared/api/mockInterestStorage'
 import { readImageFileAsDataUrl } from '@/shared/api/mockProfileMediaStorage'
@@ -67,6 +78,24 @@ const selectedTryOnImageFile = ref<File | null>(null)
 const tryOnImagePreviewUrl = ref('')
 const isTryOnImageRemoved = ref(false)
 const selectedTryOnImageName = ref('')
+const tryOnProfile = ref<TryOnProfile | null>(null)
+const tryOnProfileLoadState = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
+const tryOnProfileSaveState = ref<'idle' | 'saving' | 'success' | 'error'>('idle')
+const tryOnProfileMessage = ref('')
+const tryOnBodyForm = ref<Record<TryOnBodyFieldId, string>>({
+  heightCm: '',
+  weightKg: '',
+  chest: '',
+  waist: '',
+  hip: '',
+})
+const tryOnBodyErrors = ref<Record<TryOnBodyFieldId, string>>({
+  heightCm: '',
+  weightKg: '',
+  chest: '',
+  waist: '',
+  hip: '',
+})
 const interestBrandOptions = ref<InterestBrand[]>([])
 const interestCategoryOptions = ref<InterestCategory[]>([])
 const selectedInterestBrandIds = ref<number[]>([])
@@ -119,6 +148,7 @@ const isLoading = computed(() => loadState.value === 'loading')
 const isGuest = computed(() => loadState.value === 'guest')
 const hasLoadError = computed(() => loadState.value === 'error')
 const isProfileSaving = computed(() => profileSaveState.value === 'saving')
+const isTryOnProfileSaving = computed(() => tryOnProfileSaveState.value === 'saving')
 const profileInitial = computed(() => (profile.value?.nickname || profile.value?.name || '회').slice(0, 1))
 const profileImageDisplayUrl = computed(() => {
   if (isProfileImageRemoved.value) {
@@ -133,7 +163,7 @@ const tryOnImageDisplayUrl = computed(() => {
     return ''
   }
 
-  return tryOnImagePreviewUrl.value || profile.value?.defaultTryOnImageUrl || ''
+  return tryOnImagePreviewUrl.value || tryOnProfile.value?.bodyPhotoUrl || profile.value?.defaultTryOnImageUrl || ''
 })
 const filteredInterestBrands = computed(() => {
   const normalizedQuery = interestBrandSearchQuery.value.trim().toLowerCase()
@@ -439,10 +469,31 @@ const syncProfileForm = () => {
   profileImagePreviewUrl.value = ''
   isProfileImageRemoved.value = false
   selectedProfileImageName.value = ''
+}
+
+const syncTryOnProfileForm = () => {
+  const profileData = tryOnProfile.value
+
   selectedTryOnImageFile.value = null
   tryOnImagePreviewUrl.value = ''
   isTryOnImageRemoved.value = false
   selectedTryOnImageName.value = ''
+  tryOnProfileSaveState.value = 'idle'
+  tryOnProfileMessage.value = ''
+  tryOnBodyErrors.value = {
+    heightCm: '',
+    weightKg: '',
+    chest: '',
+    waist: '',
+    hip: '',
+  }
+  tryOnBodyForm.value = {
+    heightCm: profileData?.heightCm ? String(profileData.heightCm) : '',
+    weightKg: profileData?.weightKg ? String(profileData.weightKg) : '',
+    chest: profileData?.chest ? String(profileData.chest) : '',
+    waist: profileData?.waist ? String(profileData.waist) : '',
+    hip: profileData?.hip ? String(profileData.hip) : '',
+  }
 }
 
 const validateProfileForm = () => {
@@ -556,12 +607,9 @@ const goToSaleDetail = (saleId: number) => {
 }
 
 const goToLiveDetail = (liveId: number, status: MyLiveStatus) => {
-  const mockScenario = status === 'LIVE' ? 'default' : status.toLowerCase()
-
   void router.push({
     name: status === 'LIVE' ? ROUTE_NAMES.LIVE_BROADCAST : ROUTE_NAMES.LIVE_WATCH,
     params: { liveId },
-    query: { mock: mockScenario },
   })
 }
 
@@ -697,15 +745,15 @@ const handleTryOnImageChange = async (event: Event) => {
   }
 
   if (!file.type.startsWith('image/')) {
-    profileSaveState.value = 'error'
-    profileSaveMessage.value = '이미지 파일만 업로드할 수 있습니다.'
+    tryOnProfileSaveState.value = 'error'
+    tryOnProfileMessage.value = '이미지 파일만 업로드할 수 있습니다.'
     input.value = ''
     return
   }
 
   if (file.size > 5 * 1024 * 1024) {
-    profileSaveState.value = 'error'
-    profileSaveMessage.value = 'AI 시착용 사진은 5MB 이하로 선택해 주세요.'
+    tryOnProfileSaveState.value = 'error'
+    tryOnProfileMessage.value = 'AI 시착용 사진은 5MB 이하로 선택해 주세요.'
     input.value = ''
     return
   }
@@ -715,11 +763,11 @@ const handleTryOnImageChange = async (event: Event) => {
     selectedTryOnImageFile.value = file
     isTryOnImageRemoved.value = false
     selectedTryOnImageName.value = file.name
-    profileSaveState.value = 'idle'
-    profileSaveMessage.value = ''
+    tryOnProfileSaveState.value = 'idle'
+    tryOnProfileMessage.value = ''
   } catch (error) {
-    profileSaveState.value = 'error'
-    profileSaveMessage.value = normalizeApiError(error).message
+    tryOnProfileSaveState.value = 'error'
+    tryOnProfileMessage.value = normalizeApiError(error).message
   }
 }
 
@@ -742,6 +790,136 @@ const removeTryOnImage = () => {
 
   if (tryOnImageInput.value) {
     tryOnImageInput.value.value = ''
+  }
+}
+
+const validateTryOnBodyField = (fieldId: TryOnBodyFieldId) => {
+  const value = tryOnBodyForm.value[fieldId].trim()
+
+  if (!value) {
+    tryOnBodyErrors.value = {
+      ...tryOnBodyErrors.value,
+      [fieldId]: '',
+    }
+    return true
+  }
+
+  if (!/^[1-9]\d*$/.test(value)) {
+    tryOnBodyErrors.value = {
+      ...tryOnBodyErrors.value,
+      [fieldId]: '0보다 큰 정수로 입력해 주세요.',
+    }
+    return false
+  }
+
+  tryOnBodyErrors.value = {
+    ...tryOnBodyErrors.value,
+    [fieldId]: '',
+  }
+  return true
+}
+
+const validateTryOnBodyForm = () => {
+  let firstInvalidField: TryOnBodyFieldId | null = null
+
+  TRYON_BODY_FIELD_OPTIONS.forEach((field) => {
+    if (!validateTryOnBodyField(field.id) && !firstInvalidField) {
+      firstInvalidField = field.id
+    }
+  })
+
+  if (firstInvalidField) {
+    document.getElementById(`my-tryon-${firstInvalidField}`)?.focus()
+    return false
+  }
+
+  return true
+}
+
+const createTryOnSaveRequest = (): SaveTryOnProfileRequest => {
+  const request: SaveTryOnProfileRequest = {}
+
+  if (selectedTryOnImageFile.value) {
+    request.bodyPhoto = selectedTryOnImageFile.value
+  }
+
+  if (isTryOnImageRemoved.value) {
+    request.removeBodyPhoto = true
+  }
+
+  TRYON_BODY_FIELD_OPTIONS.forEach((field) => {
+    const value = tryOnBodyForm.value[field.id].trim()
+
+    if (value) {
+      request[field.id] = value
+    }
+  })
+
+  return request
+}
+
+const submitTryOnProfileForm = async () => {
+  if (!profile.value || !viewData.value || isTryOnProfileSaving.value || !validateTryOnBodyForm()) {
+    return
+  }
+
+  tryOnProfileSaveState.value = 'saving'
+  tryOnProfileMessage.value = ''
+
+  try {
+    const nextTryOnProfile = await saveMyTryOnProfile(createTryOnSaveRequest(), profile.value.id)
+
+    tryOnProfile.value = nextTryOnProfile
+    viewData.value = {
+      ...viewData.value,
+      summary: {
+        ...viewData.value.summary,
+        profile: {
+          ...viewData.value.summary.profile,
+          defaultTryOnImageUrl: nextTryOnProfile.bodyPhotoUrl,
+        },
+      },
+    }
+    selectedTryOnImageFile.value = null
+    tryOnImagePreviewUrl.value = ''
+    selectedTryOnImageName.value = ''
+    isTryOnImageRemoved.value = false
+    tryOnProfileSaveState.value = 'success'
+    tryOnProfileMessage.value = 'AI 시착 정보가 저장되었습니다.'
+  } catch (error) {
+    tryOnProfileSaveState.value = 'error'
+    tryOnProfileMessage.value = normalizeApiError(error).message
+  }
+}
+
+const deleteTryOnProfile = async () => {
+  if (!profile.value || !viewData.value || isTryOnProfileSaving.value) {
+    return
+  }
+
+  tryOnProfileSaveState.value = 'saving'
+  tryOnProfileMessage.value = ''
+
+  try {
+    const emptyProfile = await deleteMyTryOnProfile(profile.value.id)
+
+    tryOnProfile.value = emptyProfile
+    viewData.value = {
+      ...viewData.value,
+      summary: {
+        ...viewData.value.summary,
+        profile: {
+          ...viewData.value.summary.profile,
+          defaultTryOnImageUrl: null,
+        },
+      },
+    }
+    syncTryOnProfileForm()
+    tryOnProfileSaveState.value = 'success'
+    tryOnProfileMessage.value = 'AI 시착 정보를 삭제했습니다.'
+  } catch (error) {
+    tryOnProfileSaveState.value = 'error'
+    tryOnProfileMessage.value = normalizeApiError(error).message
   }
 }
 
@@ -771,7 +949,6 @@ const submitProfileForm = async () => {
     }
     const nextProfile = await updateMyProfile(profile.value.id, request)
     let nextProfileImageUrl = profile.value.profileImageUrl
-    let nextTryOnImageUrl = profile.value.defaultTryOnImageUrl
 
     if (isProfileImageRemoved.value) {
       const response = await deleteMyProfileImage(profile.value.id)
@@ -779,14 +956,6 @@ const submitProfileForm = async () => {
     } else if (selectedProfileImageFile.value) {
       const response = await updateMyProfileImage(profile.value.id, selectedProfileImageFile.value)
       nextProfileImageUrl = response.profileImageUrl
-    }
-
-    if (isTryOnImageRemoved.value) {
-      const response = await deleteMyDefaultTryOnImage(profile.value.id)
-      nextTryOnImageUrl = response.defaultTryOnImageUrl
-    } else if (selectedTryOnImageFile.value) {
-      const response = await updateMyDefaultTryOnImage(profile.value.id, selectedTryOnImageFile.value)
-      nextTryOnImageUrl = response.defaultTryOnImageUrl
     }
 
     await updateMyInterests(profile.value.id, {
@@ -801,7 +970,7 @@ const submitProfileForm = async () => {
         profile: {
           ...nextProfile,
           profileImageUrl: nextProfileImageUrl,
-          defaultTryOnImageUrl: nextTryOnImageUrl,
+          defaultTryOnImageUrl: profile.value.defaultTryOnImageUrl,
         },
       },
     }
@@ -809,10 +978,6 @@ const submitProfileForm = async () => {
     profileImagePreviewUrl.value = ''
     selectedProfileImageName.value = ''
     isProfileImageRemoved.value = false
-    selectedTryOnImageFile.value = null
-    tryOnImagePreviewUrl.value = ''
-    selectedTryOnImageName.value = ''
-    isTryOnImageRemoved.value = false
     profileSaveState.value = 'success'
     profileSaveMessage.value = '내 정보가 저장되었습니다.'
   } catch (error) {
@@ -855,12 +1020,64 @@ const loadMyPage = async () => {
   errorMessage.value = ''
 
   try {
-    viewData.value = await getMyPageViewData(authStore.user.id)
-    await loadMyInterests(authStore.user.id)
+    const nextViewData = await getMyPageViewData(authStore.user.id)
+    viewData.value = mergeSessionProfile(nextViewData)
+    tryOnProfileLoadState.value = 'loading'
+    const [tryOnProfileResult] = await Promise.allSettled([
+      getMyTryOnProfile(authStore.user.id),
+      loadMyInterests(authStore.user.id),
+    ])
+
+    if (tryOnProfileResult.status === 'fulfilled') {
+      tryOnProfile.value = tryOnProfileResult.value
+      tryOnProfileLoadState.value = 'success'
+      syncTryOnProfileForm()
+      viewData.value = {
+        ...viewData.value,
+        summary: {
+          ...viewData.value.summary,
+          profile: {
+            ...viewData.value.summary.profile,
+            defaultTryOnImageUrl: tryOnProfileResult.value.bodyPhotoUrl,
+          },
+        },
+      }
+    } else {
+      tryOnProfileLoadState.value = 'error'
+      tryOnProfileMessage.value = normalizeApiError(tryOnProfileResult.reason).message
+    }
+
     loadState.value = 'success'
   } catch (error) {
     errorMessage.value = normalizeApiError(error).message
     loadState.value = 'error'
+  }
+}
+
+const mergeSessionProfile = (data: MyPageViewData): MyPageViewData => {
+  const sessionUser = authStore.user
+
+  if (!sessionUser) {
+    return data
+  }
+
+  const profile = data.summary.profile
+  const sessionName = sessionUser.name?.trim() || sessionUser.email || ''
+
+  return {
+    ...data,
+    summary: {
+      ...data.summary,
+      profile: {
+        ...profile,
+        id: sessionUser.id,
+        email: profile.email || sessionUser.email,
+        name: profile.name || sessionName,
+        nickname: profile.nickname || sessionUser.name?.trim() || '',
+        onboardingCompleted:
+          profile.onboardingCompleted || sessionUser.onboardingCompleted === true,
+      },
+    },
   }
 }
 
@@ -872,7 +1089,6 @@ const goToProductDetail = (productId: number) => {
   void router.push({
     name: ROUTE_NAMES.PRODUCT_DETAIL,
     params: { productId },
-    query: { mock: 'mock' },
   })
 }
 
@@ -1207,38 +1423,6 @@ onMounted(() => {
                   />
                 </div>
 
-                <div class="my-tryon-photo">
-                  <div class="my-tryon-photo__preview" aria-hidden="true">
-                    <img
-                      v-if="tryOnImageDisplayUrl"
-                      :src="tryOnImageDisplayUrl"
-                      :alt="`${profile.name} AI 시착용 사진 미리보기`"
-                    />
-                    <span v-else>{{ profileInitial }}</span>
-                  </div>
-                  <div class="my-tryon-photo__body">
-                    <strong>AI 시착용 기본 사진</strong>
-                    <p>온보딩에서 등록한 시착용 사진입니다. JPG, PNG, WebP 이미지를 5MB 이하로 업로드할 수 있습니다.</p>
-                    <p v-if="selectedTryOnImageName" class="my-tryon-photo__file">
-                      {{ selectedTryOnImageName }}
-                    </p>
-                    <div class="my-tryon-photo__actions">
-                      <button type="button" @click="openTryOnImagePicker">사진 선택</button>
-                      <button v-if="tryOnImageDisplayUrl" type="button" @click="removeTryOnImage">
-                        사진 삭제
-                      </button>
-                    </div>
-                  </div>
-                  <input
-                    ref="tryOnImageInput"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    class="my-tryon-photo__input"
-                    aria-label="AI 시착용 사진 선택"
-                    @change="handleTryOnImageChange"
-                  />
-                </div>
-
                 <div class="my-profile-form__grid">
                   <label>
                     <span>이름</span>
@@ -1347,6 +1531,97 @@ onMounted(() => {
                     </div>
                   </div>
                 </section>
+              </form>
+            </template>
+
+            <template v-else-if="selectedSection === 'tryon'">
+              <form class="my-profile-form" @submit.prevent="submitTryOnProfileForm">
+                <div class="my-card__title">
+                  <div>
+                    <h2>AI 시착 정보</h2>
+                    <p>상품 상세와 라이브 AI 시착에서 사용할 전신 사진과 신체 기준입니다.</p>
+                  </div>
+                  <button type="submit" :disabled="isTryOnProfileSaving">
+                    {{ isTryOnProfileSaving ? '저장 중' : 'AI 시착 정보 저장' }}
+                  </button>
+                </div>
+
+                <p
+                  v-if="tryOnProfileMessage"
+                  class="my-profile-form__message"
+                  :class="{ 'my-profile-form__message--error': tryOnProfileSaveState === 'error' }"
+                >
+                  {{ tryOnProfileMessage }}
+                </p>
+
+                <div v-if="tryOnProfileLoadState === 'loading'" class="my-state">
+                  AI 시착 정보를 불러오는 중입니다.
+                </div>
+
+                <div class="my-tryon-photo">
+                  <div class="my-tryon-photo__preview" aria-hidden="true">
+                    <img
+                      v-if="tryOnImageDisplayUrl"
+                      :src="tryOnImageDisplayUrl"
+                      :alt="`${profile.name} AI 시착용 사진 미리보기`"
+                    />
+                    <span v-else>{{ profileInitial }}</span>
+                  </div>
+                  <div class="my-tryon-photo__body">
+                    <strong>전신 사진</strong>
+                    <p>상품과 라이브의 AI 시착 합성에 사용하는 기준 사진입니다. JPG, PNG, WebP 이미지를 5MB 이하로 업로드할 수 있습니다.</p>
+                    <p v-if="selectedTryOnImageName" class="my-tryon-photo__file">
+                      {{ selectedTryOnImageName }}
+                    </p>
+                    <div class="my-tryon-photo__actions">
+                      <button type="button" :disabled="isTryOnProfileSaving" @click="openTryOnImagePicker">
+                        사진 선택
+                      </button>
+                      <button
+                        v-if="tryOnImageDisplayUrl"
+                        type="button"
+                        :disabled="isTryOnProfileSaving"
+                        @click="removeTryOnImage"
+                      >
+                        사진 삭제
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    ref="tryOnImageInput"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    class="my-tryon-photo__input"
+                    aria-label="AI 시착용 전신 사진 선택"
+                    @change="handleTryOnImageChange"
+                  />
+                </div>
+
+                <div class="my-tryon-fields" aria-label="신체 정보">
+                  <label v-for="field in TRYON_BODY_FIELD_OPTIONS" :key="field.id">
+                    <span>{{ field.label }}{{ field.unit ? ` (${field.unit})` : '' }}</span>
+                    <input
+                      :id="`my-tryon-${field.id}`"
+                      v-model.trim="tryOnBodyForm[field.id]"
+                      type="text"
+                      inputmode="numeric"
+                      :placeholder="field.placeholder"
+                      :aria-invalid="Boolean(tryOnBodyErrors[field.id])"
+                      :aria-describedby="tryOnBodyErrors[field.id] ? `my-tryon-${field.id}-error` : undefined"
+                      :disabled="isTryOnProfileSaving"
+                      @blur="validateTryOnBodyField(field.id)"
+                    />
+                    <small v-if="tryOnBodyErrors[field.id]" :id="`my-tryon-${field.id}-error`">
+                      {{ tryOnBodyErrors[field.id] }}
+                    </small>
+                  </label>
+                </div>
+
+                <div class="my-tryon-actions">
+                  <button type="button" :disabled="isTryOnProfileSaving" @click="deleteTryOnProfile">
+                    전체 삭제
+                  </button>
+                </div>
               </form>
             </template>
 
@@ -3096,6 +3371,69 @@ onMounted(() => {
   display: none;
 }
 
+.my-tryon-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.my-tryon-fields label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.my-tryon-fields span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 18px;
+}
+
+.my-tryon-fields input {
+  width: 100%;
+  min-height: var(--button-height-standard);
+  padding: 0 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.my-tryon-fields input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  outline: none;
+}
+
+.my-tryon-fields input[aria-invalid='true'] {
+  border-color: var(--color-error);
+}
+
+.my-tryon-fields small {
+  color: var(--color-error);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.my-tryon-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.my-tryon-actions button {
+  min-height: var(--button-height-small);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+}
+
 .my-profile-form__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3341,7 +3679,8 @@ onMounted(() => {
   .my-business-grid,
   .my-point-panel__grid,
   .my-profile-form__grid,
-  .my-profile-grid {
+  .my-profile-grid,
+  .my-tryon-fields {
     grid-template-columns: 1fr;
   }
 

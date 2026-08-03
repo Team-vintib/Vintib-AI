@@ -381,7 +381,7 @@ docs/
 - `App.vue`는 `RouterView`만 렌더링합니다.
 - 기능 ID prefix 기준 도메인 폴더와 공통 폴더가 생성되어 있습니다.
 - `domains/auth`에는 회원가입 방식 선택 화면, 이메일 회원가입 화면, 이메일 로그인 화면, 이메일 인증 UI, SSAFY 로그인/가입 시작 화면, SSO callback 화면, 계정 연결 화면, 인증 API 호출 함수와 타입, 인증 store가 구현되어 있습니다.
-- `domains/onboard`에는 기본 정보, 관심 정보, AI 시착 정보 입력·저장 화면과 ONBOARD-004 이동 확인용 임시 화면 및 관련 API·컴포넌트가 구현되어 있습니다.
+- `domains/onboard`에는 기본 정보, 관심 정보, AI 시착 정보 입력·저장 화면과 ONBOARD-004 이동 확인용 임시 화면 및 관련 API·컴포넌트가 구현되어 있습니다. AI 시착 정보 저장은 `domains/tryon` 사용자 프로필 adapter를 사용합니다.
 - `domains/biz`에는 BIZ-001 사업자 정보 입력·검증 화면, 사업자등록증 이미지 선택
   컴포넌트, FE 더미 제출 상태 store와 BIZ-001-2 인증 대기 화면이 구현되어 있습니다.
   BIZ-001-2의 메인 이동은 HOME route로 연결되어 있으며, 실제 인증 API는 후속 작업 대기 중입니다.
@@ -433,7 +433,7 @@ docs/
   입찰가·타이머·최고 입찰자·사용 가능 포인트와 입찰 CTA를 표시하고, mock 처리 중·최근
   입찰자·포인트 부족·예정·종료·상품 없음 상태를 제공합니다. 실제 snapshot·입찰·event와
   포인트 처리는 `.codex/requests/be/007-live-tryon-contract.md` 계약 확정 후 연결합니다.
-- `domains/tryon`에는 S15P11A108-425 라이브 AI 시착 패널이 구현되어 있습니다. 등록 사진
+- `domains/tryon`에는 S15P11A108-425 라이브 AI 시착 패널과 사용자 시착 프로필 타입/API adapter가 구현되어 있습니다. 등록 사진
   있음·없음, 로컬 이미지 변경, 생성 중·결과·실패·재시도와 결과 저장 피드백을 mock으로
   제공하며, 상품 변경 시 이전 결과를 초기화합니다. 실제 사진·생성·저장 계약은
   `.codex/requests/be/007-live-tryon-contract.md` 확정 후 연결합니다.
@@ -446,7 +446,7 @@ docs/
   제거합니다. 알림 도메인의 mock data와
   `mock` query 진입점은 제거했으며, 수동 화면 확인은 로그인 계정에 실제 `notification`
   DB row를 넣어 진행합니다. 서버 카테고리 필터와 `type/refType/refId` enum 문서화는 대기 중입니다.
-- `domains/my`에는 마이페이지 요약, 프로필, 판매 상품, 주문/판매 내역, 라이브, 찜/팔로우, 사업자 섹션을 표시하는 1차 화면이 구현되어 있습니다.
+- `domains/my`에는 마이페이지 요약, 프로필, AI 시착, 판매 상품, 주문/판매 내역, 라이브, 찜/팔로우, 사업자 섹션을 표시하는 1차 화면이 구현되어 있습니다.
   `/my`에서 `section` query를 기준으로 섹션을 전환하고, 실제 마이페이지 API 계약 확정 전까지 `VITE_MY_API_ENABLED=false` 기본값으로 mock fallback을 사용합니다.
   단, 라이브 섹션은 라이브 목록과 동일하게 `VITE_LIVE_LIST_API_ENABLED`가 `false`가 아니면 `/lives`를 조회한 뒤 현재 사용자 `hostId` 기준으로 필터링합니다.
 - 나머지 도메인 폴더는 구조 보존용 `.gitkeep`만 유지합니다.

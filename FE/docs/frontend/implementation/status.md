@@ -14,7 +14,7 @@
 | 스타일          | 부분   | Tailwind와 전역 SCSS 기반 완료, 온보딩 UI 컴포넌트 및 회원가입·로그인·SSO 화면 스타일 구현                                             |
 | 레이아웃        | 부분   | 공통 슬롯 레이아웃, 인증 레이아웃, 온보딩 단계 레이아웃 구현. `DefaultLayout`은 화면별 콘텐츠 최대 폭 지정 지원                       |
 | 인증 화면       | 부분   | AUTH-001 이메일 회원가입, 가입 방식 선택, AUTH-002 이메일 로그인, AUTH-003 SSAFY 로그인·가입 진입, SSO callback·계정 연결 안내 FE 완료, BE 메일/로그인/SSO 환경에서 E2E 재검증 필요 |
-| 온보딩 화면     | 부분   | ONBOARD-001~004 FE 구현 완료, ONBOARD-003 사진 선택·촬영·미리보기·삭제 완료, ONBOARD-003·004 저장은 BE API 대기                        |
+| 온보딩 화면     | 부분   | ONBOARD-001~004 FE 구현 완료, ONBOARD-003 사진 선택·촬영·미리보기·삭제 완료. ONBOARD-003 저장은 `domains/tryon` 프로필 adapter로 통합해 마이페이지·상품/라이브 AI 시착과 같은 사진/신체 정보를 사용하며, 실제 BE API는 계약 대기 |
 | 사업자 인증 화면 | 부분   | BIZ-001 필수값·숫자 10자리·이미지 MIME 검증, 제출 활성화·중복 방지와 BIZ-001-2 더미 인증 대기 및 HOME 이동 연결 완료, BE API 대기                    |
 | 홈 화면         | 부분   | HOME 공개 route, 로그인별 Guest/Member 홈 분기, 공통 검색바 기반 검색 패널·섹션·라이브 카드·상품 카드·empty·loading/error/retry 상태 구현, `/api/home`·로그인 시 `/api/home/following` 부분 연동. BE 미제공 필드와 콘텐츠 카드는 FE 보조값 유지 |
 | 상품 목록 화면   | 부분   | PROD-008 공개 route, 홈과 같은 공통 검색바의 통합 검색 상품 탭 이동, 실사형 로컬 이미지·최소/최대 가격 검증과 mock 목록 필터링·빈 상태·상품 카드→상세 route 이동 완료, 실제 조회·찜 API 대기 |
@@ -22,9 +22,9 @@
 | 상품 등록 화면   | 부분   | S15P11A108-409·411·414 `/products/new` route, 사진 등록·기본 정보·사이즈/소재·상태/하자와 AI 품질 검증·가격·검토·완료 7단계 UI 구현. 필수값·이미지·가격·등록 실패 상태와 mock 등록 adapter 구현 완료. BE presigned 이미지 업로드 3단계 계약은 FE 문서에 반영됐고, 실제 상품 등록·이미지 역할·AI 품질 검증·가격 추천·경매 등록 API 연결 대기 |
 | 라이브 목록 화면 | 부분   | S15P11A108-413·415·418 카드·필터·정렬과 상태 화면, 홈과 같은 공통 검색바의 통합 검색 라이브 탭 이동 구현. `origin/develop-BE@dd6a0b6`에 `GET /api/lives`가 구현됐으며, 최종 009 계약의 복수 `categories[]`·공통 `PageResponse.content`·nullable `viewerCount`·`VIEWERS_DESC` 미지원 정책을 418 adapter에 반영하기 전까지 기본값은 mock |
 | 라이브 개설 화면 | 부분   | LIVE-001/002 `/lives/new` route, 라이브 유형·방송 정보·판매 상품·예약 일정·장비 확인·완료 단계 UI, 필수값/과거 일정 검증, 상품 mock 검색/선택, `getUserMedia` 기반 카메라 미리보기와 마이크 순차 확인 구현. 실제 라이브 생성/예약 API와 방송 SDK 연동 대기 |
-| 라이브 시청 화면 | 부분   | 419 방송 헤더·상품 큐·영상 stage·선택 상품·상태 화면, 423 채팅·반응·경매 패널, 425 사진 중심 AI 시착 패널과 등록 전·생성·결과·실패 mock 상태 구현. 실제 스트리밍·채팅 STOMP·경매·AI API 연동 대기 |
+| 라이브 시청 화면 | 부분   | 419 방송 헤더·상품 큐·영상 stage·선택 상품·상태 화면, 423 채팅·반응·경매 패널, 425 사진 등록·변경·mock 생성·결과·실패 상태를 포함한 AI 시착 패널 구현. 실제 스트리밍·채팅 STOMP·경매·AI 생성 API 연동은 대기 |
 | 알림 화면        | 부분   | S15P11A108-420·421 `/notifications` 읽지 않은 알림 목록·탭 필터·현재 탭 표시·전체 탭 더보기·단건/전체 읽음 처리와 공통 헤더 알림 팝업·unread badge 구현. 알림 mock data/query와 로컬 DB seed를 제거했고 실제 `/api/users/{userId}/alerts?unreadOnly=true`로 조회하며 읽음 처리된 알림은 목록에서 제거. 조회/읽음 API 재검증 완료, 실제 알림 생성 이벤트·예약 라이브 알림 신청/스케줄러·서버 카테고리 필터·알림 `type/refType` enum 문서화·탭별 bulk read API는 대기 |
-| 마이페이지 화면   | 부분   | `/my` route를 `domains/my/pages/MyPage.vue`로 연결하고 사용자 요약, 포인트 카드, 구매/판매/찜 카운터, 프로필·관심 정보·판매 상품·구매/낙찰·판매/정산·라이브·찜/팔로우·사업자 섹션 전환을 구현. `VITE_MY_API_ENABLED=false` 기본값에서는 mock fallback 사용하되, 라이브 섹션은 `VITE_LIVE_LIST_API_ENABLED` 기준으로 `/lives`를 조회해 현재 사용자 `hostId`만 표시한다. 프로필 사진·AI 시착용 사진·관심 브랜드/카테고리는 mock 저장소와 실제 API adapter 전환점을 분리했다. 주문/배송/환불/포인트/팔로우/사업자 상세 API는 BE 계약 확정 대기 |
+| 마이페이지 화면   | 부분   | `/my` route를 `domains/my/pages/MyPage.vue`로 연결하고 사용자 요약, 포인트 카드, 구매/판매/찜 카운터, 프로필·관심 정보·AI 시착·판매 상품·구매/낙찰·판매/정산·라이브·찜/팔로우·사업자 섹션 전환을 구현. `VITE_MY_API_ENABLED=false` 기본값에서는 mock fallback 사용하되, 라이브 섹션은 `VITE_LIVE_LIST_API_ENABLED` 기준으로 `/lives`를 조회해 현재 사용자 `hostId`만 표시한다. 프로필 사진·관심 브랜드/카테고리는 MY adapter로, AI 시착용 전신 사진·신체 정보는 TRYON adapter로 분리했다. 주문/배송/환불/포인트/팔로우/사업자 상세 API와 시착 생성 API는 BE 계약 확정 대기 |
 | 공통 컴포넌트   | 부분   | 온보딩 도메인에 BaseButton, BaseInput, BaseField, 단계 표시 구현. shared에는 GlobalNavigation, RoutePlaceholder, 홈·상품·라이브가 재사용하는 AppSearchBar 구현 |
 | API 타입        | 부분   | 공통 응답/에러/pagination, 인증 회원가입·로그인 요청/응답 타입, 온보딩 필드 오류·회원 유형 타입 구현                                   |
 | Mock 데이터     | 부분   | 홈·상품 목록·상품 상세·유사 상품 가격 분포·상품 등록·라이브 채팅·경매·AI 시착 패널 확인용 mock 데이터 구현, 상품 목록은 로컬 WebP와 가격 필터 사용, 홈은 BE 미제공 회원 홈 보조 섹션·콘텐츠 카드·fallback 데이터에 mock 일부 유지. 알림 도메인 mock 데이터는 제거하고 실제 DB/API 확인으로 전환 |
@@ -63,4 +63,4 @@
 
 | 영역 | 상태 | 비고 |
 | --- | --- | --- |
-| 마이페이지 화면 | 부분 | `domains/my`에 타입, mock data, API adapter, `MyPage`를 추가하고 `/my` route를 실제 화면으로 연결. 헤더 드롭다운의 `/my?section=orders/sales/wishlist` 이동을 섹션 전환으로 처리한다. `VITE_MY_API_ENABLED=false` 기본값에서는 mock fallback을 사용하되, 라이브 섹션은 `VITE_LIVE_LIST_API_ENABLED` 기준으로 실제 `/lives` 목록을 필터링한다. |
+| 마이페이지 화면 | 부분 | `domains/my`에 타입, mock data, API adapter, `MyPage`를 추가하고 `/my` route를 실제 화면으로 연결. 헤더 드롭다운의 `/my?section=orders/sales/wishlist` 이동을 섹션 전환으로 처리한다. `section=tryon` AI 시착 탭에서 전신 사진과 신체 정보를 관리한다. `VITE_MY_API_ENABLED=false`, `VITE_TRYON_API_ENABLED=false` 기본값에서는 mock fallback을 사용하되, 라이브 섹션은 `VITE_LIVE_LIST_API_ENABLED` 기준으로 실제 `/lives` 목록을 필터링한다. |

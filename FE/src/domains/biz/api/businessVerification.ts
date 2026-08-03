@@ -1,10 +1,4 @@
-import { BUSINESS_SUBMISSION_DELAY_MS } from '@/domains/biz/constants/businessVerification'
-import { http } from '@/shared/api/http'
-
 import type { ApiResponse } from '@/shared/types/api.types'
-
-const BUSINESS_VERIFICATION_API_ENABLED =
-  import.meta.env.VITE_BUSINESS_VERIFICATION_API_ENABLED === 'true'
 
 export type BusinessVerificationStatus = 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED'
 
@@ -21,44 +15,16 @@ export interface BusinessVerificationResponse {
   submittedAt: string
 }
 
-const waitForMockSubmission = () =>
-  new Promise<void>((resolve) => {
-    window.setTimeout(resolve, BUSINESS_SUBMISSION_DELAY_MS)
-  })
-
 export const submitBusinessVerification = async (
   request: SubmitBusinessVerificationRequest,
-) => {
-  if (!BUSINESS_VERIFICATION_API_ENABLED) {
-    await waitForMockSubmission()
-
-    return {
-      success: true,
-      data: {
-        id: Date.now(),
-        status: 'PENDING',
-        submittedAt: new Date().toISOString(),
-      },
-      error: null,
-    } satisfies ApiResponse<BusinessVerificationResponse>
-  }
-
-  const formData = new FormData()
-
-  formData.append('businessRegistrationNumber', request.businessRegistrationNumber)
-  formData.append('businessName', request.businessName)
-  formData.append('representativeName', request.representativeName)
-  formData.append('certificate', request.certificate)
-
-  const { data } = await http.post<ApiResponse<BusinessVerificationResponse>>(
-    '/business-verifications',
-    formData,
-    {
-      headers: {
-        'Content-Type': undefined,
-      },
+): Promise<ApiResponse<BusinessVerificationResponse>> => {
+  void request
+  return {
+    success: false,
+    data: null,
+    error: {
+      code: 'BUSINESS_VERIFICATION_API_NOT_CONNECTED',
+      message: '사업자 인증 API가 아직 연결되지 않았습니다.',
     },
-  )
-
-  return data
+  }
 }

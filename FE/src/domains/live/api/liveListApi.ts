@@ -1,5 +1,3 @@
-import fallbackThumbnail from '@/assets/images/products/product-denim-jacket.webp'
-import { liveListMockData } from '@/domains/live/constants/liveListMockData'
 import { http } from '@/shared/api/http'
 
 import type {
@@ -65,7 +63,7 @@ const mapLiveListDto = (dto: LiveListDto): LiveListItem | null => {
     id: dto.liveId,
     title: dto.title,
     sellerName: dto.hostNickname,
-    thumbnailUrl: dto.thumbnailUrl || fallbackThumbnail,
+    thumbnailUrl: dto.thumbnailUrl || '',
     status: dto.broadcastStatus,
     viewerCount: dto.viewerCount,
     category,
@@ -124,19 +122,17 @@ const normalizePageResponse = <T>(
   }
 }
 
-const getMockLiveList = async (scenario: LiveListMockScenario): Promise<LiveListViewData> => {
+const getEmptyLiveList = async (scenario: LiveListMockScenario): Promise<LiveListViewData> => {
   await wait(MOCK_DELAY_MS)
 
   if (scenario === 'error') {
-    throw new Error('LIVE_LIST_MOCK_ERROR')
+    throw new Error('LIVE_LIST_ERROR')
   }
 
-  const items = scenario === 'empty' ? [] : liveListMockData
-
   return {
-    items,
-    totalElements: items.length,
-    totalPages: items.length > 0 ? 1 : 0,
+    items: [],
+    totalElements: 0,
+    totalPages: 0,
   }
 }
 
@@ -148,7 +144,7 @@ export const getLiveListViewData = (
     return requestLiveList(query)
   }
 
-  return getMockLiveList(scenario)
+  return getEmptyLiveList(scenario)
 }
 
 export const isLiveListApiEnabled = () => LIVE_LIST_API_ENABLED

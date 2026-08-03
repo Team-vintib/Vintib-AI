@@ -4,11 +4,14 @@ import { useRouter } from 'vue-router'
 
 import {
   checkEmailDuplicate,
+  login,
   sendEmailVerificationCode,
   signUp,
   verifyEmailCode,
 } from '@/domains/auth/api/authApi'
 import EmailVerificationField from '@/domains/auth/components/EmailVerificationField.vue'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
+import type { LoginResponse, SignUpResponse } from '@/domains/auth/types/auth.types'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import type { ApiErrorBody } from '@/shared/types/api.types'
@@ -45,6 +48,8 @@ const form = reactive<SignupFormState>({
   password: '',
   passwordConfirm: '',
 })
+
+const authStore = useAuthStore()
 
 const agreements = reactive<SignupAgreements>({
   serviceTerms: false,
@@ -496,7 +501,26 @@ const handleSubmit = async () => {
       return
     }
 
-    await router.push({ name: ROUTE_NAMES.AUTH_LOGIN })
+    const loginResponse = await login({
+      email: normalizedEmail.value,
+      password: form.password,
+    })
+
+    if (!loginResponse.success) {
+      submitError.value =
+        loginResponse.error?.message ||
+        '회원가입은 완료됐지만 로그인 세션을 만들지 못했습니다. 로그인 후 온보딩을 이어가 주세요.'
+      return
+    }
+
+    if (!loginResponse.data?.accessToken) {
+      submitError.value =
+        '회원가입은 완료됐지만 로그인 토큰을 받지 못했습니다. 로그인 후 온보딩을 이어가 주세요.'
+      return
+    }
+
+    authStore.setSession(buildSignupSession(loginResponse.data, response.data), true)
+    await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -505,6 +529,20 @@ const handleSubmit = async () => {
     isSubmitting.value = false
   }
 }
+
+const buildSignupSession = (
+  loginResult: LoginResponse,
+  signupResult: SignUpResponse,
+): LoginResponse => ({
+  ...loginResult,
+  user: {
+    id: loginResult.user?.id ?? signupResult.id,
+    email: loginResult.user?.email ?? signupResult.email,
+    name: loginResult.user?.name ?? signupResult.name,
+    onboardingCompleted:
+      loginResult.user?.onboardingCompleted ?? signupResult.onboardingCompleted ?? false,
+  },
+})
 
 const handleSsafySignUp = async () => {
   if (isSubmitting.value) {

@@ -30,7 +30,12 @@ const saleTypeLabel = computed(() =>
         :to="{ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId: product.id } }"
         :aria-label="`${product.name} 상세 보기`"
       >
-        <img class="product-card__image" :src="product.imageUrl" :alt="product.imageAlt" />
+        <img
+          v-if="product.imageUrl"
+          class="product-card__image"
+          :src="product.imageUrl"
+          :alt="product.imageAlt"
+        />
         <span class="product-card__grade">{{ product.conditionGrade }}급</span>
       </RouterLink>
 

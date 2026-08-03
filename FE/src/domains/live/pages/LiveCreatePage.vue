@@ -372,6 +372,9 @@ const getScheduledAt = () => {
   return `${form.scheduledDate}T${form.scheduledTime}:00`
 }
 
+const getLiveThumbnailUrl = () =>
+  selectedProducts.value.find((product) => product.thumbnailUrl)?.thumbnailUrl || null
+
 const submitLiveCreate = async () => {
   if (createdLiveId.value) {
     return true
@@ -383,7 +386,7 @@ const submitLiveCreate = async () => {
   try {
     const baseRequest = {
       title: form.title.trim(),
-      thumbnailUrl: null,
+      thumbnailUrl: getLiveThumbnailUrl(),
       productIds: form.selectedProductIds,
     }
     const response =
