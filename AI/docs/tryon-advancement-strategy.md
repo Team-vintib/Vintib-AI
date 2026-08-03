@@ -254,3 +254,62 @@ UNet에 넣고 self-attention이 그 안에서 서로를 참조하게 하는 구
   얹는 방향을 검토한다.
 - 프로덕션(`worker/models/catvton/`) 반영 여부 결정 — 지금은 전부 `AI/validation/`
   안의 검증 코드다.
+
+## 9. 사이즈(체형-의류 치수) 기반 폭 조절 검증
+
+§8.5에서 예고한 대로, §7.5의 `adaptive_fit.py` 폭 축(width_ratio → dilation_px)을 §8의
+길이 렌더링 픽스(worn-reference + 체형 매칭 + attention 부스팅)와 결합해서 실제
+프로덕션 경로로 테스트했다(`verify_size_fit_combined.py`). `AutoMasker(...,
+body_measurements={"waist_cm": ...}, garment_measurements={"WAIST_WIDTH": 38.0})` —
+지금까지는 실제 BE 데이터가 없어 항상 `None`으로 비활성이던 경로다. 같은 반바지
+(WAIST_WIDTH=38cm 가정)를 허리둘레가 다른 세 체형(영희 65cm/철수 75cm/둘리 110cm)에게
+입혀서 자동으로 루즈/레귤러/타이트하게 나오는지 확인했다.
+
+### 9.1 재현성 버그 — generator 재사용
+
+`torch.Generator(device="cuda").manual_seed(42)`를 루프 **밖**에서 한 번만 만들어 세
+케이스에 재사용했다. `pipeline.py`의 `randn_tensor(..., generator=generator, ...)`가
+호출마다 이 generator의 내부 상태를 전진시키므로, 첫 케이스(영희)만 실제로 seed=42였고
+이후 케이스(철수/둘리)는 사실상 재현 불가능한 임의 상태로 생성됐다 — 둘리 결과에서 다리
+전체를 덮는 격자무늬(청바지 데님이 비쳐 보이는 듯한) 아티팩트로 나타났다. 케이스마다
+`manual_seed(42)`를 새로 호출하도록 고치자 해당 아티팩트는 사라졌다.
+
+### 9.2 AI 모델 사진 해상도 불일치 → 신발 잘림
+
+`cheolsu.png`/`younghee.png`/`dooly.png`가 768×1152(FASHN VTON PoC용 구도)로 생성돼
+있었는데, CatVTON 스크립트들은 `resize_and_crop(image, (768, 1024))`로 리사이즈한다.
+이 함수는 세로를 중앙 기준 대칭 크롭해서 위/아래 각 64px씩 잘라내는데, 인물 사진 구도상
+아래쪽 64px에 신발 끝부분이 걸려 세 인물 모두 신발이 잘려 나왔다. AI 모델 사진을
+CatVTON 작업 해상도(768×1024)로 직접 재생성해서(`models_ai_generated/
+regenerate_at_catvton_resolution.py`) 크롭이 사실상 no-op이 되도록 고쳤다.
+
+### 9.3 컴포지팅 고스트 아티팩트 (원인 가설, 미해결)
+
+위 두 버그를 고친 뒤에도 폭 조정량이 0에서 멀어질수록(영희 +3.4px 팽창/둘리 -6.2px
+수축) 마스크 경계를 따라 반투명 이중윤곽("고스트")이 남는다 — 조정량이 거의 0인
+철수(+0.3px)는 깨끗하다. `composite_with_original()`이 `mask_processor.blur
+(blur_factor=9)`로 부드럽게 처리된 마스크의 중간 알파(0~1) 구간에서 생성 이미지와 원본
+이미지를 섞는 구조인데, 마스크 경계를 인위적으로 넓히거나/좁히면 그 경계가 diffusion이
+실제로 그린 옷의 경계와 어긋나서 이 블렌딩 아티팩트가 생기는 것으로 추정한다. 다음
+세션에서 원인을 확정하고 수정한다.
+
+### 9.4 폴더 정리 / gitignore
+
+CatVTON PoC 결과 폴더(`*_result/`, `worn_references/`)들을 `CatVTON/` 루트에서
+`result/` 밑으로 통합했다. CatVTON 원본 `.gitignore`의 `result/` 규칙이 폴더 전체를
+무시 대상으로 삼고 있어서, 그대로 두면 이미 커밋돼 있던 결과 이미지들이 히스토리에서
+빠질 뻔했다 — `result/*` + 큐레이션된 폴더만 `!result/attention_boost_result/` 식으로
+되살리는 방식으로 고쳐서, 일회성 타임스탬프 폴더(`alpha_test_*` 등)는 계속 무시하되
+비포/애프터 비교용 결과 폴더는 계속 추적되게 했다. 곳곳에 흩어져 있던 `.log` 파일도
+각 결과 폴더로 정리하고, `AI/.gitignore`에 `validation/TRYON/AI_tryon/**/*.log` 규칙을
+추가해 앞으로는 자동으로 제외되게 했다. 중단된 FLUX.2-Klein-9B PoC(가중치만 13GB)도
+`AI/.gitignore`에 명시적으로 추가해 커밋 대상에서 제외했다.
+
+### 9.5 다음 단계
+
+- 9.3의 컴포지팅 고스트 아티팩트 원인 확정 및 수정.
+- 둘리(큰 체형)는 바지 폭 조정 효과가 육안상 약해 보인다 — FLUX로 "타이트하게 입은"
+  모습을 레퍼런스로 따로 생성해서 `condition_image`로 주는 방향을 검토한다(§8.3의
+  worn-reference 아이디어를 폭 축에도 적용).
+- 프로덕션(`worker/models/catvton/`) 반영 여부 결정 — 지금은 전부 `AI/validation/`
+  안의 검증 코드다.

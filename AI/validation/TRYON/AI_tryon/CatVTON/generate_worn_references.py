@@ -17,7 +17,7 @@ import torch
 from diffusers import Flux2KleinPipeline, Flux2Transformer2DModel, GGUFQuantizationConfig
 from transformers import AutoModelForCausalLM, BitsAndBytesConfig
 
-OUT_DIR = "worn_references"
+OUT_DIR = "result/worn_references"
 os.makedirs(OUT_DIR, exist_ok=True)
 
 WIDTH, HEIGHT = 768, 1024

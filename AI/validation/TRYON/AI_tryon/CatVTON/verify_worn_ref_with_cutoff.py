@@ -28,7 +28,7 @@ from model.cloth_masker import AutoMasker
 from model.pipeline import CatVTONPipeline
 from utils import init_weight_dtype, resize_and_crop, resize_and_padding
 
-OUT_DIR = "worn_ref_cutoff_result"
+OUT_DIR = "result/worn_ref_cutoff_result"
 os.makedirs(OUT_DIR, exist_ok=True)
 
 WIDTH, HEIGHT = 768, 1024

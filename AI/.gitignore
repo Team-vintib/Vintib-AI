@@ -52,3 +52,11 @@ validation/CLASS/product-info-check/.onnx_cache/
 validation/CLASS/crawl-collector/out/
 validation/CLASS/crawl-collector/**/out/
 
+# FLUX.2-Klein-9B PoC — RAM/VRAM 오프로딩 병목으로 PoC 자체를 중단했다(가중치만 13GB).
+# 폴더 전체를 커밋하지 않기로 확정했다.
+validation/TRYON/AI_tryon/flux2-klein9b/
+
+# tryon PoC 실행 로그 — 결과 이미지는 커밋하되(비포/애프터 비교용) 콘솔 로그는 재생성
+# 가능해서 커밋하지 않는다.
+validation/TRYON/AI_tryon/**/*.log
+
