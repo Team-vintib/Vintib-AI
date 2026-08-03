@@ -248,6 +248,23 @@ CREATE UNIQUE INDEX ux_live_product_active
     ON live_product (live_id, product_id) WHERE removed_at IS NULL;
 
 
+-- 예약 라이브 시작 알림 신청 (FE 요청 008 §3.2.1).
+-- notified_at 이 중복 발송을 막는 유일한 근거다 — 스케줄러는 이 값이 비어 있는 신청만 집고,
+-- 알림 생성과 같은 트랜잭션에서 채운다. 서버가 재기동돼도 이미 보낸 건은 다시 잡히지 않는다.
+CREATE TABLE live_reminder (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    live_id     BIGINT      NOT NULL REFERENCES live (id),
+    member_id   BIGINT      NOT NULL REFERENCES member (id),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    notified_at TIMESTAMPTZ,                        -- NULL 이면 아직 안 보냄
+    CONSTRAINT ux_live_reminder UNIQUE (live_id, member_id)
+);
+
+-- 스케줄러가 "아직 안 보낸 것"만 훑는다. 보낸 건이 쌓여도 스캔 대상이 늘지 않게 부분 인덱스로 둔다.
+CREATE INDEX ix_live_reminder_pending
+    ON live_reminder (live_id) WHERE notified_at IS NULL;
+
+
 -- =============================================================================
 -- 5. 경매·입찰 [정윤] — 프로젝트 최대 난관 구간
 -- =============================================================================

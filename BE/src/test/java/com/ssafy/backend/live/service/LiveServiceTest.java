@@ -68,12 +68,20 @@ class LiveServiceTest {
     @Mock
     private LiveViewerService liveViewerService;
 
+    @Mock
+    private LiveReminderService liveReminderService;
+
     private LiveService liveService;
 
     @BeforeEach
     void setUp() {
         liveService = new LiveService(
-                liveRepository, memberRepository, liveProductService, liveViewerService, List.of());
+                liveRepository,
+                memberRepository,
+                liveProductService,
+                liveViewerService,
+                liveReminderService,
+                List.of());
     }
 
     @Test
@@ -116,7 +124,12 @@ class LiveServiceTest {
     void 진행_중인_방송을_종료하면_ENDED로_바뀌고_정리_훅이_불린다() {
         LiveService 훅이_달린_서비스 =
                 new LiveService(
-                        liveRepository, memberRepository, liveProductService, liveViewerService, List.of(cleanupHook));
+                        liveRepository,
+                        memberRepository,
+                        liveProductService,
+                        liveViewerService,
+                        liveReminderService,
+                        List.of(cleanupHook));
         when(host.getId()).thenReturn(HOST_ID);
         Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
@@ -132,7 +145,12 @@ class LiveServiceTest {
     void 예정_방송을_시작하면_LIVE로_바뀌고_정리_훅은_불리지_않는다() {
         LiveService 훅이_달린_서비스 =
                 new LiveService(
-                        liveRepository, memberRepository, liveProductService, liveViewerService, List.of(cleanupHook));
+                        liveRepository,
+                        memberRepository,
+                        liveProductService,
+                        liveViewerService,
+                        liveReminderService,
+                        List.of(cleanupHook));
         when(host.getId()).thenReturn(HOST_ID);
         Live live = Live.schedule(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now().plusDays(1));
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));

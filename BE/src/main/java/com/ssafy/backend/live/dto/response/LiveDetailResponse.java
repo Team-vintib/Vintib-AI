@@ -36,6 +36,13 @@ public record LiveDetailResponse(
                 example = "false")
         boolean isHost,
 
+        @Schema(
+                description = "이 방송의 시작 알림을 신청해 뒀는지(FE 요청 008 §3.2.1). "
+                        + "**비회원이면 항상 false다.** 신청/취소는 "
+                        + "`POST`/`DELETE /api/lives/{liveId}/reminders`",
+                example = "false")
+        boolean isReminderSet,
+
         @Schema(description = "방송명", example = "빈티지 데님 라이브")
         String title,
 
@@ -94,13 +101,15 @@ public record LiveDetailResponse(
             List<LiveProductResponse> products,
             List<LiveCategoryResponse> categories,
             int currentViewerCount,
-            Long viewerId) {
+            Long viewerId,
+            boolean reminderSet) {
         return new LiveDetailResponse(
                 live.getId(),
                 live.getHost().getId(),
                 live.getHost().getNickname(),
                 live.getHost().getProfileImageUrl(),
                 live.isHostedBy(viewerId),
+                reminderSet,
                 live.getTitle(),
                 live.getThumbnailUrl(),
                 live.getDescription(),

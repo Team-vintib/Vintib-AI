@@ -39,6 +39,7 @@ public class LiveService {
     private final MemberRepository memberRepository;
     private final LiveProductService liveProductService;
     private final LiveViewerService liveViewerService;
+    private final LiveReminderService liveReminderService;
     // 종료 시 정리할 리소스가 늘어나면 구현체만 추가한다 — 종료 로직은 다시 열지 않는다.
     private final List<LiveCleanupHook> cleanupHooks;
 
@@ -133,7 +134,8 @@ public class LiveService {
                 categories,
                 // 화면 진입 시 초기값. 이후 변화는 /topic/lives/{liveId}/viewers 로 간다.
                 liveViewerService.getViewerCount(liveId),
-                viewerId);
+                viewerId,
+                liveReminderService.isRegistered(viewerId, liveId));
     }
 
     /**
