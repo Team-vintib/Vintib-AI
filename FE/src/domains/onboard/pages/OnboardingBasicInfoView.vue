@@ -113,7 +113,7 @@ const getValidationMessage = (field: FormField) => {
     }
 
     if (!phonePattern.test(phoneNumber)) {
-      return '전화번호 형식을 확인해 주세요. 예: 010-1234-5678'
+      return '전화번호 형식을 확인해 주세요. 예: 01012345678'
     }
   }
 
@@ -144,7 +144,7 @@ const handleFieldBlur = (field: FormField) => {
 }
 
 const handleTextUpdate = (field: TextFormField, input: string) => {
-  form[field] = field === 'phoneNumber' ? input.replace(/[^\d-]/g, '').slice(0, 13) : input
+  form[field] = field === 'phoneNumber' ? input.replace(/\D/g, '').slice(0, 11) : input
   submitError.value = ''
 
   if (touched[field]) {
@@ -348,7 +348,7 @@ const handleSubmit = async () => {
           id="phone-number"
           label="전화번호"
           required
-          hint="숫자와 하이픈(-)만 입력해 주세요."
+          hint="숫자만 입력해 주세요."
           :error="errors.phoneNumber"
           v-slot="{ descriptionId, isInvalid }"
         >
@@ -357,9 +357,9 @@ const handleSubmit = async () => {
             :model-value="form.phoneNumber"
             type="tel"
             inputmode="tel"
-            placeholder="010-1234-5678"
+            placeholder="01012345678"
             autocomplete="tel"
-            :maxlength="13"
+            :maxlength="11"
             required
             :invalid="isInvalid"
             :described-by="descriptionId"
