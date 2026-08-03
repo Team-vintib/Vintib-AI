@@ -98,11 +98,13 @@ export const routes: RouteRecordRaw[] = [
     path: ROUTE_PATHS.BIZ_VERIFY,
     name: ROUTE_NAMES.BIZ_VERIFY,
     component: () => import('@/domains/biz/pages/BusinessVerificationPage.vue'),
+    meta: { requiresAuth: true, title: '사업자 인증' },
   },
   {
     path: ROUTE_PATHS.BIZ_VERIFY_PENDING,
     name: ROUTE_NAMES.BIZ_VERIFY_PENDING,
     component: () => import('@/domains/biz/pages/BusinessVerificationPendingPage.vue'),
+    meta: { requiresAuth: true, title: '사업자 인증 대기' },
   },
   {
     path: ROUTE_PATHS.LIVE_LIST,

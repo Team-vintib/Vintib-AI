@@ -6,9 +6,12 @@ import { submitBusinessVerification } from '@/domains/biz/api/businessVerificati
 import BusinessCertificateUploader from '@/domains/biz/components/BusinessCertificateUploader.vue'
 import { BUSINESS_REGISTRATION_NUMBER_LENGTH } from '@/domains/biz/constants/businessVerification'
 import { useBusinessVerificationStore } from '@/domains/biz/stores/businessVerificationStore'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const businessVerificationStore = useBusinessVerificationStore()
 
 const businessRegistrationNumber = ref('')
@@ -103,13 +106,6 @@ const submitDescription = computed(() => {
   return '모든 필수 정보가 유효해야 제출할 수 있습니다.'
 })
 
-const onboardingSteps = [
-  { id: 1, label: '기본 정보', state: 'completed' },
-  { id: 2, label: '관심 정보', state: 'completed' },
-  { id: 3, label: '신체 정보', state: 'completed' },
-  { id: 4, label: '회원 유형', state: 'current' },
-] as const
-
 const handleBusinessRegistrationNumberInput = (event: Event) => {
   const inputElement = event.currentTarget as HTMLInputElement
   const normalizedValue = inputElement.value
@@ -152,7 +148,14 @@ const handleSubmit = async () => {
   isSubmitting.value = true
 
   try {
-    const response = await submitBusinessVerification({
+    const userId = authStore.user?.id
+
+    if (!userId) {
+      submitError.value = '로그인 후 사업자 인증을 진행해 주세요.'
+      return
+    }
+
+    const response = await submitBusinessVerification(userId, {
       businessRegistrationNumber: businessRegistrationNumber.value,
       businessName: businessName.value.trim(),
       representativeName: representativeName.value.trim(),
@@ -165,7 +168,7 @@ const handleSubmit = async () => {
     }
 
     businessVerificationStore.setSubmission({
-      id: response.data.id,
+      id: userId,
       businessRegistrationNumber: businessRegistrationNumber.value,
       businessName: businessName.value.trim(),
       representativeName: representativeName.value.trim(),
@@ -175,8 +178,10 @@ const handleSubmit = async () => {
     })
 
     await router.push({ name: ROUTE_NAMES.BIZ_VERIFY_PENDING })
-  } catch {
-    submitError.value = '제출 상태를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  } catch (error) {
+    const apiError = normalizeApiError(error)
+    submitError.value =
+      apiError.code === 'UNKNOWN_ERROR' && error instanceof Error ? error.message : apiError.message
   } finally {
     isSubmitting.value = false
   }
@@ -189,24 +194,6 @@ const handleSubmit = async () => {
       class="business-verification__container"
       aria-labelledby="business-verification-title"
     >
-      <nav class="business-progress" aria-label="회원 정보 등록 진행 단계">
-        <ol class="business-progress__list">
-          <li
-            v-for="step in onboardingSteps"
-            :key="step.id"
-            class="business-progress__item"
-            :class="`business-progress__item--${step.state}`"
-            :aria-current="step.state === 'current' ? 'step' : undefined"
-          >
-            <span class="business-progress__marker" aria-hidden="true">
-              <span v-if="step.state === 'completed'">✓</span>
-              <span v-else>{{ step.id }}</span>
-            </span>
-            <span>{{ step.label }}</span>
-          </li>
-        </ol>
-      </nav>
-
       <header class="business-verification__header">
         <span class="business-verification__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
@@ -214,8 +201,8 @@ const handleSubmit = async () => {
             <path d="m9 12 2 2 4-4" />
           </svg>
         </span>
-        <p class="business-verification__eyebrow">사업자 회원 등록</p>
-        <h1 id="business-verification-title">사업자 인증</h1>
+        <p class="business-verification__eyebrow">마이페이지 사업자 인증</p>
+        <h1 id="business-verification-title">사업자 인증하기</h1>
         <p>사업자 회원 이용을 위해 정보를 제출해 주세요.</p>
       </header>
 
@@ -351,7 +338,7 @@ const handleSubmit = async () => {
           :disabled="!isFormValid || isSubmitting"
           aria-describedby="business-submit-description"
         >
-          {{ isSubmitting ? '제출 중' : '사업자 정보 제출' }}
+          {{ isSubmitting ? '제출 중' : '사업자 인증하기' }}
         </button>
         <p id="business-submit-description" class="business-form__submit-description">
           {{ submitDescription }}
@@ -372,65 +359,6 @@ const handleSubmit = async () => {
   width: 100%;
   max-width: 880px;
   margin: 0 auto;
-}
-
-.business-progress {
-  margin-bottom: var(--space-12);
-}
-
-.business-progress__list {
-  display: grid;
-  padding: 0;
-  margin: 0;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  list-style: none;
-}
-
-.business-progress__item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-text-muted);
-  flex-direction: column;
-  font-size: 13px;
-  line-height: 18px;
-  text-align: center;
-}
-
-.business-progress__item:not(:last-child)::after {
-  position: absolute;
-  top: 17px;
-  left: calc(50% + 24px);
-  width: calc(100% - 48px);
-  height: 2px;
-  background: var(--color-primary);
-  content: '';
-}
-
-.business-progress__marker {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--color-primary);
-  border-radius: 50%;
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  font-weight: 600;
-}
-
-.business-progress__item--current {
-  color: var(--color-primary);
-  font-weight: 600;
-}
-
-.business-progress__item--current .business-progress__marker {
-  background: var(--color-surface);
-  color: var(--color-primary);
 }
 
 .business-verification__header {
@@ -681,15 +609,6 @@ const handleSubmit = async () => {
 @media (max-width: 720px) {
   .business-verification {
     padding: var(--space-8) var(--space-4);
-  }
-
-  .business-progress__item {
-    font-size: 12px;
-  }
-
-  .business-progress__item:not(:last-child)::after {
-    left: calc(50% + 20px);
-    width: calc(100% - 40px);
   }
 
   .business-form {
