@@ -1,17 +1,26 @@
 package com.ssafy.backend.point.service;
 
+import com.ssafy.backend.global.client.TossPaymentConfirmResponse;
+import com.ssafy.backend.global.client.TossPaymentsClient;
+import com.ssafy.backend.global.config.TossPaymentsConfig.TossPaymentsProperties;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.point.dto.response.PointBalanceResponse;
+import com.ssafy.backend.point.dto.response.PointChargeReadyResponse;
 import com.ssafy.backend.point.dto.response.PointTransactionResponse;
 import com.ssafy.backend.point.entity.PointAccount;
+import com.ssafy.backend.point.entity.PointCharge;
+import com.ssafy.backend.point.entity.PointChargeStatus;
 import com.ssafy.backend.point.entity.PointTransaction;
 import com.ssafy.backend.point.entity.PointTransactionType;
 import com.ssafy.backend.point.repository.PointAccountRepository;
+import com.ssafy.backend.point.repository.PointChargeRepository;
 import com.ssafy.backend.point.repository.PointTransactionRepository;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,9 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>입찰 보류(bidHeld)는 경매 입찰 자체가 아직 없어(AUCT-003 이후) 이번 범위에서도 항상 0이다.
  * 정산 대기(settling)도 관리자 승인·정산 주기 절차가 정의되지 않아 쓰지 않는다 — 구매 확정 시
- * 판매자 available로 바로 정산한다. 충전은 결제 연동 없는 테스트/데모 전용이고, 출금은 신청까지만
- * 처리한다 — 완료(관리자 승인)는 BIZ-001의 사업자 승인과 동일하게 범위 밖이라 DB를 직접 조작해야만
- * 완료 처리된다.
+ * 판매자 available로 바로 정산한다. 충전은 토스페이먼츠 결제위젯 준비({@link #readyCharge})/승인
+ * ({@link #confirmCharge}) 2단계로 처리한다(POINT-001). 출금은 신청까지만 처리한다 — 완료(관리자
+ * 승인)는 BIZ-001의 사업자 승인과 동일하게 범위 밖이라 DB를 직접 조작해야만 완료 처리된다.
  */
 @Service
 @RequiredArgsConstructor
@@ -34,6 +43,9 @@ public class PointService {
     private final PointAccountRepository pointAccountRepository;
     private final PointTransactionRepository pointTransactionRepository;
     private final MemberRepository memberRepository;
+    private final PointChargeRepository pointChargeRepository;
+    private final TossPaymentsClient tossPaymentsClient;
+    private final TossPaymentsProperties tossPaymentsProperties;
 
     // readOnly=true를 오버라이드한다 — 계정이 없으면 이 조회 안에서 0 잔액 행을 만들어야 하기 때문이다.
     @Transactional
@@ -56,7 +68,7 @@ public class PointService {
     }
 
     @Transactional
-    public PointBalanceResponse charge(Long memberId, Long amount) {
+    public PointBalanceResponse charge(Long memberId, Long amount, Long chargeRefId) {
         PointAccount account = getOrCreateAccount(memberId);
         account.charge(amount);
         pointTransactionRepository.save(PointTransaction.builder()
@@ -64,8 +76,56 @@ public class PointService {
                 .type(PointTransactionType.CHARGE)
                 .amount(amount)
                 .balanceAfter(account.getAvailable())
+                .refType("POINT_CHARGE")
+                .refId(chargeRefId)
                 .build());
         return PointBalanceResponse.from(account);
+    }
+
+    /** 충전 준비(POINT-001) — 결제위젯에 넘길 orderId를 발급하고 PointCharge를 READY로 저장한다. */
+    @Transactional
+    public PointChargeReadyResponse readyCharge(Long memberId, Long amount) {
+        PointAccount account = getOrCreateAccount(memberId);
+        String orderId = UUID.randomUUID().toString();
+        pointChargeRepository.save(PointCharge.builder()
+                .member(account.getMember())
+                .orderId(orderId)
+                .amount(amount)
+                .build());
+        return new PointChargeReadyResponse(orderId, amount, tossPaymentsProperties.clientKey());
+    }
+
+    /** 충전 승인(POINT-001) — 토스 결제 승인 후 포인트를 적립한다. 중복 confirm 호출에도 안전(idempotent)하다. */
+    @Transactional
+    public PointBalanceResponse confirmCharge(Long memberId, String orderId, String paymentKey, Long amount) {
+        PointCharge charge = pointChargeRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PAYMENT_CHARGE_NOT_FOUND));
+        // 다른 회원 소유 orderId로 시도하는 경우 존재 자체를 드러내지 않는다(IDOR 방지).
+        if (!charge.getMember().getId().equals(memberId)) {
+            throw new CustomException(ErrorCode.PAYMENT_CHARGE_NOT_FOUND);
+        }
+        if (charge.getStatus() == PointChargeStatus.DONE) {
+            return getBalance(memberId);
+        }
+        if (charge.getStatus() != PointChargeStatus.READY) {
+            throw new CustomException(ErrorCode.PAYMENT_ALREADY_PROCESSED);
+        }
+        if (!charge.getAmount().equals(amount)) {
+            throw new CustomException(ErrorCode.PAYMENT_AMOUNT_MISMATCH);
+        }
+
+        TossPaymentConfirmResponse confirmed;
+        try {
+            confirmed = tossPaymentsClient.confirm(paymentKey, orderId, amount);
+        } catch (CustomException e) {
+            charge.markFailed();
+            throw e;
+        }
+
+        charge.markDone(
+                paymentKey,
+                confirmed.approvedAt() != null ? confirmed.approvedAt().toLocalDateTime() : LocalDateTime.now());
+        return charge(memberId, amount, charge.getId());
     }
 
     /** 상시 판매 즉시구매 결제(SALE-002) — available 부족 시 거부, 성공하면 tradeEscrow로 보관한다. */

@@ -154,11 +154,12 @@
 | :--- | :--- | :--- | :---: | :--- | :---: |
 | 잔액 조회 | GET | `/users/{id}/points` | ✓ | POINT-002, MY-007 | ✓ |
 | 사용 내역 조회 | GET | `/users/{id}/points/logs` | ✓ | POINT-002, MY-007 | ✓ |
-| 포인트 충전 | POST | `/users/{id}/points/charges` | ✓ | POINT-001, MY-007 | ✓ |
+| 포인트 충전 준비 | POST | `/users/{id}/points/charges/ready` | ✓ | POINT-001, MY-007 | ✓ |
+| 포인트 충전 승인 | POST | `/users/{id}/points/charges/confirm` | ✓ | POINT-001, MY-007 | ✓ |
 | 출금 신청 | POST | `/users/{id}/withdrawals` | ✓ | POINT-004, MY-007 | ✓ |
 | 출금 내역 조회 | GET | `/users/{id}/withdrawals` | ✓ | POINT-004, MY-007 | ✓ |
 
-> 포인트 충전은 결제 연동 없이 금액만 반영하는 테스트/데모 전용이다. 출금은 신청까지만 처리하며(관리자 승인 체계 없음), 완료 처리는 DB 직접 조작으로만 가능하다.
+> 포인트 충전은 토스페이먼츠 결제위젯(테스트 키) 연동이다. `ready`로 주문번호(`orderId`)와 위젯 클라이언트 키를 발급받아 FE가 위젯을 띄우고, 결제 성공 리다이렉트에서 받은 `paymentKey`/`orderId`/`amount`로 `confirm`을 호출하면 토스 승인 후 포인트가 적립된다. 계약은 `docs/requests/FE/018-toss-payments-charge-widget.md` 참고. 출금은 신청까지만 처리하며(관리자 승인 체계 없음), 완료 처리는 DB 직접 조작으로만 가능하다.
 
 ## 주문 / 배송 / 환불 (Orders)
 

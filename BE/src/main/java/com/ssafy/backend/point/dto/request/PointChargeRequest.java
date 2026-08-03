@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Positive;
 
 public record PointChargeRequest(
 
-        @Schema(description = "충전 금액(원). 결제 연동 없이 금액만 반영하는 테스트/데모 전용 API다.", example = "100000")
+        @Schema(description = "충전 준비 요청 금액(원). 결제위젯에 넘길 orderId를 발급받는다.", example = "100000")
         @Positive
         Long amount) {
 }

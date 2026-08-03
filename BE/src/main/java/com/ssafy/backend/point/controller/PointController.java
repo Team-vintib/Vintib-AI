@@ -4,8 +4,10 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.ApiResponse;
 import com.ssafy.backend.global.response.PageResponse;
+import com.ssafy.backend.point.dto.request.PointChargeConfirmRequest;
 import com.ssafy.backend.point.dto.request.PointChargeRequest;
 import com.ssafy.backend.point.dto.response.PointBalanceResponse;
+import com.ssafy.backend.point.dto.response.PointChargeReadyResponse;
 import com.ssafy.backend.point.dto.response.PointTransactionResponse;
 import com.ssafy.backend.point.service.PointService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 // 마이페이지 포인트/출금 관리(MY-007). 출금 신청/내역은 별도 리소스라 WithdrawalController가 담당한다
 // (APIs.md 포인트/계좌/출금(Wallet) 섹션 — withdrawals가 points 하위가 아닌 독립 경로로 확정).
-// 충전은 결제 연동 없는 테스트/데모 전용이다.
+// 충전은 토스페이먼츠 결제위젯 준비(ready)/승인(confirm) 2단계로 처리한다(POINT-001).
 @Tag(name = "포인트/출금(Wallet)", description = "포인트 잔액/충전, 출금 신청/내역 API")
 @RestController
 @RequestMapping("/api/users/{userId}/points")
@@ -65,20 +67,40 @@ public class PointController {
         return ResponseEntity.ok(ApiResponse.success(pointService.getTransactions(userId, pageable)));
     }
 
-    @Operation(summary = "포인트 충전(테스트/데모 전용)",
-            description = "결제 연동 없이 금액만 받아 잔액에 더한다. 실결제 검증이 없는 테스트/데모 전용 엔드포인트다.")
+    @Operation(summary = "포인트 충전 준비",
+            description = "토스페이먼츠 결제위젯에 넘길 orderId를 발급받는다. 결제위젯 호출 후 /charges/confirm으로 승인한다.")
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "충전 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "충전 준비 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자의 잔액을 충전하려 함")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자의 충전을 준비하려 함")
     })
     @SecurityRequirement(name = "bearerAuth")
-    @PostMapping("/charges")
-    public ResponseEntity<ApiResponse<PointBalanceResponse>> charge(
+    @PostMapping("/charges/ready")
+    public ResponseEntity<ApiResponse<PointChargeReadyResponse>> readyCharge(
             Authentication authentication, @PathVariable Long userId, @Valid @RequestBody PointChargeRequest request) {
         requireSelf(authentication, userId);
-        return ResponseEntity.ok(ApiResponse.success(pointService.charge(userId, request.amount())));
+        return ResponseEntity.ok(ApiResponse.success(pointService.readyCharge(userId, request.amount())));
+    }
+
+    @Operation(summary = "포인트 충전 승인",
+            description = "결제위젯에서 받은 paymentKey로 토스 결제 승인을 요청하고, 성공하면 잔액에 반영한다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "충전 승인 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+                    description = "요청값 검증 실패, 결제 금액 불일치, 이미 처리된 결제, 또는 토스 결제 승인 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자의 충전을 승인하려 함"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않는 결제 준비 정보")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping("/charges/confirm")
+    public ResponseEntity<ApiResponse<PointBalanceResponse>> confirmCharge(
+            Authentication authentication, @PathVariable Long userId,
+            @Valid @RequestBody PointChargeConfirmRequest request) {
+        requireSelf(authentication, userId);
+        return ResponseEntity.ok(ApiResponse.success(
+                pointService.confirmCharge(userId, request.orderId(), request.paymentKey(), request.amount())));
     }
 
     // path의 userId가 인증된 본인이 아니면 존재 자체를 드러내지 않고 403으로 막는다(IDOR 방지).

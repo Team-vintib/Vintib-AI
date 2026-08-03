@@ -52,6 +52,10 @@ public enum ErrorCode {
     // [지갑/주문]
     INSUFFICIENT_POINTS(HttpStatus.BAD_REQUEST, "W001", "포인트 잔액이 부족합니다."),
     WITHDRAWAL_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "W002", "출금 가능 금액을 초과했습니다."),
+    PAYMENT_CHARGE_NOT_FOUND(HttpStatus.NOT_FOUND, "W003", "존재하지 않는 결제 준비 정보입니다."),
+    PAYMENT_ALREADY_PROCESSED(HttpStatus.BAD_REQUEST, "W004", "이미 처리된 결제입니다."),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "W005", "결제 금액이 준비된 금액과 일치하지 않습니다."),
+    PAYMENT_CONFIRM_FAILED(HttpStatus.BAD_REQUEST, "W006", "결제 승인에 실패했습니다."),
     INVALID_ORDER_STATE(HttpStatus.BAD_REQUEST, "O001", "현재 상태에서는 해당 처리를 할 수 없습니다."),
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "O002", "존재하지 않는 주문입니다."),
     SELF_PURCHASE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "O003", "본인이 등록한 상품은 구매할 수 없습니다."),

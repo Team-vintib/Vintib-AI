@@ -156,6 +156,9 @@ services:
       DELIVERY_API_SECRET_KEY: ${DELIVERY_API_SECRET_KEY:-}
       DELIVERY_API_ENDPOINT_ID: ${DELIVERY_API_ENDPOINT_ID:-}
       DELIVERY_API_WEBHOOK_SECRET: ${DELIVERY_API_WEBHOOK_SECRET:-}
+      # 포인트 충전 결제위젯(토스페이먼츠, POINT-001). 폴백이 없어 비우면 충전 승인 자체가 실패한다.
+      TOSS_SECRET_KEY: ${TOSS_SECRET_KEY:-}
+      TOSS_CLIENT_KEY: ${TOSS_CLIENT_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy

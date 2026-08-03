@@ -364,6 +364,23 @@ CREATE TABLE point_transaction (
 
 CREATE INDEX ix_point_tx_member ON point_transaction (member_id, created_at DESC);
 
+-- 포인트 충전 결제 준비/승인 상태(POINT-001). order_id 는 토스에 넘기는 주문번호(BE 발급, orders 테이블과 무관).
+CREATE TABLE point_charge (
+    id           BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    member_id    BIGINT      NOT NULL REFERENCES member (id),
+    order_id     VARCHAR(64) NOT NULL,
+    amount       BIGINT      NOT NULL,
+    status       VARCHAR(20) NOT NULL DEFAULT 'READY',
+    payment_key  VARCHAR(200),
+    approved_at  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_point_charge_order_id UNIQUE (order_id),
+    CONSTRAINT ck_point_charge_status CHECK (status IN ('READY', 'DONE', 'FAILED')),
+    CONSTRAINT ck_point_charge_amount_positive CHECK (amount > 0)
+);
+
+CREATE INDEX ix_point_charge_member ON point_charge (member_id, created_at DESC);
+
 -- 입찰 보류 상태. 입찰 내역 ↔ 포인트 보류를 잇는 테이블.
 CREATE TABLE point_hold (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
