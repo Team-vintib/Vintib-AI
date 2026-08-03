@@ -15,6 +15,7 @@
   - Home: `/api/home`, `/api/home/following`
   - Product: `/api/brands`, `/api/categories`, `/api/products`, `/api/products/{id}`, `/api/products/{id}/status`, `/api/products/{id}/auction-schedule`, `/api/products/{id}/images/upload-url`, `/api/products/{id}/images`, `/api/users/{userId}/wishes`
   - Live: `/api/lives`, `/api/lives/schedule`, `/api/lives/{liveId}`
+  - TryOn: `/api/users/{userId}/tryon`(GET/PUT/DELETE), `/api/users/{userId}/tryon/upload-url`
   - Chat/STOMP: `/api/lives/{liveId}/chat-messages`, `/ws`, `/topic/lives/{liveId}/chat`, `/topic/lives/{liveId}/reactions`, `/topic/lives/{liveId}/viewers`
   - Notification: `/api/users/{userId}/alerts`, `/api/users/{userId}/alerts/{id}`, `/api/users/{userId}/alerts/read-all`
   - Social(Follow): `/api/users/{userId}/followers`(POST/DELETE/GET), `/api/users/{userId}/followings`(GET)
@@ -42,16 +43,16 @@
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
 | 001 | `001-auth-contract.md` | Auth | 이메일 auth API 연결 완료 | `GET /api/me`, auth 응답 `user/nextStep`, SSAFY SSO |
-| 002 | `002-onboarding-contract.md` | Onboarding | FE 화면 있음, mock fallback | `/api/me/onboarding`, `/api/me/interests`, `/api/me/tryon`, complete |
 | 003 | `003-business-contract.md` | Business | FE 화면/API adapter 있음, mock fallback | 사업자 인증 제출/조회 |
 | 004 | `004-home-contract.md` | Home | 홈/팔로잉 홈 연결 완료 | live card `hostId`, 정렬/노출 정책 문서화 |
 | 005 | `005-search-contract.md` | Search | FE 화면/adapter 있음, BE `/api/search` 없음 | 통합 검색 API |
-| 006 | `006-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | 목록 필터 query 구현, 상세 응답 보강, AI 분석/가격 추천 |
-| 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성 연결 완료 | 생성용 상품 조회, 영상 token, AI 시착 생성, `/api/me/tryon` |
+| 006 | `006-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
+| 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필 연결 완료 | 생성용 상품 조회, 영상 token, AI 시착 생성 |
 | 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API 연동 완료. 알림 seed 제거 후 실제 생성 데이터 없음 | 알림 type/ref 문서화, 실제 알림 생성 이벤트, 예약 라이브 알림 신청/스케줄러, 탭별 bulk read |
 | 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수 연결 완료 | 경매 snapshot/start/bid/close/STOMP |
 | 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | FE 화면 없음, BE controller 없음 | 주문/배송/환불/포인트 전체 |
 | 011 | `011-user-mypage-contract.md` | User/MyPage | FE 화면 없음, BE API 없음 | `/api/me`, 공개 프로필, 마이페이지 요약 |
+| 013 | `013-live-seller-control.md` | Live | FE mock으로 UI 구현 완료 | 방송 종료, 현재 소개 상품 전환 트리거 엔드포인트 |
 
 ## 4. 기존 API 변경 요청
 
@@ -60,7 +61,6 @@
 - 추가할 필드
   - Auth: `user`, `nextStep`
   - Home: live card `hostId`
-  - Product: 목록 필터 반영, 상세 응답 보강
   - Social/Notification: 알림 `type/refType/refId` 문서화, 도메인 이벤트별 알림 생성 정책, 예약 라이브 알림 신청/스케줄러, 탭별 읽음 처리 API
 - 변경 영향 범위
   - route guard
@@ -94,8 +94,14 @@
   - Auth 기본 이메일 인증/로그인/토큰/로그아웃
   - Home 현재 화면 렌더링
   - Chat/Reaction/Viewer realtime
-  - Product 등록 기본 흐름과 찜 토글
+  - Product 등록 기본 흐름과 찜 토글, 목록 필터, 상세 응답 보강
   - Notification 목록/읽음 처리
   - Social 팔로우/팔로우 해제, 팔로워/팔로잉 목록 조회
+  - Onboarding 기본 정보/관심 정보/시착 프로필/온보딩 완료 전체(경로는 `/api/me/X`가 아니라 `/api/users/{id}/X`로 확정 — 처리 완료된 `002-onboarding-contract.md`는 삭제됨)
 - 기존 규격을 유지하면 되는 기능
   - BE에는 있지만 FE 화면/진입점이 없어 아직 미연결인 API는 각 도메인 화면 설계 후 연결한다.
+## 2026-08-01 추가 반영
+
+| 번호 | 문서 | 도메인 | FE 기준 상태 | 핵심 BE 요청 |
+| --- | --- | --- | --- | --- |
+| 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | `/points`, `/points/history` FE 화면 구현, mock fallback | 포인트 잔액, 거래 내역, 충전, 출금 계좌, 출금 신청/내역 상세 계약을 010에 병합 |

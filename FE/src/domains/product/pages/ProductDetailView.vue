@@ -16,6 +16,8 @@ import ProductImageGallery from '@/domains/product/components/ProductImageGaller
 import ProductPriceDistribution from '@/domains/product/components/ProductPriceDistribution.vue'
 import ProductPurchaseSummary from '@/domains/product/components/ProductPurchaseSummary.vue'
 import ProductSellerLivePanel from '@/domains/product/components/ProductSellerLivePanel.vue'
+import LiveTryOnPanel from '@/domains/tryon/components/LiveTryOnPanel.vue'
+import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
 import type {
   ProductDetailMockScenario,
   ProductDetailViewData,
@@ -27,6 +29,7 @@ type ProductDetailLoadState = 'loading' | 'success' | 'error' | 'not-found'
 
 const PRODUCT_DETAIL_MOCK_SCENARIOS: ProductDetailMockScenario[] = [
   'default',
+  'mock',
   'loading',
   'error',
   'not-found',
@@ -47,6 +50,8 @@ const selectedImageId = ref('')
 const isLiked = ref(false)
 const isInCart = ref(false)
 const isReminderSet = ref(false)
+const isTryOnOpen = ref(false)
+const isTryOnExpanded = ref(false)
 const actionMessage = ref('')
 let actionMessageTimer: ReturnType<typeof setTimeout> | undefined
 let loadRequestId = 0
@@ -56,6 +61,27 @@ const selectedImage = computed(() =>
 )
 
 const isSold = computed(() => product.value?.saleStatus === 'SOLD')
+
+// 상품 상세 상품을 AI 시착 패널(LiveTryOnPanel)이 받는 형태로 어댑트.
+// LiveTryOnPanel(TRYON-004)은 수정하지 않고 그대로 재사용한다.
+const tryOnProduct = computed<LiveWatchProduct | null>(() => {
+  if (!product.value) return null
+
+  const detail = product.value
+
+  return {
+    id: detail.id,
+    title: detail.title,
+    brandName: detail.brand,
+    price: detail.price,
+    thumbnailUrl: detail.images[0]?.url ?? null,
+    saleType: detail.saleType === 'AUCTION' ? 'AUCTION' : 'FIXED_PRICE',
+    material: detail.material,
+    condition: detail.conditionLabel,
+    measurements: detail.sizeLabel,
+    defectSummary: null,
+  }
+})
 
 const getMockScenario = (): ProductDetailMockScenario => {
   const queryValue = Array.isArray(route.query.mock) ? route.query.mock[0] : route.query.mock
@@ -137,7 +163,28 @@ const showTemporaryMessage = (message: string) => {
   }, 2400)
 }
 
-const handleTryOn = () => showTemporaryMessage('상품 AI 시착 화면은 준비 중입니다.')
+const handleTryOn = () => {
+  // 상품 가상 시착(TRYON-003): 등록 상품 이미지를 회원 전신 사진에 합성.
+  // BE 시착 생성/전신 사진 조회 API가 미구현이라 패널은 mock으로 동작한다.
+  //   → 요청: docs/requests/BE/007-live-tryon-contract.md (3.4 시착 프로필 / 3.6 상품 시착 생성)
+  if (!product.value) return
+
+  isTryOnExpanded.value = false
+  isTryOnOpen.value = true
+}
+
+const closeTryOn = () => {
+  isTryOnOpen.value = false
+  isTryOnExpanded.value = false
+}
+
+const toggleTryOnExpanded = () => {
+  isTryOnExpanded.value = !isTryOnExpanded.value
+}
+
+const handleTryOnKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') closeTryOn()
+}
 
 const handlePurchase = () =>
   showTemporaryMessage('구매 확인 화면은 후속 스토리에서 연결됩니다.')
@@ -168,9 +215,18 @@ watch(
   { immediate: true },
 )
 
+watch(isTryOnOpen, (open) => {
+  if (open) {
+    window.addEventListener('keydown', handleTryOnKeydown)
+  } else {
+    window.removeEventListener('keydown', handleTryOnKeydown)
+  }
+})
+
 onBeforeUnmount(() => {
   loadRequestId += 1
   clearTimeout(actionMessageTimer)
+  window.removeEventListener('keydown', handleTryOnKeydown)
 })
 </script>
 
@@ -254,6 +310,31 @@ onBeforeUnmount(() => {
         :selected-image="selectedImage"
       />
     </article>
+
+    <div
+      v-if="product && isTryOnOpen && tryOnProduct"
+      class="product-try-on-popup"
+      :class="{ 'product-try-on-popup--expanded': isTryOnExpanded }"
+      role="dialog"
+      aria-label="AI 가상 시착"
+    >
+      <div class="product-try-on-popup__frame">
+        <button
+          type="button"
+          class="product-try-on-popup__expand"
+          :aria-label="isTryOnExpanded ? 'AI 시착 팝업 작게 보기' : 'AI 시착 팝업 전체 화면으로 보기'"
+          @click="toggleTryOnExpanded"
+        >
+          <svg v-if="!isTryOnExpanded" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 9V4h5M4 4l6 6M20 15v5h-5M20 20l-6-6" />
+          </svg>
+          <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10 4v5H5M10 9 4 3M14 20v-5h5M14 15l6 6" />
+          </svg>
+        </button>
+        <LiveTryOnPanel :product="tryOnProduct" @close="closeTryOn" />
+      </div>
+    </div>
   </DefaultLayout>
 </template>
 
@@ -324,6 +405,84 @@ onBeforeUnmount(() => {
 @media (max-width: 940px) {
   .product-detail__hero {
     grid-template-columns: 1fr;
+  }
+}
+
+/* AI 시착 팝업 — 기본은 우하단 고정 floating(스크롤해도 보이고 뒤 페이지 조작 가능),
+   확대 버튼을 누르면 전체 화면 중앙 모달로 커진다. 닫기는 패널의 X 버튼(@close). */
+.product-try-on-popup {
+  position: fixed;
+  right: var(--space-6);
+  bottom: var(--space-6);
+  z-index: 120;
+}
+
+.product-try-on-popup__frame {
+  position: relative;
+  width: min(380px, calc(100vw - 24px));
+  height: min(72vh, 640px);
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.38);
+}
+
+.product-try-on-popup--expanded {
+  display: grid;
+  right: auto;
+  bottom: auto;
+  padding: var(--space-4);
+  background: rgba(4, 6, 5, 0.62);
+  inset: 0;
+  place-items: center;
+  backdrop-filter: blur(2px);
+}
+
+.product-try-on-popup--expanded .product-try-on-popup__frame {
+  width: min(460px, 100%);
+  height: min(88vh, 780px);
+}
+
+.product-try-on-popup__expand {
+  display: grid;
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  right: 52px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-control);
+  background: rgba(23, 27, 26, 0.92);
+  color: rgba(255, 255, 255, 0.72);
+  place-items: center;
+}
+
+.product-try-on-popup__expand:hover {
+  border-color: #b69ad7;
+  color: #d3b9ef;
+}
+
+.product-try-on-popup__expand svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+@media (max-width: 720px) {
+  .product-try-on-popup:not(.product-try-on-popup--expanded) {
+    right: var(--space-3);
+    bottom: var(--space-3);
+  }
+
+  .product-try-on-popup:not(.product-try-on-popup--expanded) .product-try-on-popup__frame {
+    width: calc(100vw - 24px);
+    height: min(70vh, 560px);
   }
 }
 </style>

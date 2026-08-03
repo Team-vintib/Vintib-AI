@@ -15,7 +15,7 @@
 
 ## 공통 규율
 
-- 커밋 메시지·브랜치 전략은 `.claude/commit-convention.md` 참고 (Notion "코딩 컨벤션" 기반).
+- 커밋 메시지·브랜치 전략은 `docs/commit-convention.md` 참고 (Notion "코딩 컨벤션" 기반).
   - **절대 직접 push하지 않는다.** 커밋까지만 하고 push는 항상 사용자가 직접 실행한다.
   - **커밋 메시지에 Claude를 Co-Authored-By로 추가하지 않는다.**
 - 팀 간 공유 계약(API 스펙, 도메인 용어 등)이 바뀌면 관련 팀 CLAUDE.md/README에도 반영한다.

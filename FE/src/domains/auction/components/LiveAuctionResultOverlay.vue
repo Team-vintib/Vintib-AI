@@ -1,0 +1,247 @@
+<script setup lang="ts">
+defineProps<{
+  winnerNickname: string
+  winningBid: number
+  productTitle?: string | null
+}>()
+
+const emit = defineEmits<{
+  close: []
+}>()
+
+// 팝업 뒤에서 위로 터지는 불꽃놀이 파티클.
+// 몇 개의 버스트 지점에서 파티클이 방사형으로 퍼지며 사라진다.
+const FIREWORK_BURSTS = [
+  { x: 30, y: 32, hue: 280, delay: 0 },
+  { x: 70, y: 26, hue: 45, delay: 0.5 },
+  { x: 50, y: 42, hue: 330, delay: 1 },
+]
+const PARTICLES_PER_BURST = 14
+const fireworks = FIREWORK_BURSTS.flatMap((burst, burstIndex) =>
+  Array.from({ length: PARTICLES_PER_BURST }, (_, particleIndex) => {
+    const angle = (particleIndex / PARTICLES_PER_BURST) * Math.PI * 2
+    const distance = 66 + (particleIndex % 3) * 16
+
+    return {
+      key: `${burstIndex}-${particleIndex}`,
+      x: burst.x,
+      y: burst.y,
+      dx: Math.round(Math.cos(angle) * distance),
+      dy: Math.round(Math.sin(angle) * distance),
+      hue: (burst.hue + particleIndex * 12) % 360,
+      delay: burst.delay,
+    }
+  }),
+)
+</script>
+
+<template>
+  <div
+    class="auction-result"
+    role="alertdialog"
+    aria-labelledby="auction-result-title"
+    aria-live="assertive"
+  >
+    <div class="auction-result__fireworks" aria-hidden="true">
+      <span
+        v-for="particle in fireworks"
+        :key="particle.key"
+        :style="{
+          left: `${particle.x}%`,
+          top: `${particle.y}%`,
+          '--dx': `${particle.dx}px`,
+          '--dy': `${particle.dy}px`,
+          '--hue': particle.hue,
+          animationDelay: `${particle.delay}s`,
+        }"
+      ></span>
+    </div>
+
+    <div class="auction-result__card">
+      <p class="auction-result__eyebrow">경매 낙찰</p>
+
+      <p class="auction-result__label">낙찰자</p>
+      <h2 id="auction-result-title" class="auction-result__winner">
+        <span aria-hidden="true">🎉</span>{{ winnerNickname }}
+      </h2>
+
+      <p class="auction-result__label auction-result__label--price">낙찰가</p>
+      <strong class="auction-result__price">{{ winningBid.toLocaleString('ko-KR') }}P</strong>
+
+      <p v-if="productTitle" class="auction-result__product">{{ productTitle }}</p>
+
+      <button type="button" class="auction-result__close" @click="emit('close')">확인</button>
+    </div>
+  </div>
+</template>
+
+<style scoped lang="scss">
+.auction-result {
+  display: grid;
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 36%, rgba(126, 87, 194, 0.36), rgba(4, 6, 5, 0.84) 62%);
+  place-items: center;
+  backdrop-filter: blur(3px);
+  animation: auction-result-fade 240ms ease-out;
+}
+
+.auction-result__card {
+  display: flex;
+  position: relative;
+  z-index: 1;
+  max-width: min(360px, 84%);
+  padding: var(--space-6) var(--space-5);
+  border: 1px solid rgba(211, 185, 239, 0.34);
+  border-radius: var(--radius-media);
+  background: rgba(17, 21, 20, 0.88);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  flex-direction: column;
+  align-items: center;
+  animation: auction-result-pop 340ms cubic-bezier(0.2, 0.9, 0.3, 1.25);
+}
+
+.auction-result__eyebrow {
+  padding: 3px 12px;
+  border: 1px solid rgba(211, 185, 239, 0.4);
+  border-radius: 999px;
+  color: #d3b9ef;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.auction-result__label {
+  margin-top: var(--space-4);
+  color: var(--color-live-text-secondary);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.auction-result__label--price {
+  margin-top: var(--space-5);
+}
+
+.auction-result__winner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 4px;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.2;
+  word-break: break-all;
+}
+
+.auction-result__price {
+  margin-top: 2px;
+  color: #ffd76a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 34px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.auction-result__product {
+  max-width: 280px;
+  margin-top: var(--space-3);
+  color: var(--color-live-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.auction-result__close {
+  height: 42px;
+  margin-top: var(--space-5);
+  padding: 0 var(--space-6);
+  border: 1px solid #8560b2;
+  border-radius: var(--radius-control);
+  background: #76539f;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.auction-result__close:hover {
+  background: var(--color-ai, #7e57c2);
+}
+
+.auction-result__close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.auction-result__fireworks {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.auction-result__fireworks span {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: hsl(var(--hue) 92% 64%);
+  box-shadow: 0 0 8px 1px hsl(var(--hue) 92% 64% / 0.7);
+  opacity: 0;
+  animation: auction-firework 1.7s ease-out infinite;
+}
+
+@keyframes auction-firework {
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes auction-result-pop {
+  from {
+    transform: scale(0.86);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes auction-result-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auction-result,
+  .auction-result__card {
+    animation: none;
+  }
+
+  .auction-result__fireworks {
+    display: none;
+  }
+}
+</style>

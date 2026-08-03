@@ -55,6 +55,12 @@ public record LiveDetailResponse(
                 example = "128")
         int currentViewerCount,
 
+        @Schema(
+                description = "지금 소개 중인 상품 ID(`NOW` 배지). **null이면 소개 중인 상품이 없다.** "
+                        + "이후 전환은 `/topic/lives/{liveId}/product` 구독으로 받는다",
+                example = "2001")
+        Long currentProductId,
+
         @Schema(description = "편성된 상품 목록. 제외된 상품은 빠진다")
         List<LiveProductResponse> products,
 
@@ -81,6 +87,7 @@ public record LiveDetailResponse(
                 live.getEndedAt(),
                 live.getPeakViewerCount(),
                 currentViewerCount,
+                live.getCurrentProductId(),
                 products,
                 categories);
     }

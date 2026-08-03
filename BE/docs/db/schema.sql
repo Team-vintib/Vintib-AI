@@ -55,11 +55,16 @@ CREATE TABLE member_social_account (
 );
 
 -- 전신 사진·신체 정보 (ONBOARD-003, TRYON-001~002)
+-- body_photo_key: 비공개(private) 버킷에 저장되는 S3 key. presigned GET으로만 열 수 있어
+-- 고정 URL이 아니라 key를 저장한다 — tryon_result.image_key와 동일한 이유.
 CREATE TABLE member_body_profile (
     member_id      BIGINT PRIMARY KEY REFERENCES member (id),
-    body_photo_url VARCHAR(500),
+    body_photo_key VARCHAR(500),
     height_cm      SMALLINT,
     weight_kg      SMALLINT,
+    chest_cm       SMALLINT,
+    waist_cm       SMALLINT,
+    hip_cm         SMALLINT,
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -203,6 +208,10 @@ CREATE TABLE live (
     ended_at          TIMESTAMPTZ,
     openvidu_room     VARCHAR(100),                   -- OpenVidu v3 room name
     peak_viewer_count INTEGER      NOT NULL DEFAULT 0,
+    -- 지금 소개 중인 상품(LIVE-004). FE NOW 배지의 원천.
+    -- 카테고리는 편성 상품에서 유도하지만 "지금 소개 중"은 호스트의 현재 의도라 파생할 근거가
+    -- 없어 컬럼으로 둔다. 편성된 상품인지는 애플리케이션이 live_product 로 검증한다.
+    current_product_id BIGINT      REFERENCES product (id),
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT ck_live_status CHECK (status IN (

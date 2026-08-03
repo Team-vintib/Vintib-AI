@@ -123,8 +123,8 @@ flowchart TD
 | `/lives/new`              | LIVE 신규   | true         | false     | 라이브 시작 placeholder                          |
 | `/lives/:liveId`          | LIVE-005    | false        | false     | 419 전체 구조, 423 채팅·경매와 425 AI 시착 패널 mock UI 구현. 실제 스트리밍·채팅 STOMP·경매·AI API 연동 대기 |
 | `/notifications`          | NOTI        | true         | false     | 알림센터 목록·탭 필터·전체 탭 더보기·읽음 처리 UI 구현, 헤더 알림 팝업과 unread badge 연동 |
-| `/my`                     | MY          | true         | false     | 마이페이지 placeholder                           |
-| `/points`                 | POINT       | true         | false     | 포인트 placeholder                               |
+| `/my`                     | MY          | true         | false     | 마이페이지 요약·섹션 전환 1차 구현. `section` query로 프로필, 판매 상품, 구매/낙찰, 판매/정산, 라이브, 찜/팔로우, 사업자 섹션 표시. `VITE_MY_API_ENABLED=false` 기본값에서는 mock fallback 사용. 라이브 섹션은 `VITE_LIVE_LIST_API_ENABLED` 기준으로 실제 `/lives` 목록을 현재 사용자 `hostId`로 필터링 |
+| `/points`                 | POINT       | true         | false     | 포인트 지갑 화면 구현, mock fallback 사용        |
 
 ## 2026-07-28 검색 흐름 보강
 

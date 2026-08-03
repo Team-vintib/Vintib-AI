@@ -303,12 +303,27 @@ OPENVIDU_TOKEN_TTL    선택, 기본 2h
 
 FE `NOW` 배지와 진입 시 기본 선택 상품의 원천이다. 지금은 없어서 FE가 배지를 못 띄운다.
 
-- [ ] `live.current_product_id` 컬럼 + `schema.sql`·`erd.md` 갱신
-- [ ] `PATCH /api/lives/{liveId}/current-product` — 호스트만. 편성된 상품인지 검증
-- [ ] 라이브 상세·목록 응답에 `currentProductId` 추가
-- [ ] `/topic/lives/{liveId}/product` 전환 브로드캐스트 (커밋 후)
-- [ ] 방송 종료 시 `null`
-- [ ] 테스트 — 호스트 아님 403, 편성 안 된 상품 400, 종료 방송 400
+- [x] `live.current_product_id` 컬럼 + `schema.sql`·`erd.md`·`comments.sql`·데이터 사전 갱신
+- [x] `PATCH /api/lives/{liveId}/current-product` — 호스트만. 편성된 상품인지 검증
+- [x] 라이브 상세·목록 응답에 `currentProductId` 추가
+- [x] `/topic/lives/{liveId}/product` 전환 브로드캐스트 (커밋 후)
+- [x] 방송 종료 시 `null`
+- [x] 테스트 — 호스트 아님 403, 편성 안 된 상품 404, 종료 방송 400
+- [x] **연결 상품 카드 필드 보강** — `brandName`·`price`·`saleType`·`conditionGrade`·`thumbnailUrl`
+      (FE 요청 `docs/requests/FE/006`에서 "Phase 5에 온다"고 약속한 것)
+- [x] FE 인계 문서 `docs/requests/FE/007-current-product-handoff.md`
+
+**계획과 달라진 것**
+
+| 항목 | 계획 | 실제 | 이유 |
+| --- | --- | --- | --- |
+| 편성 안 된 상품 | 400 | **404 `L006`** | 상품은 있지만 이 방송의 편성 목록에 없다는 뜻이라 기존 `LIVE_PRODUCT_NOT_FOUND`가 정확히 그 상황이다. 새 코드를 만드는 것보다 낫다 |
+| 전환 허용 상태 | (명시 없음) | **진행 중에도 허용**, 종료·취소만 차단 | 편성 변경은 방송 시작 시 잠기지만 소개 상품 전환은 **방송 중에 하는 것이 본래 용도**다. `isOpenForEditing`이 아니라 `isClosed`로 막는다 |
+| 상품 조회 | (명시 없음) | **배치 조회**(`ProductQueryPort.findCards`) | 편성 상품마다 상품·브랜드·이미지를 따로 읽으면 상품 수만큼 쿼리가 나간다. 시청 화면은 시청자가 들어올 때마다 열려 그 비용이 그대로 쌓인다 |
+| 이미지 배치 조회 | (명시 없음) | `live/port/ProductImageQueryRepository` 신설 | 상품 도메인 리포지토리에는 상품 하나씩 읽는 메서드뿐이다. 거기에 메서드를 추가하면 서윤 영역을 고치게 되므로 **읽기 전용 조회를 라이브 패키지에** 뒀다 |
+
+**`productId: null`은 오류가 아니라 해제다.** `@NotNull`을 걸지 않은 이유 — 호스트가 잡담 구간으로
+넘어가면 아무 상품도 소개하지 않는 상태가 필요한데, 필수로 막으면 한번 지정한 뒤 되돌릴 방법이 없다.
 
 ### Phase 6 — 경매 조회·시작 · `-96`(AUCT-002) 신규 작업 · 브랜치 `feat/209-auction-start`
 

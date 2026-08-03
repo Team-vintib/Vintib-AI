@@ -154,5 +154,5 @@ from my_module import Something  # noqa: E402 — importorskip 이후 import
 
 ## 커밋/브랜치 규칙
 
-루트 `.claude/commit-convention.md` 참고. `[JIRA-KEY] type: subject` 형식, push는 항상
+루트 `docs/commit-convention.md` 참고. `[JIRA-KEY] type: subject` 형식, push는 항상
 사용자가 직접 실행한다.

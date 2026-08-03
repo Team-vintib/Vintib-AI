@@ -1,7 +1,11 @@
 package com.ssafy.backend.live.port;
 
+import com.ssafy.backend.global.config.S3Config.AwsProperties;
+import com.ssafy.backend.global.storage.S3StorageService;
+import com.ssafy.backend.product.entity.Brand;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.Collection;
@@ -9,6 +13,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -27,6 +32,63 @@ public class ProductQueryAdapter implements ProductQueryPort {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final BrandRepository brandRepository;
+    private final ProductImageQueryRepository productImageQueryRepository;
+    private final S3StorageService s3StorageService;
+    private final AwsProperties awsProperties;
+
+    @Override
+    public Map<Long, ProductCard> findCards(Collection<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Product> products = productRepository.findAllById(productIds);
+        if (products.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, String> brandNameById = brandNames(products);
+        Map<Long, String> thumbnailByProductId = thumbnails(products);
+
+        return products.stream().collect(Collectors.toMap(
+                Product::getId,
+                product -> new ProductCard(
+                        product.getId(),
+                        product.getTitle(),
+                        product.getBrandId() == null ? null : brandNameById.get(product.getBrandId()),
+                        product.getPrice(),
+                        product.getSaleType() == null ? null : product.getSaleType().name(),
+                        product.getConditionGrade(),
+                        thumbnailByProductId.get(product.getId()))));
+    }
+
+    private Map<Long, String> brandNames(List<Product> products) {
+        List<Long> brandIds = products.stream()
+                .map(Product::getBrandId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (brandIds.isEmpty()) {
+            return Map.of();
+        }
+        return brandRepository.findAllById(brandIds).stream()
+                .collect(Collectors.toMap(Brand::getId, Brand::getName));
+    }
+
+    /**
+     * 상품별 대표 이미지 URL. 쿼리가 {@code primary DESC, sortOrder ASC} 로 정렬해 오므로
+     * <b>상품마다 첫 행이 대표</b>다. 그래서 병합 함수에서 먼저 온 것을 남긴다.
+     */
+    private Map<Long, String> thumbnails(List<Product> products) {
+        String bucket = awsProperties.s3().publicBucket();
+        return productImageQueryRepository
+                .findAllByProductIds(products.stream().map(Product::getId).toList()).stream()
+                .collect(Collectors.toMap(
+                        image -> image.getProduct().getId(),
+                        image -> s3StorageService.publicUrl(bucket, image.getImageKey()),
+                        (first, later) -> first));
+    }
 
     @Override
     public Optional<ProductSummary> findById(Long productId) {

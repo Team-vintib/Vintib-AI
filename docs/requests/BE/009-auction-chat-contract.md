@@ -85,7 +85,7 @@
   - `POST /api/auctions/{auctionId}/close`
   - `GET /api/auctions/{auctionId}/bids`
   - `GET /api/auctions/{auctionId}/winner`
-- 요청 목적: 호스트 경매 진행, 사용자 입찰, 입찰 내역/낙찰 결과 조회를 처리한다.
+- 요청 목적: 호스트 경매 진행, 사용자 입찰, 입찰 내역/낙찰 결과 조회를 처리한다. FE 입찰 버튼(AUCT-003~006)이 이 API로 동작하며, **선착순(AUCT-005)·연속 입찰 제한(AUCT-006)·종료 직전 연장(AUCT-010, 종료 3초 이하 → +5초) 판정은 서버가 확정**한다. (현재 FE는 mock 사이클로 연출 중)
 - FE 사용처: 라이브 경매 패널
 - 요청 데이터
   - 입찰: `{ "amount": number }`
@@ -118,6 +118,7 @@
 - 응답 데이터
   - `type`: `AUCTION_STARTED` | `BID_PLACED` | `AUCTION_CLOSED`
   - `auction`: snapshot
+  - **낙찰 축하 연출(AUCT-013)**: `AUCTION_CLOSED` 이벤트(및 `GET /api/auctions/{auctionId}/winner`)로 FE가 라이브 화면 위에 낙찰자 닉네임(전체)·낙찰가를 강조 연출한다. → snapshot에 `highestBidderNickname`(낙찰자)·`currentPrice`(낙찰가)가 반드시 포함돼야 한다. (현재 FE는 이 이벤트가 없어 mock 트리거로 연출)
 - 응답 예시
 
 ```json
@@ -132,6 +133,19 @@
   }
 }
 ```
+
+### 3.4 경매 생성·조건 설정 (AUCT-001, 판매자) — 추가 확인 요청
+
+- 3.2의 `POST /api/auctions/{auctionId}/start`는 **이미 만들어진 경매(auctionId)를 시작**한다.
+  그런데 판매자가 연결 상품에 대해 **경매를 만들고 시작가·증액 단위·진행 시간을 설정(AUCT-001)**하는
+  단계의 엔드포인트가 계약에 없다. FE 판매자 경매 설정 패널(`S15P11A108-436`)이 이 값을 입력받는다.
+- 필요한 것(형태는 BE가 정함):
+  - 예: `POST /api/lives/{liveId}/auctions` body `{ productId, startPrice, bidUnit, durationSeconds }`
+    → 생성된 `auctionId`(status `READY`) 반환 후 3.2 `/start`로 시작. 또는 생성+시작 통합.
+- 확인 부탁
+  - 경매 **생성/설정과 시작이 분리인지 통합**인지
+  - 진행 시간(`durationSeconds`) **단위·허용 범위**, 증액 단위(`bidUnit`) 프리셋 정책
+  - (FE는 확정 전까지 mock 기본값: 진행 1/3/5분, 증액 1,000/5,000/10,000P 사용 중)
 
 ## 4. 기존 API 변경 요청
 

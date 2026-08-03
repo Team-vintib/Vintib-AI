@@ -131,6 +131,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: '라이브 시작' },
   },
   {
+    path: ROUTE_PATHS.LIVE_BROADCAST,
+    name: ROUTE_NAMES.LIVE_BROADCAST,
+    component: () => import('@/domains/live/pages/LiveBroadcastPage.vue'),
+    meta: { requiresAuth: true, title: '라이브 송출' },
+  },
+  {
     path: ROUTE_PATHS.LIVE_WATCH,
     name: ROUTE_NAMES.LIVE_WATCH,
     component: () => import('@/domains/live/pages/LiveWatchPage.vue'),
@@ -145,13 +151,31 @@ export const routes: RouteRecordRaw[] = [
   {
     path: ROUTE_PATHS.MY,
     name: ROUTE_NAMES.MY,
-    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    component: () => import('@/domains/my/pages/MyPage.vue'),
     meta: { requiresAuth: true, title: '마이페이지' },
+  },
+  {
+    path: ROUTE_PATHS.MY_ORDER_DETAIL,
+    name: ROUTE_NAMES.MY_ORDER_DETAIL,
+    component: () => import('@/domains/my/pages/MyOrderDetailPage.vue'),
+    meta: { requiresAuth: true, title: '구매 상세' },
+  },
+  {
+    path: ROUTE_PATHS.MY_SALE_DETAIL,
+    name: ROUTE_NAMES.MY_SALE_DETAIL,
+    component: () => import('@/domains/my/pages/MySaleDetailPage.vue'),
+    meta: { requiresAuth: true, title: '판매 상세' },
+  },
+  {
+    path: ROUTE_PATHS.POINT_HISTORY,
+    name: ROUTE_NAMES.POINT_HISTORY,
+    component: () => import('@/domains/point/pages/PointHistoryPage.vue'),
+    meta: { requiresAuth: true, title: '포인트 내역' },
   },
   {
     path: ROUTE_PATHS.POINT,
     name: ROUTE_NAMES.POINT,
-    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    component: () => import('@/domains/point/pages/PointWalletPage.vue'),
     meta: { requiresAuth: true, title: '포인트' },
   },
 ]

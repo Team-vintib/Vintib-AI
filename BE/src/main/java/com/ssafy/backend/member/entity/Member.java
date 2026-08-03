@@ -14,6 +14,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "member")
@@ -58,15 +59,20 @@ public class Member extends BaseTimeEntity {
     @Column(nullable = false)
     private boolean onboardingCompleted;
 
-    // 스키마 정합성 보강 (schema.sql 반영) — 기존 FE 요청서(001-member-entity-schema-drift.md) 대응
-    // columnDefinition에 DEFAULT를 명시한다 — 이미 row가 쌓인 테이블에 NOT NULL 컬럼을 ddl-auto=update로
-    // 추가할 때 DEFAULT가 없으면 기존 row가 제약을 위반해 ALTER TABLE 자체가 실패한다.
+    // 스키마 정합성 보강 (schema.sql 반영) — 기존 FE 요청서(001-member-entity-schema-drift.md) 대응.
+    // DB 기본값은 @ColumnDefault로 별도 선언한다 — columnDefinition 문자열에 DEFAULT까지 합쳐 넣으면
+    // 컬럼이 이미 존재하는 상태로 재기동할 때마다 Hibernate가 "alter column ... set data type
+    // VARCHAR(20) DEFAULT '...'"를 생성하는데, Postgres는 ALTER COLUMN TYPE 절에 DEFAULT를 못 받아
+    // 매 부팅마다 문법 오류로 실패한다(기능엔 영향 없지만 로그 노이즈). @ColumnDefault는 별도
+    // SET DEFAULT 문으로 나가서 이 문제가 없다.
     @Enumerated(EnumType.STRING)
-    @Column(name = "member_type", nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'GENERAL'")
+    @Column(name = "member_type", nullable = false, length = 20)
+    @ColumnDefault("'GENERAL'")
     private MemberType memberType = MemberType.GENERAL;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'ACTIVE'")
+    @Column(nullable = false, length = 20)
+    @ColumnDefault("'ACTIVE'")
     private MemberStatus status = MemberStatus.ACTIVE;
 
     @Column(name = "deleted_at")
