@@ -63,6 +63,7 @@ interface ProductListDto {
   price: number | null
   primaryImageUrl?: string | null
   isWished?: boolean
+  isLiked?: boolean
   createdAt: string
 }
 
@@ -369,7 +370,7 @@ const toProductListItem = async (product: ProductListDto): Promise<ProductListIt
     categoryName: product.categoryName ?? fallbackCategoryLabel(product.categoryId),
     imageUrl,
     imageAlt: `${product.title} 상품 이미지`,
-    isLiked: product.isWished ?? false,
+    isLiked: product.isWished ?? product.isLiked ?? false,
   }
 }
 
@@ -397,7 +398,7 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
     price: product.price ?? 0,
     saleType: product.saleType,
     saleStatus: product.saleStatus,
-    isLiked: product.isWished ?? false,
+    isLiked: product.isWished ?? product.isLiked ?? false,
     images,
     seller: {
       id: product.sellerId,

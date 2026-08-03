@@ -183,6 +183,8 @@ src/
         ProductDetailView.vue
         ProductListView.vue
         ProductRegistrationPage.vue
+      stores/
+        wishStore.ts
       types/
         productDetail.types.ts
         productList.types.ts
@@ -406,13 +408,23 @@ docs/
   기본 정보, 사이즈/소재, 상태/하자와 AI 품질 검증, 가격, 검토, 완료 7단계를 제공하고 단계별
   필수값·이미지·가격·등록 실패 상태를 처리합니다. 등록 완료는 `productRegistrationApi.ts` mock
   adapter를 통해 확인합니다. `productApi.ts`는 상품 목록/카테고리/브랜드/찜 등록·해제와 상품 카드
+<<<<<<< HEAD
   목록 모델 매핑을 담당합니다. 상품 이미지 presigned 업로드와 찜 API 계약은 FE API 문서에 반영됐고,
+=======
+  목록 모델 매핑을 담당합니다. `wishStore.ts`는 상품 목록·홈·검색·상세·찜 목록에서 공유하는 찜 여부
+  상태를 관리합니다. 상품 이미지 presigned 업로드와 찜 API 계약은 FE API 문서에 반영됐고,
+>>>>>>> b5dbcfb ([S15P11A108-525] fix: 찜 충돌 해결)
   실제 상품 등록 확장·이미지 역할·AI 품질 검증·가격 추천·경매 등록 계약은
   `.codex/requests/be/006-product-contract.md` 확정 후 adapter 내부를 교체합니다.
 - `domains/my`에는 마이페이지와 독립 찜 목록 페이지가 구현되어 있습니다. `WishlistPage.vue`는
   `GET /api/users/{userId}/wishes`를 직접 조회해 상품명/브랜드 검색, 카테고리·상태·가격 필터,
+<<<<<<< HEAD
   `전체 / 즉시 구매 / 경매 예정` 탭, 찜 해제를 제공하며 이미지 URL이 비어 있으면 로컬 상품 이미지
   fallback을 사용합니다.
+=======
+  `전체 / 즉시 구매 / 경매 예정` 탭, 찜 해제를 제공하며 이미지 URL이 비어 있으면 상품 상세 API에서
+  등록된 대표 이미지를 보조 조회합니다.
+>>>>>>> b5dbcfb ([S15P11A108-525] fix: 찜 충돌 해결)
 - `domains/live`에는 S15P11A108-413·415·418 공개 라이브 목록 View, 진행 중·예정 상태 카드,
   로컬 이미지 기반 mock 데이터와 라이브 시청 route 연결, 카테고리·방송 상태 필터,
   최신 방송·시청자·제목 정렬과 초기화가 구현되어 있습니다. 라이브 목록 검색바는 통합 검색

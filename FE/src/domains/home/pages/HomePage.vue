@@ -7,22 +7,24 @@ import { getHomeViewData } from '@/domains/home/api/homeViewApi'
 import GuestHome from '@/domains/home/components/GuestHome.vue'
 import MemberHome from '@/domains/home/components/MemberHome.vue'
 import { addWish, removeWish } from '@/domains/product/api/productApi'
+import { useWishStore } from '@/domains/product/stores/wishStore'
 import type { HomeProductCardItem, HomeViewData } from '@/domains/home/types/homeView.types'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
+const wishStore = useWishStore()
 
 authStore.hydrateSession()
 
 const homeData = ref<HomeViewData | null>(null)
-const wishedProductIds = ref(new Set<number>())
 const isLoading = ref(true)
 const errorMessage = ref('')
 const homeComponent = computed(() => (authStore.isAuthenticated ? MemberHome : GuestHome))
+const wishedProductIds = computed(() => wishStore.wishedProductIds)
 
-const getInitialWishedProductIds = (data: HomeViewData) => {
+const getHomeProducts = (data: HomeViewData) => {
   const productGroups: HomeProductCardItem[][] = [
     data.directSaleProducts,
     data.upcomingAuctionProducts,
@@ -30,9 +32,10 @@ const getInitialWishedProductIds = (data: HomeViewData) => {
     ...data.categoryProductSections.map((section) => section.products),
   ]
 
-  return new Set(
-    productGroups.flat().filter((product) => product.isWished).map((product) => product.id),
-  )
+  return productGroups.flat().map((product) => ({
+    id: product.id,
+    isWished: product.isWished,
+  }))
 }
 
 const handleToggleWish = async (productId: number) => {
@@ -46,28 +49,17 @@ const handleToggleWish = async (productId: number) => {
     return
   }
 
-  const nextWishedProductIds = new Set(wishedProductIds.value)
-
-  if (nextWishedProductIds.has(productId)) {
-    nextWishedProductIds.delete(productId)
-  } else {
-    nextWishedProductIds.add(productId)
-  }
-
-  wishedProductIds.value = nextWishedProductIds
+  const wasWished = wishStore.isProductWished(productId)
+  wishStore.setProductWish(productId, !wasWished)
 
   try {
-    if (nextWishedProductIds.has(productId)) {
+    if (!wasWished) {
       await addWish(authStore.user.id, productId)
     } else {
       await removeWish(authStore.user.id, productId)
     }
   } catch {
-    wishedProductIds.value = new Set(
-      nextWishedProductIds.has(productId)
-        ? [...nextWishedProductIds].filter((wishedProductId) => wishedProductId !== productId)
-        : [...nextWishedProductIds, productId],
-    )
+    wishStore.setProductWish(productId, wasWished)
   }
 }
 
@@ -79,7 +71,7 @@ const loadHomeData = async () => {
     const nextHomeData = await getHomeViewData({ isAuthenticated: authStore.isAuthenticated })
 
     homeData.value = nextHomeData
-    wishedProductIds.value = getInitialWishedProductIds(nextHomeData)
+    wishStore.hydrateProducts(getHomeProducts(nextHomeData))
   } catch {
     errorMessage.value = '홈 데이터를 불러오지 못했습니다.'
   } finally {

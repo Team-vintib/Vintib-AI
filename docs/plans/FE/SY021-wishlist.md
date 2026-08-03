@@ -36,7 +36,7 @@
 - [x] 찜 목록 카드에서 상품 상세 이동, 찜 해제, 판매 상태 배지를 제공한다.
 - [x] 찜 목록의 로딩/오류/빈 목록/검색 결과 없음 상태를 분리한다.
 - [x] 마이페이지 내부 `wishlist` 섹션을 제거하고 헤더 찜 링크를 `/wishlist`로 연결한다.
-- [x] 찜 목록 상품 이미지가 비어 있을 때 로컬 상품 이미지 fallback을 표시한다.
+- [x] 찜 목록 상품 이미지가 비어 있을 때 상품 상세 API에서 등록된 대표 이미지를 보조 조회한다.
 - [x] `FE/docs/frontend/implementation/status.md`, `FE/docs/frontend/implementation/current-structure.md`를 갱신한다.
 - [x] `npm run type-check`와 `npm run build`로 검증한다.
 

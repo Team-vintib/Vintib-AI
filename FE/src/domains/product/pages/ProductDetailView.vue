@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { addWish, removeWish } from '@/domains/product/api/productApi'
+import { useWishStore } from '@/domains/product/stores/wishStore'
 import {
   getProductDetailViewData,
   ProductDetailNotFoundError,
@@ -27,11 +28,11 @@ type ProductDetailLoadState = 'loading' | 'success' | 'error' | 'not-found'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const wishStore = useWishStore()
 
 const product = ref<ProductDetailViewData | null>(null)
 const loadState = ref<ProductDetailLoadState>('loading')
 const selectedImageId = ref('')
-const isLiked = ref(false)
 const isInCart = ref(false)
 const isReminderSet = ref(false)
 const isTryOnOpen = ref(false)
@@ -45,6 +46,9 @@ const selectedImage = computed(() =>
 )
 
 const isSold = computed(() => product.value?.saleStatus === 'SOLD')
+const isLiked = computed(() =>
+  product.value ? wishStore.isProductWished(product.value.id, product.value.isLiked) : false,
+)
 
 // 상품 상세 상품을 AI 시착 패널(LiveTryOnPanel)이 받는 형태로 어댑트.
 // LiveTryOnPanel(TRYON-004)은 mock 생성 흐름을 유지한 채 재사용한다.
@@ -87,9 +91,9 @@ const loadProductDetail = async () => {
     if (requestId !== loadRequestId) return
 
     product.value = nextProduct
+    wishStore.hydrateProducts([{ id: nextProduct.id, isLiked: nextProduct.isLiked }])
     loadState.value = 'success'
     selectedImageId.value = nextProduct.images[0]?.id ?? ''
-    isLiked.value = nextProduct.isLiked
     isInCart.value = false
     isReminderSet.value = false
   } catch (error) {
@@ -109,8 +113,8 @@ const handleToggleLike = async () => {
     return
   }
 
-  const wasLiked = isLiked.value
-  isLiked.value = !wasLiked
+  const wasLiked = wishStore.isProductWished(product.value.id, product.value.isLiked)
+  wishStore.setProductWish(product.value.id, !wasLiked)
 
   try {
     if (wasLiked) {
@@ -119,7 +123,7 @@ const handleToggleLike = async () => {
       await addWish(authStore.user.id, product.value.id)
     }
   } catch {
-    isLiked.value = wasLiked
+    wishStore.setProductWish(product.value.id, wasLiked)
     showTemporaryMessage('찜 상태를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.')
   }
 }

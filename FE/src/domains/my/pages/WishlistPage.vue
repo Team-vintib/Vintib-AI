@@ -10,8 +10,10 @@ import {
   PRODUCT_CONDITION_OPTIONS,
   PRODUCT_SALE_TYPE_TABS,
 } from '@/domains/product/constants/productListMockData'
+import { useWishStore } from '@/domains/product/stores/wishStore'
 import type { ProductSaleType, ProductSaleTypeTab } from '@/domains/product/types/productList.types'
 import { normalizeApiError } from '@/shared/api/http'
+import AppSearchBar from '@/shared/components/AppSearchBar.vue'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
@@ -22,6 +24,7 @@ interface WishlistCategoryOption {
 
 const router = useRouter()
 const authStore = useAuthStore()
+const wishStore = useWishStore()
 
 const wishes = ref<MyWishItem[]>([])
 const categoryOptions = ref<WishlistCategoryOption[]>([])
@@ -176,15 +179,6 @@ const getStatusLabel = (saleStatus?: string) => {
 const formatPrice = (saleType: ProductSaleType, price: number) =>
   saleType === 'AUCTION' ? '경매 예정' : `${price.toLocaleString('ko-KR')}P`
 
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
-
 const goToProductDetail = (productId: number) => {
   void router.push({ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId } })
 }
@@ -200,6 +194,7 @@ const removeWishItem = async (productId: number) => {
   try {
     await removeMyWish(authStore.user.id, productId)
     wishes.value = wishes.value.filter((wish) => wish.product.id !== productId)
+    wishStore.setProductWish(productId, false)
     actionMessage.value = '찜한 상품에서 제거했습니다.'
   } catch (error) {
     actionMessage.value = normalizeApiError(error).message
@@ -238,6 +233,7 @@ const loadWishes = async () => {
     const response = await getMyWishList(authStore.user.id)
 
     wishes.value = response.items
+    wishStore.hydrateProducts(response.items.map((wish) => ({ id: wish.product.id, isLiked: true })))
     loadState.value = 'success'
   } catch (error) {
     errorMessage.value = normalizeApiError(error).message
@@ -267,6 +263,13 @@ onMounted(() => {
         {{ actionMessage }}
       </p>
 
+      <AppSearchBar
+        v-model="searchKeyword"
+        search-label="찜 상품 검색"
+        placeholder="찜한 상품명 또는 브랜드를 검색해 보세요"
+        @submit="applyFilters"
+      />
+
       <div v-if="loadState === 'loading'" class="wishlist-page__state" role="status">
         찜한 상품을 불러오는 중입니다.
       </div>
@@ -278,19 +281,6 @@ onMounted(() => {
 
       <div v-else-if="wishes.length" class="wishlist-page__content">
         <aside class="wishlist-filter" aria-label="찜 상품 필터">
-          <form class="wishlist-filter__search" @submit.prevent="applyFilters">
-            <label for="wishlist-search">검색</label>
-            <div>
-              <input
-                id="wishlist-search"
-                v-model="searchKeyword"
-                type="search"
-                placeholder="상품명 또는 브랜드"
-              />
-              <button type="submit">검색</button>
-            </div>
-          </form>
-
           <fieldset class="wishlist-filter__group">
             <legend>카테고리</legend>
             <p v-if="!categoryOptions.length" class="wishlist-filter__empty">
@@ -390,7 +380,6 @@ onMounted(() => {
               </button>
               <div class="wishlist-card__meta">
                 <span>{{ wish.product.brand }}</span>
-                <span>{{ formatDate(wish.wishedAt) }}</span>
               </div>
               <div class="wishlist-card__status">
                 <span v-if="getStatusLabel(wish.product.saleStatus)">
@@ -476,7 +465,6 @@ onMounted(() => {
   background: var(--color-surface);
 }
 
-.wishlist-filter__search,
 .wishlist-filter__group {
   display: grid;
   gap: var(--space-3);
@@ -484,7 +472,6 @@ onMounted(() => {
   border: 0;
 }
 
-.wishlist-filter__search label,
 .wishlist-filter__group legend {
   color: var(--color-text-primary);
   font-size: 14px;
@@ -492,13 +479,6 @@ onMounted(() => {
   line-height: 20px;
 }
 
-.wishlist-filter__search div {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-2);
-}
-
-.wishlist-filter__search input,
 .wishlist-filter__price input {
   width: 100%;
   min-width: 0;
@@ -510,14 +490,12 @@ onMounted(() => {
   color: var(--color-text-primary);
 }
 
-.wishlist-filter__search input:focus,
 .wishlist-filter__price input:focus {
   border-color: var(--color-primary);
   outline: 0;
   box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 
-.wishlist-filter__search button,
 .wishlist-filter__actions button,
 .wishlist-card__remove,
 .wishlist-page__state button {
@@ -532,7 +510,6 @@ onMounted(() => {
   line-height: 20px;
 }
 
-.wishlist-filter__search button:hover,
 .wishlist-filter__actions button:hover,
 .wishlist-card__remove:hover:not(:disabled),
 .wishlist-page__state button:hover {
@@ -802,7 +779,6 @@ onMounted(() => {
     line-height: 40px;
   }
 
-  .wishlist-filter__search div,
   .wishlist-filter__actions,
   .wishlist-grid {
     grid-template-columns: 1fr;

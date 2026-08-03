@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { addWish, removeWish } from '@/domains/product/api/productApi'
+import { useWishStore } from '@/domains/product/stores/wishStore'
 import SearchLiveResultCard from '@/domains/search/components/SearchLiveResultCard.vue'
 import SearchMemberResultCard from '@/domains/search/components/SearchMemberResultCard.vue'
 import SearchResultTabs from '@/domains/search/components/SearchResultTabs.vue'
@@ -27,6 +28,7 @@ import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const wishStore = useWishStore()
 
 const validTabIds: SearchResultTabId[] = ['all', 'product', 'live', 'member']
 const validSortOptionIds: SearchSortOptionId[] = ['LATEST', 'PRICE_ASC', 'PRICE_DESC']
@@ -107,17 +109,14 @@ const selectedConditionIds = ref<string[]>(queryConditionIds.value)
 const selectedSaleTypeIds = ref<string[]>(querySaleTypeIds.value)
 const minPriceInput = ref(queryMinPrice.value?.toString() ?? '')
 const maxPriceInput = ref(queryMaxPrice.value?.toString() ?? '')
-const likedProductIds = ref(
-  new Set(
-    EMPTY_SEARCH_RESULTS.products.filter((product) => product.isLiked).map((product) => product.id),
-  ),
-)
 const followedMemberIds = ref(
   new Set(
     EMPTY_SEARCH_RESULTS.members.filter((member) => member.isFollowing).map((member) => member.id),
   ),
 )
 const liveMessage = ref('')
+
+wishStore.hydrateProducts(EMPTY_SEARCH_RESULTS.products)
 
 watch(queryKeyword, (keyword) => {
   searchKeyword.value = keyword
@@ -682,16 +681,8 @@ const toggleLike = async (productId: number) => {
     return
   }
 
-  const nextLikedProductIds = new Set(likedProductIds.value)
-  const wasLiked = nextLikedProductIds.has(productId)
-
-  if (wasLiked) {
-    nextLikedProductIds.delete(productId)
-  } else {
-    nextLikedProductIds.add(productId)
-  }
-
-  likedProductIds.value = nextLikedProductIds
+  const wasLiked = wishStore.isProductWished(productId)
+  wishStore.setProductWish(productId, !wasLiked)
 
   try {
     if (wasLiked) {
@@ -700,11 +691,7 @@ const toggleLike = async (productId: number) => {
       await addWish(userId, productId)
     }
   } catch {
-    likedProductIds.value = new Set(
-      wasLiked
-        ? [...nextLikedProductIds, productId]
-        : [...nextLikedProductIds].filter((likedProductId) => likedProductId !== productId),
-    )
+    wishStore.setProductWish(productId, wasLiked)
   }
 }
 
@@ -956,15 +943,15 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
                     <button
                       class="search-product-card__like"
                       :class="{
-                        'search-product-card__like--active': likedProductIds.has(product.id),
+                        'search-product-card__like--active': wishStore.isProductWished(product.id, product.isLiked),
                       }"
                       type="button"
                       :aria-label="
-                        likedProductIds.has(product.id)
+                        wishStore.isProductWished(product.id, product.isLiked)
                           ? `${product.name} 찜 해제`
                           : `${product.name} 찜하기`
                       "
-                      :aria-pressed="likedProductIds.has(product.id)"
+                      :aria-pressed="wishStore.isProductWished(product.id, product.isLiked)"
                       @click="toggleLike(product.id)"
                     >
                       <svg aria-hidden="true" viewBox="0 0 24 24">
