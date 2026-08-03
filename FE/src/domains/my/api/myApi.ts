@@ -1,5 +1,6 @@
 import { getUnreadNotificationCount } from '@/domains/notification/api/notificationApi'
 import { getBrands, getCategories, removeWish } from '@/domains/product/api/productApi'
+import { PRODUCT_LIST_MOCK_DATA } from '@/domains/product/constants/productListMockData'
 
 import type {
   MyLiveItem,
@@ -12,7 +13,11 @@ import type {
   MySaleItem,
   MyWishItem,
 } from '@/domains/my/types/my.types'
-import type { ProductConditionGrade, ProductListItem } from '@/domains/product/types/productList.types'
+import type {
+  ProductConditionGrade,
+  ProductListItem,
+  ProductSaleStatus,
+} from '@/domains/product/types/productList.types'
 import { http } from '@/shared/api/http'
 import type {
   InterestBrand,
@@ -222,7 +227,30 @@ export const getMyProfile = async (userId: number): Promise<MyProfile> => {
   }
 }
 
-const getMyWishList = async (userId: number) => {
+export const getMyWishList = async (userId: number) => {
+  if (!MY_API_ENABLED) {
+    void userId
+    const items = PRODUCT_LIST_MOCK_DATA
+      .filter((product) => product.isLiked)
+      .map((product, index) => ({
+        product: {
+          ...product,
+          saleStatus: product.saleType === 'AUCTION' ? 'AUCTION_SCHEDULED' : 'ON_SALE',
+        },
+        wishedAt: `2026-08-0${index + 1}T10:00:00+09:00`,
+      }) satisfies MyWishItem)
+
+    return {
+      items,
+      meta: {
+        page: 1,
+        size: items.length,
+        totalElements: items.length,
+        totalPages: items.length > 0 ? 1 : 0,
+      } satisfies PageMeta,
+    }
+  }
+
   const response = await http.get<
     ApiResponse<PageResponse<MyWishApiDto> | BackendPageResponse<MyWishApiDto>>
   >(`/users/${userId}/wishes`, {
@@ -448,7 +476,10 @@ const toProductListItem = (product: MyProductApiDto): ProductListItem => ({
   price: product.price ?? 0,
   conditionGrade: product.conditionGrade,
   saleType: product.saleType === 'AUCTION' ? 'AUCTION' : 'DIRECT',
-  imageUrl: product.primaryImageUrl || '',
+  saleStatus: product.saleStatus satisfies ProductSaleStatus,
+  categoryId: product.categoryId,
+  categoryName: product.categoryName ?? fallbackCategoryLabel(product.categoryId),
+  imageUrl: product.primaryImageUrl || fallbackProductImageUrl(product.id),
   imageAlt: `${product.title} 상품 이미지`,
   isLiked: product.isWished ?? true,
 })
@@ -477,6 +508,17 @@ const getProductStatusCounts = (products: MyProductItem[]) => ({
 
 const fallbackBrandLabel = (brandId: number | null) =>
   brandId ? `브랜드 #${brandId}` : ''
+
+const fallbackCategoryLabel = (categoryId: number | null) =>
+  categoryId ? `카테고리 #${categoryId}` : ''
+
+const fallbackProductImageUrl = (productId: number) => {
+  const fallbackProduct =
+    PRODUCT_LIST_MOCK_DATA.find((product) => product.id === productId) ??
+    PRODUCT_LIST_MOCK_DATA[(Math.max(productId, 1) - 1) % PRODUCT_LIST_MOCK_DATA.length]
+
+  return fallbackProduct?.imageUrl ?? ''
+}
 
 const unwrapApiData = <T>(response: ApiResponse<T>, fallbackMessage: string) => {
   if (!response.success || response.data === null) {

@@ -24,7 +24,6 @@ export const MY_SECTION_OPTIONS: Array<{ id: MySectionId; label: string }> = [
   { id: 'orders', label: '구매·낙찰 내역' },
   { id: 'sales', label: '판매·정산 내역' },
   { id: 'lives', label: '라이브 관리' },
-  { id: 'wishlist', label: '찜한 상품' },
   { id: 'social', label: '팔로워·팔로잉' },
   { id: 'business', label: '사업자 정보' },
 ]

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { getHomeViewData } from '@/domains/home/api/homeViewApi'
 import GuestHome from '@/domains/home/components/GuestHome.vue'
 import MemberHome from '@/domains/home/components/MemberHome.vue'
+import { addWish, removeWish } from '@/domains/product/api/productApi'
 import type { HomeProductCardItem, HomeViewData } from '@/domains/home/types/homeView.types'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
@@ -34,8 +35,10 @@ const getInitialWishedProductIds = (data: HomeViewData) => {
   )
 }
 
-const handleToggleWish = (productId: number) => {
-  if (!authStore.isAuthenticated) {
+const handleToggleWish = async (productId: number) => {
+  await authStore.validateStoredSession()
+
+  if (!authStore.isAuthenticated || !authStore.user?.id) {
     void router.push({
       name: ROUTE_NAMES.AUTH_LOGIN,
       query: { redirect: ROUTE_PATHS.HOME },
@@ -52,6 +55,20 @@ const handleToggleWish = (productId: number) => {
   }
 
   wishedProductIds.value = nextWishedProductIds
+
+  try {
+    if (nextWishedProductIds.has(productId)) {
+      await addWish(authStore.user.id, productId)
+    } else {
+      await removeWish(authStore.user.id, productId)
+    }
+  } catch {
+    wishedProductIds.value = new Set(
+      nextWishedProductIds.has(productId)
+        ? [...nextWishedProductIds].filter((wishedProductId) => wishedProductId !== productId)
+        : [...nextWishedProductIds, productId],
+    )
+  }
 }
 
 const loadHomeData = async () => {

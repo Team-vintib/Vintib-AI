@@ -10,7 +10,6 @@ export type MySectionId =
   | 'orders'
   | 'sales'
   | 'lives'
-  | 'wishlist'
   | 'social'
   | 'points'
   | 'business'

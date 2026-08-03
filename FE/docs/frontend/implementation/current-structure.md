@@ -1,6 +1,6 @@
 # 현재 프로젝트 구조
 
-확인일: 2026-07-30
+확인일: 2026-08-03
 
 ## 기술 스택
 
@@ -161,6 +161,7 @@ src/
         notification.types.ts
     product/
       api/
+        productApi.ts
         productDetailApi.ts
         productRegistrationApi.ts
       components/
@@ -281,6 +282,7 @@ src/
         myMockData.ts
       pages/
         MyPage.vue
+        WishlistPage.vue
       types/
         my.types.ts
   router/
@@ -376,7 +378,7 @@ docs/
 
 - 라우터는 `router/routes.ts`로 route 배열을 분리했으며 AUTH-001~AUTH-004 후보,
   ONBOARD-001~ONBOARD-004, BIZ-001·BIZ-001-2, HOME, FOLLOWING_HOME placeholder,
-  LIVE_LIST·LIVE_CREATE·LIVE_WATCH 실제 화면, 공개 PROD-008 route가 등록되어 있습니다.
+  LIVE_LIST·LIVE_CREATE·LIVE_WATCH 실제 화면, 공개 PROD-008 route, 찜 목록 `/wishlist` route가 등록되어 있습니다.
 - `router/index.ts`에는 `requiresAuth`, `guestOnly` 메타 기반 인증 guard가 구현되어 있습니다.
 - `App.vue`는 `RouterView`만 렌더링합니다.
 - 기능 ID prefix 기준 도메인 폴더와 공통 폴더가 생성되어 있습니다.
@@ -389,7 +391,7 @@ docs/
   분기, 공통 검색바 기반 홈 검색 패널, 섹션 shell, 공통 홈 hero/content 카드, 라이브 카드, 상품 카드,
   화면 확인용 mock 데이터와 `HomeViewData` view model 타입이 구현되어 있습니다.
   `homeViewApi.ts`는 현재 mock 데이터를 반환하는 adapter 자리이며, `HomePage`는
-  loading/error/retry 상태를 처리합니다.
+  loading/error/retry 상태와 wish API 기반 상품 찜 토글을 처리합니다.
   실제 HOME API 계약이 확정되면 adapter 내부를 HTTP 호출과 응답 매핑으로 교체합니다.
 - `domains/product`에는 PROD-008 상품 목록 View, S15P11A108-408·410·412 상품 상세 UI,
   S15P11A108-409·411·414 상품 등록 화면이 구현되어 있습니다. 상품 목록은 실사형 로컬 WebP를
@@ -403,9 +405,14 @@ docs/
   상태를 구분하며 mock adapter에서 데이터를 받습니다. 상품 등록은 `/products/new`에서 사진 등록,
   기본 정보, 사이즈/소재, 상태/하자와 AI 품질 검증, 가격, 검토, 완료 7단계를 제공하고 단계별
   필수값·이미지·가격·등록 실패 상태를 처리합니다. 등록 완료는 `productRegistrationApi.ts` mock
-  adapter를 통해 확인합니다. 상품 이미지 presigned 업로드와 찜 API 계약은 FE API 문서에 반영됐고,
+  adapter를 통해 확인합니다. `productApi.ts`는 상품 목록/카테고리/브랜드/찜 등록·해제와 상품 카드
+  목록 모델 매핑을 담당합니다. 상품 이미지 presigned 업로드와 찜 API 계약은 FE API 문서에 반영됐고,
   실제 상품 등록 확장·이미지 역할·AI 품질 검증·가격 추천·경매 등록 계약은
   `.codex/requests/be/006-product-contract.md` 확정 후 adapter 내부를 교체합니다.
+- `domains/my`에는 마이페이지와 독립 찜 목록 페이지가 구현되어 있습니다. `WishlistPage.vue`는
+  `GET /api/users/{userId}/wishes`를 직접 조회해 상품명/브랜드 검색, 카테고리·상태·가격 필터,
+  `전체 / 즉시 구매 / 경매 예정` 탭, 찜 해제를 제공하며 이미지 URL이 비어 있으면 로컬 상품 이미지
+  fallback을 사용합니다.
 - `domains/live`에는 S15P11A108-413·415·418 공개 라이브 목록 View, 진행 중·예정 상태 카드,
   로컬 이미지 기반 mock 데이터와 라이브 시청 route 연결, 카테고리·방송 상태 필터,
   최신 방송·시청자·제목 정렬과 초기화가 구현되어 있습니다. 라이브 목록 검색바는 통합 검색

@@ -131,6 +131,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: '상품 등록' },
   },
   {
+    path: ROUTE_PATHS.WISHLIST,
+    name: ROUTE_NAMES.WISHLIST,
+    component: () => import('@/domains/my/pages/WishlistPage.vue'),
+    meta: { requiresAuth: true, title: '찜한 상품' },
+  },
+  {
     path: ROUTE_PATHS.LIVE_CREATE,
     name: ROUTE_NAMES.LIVE_CREATE,
     component: () => import('@/domains/live/pages/LiveCreatePage.vue'),

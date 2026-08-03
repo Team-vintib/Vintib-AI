@@ -3,6 +3,7 @@ import axios from 'axios'
 import type {
   ProductConditionGrade,
   ProductListItem,
+  ProductSaleStatus,
   ProductSaleType,
   ProductSaleTypeTab,
   ProductSortOption,
@@ -24,6 +25,7 @@ type ProductSaleStatusDto =
   | 'AUCTION_IN_PROGRESS'
   | 'AUCTION_FAILED'
   | 'SOLD'
+  | 'PRIVATE'
 
 export interface BrandDto {
   id: number
@@ -362,6 +364,9 @@ const toProductListItem = async (product: ProductListDto): Promise<ProductListIt
     price: product.price ?? 0,
     conditionGrade: product.conditionGrade,
     saleType: toProductSaleType(product.saleType),
+    saleStatus: product.saleStatus satisfies ProductSaleStatus,
+    categoryId: product.categoryId,
+    categoryName: product.categoryName ?? fallbackCategoryLabel(product.categoryId),
     imageUrl,
     imageAlt: `${product.title} 상품 이미지`,
     isLiked: product.isWished ?? false,

@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { addWish, removeWish } from '@/domains/product/api/productApi'
 import SearchLiveResultCard from '@/domains/search/components/SearchLiveResultCard.vue'
 import SearchMemberResultCard from '@/domains/search/components/SearchMemberResultCard.vue'
 import SearchResultTabs from '@/domains/search/components/SearchResultTabs.vue'
@@ -657,9 +658,9 @@ const handleStateAction = async () => {
 }
 
 const requireAuthenticatedAction = async () => {
-  authStore.hydrateSession()
+  await authStore.validateStoredSession()
 
-  if (authStore.isAuthenticated) {
+  if (authStore.isAuthenticated && authStore.user?.id) {
     return true
   }
 
@@ -676,15 +677,35 @@ const toggleLike = async (productId: number) => {
     return
   }
 
-  const nextLikedProductIds = new Set(likedProductIds.value)
+  const userId = authStore.user?.id
+  if (!userId) {
+    return
+  }
 
-  if (nextLikedProductIds.has(productId)) {
+  const nextLikedProductIds = new Set(likedProductIds.value)
+  const wasLiked = nextLikedProductIds.has(productId)
+
+  if (wasLiked) {
     nextLikedProductIds.delete(productId)
   } else {
     nextLikedProductIds.add(productId)
   }
 
   likedProductIds.value = nextLikedProductIds
+
+  try {
+    if (wasLiked) {
+      await removeWish(userId, productId)
+    } else {
+      await addWish(userId, productId)
+    }
+  } catch {
+    likedProductIds.value = new Set(
+      wasLiked
+        ? [...nextLikedProductIds, productId]
+        : [...nextLikedProductIds].filter((likedProductId) => likedProductId !== productId),
+    )
+  }
 }
 
 const toggleFollow = async (memberId: number) => {
