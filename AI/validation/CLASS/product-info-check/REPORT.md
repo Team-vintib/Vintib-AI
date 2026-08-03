@@ -569,14 +569,15 @@ ClipZeroShotColorExtractor(use_debias=True)`).
 기존 후보 4종은 전부 범용(OpenAI CLIP / Google SigLIP)이고, 의류 사진에 특화된 표현을
 배운 적이 없다.
 
-### 후보 4종
+### 비교 후보 — 범용 대조군 1 + 패션 특화 3
 
 | 레지스트리 키 | 체크포인트 | 근거 |
 |---|---|---|
+| `clip_vit_b32` | `openai/clip-vit-base-patch32` | **범용 대조군.** §V2a~§17 모든 실측의 기준선. 없으면 "패션 파인튜닝이 실제로 움직였는가"를 판정할 수 없다 |
 | `fashion_clip` | `patrickjohncyh/fashion-clip` | FashionCLIP 2.0. LAION CLIP ViT-B/32 + 패션 상품 80만 건. 모델 카드의 zero-shot weighted macro F1: FMNIST 0.78→0.83, KAGL 0.71→0.73, DEEP 0.58→0.62(베이스 LAION CLIP 대비) |
 | `marqo_fashion_clip` | `Marqo/marqo-fashionCLIP` | GCL(카테고리·색상·소재·스타일을 학습 신호로 사용). 자사 벤치마크 recall@1 FashionCLIP 2.0 대비 +22% |
 | `marqo_fashion_siglip` | `Marqo/marqo-fashionSigLIP` | 같은 레시피의 SigLIP(ViT-B-16-SigLIP webli) 판, +57%. 공개된 패션 임베딩 중 보고 성능 최고 |
-| `zooclaw_fashion_siglip2` | `srpone/zooclaw-fashionsiglip2` | SigLIP2-base-384 기반 최신(2026-06, arXiv 2606.27708). 검색 목적 증류라 분류는 부차 용도 — "더 최신/더 큰 게 실제로 더 나은가" 대조군 |
+| ~~`zooclaw_fashion_siglip2`~~ | `srpone/zooclaw-fashionsiglip2` | **이번 비교 제외**(사용자 결정). 레지스트리에는 등록해 뒀고 노트북 §2에 주석으로 남아 있어 한 줄만 풀면 켜진다. SigLIP2-base-384 기반 최신(2026-06, arXiv 2606.27708)이지만 검색 목적 증류라 분류는 부차 용도 |
 
 **Marqo 두 모델을 색상에도 거는 이유**: GCL이 색상을 명시적 학습 신호로 썼다고 밝히고
 있다. §17에서 CLIP 색상이 막힌 게 "체크포인트가 색상을 안 배워서"인지 "zero-shot 방식
@@ -585,14 +586,31 @@ ClipZeroShotColorExtractor(use_debias=True)`).
 
 ### 실행 방법
 
-`major_category_and_color_check.ipynb` §2-2(카테고리)·§6-1(색상). `RUN_FASHION_SWEEP=True`로
-바꾸고 실행한다. 비교 축을 체크포인트 하나로 고정하려고 정답셋·프롬프트 템플릿
-(`en_clip_style`)·스코어링(코사인 + temperature softmax)은 baseline과 동일하게 뒀다.
-카테고리는 직접 대분류 질의 / 소분류 역산 / 소분류 30-way 세 지표를, 색상은 원본 / `_wb`
-두 조건을 잰다.
+**전용 노트북 `fashion_model_compare.ipynb`** 를 위에서부터 실행한다(§14 실측이 끝난
+`major_category_and_color_check.ipynb`와 분리했다 — 그쪽은 축이 "대분류 6종 + 색상 기법 +
+VLM 대조군"이고 Qwen3-VL 로드가 전제라 GPU가 필요한데, 이 비교는 CLIP 계열만 써서 VLM
+없이 돈다).
+
+비교 축을 체크포인트 하나로 고정하려고 정답셋·프롬프트 템플릿(`en_clip_style`)·분류
+모드(`one_stage`)·스코어링(코사인 + temperature softmax)은 전 모델 동일하게 뒀다.
+재는 것은 세 가지 + 지연:
+
+| # | 테스트 | 지표 |
+|---|---|---|
+| 1 | 중분류(소분류) 30-way 추론 | `sub_top1` / `sub_top3` |
+| 2 | 중분류 → 대분류 역산 | `major_inverted`. **추가 추론 없음** — 테스트 1의 예측을 `major_of()`로 접는다 |
+| 3 | 색상 추론 | `color_acc` / `color_acc_wb` (모델당 원본 / 화이트밸런스 2조건) |
+| + | 지연 | `benchmark_backend(template_key=en_clip_style, stress="idle")`의 p50/p95/load |
+
+§6 스코어보드가 모델당 한 줄로 정리하고 baseline 대비 `_Δ` 컬럼을 붙인다. §7이
+`outputs/report_fashion_compare.json`으로 ECE·임계값 추천·혼동행렬까지 떨군다.
+
+**대분류 6-way 직접 질의는 재지 않는다** — §14에서 범용 CLIP이 0.35로 무너지고 17장 중
+12장이 OUTER로 쏠리는 게 확인됐고, 역산(1.00)이 같은 비용에 더 정확해서 직접 질의를 쓸
+이유가 없다.
 
 **사전 준비**: `pip install open_clip_torch`(Marqo 두 모델이 `trust_remote_code`로 open_clip
-래퍼를 싣는다. 없으면 그 두 개만 스킵되고 나머지는 그대로 돈다) + 체크포인트 다운로드 약 2GB.
+래퍼를 싣는다. 없으면 그 두 개만 스킵되고 나머지는 그대로 돈다) + 체크포인트 다운로드 약 1.5GB.
 
 **구현**: `classify.CATEGORY_MODEL_LOAD_OPTIONS`(모델별 `trust_remote_code`/`feature_api`/
 `text_padding`) + `make_embedding_classifier()`(레지스트리 키 → 조립). `EmbeddingZeroShotClassifier`는
