@@ -70,7 +70,7 @@ const profileMenuItems = computed<ProfileMenuItem[]>(() => [
   { label: '구매 내역', path: ROUTE_PATHS.MY, query: { section: 'orders' } },
   { label: '판매 내역', path: ROUTE_PATHS.MY, query: { section: 'sales' } },
   { label: '찜한 상품', path: ROUTE_PATHS.MY, query: { section: 'wishlist' } },
-  { label: '포인트', path: ROUTE_PATHS.POINT },
+  { label: '장바구니', path: ROUTE_PATHS.MY, query: { section: 'cart' } },
 ])
 
 const getRouteSection = () => {
