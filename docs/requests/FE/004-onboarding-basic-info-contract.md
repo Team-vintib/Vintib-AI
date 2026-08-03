@@ -38,3 +38,13 @@
 - Swagger: `/swagger-ui/index.html` — "회원(Users)" 태그, `PATCH /api/users/{id}`
 - `BE/src/main/java/com/ssafy/backend/member/controller/UserController.java`
 - `BE/src/main/java/com/ssafy/backend/member/dto/request/UpdateMemberRequest.java`
+
+## FE 요청 사항
+
+- `OnboardingBasicInfoView.vue`의 전화번호 입력 힌트("숫자와 하이픈(-)만 입력해 주세요.")와 에러
+  예시("예: 010-1234-5678")에서 **하이픈 언급을 빼달라**. `phoneNumber`는 서버가 숫자만
+  10~11자리로 검증한다(`^\d{10,11}$`) — 하이픈을 넣어 보내면 그대로 400으로 거부된다.
+
+## 처리 결과
+
+(FE 반영 후 기입)

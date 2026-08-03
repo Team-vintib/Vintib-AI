@@ -43,5 +43,4 @@
 
 ## 처리 결과
 
-- 2026-07-30: FE 문서 반영 완료.
-- 반영 위치: `FE/docs/frontend/api/api-index.md`, `FE/docs/frontend/implementation/status.md`, `FE/docs/frontend/decisions/open-questions.md`
+- 2026-07-30: FE 문서(`api-index.md` 등) 반영 완료로 기록됐으나, **실제 코드엔 자동 선택 로직이 없다**(확인일 2026-08-03) — `ProductRegistrationPage.vue`의 `isRepresentative`는 항상 `false`로 시작하고 사용자가 클릭해야만 대표로 바뀐다. `aiCheckPhotoIds`도 빈 배열로 시작해 클릭으로만 채워진다. 두 자동 선택 항목 다 미반영 상태로 되돌림.
