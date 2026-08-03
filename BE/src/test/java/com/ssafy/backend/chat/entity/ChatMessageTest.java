@@ -16,7 +16,7 @@ class ChatMessageTest {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 7, 30, 14, 0);
 
     private Live 라이브() {
-        return Live.openNow(회원("호스트", "빈티지장인"), "빈티지 데님 라이브", null, NOW);
+        return Live.openNow(회원("호스트", "빈티지장인"), "빈티지 데님 라이브", null, null, NOW);
     }
 
     private Member 회원(String name, String nickname) {

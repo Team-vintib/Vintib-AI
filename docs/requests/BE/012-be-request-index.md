@@ -34,14 +34,22 @@
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
 | 001 | `001-auth-contract.md` | Auth | 이메일 auth API 연결 완료 | `GET /api/me`, auth 응답 `user/nextStep`, SSAFY SSO |
-| 004 | `004-home-contract.md` | Home | 홈/팔로잉 홈 연결 완료 | live card `hostId`, 정렬/노출 정책 문서화 |
-| 005 | `005-search-contract.md` | Search | FE 화면/adapter 있음, BE `/api/search` 없음 | 통합 검색 API |
 | 006 | `006-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
-| 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰 연결 완료 | 생성용 상품 조회, AI 시착 생성 |
-| 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API 연동 완료. 알림 seed 제거 후 실제 생성 데이터 없음 | 알림 type/ref 문서화, 실제 알림 생성 이벤트, 예약 라이브 알림 신청/스케줄러, 탭별 bulk read |
+| 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 전 항목 반영 완료 | **AI 시착 생성만 남음**(라이브 안/밖) |
+| 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API 연동 완료 | 알림 type/ref 문서화, 실제 알림 생성 이벤트, 탭별 bulk read (예약 라이브 알림은 반영 완료) |
 | 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수, 경매 조건 설정 연결 완료 | 경매 snapshot/start/bid/close/STOMP |
 | 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | FE 화면 없음, BE controller 없음 | 주문 생성/배송/환불/포인트 전체(세금계산서 발행/조회는 구현 완료 — `docs/requests/FE/011-business-invoice-contract.md` §4~5, 단 주문 생성 API가 없어 아직 실호출 불가) |
-| 013 | `013-live-seller-control.md` | Live | 방송 종료 연결 완료(PATCH .../status로) | 현재 소개 상품 전환 트리거, 종료 시청자 실시간 전파 |
+
+### 2026-08-03 정윤 처리 — 삭제된 문서
+
+아래 문서는 요청이 전부 반영돼 삭제했다. 무엇을 어떻게 반영했는지는
+`docs/requests/FE/016-pre-auction-batch-handoff.md`에 항목별로 정리돼 있다.
+
+| 삭제된 문서 | 도메인 | 결과 |
+| --- | --- | --- |
+| `004-home-contract.md` | Home | live card `hostId` 추가, 홈 전 섹션 실데이터 전환(종료 라이브 노출 버그 해소), 노출 정책 문서화 |
+| `005-search-contract.md` | Search | `GET /api/search` 구현 |
+| `013-live-seller-control.md` | Live | 현재 소개 상품 전환 API·전파(Phase 5), 방송 종료 실시간 전파(`/topic/lives/{id}/status`) |
 
 ## 4. 기존 API 변경 요청
 
@@ -49,8 +57,7 @@
   - 세부 내용은 각 도메인 문서의 4번 섹션을 따른다.
 - 추가할 필드
   - Auth: `user`, `nextStep`
-  - Home: live card `hostId`
-  - Social/Notification: 알림 `type/refType/refId` 문서화, 도메인 이벤트별 알림 생성 정책, 예약 라이브 알림 신청/스케줄러, 탭별 읽음 처리 API
+  - Social/Notification: 알림 `type/refType/refId` 문서화, 도메인 이벤트별 알림 생성 정책, 탭별 읽음 처리 API
 - 변경 영향 범위
   - route guard
   - 홈/상품/라이브 카드 이동

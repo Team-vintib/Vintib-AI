@@ -106,7 +106,7 @@ class LiveControllerTest {
     /** 상태 전이·시청 조회 검증에 쓸 진행 중 라이브를 하나 만들어 ID를 돌려준다. */
     private Long 개설된_라이브_ID() {
         return liveRepository.save(
-                        Live.openNow(hostMember, "빈티지 데님 라이브", null, LocalDateTime.now()))
+                        Live.openNow(hostMember, "빈티지 데님 라이브", null, null, LocalDateTime.now()))
                 .getId();
     }
 
@@ -209,7 +209,7 @@ class LiveControllerTest {
     @Test
     void 예정_방송을_시작하면_영상_room이_배정된다() throws Exception {
         Long liveId = liveRepository.save(
-                        Live.schedule(hostMember, "예약 라이브", null, LocalDateTime.now().plusDays(1)))
+                        Live.schedule(hostMember, "예약 라이브", null, null, LocalDateTime.now().plusDays(1)))
                 .getId();
 
         mockMvc.perform(patch("/api/lives/{liveId}/status", liveId)
@@ -264,7 +264,7 @@ class LiveControllerTest {
     /** 특정 카테고리 상품을 편성한 진행 중 라이브를 만들어 ID를 돌려준다. 목록 카테고리 필터 검증용. */
     private Long 상품이_편성된_라이브_ID(Long linkedProductId) {
         Live live = liveRepository.save(
-                Live.openNow(hostMember, "카테고리 필터 검증용 라이브", null, LocalDateTime.now()));
+                Live.openNow(hostMember, "카테고리 필터 검증용 라이브", null, null, LocalDateTime.now()));
         liveProductRepository.save(LiveProduct.link(live, linkedProductId, (short) 0, LocalDateTime.now()));
         return live.getId();
     }
@@ -398,7 +398,7 @@ class LiveControllerTest {
     /** 진행 중 라이브 + 그 방송에 편성된 상품 하나. 소개 상품 전환 테스트용. */
     private Long 편성까지_끝난_라이브_ID() {
         Live live = liveRepository.save(
-                Live.openNow(hostMember, "빈티지 데님 라이브", null, LocalDateTime.now()));
+                Live.openNow(hostMember, "빈티지 데님 라이브", null, null, LocalDateTime.now()));
         liveProductRepository.save(LiveProduct.link(live, productId, (short) 0, LocalDateTime.now()));
         return live.getId();
     }
