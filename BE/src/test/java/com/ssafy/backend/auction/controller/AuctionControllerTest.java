@@ -98,7 +98,7 @@ class AuctionControllerTest {
                 .build());
         linkedProductId = product.getId();
 
-        Live live = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, LocalDateTime.now()));
+        Live live = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, null, LocalDateTime.now()));
         liveId = live.getId();
         liveProductRepository.save(LiveProduct.link(live, linkedProductId, (short) 0, LocalDateTime.now()));
     }

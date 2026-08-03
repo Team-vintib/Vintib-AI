@@ -40,6 +40,9 @@ public class SecurityConfig {
             // 카테고리/브랜드 마스터 조회는 비회원도 가능(SY007)
             "/api/categories",
             "/api/brands",
+            // 통합 검색(SEARCH-001/002)도 비회원 공개. 목록·상세가 열려 있으니 찾는 것도 열어야 한다.
+            // 토큰이 붙어 있으면 찜·팔로우 여부가 함께 채워진다.
+            "/api/search",
             // STOMP 핸드셰이크는 비회원도 통과해야 한다(라이브 시청·채팅 읽기). 인증은 여기서
             // 하지 않고 CONNECT 프레임에서 StompAuthChannelInterceptor 가 처리한다 — 브라우저는
             // 핸드셰이크 요청에 Authorization 헤더를 붙일 수 없다.

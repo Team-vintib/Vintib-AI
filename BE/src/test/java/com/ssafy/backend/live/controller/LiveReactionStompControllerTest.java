@@ -75,7 +75,7 @@ class LiveReactionStompControllerTest {
         viewer = saveMember("시청자");
         viewerToken = jwtTokenProvider.createAccessToken(viewer.getId(), viewer.getEmail());
 
-        liveId = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, LocalDateTime.now())).getId();
+        liveId = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, null, LocalDateTime.now())).getId();
 
         // rate limit 은 방송·회원 단위 키라 새 회원·새 방송이면 이미 비어 있다. 남은 창이
         // 겹치지 않도록 명시적으로도 지운다.
@@ -185,7 +185,7 @@ class LiveReactionStompControllerTest {
 
     @Test
     void 종료된_방송에는_반응할_수_없다() throws Exception {
-        Live ended = liveRepository.save(Live.openNow(host, "끝난 방송", null, LocalDateTime.now()));
+        Live ended = liveRepository.save(Live.openNow(host, "끝난 방송", null, null, LocalDateTime.now()));
         ended.transitionTo(LiveStatus.ENDED, LocalDateTime.now());
         liveRepository.save(ended);
 

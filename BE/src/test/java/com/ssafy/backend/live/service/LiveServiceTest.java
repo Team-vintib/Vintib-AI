@@ -48,6 +48,7 @@ class LiveServiceTest {
     private static final List<Long> PRODUCT_IDS = List.of(2001L);
     private static final String TITLE = "빈티지 데님 라이브";
     private static final String THUMBNAIL_URL = "https://cdn.example.com/live/1.jpg";
+    private static final String DESCRIPTION = "90년대 데님 위주로 소개합니다";
 
     @Mock
     private LiveRepository liveRepository;
@@ -67,12 +68,20 @@ class LiveServiceTest {
     @Mock
     private LiveViewerService liveViewerService;
 
+    @Mock
+    private LiveReminderService liveReminderService;
+
     private LiveService liveService;
 
     @BeforeEach
     void setUp() {
         liveService = new LiveService(
-                liveRepository, memberRepository, liveProductService, liveViewerService, List.of());
+                liveRepository,
+                memberRepository,
+                liveProductService,
+                liveViewerService,
+                liveReminderService,
+                List.of());
     }
 
     @Test
@@ -83,7 +92,7 @@ class LiveServiceTest {
         when(liveRepository.save(any(Live.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         LiveResponse response =
-                liveService.scheduleLive(HOST_ID, new LiveScheduleRequest(TITLE, THUMBNAIL_URL, scheduledAt, PRODUCT_IDS));
+                liveService.scheduleLive(HOST_ID, new LiveScheduleRequest(TITLE, THUMBNAIL_URL, DESCRIPTION, scheduledAt, PRODUCT_IDS));
 
         assertThat(response.status()).isEqualTo(LiveStatus.SCHEDULED);
         assertThat(response.scheduledAt()).isEqualTo(scheduledAt);
@@ -101,7 +110,7 @@ class LiveServiceTest {
         when(host.getId()).thenReturn(HOST_ID);
         when(liveRepository.save(any(Live.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        LiveResponse response = liveService.openLiveNow(HOST_ID, new LiveInstantRequest(TITLE, THUMBNAIL_URL, PRODUCT_IDS));
+        LiveResponse response = liveService.openLiveNow(HOST_ID, new LiveInstantRequest(TITLE, THUMBNAIL_URL, DESCRIPTION, PRODUCT_IDS));
 
         assertThat(response.status()).isEqualTo(LiveStatus.LIVE);
         assertThat(response.scheduledAt()).isNull();
@@ -115,9 +124,14 @@ class LiveServiceTest {
     void 진행_중인_방송을_종료하면_ENDED로_바뀌고_정리_훅이_불린다() {
         LiveService 훅이_달린_서비스 =
                 new LiveService(
-                        liveRepository, memberRepository, liveProductService, liveViewerService, List.of(cleanupHook));
+                        liveRepository,
+                        memberRepository,
+                        liveProductService,
+                        liveViewerService,
+                        liveReminderService,
+                        List.of(cleanupHook));
         when(host.getId()).thenReturn(HOST_ID);
-        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
+        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
 
         LiveResponse response = 훅이_달린_서비스.transitionStatus(
@@ -131,9 +145,14 @@ class LiveServiceTest {
     void 예정_방송을_시작하면_LIVE로_바뀌고_정리_훅은_불리지_않는다() {
         LiveService 훅이_달린_서비스 =
                 new LiveService(
-                        liveRepository, memberRepository, liveProductService, liveViewerService, List.of(cleanupHook));
+                        liveRepository,
+                        memberRepository,
+                        liveProductService,
+                        liveViewerService,
+                        liveReminderService,
+                        List.of(cleanupHook));
         when(host.getId()).thenReturn(HOST_ID);
-        Live live = Live.schedule(host, TITLE, THUMBNAIL_URL, LocalDateTime.now().plusDays(1));
+        Live live = Live.schedule(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now().plusDays(1));
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
 
         LiveResponse response = 훅이_달린_서비스.transitionStatus(
@@ -147,7 +166,7 @@ class LiveServiceTest {
     @Test
     void 허용되지_않는_전이는_거부된다() {
         when(host.getId()).thenReturn(HOST_ID);
-        Live 종료된_방송 = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
+        Live 종료된_방송 = Live.openNow(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now());
         종료된_방송.transitionTo(LiveStatus.ENDED, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(종료된_방송));
         LiveStatusUpdateRequest request = new LiveStatusUpdateRequest(LiveStatus.LIVE);
@@ -160,7 +179,7 @@ class LiveServiceTest {
     @Test
     void 본인_라이브가_아니면_상태를_바꿀_수_없다() {
         when(host.getId()).thenReturn(HOST_ID);
-        Live 남의_라이브 = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
+        Live 남의_라이브 = Live.openNow(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(남의_라이브));
         LiveStatusUpdateRequest request = new LiveStatusUpdateRequest(LiveStatus.ENDED);
 
@@ -182,12 +201,12 @@ class LiveServiceTest {
     @Test
     void 시청_조회는_방_정보와_편성_상품을_함께_반환한다() {
         when(host.getId()).thenReturn(HOST_ID);
-        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
+        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now());
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
         when(liveProductService.getLinkedProducts(LIVE_ID)).thenReturn(List.of());
         when(liveViewerService.getViewerCount(LIVE_ID)).thenReturn(37);
 
-        LiveDetailResponse response = liveService.getLiveDetail(LIVE_ID);
+        LiveDetailResponse response = liveService.getLiveDetail(LIVE_ID, HOST_ID);
 
         assertThat(response.status()).isEqualTo(LiveStatus.LIVE);
         assertThat(response.title()).isEqualTo(TITLE);
@@ -199,10 +218,50 @@ class LiveServiceTest {
     }
 
     @Test
+    void 호스트_본인이_조회하면_isHost가_true다() {
+        when(host.getId()).thenReturn(HOST_ID);
+        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now());
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        when(liveProductService.getLinkedProducts(LIVE_ID)).thenReturn(List.of());
+
+        assertThat(liveService.getLiveDetail(LIVE_ID, HOST_ID).isHost()).isTrue();
+    }
+
+    @Test
+    void 다른_회원이_조회하면_isHost가_false다() {
+        when(host.getId()).thenReturn(HOST_ID);
+        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now());
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        when(liveProductService.getLinkedProducts(LIVE_ID)).thenReturn(List.of());
+
+        assertThat(liveService.getLiveDetail(LIVE_ID, OTHER_MEMBER_ID).isHost()).isFalse();
+    }
+
+    @Test
+    void 비회원이_조회하면_isHost가_false다() {
+        // 시청 조회는 공개 엔드포인트라 viewerId 가 null 로 들어온다 — NPE 없이 false 여야 한다.
+        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now());
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        when(liveProductService.getLinkedProducts(LIVE_ID)).thenReturn(List.of());
+
+        assertThat(liveService.getLiveDetail(LIVE_ID, null).isHost()).isFalse();
+    }
+
+    @Test
+    void 개설_시_받은_방송_설명이_상세에_그대로_담긴다() {
+        when(host.getId()).thenReturn(HOST_ID);
+        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, DESCRIPTION, LocalDateTime.now());
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        when(liveProductService.getLinkedProducts(LIVE_ID)).thenReturn(List.of());
+
+        assertThat(liveService.getLiveDetail(LIVE_ID, HOST_ID).description()).isEqualTo(DESCRIPTION);
+    }
+
+    @Test
     void 존재하지_않는_라이브는_시청_조회할_수_없다() {
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> liveService.getLiveDetail(LIVE_ID))
+        assertThatThrownBy(() -> liveService.getLiveDetail(LIVE_ID, HOST_ID))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.LIVE_NOT_FOUND);
     }
@@ -211,7 +270,8 @@ class LiveServiceTest {
     void 존재하지_않는_회원이_개설하면_예외가_발생한다() {
         when(memberRepository.findById(HOST_ID)).thenReturn(Optional.empty());
         LiveScheduleRequest request =
-                new LiveScheduleRequest(TITLE, THUMBNAIL_URL, LocalDateTime.now().plusDays(1), PRODUCT_IDS);
+                new LiveScheduleRequest(
+                        TITLE, THUMBNAIL_URL, DESCRIPTION, LocalDateTime.now().plusDays(1), PRODUCT_IDS);
 
         assertThatThrownBy(() -> liveService.scheduleLive(HOST_ID, request))
                 .isInstanceOf(CustomException.class);

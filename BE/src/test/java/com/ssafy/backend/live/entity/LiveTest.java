@@ -21,7 +21,7 @@ class LiveTest {
     void 예약_개설하면_SCHEDULED_상태로_방송_예정_시각만_채워진다() {
         LocalDateTime scheduledAt = LocalDateTime.of(2026, 7, 28, 20, 0);
 
-        Live live = Live.schedule(host, TITLE, THUMBNAIL_URL, scheduledAt);
+        Live live = Live.schedule(host, TITLE, THUMBNAIL_URL, null, scheduledAt);
 
         assertThat(live.getStatus()).isEqualTo(LiveStatus.SCHEDULED);
         assertThat(live.getScheduledAt()).isEqualTo(scheduledAt);
@@ -33,7 +33,7 @@ class LiveTest {
     void 즉시_개설하면_LIVE_상태로_시작_시각만_채워진다() {
         LocalDateTime startedAt = LocalDateTime.of(2026, 7, 27, 21, 30);
 
-        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, startedAt);
+        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, null, startedAt);
 
         assertThat(live.getStatus()).isEqualTo(LiveStatus.LIVE);
         assertThat(live.getStartedAt()).isEqualTo(startedAt);
@@ -43,7 +43,7 @@ class LiveTest {
 
     @Test
     void 개설_직후에는_호스트_제목이_유지되고_최고_시청자_수가_0이다() {
-        Live live = Live.schedule(host, TITLE, THUMBNAIL_URL, LocalDateTime.of(2026, 7, 28, 20, 0));
+        Live live = Live.schedule(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.of(2026, 7, 28, 20, 0));
 
         assertThat(live.getHost()).isSameAs(host);
         assertThat(live.getTitle()).isEqualTo(TITLE);
@@ -55,7 +55,7 @@ class LiveTest {
 
     @Test
     void 소개_중인_상품을_바꾸고_해제할_수_있다() {
-        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
+        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now());
 
         live.changeCurrentProduct(2001L);
         assertThat(live.getCurrentProductId()).isEqualTo(2001L);
@@ -67,7 +67,7 @@ class LiveTest {
 
     @Test
     void 방송이_종료되면_소개_중인_상품이_해제된다() {
-        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, LocalDateTime.now());
+        Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now());
         live.changeCurrentProduct(2001L);
 
         live.transitionTo(LiveStatus.ENDED, LocalDateTime.now());

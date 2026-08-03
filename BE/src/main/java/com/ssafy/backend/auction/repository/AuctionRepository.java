@@ -3,6 +3,8 @@ package com.ssafy.backend.auction.repository;
 import com.ssafy.backend.auction.entity.Auction;
 import com.ssafy.backend.auction.entity.AuctionStatus;
 import java.util.Collection;
+import java.util.List;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface AuctionRepository extends JpaRepository<Auction, Long> {
@@ -13,4 +15,14 @@ public interface AuctionRepository extends JpaRepository<Auction, Long> {
      */
     boolean existsByLiveIdAndProductIdAndStatusIn(
             Long liveId, Long productId, Collection<AuctionStatus> statuses);
+
+    /**
+     * 홈 "경매 예정" 카드(HOME-001)용 — 상품에 걸린 경매를 한 번에.
+     *
+     * <p>카드가 시작가와 시작 예정 시각을 함께 보여 주는데, 시작 예정 시각은 경매가 아니라
+     * <b>그 경매가 얹힌 방송의 예정 시각</b>이다({@code auction.live_id}는 NOT NULL). 그래서
+     * {@code live}를 함께 당겨 온다 — 상품 수만큼 방송을 다시 조회하면 N+1이 된다.
+     */
+    @EntityGraph(attributePaths = "live")
+    List<Auction> findByProductIdIn(Collection<Long> productIds);
 }

@@ -26,7 +26,17 @@ public record LiveScheduleRequest(
         @Size(max = 500)
         String thumbnailUrl,
 
-        @Schema(description = "방송 예정 시각. 반드시 미래여야 한다", example = "2026-08-01T20:00:00")
+        @Schema(
+                description = "방송 설명. **선택**이며 없으면 null",
+                example = "90년대 리바이스·랭글러 위주로 소개합니다",
+                maxLength = 1000)
+        @Size(max = 1000)
+        String description,
+
+        @Schema(
+                description = "방송 예정 시각. 반드시 미래여야 한다. **오프셋 없는 KST 벽시계로 보낸다** "
+                        + "(서버도 KST 로 돌아간다)",
+                example = "2026-08-01T20:00:00")
         @NotNull
         @Future
         LocalDateTime scheduledAt,

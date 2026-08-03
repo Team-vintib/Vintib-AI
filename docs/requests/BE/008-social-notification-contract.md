@@ -135,51 +135,10 @@ FE 현재 임시 이동:
 | 배송 완료 | `SHIPMENT_COMPLETED` | `SHIPMENT` / order or shipment id |
 | 포인트 충전/환불/출금 완료 | `POINT_CHARGED`, `POINT_REFUNDED`, `WITHDRAW_COMPLETED` | `POINT` / point transaction id |
 
-### 3.2.1 예약 라이브 알림 신청과 스케줄러
+### 3.2.1 예약 라이브 알림 신청과 스케줄러 — 반영 완료 (2026-08-03, 정윤)
 
-- Method / Endpoint 제안
-  - `POST /api/lives/{liveId}/reminders`
-  - `DELETE /api/lives/{liveId}/reminders`
-  - `GET /api/lives/{liveId}` 또는 라이브 목록 응답에 `isReminderSet` 포함
-- 요청 목적: 사용자가 예정된 라이브에 알림을 신청하고, 라이브 시작 시점 또는 시작 N분 전에 실제 `notification` row가 생성되도록 한다.
-- FE 사용처: 라이브 예정 목록/상세의 알림 신청 버튼, 알림센터, 공통 헤더 알림 팝업
-- 요청 데이터
-  - Header: `Authorization: Bearer {accessToken}`
-  - Path: `liveId`
-- 응답 데이터 제안
-  - `liveId`: number
-  - `isReminderSet`: boolean
-  - `reminderCount`: number
-  - `scheduledAt`: string
-
-응답 예시:
-
-```json
-{
-  "success": true,
-  "data": {
-    "liveId": 15,
-    "isReminderSet": true,
-    "reminderCount": 8,
-    "scheduledAt": "2026-07-31T20:00:00"
-  },
-  "error": null
-}
-```
-
-BE 구현 요청:
-
-- `live_reminder` 또는 동등한 구독 테이블을 두고 `(user_id, live_id)` 중복 신청을 방지해 주세요.
-- 라이브 시작 시점 또는 시작 10분 전 등 정책으로 정한 시점에 스케줄러가 `notification` row를 생성해 주세요.
-- 생성 알림의 권장 값은 `type=LIVE_REMINDER`, `refType=LIVE`, `refId={liveId}`입니다.
-- 이미 시작했거나 종료된 라이브에는 신청할 수 없는지, 신청 가능하다면 어떤 응답을 줄지 정책을 정해 주세요.
-- 스케줄러 재시도나 서버 재기동 시 같은 라이브 알림이 중복 생성되지 않도록 idempotency 기준을 정해 주세요.
-- 목록/상세 응답에 `isReminderSet`이 없으면 FE가 버튼의 현재 상태를 표시할 수 없으므로 필드 제공이 필요합니다.
-
-FE 현재 처리 방침:
-
-- 위 API가 없을 때 localStorage/mock 상태로 알림 신청을 흉내 내지 않습니다.
-- API가 제공되면 라이브 예정 카드/상세에 신청 토글을 연결하고, 실제 notification 목록에서만 알림 노출을 확인합니다.
+`POST`/`DELETE /api/lives/{liveId}/reminders`, `GET /api/lives/{liveId}`의 `isReminderSet`, 발송 스케줄러까지 구현했다.
+계약·정책·미반영 필드(`reminderCount`)는 `docs/requests/FE/016-pre-auction-batch-handoff.md` 참고.
 
 ### 3.3 unread count 전용 API 검토
 
