@@ -18,6 +18,7 @@ export type AiQualityAnalysisStatus =
 
 export type ProductDetailMockScenario =
   | 'default'
+  | 'mock'
   | 'loading'
   | 'error'
   | 'not-found'

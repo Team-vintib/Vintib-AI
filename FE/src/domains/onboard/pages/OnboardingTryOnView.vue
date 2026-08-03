@@ -3,6 +3,7 @@ import axios from 'axios'
 import { computed, nextTick, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { saveOnboardingTryOnProfile } from '@/domains/onboard/api/onboarding'
 import BaseField from '@/domains/onboard/components/BaseField.vue'
 import BaseInput from '@/domains/onboard/components/BaseInput.vue'
@@ -60,6 +61,7 @@ const selectedFullBodyPhoto = ref<File | null>(null)
 const isSubmitting = ref(false)
 const submitError = ref('')
 const router = useRouter()
+const authStore = useAuthStore()
 
 const completedMeasurementCount = computed(
   () => bodyFields.filter((field) => bodyForm[field.id].trim()).length,
@@ -210,7 +212,9 @@ const handleSave = async () => {
   isSubmitting.value = true
 
   try {
-    const response = await saveOnboardingTryOnProfile(createSaveRequest())
+    const response = await saveOnboardingTryOnProfile(createSaveRequest(), {
+      userId: authStore.user?.id,
+    })
 
     if (!response.success) {
       await applyApiError(response.error ?? null)

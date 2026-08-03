@@ -3,10 +3,12 @@ package com.ssafy.backend.live.service;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
+import com.ssafy.backend.live.dto.request.LiveCurrentProductRequest;
 import com.ssafy.backend.live.dto.request.LiveInstantRequest;
 import com.ssafy.backend.live.dto.request.LiveScheduleRequest;
 import com.ssafy.backend.live.dto.request.LiveListSort;
 import com.ssafy.backend.live.dto.request.LiveStatusUpdateRequest;
+import com.ssafy.backend.live.dto.response.CurrentProductResponse;
 import com.ssafy.backend.live.dto.response.LiveCategoryResponse;
 import com.ssafy.backend.live.dto.response.LiveDetailResponse;
 import com.ssafy.backend.live.dto.response.LiveListItemResponse;
@@ -250,6 +252,38 @@ public class LiveService {
         }
 
         return LiveResponse.from(live);
+    }
+
+    /**
+     * 지금 소개 중인 상품을 바꾼다(LIVE-004). 호스트 본인만.
+     *
+     * <p><b>편성 변경과 다른 판정을 쓴다.</b> 상품 편성은 방송이 시작되면 잠기지만(운영 정책),
+     * 소개 상품 전환은 <b>방송 중에 하는 것이 본래 용도</b>다. 그래서 {@code isOpenForEditing}이
+     * 아니라 {@code isClosed}로 막는다 — 끝난 방송에서만 거부한다.
+     *
+     * @param productId 소개할 상품. <b>{@code null}이면 해제</b>(잡담 구간 등)
+     */
+    @Transactional
+    public CurrentProductResponse changeCurrentProduct(
+            Long hostId, Long liveId, LiveCurrentProductRequest request) {
+        Live live = liveRepository.findById(liveId)
+                .orElseThrow(() -> new CustomException(ErrorCode.LIVE_NOT_FOUND));
+
+        if (!live.isHostedBy(hostId)) {
+            throw new CustomException(ErrorCode.NOT_LIVE_HOST);
+        }
+        if (live.isClosed()) {
+            throw new CustomException(ErrorCode.INVALID_LIVE_STATE);
+        }
+        // 편성되지 않은 상품을 소개 중으로 두면 시청자가 목록에 없는 상품의 NOW 배지를 보게 된다.
+        if (request.productId() != null
+                && !liveProductService.isLinked(liveId, request.productId())) {
+            throw new CustomException(ErrorCode.LIVE_PRODUCT_NOT_FOUND);
+        }
+
+        live.changeCurrentProduct(request.productId());
+
+        return CurrentProductResponse.of(liveId, request.productId());
     }
 
     private Member findHost(Long hostId) {

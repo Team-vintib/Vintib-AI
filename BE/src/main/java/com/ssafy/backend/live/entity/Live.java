@@ -63,6 +63,19 @@ public class Live extends BaseTimeEntity {
     @Column(name = "peak_viewer_count", nullable = false)
     private int peakViewerCount;
 
+    /**
+     * 지금 소개 중인 상품(LIVE-004). FE의 {@code NOW} 배지와 시청 화면 진입 시 기본 선택 상품의
+     * 원천이다.
+     *
+     * <p><b>카테고리와 달리 저장한다.</b> 카테고리는 편성 상품에서 계산할 근거가 있지만
+     * "지금 소개 중"은 <b>호스트의 현재 의도라 파생할 근거가 없다.</b>
+     *
+     * <p>전환 이력은 남기지 않는다. 필요해지면(다시보기) 별도 이력 테이블을 만든다 —
+     * {@code shown_at} 한 컬럼으로 현재와 이력을 겸하려 하면 상품을 되돌아갈 때 둘 다 깨진다.
+     */
+    @Column(name = "current_product_id")
+    private Long currentProductId;
+
     // 개설 경로가 둘(예약/즉시)이고 각각 채워야 할 시각 필드가 다르다. @Builder 로 열어 두면
     // "SCHEDULED 인데 scheduledAt 이 없는" 조합을 만들 수 있어, 생성자는 감추고 정적 팩터리만 연다.
     private Live(
@@ -133,11 +146,25 @@ public class Live extends BaseTimeEntity {
         this.status = target;
         switch (target) {
             case LIVE -> this.startedAt = at;
-            case ENDED -> this.endedAt = at;
+            case ENDED -> {
+                this.endedAt = at;
+                // 끝난 방송에 "지금 소개 중"이 남아 있으면 안 된다. 종료 화면이나 다시보기에서
+                // 그 상품만 NOW 배지를 달고 있게 된다.
+                this.currentProductId = null;
+            }
             default -> {
                 // SCHEDULED·CANCELED 는 별도로 박을 시각이 없다.
             }
         }
+    }
+
+    /**
+     * 지금 소개 중인 상품을 바꾼다. {@code null}이면 해제(아무것도 소개하지 않는 상태)다.
+     *
+     * <p>편성된 상품인지는 서비스가 검증한다 — 엔티티는 {@code live_product} 를 모른다.
+     */
+    public void changeCurrentProduct(Long productId) {
+        this.currentProductId = productId;
     }
 
     /** 방송을 실제로 시작하는 시점에 OpenVidu room 이름을 채운다(연동은 -449). */

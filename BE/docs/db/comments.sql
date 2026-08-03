@@ -86,6 +86,7 @@ COMMENT ON COLUMN live.status            IS 'SCHEDULED(예정) | LIVE(진행 중
 COMMENT ON COLUMN live.scheduled_at      IS '예약 방송 시작 예정 시각 (LIVE-001). 즉시 개설(LIVE-002)은 NULL.';
 COMMENT ON COLUMN live.openvidu_room     IS 'OpenVidu v3 room name. WebRTC 세션·토큰 발급 시 사용.';
 COMMENT ON COLUMN live.peak_viewer_count IS '최고 동시 시청자 수. 통계·발표용.';
+COMMENT ON COLUMN live.current_product_id IS '지금 소개 중인 상품 (LIVE-004, FE NOW 배지). 편성 상품(live_product) 중 하나여야 하며 애플리케이션이 검증한다. 방송 종료 시 NULL. 전환 이력은 남기지 않는다.';
 
 COMMENT ON TABLE live_product IS '라이브 ↔ 상품 연결 (LIVE-003). 방송 전·중 모두 추가·제외 가능하며 개수 제한이 없다.';
 COMMENT ON COLUMN live_product.sort_order IS '방송 중 소개 순서.';

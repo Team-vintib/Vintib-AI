@@ -29,6 +29,7 @@ type ProductDetailLoadState = 'loading' | 'success' | 'error' | 'not-found'
 
 const PRODUCT_DETAIL_MOCK_SCENARIOS: ProductDetailMockScenario[] = [
   'default',
+  'mock',
   'loading',
   'error',
   'not-found',

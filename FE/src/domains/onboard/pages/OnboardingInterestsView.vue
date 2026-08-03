@@ -1,59 +1,59 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { saveOnboardingInterests } from '@/domains/onboard/api/onboarding'
 import BaseField from '@/domains/onboard/components/BaseField.vue'
 import BaseInput from '@/domains/onboard/components/BaseInput.vue'
 import OnboardingLayout from '@/domains/onboard/components/OnboardingLayout.vue'
+import { getBrands, getCategories } from '@/domains/product/api/productApi'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
+import { getMockInterestOptions } from '@/shared/api/mockInterestStorage'
 
 import type { ApiErrorBody as ApiError, ApiResponse } from '@/shared/types/api.types'
 
 interface InterestOption {
-  id: string
+  id: number
   label: string
 }
 
-const brands: InterestOption[] = [
-  { id: 'brand-a', label: '브랜드 A' },
-  { id: 'brand-b', label: '브랜드 B' },
-  { id: 'brand-c', label: '브랜드 C' },
-  { id: 'brand-d', label: '브랜드 D' },
-  { id: 'brand-e', label: '브랜드 E' },
-  { id: 'brand-f', label: '브랜드 F' },
-]
-
-const categories: InterestOption[] = [
-  { id: 'outer', label: '아우터' },
-  { id: 'top', label: '상의' },
-  { id: 'bottom', label: '하의' },
-  { id: 'dress', label: '원피스' },
-  { id: 'shoes', label: '신발' },
-  { id: 'accessories', label: '액세서리' },
-]
+const mockInterestOptions = getMockInterestOptions()
 
 const brandSearchQuery = ref('')
-const selectedBrandIds = ref<string[]>([])
-const selectedCategoryIds = ref<string[]>([])
+const brands = ref<InterestOption[]>(
+  mockInterestOptions.brands.map((brand) => ({
+    id: brand.id,
+    label: brand.nameEn ? `${brand.name} (${brand.nameEn})` : brand.name,
+  })),
+)
+const categories = ref<InterestOption[]>(
+  mockInterestOptions.categories.map((category) => ({
+    id: category.id,
+    label: category.name,
+  })),
+)
+const selectedBrandIds = ref<number[]>([])
+const selectedCategoryIds = ref<number[]>([])
 const isSubmitting = ref(false)
 const submitError = ref('')
 const router = useRouter()
+const authStore = useAuthStore()
 
 const filteredBrands = computed(() => {
   const normalizedSearchQuery = brandSearchQuery.value.trim().toLocaleLowerCase()
 
   if (!normalizedSearchQuery) {
-    return brands
+    return brands.value
   }
 
-  return brands.filter((brand) => brand.label.toLocaleLowerCase().includes(normalizedSearchQuery))
+  return brands.value.filter((brand) => brand.label.toLocaleLowerCase().includes(normalizedSearchQuery))
 })
 
-const isBrandSelected = (brandId: string) => selectedBrandIds.value.includes(brandId)
+const isBrandSelected = (brandId: number) => selectedBrandIds.value.includes(brandId)
 
-const toggleBrand = (brandId: string) => {
+const toggleBrand = (brandId: number) => {
   submitError.value = ''
 
   if (isBrandSelected(brandId)) {
@@ -87,6 +87,8 @@ const handleSave = async (skip = false) => {
     const response = await saveOnboardingInterests({
       brandIds: skip ? [] : [...selectedBrandIds.value],
       categoryIds: skip ? [] : [...selectedCategoryIds.value],
+    }, {
+      userId: authStore.user?.id,
     })
 
     if (!response.success) {
@@ -114,6 +116,36 @@ const handleSave = async (skip = false) => {
 const handleCategoryChange = () => {
   submitError.value = ''
 }
+
+const loadInterestOptions = async () => {
+  try {
+    const [brandResponse, categoryResponse] = await Promise.all([getBrands(), getCategories()])
+
+    brands.value = brandResponse.map((brand) => ({
+      id: brand.id,
+      label: brand.nameEn ? `${brand.name} (${brand.nameEn})` : brand.name,
+    }))
+    categories.value = categoryResponse
+      .filter((category) => category.depth <= 2)
+      .map((category) => ({
+        id: category.id,
+        label: category.name,
+      }))
+  } catch {
+    brands.value = mockInterestOptions.brands.map((brand) => ({
+      id: brand.id,
+      label: brand.nameEn ? `${brand.name} (${brand.nameEn})` : brand.name,
+    }))
+    categories.value = mockInterestOptions.categories.map((category) => ({
+      id: category.id,
+      label: category.name,
+    }))
+  }
+}
+
+onMounted(() => {
+  void loadInterestOptions()
+})
 </script>
 
 <template>
