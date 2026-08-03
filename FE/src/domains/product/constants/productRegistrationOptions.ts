@@ -45,7 +45,7 @@ export const PRODUCT_REGISTRATION_CONDITION_OPTIONS: ProductRegistrationOption[]
 ]
 
 export const PRODUCT_REGISTRATION_SALE_TYPE_OPTIONS: ProductRegistrationOption[] = [
-  { id: 'DIRECT', label: '상시 판매' },
+  { id: 'DIRECT', label: '정찰제' },
   { id: 'AUCTION', label: '경매' },
 ]
 
@@ -134,6 +134,5 @@ export const PRODUCT_REGISTRATION_VALIDATION_MESSAGES = {
   aiModelGenderRequired: 'AI 모델을 선택해 주세요.',
   saleTypeRequired: '판매 방식을 선택해 주세요.',
   directSalePriceRequired: '판매가를 입력해 주세요.',
-  auctionStartPriceRequired: '시작가를 입력해 주세요.',
   priceInvalid: '가격은 0보다 큰 숫자로 입력해 주세요.',
 } as const
