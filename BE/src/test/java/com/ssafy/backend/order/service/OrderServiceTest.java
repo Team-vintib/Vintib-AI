@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.ssafy.backend.global.client.DeliveryTrackingClient;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
@@ -18,6 +19,7 @@ import com.ssafy.backend.order.dto.request.OrderShipmentAddressRequest;
 import com.ssafy.backend.order.dto.request.OrderShipmentRegisterRequest;
 import com.ssafy.backend.order.dto.response.OrderListItemResponse;
 import com.ssafy.backend.order.dto.response.OrderShipmentResponse;
+import com.ssafy.backend.order.entity.CourierCode;
 import com.ssafy.backend.order.entity.Order;
 import com.ssafy.backend.order.entity.OrderShipment;
 import com.ssafy.backend.order.entity.OrderStatus;
@@ -62,6 +64,9 @@ class OrderServiceTest {
     private PointService pointService;
 
     @Mock
+    private DeliveryTrackingClient deliveryTrackingClient;
+
+    @Mock
     private Order order;
 
     @Mock
@@ -78,7 +83,8 @@ class OrderServiceTest {
     @BeforeEach
     void setUp() {
         orderService = new OrderService(
-                orderRepository, orderShipmentRepository, productRepository, memberRepository, pointService);
+                orderRepository, orderShipmentRepository, productRepository, memberRepository, pointService,
+                deliveryTrackingClient);
     }
 
     private Product realDirectSaleProduct() {
@@ -215,21 +221,43 @@ class OrderServiceTest {
         assertThat(response.recipientName()).isEqualTo("홍길동");
     }
 
+    private OrderShipment newShipmentFor(Order realOrder) {
+        return OrderShipment.builder()
+                .order(realOrder).recipientName("홍길동").recipientPhone("010-1234-5678")
+                .zipcode("06134").address1("테헤란로 1").build();
+    }
+
     @Test
-    void 송장을_등록하면_배송완료까지_반영되고_자동확정_시각이_계산된다() {
+    void 웹훅_구독에_성공하면_송장만_등록하고_아직_배송완료로_바뀌지_않는다() {
         Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
         when(buyer.getId()).thenReturn(BUYER_ID);
         when(seller.getId()).thenReturn(SELLER_ID);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
-        OrderShipment shipment = OrderShipment.builder()
-                .order(realOrder).recipientName("홍길동").recipientPhone("010-1234-5678")
-                .zipcode("06134").address1("테헤란로 1").build();
+        OrderShipment shipment = newShipmentFor(realOrder);
         when(orderShipmentRepository.findById(ORDER_ID)).thenReturn(Optional.of(shipment));
+        when(deliveryTrackingClient.subscribe(CourierCode.CJ, "123456789012", ORDER_ID)).thenReturn(true);
 
         OrderShipmentResponse response = orderService.registerShipment(
-                ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest("CJ대한통운", "123456789012"));
+                ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest(CourierCode.CJ, "123456789012"));
 
         assertThat(response.trackingNumber()).isEqualTo("123456789012");
+        assertThat(response.courierCode()).isEqualTo(CourierCode.CJ);
+        assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.SHIPPING);
+        assertThat(realOrder.getAutoConfirmAt()).isNull();
+    }
+
+    @Test
+    void 웹훅_구독에_실패하면_즉시_배송완료로_폴백한다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+        OrderShipment shipment = newShipmentFor(realOrder);
+        when(orderShipmentRepository.findById(ORDER_ID)).thenReturn(Optional.of(shipment));
+        when(deliveryTrackingClient.subscribe(CourierCode.CJ, "123456789012", ORDER_ID)).thenReturn(false);
+
+        orderService.registerShipment(ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest(CourierCode.CJ, "123456789012"));
+
         assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
         assertThat(realOrder.getAutoConfirmAt()).isAfter(LocalDateTime.now().plusDays(6));
     }
@@ -243,9 +271,37 @@ class OrderServiceTest {
         when(orderShipmentRepository.findById(ORDER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService.registerShipment(
-                ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest("CJ대한통운", "123456789012")))
+                ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest(CourierCode.CJ, "123456789012")))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ORDER_SHIPMENT_ADDRESS_REQUIRED);
+    }
+
+    @Test
+    void 배송완료_웹훅을_받으면_SHIPPING_주문이_배송완료로_바뀐다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        realOrder.markShipping();
+        OrderShipment shipment = newShipmentFor(realOrder);
+        when(orderShipmentRepository.findByCourierAndTrackingNumber(CourierCode.CJ, "123456789012"))
+                .thenReturn(Optional.of(shipment));
+
+        orderService.markShipmentDelivered(CourierCode.CJ, "123456789012");
+
+        assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
+        assertThat(shipment.getDeliveredAt()).isNotNull();
+    }
+
+    @Test
+    void 이미_배송완료된_주문에_중복_웹훅이_와도_조용히_무시한다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        realOrder.markShipping();
+        realOrder.markDelivered(LocalDateTime.now());
+        OrderShipment shipment = newShipmentFor(realOrder);
+        when(orderShipmentRepository.findByCourierAndTrackingNumber(CourierCode.CJ, "123456789012"))
+                .thenReturn(Optional.of(shipment));
+
+        orderService.markShipmentDelivered(CourierCode.CJ, "123456789012");
+
+        assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
     }
 
     @Test

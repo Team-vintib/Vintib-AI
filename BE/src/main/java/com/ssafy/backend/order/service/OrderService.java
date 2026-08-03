@@ -1,5 +1,6 @@
 package com.ssafy.backend.order.service;
 
+import com.ssafy.backend.global.client.DeliveryTrackingClient;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
@@ -11,6 +12,7 @@ import com.ssafy.backend.order.dto.request.OrderShipmentAddressRequest;
 import com.ssafy.backend.order.dto.request.OrderShipmentRegisterRequest;
 import com.ssafy.backend.order.dto.response.OrderListItemResponse;
 import com.ssafy.backend.order.dto.response.OrderShipmentResponse;
+import com.ssafy.backend.order.entity.CourierCode;
 import com.ssafy.backend.order.entity.Order;
 import com.ssafy.backend.order.entity.OrderShipment;
 import com.ssafy.backend.order.entity.OrderStatus;
@@ -22,6 +24,7 @@ import com.ssafy.backend.product.repository.ProductRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -32,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 구매 확정·정산(ORDER-002/003, {@link #confirmOrder}/{@link #autoConfirmDueOrders}).
  * 세금계산서 발행은 {@code InvoiceService}가 담당한다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -42,6 +46,7 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
     private final PointService pointService;
+    private final DeliveryTrackingClient deliveryTrackingClient;
 
     /**
      * {@code role}로 구매자/판매자 관점을 구분해 본인 주문 목록을 최신순으로 조회한다(MY-003/004).
@@ -125,7 +130,8 @@ public class OrderService {
 
     /**
      * 송장 등록(SHIP-001) — 판매자만, PAID 상태 + 배송지 등록 완료 후에만 가능하다.
-     * 실제 택배 연동이 없어 등록과 동시에 배송 시작~완료까지 반영한다({@link Order#markDelivered} 참고).
+     * deliveryapi.co.kr 웹훅 구독에 성공하면 배송완료는 {@link #markShipmentDelivered}(웹훅 수신)로만
+     * 반영된다. 구독에 실패하면(자격증명 없음, API 오류 등) SY033의 즉시-확정 방식으로 폴백한다.
      */
     @Transactional
     public OrderShipmentResponse registerShipment(Long orderId, Long sellerId, OrderShipmentRegisterRequest request) {
@@ -140,11 +146,40 @@ public class OrderService {
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_SHIPMENT_ADDRESS_REQUIRED));
 
         LocalDateTime now = LocalDateTime.now();
-        shipment.registerTracking(request.courier(), request.trackingNumber(), now, now);
+        shipment.registerTracking(request.courierCode(), request.trackingNumber(), now);
         order.markShipping();
-        order.markDelivered(now);
+
+        boolean subscribed = deliveryTrackingClient.subscribe(request.courierCode(), request.trackingNumber(), orderId);
+        if (!subscribed) {
+            log.warn("배송 조회 웹훅 구독 실패, 즉시-확정 폴백으로 처리한다(orderId={})", orderId);
+            deliver(order, shipment, now);
+        }
 
         return OrderShipmentResponse.from(shipment);
+    }
+
+    /**
+     * 배송완료 웹훅 수신(SHIP-002, deliveryapi.co.kr) — (택배사, 송장번호)로 대상 주문을 찾아 확정한다.
+     * 이미 SHIPPING이 아니면(중복 웹훅 등) 조용히 무시한다(idempotent).
+     */
+    @Transactional
+    public void markShipmentDelivered(CourierCode courier, String trackingNumber) {
+        OrderShipment shipment = orderShipmentRepository.findByCourierAndTrackingNumber(courier, trackingNumber)
+                .orElse(null);
+        if (shipment == null) {
+            log.warn("배송완료 웹훅에 매칭되는 주문이 없다(courier={}, trackingNumber={})", courier, trackingNumber);
+            return;
+        }
+        Order order = shipment.getOrder();
+        if (order.getStatus() != OrderStatus.SHIPPING) {
+            return;
+        }
+        deliver(order, shipment, LocalDateTime.now());
+    }
+
+    private void deliver(Order order, OrderShipment shipment, LocalDateTime deliveredAt) {
+        order.markDelivered(deliveredAt);
+        shipment.markDelivered(deliveredAt);
     }
 
     /** 구매 확정 처리(ORDER-002) — 구매자만, DELIVERED 상태에서만 가능하다. */

@@ -179,8 +179,8 @@ BE/
 │   │   ├── repository/
 │   │   └── dto/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
-│       ├── client/              # AiClient — Spring → FastAPI
-│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig, SchedulingConfig
+│       ├── client/              # AiClient(Spring → FastAPI), DeliveryTrackingClient(deliveryapi.co.kr 배송 조회 웹훅)
+│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig, SchedulingConfig, DeliveryApiConfig
 │       ├── entity/              # BaseTimeEntity 등 공통 베이스 엔티티
 │       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
 │       ├── health/              # HealthController
