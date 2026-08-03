@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import {
   LIVE_TRY_ON_GENERATION_DELAY_MS,
   LIVE_TRY_ON_MOCK_RESULT,
   LIVE_TRY_ON_REGISTERED_PHOTO_URL,
 } from '@/domains/tryon/constants/liveTryOnMockData'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { getMyTryOnProfile, saveMyTryOnProfile } from '@/domains/tryon/api/tryOnProfileApi'
+import { normalizeApiError } from '@/shared/api/http'
 
 import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
 import type {
   LiveTryOnMockScenario,
   LiveTryOnPanelState,
 } from '@/domains/tryon/types/liveTryOn.types'
+import type { TryOnProfile } from '@/domains/tryon/types/tryOnProfile.types'
 
 const props = withDefaults(
   defineProps<{
@@ -27,7 +31,9 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const authStore = useAuthStore()
 const fileInputElement = ref<HTMLInputElement | null>(null)
+const tryOnProfile = ref<TryOnProfile | null>(null)
 const selectedPhotoUrl = ref<string | null>(
   props.mockScenario === 'empty' ? null : LIVE_TRY_ON_REGISTERED_PHOTO_URL,
 )
@@ -71,7 +77,7 @@ const resetMockScenario = (scenario: LiveTryOnMockScenario) => {
   clearGenerationTimer()
   releasePreviewObjectUrl()
   selectedPhotoUrl.value =
-    scenario === 'empty' ? null : LIVE_TRY_ON_REGISTERED_PHOTO_URL
+    scenario === 'empty' ? null : tryOnProfile.value?.bodyPhotoUrl ?? LIVE_TRY_ON_REGISTERED_PHOTO_URL
   generationPhotoUrl.value = null
   panelState.value = scenario === 'empty' ? 'EMPTY' : 'READY'
   shouldFailNextGeneration.value = scenario === 'error'
@@ -86,7 +92,7 @@ const openFilePicker = () => {
   fileInputElement.value?.click()
 }
 
-const handleFileChange = (event: Event) => {
+const handleFileChange = async (event: Event) => {
   const inputElement = event.currentTarget as HTMLInputElement
   const selectedFile = inputElement.files?.[0]
 
@@ -107,6 +113,29 @@ const handleFileChange = (event: Event) => {
   panelState.value = 'READY'
   fileError.value = ''
   isResultSaved.value = false
+
+  if (!authStore.user?.id) {
+    return
+  }
+
+  try {
+    const nextProfile = await saveMyTryOnProfile(
+      {
+        bodyPhoto: selectedFile,
+        heightCm: toOptionalString(tryOnProfile.value?.heightCm),
+        weightKg: toOptionalString(tryOnProfile.value?.weightKg),
+        chest: toOptionalString(tryOnProfile.value?.chest),
+        waist: toOptionalString(tryOnProfile.value?.waist),
+        hip: toOptionalString(tryOnProfile.value?.hip),
+      },
+      authStore.user.id,
+    )
+
+    tryOnProfile.value = nextProfile
+    selectedPhotoUrl.value = nextProfile.bodyPhotoUrl || selectedPhotoUrl.value
+  } catch (error) {
+    fileError.value = normalizeApiError(error).message
+  }
 }
 
 const startGeneration = () => {
@@ -140,6 +169,37 @@ const returnToReady = () => {
   panelState.value = selectedPhotoUrl.value ? 'READY' : 'EMPTY'
 }
 
+const loadRegisteredTryOnProfile = async () => {
+  await authStore.validateStoredSession()
+
+  if (!authStore.user?.id) {
+    return
+  }
+
+  try {
+    const profile = await getMyTryOnProfile(authStore.user.id)
+    tryOnProfile.value = profile
+
+    if (profile.bodyPhotoUrl) {
+      clearGenerationTimer()
+      releasePreviewObjectUrl()
+      selectedPhotoUrl.value = profile.bodyPhotoUrl
+      generationPhotoUrl.value = null
+      panelState.value = 'READY'
+      fileError.value = ''
+      isResultSaved.value = false
+    } else {
+      selectedPhotoUrl.value = null
+      panelState.value = 'EMPTY'
+    }
+  } catch (error) {
+    fileError.value = normalizeApiError(error).message
+  }
+}
+
+const toOptionalString = (value: number | null | undefined) =>
+  value === null || value === undefined ? undefined : String(value)
+
 watch(
   () => props.product.id,
   () => {
@@ -154,6 +214,10 @@ watch(
     resetMockScenario(scenario)
   },
 )
+
+onMounted(() => {
+  void loadRegisteredTryOnProfile()
+})
 
 onBeforeUnmount(() => {
   clearGenerationTimer()
