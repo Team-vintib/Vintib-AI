@@ -45,10 +45,22 @@ public record MemberProfileResponse(
         MemberStatus status,
 
         @Schema(example = "true")
-        boolean onboardingCompleted
+        boolean onboardingCompleted,
+
+        @Schema(description = "NONE(미제출) | PENDING | APPROVED | REJECTED", example = "NONE")
+        String businessVerificationStatus,
+
+        @Schema(description = "프로필 이미지 URL")
+        String profileImageUrl,
+
+        @Schema(description = "소개글", example = "빈티지 셀러입니다.")
+        String description,
+
+        @Schema(description = "커버 이미지 URL")
+        String coverImageUrl
 ) {
 
-    public static MemberProfileResponse from(Member member) {
+    public static MemberProfileResponse from(Member member, String businessVerificationStatus) {
         return new MemberProfileResponse(
                 member.getId(),
                 member.getEmail(),
@@ -61,7 +73,11 @@ public record MemberProfileResponse(
                 member.getGender(),
                 member.getMemberType(),
                 member.getStatus(),
-                member.isOnboardingCompleted()
+                member.isOnboardingCompleted(),
+                businessVerificationStatus,
+                member.getProfileImageUrl(),
+                member.getDescription(),
+                member.getCoverImageUrl()
         );
     }
 }

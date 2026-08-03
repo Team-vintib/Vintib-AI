@@ -10,19 +10,7 @@
 
 ## 2. 현재 연동 상태
 
-- 연동 완료 API
-  - Auth: `/api/auth/email/check-duplicate`, `/api/auth/email/send-code`, `/api/auth/email/verify-code`, `/api/auth/signup`, `/api/auth/signin`, `/api/auth/reissue`, `/api/auth/logout`
-  - Home: `/api/home`, `/api/home/following`
-  - Product: `/api/brands`, `/api/categories`, `/api/products`, `/api/products/{id}`, `/api/products/{id}/status`, `/api/products/{id}/auction-schedule`, `/api/products/{id}/images/upload-url`, `/api/products/{id}/images`, `/api/users/{userId}/wishes`
-  - Live: `/api/lives`, `/api/lives/schedule`, `/api/lives/{liveId}`
-  - TryOn: `/api/users/{userId}/tryon`(GET/PUT/DELETE), `/api/users/{userId}/tryon/upload-url`
-  - Chat/STOMP: `/api/lives/{liveId}/chat-messages`, `/ws`, `/topic/lives/{liveId}/chat`, `/topic/lives/{liveId}/reactions`, `/topic/lives/{liveId}/viewers`
-  - Notification: `/api/users/{userId}/alerts`, `/api/users/{userId}/alerts/{id}`, `/api/users/{userId}/alerts/read-all`
-  - Social(Follow): `/api/users/{userId}/followers`(POST/DELETE/GET), `/api/users/{userId}/followings`(GET)
-  - Business: `/api/users/{userId}/business`(GET/POST), `/api/users/{userId}/business/upload-url`
-  - Invoice: `/api/orders/{orderId}/invoices`(POST/GET) — 주문 생성 API가 없어 아직 실제 호출 가능한 주문은 없음
 - FE 구현 완료 범위
-  - Auth, Home, Product 일부, Live 일부, Chat realtime 일부는 실제 API 연결 완료
   - Onboarding, Search, Auction, Commerce, MyPage는 mock 또는 미구현 범위가 남아 있음
   - Business는 BE 구현 완료(제출/조회/재제출) — FE는 아직 mock 사용 중(`docs/requests/FE/011-business-invoice-contract.md` 반영 필요)
 - 현재 임시 처리 또는 Mock 사용 여부
@@ -49,12 +37,11 @@
 | 004 | `004-home-contract.md` | Home | 홈/팔로잉 홈 연결 완료 | live card `hostId`, 정렬/노출 정책 문서화 |
 | 005 | `005-search-contract.md` | Search | FE 화면/adapter 있음, BE `/api/search` 없음 | 통합 검색 API |
 | 006 | `006-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
-| 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필 연결 완료 | 생성용 상품 조회, 영상 token, AI 시착 생성 |
+| 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰 연결 완료 | 생성용 상품 조회, AI 시착 생성 |
 | 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API 연동 완료. 알림 seed 제거 후 실제 생성 데이터 없음 | 알림 type/ref 문서화, 실제 알림 생성 이벤트, 예약 라이브 알림 신청/스케줄러, 탭별 bulk read |
-| 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수 연결 완료 | 경매 snapshot/start/bid/close/STOMP |
+| 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수, 경매 조건 설정 연결 완료 | 경매 snapshot/start/bid/close/STOMP |
 | 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | FE 화면 없음, BE controller 없음 | 주문 생성/배송/환불/포인트 전체(세금계산서 발행/조회는 구현 완료 — `docs/requests/FE/011-business-invoice-contract.md` §4~5, 단 주문 생성 API가 없어 아직 실호출 불가) |
-| 011 | `011-user-mypage-contract.md` | User/MyPage | FE 화면 없음, BE API 없음 | `/api/me`, 공개 프로필, 마이페이지 요약 |
-| 013 | `013-live-seller-control.md` | Live | FE mock으로 UI 구현 완료 | 방송 종료, 현재 소개 상품 전환 트리거 엔드포인트 |
+| 013 | `013-live-seller-control.md` | Live | 방송 종료 연결 완료(PATCH .../status로) | 현재 소개 상품 전환 트리거, 종료 시청자 실시간 전파 |
 
 ## 4. 기존 API 변경 요청
 
@@ -92,15 +79,7 @@
 
 ## 7. 추가 요청 없음
 
-- 이미 정상 연동된 API
-  - Auth 기본 이메일 인증/로그인/토큰/로그아웃
-  - Home 현재 화면 렌더링
-  - Chat/Reaction/Viewer realtime
-  - Product 등록 기본 흐름과 찜 토글, 목록 필터, 상세 응답 보강
-  - Notification 목록/읽음 처리
-  - Social 팔로우/팔로우 해제, 팔로워/팔로잉 목록 조회
-  - Onboarding 기본 정보/관심 정보/시착 프로필/온보딩 완료 전체(경로는 `/api/me/X`가 아니라 `/api/users/{id}/X`로 확정 — 처리 완료된 `002-onboarding-contract.md`는 삭제됨)
-  - Business 사업자 정보 제출/조회/재제출 — `docs/requests/FE/011-business-invoice-contract.md` 기준(경로·업로드 방식이 요청과 다르게 확정 — 처리 완료된 `003-business-contract.md`는 삭제됨). 관리자 승인/반려 API는 범위 밖
+- 이미 정상 연동된 API: 없음(완료된 항목은 각 도메인 문서에서 삭제하고 이 목록에도 남기지 않는다 — 반영 내용은 커밋/Jira에 남는다)
 - 기존 규격을 유지하면 되는 기능
   - BE에는 있지만 FE 화면/진입점이 없어 아직 미연결인 API는 각 도메인 화면 설계 후 연결한다.
 ## 2026-08-01 추가 반영

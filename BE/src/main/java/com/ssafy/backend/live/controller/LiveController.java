@@ -85,7 +85,7 @@ public class LiveController {
     }
 
     @Operation(
-            summary = "공개 라이브 목록 조회",
+            summary = "라이브 목록 조회",
             description = "예정·진행 중인 라이브를 페이지로 반환한다. **비회원도 조회할 수 있다.** "
                     + "종료·취소된 방송은 상태 필터 허용값에서도 결과에서도 제외된다. "
                     + "카테고리는 편성 상품에서 유도하므로 라이브 하나가 여러 카테고리를 가질 수 있고, "
@@ -93,35 +93,44 @@ public class LiveController {
                     + "조건에 맞는 라이브가 없으면 404가 아니라 200과 빈 목록을 준다. "
                     + "`viewerCount`는 실시간 집계 값이며, 예약 방송은 0이다. "
                     + "`sort=VIEWERS_DESC`(시청자 수 많은 순)는 Redis 값으로 정렬하므로 최대 500개 방송까지만 "
-                    + "대상으로 삼고, 그때 `totalElements`는 정렬 대상이 된 수를 뜻한다.")
+                    + "대상으로 삼고, 그때 `totalElements`는 정렬 대상이 된 수를 뜻한다. "
+                    + "`hostId`에 인증된 본인 ID를 넘기면 마이페이지 라이브 관리(MY-005)로 쓸 수 있다 — "
+                    + "이때는 종료·취소된 방송까지 전부 조회된다(타인의 hostId를 넘기면 공개 상태만 보인다).")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "허용되지 않는 status·sort 값 또는 음수 page·size")
     })
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<LiveListItemResponse>>> getPublicLives(
+            Authentication authentication,
             @Parameter(description = "카테고리 ID 목록. 대분류를 주면 하위 소분류까지 포함한다")
             @RequestParam(required = false) List<Long> categoryIds,
-            @Parameter(description = "방송 상태. 생략하면 예정·진행 중 모두")
+            @Parameter(description = "호스트 회원 ID. 인증된 본인 ID를 넘기면 종료·취소 이력까지 본다(MY-005)")
+            @RequestParam(required = false) Long hostId,
+            @Parameter(description = "방송 상태. 생략하면 예정·진행 중 모두(본인 라이브 조회면 전체 상태)")
             @RequestParam(required = false) LiveStatus status,
             @RequestParam(defaultValue = "LATEST") LiveListSort sort,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "12") @Min(1) @Max(100) int size) {
+        Long viewerId = authentication != null ? (Long) authentication.getPrincipal() : null;
+        boolean selfView = hostId != null && hostId.equals(viewerId);
+
+        List<LiveStatus> statuses = resolveStatuses(status, selfView);
         PageResponse<LiveListItemResponse> response =
-                liveService.getPublicLives(categoryIds, publicStatusOf(status), sort, page, size);
+                liveService.getLives(categoryIds, hostId, statuses, sort, page, size);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    // 공개 목록에 종료·취소를 조회하려는 요청은 값 자체를 거부한다 — 빈 목록으로 조용히 넘기면
-    // FE 가 "그런 방송이 없다"로 오해한다.
-    private LiveStatus publicStatusOf(LiveStatus status) {
+    // 공개 조회에서 종료·취소를 조회하려는 요청은 값 자체를 거부한다 — 빈 목록으로 조용히 넘기면
+    // FE 가 "그런 방송이 없다"로 오해한다. 본인 라이브 조회(selfView)는 관리 목적이라 예외를 둔다.
+    private List<LiveStatus> resolveStatuses(LiveStatus status, boolean selfView) {
         if (status == null) {
-            return null;
+            return selfView ? LiveService.ALL_STATUSES : LiveService.PUBLIC_STATUSES;
         }
-        if (status != LiveStatus.LIVE && status != LiveStatus.SCHEDULED) {
+        if (!selfView && status != LiveStatus.LIVE && status != LiveStatus.SCHEDULED) {
             throw new CustomException(ErrorCode.INVALID_LIVE_STATE);
         }
-        return status;
+        return List.of(status);
     }
 
     @Operation(

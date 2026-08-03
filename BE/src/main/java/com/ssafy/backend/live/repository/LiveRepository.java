@@ -14,13 +14,17 @@ import org.springframework.transaction.annotation.Transactional;
 public interface LiveRepository extends JpaRepository<Live, Long> {
 
     /**
-     * 공개 라이브 목록. 상태 필터와 카테고리 필터(선택)를 함께 건다.
+     * 공개 라이브 목록. 상태 필터·카테고리 필터(선택)·호스트 필터(선택, MY-005)를 함께 건다.
      *
      * <p>카테고리 필터는 <b>상품 ID 집합으로 환원해서</b> 받는다 — 라이브 도메인이 상품·카테고리
      * 테이블을 직접 조인하지 않도록 {@code ProductQueryPort}가 먼저 ID를 뽑아 주고, 여기서는
      * 자기 도메인인 {@code LiveProduct}만 본다.
      *
+     * <p>호스트 필터는 마이페이지 라이브 관리(MY-005)가 쓴다 — 본인 조회일 때는 컨트롤러가
+     * {@code statuses}에 종료·취소까지 넣어 함께 넘긴다.
+     *
      * @param filterByCategory 카테고리 필터를 걸지 여부. false면 {@code productIds}는 무시된다
+     * @param filterByHost     호스트 필터를 걸지 여부. false면 {@code hostId}는 무시된다
      */
     @Query("""
             SELECT l FROM Live l
@@ -30,12 +34,18 @@ public interface LiveRepository extends JpaRepository<Live, Long> {
                               WHERE lp.live = l
                                 AND lp.removedAt IS NULL
                                 AND lp.productId IN :productIds))
+              AND (:filterByHost = false OR l.host.id = :hostId)
             """)
     Page<Live> findPublicLives(
             @Param("statuses") Collection<LiveStatus> statuses,
             @Param("filterByCategory") boolean filterByCategory,
             @Param("productIds") Collection<Long> productIds,
+            @Param("filterByHost") boolean filterByHost,
+            @Param("hostId") Long hostId,
             Pageable pageable);
+
+    /** 공개 프로필(011 §3.3) — 공개 상태(예정/진행 중)의 방송 수. */
+    long countByHost_IdAndStatusIn(Long hostId, Collection<LiveStatus> statuses);
 
     /**
      * 최고 시청자 수를 끌어올린다. 지금 값보다 크지 않으면 아무 행도 바뀌지 않는다.

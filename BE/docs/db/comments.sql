@@ -172,6 +172,8 @@ COMMENT ON COLUMN notification.is_read  IS '읽음 여부. 알림함 기본 조�
 -- ---------- 나머지 컬럼 ----------
 COMMENT ON COLUMN member.phone_number      IS '연락처. 배송·정산 확인용이며 외부 노출 금지.';
 COMMENT ON COLUMN member.profile_image_url IS '프로필 이미지 URL.';
+COMMENT ON COLUMN member.description       IS '소개글. 공개 프로필에 노출된다.';
+COMMENT ON COLUMN member.cover_image_url   IS '커버 이미지 URL. 공개 프로필에 노출된다.';
 
 COMMENT ON COLUMN brand.name    IS '브랜드명. 중복 불가.';
 COMMENT ON COLUMN brand.name_en IS '브랜드 영문명. 없는 브랜드는 NULL.';
