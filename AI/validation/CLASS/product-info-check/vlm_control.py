@@ -336,19 +336,29 @@ def query_color(
     image_path: Path,
     model_key: str = ACTIVE_VLM,
     prompt_version: str = ACTIVE_COLOR_PROMPT_VERSION,
+    apply_white_balance: bool = True,
 ) -> tuple[str, str | None, dict]:
     """color.py의 VLMColorExtractor가 호출하는 진입점. (primary, secondary, raw) 반환.
 
     파싱 실패 시 예외를 던지지 않고 primary="UNKNOWN"으로 폴백한다 — evaluate.py가 이걸
     "팔레트 밖으로 나가는 비율" 지표에 그대로 잡을 수 있게 하기 위해서다(실패도 데이터다).
 
-    `prompt_version`: `COLOR_PROMPT_VERSIONS`의 키(`"v1"` 기본 / `"v2_anchored"` — 팔레트
-    코드 시각적 앵커 + 근접색 구분 기준을 명시한 버전, 2026-08-03 추가)."""
+    `prompt_version`: `COLOR_PROMPT_VERSIONS`의 키. **프롬프트 엔지니어링(v2/v3)은 실측상
+    v1보다 낫지 않아 기본값은 여전히 `"v1"`이다**(`REPORT.md` §12).
+
+    `apply_white_balance`: 기본 True — `color.gray_world_white_balance()`로 입력 이미지의
+    조명 색 편향을 먼저 보정한다. 프롬프트 개선(§10~§12)이 못 올린 색상 정확도를 이 전처리가
+    실제로 올렸다(0.60~0.70 -> 0.90, N=10 3회 다수결, `REPORT.md` §13) — 색상 문제의 상당
+    부분이 프롬프트가 아니라 입력 이미지의 색 편향이었다는 뜻이다."""
     from PIL import Image
+
+    from color import gray_world_white_balance
 
     bundle = _get_bundle()
     with Image.open(image_path) as img:
         image = img.convert("RGB")
+    if apply_white_balance:
+        image = gray_world_white_balance(image)
     valid_codes = list(PALETTE) + [MULTI_LABEL]
     template = COLOR_PROMPT_VERSIONS[prompt_version]
     prompt = template.format(codes=", ".join(valid_codes))
