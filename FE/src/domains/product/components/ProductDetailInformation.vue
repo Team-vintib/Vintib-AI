@@ -1,9 +1,15 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 import type { ProductDetailViewData } from '@/domains/product/types/productDetail.types'
 
-defineProps<{
+const props = defineProps<{
   product: ProductDetailViewData
 }>()
+
+// 실측(measurements)은 BE 상세 계약(010)이 { 라벨: 값(cm) } 형태로 준다.
+// 키가 라벨, 값이 cm 수치. 값이 없으면 실측 섹션 자체를 숨긴다.
+const measurementEntries = computed(() => Object.entries(props.product.measurements ?? {}))
 </script>
 
 <template>
@@ -26,37 +32,17 @@ defineProps<{
         <dd>{{ product.material }}</dd>
       </div>
       <div>
-        <dt>생산 시기</dt>
-        <dd>1990년대</dd>
-      </div>
-      <div>
-        <dt>생산 국가</dt>
-        <dd>대한민국</dd>
-      </div>
-      <div>
         <dt>상품 상태</dt>
         <dd>{{ product.conditionLabel }}</dd>
       </div>
     </dl>
 
-    <div class="detail-information__sizes">
+    <div v-if="measurementEntries.length" class="detail-information__sizes">
       <h3>실측</h3>
       <dl>
-        <div>
-          <dt>어깨</dt>
-          <dd>48cm</dd>
-        </div>
-        <div>
-          <dt>가슴</dt>
-          <dd>56cm</dd>
-        </div>
-        <div>
-          <dt>소매</dt>
-          <dd>61cm</dd>
-        </div>
-        <div>
-          <dt>총장</dt>
-          <dd>67cm</dd>
+        <div v-for="[label, value] in measurementEntries" :key="label">
+          <dt>{{ label }}</dt>
+          <dd>{{ value }}cm</dd>
         </div>
       </dl>
     </div>
