@@ -170,7 +170,14 @@ const handleTryOnKeydown = (event: KeyboardEvent) => {
 const handlePurchase = () =>
   showTemporaryMessage('구매 확인 화면은 후속 스토리에서 연결됩니다.')
 
-const handleViewSeller = () => showTemporaryMessage('판매자 프로필 화면은 준비 중입니다.')
+const handleViewSeller = () => {
+  if (!product.value) return
+
+  void router.push({
+    name: ROUTE_NAMES.PROFILE,
+    params: { userId: product.value.seller.id },
+  })
+}
 
 const handleViewSimilarProduct = (productId: number) => {
   void router.push({ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId } })
