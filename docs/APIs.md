@@ -23,22 +23,45 @@
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 내 정보 조회 | GET | `/users/me` |  | MY-001 |  |
-| 회원 상세 조회 | GET | `/users/{id}` |  |  |  |
+| 내 정보 조회 | GET | `/users/{id}` | ✓ | MY-001 | ✓ |
 | 회원 정보 등록, 수정 | PATCH | `/users/{id}` | ✓ | ONBOARD-001, MY-001 | ✓ |
 | 관심 정보 조회 | GET | `/users/{id}/interests` | ✓ | ONBOARD-002 | ✓ |
 | 관심 정보 등록, 수정 | PUT | `/users/{id}/interests` | ✓ | ONBOARD-002 | ✓ |
 | 회원 유형 저장, 온보딩 완료 | PATCH | `/users/{id}/member-type` | ✓ | ONBOARD-004 | ✓ |
+| 소개글 등록, 수정 | PATCH | `/users/{id}/bio` | ✓ | 011 §5 | ✓ |
+| 프로필 이미지 업로드 URL 발급 | POST | `/users/{id}/profile-image/upload-url` | ✓ | 011 §5 | ✓ |
+| 프로필 이미지 확정 | PUT | `/users/{id}/profile-image` | ✓ | 011 §5 | ✓ |
+| 프로필 이미지 삭제 | DELETE | `/users/{id}/profile-image` | ✓ | 011 §5 | ✓ |
+| 커버 이미지 업로드 URL 발급 | POST | `/users/{id}/cover-image/upload-url` | ✓ | 011 §5 | ✓ |
+| 커버 이미지 확정 | PUT | `/users/{id}/cover-image` | ✓ | 011 §5 | ✓ |
+| 커버 이미지 삭제 | DELETE | `/users/{id}/cover-image` | ✓ | 011 §5 | ✓ |
+| 마이페이지 요약 조회 | GET | `/users/{id}/mypage` | ✓ | S15P11A108-207 | ✓ |
+| 공개 회원/판매자 프로필 조회 | GET | `/users/{id}/profile` |  | MY-001(011 §3.3) | ✓ |
+
+> 공개 프로필은 `/users/{id}`(본인 전용, 민감정보 포함)와 별개 경로다. 비회원도 조회 가능하며
+> `id/nickname/profileImageUrl/description/coverImageUrl/followerCount/followingCount/productCount/
+> liveCount/isFollowing/businessVerified`를 내려준다. 소개글은 `PATCH /users/{id}/bio`(선택 입력,
+> 부분 수정 아님 — 값을 안 보내면 지워짐)로 등록·수정한다.
+>
+> 프로필/커버 이미지는 상품 이미지·시착 프로필 사진과 동일한 presigned 2단계로 업로드한다:
+> 1) `POST .../profile-image/upload-url`(또는 `cover-image/upload-url`)로 key·업로드용 URL을
+> 발급받는다(jpeg/png/webp만, 5분 만료). 2) 받은 `uploadUrl`로 브라우저가 파일을 직접 PUT한다.
+> 3) `PUT .../profile-image`(또는 `cover-image`)에 `{key}`를 보내 확정하면 최종 공개 URL이
+> 저장된다(업로드 미확인·10MB 초과면 400). `DELETE .../profile-image`(또는 `cover-image`)로
+> 지울 수 있다 — 단 S3의 이전 객체 자체는 지우지 않고 참조만 비운다(공개 버킷의 비민감 이미지라
+> orphan을 남겨도 된다고 판단).
 
 ## 사업자 (Businesses)
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 사업자 인증 상태 조회 | GET | `/users/{id}/business` |  | MY-008 |  |
-| 사업자 정보 등록 | POST | `/users/{id}/business` |  | BIZ-001 |  |
+| 사업자 인증 상태 조회 | GET | `/users/{id}/business` | ✓ | MY-008 | ✓ |
+| 사업자 정보 등록 | POST | `/users/{id}/business` | ✓ | BIZ-001 | ✓ |
 | 사업자 정보 수정 | PATCH | `/users/{id}/business` |  | MY-008 |  |
-| 세금계산서 발행 요청 | POST | `/orders/{id}/invoices` |  | BIZ-002 |  |
-| 세금계산서 조회 | GET | `/orders/{id}/invoices` |  | BIZ-002 |  |
+| 세금계산서 발행 요청 | POST | `/orders/{id}/invoices` | ✓ | BIZ-002 | ✓ |
+| 세금계산서 조회 | GET | `/orders/{id}/invoices` | ✓ | BIZ-002 | ✓ |
+
+> 사업자 정보 수정(PATCH)은 관리자 승인 체계가 없어 이번 범위 밖 — 제출은 등록(POST)이 재제출까지 겸한다(REJECTED 상태에서만).
 
 ## 검색 / 추천 (Discovery)
 
@@ -51,13 +74,13 @@
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 팔로워 목록 조회 | GET | `/users/{id}/followers` |  | MY-006 |  |
-| 팔로잉 목록 조회 | GET | `/users/{id}/followings` |  | MY-006 |  |
-| 팔로우 | POST | `/users/{id}/followers` |  | FOLLOW-001 |  |
-| 팔로우 해제 | DELETE | `/users/{id}/followers` |  | FOLLOW-001 |  |
-| 찜 목록 조회 | GET | `/users/{userId}/wishes` | ✓ | MY-006., MY-009 |  |
-| 상품 찜 | POST | `/users/{userId}/wishes` | ✓ | MY-009 |  |
-| 상품 찜 해제 | DELETE | `/users/{userId}/wishes/{id}` | ✓ | MY-009 |  |
+| 팔로워 목록 조회 | GET | `/users/{id}/followers` |  | MY-006 | ✓ |
+| 팔로잉 목록 조회 | GET | `/users/{id}/followings` |  | MY-006 | ✓ |
+| 팔로우 | POST | `/users/{id}/followers` | ✓ | FOLLOW-001 | ✓ |
+| 팔로우 해제 | DELETE | `/users/{id}/followers` | ✓ | FOLLOW-001 | ✓ |
+| 찜 목록 조회 | GET | `/users/{userId}/wishes` | ✓ | MY-006., MY-009 | ✓ |
+| 상품 찜 | POST | `/users/{userId}/wishes` | ✓ | MY-009 | ✓ |
+| 상품 찜 해제 | DELETE | `/users/{userId}/wishes/{id}` | ✓ | MY-009 | ✓ |
 
 ## 알림 (Notifications)
 
@@ -71,7 +94,8 @@
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 상품 목록 조회 | GET | `/products` |  | PROD-008, SEARCH-002 | ✓ |
+| 상품 목록 조회 | GET | `/products` |  | PROD-008, SEARCH-002, 011 §3.5 | ✓ |
+| 판매 상품 관리 목록 조회 | GET | `/users/{id}/products` | ✓ | MY-002 | ✓ |
 | 상품 기본 정보 저장 | POST | `/products` | ✓ | PROD-001 | ✓ |
 | 상품 이미지 등록 | POST | `/products/{id}/images` | ✓ | PROD-001 | ✓ |
 | 상품 이미지 업로드 URL 발급 | POST | `/products/{id}/images/upload-url` | ✓ | PROD-001 | ✓ |
@@ -85,14 +109,16 @@
 | 상품 정보 수정 | PATCH | `/products/{id}` | ✓ | PROD-007 | ✓ |
 | 상품 삭제 | DELETE | `/products/{id}` | ✓ | PROD-007 | ✓ |
 
+> 상품 목록 조회는 `sellerId` 쿼리 파라미터로 특정 판매자의 상품만 필터링할 수 있다(011 §3.5, 공개 프로필 판매 상품 목록). 목록 조회 자체가 비회원도 가능하다는 걸 이번에 확정했다(기존엔 인증을 요구하도록 잘못 막혀 있었다).
+
 ## 라이브 / 채팅 (Lives)
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 라이브 목록 조회 | GET | `/lives` |  | MY-005 |  |
+| 라이브 목록 조회 | GET | `/lives` |  | LIVE-005, MY-005 | ✓ |
 | 라이브 예약 개설 | POST | `/lives/schedule` | ✓ | LIVE-001 | ✓ |
 | 라이브 즉시 개설 | POST | `/lives` | ✓ | LIVE-002 | ✓ |
-| 라이브 상세 조회 | GET | `/lives/{id}` |  | LIVE-005 |  |
+| 라이브 상세 조회 | GET | `/lives/{id}` |  | LIVE-005 | ✓ |
 | 라이브 정보 수정 | PATCH | `/lives/{id}` |  | LIVE-001 |  |
 | 라이브 상품 목록 조회 | GET | `/lives/{id}/products` |  | LIVE-003 | ✓ |
 | 라이브 상품 등록 | POST | `/lives/{id}/products` | ✓ | LIVE-003, LIVE-006 | ✓ |
@@ -101,6 +127,8 @@
 | 채팅 메시지 전송 | POST | `/lives/{id}/messages` |  | CHAT-001, CHAT-002, CHAT-003 |  |
 | 채팅 메시지 숨김, 차단 처리 | PATCH | `/lives/{liveId}/messages/{id}` |  | CHAT-004 |  |
 | STT 변환 텍스트 조회 | GET | `/lives/{id}/transcripts` |  | LIVE-007 |  |
+
+> 라이브 목록 조회는 `hostId` 쿼리 파라미터로 특정 호스트만 필터링할 수 있다(MY-005, 마이페이지 라이브 관리). 인증된 본인의 `hostId`를 넘기면 종료·취소된 방송까지 포함해 전체 상태를 볼 수 있고, 그 외에는 예정·진행 중만 보인다.
 
 ## 경매 / 입찰 (Auctions)
 
@@ -118,19 +146,21 @@
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 잔액 조회 | GET | `/users/{id}/points` |  | POINT-002 |  |
-| 사용 내역 조회 | GET | `/users/{id}/points/logs` |  | POINT-002 |  |
-| 포인트 충전 | POST | `/users/{id}/points/charges` |  | POINT-001 |  |
-| 출금 신청 | POST | `/users/{id}/withdrawals` |  | POINT-004 |  |
-| 출금 내역 조회 | GET | `/users/{id}/withdrawals` |  | POINT-004, MY-007 |  |
+| 잔액 조회 | GET | `/users/{id}/points` | ✓ | POINT-002, MY-007 | ✓ |
+| 사용 내역 조회 | GET | `/users/{id}/points/logs` | ✓ | POINT-002, MY-007 | ✓ |
+| 포인트 충전 | POST | `/users/{id}/points/charges` | ✓ | POINT-001, MY-007 | ✓ |
+| 출금 신청 | POST | `/users/{id}/withdrawals` | ✓ | POINT-004, MY-007 | ✓ |
+| 출금 내역 조회 | GET | `/users/{id}/withdrawals` | ✓ | POINT-004, MY-007 | ✓ |
+
+> 포인트 충전은 결제 연동 없이 금액만 반영하는 테스트/데모 전용이다. 출금은 신청까지만 처리하며(관리자 승인 체계 없음), 완료 처리는 DB 직접 조작으로만 가능하다.
 
 ## 주문 / 배송 / 환불 (Orders)
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 주문 목록 조회 | GET | `/users/{id}/orders` |  | MY-003, MY-004 |  |
+| 주문 목록 조회 | GET | `/users/{id}/orders` | ✓ | MY-003, MY-004 | ✓ |
 | 상시 판매 주문 생성 | POST | `/orders` |  | SALE-001, SALE-002 |  |
-| 주문 상세 조회 | GET | `/orders/{id}` |  | MY-003 |  |
+| 주문 상세 조회 | GET | `/orders/{id}` | ✓ | MY-003 | ✓ |
 | 주문 배송지 조회 | GET | `/orders/{id}/address` |  | ORDER-001 |  |
 | 주문 배송지 등록, 수정 | PATCH | `/orders/{id}/address` |  | ORDER-001 |  |
 | 구매 확정 처리 | POST | `/orders/{id}/confirmation` |  | ORDER-002, ORDER-003 |  |
@@ -139,6 +169,8 @@
 | 환불 요청 목록 조회 | GET | `/orders/{id}/refunds` |  | REFUND-001 |  |
 | 환불 요청 등록 | POST | `/orders/{id}/refunds` |  | REFUND-001 |  |
 | 환불 승인, 거절 처리 | PATCH | `/refunds/{id}` |  | REFUND-002 |  |
+
+> 주문 목록 조회는 `role` 쿼리 파라미터(`BUYER`/`SELLER`, 필수)로 구매 내역(MY-003)/판매·정산 내역(MY-004)을 구분한다. 정산 완료 여부는 주문 상태가 `SETTLED`인지로 판단하며, 정산액은 수수료 없이 주문 금액 그대로다. 주문 생성 API가 아직 없어(위 상시 판매 주문 생성 등) 실제 주문 데이터는 DB에 직접 심어야 확인할 수 있다.
 
 ## AI 가상 시착 (TryOns)
 

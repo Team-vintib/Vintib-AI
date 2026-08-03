@@ -10,14 +10,6 @@
 
 ## 2. 현재 연동 상태
 
-- 연동 완료 API/topic
-  - `GET /api/lives/{liveId}/chat-messages`
-  - WebSocket `/ws`
-  - publish `/app/lives/{liveId}/chat`
-  - subscribe `/topic/lives/{liveId}/chat`
-  - publish `/app/lives/{liveId}/reactions`
-  - subscribe `/topic/lives/{liveId}/reactions`
-  - subscribe `/topic/lives/{liveId}/viewers`
 - FE 구현 완료 범위
   - 채팅 내역 표시
   - 채팅 발송
@@ -134,19 +126,6 @@
 }
 ```
 
-### 3.4 경매 생성·조건 설정 (AUCT-001, 판매자) — 추가 확인 요청
-
-- 3.2의 `POST /api/auctions/{auctionId}/start`는 **이미 만들어진 경매(auctionId)를 시작**한다.
-  그런데 판매자가 연결 상품에 대해 **경매를 만들고 시작가·증액 단위·진행 시간을 설정(AUCT-001)**하는
-  단계의 엔드포인트가 계약에 없다. FE 판매자 경매 설정 패널(`S15P11A108-436`)이 이 값을 입력받는다.
-- 필요한 것(형태는 BE가 정함):
-  - 예: `POST /api/lives/{liveId}/auctions` body `{ productId, startPrice, bidUnit, durationSeconds }`
-    → 생성된 `auctionId`(status `READY`) 반환 후 3.2 `/start`로 시작. 또는 생성+시작 통합.
-- 확인 부탁
-  - 경매 **생성/설정과 시작이 분리인지 통합**인지
-  - 진행 시간(`durationSeconds`) **단위·허용 범위**, 증액 단위(`bidUnit`) 프리셋 정책
-  - (FE는 확정 전까지 mock 기본값: 진행 1/3/5분, 증액 1,000/5,000/10,000P 사용 중)
-
 ## 4. 기존 API 변경 요청
 
 - 기존 요청·응답에서 변경할 내용
@@ -180,10 +159,5 @@
 
 ## 7. 추가 요청 없음
 
-- 이미 정상 연동된 API
-  - 채팅 내역
-  - 채팅 STOMP
-  - 반응 STOMP
-  - 시청자 수 STOMP
-- 기존 규격을 유지하면 되는 기능
-  - 채팅/반응/시청자 수 연결
+- 이미 정상 연동된 API: 없음
+- 기존 규격을 유지하면 되는 기능: 없음

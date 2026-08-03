@@ -40,6 +40,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findBySeller_IdInAndSaleStatusOrderByCreatedAtDesc(
             Collection<Long> sellerIds, SaleStatus saleStatus, Pageable pageable);
 
+    /** 마이페이지 판매 상품 관리(MY-002) — 본인 소유 상품은 DRAFT 등 비공개 상태까지 전부 보여준다. */
+    Page<Product> findBySeller_IdOrderByCreatedAtDesc(Long sellerId, Pageable pageable);
+
     interface SellerProductCount {
         Long getSellerId();
 
@@ -66,6 +69,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
               AND (:hasSaleTypeFilter = false OR p.saleType = :saleType)
               AND (:hasMinPrice = false OR p.price >= :minPrice)
               AND (:hasMaxPrice = false OR p.price <= :maxPrice)
+              AND (:hasSellerFilter = false OR p.seller.id = :sellerId)
             """)
     Page<Product> findWithFilter(
             @Param("hasCategoryFilter") boolean hasCategoryFilter,
@@ -78,5 +82,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             @Param("minPrice") Long minPrice,
             @Param("hasMaxPrice") boolean hasMaxPrice,
             @Param("maxPrice") Long maxPrice,
+            @Param("hasSellerFilter") boolean hasSellerFilter,
+            @Param("sellerId") Long sellerId,
             Pageable pageable);
 }

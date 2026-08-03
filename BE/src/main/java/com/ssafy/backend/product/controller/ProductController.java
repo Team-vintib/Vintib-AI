@@ -116,15 +116,14 @@ public class ProductController {
             summary = "상품 목록 조회",
             description = """
                     공개된 상품 목록을 조회한다. DRAFT 상태 상품은 제외한다.
-                    카테고리·상태등급·판매방식·가격 범위 필터를 조합할 수 있으며,
-                    각 파라미터를 생략하면 해당 조건을 건너뛴다.
+                    카테고리·상태등급·판매방식·가격 범위·판매자(sellerId) 필터를 조합할 수 있으며,
+                    각 파라미터를 생략하면 해당 조건을 건너뛴다. sellerId는 공개 프로필에서
+                    특정 판매자의 상품만 보여줄 때 쓴다(011 §3.5).
                     정렬: LATEST(기본값, 최신순) / PRICE_ASC(가격 낮은 순) / PRICE_DESC(가격 높은 순).
                     """)
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
     })
-    @SecurityRequirement(name = "bearerAuth")
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getProductList(
             @RequestParam(required = false) List<Long> categoryIds,
@@ -133,9 +132,10 @@ public class ProductController {
             @RequestParam(required = false) Long minPrice,
             @RequestParam(required = false) Long maxPrice,
             @RequestParam(required = false) ProductSortType sort,
+            @RequestParam(required = false) Long sellerId,
             @PageableDefault(size = 20) Pageable pageable) {
         ProductListFilterParams filter =
-                new ProductListFilterParams(categoryIds, conditionGrades, saleType, minPrice, maxPrice, sort);
+                new ProductListFilterParams(categoryIds, conditionGrades, saleType, minPrice, maxPrice, sort, sellerId);
         PageResponse<ProductResponse> response = productService.getProductList(filter, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
