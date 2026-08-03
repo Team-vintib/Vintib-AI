@@ -103,6 +103,11 @@ BIZ-002(세금계산서)는 FE가 요청한 적이 없는 BE 주도 신규 API�
 - `BE/src/main/java/com/ssafy/backend/order/controller/InvoiceController.java`
 - 참고 선례: `docs/requests/FE/009-tryon-profile-presigned-upload.md`(동일한 presigned 2단계 흐름)
 
+## FE 요청 사항
+
+- 사업자 인증 온보딩 화면(`BUSINESS` 선택 후 이동):
+  - **뒤로가기 버튼**을 달아줘. 누르면 이전 온보딩 단계(회원 유형 선택 화면)로 돌아간다.
+
 ## 처리 결과
 
 (FE 반영 후 기입)

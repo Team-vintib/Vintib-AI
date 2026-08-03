@@ -34,6 +34,13 @@
 - Swagger: `/swagger-ui/index.html` — "상품" 태그 하위 이미지 관련 4개 엔드포인트(업로드 URL 발급/등록/수정/삭제)
 - `BE/src/main/java/com/ssafy/backend/product/controller/ProductController.java`
 
+## FE 요청 사항
+
+- **상품 등록** 이미지 업로드 화면:
+  - 첫 번째로 올린 사진을 **대표 사진(`isPrimary: true`)으로 자동 선택**해줘. 사용자가 별도로 대표를 지정하지 않을 경우의 기본값이다.
+- **AI 품질 검증** 단계 사진 선택:
+  - Front View 사진 셀렉터를 등록된 사진 중 첫 번째 사진으로 **자동 선택**해줘(사용자가 다른 사진으로 바꿀 수는 있음).
+
 ## 처리 결과
 
 - 2026-07-30: FE 문서 반영 완료.

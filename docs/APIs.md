@@ -1,6 +1,6 @@
 # API 명세서
 
-## 미분류
+## 시스템 (System)
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
@@ -51,15 +51,16 @@
 > 지울 수 있다 — 단 S3의 이전 객체 자체는 지우지 않고 참조만 비운다(공개 버킷의 비민감 이미지라
 > orphan을 남겨도 된다고 판단).
 
-## 사업자 (Businesses)
+## 사업자 (Businesses) · 세금계산서 (Invoices)
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
+| 사업자등록증 이미지 업로드 URL 발급 | POST | `/users/{userId}/business/upload-url` | ✓ | BIZ-001 | ✓ |
 | 사업자 인증 상태 조회 | GET | `/users/{id}/business` | ✓ | MY-008 | ✓ |
 | 사업자 정보 등록 | POST | `/users/{id}/business` | ✓ | BIZ-001 | ✓ |
 | 사업자 정보 수정 | PATCH | `/users/{id}/business` |  | MY-008 |  |
-| 세금계산서 발행 요청 | POST | `/orders/{id}/invoices` | ✓ | BIZ-002 | ✓ |
-| 세금계산서 조회 | GET | `/orders/{id}/invoices` | ✓ | BIZ-002 | ✓ |
+| 세금계산서 발행 요청 | POST | `/orders/{orderId}/invoices` | ✓ | BIZ-002 | ✓ |
+| 세금계산서 조회 | GET | `/orders/{orderId}/invoices` | ✓ | BIZ-002 | ✓ |
 
 > 사업자 정보 수정(PATCH)은 관리자 승인 체계가 없어 이번 범위 밖 — 제출은 등록(POST)이 재제출까지 겸한다(REJECTED 상태에서만).
 
@@ -101,7 +102,7 @@
 | 상품 이미지 업로드 URL 발급 | POST | `/products/{id}/images/upload-url` | ✓ | PROD-001 | ✓ |
 | 경매 상품 등록 및 경매 전환 | PATCH | `/products/{id}/auction-schedule` | ✓ | PROD-003, PROD-004 | ✓ |
 | 판매 가격 설정 및 상시 판매 등록 | PATCH | `/products/{id}/status` | ✓ | PROD-002, PROD-004, PROD-005, AUCT-014 | ✓ |
-| 상품 이미지 삭제 | DELETE | `/products/{id}/images/{imgId}` | ✓ | PROD-001 | ✓ |
+| 상품 이미지 삭제 | DELETE | `/products/{id}/images/{imageId}` | ✓ | PROD-001 | ✓ |
 | 상품 이미지 수정 | PATCH | `/products/{id}/images/{imageId}` | ✓ | PROD-001 | ✓ |
 | 상품 상세 조회 | GET | `/products/{id}` |  | PROD-006 | ✓ |
 | 카테고리 전체 목록 조회 | GET | `/categories` |  | PROD-001 | ✓ |
@@ -118,12 +119,13 @@
 | 라이브 목록 조회 | GET | `/lives` |  | LIVE-005, MY-005 | ✓ |
 | 라이브 예약 개설 | POST | `/lives/schedule` | ✓ | LIVE-001 | ✓ |
 | 라이브 즉시 개설 | POST | `/lives` | ✓ | LIVE-002 | ✓ |
-| 라이브 상세 조회 | GET | `/lives/{id}` |  | LIVE-005 | ✓ |
+| 라이브 상세 조회 | GET | `/lives/{liveId}` |  | LIVE-005 | ✓ |
 | 라이브 정보 수정 | PATCH | `/lives/{id}` |  | LIVE-001 |  |
-| 라이브 상품 목록 조회 | GET | `/lives/{id}/products` |  | LIVE-003 | ✓ |
-| 라이브 상품 등록 | POST | `/lives/{id}/products` | ✓ | LIVE-003, LIVE-006 | ✓ |
-| 라이브 상품 해제 | DELETE | `/lives/{liveId}/products/{id}` | ✓ | LIVE-003 | ✓ |
-| 채팅 메시지 목록 조회 | GET | `/lives/{id}/messages` |  | CHAT-001 |  |
+| 라이브 상품 목록 조회 | GET | `/lives/{liveId}/products` |  | LIVE-003 | ✓ |
+| 라이브 상품 등록 | POST | `/lives/{liveId}/products` | ✓ | LIVE-003, LIVE-006 | ✓ |
+| 라이브 상품 해제 | DELETE | `/lives/{liveId}/products/{productId}` | ✓ | LIVE-003 | ✓ |
+| 영상 접속 토큰 발급 | POST | `/lives/{liveId}/video-token` |  | LIVE-004 | ✓ |
+| 채팅 메시지 목록 조회 | GET | `/lives/{liveId}/chat-messages` |  | CHAT-001 | ✓ |
 | 채팅 메시지 전송 | POST | `/lives/{id}/messages` |  | CHAT-001, CHAT-002, CHAT-003 |  |
 | 채팅 메시지 숨김, 차단 처리 | PATCH | `/lives/{liveId}/messages/{id}` |  | CHAT-004 |  |
 | STT 변환 텍스트 조회 | GET | `/lives/{id}/transcripts` |  | LIVE-007 |  |
@@ -176,9 +178,10 @@
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 시착 프로필 조회 | GET | `/users/{userId}/tryon` |  | TRYON-001, TRYON-002 |  |
-| 시착 프로필 등록, 수정 | PUT | `/users/{id}/tryon` |  | TRYON-001, TRYON-002 |  |
-| 시착 프로필 삭제 | DELETE | `/users/{id}/tryon` |  | TRYON-001 |  |
+| 시착 프로필 사진 업로드 URL 발급 | POST | `/users/{userId}/tryon/upload-url` | ✓ | TRYON-001 | ✓ |
+| 시착 프로필 조회 | GET | `/users/{userId}/tryon` | ✓ | TRYON-001, TRYON-002 | ✓ |
+| 시착 프로필 등록, 수정 | PUT | `/users/{userId}/tryon` | ✓ | TRYON-001, TRYON-002 | ✓ |
+| 시착 프로필 삭제 | DELETE | `/users/{userId}/tryon` | ✓ | TRYON-001 | ✓ |
 | 가상 시착 생성 | POST | `/users/{id}/tryons` |  | TRYON-003, TRYON-004 |  |
 | 시착 결과 목록 조회 | GET | `/users/{userId}/tryons` | ✓ | TRYON-005 | ✓ |
 | 시착 결과 상세 조회 | GET | `/users/{userId}/tryons/{id}` | ✓ | TRYON-005 | ✓ |
