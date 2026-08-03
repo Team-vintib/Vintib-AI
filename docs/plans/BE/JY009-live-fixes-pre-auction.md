@@ -106,26 +106,36 @@ Phase 5까지 끝낸 시점에서 두 갈래를 점검했다.
 - 상품 섹션 조회가 서윤 API에 막히면 **라이브 섹션만 먼저 실데이터로 돌린다** — `liveNow` 정합성
   버그(`004 §3.3`)는 그것만으로 해소된다.
 
+## 정윤 결정 (2026-08-03)
+
+1. **통합 검색은 한다.** 새 Jira 티켓은 만들지 않고 기존 스토리 `-68`[SEARCH-001/002]에 붙인다.
+2. **예약 라이브 알림도 한다.** FE가 요청했으므로 `live_reminder` + 스케줄러까지 이번 배치에 넣는다.
+3. **`description`도 넣는다.** 선택 항목이지만 컬럼 하나라 비용이 작다.
+4. **브랜치는 하나로 간다** — `feat/217-live-fixes-pre-auction`.
+
 ## 구현 목록
 
-- [ ] `docker-compose.yml`·`BE/Dockerfile`에 `TZ=Asia/Seoul` (D1)
-- [ ] 타임존 계약을 `BE/README.md`와 FE 요청 문서에 명시 (D1)
-- [ ] `LiveDetailResponse.isHost` + 컨트롤러 선택 인증 (D2)
-- [ ] `isHost` 서비스 테스트 — 호스트/타인/비회원 3케이스 (D2)
-- [ ] `/topic/lives/{liveId}/status` 브로드캐스트 (D3)
-- [ ] 상태 전파 STOMP 테스트 (D3)
-- [ ] `LiveCardResponse.hostId` (D4)
-- [ ] `HomeService` 라이브 섹션 실데이터 전환 (D4)
-- [ ] `FollowingService` 라이브 섹션 실데이터 전환 (D4)
-- [ ] 홈 상품 섹션 실데이터 전환 — 서윤 port 확보 후 (D4)
-- [ ] 홈 노출 정책 문서화 (D4)
-- [ ] 처리 끝난 FE 요청 문서 정리 — `013` 삭제, `004`·`007`·`012` 반영분 축소
-- [ ] FE 핸드오프 문서 — `isHost`, status 토픽, 타임존 계약, 생성용 상품 조회 안내
+- [x] `docker-compose.yml`·`BE/Dockerfile`에 `TZ=Asia/Seoul` (D1)
+- [x] 타임존 계약을 `BE/README.md`와 FE 요청 문서에 명시 (D1)
+- [x] `LiveDetailResponse.isHost` + 컨트롤러 선택 인증 (D2)
+- [x] `isHost` 서비스 테스트 — 호스트/타인/비회원 3케이스 (D2)
+- [x] `/topic/lives/{liveId}/status` 브로드캐스트 (D3)
+- [x] 상태 전파 STOMP 테스트 — 전파 / 전이 거부 시 미전파 (D3)
+- [x] `LiveCardResponse.hostId` (D4)
+- [x] `HomeService` 전 섹션 실데이터 전환 (D4)
+- [x] `FollowingService` 라이브 섹션 실데이터 전환 + 판매자 카드 라이브 배지 (D4)
+- [x] 홈 노출 정책 문서화 (D4)
+- [x] `live.description` 컬럼·요청·응답 (결정 3)
+- [x] `GET /api/search` 통합 검색 + 테스트 (결정 1)
+- [x] 예약 라이브 알림 신청·취소·스케줄러 + 테스트 (결정 2)
+- [x] 처리 끝난 FE 요청 문서 정리 — `004`·`005`·`013` 삭제, `007`·`008`·`012` 축소
+- [x] FE 핸드오프 문서 `docs/requests/FE/016-pre-auction-batch-handoff.md`
 
-## 미결정 — 정윤 확인 필요
+## 이번 범위에서 뺀 것 (핸드오프 문서 §6에 사유 기재)
 
-1. **통합 검색 `GET /api/search`(`005`)** — Jira 티켓이 없다. 이번 주에 넣을지, 시연 범위에서 뺄지.
-2. **예약 라이브 알림 신청·스케줄러(`008 §3.2.1`)** — `live_reminder` 테이블·스케줄러가 필요하다.
-   기능 정의서상 "추가" 우선순위. 이번 주 제외로 보고 있다.
-3. **`LiveDetailResponse.description`(`007 §3.5` 선택)** — `live` 테이블에 설명 컬럼 자체가 없다.
-   컬럼을 새로 파야 해서 이번 범위에서 뺐다.
+- `007 §3.1` 생성용 상품 조회 — 기존 `GET /api/users/{userId}/products`로 충족
+- `007 §3.5` `material`/`measurements`/`defectSummary` — 선택 항목이고 상품 상세에 이미 있다
+- `007 §3.3`·`§3.6` AI 시착 생성 — 서윤·AI 파트
+- `008 §3.2.1` `reminderCount` — 쓰임새가 불명확하고 집계 질의가 늘어난다
+- 좀비 라이브 자동 종료(D5) — `-466` 경매 마감 스케줄러에 합친다.
+  `SchedulingConfig`는 이번에 들어갔으므로 그때는 작업만 얹으면 된다
