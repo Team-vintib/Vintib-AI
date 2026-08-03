@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 // 마이페이지 판매 상품 관리(MY-002). 기존 ProductController(/api/products, 공개 목록)와
 // 경로 prefix가 달라 별도 컨트롤러로 분리한다(TryOnController/TryOnProfileController와 같은 이유).
-@Tag(name = "마이페이지(MyPage)", description = "마이페이지 도메인별 요약/관리 API")
+@Tag(name = "상품(Products)", description = "상품 등록/조회, 브랜드/카테고리 마스터 조회 API")
 @RestController
 @RequestMapping("/api/users/{userId}/products")
 @RequiredArgsConstructor

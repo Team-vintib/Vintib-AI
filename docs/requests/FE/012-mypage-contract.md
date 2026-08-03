@@ -43,6 +43,11 @@
 - 주문 생성 API가 아직 없어 `orders`, `counts.orders`/`counts.sales`는 항상 빈 값/0이다.
 - `bio`에서 `coverImageUrl` 필드는 제거됐다 — 커버 이미지는 이제 업로드 API로만 설정한다.
 
+## FE 요청 사항
+
+- 마이페이지 사이드바에서 **"포인트·출금" 메뉴 항목을 없애달라**(`myMockData.ts`의
+  `{ id: 'points', label: '포인트·출금' }`). 관련 API 자체는 그대로 유지한다.
+
 ## 처리 결과
 
 (FE 반영 후 기입)

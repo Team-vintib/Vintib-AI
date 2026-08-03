@@ -100,6 +100,7 @@ CREATE TABLE category (
     id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     parent_id BIGINT REFERENCES category (id),   -- 상위 카테고리, 최상위는 NULL
     name      VARCHAR(100) NOT NULL,
+    name_en   VARCHAR(100) NOT NULL,              -- 영문 코드(예: JACKET) — AI/FE 연동용
     depth     SMALLINT     NOT NULL DEFAULT 1
 );
 

@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 // 마이페이지 구매/낙찰 내역(MY-003), 판매/정산 내역(MY-004). 기존 OrderController(/api/orders,
 // 상세 조회)와 경로 prefix가 달라 별도 컨트롤러로 분리한다(MyProductController와 같은 이유).
-@Tag(name = "마이페이지(MyPage)", description = "마이페이지 도메인별 요약/관리 API")
+@Tag(name = "주문(Orders)", description = "주문 조회 API")
 @RestController
 @RequestMapping("/api/users/{userId}/orders")
 @RequiredArgsConstructor
