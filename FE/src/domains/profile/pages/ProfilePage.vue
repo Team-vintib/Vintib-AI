@@ -80,6 +80,9 @@ const productEmptyMessage = computed(() =>
 const liveEmptyMessage = computed(() =>
   isSelfProfile.value ? '아직 개설한 라이브가 없습니다.' : '등록된 라이브가 없습니다.',
 )
+const profileLiveCount = computed(() =>
+  Math.max(profile.value?.liveCount ?? 0, lives.value.length),
+)
 const visibleProductPages = computed(() =>
   Array.from({ length: productTotalPages.value }, (_, index) => index + 1),
 )
@@ -199,8 +202,8 @@ const loadLives = async () => {
 
     if (requestId !== liveRequestId) return
 
-    lives.value = response.items
-    liveTotalPages.value = Math.max(response.totalPages, 1)
+    lives.value = response.items.filter((live) => live.status !== 'ENDED')
+    liveTotalPages.value = lives.value.length ? Math.max(response.totalPages, 1) : 1
     liveLoadState.value = 'success'
   } catch {
     if (requestId !== liveRequestId) return
@@ -404,7 +407,7 @@ watch(
               :class="{ 'profile-tabs__item--active': activeTab === 'lives' }"
               @click="selectTab('lives')"
             >
-              라이브 {{ profile.liveCount.toLocaleString('ko-KR') }}
+              라이브 {{ profileLiveCount.toLocaleString('ko-KR') }}
             </button>
           </div>
 
