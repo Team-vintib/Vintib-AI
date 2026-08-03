@@ -108,7 +108,7 @@ interface ProductImageRegisterRequest {
 }
 
 interface ProductListParams {
-  categoryIds?: string[]
+  categoryIds?: number[]
   conditionGrades?: string[]
   maxPrice?: number | null
   minPrice?: number | null
@@ -154,7 +154,7 @@ export const getProductList = async ({
       conditionGrades: conditionGrades.length ? conditionGrades.join(',') : undefined,
       minPrice: minPrice ?? undefined,
       maxPrice: maxPrice ?? undefined,
-      saleType: saleType === 'ALL' ? undefined : saleType,
+      saleType: toSaleTypeParam(saleType),
     },
   })
   const pageResponse = normalizePageResponse(unwrapApiData(response.data))
@@ -390,6 +390,18 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
 
 const toProductSaleType = (saleType: ProductSaleTypeDto): ProductSaleType =>
   saleType === 'AUCTION' ? 'AUCTION' : 'DIRECT'
+
+// 목록 필터 탭 id(FE 표시용 'DIRECT')를 BE 계약(010)의 saleType 값으로 변환한다.
+// 'ALL'은 전체 조회라 파라미터를 보내지 않는다.
+const toSaleTypeParam = (
+  saleType: ProductSaleTypeTab['id'],
+): ProductSaleTypeDto | undefined => {
+  if (saleType === 'ALL') {
+    return undefined
+  }
+
+  return saleType === 'DIRECT' ? 'DIRECT_SALE' : 'AUCTION'
+}
 
 const getPrimaryImageUrl = (product: ProductDetailDto) =>
   getSortedProductImages(product)[0]?.url ?? ''

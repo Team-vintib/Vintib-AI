@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import {
-  PRODUCT_CATEGORY_OPTIONS,
-  PRODUCT_CONDITION_OPTIONS,
-} from '@/domains/product/constants/productListMockData'
+import { PRODUCT_CONDITION_OPTIONS } from '@/domains/product/constants/productListMockData'
+import type { ProductCategoryOption } from '@/domains/product/types/productList.types'
 
 interface Props {
-  selectedCategoryIds: string[]
+  categoryOptions: ProductCategoryOption[]
+  selectedCategoryIds: number[]
   selectedConditionIds: string[]
   minimumPrice: string
   maximumPrice: string
@@ -15,7 +14,7 @@ interface Props {
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
-  'update:selectedCategoryIds': [categoryIds: string[]]
+  'update:selectedCategoryIds': [categoryIds: number[]]
   'update:selectedConditionIds': [conditionIds: string[]]
   'update:minimumPrice': [price: string]
   'update:maximumPrice': [price: string]
@@ -23,7 +22,7 @@ const emit = defineEmits<{
   apply: []
 }>()
 
-const toggleSelection = (selectedIds: string[], targetId: string, isSelected: boolean) => {
+const toggleSelection = <T,>(selectedIds: T[], targetId: T, isSelected: boolean): T[] => {
   if (isSelected) {
     return [...selectedIds, targetId]
   }
@@ -31,7 +30,7 @@ const toggleSelection = (selectedIds: string[], targetId: string, isSelected: bo
   return selectedIds.filter((id) => id !== targetId)
 }
 
-const handleCategoryChange = (event: Event, categoryId: string) => {
+const handleCategoryChange = (event: Event, categoryId: number) => {
   const isSelected = (event.target as HTMLInputElement).checked
 
   emit(
@@ -66,8 +65,12 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
     <fieldset class="product-filter__group">
       <legend class="product-filter__legend">카테고리</legend>
 
+      <p v-if="!categoryOptions.length" class="product-filter__empty">
+        카테고리를 불러오는 중입니다.
+      </p>
+
       <label
-        v-for="option in PRODUCT_CATEGORY_OPTIONS"
+        v-for="option in categoryOptions"
         :key="option.id"
         class="product-filter__option"
       >
@@ -202,6 +205,12 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
   gap: var(--space-3);
   color: var(--color-text-secondary);
   cursor: pointer;
+}
+
+.product-filter__empty {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .product-filter__checkbox {
