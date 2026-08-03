@@ -76,7 +76,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
           :live="live"
           variant="scheduled"
           :action-to="ROUTE_PATHS.AUTH_LOGIN"
-          action-label="방송 알림 받기"
+          action-label="예약하기"
         />
       </div>
     </HomeSection>

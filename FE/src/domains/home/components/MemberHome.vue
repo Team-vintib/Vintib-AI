@@ -118,7 +118,7 @@ const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
           :live="live"
           variant="scheduled"
           :action-to="getLivePath(live.id)"
-          action-label="방송 알림 받기"
+          action-label="예약하기"
         />
       </div>
     </HomeSection>
@@ -222,10 +222,10 @@ const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
   overflow: hidden;
   display: grid;
   min-height: 132px;
-  border: 1px solid #e6e1d8;
+  border: 1px solid var(--color-border);
   border-radius: 20px;
   background: var(--color-surface);
-  box-shadow: 0 8px 24px rgb(18 18 18 / 5%);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text-primary) 5%, transparent);
   color: inherit;
   transition:
     border-color 160ms ease,
@@ -234,8 +234,8 @@ const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
 }
 
 .seller-card:hover {
-  border-color: #ded8ce;
-  box-shadow: 0 10px 26px rgb(18 18 18 / 7%);
+  border-color: var(--color-border-strong);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--color-text-primary) 7%, transparent);
   transform: translateY(-2px);
 }
 
@@ -263,17 +263,10 @@ const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
   display: -webkit-box;
   overflow: hidden;
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 26px;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-}
-
-.seller-card__name {
-  display: block;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 24px;
 }
 
 .seller-card__stats {

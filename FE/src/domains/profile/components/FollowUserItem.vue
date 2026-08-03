@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 
 import FollowButton from '@/domains/profile/components/FollowButton.vue'
 import type { FollowUser } from '@/domains/profile/types/profile.types'
@@ -17,35 +17,28 @@ const emit = defineEmits<{
   toggleFollow: [userId: number]
 }>()
 
-const router = useRouter()
-
-const goToProfile = () => {
-  void router.push({ name: ROUTE_NAMES.PROFILE, params: { userId: props.user.id } })
-}
+const getProfileRoute = () => ({ name: ROUTE_NAMES.PROFILE, params: { userId: props.user.id } })
 </script>
 
 <template>
-  <article
-    class="follow-user-item"
-    role="link"
-    tabindex="0"
-    :aria-label="`${user.nickname} 프로필 보기`"
-    @click="goToProfile"
-    @keydown.enter.prevent="goToProfile"
-    @keydown.space.prevent="goToProfile"
-  >
-    <div class="follow-user-item__body">
-      <strong>{{ user.nickname }}</strong>
-      <span>상품 {{ user.productCount.toLocaleString('ko-KR') }} · 팔로워 {{ followerCount.toLocaleString('ko-KR') }}</span>
-    </div>
+  <article class="follow-user-item">
+    <RouterLink
+      class="follow-user-item__link"
+      :to="getProfileRoute()"
+      :aria-label="`${user.nickname} 프로필 보기`"
+    >
+      <span class="follow-user-item__body">
+        <strong>{{ user.nickname }}</strong>
+        <span>상품 {{ user.productCount.toLocaleString('ko-KR') }} · 팔로워 {{ followerCount.toLocaleString('ko-KR') }}</span>
+      </span>
 
-    <span class="follow-user-item__arrow" aria-hidden="true">›</span>
+      <span class="follow-user-item__arrow" aria-hidden="true">›</span>
+    </RouterLink>
 
     <FollowButton
       :is-following="isFollowing"
       :is-pending="isPending"
       :is-self="isSelf"
-      @click.stop
       @toggle="emit('toggleFollow', user.id)"
     />
   </article>
@@ -54,7 +47,7 @@ const goToProfile = () => {
 <style scoped lang="scss">
 .follow-user-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   min-height: 84px;
   gap: var(--space-3);
@@ -62,21 +55,33 @@ const goToProfile = () => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  cursor: pointer;
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease;
 }
 
-.follow-user-item:hover,
-.follow-user-item:focus-visible {
+.follow-user-item:hover {
   border-color: var(--color-border-strong);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--color-text-primary) 5%, transparent);
 }
 
-.follow-user-item:focus-visible {
+.follow-user-item:focus-within {
+  border-color: var(--color-border-strong);
+}
+
+.follow-user-item__link:focus-visible {
   outline: 3px solid var(--color-primary-soft);
   outline-offset: 3px;
+}
+
+.follow-user-item__link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-3);
+  color: inherit;
+  text-decoration: none;
 }
 
 .follow-user-item__body {
@@ -87,8 +92,8 @@ const goToProfile = () => {
   text-decoration: none;
 }
 
-.follow-user-item:hover .follow-user-item__body strong,
-.follow-user-item:focus-visible .follow-user-item__body strong {
+.follow-user-item__link:hover .follow-user-item__body strong,
+.follow-user-item__link:focus-visible .follow-user-item__body strong {
   color: var(--color-primary);
 }
 

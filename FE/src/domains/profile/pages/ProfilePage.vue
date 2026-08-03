@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { getLiveListViewData } from '@/domains/live/api/liveListApi'
 import LiveListCard from '@/domains/live/components/LiveListCard.vue'
-import type { LiveListItem } from '@/domains/live/types/liveList.types'
+import type { LiveBroadcastStatus, LiveListItem } from '@/domains/live/types/liveList.types'
 import {
   deleteProfileImage,
   getPublicProfile,
@@ -44,6 +44,8 @@ const followStore = useFollowStore()
 const wishStore = useWishStore()
 
 const PROFILE_PAGE_SIZE = 12
+const PROFILE_LIVE_FETCH_SIZE = 100
+const PROFILE_LIVE_STATUSES: Exclude<LiveBroadcastStatus, 'ENDED'>[] = ['LIVE', 'SCHEDULED']
 
 const profile = ref<PublicProfile | null>(null)
 const profileLoadState = ref<ProfileLoadState>('loading')
@@ -55,6 +57,7 @@ const products = ref<ProductListItem[]>([])
 const lives = ref<LiveListItem[]>([])
 const productTotalPages = ref(1)
 const liveTotalPages = ref(1)
+const activeLiveTotalCount = ref(0)
 const productLoadState = ref<ListLoadState>('idle')
 const liveLoadState = ref<ListLoadState>('idle')
 const productMessage = ref('')
@@ -98,9 +101,7 @@ const productEmptyMessage = computed(() =>
 const liveEmptyMessage = computed(() =>
   isSelfProfile.value ? '아직 개설한 라이브가 없습니다.' : '등록된 라이브가 없습니다.',
 )
-const profileLiveCount = computed(() =>
-  Math.max(profile.value?.liveCount ?? 0, lives.value.length),
-)
+const profileLiveCount = computed(() => activeLiveTotalCount.value)
 const visibleProductPages = computed(() =>
   Array.from({ length: productTotalPages.value }, (_, index) => index + 1),
 )
@@ -226,26 +227,66 @@ const loadLives = async () => {
   liveMessage.value = ''
 
   try {
-    const response = await getLiveListViewData({
-      hostId: profile.value.id,
-      page: livePage.value,
-      size: PROFILE_PAGE_SIZE,
-      sort: 'LATEST',
-    })
+    const allLives = await loadDisplayableLives(profile.value.id)
 
     if (requestId !== liveRequestId) return
 
-    lives.value = response.items.filter((live) => live.status !== 'ENDED')
-    liveTotalPages.value = lives.value.length ? Math.max(response.totalPages, 1) : 1
+    const startIndex = (livePage.value - 1) * PROFILE_PAGE_SIZE
+
+    activeLiveTotalCount.value = allLives.length
+    lives.value = allLives.slice(startIndex, startIndex + PROFILE_PAGE_SIZE)
+    liveTotalPages.value = Math.max(Math.ceil(allLives.length / PROFILE_PAGE_SIZE), 1)
     liveLoadState.value = 'success'
   } catch {
     if (requestId !== liveRequestId) return
 
     lives.value = []
+    activeLiveTotalCount.value = 0
     liveTotalPages.value = 1
     liveLoadState.value = 'error'
     liveMessage.value = '라이브 목록을 불러오지 못했습니다.'
   }
+}
+
+const loadDisplayableLives = async (hostId: number) => {
+  const liveGroups = await Promise.all(
+    PROFILE_LIVE_STATUSES.map((status) => loadLivesByStatus(hostId, status)),
+  )
+
+  return liveGroups
+    .flat()
+    .sort((a, b) => new Date(b.broadcastAt).getTime() - new Date(a.broadcastAt).getTime())
+}
+
+const loadLivesByStatus = async (
+  hostId: number,
+  status: Exclude<LiveBroadcastStatus, 'ENDED'>,
+) => {
+  const firstPage = await getLiveListViewData({
+    hostId,
+    page: 1,
+    size: PROFILE_LIVE_FETCH_SIZE,
+    sort: 'LATEST',
+    status,
+  })
+
+  if (firstPage.totalPages <= 1) {
+    return firstPage.items
+  }
+
+  const restPages = await Promise.all(
+    Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
+      getLiveListViewData({
+        hostId,
+        page: index + 2,
+        size: PROFILE_LIVE_FETCH_SIZE,
+        sort: 'LATEST',
+        status,
+      }),
+    ),
+  )
+
+  return [firstPage, ...restPages].flatMap((page) => page.items)
 }
 
 const requireAuthenticatedAction = async () => {
@@ -516,20 +557,32 @@ watch(
           </p>
 
           <div v-if="isSelfProfile && isEditPanelOpen" class="profile-editor">
-            <div class="profile-editor__field">
-              <label for="profile-bio">소개글</label>
-              <textarea
-                id="profile-bio"
-                v-model="bioDraft"
-                maxlength="500"
-                rows="3"
+            <div class="profile-editor__section">
+              <div class="profile-editor__field">
+                <label for="profile-bio">소개글</label>
+                <textarea
+                  id="profile-bio"
+                  v-model="bioDraft"
+                  maxlength="500"
+                  rows="3"
+                  :disabled="isProfileEditBusy"
+                  placeholder="상점을 소개해 주세요"
+                ></textarea>
+                <span>{{ bioDraft.length }}/500</span>
+              </div>
+
+              <button
+                class="profile-editor__button profile-editor__button--primary"
+                type="button"
                 :disabled="isProfileEditBusy"
-                placeholder="상점을 소개해 주세요"
-              ></textarea>
-              <span>{{ bioDraft.length }}/500</span>
+                @click="saveProfileBio"
+              >
+                {{ editLoadState === 'saving' ? '저장 중' : '소개글 저장' }}
+              </button>
             </div>
 
-            <div class="profile-editor__media-actions">
+            <div class="profile-editor__section profile-editor__section--media">
+              <strong class="profile-editor__section-title">이미지</strong>
               <input
                 ref="profileImageInput"
                 class="sr-only"
@@ -545,31 +598,42 @@ watch(
                 @change="handleProfileImageChange('cover', $event)"
               />
 
-              <button type="button" :disabled="isProfileEditBusy" @click="saveProfileBio">
-                {{ editLoadState === 'saving' ? '저장 중' : '소개글 저장' }}
-              </button>
-              <button type="button" :disabled="isProfileEditBusy" @click="chooseProfileImage('profile')">
-                {{ editLoadState === 'uploading-profile' ? '업로드 중' : '프로필 이미지 변경' }}
-              </button>
-              <button type="button" :disabled="isProfileEditBusy" @click="chooseProfileImage('cover')">
-                {{ editLoadState === 'uploading-cover' ? '업로드 중' : '커버 이미지 변경' }}
-              </button>
-              <button
-                v-if="profile.profileImageUrl"
-                type="button"
-                :disabled="isProfileEditBusy"
-                @click="removeProfileImage('profile')"
-              >
-                {{ editLoadState === 'deleting-profile' ? '삭제 중' : '프로필 이미지 삭제' }}
-              </button>
-              <button
-                v-if="profile.coverImageUrl"
-                type="button"
-                :disabled="isProfileEditBusy"
-                @click="removeProfileImage('cover')"
-              >
-                {{ editLoadState === 'deleting-cover' ? '삭제 중' : '커버 이미지 삭제' }}
-              </button>
+              <div class="profile-editor__media-actions">
+                <button
+                  class="profile-editor__button"
+                  type="button"
+                  :disabled="isProfileEditBusy"
+                  @click="chooseProfileImage('profile')"
+                >
+                  {{ editLoadState === 'uploading-profile' ? '업로드 중' : '프로필 이미지 변경' }}
+                </button>
+                <button
+                  class="profile-editor__button"
+                  type="button"
+                  :disabled="isProfileEditBusy"
+                  @click="chooseProfileImage('cover')"
+                >
+                  {{ editLoadState === 'uploading-cover' ? '업로드 중' : '커버 이미지 변경' }}
+                </button>
+                <button
+                  v-if="profile.profileImageUrl"
+                  class="profile-editor__button profile-editor__button--danger"
+                  type="button"
+                  :disabled="isProfileEditBusy"
+                  @click="removeProfileImage('profile')"
+                >
+                  {{ editLoadState === 'deleting-profile' ? '삭제 중' : '프로필 이미지 삭제' }}
+                </button>
+                <button
+                  v-if="profile.coverImageUrl"
+                  class="profile-editor__button profile-editor__button--danger"
+                  type="button"
+                  :disabled="isProfileEditBusy"
+                  @click="removeProfileImage('cover')"
+                >
+                  {{ editLoadState === 'deleting-cover' ? '삭제 중' : '커버 이미지 삭제' }}
+                </button>
+              </div>
             </div>
 
             <p v-if="editMessage" class="profile-editor__message" role="status">
@@ -836,11 +900,28 @@ watch(
 
 .profile-editor {
   display: grid;
-  gap: var(--space-4);
-  padding: var(--space-5);
+  gap: var(--space-5);
+  padding: var(--space-4);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-media);
   background: var(--color-surface-secondary);
+}
+
+.profile-editor__section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.profile-editor__section--media {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.profile-editor__section-title {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 20px;
 }
 
 .profile-editor__field {
@@ -885,7 +966,8 @@ watch(
   gap: var(--space-2);
 }
 
-.profile-editor__media-actions button {
+.profile-editor__button {
+  justify-self: start;
   min-height: 38px;
   padding: 0 var(--space-3);
   border: 1px solid var(--color-border);
@@ -896,18 +978,27 @@ watch(
   font-weight: var(--font-weight-bold);
 }
 
-.profile-editor__media-actions button:first-child {
+.profile-editor__button--primary {
   border-color: var(--color-primary);
   background: var(--color-primary);
   color: var(--color-text-inverse);
 }
 
-.profile-editor__media-actions button:hover:not(:disabled),
-.profile-editor__media-actions button:focus-visible {
+.profile-editor__button--danger {
+  color: var(--color-danger);
+}
+
+.profile-editor__button:hover:not(:disabled),
+.profile-editor__button:focus-visible {
   border-color: var(--color-primary);
 }
 
-.profile-editor__media-actions button:disabled {
+.profile-editor__button--danger:hover:not(:disabled),
+.profile-editor__button--danger:focus-visible {
+  border-color: var(--color-danger);
+}
+
+.profile-editor__button:disabled {
   cursor: wait;
   opacity: 0.7;
 }
