@@ -124,7 +124,9 @@
 | --- | --- | --- | --- | --- | --- |
 | `member_id` | `bigint` | NOT NULL |  | FK→member, PK | 대상 회원. |
 | `business_number` | `varchar(20)` | NOT NULL |  |  | 사업자등록번호. |
-| `certificate_url` | `varchar(500)` | NOT NULL |  |  | 사업자등록증 사본 URL. |
+| `business_name` | `varchar(100)` | NOT NULL |  |  | 상호명. |
+| `representative_name` | `varchar(50)` | NOT NULL |  |  | 대표자명. |
+| `certificate_key` | `varchar(500)` | NOT NULL |  |  | 사업자등록증 사본 S3 key(비공개 버킷). |
 | `verification_status` | `varchar(20)` | NOT NULL | `'PENDING'` |  | PENDING \| APPROVED \| REJECTED |
 | `submitted_at` | `timestamptz` | NOT NULL | `now()` |  | 인증 서류 제출 시각. |
 | `verified_at` | `timestamptz` |  |  |  | 인증 승인·거절 처리 시각. |
@@ -191,6 +193,28 @@
 **인덱스**
 
 - `ux_follow` — `CREATE UNIQUE INDEX ux_follow ON public.follow USING btree (follower_id, following_id)`
+
+---
+
+### `invoice`
+
+세금계산서 (BIZ-002). 주문당 1건, 발행 시점 사업자 정보를 스냅샷으로 저장.
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `order_id` | `bigint` | NOT NULL |  | FK→orders, UQ | 대상 주문. |
+| `business_number` | `varchar(20)` | NOT NULL |  |  | 발행 시점 판매자 사업자등록번호(스냅샷). |
+| `business_name` | `varchar(100)` | NOT NULL |  |  | 발행 시점 판매자 상호명(스냅샷). |
+| `representative_name` | `varchar(50)` | NOT NULL |  |  | 발행 시점 판매자 대표자명(스냅샷). |
+| `supply_amount` | `bigint` | NOT NULL |  |  | 공급가액. round(orders.order_price / 1.1). |
+| `tax_amount` | `bigint` | NOT NULL |  |  | 부가세. orders.order_price - supply_amount. |
+| `total_amount` | `bigint` | NOT NULL |  |  | 합계금액. orders.order_price와 동일. |
+| `issued_at` | `timestamptz` | NOT NULL | `now()` |  |  |
+
+**인덱스**
+
+- `uq_invoice_order` — `CREATE UNIQUE INDEX uq_invoice_order ON public.invoice USING btree (order_id)`
 
 ---
 
