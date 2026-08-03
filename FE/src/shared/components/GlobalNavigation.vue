@@ -40,6 +40,7 @@ const profileNickname = ref('')
 const displayName = computed(() => authStore.user?.nickname || profileNickname.value || '회원')
 const profileInitial = computed(() => displayName.value.slice(0, 1).toUpperCase())
 const pointBalance = ref<PointBalance | null>(null)
+const cartItemCount = computed<number | null>(() => null)
 const isLoggingOut = ref(false)
 const isNotificationPopupOpen = ref(false)
 let pointBalanceRequestId = 0
@@ -61,15 +62,23 @@ const primaryMenuItems = [
 }>
 
 const userActionItems = computed<UserActionItem[]>(() => [
-  { label: '찜', icon: 'heart', path: ROUTE_PATHS.MY, query: { section: 'wishlist' }, badge: '' },
+  { label: '찜', icon: 'heart', path: ROUTE_PATHS.WISHLIST, badge: '' },
+  {
+    label: '장바구니',
+    icon: 'cart',
+    path: ROUTE_PATHS.MY,
+    query: { section: 'cart' },
+    badge: cartItemCount.value ?? '',
+  },
 ])
 
 const profileMenuItems = computed<ProfileMenuItem[]>(() => [
-  { label: '마이페이지', path: ROUTE_PATHS.MY },
+  { label: '프로필', path: ROUTE_PATHS.PROFILE_ME },
+  { label: '마이페이지', path: ROUTE_PATHS.MY, query: { section: 'dashboard' } },
   { label: '시착 정보', path: ROUTE_PATHS.MY, query: { section: 'tryon' } },
   { label: '구매 내역', path: ROUTE_PATHS.MY, query: { section: 'orders' } },
   { label: '판매 내역', path: ROUTE_PATHS.MY, query: { section: 'sales' } },
-  { label: '찜한 상품', path: ROUTE_PATHS.MY, query: { section: 'wishlist' } },
+  { label: '라이브 관리', path: ROUTE_PATHS.MY, query: { section: 'lives' } },
   { label: '장바구니', path: ROUTE_PATHS.MY, query: { section: 'cart' } },
 ])
 
@@ -309,6 +318,33 @@ watch(
                   stroke-width="1.8"
                   stroke-linecap="round"
                   stroke-linejoin="round"
+                />
+              </svg>
+              <svg
+                v-else-if="item.icon === 'cart'"
+                class="global-nav__icon-svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M6.2 6.4h15.1l-1.7 8.1H8L6.2 6.4Z"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M3 4.5h2.3l.9 1.9"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M9.2 18.8h.1M18.2 18.8h.1"
+                  stroke="currentColor"
+                  stroke-width="2.8"
+                  stroke-linecap="round"
                 />
               </svg>
               <template v-else>{{ item.icon }}</template>

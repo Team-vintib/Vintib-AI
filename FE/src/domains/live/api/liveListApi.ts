@@ -22,7 +22,7 @@ interface BackendPageResponse<T> {
 
 const MOCK_DELAY_MS = 450
 const LIVE_LIST_API_ENABLED = import.meta.env.VITE_LIVE_LIST_API_ENABLED !== 'false'
-const PUBLIC_LIVE_STATUSES: LiveBroadcastStatus[] = ['LIVE', 'SCHEDULED']
+const DISPLAYABLE_LIVE_STATUSES: LiveBroadcastStatus[] = ['LIVE', 'SCHEDULED', 'ENDED']
 const LIVE_CATEGORIES: LiveCategory[] = ['아우터', '상의', '하의', '가방', '신발', '액세서리']
 
 export class LiveListContractError extends Error {
@@ -42,8 +42,8 @@ const isLiveCategory = (categoryName: string): categoryName is LiveCategory =>
 
 const isPublicLiveStatus = (
   status: LiveListDto['broadcastStatus'],
-): status is Exclude<LiveBroadcastStatus, 'ENDED'> =>
-  PUBLIC_LIVE_STATUSES.includes(status as LiveBroadcastStatus)
+): status is LiveBroadcastStatus =>
+  DISPLAYABLE_LIVE_STATUSES.includes(status as LiveBroadcastStatus)
 
 const mapLiveListDto = (dto: LiveListDto): LiveListItem | null => {
   if (!isPublicLiveStatus(dto.broadcastStatus)) {
@@ -53,7 +53,12 @@ const mapLiveListDto = (dto: LiveListDto): LiveListItem | null => {
   const categoryName = dto.categories?.[0]?.name ?? dto.categoryName ?? ''
   const category = isLiveCategory(categoryName) ? categoryName : null
 
-  const broadcastAt = dto.broadcastStatus === 'LIVE' ? dto.startedAt : dto.scheduledAt
+  const broadcastAt =
+    dto.broadcastStatus === 'LIVE'
+      ? dto.startedAt
+      : dto.broadcastStatus === 'ENDED'
+        ? (dto.startedAt ?? dto.scheduledAt)
+        : dto.scheduledAt
 
   if (!broadcastAt) {
     throw new LiveListContractError('방송 상태에 맞는 시작 시각이 없습니다.')
@@ -76,7 +81,6 @@ const requestLiveList = async (query: LiveListQuery): Promise<LiveListViewData> 
     '/lives',
     {
       params: toLiveListParams(query),
-      skipAuth: true,
     },
   )
   const responseBody = response.data
@@ -98,6 +102,7 @@ const requestLiveList = async (query: LiveListQuery): Promise<LiveListViewData> 
 
 const toLiveListParams = (query: LiveListQuery) => ({
   categoryIds: query.categoryId,
+  hostId: query.hostId,
   status: query.status,
   sort: query.sort,
   page: Math.max(query.page - 1, 0),

@@ -9,7 +9,6 @@ import {
   getMyPageViewData,
   getMyInterestOptions,
   getMyInterests,
-  removeMyWish,
   updateMyInterests,
   updateMyProfile,
   updateMyProfileImage,
@@ -103,8 +102,6 @@ const selectedInterestCategoryIds = ref<number[]>([])
 const interestBrandSearchQuery = ref('')
 const isInterestLoading = ref(false)
 const interestLoadMessage = ref('')
-const wishRemoveProductId = ref<number | null>(null)
-const wishActionMessage = ref('')
 type ProductFilterId = 'ALL' | Extract<MyProductStatus, 'ON_SALE' | 'SOLD'>
 const productFilterOptions = [
   { id: 'ALL', label: '전체' },
@@ -1093,44 +1090,6 @@ const goToProductDetail = (productId: number) => {
   })
 }
 
-const removeWishItem = async (productId: number) => {
-  if (!authStore.user?.id || !viewData.value) {
-    return
-  }
-
-  wishRemoveProductId.value = productId
-  wishActionMessage.value = ''
-
-  try {
-    await removeMyWish(authStore.user.id, productId)
-
-    const nextWishes = viewData.value.wishes.filter((wish) => wish.product.id !== productId)
-
-    viewData.value = {
-      ...viewData.value,
-      summary: {
-        ...viewData.value.summary,
-        counts: {
-          ...viewData.value.summary.counts,
-          wishes: nextWishes.length,
-        },
-      },
-      wishes: nextWishes,
-      wishMeta: {
-        ...viewData.value.wishMeta,
-        totalElements: nextWishes.length,
-        totalPages: nextWishes.length > 0 ? 1 : 0,
-      },
-    }
-
-    wishActionMessage.value = '찜한 상품에서 제거했습니다.'
-  } catch (error) {
-    wishActionMessage.value = normalizeApiError(error).message
-  } finally {
-    wishRemoveProductId.value = null
-  }
-}
-
 const goToBusinessVerification = () => {
   const status = profile.value?.businessVerificationStatus
 
@@ -1821,46 +1780,6 @@ onMounted(() => {
               </p>
             </template>
 
-            <template v-else-if="selectedSection === 'wishlist'">
-              <div class="my-card__title">
-                <h2>찜한 상품</h2>
-              </div>
-              <p v-if="wishActionMessage" class="my-wish-message" role="status">
-                {{ wishActionMessage }}
-              </p>
-              <div v-if="viewData.wishes.length" class="my-product-grid">
-                <article
-                  v-for="wish in viewData.wishes"
-                  :key="wish.product.id"
-                  class="my-product-card my-wish-card"
-                >
-                  <button
-                    type="button"
-                    class="my-product-card__main"
-                    @click="goToProductDetail(wish.product.id)"
-                  >
-                    <img :src="wish.product.imageUrl" :alt="wish.product.imageAlt" />
-                    <span>찜</span>
-                    <strong>{{ wish.product.name }}</strong>
-                    <p>{{ wish.product.price.toLocaleString('ko-KR') }}P</p>
-                  </button>
-                  <div class="my-wish-card__meta">
-                    <span>{{ wish.product.brand }}</span>
-                    <span>{{ formatOrderDate(wish.wishedAt) }}</span>
-                  </div>
-                  <button
-                    type="button"
-                    class="my-wish-card__remove"
-                    :disabled="wishRemoveProductId === wish.product.id"
-                    @click="removeWishItem(wish.product.id)"
-                  >
-                    {{ wishRemoveProductId === wish.product.id ? '해제 중' : '찜 해제' }}
-                  </button>
-                </article>
-              </div>
-              <p v-else class="my-product-empty">찜한 상품이 없습니다.</p>
-            </template>
-
             <template v-else-if="selectedSection === 'social'">
               <div class="my-card__title">
                 <h2>팔로워·팔로잉</h2>
@@ -2127,7 +2046,6 @@ onMounted(() => {
 .my-order-tabs button:focus-visible,
 .my-product-card__main:focus-visible,
 .my-order-card__main:focus-visible,
-.my-wish-card__remove:focus-visible,
 .my-business-status button:focus-visible,
 .my-profile-photo__actions button:focus-visible,
 .my-tryon-photo__actions button:focus-visible,
@@ -2709,63 +2627,6 @@ onMounted(() => {
   font-size: 14px;
   line-height: 22px;
   text-align: center;
-}
-
-.my-wish-card {
-  align-content: start;
-}
-
-.my-wish-card__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: var(--space-3) var(--space-4) 0;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.my-wish-card__meta span {
-  overflow: hidden;
-  min-width: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.my-wish-card__remove {
-  min-height: 36px;
-  padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  margin: var(--space-3) var(--space-4) var(--space-4);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: var(--font-weight-bold);
-  line-height: 20px;
-  cursor: pointer;
-}
-
-.my-wish-card__remove:hover:not(:disabled) {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.my-wish-card__remove:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.my-wish-message {
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-secondary);
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
 }
 
 .my-social-grid {

@@ -36,8 +36,16 @@
 | --- | --- | --- |
 | 검색 결과 화면 | 부분 | SEARCH-001/002 `/search` 공개 route, 전체/상품/라이브/회원 탭, query 기반 탭 전환, 전체 탭 preview·전체보기, 개별 탭 페이지네이션, 상품/라이브/회원 mock 결과 카드, 카테고리·상태·가격·판매 유형 필터, 상품 결과 정렬, 검색어 기반 mock 필터링 구현. 실제 통합 검색 API 대기 |
 | 검색 상태 화면 | 부분 | 초기 검색어 없음, loading, error, 검색 결과 없음, 필터 결과 없음, 가격 범위 오류 상태 구현. loading/error/empty는 `status` query로 mock 확인 가능 |
-| 검색 액션 | 부분 | 상품 카드는 상세 route 이동, 라이브 카드는 시청 route 이동, 찜/팔로우는 로그인 필요 시 login redirect 처리. 실제 찜/팔로우 API와 회원 프로필 route 대기 |
+| 검색 액션 | 부분 | 상품 카드는 상세 route 이동, 라이브 카드는 시청 route 이동, 찜은 로그인 필요 시 login redirect 후 wish API로 등록/해제하고 실패 시 상태를 복구한다. 팔로우 API와 회원 프로필 route는 대기 |
 | 스타일 토큰 | 부분 | 상품 목록/검색 필터가 공유하는 필터 패널 폭, 본문/캡션/버튼 글자 크기, font-weight, line-height CSS 변수 추가 |
+
+## 2026-08-04 공개 프로필·팔로우 상태
+
+| 영역 | 상태 | 비고 |
+| --- | --- | --- |
+| 공개 프로필 | 부분 | `/profile/me`, `/profile/:userId` route를 추가하고 `GET /api/users/{id}/profile`로 프로필 상단, 팔로잉/팔로워/상품 통계, 상품/라이브 탭을 표시한다. `/my` 기본 진입은 `/profile/me`로 연결하고, `section` query가 있는 기존 본인 전용 관리 링크는 유지한다. |
+| 팔로우 | 부분 | `POST /api/users/{id}/followers`, `DELETE /api/users/{id}/followers`, 팔로워/팔로잉 목록 API를 `domains/profile`에 연결했다. 프로필, 팔로워·팔로잉 목록, 검색 사용자 카드가 공통 `FollowButton`과 `followStore`를 사용한다. |
+| 사용자 검색 | 부분 | `/search`가 실제 `GET /api/search`의 `users` 결과를 읽고 사용자 카드에서 공개 프로필 이동과 팔로우/언팔로우를 제공한다. 기존 FE의 `members` 임시 계약은 BE의 `users`/`USER` 계약으로 정정했다. |
 
 ## 2026-07-30 초기 진입 스플래시 상태
 
@@ -63,4 +71,11 @@
 
 | 영역 | 상태 | 비고 |
 | --- | --- | --- |
-| 마이페이지 화면 | 부분 | `domains/my`에 타입, mock data, API adapter, `MyPage`를 추가하고 `/my` route를 실제 화면으로 연결. 헤더 드롭다운의 `/my?section=orders/sales/wishlist` 이동을 섹션 전환으로 처리한다. `section=tryon` AI 시착 탭에서 전신 사진과 신체 정보를 관리한다. `VITE_MY_API_ENABLED=false`, `VITE_TRYON_API_ENABLED=false` 기본값에서는 mock fallback을 사용하되, 라이브 섹션은 `VITE_LIVE_LIST_API_ENABLED` 기준으로 실제 `/lives` 목록을 필터링한다. |
+| 마이페이지 화면 | 부분 | `domains/my`에 타입, mock data, API adapter, `MyPage`를 추가하고 `/my` route를 실제 화면으로 연결. 헤더 드롭다운의 `/my?section=orders/sales` 이동을 섹션 전환으로 처리한다. `section=tryon` AI 시착 탭에서 전신 사진과 신체 정보를 관리한다. 찜 목록은 `/wishlist` 독립 페이지로 분리했다. `VITE_MY_API_ENABLED=false`, `VITE_TRYON_API_ENABLED=false` 기본값에서는 mock fallback을 사용하되, 라이브 섹션은 `VITE_LIVE_LIST_API_ENABLED` 기준으로 실제 `/lives` 목록을 필터링한다. |
+
+## 2026-08-03 찜 기능 상태
+
+| 영역 | 상태 | 비고 |
+| --- | --- | --- |
+| 찜 버튼 | 부분 | 상품 목록·상품 상세·홈·검색 상품 카드의 하트 버튼이 `POST /api/users/{userId}/wishes`, `DELETE /api/users/{userId}/wishes/{productId}`를 사용해 낙관적 토글 후 실패 시 복구한다. 검색 결과는 실제 검색 API의 `isWished`를 초기 상태로 사용한다. |
+| 찜 목록 | 부분 | `/wishlist` 독립 route에서 `GET /api/users/{userId}/wishes` 결과를 상품 카드형으로 표시하고, 상단 공통 검색바 기반 상품명/브랜드 검색, 카테고리·상태·가격 필터, `전체 / 즉시 구매 / 경매 예정` 탭, 찜 해제를 제공한다. BE 찜 목록 응답의 `primaryImageUrl`이 비어 있으면 상품 상세 API에서 등록된 대표 이미지를 보조 조회한다. BE 찜 목록 API가 검색/필터 파라미터를 지원하지 않아 현재는 클라이언트 필터링이다. |

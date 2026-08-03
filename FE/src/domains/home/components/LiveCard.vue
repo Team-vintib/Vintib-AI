@@ -97,10 +97,10 @@ const formatSchedule = (value?: string) => {
   position: relative;
   display: grid;
   overflow: hidden;
-  border: 1px solid #e6e1d8;
+  border: 1px solid var(--color-border);
   border-radius: 20px;
   background: var(--color-surface);
-  box-shadow: 0 8px 24px rgb(18 18 18 / 5%);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text-primary) 5%, transparent);
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -109,8 +109,8 @@ const formatSchedule = (value?: string) => {
 
 .live-card:hover,
 .schedule-card:hover {
-  border-color: #ded8ce;
-  box-shadow: 0 10px 26px rgb(18 18 18 / 7%);
+  border-color: var(--color-border-strong);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--color-text-primary) 7%, transparent);
   transform: translateY(-2px);
 }
 

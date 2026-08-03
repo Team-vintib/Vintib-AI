@@ -7,6 +7,7 @@ import {
   addWish,
   getCategories,
   getProductList,
+  getWishProductIds,
   removeWish,
 } from '@/domains/product/api/productApi'
 import ProductCard from '@/domains/product/components/ProductCard.vue'
@@ -21,6 +22,7 @@ import type {
   ProductSaleTypeTab,
   ProductSortOption,
 } from '@/domains/product/types/productList.types'
+import { useWishStore } from '@/domains/product/stores/wishStore'
 import { normalizeApiError } from '@/shared/api/http'
 import AppSearchBar from '@/shared/components/AppSearchBar.vue'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
@@ -28,6 +30,7 @@ import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const wishStore = useWishStore()
 const categoryOptions = ref<ProductCategoryOption[]>([])
 const selectedCategoryIds = ref<number[]>([])
 const selectedConditionIds = ref<string[]>([])
@@ -45,7 +48,6 @@ const totalProductCount = ref(0)
 const totalPageCount = ref(1)
 const isLoadingProducts = ref(false)
 const productLoadError = ref('')
-const likedProductIds = ref(new Set<number>())
 const filterStatusMessage = ref('')
 
 const selectedFilterCount = computed(
@@ -137,7 +139,8 @@ const loadProducts = async () => {
     products.value = response.items
     totalProductCount.value = response.meta.totalElements
     totalPageCount.value = Math.max(response.meta.totalPages, 1)
-    likedProductIds.value = new Set(response.items.filter((product) => product.isLiked).map((product) => product.id))
+    wishStore.hydrateProducts(response.items)
+    await hydrateVisibleProductWishes(response.items)
     filterStatusMessage.value =
       selectedFilterCount.value > 0
         ? `선택한 필터를 적용해 상품 ${response.meta.totalElements}개를 찾았습니다.`
@@ -148,7 +151,6 @@ const loadProducts = async () => {
     products.value = []
     totalProductCount.value = 0
     totalPageCount.value = 1
-    likedProductIds.value = new Set()
     productLoadError.value =
       apiError.code === 'U010'
         ? '로그인이 만료되었습니다. 다시 로그인한 뒤 상품 목록을 확인해 주세요.'
@@ -159,22 +161,40 @@ const loadProducts = async () => {
   }
 }
 
+const hydrateVisibleProductWishes = async (visibleProducts: ProductListItem[]) => {
+  if (!authStore.isAuthenticated || !authStore.user?.id) {
+    wishStore.hydrateProducts(
+      visibleProducts.map((product) => ({
+        id: product.id,
+        isLiked: false,
+      })),
+    )
+    return
+  }
+
+  try {
+    const wishedProductIds = new Set(await getWishProductIds(authStore.user.id))
+
+    wishStore.hydrateWishedProductIds([...wishedProductIds])
+    wishStore.hydrateProducts(
+      visibleProducts.map((product) => ({
+        id: product.id,
+        isLiked: wishedProductIds.has(product.id),
+      })),
+    )
+  } catch {
+    // 상품 목록 조회 자체는 유지하고, 기존 스토어 상태로 찜 표시를 계속 시도한다.
+  }
+}
+
 const handleToggleLike = async (productId: number) => {
   if (!authStore.isAuthenticated || !authStore.user?.id) {
     await router.push({ name: ROUTE_NAMES.AUTH_LOGIN })
     return
   }
 
-  const wasLiked = likedProductIds.value.has(productId)
-  const nextLikedProductIds = new Set(likedProductIds.value)
-
-  if (wasLiked) {
-    nextLikedProductIds.delete(productId)
-  } else {
-    nextLikedProductIds.add(productId)
-  }
-
-  likedProductIds.value = nextLikedProductIds
+  const wasLiked = wishStore.isProductWished(productId)
+  wishStore.setProductWish(productId, !wasLiked)
 
   try {
     if (wasLiked) {
@@ -183,11 +203,7 @@ const handleToggleLike = async (productId: number) => {
       await addWish(authStore.user.id, productId)
     }
   } catch {
-    likedProductIds.value = new Set(
-      wasLiked
-        ? [...nextLikedProductIds, productId]
-        : [...nextLikedProductIds].filter((likedProductId) => likedProductId !== productId),
-    )
+    wishStore.setProductWish(productId, wasLiked)
   }
 }
 
@@ -292,7 +308,7 @@ onMounted(() => {
               v-for="product in products"
               :key="product.id"
               :product="product"
-              :is-liked="likedProductIds.has(product.id)"
+              :is-liked="wishStore.isProductWished(product.id, product.isLiked)"
               @toggle-like="handleToggleLike"
             />
           </div>

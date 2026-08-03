@@ -1,5 +1,11 @@
 import { getUnreadNotificationCount } from '@/domains/notification/api/notificationApi'
-import { getBrands, getCategories, removeWish } from '@/domains/product/api/productApi'
+import {
+  getBrands,
+  getCategories,
+  getProductPrimaryImageUrl,
+  removeWish,
+} from '@/domains/product/api/productApi'
+import { PRODUCT_LIST_MOCK_DATA } from '@/domains/product/constants/productListMockData'
 
 import type {
   MyLiveItem,
@@ -12,7 +18,11 @@ import type {
   MySaleItem,
   MyWishItem,
 } from '@/domains/my/types/my.types'
-import type { ProductConditionGrade, ProductListItem } from '@/domains/product/types/productList.types'
+import type {
+  ProductConditionGrade,
+  ProductListItem,
+  ProductSaleStatus,
+} from '@/domains/product/types/productList.types'
 import { http } from '@/shared/api/http'
 import type {
   InterestBrand,
@@ -64,6 +74,7 @@ interface MyProductApiDto {
   saleStatus: ProductSaleStatusDto
   price: number | null
   primaryImageUrl?: string | null
+  isLiked?: boolean
   isWished?: boolean
   createdAt: string
 }
@@ -222,7 +233,30 @@ export const getMyProfile = async (userId: number): Promise<MyProfile> => {
   }
 }
 
-const getMyWishList = async (userId: number) => {
+export const getMyWishList = async (userId: number) => {
+  if (!MY_API_ENABLED) {
+    void userId
+    const items = PRODUCT_LIST_MOCK_DATA
+      .filter((product) => product.isLiked)
+      .map((product, index) => ({
+        product: {
+          ...product,
+          saleStatus: product.saleType === 'AUCTION' ? 'AUCTION_SCHEDULED' : 'ON_SALE',
+        },
+        wishedAt: `2026-08-0${index + 1}T10:00:00+09:00`,
+      }) satisfies MyWishItem)
+
+    return {
+      items,
+      meta: {
+        page: 1,
+        size: items.length,
+        totalElements: items.length,
+        totalPages: items.length > 0 ? 1 : 0,
+      } satisfies PageMeta,
+    }
+  }
+
   const response = await http.get<
     ApiResponse<PageResponse<MyWishApiDto> | BackendPageResponse<MyWishApiDto>>
   >(`/users/${userId}/wishes`, {
@@ -234,7 +268,7 @@ const getMyWishList = async (userId: number) => {
   const pageResponse = normalizePageResponse(unwrapApiData(response.data, '찜 목록을 불러오지 못했습니다.'))
 
   return {
-    items: pageResponse.items.map(toMyWishItem),
+    items: await Promise.all(pageResponse.items.map(toMyWishItem)),
     meta: pageResponse.meta,
   }
 }
@@ -253,10 +287,13 @@ const getMySellerProducts = async (userId: number): Promise<MyProductItem[]> => 
     unwrapApiData(response.data, '판매 상품 목록을 불러오지 못했습니다.'),
   )
 
-  return pageResponse.items
-    .filter((product) => product.sellerId === userId)
-    .map(toMyProductItem)
-    .filter((item): item is MyProductItem => item !== null)
+  const products = await Promise.all(
+    pageResponse.items
+      .filter((product) => product.sellerId === userId)
+      .map(toMyProductItem),
+  )
+
+  return products.filter((item): item is MyProductItem => item !== null)
 }
 
 const getMyHostLives = async (userId: number): Promise<MyLiveItem[]> => {
@@ -405,12 +442,12 @@ const normalizePageResponse = <T>(
   }
 }
 
-const toMyWishItem = (wish: MyWishApiDto): MyWishItem => ({
-  product: toProductListItem(wish.product),
+const toMyWishItem = async (wish: MyWishApiDto): Promise<MyWishItem> => ({
+  product: await toProductListItem(wish.product),
   wishedAt: wish.wishedAt,
 })
 
-const toMyProductItem = (product: MyProductApiDto): MyProductItem | null => {
+const toMyProductItem = async (product: MyProductApiDto): Promise<MyProductItem | null> => {
   const status = toMyProductStatus(product.saleStatus)
 
   if (!status) {
@@ -419,7 +456,7 @@ const toMyProductItem = (product: MyProductApiDto): MyProductItem | null => {
 
   return {
     id: product.id,
-    product: toProductListItem(product),
+    product: await toProductListItem(product),
     status,
     updatedAt: product.createdAt,
   }
@@ -441,17 +478,25 @@ const toMyLiveItem = (live: MyLiveApiDto): MyLiveItem | null => {
   }
 }
 
-const toProductListItem = (product: MyProductApiDto): ProductListItem => ({
-  id: product.id,
-  brand: product.brandName || fallbackBrandLabel(product.brandId),
-  name: product.title,
-  price: product.price ?? 0,
-  conditionGrade: product.conditionGrade,
-  saleType: product.saleType === 'AUCTION' ? 'AUCTION' : 'DIRECT',
-  imageUrl: product.primaryImageUrl || '',
-  imageAlt: `${product.title} 상품 이미지`,
-  isLiked: product.isWished ?? true,
-})
+const toProductListItem = async (product: MyProductApiDto): Promise<ProductListItem> => {
+  const imageUrl =
+    product.primaryImageUrl || (await getProductPrimaryImageUrl(product.id).catch(() => ''))
+
+  return {
+    id: product.id,
+    brand: product.brandName || fallbackBrandLabel(product.brandId),
+    name: product.title,
+    price: product.price ?? 0,
+    conditionGrade: product.conditionGrade,
+    saleType: product.saleType === 'AUCTION' ? 'AUCTION' : 'DIRECT',
+    saleStatus: product.saleStatus satisfies ProductSaleStatus,
+    categoryId: product.categoryId,
+    categoryName: product.categoryName ?? fallbackCategoryLabel(product.categoryId),
+    imageUrl,
+    imageAlt: `${product.title} 상품 이미지`,
+    isLiked: product.isWished ?? product.isLiked ?? true,
+  }
+}
 
 const toMyProductStatus = (status: ProductSaleStatusDto): MyProductStatus | null => {
   if (status === 'ON_SALE') {
@@ -477,6 +522,9 @@ const getProductStatusCounts = (products: MyProductItem[]) => ({
 
 const fallbackBrandLabel = (brandId: number | null) =>
   brandId ? `브랜드 #${brandId}` : ''
+
+const fallbackCategoryLabel = (categoryId: number | null) =>
+  categoryId ? `카테고리 #${categoryId}` : ''
 
 const unwrapApiData = <T>(response: ApiResponse<T>, fallbackMessage: string) => {
   if (!response.success || response.data === null) {

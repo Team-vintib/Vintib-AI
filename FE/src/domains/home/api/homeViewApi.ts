@@ -65,7 +65,9 @@ interface HomeFollowedSellerResponse {
   profileImageUrl: string
   coverImageUrl: string
   followerCount: number
+  followingCount?: number | null
   productCount: number
+  liveCount?: number | null
   liveId: number | null
   liveStatus: HomeLiveBroadcastStatus | null
   liveTitle: string | null
@@ -243,7 +245,9 @@ const toHomeFollowedSellerItem = (
   coverImageUrl: seller.coverImageUrl,
   specialty: '',
   followerCount: seller.followerCount,
+  followingCount: seller.followingCount ?? 0,
   newProductCount: seller.productCount,
+  liveCount: seller.liveCount ?? 0,
   liveStatus: seller.liveStatus ?? undefined,
   liveTitle: seller.liveTitle ?? undefined,
   liveAt: seller.liveAt ?? undefined,
