@@ -3,8 +3,11 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { followUser, unfollowUser } from '@/domains/profile/api/profileApi'
+import { useFollowStore } from '@/domains/profile/stores/followStore'
 import { addWish, removeWish } from '@/domains/product/api/productApi'
 import { useWishStore } from '@/domains/product/stores/wishStore'
+import { searchUnified } from '@/domains/search/api/searchApi'
 import SearchLiveResultCard from '@/domains/search/components/SearchLiveResultCard.vue'
 import SearchMemberResultCard from '@/domains/search/components/SearchMemberResultCard.vue'
 import SearchResultTabs from '@/domains/search/components/SearchResultTabs.vue'
@@ -29,6 +32,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const wishStore = useWishStore()
+const followStore = useFollowStore()
 
 const validTabIds: SearchResultTabId[] = ['all', 'product', 'live', 'member']
 const validSortOptionIds: SearchSortOptionId[] = ['LATEST', 'PRICE_ASC', 'PRICE_DESC']
@@ -41,6 +45,12 @@ const EMPTY_SEARCH_RESULTS: SearchResultsViewModel = {
   products: [],
   lives: [],
   members: [],
+  productTotalElements: 0,
+  productTotalPages: 0,
+  liveTotalElements: 0,
+  liveTotalPages: 0,
+  memberTotalElements: 0,
+  memberTotalPages: 0,
 }
 const SEARCH_SORT_OPTIONS: { id: SearchSortOptionId; label: string }[] = [
   { id: 'LATEST', label: '최신순' },
@@ -109,12 +119,11 @@ const selectedConditionIds = ref<string[]>(queryConditionIds.value)
 const selectedSaleTypeIds = ref<string[]>(querySaleTypeIds.value)
 const minPriceInput = ref(queryMinPrice.value?.toString() ?? '')
 const maxPriceInput = ref(queryMaxPrice.value?.toString() ?? '')
-const followedMemberIds = ref(
-  new Set(
-    EMPTY_SEARCH_RESULTS.members.filter((member) => member.isFollowing).map((member) => member.id),
-  ),
-)
+const searchResults = ref<SearchResultsViewModel>(EMPTY_SEARCH_RESULTS)
+const isSearchLoading = ref(false)
+const hasSearchError = ref(false)
 const liveMessage = ref('')
+let searchRequestId = 0
 
 wishStore.hydrateProducts(EMPTY_SEARCH_RESULTS.products)
 
@@ -227,6 +236,10 @@ const filteredProducts = computed(() => {
     return []
   }
 
+  if (queryKeyword.value) {
+    return searchResults.value.products
+  }
+
   if (isPriceRangeInvalid.value) {
     return []
   }
@@ -297,6 +310,10 @@ const visibleLives = computed(() => {
     return []
   }
 
+  if (queryKeyword.value) {
+    return searchResults.value.lives
+  }
+
   return EMPTY_SEARCH_RESULTS.lives.filter((live) =>
     matchesKeyword([live.title, live.hostName, live.status]),
   )
@@ -306,13 +323,24 @@ const visibleMembers = computed(() => {
     return []
   }
 
+  if (queryKeyword.value) {
+    return searchResults.value.members
+  }
+
   return EMPTY_SEARCH_RESULTS.members.filter((member) =>
     matchesKeyword([member.nickname, member.description]),
   )
 })
-const totalResultCount = computed(
-  () => filteredProducts.value.length + visibleLives.value.length + visibleMembers.value.length,
+const totalProductCount = computed(() =>
+  queryKeyword.value ? searchResults.value.productTotalElements : filteredProducts.value.length,
 )
+const totalLiveCount = computed(() =>
+  queryKeyword.value ? searchResults.value.liveTotalElements : visibleLives.value.length,
+)
+const totalMemberCount = computed(() =>
+  queryKeyword.value ? searchResults.value.memberTotalElements : visibleMembers.value.length,
+)
+const totalResultCount = computed(() => totalProductCount.value + totalLiveCount.value + totalMemberCount.value)
 const previewProducts = computed(() => sortedProducts.value.slice(0, SEARCH_RESULT_PREVIEW_LIMIT))
 const previewLives = computed(() => visibleLives.value.slice(0, SEARCH_RESULT_PREVIEW_LIMIT))
 const previewMembers = computed(() => visibleMembers.value.slice(0, SEARCH_RESULT_PREVIEW_LIMIT))
@@ -334,15 +362,15 @@ const activePageSize = computed(() => {
 
 const activePaginationTotalCount = computed(() => {
   if (activeTabId.value === 'live') {
-    return visibleLives.value.length
+    return totalLiveCount.value
   }
 
   if (activeTabId.value === 'member') {
-    return visibleMembers.value.length
+    return totalMemberCount.value
   }
 
   if (activeTabId.value === 'product') {
-    return sortedProducts.value.length
+    return totalProductCount.value
   }
 
   return 0
@@ -363,21 +391,27 @@ const getPageSlice = <T,>(items: T[], pageSize: number) => {
 
   return items.slice(startIndex, startIndex + pageSize)
 }
-const pagedProducts = computed(() => getPageSlice(sortedProducts.value, SEARCH_PRODUCT_PAGE_SIZE))
-const pagedLives = computed(() => getPageSlice(visibleLives.value, SEARCH_LIVE_PAGE_SIZE))
-const pagedMembers = computed(() => getPageSlice(visibleMembers.value, SEARCH_MEMBER_PAGE_SIZE))
+const pagedProducts = computed(() =>
+  queryKeyword.value ? sortedProducts.value : getPageSlice(sortedProducts.value, SEARCH_PRODUCT_PAGE_SIZE),
+)
+const pagedLives = computed(() =>
+  queryKeyword.value ? visibleLives.value : getPageSlice(visibleLives.value, SEARCH_LIVE_PAGE_SIZE),
+)
+const pagedMembers = computed(() =>
+  queryKeyword.value ? visibleMembers.value : getPageSlice(visibleMembers.value, SEARCH_MEMBER_PAGE_SIZE),
+)
 
 const activeTabResultCount = computed(() => {
   if (activeTabId.value === 'product') {
-    return filteredProducts.value.length
+    return totalProductCount.value
   }
 
   if (activeTabId.value === 'live') {
-    return visibleLives.value.length
+    return totalLiveCount.value
   }
 
   if (activeTabId.value === 'member') {
-    return visibleMembers.value.length
+    return totalMemberCount.value
   }
 
   return totalResultCount.value
@@ -385,14 +419,14 @@ const activeTabResultCount = computed(() => {
 
 const resultTabs = computed(() => [
   { id: 'all' as const, label: '전체', count: totalResultCount.value },
-  { id: 'product' as const, label: '상품', count: filteredProducts.value.length },
-  { id: 'live' as const, label: '라이브', count: visibleLives.value.length },
-  { id: 'member' as const, label: '회원', count: visibleMembers.value.length },
+  { id: 'product' as const, label: '상품', count: totalProductCount.value },
+  { id: 'live' as const, label: '라이브', count: totalLiveCount.value },
+  { id: 'member' as const, label: '사용자', count: totalMemberCount.value },
 ])
 
 const resultSummary = computed(() => {
   if (!queryKeyword.value) {
-    return '검색어를 입력하면 상품, 라이브, 회원 결과를 함께 확인할 수 있습니다.'
+    return '검색어를 입력하면 상품, 라이브, 사용자 결과를 함께 확인할 수 있습니다.'
   }
 
   return `'${queryKeyword.value}' 검색 결과 ${totalResultCount.value.toLocaleString('ko-KR')}건`
@@ -404,11 +438,11 @@ const searchState = computed<SearchStateKind | null>(() => {
     return 'initial'
   }
 
-  if (mockStatus.value === 'loading') {
+  if (mockStatus.value === 'loading' || isSearchLoading.value) {
     return 'loading'
   }
 
-  if (mockStatus.value === 'error') {
+  if (mockStatus.value === 'error' || hasSearchError.value) {
     return 'error'
   }
 
@@ -464,7 +498,7 @@ const stateContent = computed<SearchStateContent>(() => {
 
   return {
     title: '검색어를 입력해 주세요.',
-    description: '상품, 라이브, 회원 결과가 유형별 탭으로 정리됩니다.',
+    description: '상품, 라이브, 사용자 결과가 유형별 탭으로 정리됩니다.',
   }
 })
 
@@ -638,6 +672,7 @@ const retrySearch = async () => {
     ...route.query,
     status: undefined,
   } as Record<string, string | undefined>)
+  await loadSearchResults()
 }
 
 const handleStateAction = async () => {
@@ -671,6 +706,57 @@ const requireAuthenticatedAction = async () => {
   return false
 }
 
+const loadSearchResults = async () => {
+  const keyword = queryKeyword.value.trim()
+  const requestId = ++searchRequestId
+
+  hasSearchError.value = false
+
+  if (!keyword) {
+    searchResults.value = EMPTY_SEARCH_RESULTS
+    return
+  }
+
+  isSearchLoading.value = true
+
+  try {
+    await authStore.validateStoredSession()
+
+    const results = await searchUnified({
+      keyword,
+      type: activeTabId.value,
+      categories: queryCategoryIds.value,
+      conditions: queryConditionIds.value,
+      saleTypes: querySaleTypeIds.value,
+      minPrice: queryMinPrice.value,
+      maxPrice: queryMaxPrice.value,
+      sort: querySortOption.value,
+      page: queryPage.value,
+      size: activePageSize.value,
+    })
+
+    if (requestId !== searchRequestId) return
+
+    searchResults.value = results
+    wishStore.hydrateProducts(results.products.map((product) => ({ id: product.id, isLiked: product.isLiked })))
+    results.members.forEach((member) => {
+      followStore.setFollowState(member.id, {
+        followerCount: member.followerCount,
+        isFollowing: member.isFollowing === true,
+      })
+    })
+  } catch {
+    if (requestId !== searchRequestId) return
+
+    searchResults.value = EMPTY_SEARCH_RESULTS
+    hasSearchError.value = true
+  } finally {
+    if (requestId === searchRequestId) {
+      isSearchLoading.value = false
+    }
+  }
+}
+
 const toggleLike = async (productId: number) => {
   if (!(await requireAuthenticatedAction())) {
     return
@@ -696,24 +782,82 @@ const toggleLike = async (productId: number) => {
 }
 
 const toggleFollow = async (memberId: number) => {
+  if (authStore.user?.id === memberId || followStore.isPending(memberId)) {
+    return
+  }
+
   if (!(await requireAuthenticatedAction())) {
     return
   }
 
-  const nextFollowedMemberIds = new Set(followedMemberIds.value)
+  const member = searchResults.value.members.find((item) => item.id === memberId)
+  const previousState = followStore.getFollowState(memberId, {
+    followerCount: member?.followerCount ?? 0,
+    isFollowing: member?.isFollowing === true,
+  })
+  const nextIsFollowing = !previousState.isFollowing
+  const nextFollowerCount = Math.max(
+    previousState.followerCount + (nextIsFollowing ? 1 : -1),
+    0,
+  )
 
-  if (nextFollowedMemberIds.has(memberId)) {
-    nextFollowedMemberIds.delete(memberId)
-  } else {
-    nextFollowedMemberIds.add(memberId)
+  followStore.setPending(memberId, true)
+  followStore.setFollowState(memberId, {
+    followerCount: nextFollowerCount,
+    isFollowing: nextIsFollowing,
+  })
+
+  try {
+    if (previousState.isFollowing) {
+      await unfollowUser(memberId)
+    } else {
+      const response = await followUser(memberId)
+      followStore.setFollowState(memberId, {
+        followerCount: response.followerCount,
+        isFollowing: response.isFollowing,
+      })
+    }
+  } catch {
+    followStore.setFollowState(memberId, previousState)
+    liveMessage.value = '팔로우 상태를 변경하지 못했습니다.'
+  } finally {
+    followStore.setPending(memberId, false)
   }
-
-  followedMemberIds.value = nextFollowedMemberIds
 }
+
+const getMemberFollowerCount = (member: SearchResultsViewModel['members'][number]) =>
+  followStore.getFollowState(member.id, {
+    followerCount: member.followerCount,
+    isFollowing: member.isFollowing === true,
+  }).followerCount
+
+const getMemberIsFollowing = (member: SearchResultsViewModel['members'][number]) =>
+  followStore.getFollowState(member.id, {
+    followerCount: member.followerCount,
+    isFollowing: member.isFollowing === true,
+  }).isFollowing
 
 const formatPrice = (value: number) => `${value.toLocaleString('ko-KR')}P`
 const getSaleTypeLabel = (product: SearchProductResult) =>
   product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'
+
+watch(
+  () => [
+    route.query.keyword,
+    route.query.type,
+    route.query.categories,
+    route.query.conditions,
+    route.query.saleTypes,
+    route.query.minPrice,
+    route.query.maxPrice,
+    route.query.sort,
+    route.query.page,
+  ],
+  () => {
+    void loadSearchResults()
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -854,7 +998,7 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
               v-if="activeTabId === 'all' || activeTabId === 'product'"
               class="search-page__sort-toolbar"
             >
-              <span>{{ filteredProducts.length }}개</span>
+              <span>{{ totalProductCount }}개</span>
               <label class="sr-only" for="search-product-sort">검색 상품 정렬</label>
               <select
                 id="search-product-sort"
@@ -911,9 +1055,9 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
                 <div class="search-page__section-header">
                   <h2 id="search-products-title">상품</h2>
                   <div class="search-page__section-summary">
-                    <span>{{ filteredProducts.length }}개</span>
+                    <span>{{ totalProductCount }}개</span>
                     <button
-                      v-if="activeTabId === 'all' && filteredProducts.length > SEARCH_RESULT_PREVIEW_LIMIT"
+                      v-if="activeTabId === 'all' && totalProductCount > SEARCH_RESULT_PREVIEW_LIMIT"
                       type="button"
                       @click="viewAllResults('product')"
                     >
@@ -994,9 +1138,9 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
                 <div class="search-page__section-header">
                   <h2 id="search-lives-title">라이브</h2>
                   <div class="search-page__section-summary">
-                    <span>{{ visibleLives.length }}개</span>
+                    <span>{{ totalLiveCount }}개</span>
                     <button
-                      v-if="activeTabId === 'all' && visibleLives.length > SEARCH_RESULT_PREVIEW_LIMIT"
+                      v-if="activeTabId === 'all' && totalLiveCount > SEARCH_RESULT_PREVIEW_LIMIT"
                       type="button"
                       @click="viewAllResults('live')"
                     >
@@ -1020,11 +1164,11 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
                 aria-labelledby="search-members-title"
               >
                 <div class="search-page__section-header">
-                  <h2 id="search-members-title">회원</h2>
+                  <h2 id="search-members-title">사용자</h2>
                   <div class="search-page__section-summary">
-                    <span>{{ visibleMembers.length }}명</span>
+                    <span>{{ totalMemberCount }}명</span>
                     <button
-                      v-if="activeTabId === 'all' && visibleMembers.length > SEARCH_RESULT_PREVIEW_LIMIT"
+                      v-if="activeTabId === 'all' && totalMemberCount > SEARCH_RESULT_PREVIEW_LIMIT"
                       type="button"
                       @click="viewAllResults('member')"
                     >
@@ -1037,8 +1181,10 @@ const getSaleTypeLabel = (product: SearchProductResult) =>
                   <SearchMemberResultCard
                     v-for="member in activeTabId === 'all' ? previewMembers : pagedMembers"
                     :key="member.id"
-                    :member="member"
-                    :is-following="followedMemberIds.has(member.id)"
+                    :member="{ ...member, followerCount: getMemberFollowerCount(member) }"
+                    :is-following="getMemberIsFollowing(member)"
+                    :is-pending="followStore.isPending(member.id)"
+                    :is-self="authStore.user?.id === member.id"
                     @toggle-follow="toggleFollow"
                   />
                 </div>

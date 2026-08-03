@@ -73,7 +73,7 @@ const userActionItems = computed<UserActionItem[]>(() => [
 ])
 
 const profileMenuItems = computed<ProfileMenuItem[]>(() => [
-  { label: '마이페이지', path: ROUTE_PATHS.MY },
+  { label: '프로필', path: ROUTE_PATHS.PROFILE_ME },
   { label: '시착 정보', path: ROUTE_PATHS.MY, query: { section: 'tryon' } },
   { label: '구매 내역', path: ROUTE_PATHS.MY, query: { section: 'orders' } },
   { label: '판매 내역', path: ROUTE_PATHS.MY, query: { section: 'sales' } },

@@ -16,7 +16,7 @@ export interface SearchProductResult {
   categoryName: string
   imageUrl: string
   imageAlt: string
-  isLiked: boolean
+  isLiked?: boolean
   bidCount?: number
   timeLeftLabel?: string
   isLive?: boolean
@@ -37,18 +37,24 @@ export interface SearchLiveResult {
 export interface SearchMemberResult {
   id: number
   nickname: string
-  profileImageUrl: string
+  profileImageUrl: string | null
   description: string
   followerCount: number
   productCount: number
-  liveCount: number
-  isFollowing: boolean
+  liveCount?: number
+  isFollowing?: boolean | null
 }
 
 export interface SearchResultsViewModel {
   products: SearchProductResult[]
   lives: SearchLiveResult[]
   members: SearchMemberResult[]
+  productTotalElements: number
+  productTotalPages: number
+  liveTotalElements: number
+  liveTotalPages: number
+  memberTotalElements: number
+  memberTotalPages: number
 }
 
 export interface SearchResultTab {

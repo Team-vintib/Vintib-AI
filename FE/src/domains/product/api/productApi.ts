@@ -137,6 +137,7 @@ interface ProductListParams {
   minPrice?: number | null
   page?: number
   saleType?: ProductSaleTypeTab['id']
+  sellerId?: number
   size?: number
   sort?: ProductSortOption
 }
@@ -164,6 +165,7 @@ export const getProductList = async ({
   minPrice = null,
   page = 1,
   saleType = 'ALL',
+  sellerId,
   size = 20,
   sort = 'LATEST',
 }: ProductListParams = {}) => {
@@ -178,6 +180,7 @@ export const getProductList = async ({
       minPrice: minPrice ?? undefined,
       maxPrice: maxPrice ?? undefined,
       saleType: toSaleTypeParam(saleType),
+      sellerId,
     },
   })
   const pageResponse = normalizePageResponse(unwrapApiData(response.data))

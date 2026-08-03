@@ -1,39 +1,55 @@
 <script setup lang="ts">
-import type { SearchMemberResult } from '@/domains/search/types/search.types'
+import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 
-defineProps<{
+import FollowButton from '@/domains/profile/components/FollowButton.vue'
+import type { SearchMemberResult } from '@/domains/search/types/search.types'
+import { ROUTE_NAMES } from '@/shared/constants/routes'
+
+const props = defineProps<{
   member: SearchMemberResult
   isFollowing: boolean
+  isPending?: boolean
+  isSelf?: boolean
 }>()
 
 const emit = defineEmits<{
   toggleFollow: [memberId: number]
 }>()
+
+const initial = computed(() => props.member.nickname.slice(0, 1).toUpperCase())
 </script>
 
 <template>
   <article class="search-member-card">
-    <img class="search-member-card__avatar" :src="member.profileImageUrl" :alt="member.nickname" />
+    <RouterLink
+      class="search-member-card__avatar"
+      :to="{ name: ROUTE_NAMES.PROFILE, params: { userId: member.id } }"
+      :aria-label="`${member.nickname} 프로필 보기`"
+    >
+      <img v-if="member.profileImageUrl" :src="member.profileImageUrl" :alt="member.nickname" />
+      <span v-else>{{ initial }}</span>
+    </RouterLink>
 
     <div class="search-member-card__body">
       <div class="search-member-card__header">
-        <div>
+        <RouterLink
+          class="search-member-card__profile-link"
+          :to="{ name: ROUTE_NAMES.PROFILE, params: { userId: member.id } }"
+        >
           <h3 class="search-member-card__name">{{ member.nickname }}</h3>
           <p class="search-member-card__stats">
             팔로워 {{ member.followerCount.toLocaleString('ko-KR') }}명 · 상품
-            {{ member.productCount }}개 · 라이브 {{ member.liveCount }}회
+            {{ member.productCount }}개
           </p>
-        </div>
+        </RouterLink>
 
-        <button
-          class="search-member-card__follow"
-          :class="{ 'search-member-card__follow--active': isFollowing }"
-          type="button"
-          :aria-pressed="isFollowing"
-          @click="emit('toggleFollow', member.id)"
-        >
-          {{ isFollowing ? '팔로잉' : '팔로우' }}
-        </button>
+        <FollowButton
+          :is-following="isFollowing"
+          :is-pending="isPending"
+          :is-self="isSelf"
+          @toggle="emit('toggleFollow', member.id)"
+        />
       </div>
 
       <p class="search-member-card__description">{{ member.description }}</p>
@@ -53,11 +69,22 @@ const emit = defineEmits<{
 }
 
 .search-member-card__avatar {
+  display: grid;
+  place-items: center;
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  object-fit: cover;
   background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.search-member-card__avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
 }
 
 .search-member-card__body {
@@ -69,6 +96,11 @@ const emit = defineEmits<{
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
+}
+
+.search-member-card__profile-link {
+  color: inherit;
+  text-decoration: none;
 }
 
 .search-member-card__name {
@@ -91,28 +123,6 @@ const emit = defineEmits<{
   margin-top: var(--space-3);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-}
-
-.search-member-card__follow {
-  flex: 0 0 auto;
-  min-width: 76px;
-  height: var(--button-height-small);
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius-control);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  font-size: var(--font-size-button-small);
-  font-weight: var(--font-weight-bold);
-}
-
-.search-member-card__follow--active {
-  background: var(--color-surface);
-  color: var(--color-primary);
-}
-
-.search-member-card__follow:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
-  outline-offset: 2px;
 }
 
 @media (max-width: 520px) {

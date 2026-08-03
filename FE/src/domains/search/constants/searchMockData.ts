@@ -184,4 +184,10 @@ export const SEARCH_MOCK_RESULTS: SearchResultsViewModel = {
       isFollowing: false,
     },
   ],
+  productTotalElements: 6,
+  productTotalPages: 2,
+  liveTotalElements: 4,
+  liveTotalPages: 2,
+  memberTotalElements: 4,
+  memberTotalPages: 2,
 }
