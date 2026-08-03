@@ -82,4 +82,8 @@ public class Order extends BaseTimeEntity {
     public boolean isPartyOf(Long memberId) {
         return memberId != null && (buyer.getId().equals(memberId) || seller.getId().equals(memberId));
     }
+
+    public boolean isBuyer(Long memberId) {
+        return memberId != null && buyer.getId().equals(memberId);
+    }
 }

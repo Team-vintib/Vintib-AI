@@ -14,10 +14,14 @@ import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.order.dto.request.OrderCreateRequest;
 import com.ssafy.backend.order.dto.request.OrderRole;
+import com.ssafy.backend.order.dto.request.OrderShipmentAddressRequest;
 import com.ssafy.backend.order.dto.response.OrderListItemResponse;
+import com.ssafy.backend.order.dto.response.OrderShipmentResponse;
 import com.ssafy.backend.order.entity.Order;
+import com.ssafy.backend.order.entity.OrderShipment;
 import com.ssafy.backend.order.entity.OrderStatus;
 import com.ssafy.backend.order.repository.OrderRepository;
+import com.ssafy.backend.order.repository.OrderShipmentRepository;
 import com.ssafy.backend.point.service.PointService;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.ProductRepository;
@@ -44,6 +48,9 @@ class OrderServiceTest {
     private OrderRepository orderRepository;
 
     @Mock
+    private OrderShipmentRepository orderShipmentRepository;
+
+    @Mock
     private ProductRepository productRepository;
 
     @Mock
@@ -68,7 +75,8 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository, productRepository, memberRepository, pointService);
+        orderService = new OrderService(
+                orderRepository, orderShipmentRepository, productRepository, memberRepository, pointService);
     }
 
     private Product realDirectSaleProduct() {
@@ -189,5 +197,19 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.createOrder(BUYER_ID, new OrderCreateRequest(PRODUCT_ID)))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SELF_PURCHASE_NOT_ALLOWED);
+    }
+
+    @Test
+    void 배송지를_처음_등록하면_새로_생성된다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+        when(orderShipmentRepository.findById(ORDER_ID)).thenReturn(Optional.empty());
+        when(orderShipmentRepository.save(any(OrderShipment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderShipmentResponse response = orderService.registerAddress(
+                ORDER_ID, BUYER_ID, new OrderShipmentAddressRequest("홍길동", "010-1234-5678", "06134", "테헤란로 1", null));
+
+        assertThat(response.recipientName()).isEqualTo("홍길동");
     }
 }

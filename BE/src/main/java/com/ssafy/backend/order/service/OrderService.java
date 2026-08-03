@@ -7,9 +7,14 @@ import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.order.dto.request.OrderCreateRequest;
 import com.ssafy.backend.order.dto.request.OrderRole;
+import com.ssafy.backend.order.dto.request.OrderShipmentAddressRequest;
 import com.ssafy.backend.order.dto.response.OrderListItemResponse;
+import com.ssafy.backend.order.dto.response.OrderShipmentResponse;
 import com.ssafy.backend.order.entity.Order;
+import com.ssafy.backend.order.entity.OrderShipment;
+import com.ssafy.backend.order.entity.OrderStatus;
 import com.ssafy.backend.order.repository.OrderRepository;
+import com.ssafy.backend.order.repository.OrderShipmentRepository;
 import com.ssafy.backend.point.service.PointService;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.ProductRepository;
@@ -20,7 +25,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 주문 조회(MY-003/004), 상시 판매 주문 생성(SALE-002). 세금계산서 발행은 {@code InvoiceService}가 담당한다.
+ * 주문 조회(MY-003/004), 상시 판매 주문 생성(SALE-002), 배송지(ORDER-001).
+ * 세금계산서 발행은 {@code InvoiceService}가 담당한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -28,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final OrderShipmentRepository orderShipmentRepository;
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
     private final PointService pointService;
@@ -73,6 +80,43 @@ public class OrderService {
         product.markSold();
 
         return OrderListItemResponse.from(order);
+    }
+
+    /** 배송지 등록/수정(ORDER-001) — 구매자만, 송장이 등록되기 전(PAID)에만 upsert 허용. */
+    @Transactional
+    public OrderShipmentResponse registerAddress(Long orderId, Long buyerId, OrderShipmentAddressRequest request) {
+        Order order = findOrder(orderId, buyerId);
+        if (!order.isBuyer(buyerId)) {
+            throw new CustomException(ErrorCode.ORDER_BUYER_ONLY);
+        }
+        if (order.getStatus() != OrderStatus.PAID) {
+            throw new CustomException(ErrorCode.INVALID_ORDER_STATE);
+        }
+
+        OrderShipment shipment = orderShipmentRepository.findById(orderId).orElse(null);
+        if (shipment == null) {
+            shipment = orderShipmentRepository.save(OrderShipment.builder()
+                    .order(order)
+                    .recipientName(request.recipientName())
+                    .recipientPhone(request.recipientPhone())
+                    .zipcode(request.zipcode())
+                    .address1(request.address1())
+                    .address2(request.address2())
+                    .build());
+        } else {
+            shipment.updateAddress(
+                    request.recipientName(), request.recipientPhone(), request.zipcode(),
+                    request.address1(), request.address2());
+        }
+        return OrderShipmentResponse.from(shipment);
+    }
+
+    /** 배송지/송장 조회(ORDER-001, SHIP-002 공용) — 구매자·판매자 모두 조회 가능. */
+    public OrderShipmentResponse getShipment(Long orderId, Long memberId) {
+        findOrder(orderId, memberId);
+        OrderShipment shipment = orderShipmentRepository.findById(orderId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ORDER_SHIPMENT_NOT_FOUND));
+        return OrderShipmentResponse.from(shipment);
     }
 
     private Order findOrder(Long orderId, Long memberId) {
