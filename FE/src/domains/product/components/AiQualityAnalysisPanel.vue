@@ -1,32 +1,46 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
-import type {
-  AiQualityAnalysis,
-  ProductDetailImage,
-} from '@/domains/product/types/productDetail.types'
+import type { AiQualityAnalysis } from '@/domains/product/types/productDetail.types'
 
 const props = defineProps<{
   analysis: AiQualityAnalysis
-  selectedImage: ProductDetailImage | undefined
 }>()
 
-const selectedImageIndex = computed(() => {
-  const imageOrder = ['front', 'front-detail', 'hem-detail', 'cuff-detail']
-  const selectedIndex = imageOrder.indexOf(props.selectedImage?.id ?? 'front')
-  return selectedIndex >= 0 ? selectedIndex : 0
-})
+const images = computed(() => props.analysis.images)
+const total = computed(() => images.value.length)
+const currentIndex = ref(0)
 
-const comparisonImageStyle = computed(() => {
-  const detailStyles = [
-    { transform: 'scale(1)', transformOrigin: '50% 50%' },
-    { transform: 'scale(1.35)', transformOrigin: '50% 26%' },
-    { transform: 'scale(1.45)', transformOrigin: '45% 78%' },
-    { transform: 'scale(1.45)', transformOrigin: '90% 78%' },
-  ]
+const currentImage = computed(() => images.value[currentIndex.value] ?? images.value[0])
 
-  return detailStyles[selectedImageIndex.value] ?? detailStyles[0]
-})
+// 검수 이미지 위에 얹는 빨간 네모(탐지 위치) 좌표만 추린다.
+const currentBoxes = computed(() =>
+  (currentImage.value?.findings ?? [])
+    .map((finding) => finding.box)
+    .filter((box): box is NonNullable<typeof box> => Boolean(box)),
+)
+
+// 상품(=분석 대상)이 바뀌면 첫 장으로 되돌린다.
+watch(
+  () => props.analysis,
+  () => {
+    currentIndex.value = 0
+  },
+)
+
+const goPrev = () => {
+  if (total.value <= 1) return
+  currentIndex.value = (currentIndex.value - 1 + total.value) % total.value
+}
+
+const goNext = () => {
+  if (total.value <= 1) return
+  currentIndex.value = (currentIndex.value + 1) % total.value
+}
+
+const goTo = (index: number) => {
+  currentIndex.value = index
+}
 
 const statusMeta = computed(() => {
   const statusMap = {
@@ -44,7 +58,7 @@ const statusMeta = computed(() => {
     },
     COMPLETED: {
       label: '분석 완료',
-      intro: '원본 상품 이미지와 AI가 표시한 검수 이미지를 비교해 보세요.',
+      intro: '원본 상품 이미지와 AI가 표시한 검수 이미지를 넘겨 가며 비교해 보세요.',
       title: '',
       description: '',
     },
@@ -79,40 +93,88 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 
     <p class="ai-analysis__intro">{{ statusMeta.intro }}</p>
 
-    <template v-if="analysis.status === 'COMPLETED'">
+    <template v-if="analysis.status === 'COMPLETED' && currentImage">
+      <div class="ai-analysis__carousel-nav">
+        <button
+          type="button"
+          class="ai-analysis__nav-button"
+          :disabled="total <= 1"
+          aria-label="이전 검수 이미지"
+          @click="goPrev"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+        </button>
+
+        <div class="ai-analysis__carousel-meta">
+          <span class="ai-analysis__carousel-label">{{ currentImage.label }}</span>
+          <span class="ai-analysis__carousel-count">{{ currentIndex + 1 }} / {{ total }}</span>
+        </div>
+
+        <button
+          type="button"
+          class="ai-analysis__nav-button"
+          :disabled="total <= 1"
+          aria-label="다음 검수 이미지"
+          @click="goNext"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+        </button>
+      </div>
+
       <div class="ai-analysis__comparison" aria-live="polite">
         <figure>
-          <figcaption>{{ selectedImage?.label ?? '대표' }} 원본 이미지</figcaption>
+          <figcaption>{{ currentImage.label }} 원본 이미지</figcaption>
           <div class="ai-analysis__image-frame">
-            <img
-              :src="analysis.originalImageUrl"
-              :alt="`${selectedImage?.label ?? '대표'} ${analysis.originalImageAlt}`"
-              :style="comparisonImageStyle"
-            />
+            <img :src="currentImage.originalImageUrl" :alt="currentImage.originalImageAlt" />
           </div>
         </figure>
 
         <figure>
           <figcaption>
-            <span>{{ selectedImage?.label ?? '대표' }} AI 검수 이미지</span>
+            <span>{{ currentImage.label }} AI 검수 이미지</span>
             <span class="ai-analysis__reference-label">탐지 위치 표시</span>
           </figcaption>
           <div class="ai-analysis__image-frame">
-            <img
-              :src="analysis.analyzedImageUrl"
-              :alt="`${selectedImage?.label ?? '대표'} ${analysis.analyzedImageAlt}`"
-              :style="comparisonImageStyle"
+            <img :src="currentImage.analyzedImageUrl" :alt="currentImage.analyzedImageAlt" />
+            <span
+              v-for="(box, boxIndex) in currentBoxes"
+              :key="boxIndex"
+              class="ai-analysis__box"
+              :style="{
+                left: `${box.x}%`,
+                top: `${box.y}%`,
+                width: `${box.width}%`,
+                height: `${box.height}%`,
+              }"
             />
           </div>
         </figure>
       </div>
 
+      <div
+        v-if="total > 1"
+        class="ai-analysis__dots"
+        role="tablist"
+        aria-label="검수 이미지 선택"
+      >
+        <button
+          v-for="(image, dotIndex) in images"
+          :key="image.id"
+          type="button"
+          class="ai-analysis__dot"
+          :class="{ 'ai-analysis__dot--active': dotIndex === currentIndex }"
+          :aria-label="`${image.label} 검수 이미지 보기`"
+          :aria-current="dotIndex === currentIndex"
+          @click="goTo(dotIndex)"
+        />
+      </div>
+
       <div class="ai-analysis__description">
         <h3>AI 분석 설명</h3>
-        <p>{{ analysis.summary }}</p>
+        <p>{{ currentImage.summary }}</p>
 
-        <ul>
-          <li v-for="(finding, index) in analysis.findings" :key="finding.id">
+        <ul v-if="currentImage.findings.length">
+          <li v-for="(finding, index) in currentImage.findings" :key="finding.id">
             <span>{{ index + 1 }}</span>
             <div>
               <strong>{{ finding.type }} · {{ finding.location }}</strong>
@@ -235,6 +297,242 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
   line-height: 24px;
 }
 
+.ai-analysis__carousel-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6) 0;
+}
+
+.ai-analysis__nav-button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  place-items: center;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.ai-analysis__nav-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.ai-analysis__nav-button:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.ai-analysis__nav-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.ai-analysis__nav-button:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 2px;
+}
+
+.ai-analysis__carousel-meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.ai-analysis__carousel-label {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+.ai-analysis__carousel-count {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.ai-analysis__comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-6) var(--space-4);
+}
+
+.ai-analysis__comparison figure {
+  min-width: 0;
+}
+
+.ai-analysis__comparison figcaption {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.ai-analysis__reference-label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.ai-analysis__image-frame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-media);
+  background: var(--color-surface-secondary);
+}
+
+.ai-analysis__image-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ai-analysis__box {
+  position: absolute;
+  border: 2px solid var(--color-error);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+}
+
+.ai-analysis__dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-6) var(--space-2);
+}
+
+.ai-analysis__dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.ai-analysis__dot--active {
+  background: var(--color-primary);
+  transform: scale(1.25);
+}
+
+.ai-analysis__dot:focus-visible {
+  outline: 3px solid var(--color-primary-soft);
+  outline-offset: 2px;
+}
+
+.ai-analysis__description {
+  padding: var(--space-6);
+  border-top: 1px solid var(--color-border);
+}
+
+.ai-analysis__description h3 {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.ai-analysis__description > p {
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 24px;
+}
+
+.ai-analysis__description ul {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  list-style: none;
+}
+
+.ai-analysis__description li {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.ai-analysis__description li > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-error);
+  color: var(--color-text-inverse);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 18px;
+  place-items: center;
+}
+
+.ai-analysis__description li strong {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.ai-analysis__description li p {
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.ai-analysis__description .ai-analysis__disclaimer {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.ai-analysis__disclaimer > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--color-text-muted);
+  border-radius: 50%;
+  font-family: serif;
+  font-weight: 700;
+  place-items: center;
+}
+
 .ai-analysis__state {
   display: grid;
   min-height: 340px;
@@ -341,138 +639,6 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
   to {
     transform: rotate(360deg);
   }
-}
-
-.ai-analysis__comparison {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-6);
-  padding: var(--space-6);
-}
-
-.ai-analysis__comparison figure {
-  min-width: 0;
-}
-
-.ai-analysis__comparison figcaption {
-  display: flex;
-  min-height: 24px;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
-}
-
-.ai-analysis__reference-label {
-  color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 16px;
-}
-
-.ai-analysis__image-frame {
-  overflow: hidden;
-  aspect-ratio: 4 / 5;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-media);
-  background: var(--color-surface-secondary);
-}
-
-.ai-analysis__image-frame img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 180ms ease;
-}
-
-.ai-analysis__description {
-  padding: var(--space-6);
-  border-top: 1px solid var(--color-border);
-}
-
-.ai-analysis__description h3 {
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
-}
-
-.ai-analysis__description > p {
-  margin-top: var(--space-2);
-  color: var(--color-text-secondary);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 24px;
-}
-
-.ai-analysis__description ul {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-3);
-  margin-top: var(--space-5);
-  list-style: none;
-}
-
-.ai-analysis__description li {
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-}
-
-.ai-analysis__description li > span {
-  display: grid;
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--color-error);
-  color: var(--color-text-inverse);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 18px;
-  place-items: center;
-}
-
-.ai-analysis__description li strong {
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 24px;
-}
-
-.ai-analysis__description li p {
-  margin-top: 2px;
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
-}
-
-.ai-analysis__description .ai-analysis__disclaimer {
-  display: flex;
-  gap: var(--space-3);
-  margin-top: var(--space-5);
-  padding: var(--space-4);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-secondary);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
-}
-
-.ai-analysis__disclaimer > span {
-  display: grid;
-  flex: 0 0 auto;
-  width: 20px;
-  height: 20px;
-  border: 1px solid var(--color-text-muted);
-  border-radius: 50%;
-  font-family: serif;
-  font-weight: 700;
-  place-items: center;
 }
 
 @media (max-width: 760px) {

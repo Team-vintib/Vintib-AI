@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 
 import logoImage from '@/assets/images/logo.png'
 import { getSsafySsoStartUrl } from '@/domains/auth/api/authApi'
+import { ROUTE_NAMES } from '@/shared/constants/routes'
 
 const SSO_SOURCE_STORAGE_KEY = 'vintib_ssafy_sso_source'
 
@@ -59,7 +60,13 @@ function getQueryValue(value: unknown) {
     aria-labelledby="ssafy-title"
   >
     <header class="ssafy-header">
-      <img class="ssafy-header__logo" :src="logoImage" alt="VinTib" />
+      <RouterLink
+        class="ssafy-header__logo-link"
+        :to="{ name: ROUTE_NAMES.HOME }"
+        aria-label="VinTib 홈"
+      >
+        <img class="ssafy-header__logo" :src="logoImage" alt="VinTib" />
+      </RouterLink>
       <p class="ssafy-header__eyebrow">SSAFYERS SSO</p>
       <h1 id="ssafy-title" class="ssafy-header__title text-[var(--color-text-primary)]">
         {{ title }}
@@ -100,12 +107,19 @@ function getQueryValue(value: unknown) {
   text-align: center;
 }
 
-.ssafy-header__logo {
+.ssafy-header__logo-link {
+  display: block;
   width: min(180px, 52vw);
-  height: auto;
   margin-right: auto;
   margin-bottom: var(--space-2);
   margin-left: auto;
+  border-radius: var(--radius-control);
+}
+
+.ssafy-header__logo {
+  display: block;
+  width: 100%;
+  height: auto;
   object-fit: contain;
 }
 
@@ -188,6 +202,7 @@ function getQueryValue(value: unknown) {
 }
 
 .ssafy-primary-button:focus-visible,
+.ssafy-header__logo-link:focus-visible,
 .ssafy-secondary-button:focus-visible {
   outline: 3px solid var(--color-primary);
   outline-offset: 3px;

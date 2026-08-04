@@ -155,7 +155,13 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
       aria-labelledby="link-title"
     >
       <header class="link-header">
-        <img class="link-header__logo" :src="logoImage" alt="VinTib" />
+        <RouterLink
+          class="link-header__logo-link"
+          :to="{ name: ROUTE_NAMES.HOME }"
+          aria-label="VinTib 홈"
+        >
+          <img class="link-header__logo" :src="logoImage" alt="VinTib" />
+        </RouterLink>
         <p class="link-header__eyebrow">SSAFYERS SSO</p>
         <h1 id="link-title" class="link-header__title">기존 계정 연결 안내</h1>
         <p class="link-header__description">
@@ -269,12 +275,19 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
   text-align: center;
 }
 
-.link-header__logo {
+.link-header__logo-link {
+  display: block;
   width: min(180px, 52vw);
-  height: auto;
   margin-right: auto;
   margin-bottom: var(--space-2);
   margin-left: auto;
+  border-radius: var(--radius-control);
+}
+
+.link-header__logo {
+  display: block;
+  width: 100%;
+  height: auto;
   object-fit: contain;
 }
 
@@ -451,6 +464,7 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
 
 .link-primary:focus-visible,
 .link-secondary:focus-visible,
+.link-header__logo-link:focus-visible,
 .link-text-button:focus-visible {
   outline: 3px solid var(--color-primary);
   outline-offset: 3px;

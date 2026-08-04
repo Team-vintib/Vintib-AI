@@ -17,6 +17,7 @@ import type {
   PointBalance,
   PointTransaction,
 } from '@/domains/point/types/point.types'
+import { dispatchPointBalanceUpdated } from '@/domains/point/utils/pointBalanceEvents'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
@@ -98,7 +99,9 @@ const handleCharge = async (amount: number) => {
   actionErrorMessage.value = ''
 
   try {
-    balance.value = await chargePoints(authStore.user.id, amount)
+    const nextBalance = await chargePoints(authStore.user.id, amount)
+    balance.value = nextBalance
+    dispatchPointBalanceUpdated({ userId: authStore.user.id, balance: nextBalance })
     actionMessage.value = `${amount.toLocaleString('ko-KR')}P 충전 요청이 처리되었습니다.`
     await loadWallet()
     selectedSection.value = 'history'
