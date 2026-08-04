@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
+import fallbackProductImage from '@/assets/images/products/product-denim-jacket.webp'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { addWish, removeWish } from '@/domains/product/api/productApi'
 import { useWishStore } from '@/domains/product/stores/wishStore'
@@ -34,6 +35,15 @@ const wishStore = useWishStore()
 const validTabIds: SearchResultTabId[] = ['all', 'product', 'live', 'member']
 const validSortOptionIds: SearchSortOptionId[] = ['LATEST', 'PRICE_ASC', 'PRICE_DESC']
 const validMockStatuses = ['loading', 'error', 'empty'] as const
+const getProductThumbnail = (imageUrl: string) => imageUrl || fallbackProductImage
+const handleProductImageError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackProductImage
+  }
+}
 const SEARCH_RESULT_PREVIEW_LIMIT = 3
 const SEARCH_PRODUCT_PAGE_SIZE = 3
 const SEARCH_LIVE_PAGE_SIZE = 2
@@ -1011,8 +1021,9 @@ watch(
                     >
                       <img
                         class="search-product-card__image"
-                        :src="product.imageUrl"
+                        :src="getProductThumbnail(product.imageUrl)"
                         :alt="product.imageAlt"
+                        @error="handleProductImageError"
                       />
                       <span class="search-product-card__grade">{{ product.conditionGrade }}급</span>
                     </RouterLink>

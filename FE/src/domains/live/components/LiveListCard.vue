@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { registerLiveReminder } from '@/domains/live/api/liveWatchApi'
+import fallbackLiveThumbnail from '@/assets/images/products/product-denim-jacket.webp'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 
 import type { LiveListItem } from '@/domains/live/types/liveList.types'
@@ -18,6 +19,15 @@ const authStore = useAuthStore()
 const isReminderPending = ref(false)
 const isReminderSet = ref(false)
 const actionMessage = ref('')
+const displayThumbnailUrl = computed(() => props.live.thumbnailUrl || fallbackLiveThumbnail)
+const handleThumbnailError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackLiveThumbnail
+  }
+}
 
 const statusLabel = computed(() => {
   if (props.live.status === 'LIVE') {
@@ -132,7 +142,12 @@ const handleActionClick = () => {
     @keydown.space.prevent="handleCardClick"
   >
     <span class="live-list-card__media">
-      <img class="live-list-card__image" :src="live.thumbnailUrl" :alt="`${live.title} 썸네일`" />
+      <img
+        class="live-list-card__image"
+        :src="displayThumbnailUrl"
+        :alt="`${live.title} 썸네일`"
+        @error="handleThumbnailError"
+      />
       <span class="live-list-card__badge" :class="statusClass">
         {{ statusLabel }}
       </span>
