@@ -80,4 +80,27 @@ public class PointAccount {
         this.withdrawing += amount;
         this.updatedAt = LocalDateTime.now();
     }
+
+    /** 잔액이 충분한지. 보류 전에 서비스가 먼저 확인해 부족하면 400으로 돌려준다 — DB
+     *  {@code ck_point_non_negative}까지 가면 500이 된다. */
+    public boolean hasEnoughAvailable(long amount) {
+        return available >= amount;
+    }
+
+    /**
+     * 입찰 보류(AUCT-007). {@code available}에서 빼 {@code bidHeld}로 옮긴다.
+     * 잔액 검증은 {@link #hasEnoughAvailable}로 서비스가 미리 한다.
+     */
+    public void holdForBid(long amount) {
+        this.available -= amount;
+        this.bidHeld += amount;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /** 보류 해제(AUCT-008). 상위 입찰에 밀리거나 경매가 유찰됐을 때 {@code bidHeld}를 되돌린다. */
+    public void releaseHold(long amount) {
+        this.bidHeld -= amount;
+        this.available += amount;
+        this.updatedAt = LocalDateTime.now();
+    }
 }
