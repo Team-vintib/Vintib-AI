@@ -222,14 +222,73 @@ svg {
   letter-spacing: -0.04em;
 }
 
+/* 텍스트 선택 · 스크롤바 (VinTib) */
+::selection {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-page);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-input);
+}
+
+/* 키보드 포커스 (스펙: 1px #F2F0ED, offset 2px) */
+:focus-visible {
+  outline: 1px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* VinTib 모션 키프레임 */
+@keyframes vtReveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes vtPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+@keyframes vtBar {
+  from {
+    transform: scaleY(0.04);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
 /* 접근성: 모션 최소화. 콘텐츠는 절대 숨기지 않는다(리빌 실패 시에도 보여야 함). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    animation: none !important;
+    transition: none !important;
     scroll-behavior: auto !important;
   }
 }
