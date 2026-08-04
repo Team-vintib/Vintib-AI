@@ -307,6 +307,70 @@ class LiveServiceTest {
     }
 
     @Test
+    void 목록_조회에서_본인_라이브면_isHost가_true고_아니면_false다() {
+        when(host.getId()).thenReturn(HOST_ID);
+        Live 내_라이브 = Live.openNow(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now());
+        ReflectionTestUtils.setField(내_라이브, "id", LIVE_ID);
+        when(liveRepository.findPublicLives(
+                        eq(LiveService.PUBLIC_STATUSES), eq(false), eq(List.of()), eq(false), eq(null),
+                        any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(내_라이브)));
+        when(liveProductService.getCategoriesByLiveIds(any())).thenReturn(java.util.Map.of());
+        when(liveViewerService.getViewerCounts(any())).thenReturn(java.util.Map.of());
+
+        PageResponse<LiveListItemResponse> 본인_조회 = liveService.getLives(
+                null, null, LiveService.PUBLIC_STATUSES, LiveListSort.LATEST, 0, 12, HOST_ID);
+        PageResponse<LiveListItemResponse> 타인_조회 = liveService.getLives(
+                null, null, LiveService.PUBLIC_STATUSES, LiveListSort.LATEST, 0, 12, OTHER_MEMBER_ID);
+
+        assertThat(본인_조회.content().get(0).isHost()).isTrue();
+        assertThat(타인_조회.content().get(0).isHost()).isFalse();
+    }
+
+    @Test
+    void 예정_시각이_지난_예약_라이브는_자동으로_LIVE로_전이된다() {
+        when(host.getId()).thenReturn(HOST_ID);
+        Live 지난_예약 = Live.schedule(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now().minusMinutes(1));
+        ReflectionTestUtils.setField(지난_예약, "id", LIVE_ID);
+        when(liveRepository.findByStatusAndScheduledAtLessThanEqualOrderByScheduledAtAsc(
+                        eq(LiveStatus.SCHEDULED), any(LocalDateTime.class), any(Pageable.class)))
+                .thenReturn(List.of(지난_예약));
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(지난_예약));
+        when(followRepository.findByFollowing_Id(eq(HOST_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        List<LiveResponse> started = liveService.autoStartDueLives();
+
+        assertThat(started).hasSize(1);
+        assertThat(started.get(0).status()).isEqualTo(LiveStatus.LIVE);
+        assertThat(지난_예약.getStatus()).isEqualTo(LiveStatus.LIVE);
+    }
+
+    @Test
+    void 자동_시작_중_한_라이브가_실패해도_나머지는_전이된다() {
+        when(host.getId()).thenReturn(HOST_ID);
+        Live 실패할_라이브 = Live.schedule(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now().minusMinutes(2));
+        ReflectionTestUtils.setField(실패할_라이브, "id", LIVE_ID);
+        Long 다른_라이브_ID = 202L;
+        Live 성공할_라이브 = Live.schedule(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now().minusMinutes(1));
+        ReflectionTestUtils.setField(성공할_라이브, "id", 다른_라이브_ID);
+        when(liveRepository.findByStatusAndScheduledAtLessThanEqualOrderByScheduledAtAsc(
+                        eq(LiveStatus.SCHEDULED), any(LocalDateTime.class), any(Pageable.class)))
+                .thenReturn(List.of(실패할_라이브, 성공할_라이브));
+        // 실패할_라이브는 조회 시점에 이미 사라진 것으로 흉내 낸다(다른 트랜잭션이 먼저 처리한 경우 등).
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.empty());
+        when(liveRepository.findById(다른_라이브_ID)).thenReturn(Optional.of(성공할_라이브));
+        when(followRepository.findByFollowing_Id(eq(HOST_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        List<LiveResponse> started = liveService.autoStartDueLives();
+
+        assertThat(started).hasSize(1);
+        assertThat(started.get(0).id()).isEqualTo(다른_라이브_ID);
+        assertThat(성공할_라이브.getStatus()).isEqualTo(LiveStatus.LIVE);
+    }
+
+    @Test
     void 존재하지_않는_회원이_개설하면_예외가_발생한다() {
         when(memberRepository.findById(HOST_ID)).thenReturn(Optional.empty());
         LiveScheduleRequest request =
