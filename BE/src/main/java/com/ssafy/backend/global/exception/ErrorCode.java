@@ -67,6 +67,11 @@ public enum ErrorCode {
     ORDER_SHIPMENT_ADDRESS_REQUIRED(HttpStatus.BAD_REQUEST, "O007", "배송지가 아직 등록되지 않았습니다."),
     ORDER_SHIPMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "O008", "등록된 배송지/송장 정보가 없습니다."),
 
+    // [환불]
+    REFUND_NOT_FOUND(HttpStatus.NOT_FOUND, "R001", "존재하지 않는 환불 요청입니다."),
+    REFUND_ALREADY_REQUESTED(HttpStatus.CONFLICT, "R002", "이미 진행 중인 환불 요청이 있습니다."),
+    REFUND_ALREADY_REVIEWED(HttpStatus.BAD_REQUEST, "R003", "이미 처리된 환불 요청입니다."),
+
     // [사업자]
     BUSINESS_CERTIFICATE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "B001", "업로드가 확인되지 않았습니다. 먼저 사업자등록증을 업로드해주세요."),
     BUSINESS_INFO_FORBIDDEN(HttpStatus.FORBIDDEN, "B002", "본인의 사업자 정보만 처리할 수 있습니다."),

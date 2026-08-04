@@ -222,6 +222,19 @@ class PointServiceTest {
     }
 
     @Test
+    void 환불_승인시_구매자_tradeEscrow가_줄고_available로_돌아온다() {
+        PointAccount buyerAccount = newAccount();
+        buyerAccount.charge(100_000L);
+        buyerAccount.pay(60_000L);
+        when(pointAccountRepository.findById(MEMBER_ID)).thenReturn(Optional.of(buyerAccount));
+
+        pointService.refundOrder(MEMBER_ID, 60_000L, 10L);
+
+        assertThat(buyerAccount.getTradeEscrow()).isZero();
+        assertThat(buyerAccount.getAvailable()).isEqualTo(100_000L);
+    }
+
+    @Test
     void 출금_내역_조회시_WITHDRAW_타입만_반환한다() {
         Pageable pageable = PageRequest.of(0, 20);
         PointTransaction withdrawal = PointTransaction.builder()

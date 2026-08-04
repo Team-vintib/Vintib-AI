@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 // 주문 리소스(/api/orders). 경로에 userId가 없어 requireSelf 패턴 대신 서비스 내부
 // Order.isPartyOf(principal)/isBuyer/isSeller에 권한 확인을 위임한다(InvoiceController와 동일한 이유).
-@Tag(name = "주문 / 배송 / 환불(Orders)", description = "주문 생성/조회, 배송지·송장, 구매 확정 API")
+@Tag(name = "주문 / 배송 / 환불(Orders)", description = "주문 생성/조회, 배송지·송장, 구매 확정, 환불 요청/승인/거절 API")
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor

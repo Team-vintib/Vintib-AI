@@ -65,6 +65,9 @@ public class Order extends BaseTimeEntity {
     @Column(name = "auto_confirm_at")
     private LocalDateTime autoConfirmAt;
 
+    @Column(name = "refund_requested", nullable = false)
+    private boolean refundRequested;
+
     @Builder(access = AccessLevel.PACKAGE)
     private Order(Member buyer, Member seller, Product product, Auction auction, Long orderPrice, OrderStatus status) {
         this.buyer = buyer;
@@ -101,6 +104,25 @@ public class Order extends BaseTimeEntity {
     public void confirmAndSettle() {
         this.status = OrderStatus.CONFIRMED;
         this.status = OrderStatus.SETTLED;
+    }
+
+    /** 환불 요청(REFUND-001) — 전제조건(PAID/SHIPPING/DELIVERED, 중복 요청 아님)은 서비스가 검증한다. */
+    public void markRefundRequested() {
+        this.refundRequested = true;
+    }
+
+    /**
+     * 환불 승인(REFUND-002) — {@code status}를 바꾸지 않고 바로 REFUNDED로 전이한다.
+     * 정산(포인트 환급)은 서비스가 처리한다.
+     */
+    public void markRefunded() {
+        this.refundRequested = false;
+        this.status = OrderStatus.REFUNDED;
+    }
+
+    /** 환불 거절(REFUND-002) — {@code status}는 요청 이전 상태 그대로 둔다(진행 중이던 흐름을 이어간다). */
+    public void clearRefundRequested() {
+        this.refundRequested = false;
     }
 
     /** memberId가 이 주문의 구매자 또는 판매자인지 확인한다. 세금계산서 등 주문 관련 API의 권한 확인에 쓴다. */

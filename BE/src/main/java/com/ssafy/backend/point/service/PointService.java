@@ -30,7 +30,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 포인트 잔액 조회/충전/출금 신청(MY-007), 주문 결제·정산({@link #pay}/{@link #settleOrder}, SALE-002/ORDER-002/003).
+ * 포인트 잔액 조회/충전/출금 신청(MY-007), 주문 결제·정산({@link #pay}/{@link #settleOrder}, SALE-002/ORDER-002/003),
+ * 환불 승인 시 구매자 환급({@link #refundOrder}, REFUND-002).
  *
  * <p>입찰 보류(bidHeld)는 경매 입찰 자체가 아직 없어(AUCT-003 이후) 이번 범위에서도 항상 0이다.
  * 정산 대기(settling)도 관리자 승인·정산 주기 절차가 정의되지 않아 쓰지 않는다 — 구매 확정 시
@@ -165,6 +166,24 @@ public class PointService {
                 .type(PointTransactionType.SETTLEMENT)
                 .amount(amount)
                 .balanceAfter(sellerAccount.getAvailable())
+                .refType("ORDER")
+                .refId(orderId)
+                .build());
+    }
+
+    /**
+     * 환불 승인 정산(REFUND-002) — 보관 중이던 대금을 판매자에게 정산하지 않고 구매자 available로
+     * 돌려준다. {@link #settleOrder}와 달리 판매자 측 반영이 없다.
+     */
+    @Transactional
+    public void refundOrder(Long buyerId, Long amount, Long orderId) {
+        PointAccount account = getOrCreateAccount(buyerId);
+        account.refund(amount);
+        pointTransactionRepository.save(PointTransaction.builder()
+                .member(account.getMember())
+                .type(PointTransactionType.REFUND)
+                .amount(amount)
+                .balanceAfter(account.getAvailable())
                 .refType("ORDER")
                 .refId(orderId)
                 .build());

@@ -40,7 +40,6 @@
 | 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰 연결 완료 | 생성용 상품 조회, AI 시착 생성 |
 | 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API 연동 완료. 알림 seed 제거 후 실제 생성 데이터 없음 | 알림 type/ref 문서화, 실제 알림 생성 이벤트, 예약 라이브 알림 신청/스케줄러, 탭별 bulk read |
 | 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수, 경매 조건 설정 연결 완료 | 경매 snapshot/start/bid/close/STOMP |
-| 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | 주문 생성/목록/상세, 배송지, 송장(실 택배 조회 웹훅 포함), 구매확정, 포인트 잔액/내역/충전/출금 신청·내역 전부 구현 완료(계약은 요청과 다름 — 010 참고) | 환불(REFUND-001/002), 출금 계좌 관리(POINT-003), 오류 코드 명 확정 |
 
 ## 4. 기존 API 변경 요청
 
@@ -85,4 +84,9 @@
 ## 2026-08-03 정리
 
 - `013-live-seller-control.md`는 완전히 반영돼(현재 소개 상품 전환 + STOMP 전파까지 확인) 삭제했다 — 위 표에서도 뺐다.
-- `010`은 주문/배송/포인트 대부분이 구현 완료됐다 — 남은 건 환불/출금 계좌/오류 코드뿐(010 문서 참고).
+
+## 2026-08-04 정리
+
+- `010-commerce-wallet-contract.md`는 남아 있던 환불(REFUND-001/002, 이슈 509)·출금 계좌·최소 충전/출금
+  금액(10,000원)까지 전부 반영돼 삭제했다 — 위 표에서도 뺐다. 환불 승인 주체는 운영자가 아니라
+  판매자로 확정했다(`docs/plans/BE/SY037-refund.md` 참고).

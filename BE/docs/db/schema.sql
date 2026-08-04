@@ -434,16 +434,19 @@ CREATE TABLE orders (
     auction_id      BIGINT      REFERENCES auction (id),  -- 상시 판매 주문은 NULL
     order_price     BIGINT      NOT NULL,
     status          VARCHAR(30) NOT NULL DEFAULT 'PAID',
-    -- 배송 완료 후 7일 경과 시 자동 구매 확정. 스케줄러가 이 컬럼으로 대상을 찾는다.
+    -- 배송 완료 후 3일 경과 시 자동 구매 확정. 스케줄러가 이 컬럼으로 대상을 찾는다.
     -- 배송 완료 시점(delivered_at)에 계산해 채운다.
-    auto_confirm_at TIMESTAMPTZ,
+    auto_confirm_at   TIMESTAMPTZ,
+    -- 진행 중인(REQUESTED) 환불 요청이 있는 동안 true. 송장 등록·구매 확정(수동/자동)을 막는 용도로만
+    -- 쓴다 — 요청 중에도 status는 바꾸지 않는다(REFUND-001/002).
+    refund_requested  BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT ck_order_status CHECK (status IN (
         'PAID',        -- 결제 완료, 거래 대금 보관 중
         'SHIPPING',    -- 송장 등록·배송 중 (SHIP-*)
         'DELIVERED',   -- 배송 완료
-        'CONFIRMED',   -- 구매 확정 (수동 또는 7일 자동)
+        'CONFIRMED',   -- 구매 확정 (수동 또는 3일 자동)
         'SETTLED',     -- 판매자 정산 완료
         'REFUNDED',
         'CANCELED'
@@ -477,6 +480,27 @@ CREATE TABLE order_shipment (
         'DAESIN', 'LOGEN', 'HAPDONG', 'COUPANG', 'WOORI'
     ))
 );
+
+-- 환불 요청·승인/거절 (REFUND-001/002). 구매자가 요청하고 판매자가 승인/거절한다(운영자 승인 아님 —
+-- 이 프로젝트엔 관리자 역할이 없다). 승인되면 보관 중이던 대금을 판매자 정산 없이 구매자 포인트로
+-- 돌려준다(point_transaction의 REFUND 타입). 같은 주문에 여러 건 있을 수 있다(거절 후 재요청 허용).
+CREATE TABLE refund_request (
+    id               BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    order_id         BIGINT      NOT NULL REFERENCES orders (id),
+    reason           VARCHAR(30) NOT NULL,
+    detail_reason    TEXT        NOT NULL,
+    status           VARCHAR(20) NOT NULL DEFAULT 'REQUESTED',
+    rejection_reason TEXT,
+    reviewed_at      TIMESTAMPTZ,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_refund_request_reason CHECK (reason IN (
+        'NOT_AS_DESCRIBED', 'UNDISCLOSED_DEFECT', 'NOT_SHIPPED', 'DUPLICATE_PAYMENT', 'SYSTEM_ERROR'
+    )),
+    CONSTRAINT ck_refund_request_status CHECK (status IN ('REQUESTED', 'APPROVED', 'REJECTED'))
+);
+
+CREATE INDEX ix_refund_request_order ON refund_request (order_id, created_at DESC);
 
 -- 세금계산서 (BIZ-002). 법적 문서라 발행 시점 사업자 정보를 스냅샷으로 저장한다 —
 -- 이후 판매자가 business_info를 바꿔도 이미 발행된 계산서는 바뀌지 않는다.
