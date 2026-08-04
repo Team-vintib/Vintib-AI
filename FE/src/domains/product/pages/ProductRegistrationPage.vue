@@ -2487,13 +2487,16 @@ onBeforeUnmount(() => {
 
 .product-registration__header h1 {
   color: var(--color-text-primary);
-  font-size: 36px;
-  font-weight: var(--font-weight-extrabold);
-  line-height: 48px;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
 }
 
 .product-registration__header p {
   color: var(--color-text-secondary);
+  font-weight: 300;
 }
 
 .product-registration__steps ol {
