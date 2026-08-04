@@ -44,7 +44,7 @@ API가 없어 **mock 처리**로 구현하고, 필요한 계약은 `docs/request
 
 - 미낙찰 처리에 필요한 API가 **전부 존재**해 실 API로 연결했다(006 §2 연동 완료). mock 처리 없음.
 - **의미 확인 요청**: 경매 종료 상품에 `/status`·`/auction-schedule`를 그대로 호출해도 되는지, "복원"
-  선행 단계가 필요한지 → `docs/requests/BE/014-unsold-product-disposition.md`.
+  선행 단계가 필요한지 → `docs/requests/BE/007-unsold-product-disposition.md`.
 - **등록 내용 전체 수정**(가격 외 필드) API는 없음 → 지금은 **가격만** 지정/수정. 필요 시 상품 수정 API
   요청(014에 명시).
 - 미리보기/비로그인에서는 상품 API가 인증 필요라 실패 → 카드가 라이브 상품 데이터로 대체 표시(실제 처리

@@ -63,6 +63,12 @@ public enum ErrorCode {
     // [지갑/주문]
     INSUFFICIENT_POINTS(HttpStatus.BAD_REQUEST, "W001", "포인트 잔액이 부족합니다."),
     WITHDRAWAL_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "W002", "출금 가능 금액을 초과했습니다."),
+    PAYMENT_CHARGE_NOT_FOUND(HttpStatus.NOT_FOUND, "W003", "존재하지 않는 결제 준비 정보입니다."),
+    PAYMENT_ALREADY_PROCESSED(HttpStatus.BAD_REQUEST, "W004", "이미 처리된 결제입니다."),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "W005", "결제 금액이 준비된 금액과 일치하지 않습니다."),
+    PAYMENT_CONFIRM_FAILED(HttpStatus.BAD_REQUEST, "W006", "결제 승인에 실패했습니다."),
+    WITHDRAWAL_ACCOUNT_REQUIRED(HttpStatus.BAD_REQUEST, "W007", "등록된 출금 계좌가 없습니다. 먼저 계좌를 등록해주세요."),
+    WITHDRAWAL_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "W008", "등록된 출금 계좌가 없습니다."),
     INVALID_ORDER_STATE(HttpStatus.BAD_REQUEST, "O001", "현재 상태에서는 해당 처리를 할 수 없습니다."),
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "O002", "존재하지 않는 주문입니다."),
     SELF_PURCHASE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "O003", "본인이 등록한 상품은 구매할 수 없습니다."),
@@ -71,6 +77,11 @@ public enum ErrorCode {
     ORDER_SELLER_ONLY(HttpStatus.FORBIDDEN, "O006", "판매자만 처리할 수 있습니다."),
     ORDER_SHIPMENT_ADDRESS_REQUIRED(HttpStatus.BAD_REQUEST, "O007", "배송지가 아직 등록되지 않았습니다."),
     ORDER_SHIPMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "O008", "등록된 배송지/송장 정보가 없습니다."),
+
+    // [환불]
+    REFUND_NOT_FOUND(HttpStatus.NOT_FOUND, "R001", "존재하지 않는 환불 요청입니다."),
+    REFUND_ALREADY_REQUESTED(HttpStatus.CONFLICT, "R002", "이미 진행 중인 환불 요청이 있습니다."),
+    REFUND_ALREADY_REVIEWED(HttpStatus.BAD_REQUEST, "R003", "이미 처리된 환불 요청입니다."),
 
     // [사업자]
     BUSINESS_CERTIFICATE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "B001", "업로드가 확인되지 않았습니다. 먼저 사업자등록증을 업로드해주세요."),

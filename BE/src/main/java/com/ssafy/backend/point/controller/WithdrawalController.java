@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 // 출금 신청/내역(MY-007, POINT-004). points 하위가 아니라 독립 리소스로 확정(APIs.md).
 // 관리자 승인 체계가 없어 신청까지만 처리한다 — 완료 처리는 DB 직접 조작.
-@Tag(name = "포인트/출금(Wallet)", description = "포인트 잔액/충전, 출금 신청/내역 API")
+@Tag(name = "포인트 / 계좌 / 출금 (Wallet)", description = "포인트 잔액/충전, 출금 신청/내역 API")
 @RestController
 @RequestMapping("/api/users/{userId}/withdrawals")
 @RequiredArgsConstructor
@@ -36,7 +36,7 @@ public class WithdrawalController {
     private final PointService pointService;
 
     @Operation(summary = "출금 신청",
-            description = "잔액에서 출금을 신청한다(신청까지만 처리 — 완료 처리는 범위 밖). available 잔액이 부족하면 400으로 거부된다.")
+            description = "잔액에서 출금을 신청한다. available 잔액이 부족하면 400으로 거부된다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "출금 신청 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잔액 부족 또는 요청값 검증 실패"),

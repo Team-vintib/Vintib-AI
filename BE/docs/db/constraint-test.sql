@@ -13,7 +13,7 @@ SET client_min_messages TO NOTICE;
 INSERT INTO member (email, nickname) VALUES
     ('seller@t.com', '판매자'), ('bidder1@t.com', '입찰자1'), ('bidder2@t.com', '입찰자2');
 
-INSERT INTO category (name) VALUES ('아우터');
+INSERT INTO category (name, name_en) VALUES ('아우터', 'OUTER');
 
 INSERT INTO product (seller_id, category_id, title, sale_type, sale_status, price)
 VALUES (1, 1, '빈티지 데님 자켓', 'AUCTION', 'AUCTION_SCHEDULED', NULL),

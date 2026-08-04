@@ -62,7 +62,7 @@
 - [x] `product/service/ProductService.java` — 포트 주입, 상세조회 조립 로직
 - [x] `BE/docs/db/schema.sql`/`comments.sql`(follow 테이블) 수정 → `regen.sh` 실행
 - [x] `../../../../../APIs.md` 238 행 — 이미 구현 완료 ✓ 표시돼 있었음(필드 목록 컬럼은 없음)
-- [x] `docs/requests/BE/006-product-contract.md` 3.2절 반영 정리(`similarProducts`/`priceDistribution`만 남김)
+- [x] `docs/requests/BE/002-product-contract.md` 3.2절 반영 정리(`similarProducts`/`priceDistribution`만 남김)
 - [ ] Jira에 "AI 품질분석 BE 연동" 신규 이슈 생성(에픽 211 하위) — 아직 안 함, 사용자 승인 필요
 - [x] `ProductServiceTest`에 포트를 목(mock)으로 주입한 상세조회 조립 케이스 추가(`categoryName`/`brandName` 포함)
 - [x] `BE:verify` 통과 확인
@@ -82,7 +82,7 @@
   반환하도록 이미 구현돼 있었다 — "비회원 isWished 값 정책" 미결정 사항을 `false`로 확정.
 - **`seller` 중첩 객체 대신 평탄 필드**: FE 요청 문서는 `seller: { ... }` 중첩 객체를 제안했지만,
   실제 구현은 기존 `sellerNickname`과 같은 레벨에 `sellerFollowerCount`/`sellerProductCount`를
-  평탄하게 추가했다 — 기존 응답 모양과의 일관성을 우선했다. `docs/requests/BE/006-product-contract.md`에
+  평탄하게 추가했다 — 기존 응답 모양과의 일관성을 우선했다. `docs/requests/BE/002-product-contract.md`에
   이 결정을 반영해뒀다.
 
 ## 확인 필요한 미결정 사항

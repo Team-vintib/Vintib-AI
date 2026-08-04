@@ -126,4 +126,14 @@ public class PointAccount {
         this.available += amount;
         this.updatedAt = LocalDateTime.now();
     }
+
+    /**
+     * 환불 승인(REFUND-002) 구매자 측 — 판매자에게 정산하지 않고 보관하던 금액을 그대로 돌려준다.
+     * {@link #releaseEscrow}와 달리 여기서는 available까지 함께 채운다.
+     */
+    public void refund(long amount) {
+        this.tradeEscrow -= amount;
+        this.available += amount;
+        this.updatedAt = LocalDateTime.now();
+    }
 }

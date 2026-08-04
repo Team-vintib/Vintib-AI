@@ -122,8 +122,8 @@ INVOICE_FORBIDDEN(HttpStatus.FORBIDDEN, "I004", "본인이 거래 당사자인 �
 ### 9) FE 문서
 
 - `docs/requests/BE/003-business-contract.md` §3.1/§3.2를 "구현 완료, 계약은 다르게 확정됨"(SY025가 이미 쓴 톤)으로 갱신: 경로·업로드 방식·응답 필드 차이 명시, 관리자 승인/`PATCH`는 범위 밖임을 명시.
-- 신규 `docs/requests/FE/011-business-invoice-contract.md`(`001-product-image-presigned-upload.md` 형식): BIZ-001 확정 계약 + BIZ-002는 "FE 요청 없었던 BE 주도 신규 API 안내"로 스펙 전달, 주문 생성 API가 없어 실제 호출 가능한 주문이 아직 없다는 제약 명시. 에러코드 표(`B001~B003`/`O002`/`I001~I004`) 포함.
-- `docs/requests/BE/012-be-request-index.md` 003번 행 갱신.
+- 신규 `docs/requests/FE/017-business-invoice-contract.md`(`002-product-image-presigned-upload.md` 형식): BIZ-001 확정 계약 + BIZ-002는 "FE 요청 없었던 BE 주도 신규 API 안내"로 스펙 전달, 주문 생성 API가 없어 실제 호출 가능한 주문이 아직 없다는 제약 명시. 에러코드 표(`B001~B003`/`O002`/`I001~I004`) 포함.
+- `docs/requests/BE/006-be-request-index.md` 003번 행 갱신.
 
 ### 10) 테스트
 
@@ -166,8 +166,8 @@ INVOICE_FORBIDDEN(HttpStatus.FORBIDDEN, "I004", "본인이 거래 당사자인 �
 - [ ] `order/controller/InvoiceController.java`(Swagger)
 - [ ] `ErrorCode`에 `O002`, `B001~B003`, `I001~I004` 추가
 - [ ] `docs/requests/BE/003-business-contract.md` 갱신
-- [ ] `docs/requests/FE/011-business-invoice-contract.md` 신규
-- [ ] `docs/requests/BE/012-be-request-index.md` 갱신
+- [ ] `docs/requests/FE/017-business-invoice-contract.md` 신규
+- [ ] `docs/requests/BE/006-be-request-index.md` 갱신
 - [ ] `BusinessInfoServiceTest`(9건), `InvoiceServiceTest`(7건)
 - [ ] `BE/README.md` 갱신
 - [ ] `.claude/skills/BE:verify` 기준 `./gradlew build` 통과 확인

@@ -14,7 +14,7 @@ Jira 436 `[AUCT-003~006 | FE] 경매 설정 패널 UI 구현` (스토리 `-97`/`
 - 기능 정의서 §4.7 — 판매자: **AUCT-001**(조건 설정), **AUCT-002**(단일 상품 시작),
   **AUCT-011**(최고 입찰자 표시), **AUCT-010**(종료 직전 자동 연장), **AUCT-014**(미낙찰 복원)
 - 시청자 입찰 패널 `LiveAuctionPanel.vue` / `liveAuction.types.ts` (표현 일관성용, 재사용 아님)
-- `docs/requests/BE/009-auction-chat-contract.md`(경매 시작/입찰/종료 이벤트 요청 중),
+- `docs/requests/BE/005-auction-chat-contract.md`(경매 시작/입찰/종료 이벤트 요청 중),
   `docs/requests/FE/001`(경매 토픽 Phase 6~8 ⏳)
 
 ## 작업 내용

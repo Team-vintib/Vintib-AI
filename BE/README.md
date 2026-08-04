@@ -193,17 +193,23 @@ BE/
 │   │   ├── service/              # InvoiceService, OrderService
 │   │   ├── entity/               # Order, OrderStatus, OrderShipment(배송지+송장, 공유 PK 1:1), Invoice
 │   │   ├── repository/           # OrderRepository, OrderShipmentRepository, InvoiceRepository
-│   │   ├── scheduler/            # OrderAutoConfirmScheduler(ORDER-003, 배송완료 7일 후 자동 구매확정)
+│   │   ├── scheduler/            # OrderAutoConfirmScheduler(ORDER-003, 배송완료 3일 후 자동 구매확정)
 │   │   └── dto/
-│   ├── point/                    # 포인트 잔액/충전/출금(MY-007), 주문 결제·정산(SALE-002/ORDER-002·003) — 서윤 / 입찰 보류·해제(AUCT-007~009) — 정윤
+│   ├── point/                    # 포인트 잔액/충전/출금(MY-007), 주문 결제·정산(SALE-002/ORDER-002·003), 환불 환급(REFUND-002) — 서윤 / 입찰 보류·해제(AUCT-007~009) — 정윤
 │   │   ├── controller/
-│   │   ├── service/              # PointService — pay(결제)/settleOrder(정산). 입찰 보류/해제는 auction/port/PointCommandAdapter가 이 패키지 엔티티를 직접 조립
-│   │   ├── entity/               # PointAccount(공유 PK 1:1, holdForBid/releaseHold/pay/releaseEscrow/settle), PointTransaction(원장), PointTransactionType, PointHold(AUCT-007~009), PointHoldStatus
+│   │   ├── service/              # PointService — pay(결제)/settleOrder(정산)/refundOrder(환불 환급)/readyCharge·confirmCharge(토스 결제위젯 충전, POINT-001). 입찰 보류/해제는 auction/port/PointCommandAdapter가 이 패키지 엔티티를 직접 조립
+│   │   ├── entity/               # PointAccount(공유 PK 1:1, holdForBid/releaseHold/pay/releaseEscrow/settle/refund), PointTransaction(원장), PointTransactionType, PointHold(AUCT-007~009), PointHoldStatus, PointCharge(충전 준비/승인 상태), PointChargeStatus, WithdrawalAccount(출금 계좌, 공유 PK 1:1, POINT-003)
 │   │   ├── repository/
 │   │   └── dto/
+│   ├── refund/                   # 환불 요청/승인/거절(REFUND-001/002, 판매자 승인) — 서윤
+│   │   ├── controller/           # RefundController
+│   │   ├── service/              # RefundService
+│   │   ├── entity/               # RefundRequest, RefundReason, RefundStatus
+│   │   ├── repository/           # RefundRequestRepository
+│   │   └── dto/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
-│       ├── client/              # AiClient(Spring → FastAPI), DeliveryTrackingClient(deliveryapi.co.kr 배송 조회 웹훅)
-│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig, SchedulingConfig, DeliveryApiConfig
+│       ├── client/              # AiClient(Spring → FastAPI), DeliveryTrackingClient(deliveryapi.co.kr 배송 조회 웹훅), TossPaymentsClient(결제위젯 승인)
+│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig, SchedulingConfig, DeliveryApiConfig, TossPaymentsConfig
 │       ├── entity/              # BaseTimeEntity 등 공통 베이스 엔티티
 │       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
 │       ├── health/              # HealthController
