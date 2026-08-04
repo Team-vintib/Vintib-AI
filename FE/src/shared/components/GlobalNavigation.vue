@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import logoImage from '@/assets/images/logo.png'
@@ -8,6 +8,10 @@ import { getMyProfile } from '@/domains/my/api/myApi'
 import NotificationPopup from '@/domains/notification/components/NotificationPopup.vue'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import { getPointBalance } from '@/domains/point/api/pointApi'
+import {
+  isPointBalanceUpdatedEvent,
+  POINT_BALANCE_UPDATED_EVENT,
+} from '@/domains/point/utils/pointBalanceEvents'
 import { ROUTE_NAMES, ROUTE_PATHS, type RoutePath } from '@/shared/constants/routes'
 
 import type { NotificationItem } from '@/domains/notification/types/notification.types'
@@ -166,6 +170,14 @@ const loadPointBalance = async (userId: number) => {
   }
 }
 
+const handlePointBalanceUpdated = (event: Event) => {
+  if (!isPointBalanceUpdatedEvent(event) || event.detail.userId !== currentUserId.value) {
+    return
+  }
+
+  pointBalance.value = event.detail.balance
+}
+
 const handleNotificationButtonClick = async () => {
   isNotificationPopupOpen.value = !isNotificationPopupOpen.value
 
@@ -248,6 +260,14 @@ watch(
   },
   { immediate: true },
 )
+
+onMounted(() => {
+  window.addEventListener(POINT_BALANCE_UPDATED_EVENT, handlePointBalanceUpdated)
+})
+
+onUnmounted(() => {
+  window.removeEventListener(POINT_BALANCE_UPDATED_EVENT, handlePointBalanceUpdated)
+})
 </script>
 
 <template>
