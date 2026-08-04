@@ -804,7 +804,7 @@ watch(
   border: 1px solid var(--color-border);
   border-radius: 18px;
   background: var(--color-surface);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+  box-shadow: none;
 }
 
 .profile-summary__cover {
@@ -949,7 +949,7 @@ watch(
 }
 
 .profile-editor__field textarea:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   border-color: var(--color-primary);
 }
 
@@ -1070,7 +1070,7 @@ watch(
 }
 
 .profile-stats button.profile-stats__item:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 3px;
 }
 

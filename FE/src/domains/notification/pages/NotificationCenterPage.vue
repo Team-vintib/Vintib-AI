@@ -306,7 +306,7 @@ onMounted(() => {
   right: 0;
   left: 0;
   height: 3px;
-  border-radius: 999px 999px 0 0;
+  border-radius: 0;
   background: transparent;
   content: '';
   transform: scaleX(0);
@@ -333,7 +333,7 @@ button.notification-page__tab--active::after {
 
 .notification-page__tabs button:focus-visible,
 .notification-page__read-all:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -377,7 +377,7 @@ button.notification-page__tab--active::after {
 }
 
 .notification-page__pagination button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 

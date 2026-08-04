@@ -1194,7 +1194,7 @@ watch(
 
 .search-page__search:focus-within {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .search-page__search-icon {
@@ -1236,7 +1236,7 @@ watch(
 }
 
 .search-page__search button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -1404,7 +1404,7 @@ watch(
 
 .search-page__product-filter input:focus-visible {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .search-page__field-error {
@@ -1435,7 +1435,7 @@ watch(
 }
 
 .search-page__filter-actions button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -1476,7 +1476,7 @@ watch(
 
 .search-page__sort-toolbar select:focus-visible {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .search-page__selected-filters {
@@ -1499,7 +1499,7 @@ watch(
   min-height: 28px;
   padding: 0 var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
@@ -1610,7 +1610,7 @@ watch(
 }
 
 .search-page__pagination button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -1652,7 +1652,7 @@ watch(
 .search-product-card__media:focus-visible,
 .search-product-card__name:focus-visible,
 .search-product-card__like:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -1673,7 +1673,7 @@ watch(
   left: var(--space-3);
   padding: 2px var(--space-2);
   border-radius: var(--radius-badge);
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(10, 10, 10, 0.82);
   color: var(--color-text-primary);
   font-size: 12px;
   font-weight: 800;
@@ -1688,9 +1688,9 @@ watch(
   place-items: center;
   width: 40px;
   height: 40px;
-  border: 1px solid rgba(225, 224, 218, 0.8);
+  border: 1px solid var(--color-border);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(10, 10, 10, 0.55);
   color: var(--color-text-secondary);
 }
 
