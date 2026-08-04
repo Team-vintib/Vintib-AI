@@ -35,13 +35,13 @@ export const MY_PRODUCT_STATUS_LABELS: Record<MyProductStatus, string> = {
 }
 
 export const MY_ORDER_STATUS_LABELS: Record<MyOrderItem['status'], string> = {
-  CREATED: '주문 생성',
   PAID: '결제 완료',
   SHIPPING: '배송 중',
   DELIVERED: '배송 완료',
   CONFIRMED: '구매 확정',
-  REFUND_REQUESTED: '환불 요청',
+  SETTLED: '정산 완료',
   REFUNDED: '환불 완료',
+  CANCELED: '주문 취소',
 }
 
 export const MY_LIVE_STATUS_LABELS: Record<MyLiveItem['status'], string> = {
@@ -137,7 +137,7 @@ const mockOrders: MyOrderItem[] = [
   {
     id: 9004,
     type: 'DIRECT',
-    status: 'REFUND_REQUESTED',
+    status: 'REFUNDED',
     productName: PRODUCT_LIST_MOCK_DATA[4].name,
     productThumbnailUrl: PRODUCT_LIST_MOCK_DATA[4].imageUrl,
     sellerNickname: 'Sneaker Vault',
@@ -199,7 +199,7 @@ const mockSales: MySaleItem[] = [
   },
   {
     id: 8104,
-    status: 'REFUND_REQUESTED',
+    status: 'REFUNDED',
     settlementStatus: 'REFUND_REQUESTED',
     productName: PRODUCT_LIST_MOCK_DATA[4].name,
     productThumbnailUrl: PRODUCT_LIST_MOCK_DATA[4].imageUrl,

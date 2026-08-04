@@ -22,6 +22,8 @@ import LiveSelectedProduct from '@/domains/live/components/LiveSelectedProduct.v
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchHeader from '@/domains/live/components/LiveWatchHeader.vue'
 import LiveWatchState from '@/domains/live/components/LiveWatchState.vue'
+import { followUser, getPublicProfile, unfollowUser } from '@/domains/profile/api/profileApi'
+import { useFollowStore } from '@/domains/profile/stores/followStore'
 import LiveTryOnPanel from '@/domains/tryon/components/LiveTryOnPanel.vue'
 import { LIVE_TRY_ON_MOCK_SCENARIOS } from '@/domains/tryon/types/liveTryOn.types'
 import { normalizeApiError } from '@/shared/api/http'
@@ -54,12 +56,64 @@ const live = ref<LiveWatchViewData | null>(null)
 const loadState = ref<LiveWatchLoadState>('loading')
 const errorMessage = ref('')
 const selectedProductId = ref<number | null>(null)
-const isFollowing = ref(false)
+const followStore = useFollowStore()
+const isFollowingHost = computed(() =>
+  live.value
+    ? followStore.getFollowState(live.value.hostId, { followerCount: 0, isFollowing: false })
+        .isFollowing
+    : false,
+)
 const wishedProductIds = ref<number[]>([])
 const isTryOnOpen = ref(false)
 const now = ref(Date.now())
 const videoConnectionLabel = ref('')
 const apiEnabled = isLiveWatchApiEnabled()
+
+const loadHostFollowState = async (hostId: number) => {
+  try {
+    const hostProfile = await getPublicProfile(hostId)
+    followStore.setFollowState(hostId, {
+      followerCount: hostProfile.followerCount,
+      isFollowing: hostProfile.isFollowing,
+    })
+  } catch {
+    // 팔로우 상태 보강 실패는 무시한다 — 버튼은 기본값(false)으로 남는다.
+  }
+}
+
+const handleToggleFollow = async () => {
+  if (!live.value || followStore.isPending(live.value.hostId)) {
+    return
+  }
+
+  const hostId = live.value.hostId
+  const previousState = followStore.getFollowState(hostId, { followerCount: 0, isFollowing: false })
+
+  if (previousState.isFollowing && !window.confirm('팔로우를 취소하시겠습니까?')) {
+    return
+  }
+
+  const nextIsFollowing = !previousState.isFollowing
+
+  followStore.setPending(hostId, true)
+  followStore.setFollowState(hostId, { isFollowing: nextIsFollowing })
+
+  try {
+    if (previousState.isFollowing) {
+      await unfollowUser(hostId)
+    } else {
+      const response = await followUser(hostId)
+      followStore.setFollowState(hostId, {
+        followerCount: response.followerCount,
+        isFollowing: response.isFollowing,
+      })
+    }
+  } catch {
+    followStore.setFollowState(hostId, previousState)
+  } finally {
+    followStore.setPending(hostId, false)
+  }
+}
 
 const handleToggleReminder = async () => {
   if (!live.value) {
@@ -194,6 +248,7 @@ const loadLiveWatch = async () => {
       response.currentProductId ?? response.products.at(0)?.id ?? null
     now.value = Date.now()
     loadState.value = 'success'
+    void loadHostFollowState(response.hostId)
 
     if (response.status === 'LIVE') {
       void loadVideoToken(response.id)
@@ -408,9 +463,9 @@ onBeforeUnmount(() => {
       <LiveWatchHeader
         :live="live"
         :elapsed-time="elapsedTime"
-        :is-following="isFollowing"
+        :is-following="isFollowingHost"
         @back="goBack"
-        @toggle-follow="isFollowing = !isFollowing"
+        @toggle-follow="handleToggleFollow"
       />
 
       <div class="live-watch-page__body">

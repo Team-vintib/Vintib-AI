@@ -12,7 +12,15 @@ import {
   updateMyInterests,
   updateMyProfile,
 } from '@/domains/my/api/myApi'
-import { getPublicProfile } from '@/domains/profile/api/profileApi'
+import { getPointBalance } from '@/domains/point/api/pointApi'
+import {
+  followUser,
+  getFollowers,
+  getFollowings,
+  getPublicProfile,
+  unfollowUser,
+} from '@/domains/profile/api/profileApi'
+import { useFollowStore } from '@/domains/profile/stores/followStore'
 import {
   MY_BUSINESS_STATUS_LABELS,
   MY_LIVE_STATUS_LABELS,
@@ -42,6 +50,8 @@ import type {
   TryOnBodyFieldId,
   TryOnProfile,
 } from '@/domains/tryon/types/tryOnProfile.types'
+import type { PointBalance } from '@/domains/point/types/point.types'
+import type { FollowUser } from '@/domains/profile/types/profile.types'
 import { normalizeApiError } from '@/shared/api/http'
 import type { InterestBrand, InterestCategory } from '@/shared/api/mockInterestStorage'
 import { readImageFileAsDataUrl } from '@/shared/api/mockProfileMediaStorage'
@@ -52,8 +62,14 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const businessVerificationStore = useBusinessVerificationStore()
+const followStore = useFollowStore()
 
 const viewData = ref<MyPageViewData | null>(null)
+const pointBalance = ref<PointBalance | null>(null)
+const followerCount = ref(0)
+const followingCount = ref(0)
+const followersList = ref<FollowUser[]>([])
+const followingsList = ref<FollowUser[]>([])
 const selectedSection = ref<MySectionId>('dashboard')
 const loadState = ref<'idle' | 'loading' | 'success' | 'error' | 'guest'>('idle')
 const errorMessage = ref('')
@@ -204,15 +220,12 @@ const filteredLives = computed(() => {
 
   return lives.filter((live) => live.status === selectedLiveFilter.value)
 })
-const visibleSocialUsers = computed(() => {
-  if (!viewData.value) {
-    return []
-  }
-
-  return selectedSocialTab.value === 'followers'
-    ? viewData.value.followers
-    : viewData.value.followings
-})
+const visibleSocialUsers = computed(() =>
+  selectedSocialTab.value === 'followers' ? followersList.value : followingsList.value,
+)
+const isSocialUserFollowing = (user: FollowUser) =>
+  followStore.getFollowState(user.id, { followerCount: user.followerCount, isFollowing: user.isFollowing })
+    .isFollowing
 const businessSubmission = computed(() => businessVerificationStore.submission)
 const businessStatusDescription = computed(() => {
   const status = profile.value?.businessVerificationStatus
@@ -301,7 +314,7 @@ const homeCards = computed(() => {
     },
     {
       label: '정산 예정',
-      value: summary?.settlementSummary.pendingAmount ?? summary?.pendingSettlementAmount ?? 0,
+      value: pointBalance.value?.pendingSettlement ?? 0,
       section: 'sales',
       suffix: 'P',
       tone: 'green',
@@ -326,39 +339,37 @@ const profileStats = computed(() => {
   const summary = viewData.value?.summary
 
   return [
-    { label: '팔로워', value: summary?.counts.followers ?? 0, suffix: '' },
-    { label: '팔로잉', value: 42, suffix: '' },
+    { label: '팔로워', value: followerCount.value, suffix: '' },
+    { label: '팔로잉', value: followingCount.value, suffix: '' },
     {
       label: '판매 완료',
       value: summary?.salesPerformance.soldCount ?? summary?.counts.sales ?? 0,
       suffix: '건',
     },
-    { label: '보유 포인트', value: summary?.pointBalance ?? 0, suffix: 'P' },
+    { label: '보유 포인트', value: pointBalance.value?.available ?? 0, suffix: 'P' },
   ]
 })
 
 const pointCards = computed(() => {
-  const summary = viewData.value?.summary
-
   return [
     {
       label: '사용 가능',
-      value: summary?.pointBalance ?? 0,
+      value: pointBalance.value?.available ?? 0,
       helper: '즉시 사용 가능',
     },
     {
       label: '입찰 보류',
-      value: 39000,
+      value: pointBalance.value?.held ?? 0,
       helper: '경매 종료 시 반환',
     },
     {
       label: '거래 보관',
-      value: summary?.settlementSummary.escrowAmount ?? 0,
+      value: pointBalance.value?.escrow ?? 0,
       helper: '구매 확정 후 정산',
     },
     {
       label: '판매 정산',
-      value: summary?.settlementSummary.pendingAmount ?? summary?.pendingSettlementAmount ?? 0,
+      value: pointBalance.value?.pendingSettlement ?? 0,
       helper: '출금 신청 가능',
     },
   ]
@@ -547,15 +558,15 @@ const getProductFilterCount = (filterId: ProductFilterId) => {
 
 const isOrderInFilter = (status: MyOrderStatus, filterId: OrderFilterId) => {
   if (filterId === 'IN_PROGRESS') {
-    return status === 'CREATED' || status === 'PAID' || status === 'SHIPPING' || status === 'DELIVERED'
+    return status === 'PAID' || status === 'SHIPPING' || status === 'DELIVERED'
   }
 
   if (filterId === 'COMPLETED') {
-    return status === 'CONFIRMED'
+    return status === 'CONFIRMED' || status === 'SETTLED'
   }
 
   if (filterId === 'REFUND') {
-    return status === 'REFUND_REQUESTED' || status === 'REFUNDED'
+    return status === 'REFUNDED'
   }
 
   return true
@@ -563,15 +574,15 @@ const isOrderInFilter = (status: MyOrderStatus, filterId: OrderFilterId) => {
 
 const isSaleInFilter = (status: MyOrderStatus, filterId: SaleFilterId) => {
   if (filterId === 'IN_PROGRESS') {
-    return status === 'CREATED' || status === 'PAID' || status === 'SHIPPING' || status === 'DELIVERED'
+    return status === 'PAID' || status === 'SHIPPING' || status === 'DELIVERED'
   }
 
   if (filterId === 'COMPLETED') {
-    return status === 'CONFIRMED'
+    return status === 'CONFIRMED' || status === 'SETTLED'
   }
 
   if (filterId === 'REFUND') {
-    return status === 'REFUND_REQUESTED' || status === 'REFUNDED'
+    return status === 'REFUNDED'
   }
 
   return true
@@ -591,6 +602,45 @@ const selectLiveFilter = (filterId: LiveFilterId) => {
 
 const selectSocialTab = (tabId: SocialTabId) => {
   selectedSocialTab.value = tabId
+}
+
+const toggleSocialFollow = async (user: FollowUser) => {
+  if (followStore.isPending(user.id)) {
+    return
+  }
+
+  const previousState = followStore.getFollowState(user.id, {
+    followerCount: user.followerCount,
+    isFollowing: user.isFollowing,
+  })
+
+  if (previousState.isFollowing && !window.confirm('팔로우를 취소하시겠습니까?')) {
+    return
+  }
+
+  const nextIsFollowing = !previousState.isFollowing
+
+  followStore.setPending(user.id, true)
+  followStore.setFollowState(user.id, { isFollowing: nextIsFollowing })
+  followingCount.value = Math.max(followingCount.value + (nextIsFollowing ? 1 : -1), 0)
+
+  try {
+    if (previousState.isFollowing) {
+      await unfollowUser(user.id)
+      followingsList.value = followingsList.value.filter((item) => item.id !== user.id)
+    } else {
+      const response = await followUser(user.id)
+      followStore.setFollowState(user.id, {
+        followerCount: response.followerCount,
+        isFollowing: response.isFollowing,
+      })
+    }
+  } catch {
+    followStore.setFollowState(user.id, previousState)
+    followingCount.value = Math.max(followingCount.value + (nextIsFollowing ? -1 : 1), 0)
+  } finally {
+    followStore.setPending(user.id, false)
+  }
 }
 
 const goToOrderDetail = (orderId: number) => {
@@ -638,13 +688,8 @@ const getLiveFilterCount = (filterId: LiveFilterId) => {
   return lives.filter((live) => live.status === filterId).length
 }
 
-const getSocialTabCount = (tabId: SocialTabId) => {
-  if (!viewData.value) {
-    return 0
-  }
-
-  return tabId === 'followers' ? viewData.value.followers.length : viewData.value.followings.length
-}
+const getSocialTabCount = (tabId: SocialTabId) =>
+  tabId === 'followers' ? followerCount.value : followingCount.value
 
 const formatOrderDate = (value: string) =>
   new Intl.DateTimeFormat('ko-KR', {
@@ -964,10 +1009,20 @@ const loadMyPage = async () => {
     const nextViewData = await getMyPageViewData(authStore.user.id)
     viewData.value = mergeSessionProfile(nextViewData)
     tryOnProfileLoadState.value = 'loading'
-    const [tryOnProfileResult, , publicProfileResult] = await Promise.allSettled([
+    const [
+      tryOnProfileResult,
+      ,
+      publicProfileResult,
+      pointBalanceResult,
+      followersResult,
+      followingsResult,
+    ] = await Promise.allSettled([
       getMyTryOnProfile(authStore.user.id),
       loadMyInterests(authStore.user.id),
       getPublicProfile(authStore.user.id),
+      getPointBalance(authStore.user.id),
+      getFollowers(authStore.user.id, { page: 1, size: 60 }),
+      getFollowings(authStore.user.id, { page: 1, size: 60 }),
     ])
 
     if (tryOnProfileResult.status === 'fulfilled') {
@@ -1000,6 +1055,32 @@ const loadMyPage = async () => {
           },
         },
       }
+      followerCount.value = publicProfileResult.value.followerCount
+      followingCount.value = publicProfileResult.value.followingCount
+    }
+
+    if (pointBalanceResult.status === 'fulfilled') {
+      pointBalance.value = pointBalanceResult.value
+    }
+
+    if (followersResult.status === 'fulfilled') {
+      followersList.value = followersResult.value.items
+      followersResult.value.items.forEach((user) => {
+        followStore.setFollowState(user.id, {
+          followerCount: user.followerCount,
+          isFollowing: user.isFollowing,
+        })
+      })
+    }
+
+    if (followingsResult.status === 'fulfilled') {
+      followingsList.value = followingsResult.value.items
+      followingsResult.value.items.forEach((user) => {
+        followStore.setFollowState(user.id, {
+          followerCount: user.followerCount,
+          isFollowing: user.isFollowing,
+        })
+      })
     }
 
     loadState.value = 'success'
@@ -1766,21 +1847,30 @@ onMounted(() => {
                   </div>
                   <div class="my-social-card__body">
                     <strong>{{ user.nickname }}</strong>
-                    <p>{{ user.introduction }}</p>
                     <dl>
                       <div>
                         <dt>팔로워</dt>
                         <dd>{{ user.followerCount.toLocaleString('ko-KR') }}</dd>
                       </div>
                       <div>
-                        <dt>팔로잉</dt>
-                        <dd>{{ user.followingCount.toLocaleString('ko-KR') }}</dd>
+                        <dt>상품</dt>
+                        <dd>{{ user.productCount.toLocaleString('ko-KR') }}</dd>
                       </div>
                     </dl>
-                    <span>{{ formatOrderDate(user.followedAt) }}</span>
                   </div>
-                  <button type="button" disabled>
-                    {{ selectedSocialTab === 'followers' && !user.isFollowing ? '팔로우' : '프로필 보기' }}
+                  <button
+                    type="button"
+                    :class="{ 'my-social-card__follow--active': isSocialUserFollowing(user) }"
+                    :disabled="followStore.isPending(user.id)"
+                    @click="toggleSocialFollow(user)"
+                  >
+                    {{
+                      followStore.isPending(user.id)
+                        ? '처리 중'
+                        : isSocialUserFollowing(user)
+                          ? '언팔로우'
+                          : '팔로우'
+                    }}
                   </button>
                 </article>
               </div>
@@ -2680,14 +2770,24 @@ onMounted(() => {
 .my-social-card > button {
   min-height: 36px;
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-primary);
   border-radius: var(--radius-control);
-  background: var(--color-surface-secondary);
-  color: var(--color-text-secondary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
   font-size: 13px;
   font-weight: var(--font-weight-bold);
   grid-column: 2;
   justify-self: start;
+}
+
+.my-social-card > button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.my-social-card__follow--active {
+  background: var(--color-surface);
+  color: var(--color-primary);
 }
 
 .my-business-status {

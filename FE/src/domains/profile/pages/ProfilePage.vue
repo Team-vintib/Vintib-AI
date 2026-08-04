@@ -315,6 +315,11 @@ const toggleProfileFollow = async () => {
 
   const userId = profile.value.id
   const previousState = followState.value
+
+  if (previousState.isFollowing && !window.confirm('팔로우를 취소하시겠습니까?')) {
+    return
+  }
+
   const nextIsFollowing = !previousState.isFollowing
   const nextFollowerCount = Math.max(
     previousState.followerCount + (nextIsFollowing ? 1 : -1),
