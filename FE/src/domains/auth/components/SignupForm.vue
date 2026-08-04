@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import {
@@ -88,7 +88,37 @@ const duplicateEmail = ref('')
 const duplicateCheckedEmail = ref('')
 const verificationToken = ref('')
 const verifiedEmail = ref('')
+const verificationCodeRemainingSeconds = ref(0)
 const router = useRouter()
+
+const VERIFICATION_CODE_TTL_SECONDS = 300
+let verificationCodeTimerId: number | undefined
+
+const stopVerificationCodeTimer = () => {
+  window.clearInterval(verificationCodeTimerId)
+  verificationCodeTimerId = undefined
+}
+
+const startVerificationCodeTimer = () => {
+  stopVerificationCodeTimer()
+  verificationCodeRemainingSeconds.value = VERIFICATION_CODE_TTL_SECONDS
+
+  verificationCodeTimerId = window.setInterval(() => {
+    verificationCodeRemainingSeconds.value -= 1
+
+    if (verificationCodeRemainingSeconds.value <= 0) {
+      stopVerificationCodeTimer()
+      verificationCodeRemainingSeconds.value = 0
+      isEmailVerificationCodeSent.value = false
+      emailVerificationMessage.value = ''
+      errors.verificationCode = '인증코드가 만료되었습니다. 인증코드를 다시 받아주세요.'
+    }
+  }, 1000)
+}
+
+onBeforeUnmount(() => {
+  stopVerificationCodeTimer()
+})
 
 const agreementItems: {
   key: AgreementField
@@ -132,11 +162,26 @@ const normalizedEmail = computed(() => form.email.trim())
 const isCurrentEmailDuplicateChecked = computed(
   () => isEmailDuplicateChecked.value && duplicateCheckedEmail.value === normalizedEmail.value,
 )
-const canCheckEmailDuplicate = computed(() => isEmail(form.email))
 const canRequestVerificationCode = computed(
-  () => isEmail(form.email) && isCurrentEmailDuplicateChecked.value,
+  () =>
+    isEmail(form.email) &&
+    !(isEmailVerificationCodeSent.value && verificationCodeRemainingSeconds.value > 0),
 )
 const canConfirmVerificationCode = computed(() => isVerificationCode(form.verificationCode))
+const codeExpiresInLabel = computed(() => {
+  if (
+    !isEmailVerificationCodeSent.value ||
+    isEmailVerified.value ||
+    verificationCodeRemainingSeconds.value <= 0
+  ) {
+    return ''
+  }
+
+  const minutes = Math.floor(verificationCodeRemainingSeconds.value / 60)
+  const seconds = verificationCodeRemainingSeconds.value % 60
+
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+})
 const serverFieldMap: Partial<Record<string, ServerSignupField | 'verificationCode'>> = {
   name: 'name',
   email: 'email',
@@ -260,6 +305,8 @@ const handleVerificationCodeUpdate = (verificationCode: string) => {
 }
 
 const resetEmailVerification = () => {
+  stopVerificationCodeTimer()
+  verificationCodeRemainingSeconds.value = 0
   form.verificationCode = ''
   isEmailDuplicateChecked.value = false
   isEmailVerificationCodeSent.value = false
@@ -274,14 +321,15 @@ const resetEmailVerification = () => {
   }
 }
 
-const handleCheckEmailDuplicate = async () => {
+const handleRequestVerificationCode = async () => {
   touched.email = true
 
   if (
     !validateField('email') ||
     isCheckingEmailDuplicate.value ||
     isSendingVerificationCode.value ||
-    isVerifyingEmailCode.value
+    isVerifyingEmailCode.value ||
+    !canRequestVerificationCode.value
   ) {
     return
   }
@@ -293,47 +341,26 @@ const handleCheckEmailDuplicate = async () => {
   errors.verificationCode = ''
 
   try {
-    const response = await checkEmailDuplicate({ email: normalizedEmail.value })
+    const duplicateResponse = await checkEmailDuplicate({ email: normalizedEmail.value })
 
-    if (!response.success) {
-      applyEmailDuplicateCheckError(response.error?.code, response.error?.message)
+    if (!duplicateResponse.success) {
+      applyEmailDuplicateCheckError(duplicateResponse.error?.code, duplicateResponse.error?.message)
       return
     }
 
     isEmailDuplicateChecked.value = true
     duplicateCheckedEmail.value = normalizedEmail.value
-    emailVerificationMessage.value = '사용 가능한 이메일입니다. 인증코드를 발송해 주세요.'
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
     applyEmailDuplicateCheckError(apiError.code, apiError.message)
+    return
   } finally {
     isCheckingEmailDuplicate.value = false
   }
-}
-
-const handleSendVerificationCode = async () => {
-  touched.email = true
-
-  if (!isCurrentEmailDuplicateChecked.value) {
-    errors.email = '이메일 중복 확인을 먼저 완료해 주세요.'
-    return
-  }
-
-  if (
-    !validateField('email') ||
-    isCheckingEmailDuplicate.value ||
-    isSendingVerificationCode.value ||
-    isVerifyingEmailCode.value
-  ) {
-    return
-  }
 
   isSendingVerificationCode.value = true
-  emailVerificationMessage.value = ''
   form.verificationCode = ''
-  errors.email = ''
-  errors.verificationCode = ''
   verificationToken.value = ''
   verifiedEmail.value = ''
   isEmailVerified.value = false
@@ -351,6 +378,7 @@ const handleSendVerificationCode = async () => {
     verificationToken.value = ''
     verifiedEmail.value = ''
     emailVerificationMessage.value = '인증코드를 발송했습니다. 이메일을 확인해 주세요.'
+    startVerificationCodeTimer()
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -400,6 +428,7 @@ const handleVerifyEmailCode = async () => {
     verificationToken.value = response.data.verificationToken
     verifiedEmail.value = normalizedEmail.value
     emailVerificationMessage.value = '이메일 인증이 완료되었습니다.'
+    stopVerificationCodeTimer()
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -670,21 +699,19 @@ const applyDuplicateEmailError = (message?: string) => {
         :email-error="errors.email"
         :verification-code-error="errors.verificationCode"
         :status-message="emailVerificationMessage"
-        :is-checking-duplicate="isCheckingEmailDuplicate"
-        :is-sending-code="isSendingVerificationCode"
+        :is-sending-code="isCheckingEmailDuplicate || isSendingVerificationCode"
         :is-verifying-code="isVerifyingEmailCode"
-        :can-check-duplicate="canCheckEmailDuplicate"
         :can-send-code="canRequestVerificationCode"
         :can-verify-code="canConfirmVerificationCode"
-        :is-duplicate-checked="isCurrentEmailDuplicateChecked"
+        :is-code-sent="isEmailVerificationCodeSent"
         :is-verified="isEmailVerified"
         :disabled="isSubmitting"
+        :code-expires-in-label="codeExpiresInLabel"
         @update:email="handleFieldInput('email')"
         @update:verification-code="handleVerificationCodeUpdate"
         @email-blur="handleFieldBlur('email')"
         @verification-code-blur="handleFieldBlur('verificationCode')"
-        @check-duplicate="handleCheckEmailDuplicate"
-        @send-code="handleSendVerificationCode"
+        @send-code="handleRequestVerificationCode"
         @verify-code="handleVerifyEmailCode"
       />
 
