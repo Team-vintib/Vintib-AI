@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from app.pricing import registry
+from app.pricing import registry, store
 from app.pricing.comps import CompsFetch, CompsSource, CompsUnavailable
 from app.pricing.pricer import RuleBaselinePricer
 from app.pricing.retail import RetailFetch, RetailSource
@@ -18,9 +18,10 @@ from app.pricing.service import PricingService
 
 
 class _StubSource(CompsSource):
-    key = "mock"
-
-    def __init__(self, fetch_result=None, error: Exception | None = None) -> None:
+    def __init__(
+        self, fetch_result=None, error: Exception | None = None, key: str = "mock"
+    ) -> None:
+        self.key = key
         self._fetch_result = fetch_result
         self._error = error
 
@@ -114,6 +115,46 @@ def test_estimate_raises_on_infrastructure_failure():
 
     with pytest.raises(CompsUnavailable):
         service.estimate(_request())
+
+
+# --- 관측 로그(CH017) — mock은 적재하지 않고, 실패해도 산정을 막지 않는다 ------------
+
+
+def test_mock_backend_results_are_not_logged(monkeypatch):
+    """가짜 데이터를 관측 로그에 쌓으면 이후 캐시·검수가 오염된다."""
+    calls = []
+    monkeypatch.setattr(store, "save_observations", lambda *a, **k: calls.append(a))
+
+    _service(_StubSource(_comps(10_000, 20_000, 30_000), key="mock")).estimate(_request())
+
+    assert calls == []
+
+
+def test_real_backend_results_are_logged(monkeypatch):
+    calls = []
+    monkeypatch.setattr(store, "save_observations", lambda *a, **k: calls.append(a))
+
+    _service(_StubSource(_comps(10_000, 20_000), key="llm_web_search")).estimate(_request())
+
+    assert len(calls) == 1
+    query, source, items = calls[0]
+    assert source == "llm_web_search"
+    assert len(items) == 2
+
+
+def test_observation_log_failure_does_not_break_estimate(monkeypatch):
+    """관측 로그는 부가 기능이다 — DB가 죽어도 가격 산정은 그대로 나와야 한다."""
+
+    def _explode(*args, **kwargs):
+        raise RuntimeError("DB 연결 실패")
+
+    monkeypatch.setattr(store, "save_observations", _explode)
+
+    result = _service(_StubSource(_comps(10_000, 20_000, 30_000), key="llm_web_search")).estimate(
+        _request()
+    )
+
+    assert result.priced is True
 
 
 # --- 신상품가(retail) — comps와 완전히 분리, include_retail로 조건부 호출 --------
