@@ -72,6 +72,9 @@ python validation/CLASS/product-info-finetune/aihub_dataset.py scan \
 
 먼저 감만 볼 거면 `--limit 5000`. 두 루트 중 하나만 줘도 된다.
 
+게이트 2 색상 표는 다색 콤마 조합("Black,White" 등)까지 세면 수백 줄이 나온다 — 기본으로
+상위 20개만 찍고 나머지는 합계 한 줄로 접는다. 전체가 필요하면 `--color-top 0`.
+
 ### 사람이 판정해야 하는 것 2개 (브리핑 §4)
 
 1. **게이트 1 — `metadata.model.type`의 front/back이 상품컷인가 착용샷인가.** scan이 값마다
@@ -137,7 +140,8 @@ for split in train val test; do
   for variant in masked raw; do
     python validation/CLASS/product-info-finetune/aihub_embed.py \
         --index      .../artifacts/sample.jsonl \
-        --label-root /path/to/aihub/008.의류_통합_데이터 \
+        --label-root           /path/to/aihub/008.의류_통합_데이터 \
+        --accessory-label-root /path/to/aihub/009.패션_액세서리_착용_데이터 \
         --image-root /path/to/aihub \
         --out-dir    .../artifacts \
         --split "$split" --variant "$variant" --batch-size 64
@@ -148,6 +152,12 @@ done
 `masked`와 `raw`를 **둘 다** 뽑는 게 브리핑 §3(A)의 요구사항이다 — 그 차이가 곧 "배경 제거의
 가치"다. 이미 있는 산출물은 건너뛴다(`--overwrite`로 강제). 액세서리 착용컷이 도메인에
 안 맞으면 `--shot-type product`로 제품 단독컷만 쓸 수 있다.
+
+⚠️ **`--accessory-label-root`를 빼먹지 말 것.** `sample.jsonl`이 의류·액세서리를 섞고
+있고 `label_path`는 소스마다 다른 루트 기준 상대경로다. `masked` variant에서 이 인자가
+없으면 액세서리 행은 의류 라벨 폴더에서 폴리곤을 찾으려다 실패해 **마스크 없이(원본
+그대로) 처리된다** — 에러 없이 조용히 품질이 떨어지는 경로라 실수하기 쉽다(2026-08-04
+실측으로 발견). `raw` variant는 폴리곤이 필요 없어 무관하다.
 
 산출물 3종(행 순서 일치): `<split>_<variant>.npy` · `.jsonl` · `.meta.json`.
 `.meta.json`의 `failures.missing_image`가 크면 `--image-root`가 틀린 것이다.
