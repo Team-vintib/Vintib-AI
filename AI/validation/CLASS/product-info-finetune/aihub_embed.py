@@ -98,7 +98,10 @@ def load_model(model_id: str, device: str) -> tuple[Any, Any]:
     model.to(device)
     for parameter in model.parameters():
         parameter.requires_grad_(False)  # 백본 동결을 코드로 못박는다
-    processor = AutoProcessor.from_pretrained(model_id)
+    # use_fast=True: torchvision 기반 빠른 프로세서. 체크포인트가 저장될 당시 설정에
+    # use_fast가 없어 안 주면 transformers가 느린(PIL 기반) 프로세서로 폴백하며 경고를
+    # 찍는다(v4.52부터는 fast가 기본값). 결과물(정규화된 리사이즈 텐서)은 사실상 동일하다.
+    processor = AutoProcessor.from_pretrained(model_id, use_fast=True)
     torch.set_grad_enabled(False)
     return model, processor
 

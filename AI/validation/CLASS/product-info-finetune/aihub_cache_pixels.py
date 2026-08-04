@@ -57,7 +57,8 @@ def load_processor(model_id: str) -> Any:
     """CLIP 이미지 프로세서만 싣는다. 모델(가중치)은 로드하지 않는다 — GPU 불필요."""
     from transformers import AutoProcessor
 
-    return AutoProcessor.from_pretrained(model_id)
+    # use_fast=True — 이유는 aihub_embed.load_model()과 같다(느린 PIL 프로세서 폴백 경고 회피).
+    return AutoProcessor.from_pretrained(model_id, use_fast=True)
 
 
 def cache_pixel_rows(
