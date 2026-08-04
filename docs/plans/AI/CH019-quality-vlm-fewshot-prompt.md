@@ -43,7 +43,23 @@ TODO가 이미 "지연시간 비용 때문에 텍스트 예시부터"라고 정�
   요청 중인 defect_label과 예시의 유형이 달라도(예: HOLE_TEAR를 물으면서 오염/올풀림 예시를
   보여줌) 문제되지 않는다.
 
-### 2. 테스트 — `AI/test/worker/quality_vlm/test_quality_vlm_prompts.py`(신규)
+### 2. 검증 스파이크 반영 — `AI/validation/QUAL/vlm-description-check/`
+
+프로덕션과 스파이크가 다른 프롬프트를 검증하면 스파이크 실측이 의미가 없어진다.
+`loaders.py`의 `build_defect_prompt()`도 같은 few-shot 문구로 교체해 **노트북의
+"default" 변형이 곧 프로덕션 프롬프트**가 되게 한다.
+
+- `loaders.py`: `_FEW_SHOT_EXAMPLES` + `build_defect_prompt()`를
+  `worker/models/quality_vlm/prompts.py`와 동일 문구로 재작성.
+- `vlm_description_check.ipynb` §0-2 `PROMPT_VARIANTS`에 `no_fewshot_baseline`(few-shot
+  도입 전 문구, 비교용 스냅샷) 추가. `build_prompt()`에 `variant_key` 선택 인자를 추가해
+  `ACTIVE_PROMPT_VARIANT`에 안 걸리고 특정 변형을 바로 쓸 수 있게 함.
+- 신규 §4-1 "Few-shot 전/후 비교" 셀 — 같은 크롭·finding으로 `no_fewshot_baseline`과
+  `default`를 둘 다 돌려 문체·생성시간을 나란히 출력한다. **사용자가 GPU 환경에서 직접
+  실행**해서 확인한다(Claude는 실행하지 않음 — torch/GPU 필요, 팀원 노트북 몫).
+- "TO-DO: 프롬프트 실험 백로그" 셀의 few-shot 항목을 체크 완료로 갱신.
+
+### 3. 테스트 — `AI/test/worker/quality_vlm/test_quality_vlm_prompts.py`(신규)
 
 순수 문자열 조립이라 torch 불필요(가드 없이 CI에서 그대로 실행). 확인 항목:
 - few-shot 예시 두 문장이 프롬프트에 그대로 포함되는지
@@ -60,13 +76,17 @@ TODO가 이미 "지연시간 비용 때문에 텍스트 예시부터"라고 정�
 ## 구현 목록
 
 - [ ] `worker/models/quality_vlm/prompts.py`: `_FEW_SHOT_EXAMPLES` + `build_defect_prompt()` 재작성, TODO 주석 갱신
+- [ ] `AI/validation/QUAL/vlm-description-check/loaders.py`: 동일 few-shot 반영
+- [ ] `AI/validation/QUAL/vlm-description-check/vlm_description_check.ipynb`: `no_fewshot_baseline`
+      변형 추가, §4-1 비교 셀 신규, TODO 백로그 갱신
 - [ ] `AI/test/worker/quality_vlm/test_quality_vlm_prompts.py` 신규
 - [ ] `ruff`/`black`/`pytest` 로컬 통과 확인 후 커밋 (push는 사용자)
 
 ## 확인이 필요한 미결정 사항 / 후속 과제
 
 1. **실모델 검증 미완료** — few-shot이 실제 `Qwen3-VL` 출력 스타일에 효과가 있는지는
-   GPU 실측이 필요하다(`QUALITY_VLM_BACKEND=qwen3_vl`). 무거운 리소스라 팀원 노트북에서
-   사용자가 직접 실행해 확인한다 — 이 계획은 프롬프트 코드까지만 다룬다.
+   GPU 실측이 필요하다. `vlm_description_check.ipynb` §4-1(few-shot 전/후 비교 셀)을
+   `qual` conda 환경에서 사용자가 직접 실행해 확인한다 — 무거운 리소스라 Claude는 실행하지
+   않는다. 프로덕션에서 실제로 켜서 확인하려면 `QUALITY_VLM_BACKEND=qwen3_vl`.
 2. **위치 탐지 방법론 고도화(시맨틱 파츠 세그먼트)** — 별도 CH 계획으로 분리한다. 이번
    커밋에는 포함하지 않는다.
