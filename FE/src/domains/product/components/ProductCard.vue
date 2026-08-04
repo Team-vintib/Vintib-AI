@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import fallbackProductImage from '@/assets/images/products/product-denim-jacket.webp'
 import type { ProductListItem } from '@/domains/product/types/productList.types'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 
@@ -23,6 +24,15 @@ const formattedPrice = computed(() =>
 const saleTypeLabel = computed(() =>
   props.product.saleType === 'AUCTION' ? '경매 예정' : '정찰제',
 )
+const displayImageUrl = computed(() => props.product.imageUrl || fallbackProductImage)
+const handleImageError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackProductImage
+  }
+}
 </script>
 
 <template>
@@ -34,10 +44,10 @@ const saleTypeLabel = computed(() =>
         :aria-label="`${product.name} 상세 보기`"
       >
         <img
-          v-if="product.imageUrl"
           class="product-card__image"
-          :src="product.imageUrl"
+          :src="displayImageUrl"
           :alt="product.imageAlt"
+          @error="handleImageError"
         />
         <span class="product-card__grade">{{ product.conditionGrade }}급</span>
       </RouterLink>

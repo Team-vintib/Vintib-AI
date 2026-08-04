@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import fallbackImageUrl from '@/assets/images/products/product-denim-jacket.webp'
 import type { HomeLiveCardItem } from '@/domains/home/types/homeView.types'
 import type { RouteLocationRaw } from 'vue-router'
 
@@ -25,8 +26,7 @@ const rootComponent = computed(() => (props.to ? RouterLink : 'article'))
 const isScheduled = computed(() => props.variant === 'scheduled')
 const rootClass = computed(() => (isScheduled.value ? 'schedule-card' : 'live-card'))
 const rootProps = computed(() => (props.to ? { to: props.to } : {}))
-const fallbackImageUrl =
-  'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=80'
+const displayImageUrl = computed(() => props.live.thumbnailUrl || fallbackImageUrl)
 
 const handleImageError = (event: Event) => {
   if (event.target instanceof HTMLImageElement) {
@@ -55,7 +55,7 @@ const formatSchedule = (value?: string) => {
     <span :class="isScheduled ? 'schedule-card__media' : 'live-card__media'">
       <img
         :class="isScheduled ? 'schedule-card__image' : 'live-card__image'"
-        :src="live.thumbnailUrl"
+        :src="displayImageUrl"
         :alt="live.title"
         @error="handleImageError"
       />

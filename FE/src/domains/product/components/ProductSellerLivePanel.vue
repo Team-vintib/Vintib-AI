@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
+import fallbackLiveThumbnail from '@/assets/images/products/product-denim-jacket.webp'
 import type { ProductLinkedLive } from '@/domains/product/types/productDetail.types'
 
 const props = defineProps<{
@@ -11,6 +14,16 @@ const emit = defineEmits<{
   toggleReminder: []
   viewLive: [liveId: number]
 }>()
+
+const displayThumbnailUrl = computed(() => props.linkedLive?.thumbnailUrl || fallbackLiveThumbnail)
+const handleThumbnailError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackLiveThumbnail
+  }
+}
 
 const formatLiveDate = (date: string) =>
   new Intl.DateTimeFormat('ko-KR', {
@@ -26,7 +39,11 @@ const formatLiveDate = (date: string) =>
     <h2 id="linked-live-title">연결 라이브</h2>
 
     <article class="seller-live__live">
-      <img :src="linkedLive.thumbnailUrl" :alt="`${linkedLive.title} 대표 이미지`" />
+      <img
+        :src="displayThumbnailUrl"
+        :alt="`${linkedLive.title} 대표 이미지`"
+        @error="handleThumbnailError"
+      />
       <div class="seller-live__live-copy">
         <span class="seller-live__status">
           {{ linkedLive.status === 'LIVE' ? '방송 중' : '방송 예정' }}

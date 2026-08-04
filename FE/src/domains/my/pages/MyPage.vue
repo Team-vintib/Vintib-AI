@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import fallbackThumbnailImage from '@/assets/images/products/product-denim-jacket.webp'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useBusinessVerificationStore } from '@/domains/biz/stores/businessVerificationStore'
 import {
@@ -424,6 +425,16 @@ const maxMonthlyRevenue = computed(() =>
 
 const getRevenueBarHeight = (revenue: number) =>
   `${Math.max(10, Math.round((revenue / maxMonthlyRevenue.value) * 100))}%`
+
+const getThumbnail = (url: string) => url || fallbackThumbnailImage
+const handleThumbnailError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackThumbnailImage
+  }
+}
 
 const formatPoint = (value: number) => `${value.toLocaleString('ko-KR')}P`
 
@@ -1543,7 +1554,11 @@ onMounted(() => {
                     class="my-product-card__main"
                     @click="goToProductDetail(item.product.id)"
                   >
-                    <img :src="item.product.imageUrl" :alt="item.product.imageAlt" />
+                    <img
+                      :src="getThumbnail(item.product.imageUrl)"
+                      :alt="item.product.imageAlt"
+                      @error="handleThumbnailError"
+                    />
                     <span>{{ MY_PRODUCT_STATUS_LABELS[item.status] }}</span>
                     <strong>{{ item.product.name }}</strong>
                     <p>{{ item.product.price.toLocaleString('ko-KR') }}P</p>
@@ -1582,7 +1597,11 @@ onMounted(() => {
                     class="my-order-card__main"
                     @click="goToOrderDetail(order.id)"
                   >
-                    <img :src="order.productThumbnailUrl" :alt="order.productName" />
+                    <img
+                      :src="getThumbnail(order.productThumbnailUrl)"
+                      :alt="order.productName"
+                      @error="handleThumbnailError"
+                    />
                     <div class="my-order-card__body">
                       <div class="my-order-card__top">
                         <span>{{ getOrderTypeLabel(order.type) }}</span>
@@ -1634,7 +1653,11 @@ onMounted(() => {
                     class="my-order-card__main"
                     @click="goToSaleDetail(sale.id)"
                   >
-                    <img :src="sale.productThumbnailUrl" :alt="sale.productName" />
+                    <img
+                      :src="getThumbnail(sale.productThumbnailUrl)"
+                      :alt="sale.productName"
+                      @error="handleThumbnailError"
+                    />
                     <div class="my-order-card__body">
                       <div class="my-order-card__top">
                         <span>{{ MY_ORDER_STATUS_LABELS[sale.status] }}</span>
@@ -1686,7 +1709,11 @@ onMounted(() => {
                     class="my-order-card__main"
                     @click="goToLiveDetail(live.id, live.status)"
                   >
-                    <img :src="live.thumbnailUrl" :alt="live.title" />
+                    <img
+                      :src="getThumbnail(live.thumbnailUrl)"
+                      :alt="live.title"
+                      @error="handleThumbnailError"
+                    />
                     <div class="my-order-card__body">
                       <div class="my-order-card__top">
                         <span>{{ MY_LIVE_STATUS_LABELS[live.status] }}</span>
