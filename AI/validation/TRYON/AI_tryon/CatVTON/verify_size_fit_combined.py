@@ -46,7 +46,8 @@ GARMENT_WAIST_WIDTH_CM = 38.0  # 반바지 레퍼런스의 평편 원단 폭(가
 PEOPLE = {
     # (person_image, worn_reference, 가정 허리둘레cm) -- 허리둘레만 다르고 옷은 동일.
     # 둘리는 마스크 침식(폭 축)만으로는 타이트함이 육안상 약해서, 레퍼런스 자체도
-    # "타이트하게 입은" 버전(pants_worn_reference_dooly_tight.png)으로 바꿔 신호를 강화한다.
+    # "타이트하게 입은" 버전(pants_worn_reference_dooly_tight.png, VLM 자동 캡션 기반으로
+    # 생성 -- generate_worn_reference_dooly_tight.py)으로 바꿔 신호를 강화한다.
     "younghee_loose": ("younghee.png", "pants_worn_reference_younghee.png", 65.0),
     "cheolsu_regular": ("cheolsu.png", "pants_worn_reference_cheolsu.png", 75.0),
     "dooly_tight": ("dooly.png", "pants_worn_reference_dooly_tight.png", 110.0),
