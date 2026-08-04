@@ -259,7 +259,7 @@ class OrderServiceTest {
         orderService.registerShipment(ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest(CourierCode.CJ, "123456789012"));
 
         assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
-        assertThat(realOrder.getAutoConfirmAt()).isAfter(LocalDateTime.now().plusDays(6));
+        assertThat(realOrder.getAutoConfirmAt()).isAfter(LocalDateTime.now().plusDays(2));
     }
 
     @Test

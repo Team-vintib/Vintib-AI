@@ -170,7 +170,7 @@ BE/
 │   │   ├── service/              # InvoiceService, OrderService
 │   │   ├── entity/               # Order, OrderStatus, OrderShipment(배송지+송장, 공유 PK 1:1), Invoice
 │   │   ├── repository/           # OrderRepository, OrderShipmentRepository, InvoiceRepository
-│   │   ├── scheduler/            # OrderAutoConfirmScheduler(ORDER-003, 배송완료 7일 후 자동 구매확정)
+│   │   ├── scheduler/            # OrderAutoConfirmScheduler(ORDER-003, 배송완료 3일 후 자동 구매확정)
 │   │   └── dto/
 │   ├── point/                    # 포인트 잔액/충전/출금(MY-007), 주문 결제·정산(SALE-002/ORDER-002·003) — 서윤
 │   │   ├── controller/

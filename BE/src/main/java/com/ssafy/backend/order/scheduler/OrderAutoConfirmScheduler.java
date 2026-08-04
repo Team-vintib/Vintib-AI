@@ -6,7 +6,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * 자동 구매 확정 배치(ORDER-003). 배송 완료(DELIVERED) 후 7일이 지난 주문을 찾아
+ * 자동 구매 확정 배치(ORDER-003). 배송 완료(DELIVERED) 후 3일이 지난 주문을 찾아
  * {@link OrderService#autoConfirmDueOrders}로 구매 확정과 동일하게 정산한다.
  *
  * <p>주기는 운영 정책이 미확정이라 10분으로 잡는다 — 정책이 정해지면 조정한다.

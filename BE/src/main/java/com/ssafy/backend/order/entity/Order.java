@@ -91,7 +91,7 @@ public class Order extends BaseTimeEntity {
      */
     public void markDelivered(LocalDateTime deliveredAt) {
         this.status = OrderStatus.DELIVERED;
-        this.autoConfirmAt = deliveredAt.plusDays(7);
+        this.autoConfirmAt = deliveredAt.plusDays(3);
     }
 
     /**
