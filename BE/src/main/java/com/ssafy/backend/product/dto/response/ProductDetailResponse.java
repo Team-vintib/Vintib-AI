@@ -36,6 +36,8 @@ public record ProductDetailResponse(
         @Schema(description = "마네킹 사진 기반 AI 착용컷 사용 여부", example = "true") boolean aiModelEnabled,
         @Schema(description = "AI 착용컷 모델 성별. aiModelEnabled=false면 null", example = "FEMALE")
                 AiModelGender aiModelGender,
+        @Schema(description = "같은 카테고리 유사 상품 목록. 같은 브랜드 상품이 앞쪽에 온다")
+                List<SimilarProductResponse> similarProducts,
         @Schema(example = "2026-07-29T12:00:00") LocalDateTime createdAt,
         @Schema(example = "2026-07-29T12:00:00") LocalDateTime updatedAt) {
 
@@ -48,7 +50,8 @@ public record ProductDetailResponse(
             Boolean isWished,
             Long sellerFollowerCount,
             Long sellerProductCount,
-            LinkedLiveSummaryResponse linkedLive) {
+            LinkedLiveSummaryResponse linkedLive,
+            List<SimilarProductResponse> similarProducts) {
         return new ProductDetailResponse(
                 product.getId(),
                 product.getSeller().getId(),
@@ -75,6 +78,7 @@ public record ProductDetailResponse(
                 linkedLive,
                 product.isAiModelEnabled(),
                 product.getAiModelGender(),
+                similarProducts,
                 product.getCreatedAt(),
                 product.getUpdatedAt());
     }

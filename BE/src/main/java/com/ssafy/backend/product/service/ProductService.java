@@ -13,6 +13,7 @@ import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.product.dto.response.LinkedLiveSummaryResponse;
+import com.ssafy.backend.product.dto.response.SimilarProductResponse;
 import com.ssafy.backend.product.entity.Brand;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
@@ -39,6 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ProductService {
 
+    // 그래프용 표본으로 충분한 개수(011). 상세 조회 왕복마다 전수 조회하지 않도록 상한을 둔다.
+    private static final int SIMILAR_PRODUCT_LIMIT = 20;
 
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
@@ -204,6 +207,15 @@ public class ProductService {
                 .map(LinkedLiveSummaryResponse::from)
                 .orElse(null);
 
+        List<SimilarProductResponse> similarProducts = productRepository.findSimilarProducts(
+                        product.getCategoryId(),
+                        productId,
+                        product.getBrandId(),
+                        PageRequest.of(0, SIMILAR_PRODUCT_LIMIT))
+                .stream()
+                .map(SimilarProductResponse::from)
+                .toList();
+
         return ProductDetailResponse.from(
                 product,
                 categoryName,
@@ -213,7 +225,8 @@ public class ProductService {
                 isWished,
                 sellerFollowerCount,
                 sellerProductCount,
-                linkedLive);
+                linkedLive,
+                similarProducts);
     }
 
     @Transactional

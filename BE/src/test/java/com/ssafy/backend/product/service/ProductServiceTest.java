@@ -801,4 +801,34 @@ class ProductServiceTest {
         assertThat(response.linkedLive().title()).isEqualTo("빈티지 특가");
         assertThat(response.linkedLive().status()).isEqualTo("SCHEDULED");
     }
+
+    @Test
+    void 상품_상세조회시_유사_상품_목록을_그대로_담아_반환한다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(seller.getNickname()).thenReturn("판매자");
+        Product product = Product.builder()
+                .seller(seller)
+                .categoryId(CATEGORY_ID)
+                .brandId(2L)
+                .title("빈티지 자켓")
+                .build();
+        product.registerDirectSale(50000L);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        Member otherSeller = org.mockito.Mockito.mock(Member.class);
+        Product sameBrand = Product.builder()
+                .seller(otherSeller).categoryId(CATEGORY_ID).brandId(2L).title("같은 브랜드 상품").build();
+        ReflectionTestUtils.setField(sameBrand, "id", 2L);
+        sameBrand.registerDirectSale(70000L);
+        when(productRepository.findSimilarProducts(
+                eq(CATEGORY_ID), eq(1L), eq(2L), any(Pageable.class)))
+                .thenReturn(List.of(sameBrand));
+
+        ProductDetailResponse response = productService.getProductDetail(2L, 1L);
+
+        assertThat(response.similarProducts()).hasSize(1);
+        assertThat(response.similarProducts().get(0).id()).isEqualTo(2L);
+        assertThat(response.similarProducts().get(0).title()).isEqualTo("같은 브랜드 상품");
+        assertThat(response.similarProducts().get(0).price()).isEqualTo(70000L);
+    }
 }
