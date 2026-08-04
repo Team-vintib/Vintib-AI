@@ -74,8 +74,19 @@ const initWidgets = async () => {
     await nextWidgets.renderAgreement({ selector: AGREEMENT_SELECTOR })
 
     widgets = nextWidgets
-  } catch {
-    emit('error', '결제 수단을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.')
+  } catch (error) {
+     
+    console.error('[PointChargePanel] 결제 위젯 준비 실패', error)
+    const detail =
+      error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+        ? error.message
+        : ''
+    emit(
+      'error',
+      detail
+        ? `결제 수단을 불러오지 못했습니다. (${detail})`
+        : '결제 수단을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
+    )
   } finally {
     isPreparing.value = false
   }
