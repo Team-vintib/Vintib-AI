@@ -16,7 +16,7 @@ from collections import Counter
 from collections.abc import Sequence
 
 from . import registry
-from .contracts import ConditionGrade, DefectType, Finding, FindingStatus
+from .contracts import ConditionGrade, DefectType, Finding, FindingStatus, ImageSummary
 
 MAX_SCORE = 100.0
 
@@ -100,6 +100,21 @@ def summarize(findings: Sequence[Finding]) -> str:
         prefix = "추가로 " if detected else ""
         parts.append(f"{prefix}{', '.join(suspected)}이 의심됩니다.")
     return " ".join(parts)
+
+
+def summarize_by_image(findings: Sequence[Finding], image_count: int) -> list[ImageSummary]:
+    """이미지별 한 줄 요약(CH020). 하자가 없는 이미지도 "확인된 하자가 없습니다"로 채운다.
+
+    `image_count`를 따로 받는 이유: findings에 안 나타나는 이미지(하자 0건인 뒷면 등)도
+    빠짐없이 요약을 내야 캐러셀에서 이미지 개수와 요약 개수가 어긋나지 않는다.
+    """
+    return [
+        ImageSummary(
+            image_index=image_index,
+            summary=summarize([f for f in findings if f.image_index == image_index]),
+        )
+        for image_index in range(image_count)
+    ]
 
 
 def build_notes(findings: Sequence[Finding], unreliable_prompts: Sequence[str] = ()) -> list[str]:
