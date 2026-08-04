@@ -35,8 +35,8 @@
 | --- | --- | --- | --- | --- |
 | 001 | `001-auth-contract.md` | Auth | 이메일 auth API 연결 완료 | `GET /api/me`, auth 응답 `user/nextStep`, SSAFY SSO |
 | 002 | `002-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
-| 003 | `003-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 상품/헤더 필수 필드(brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId) 연결 완료 | 생성용 상품 조회, AI 시착 생성, 선택 필드(hostProfileImageUrl/description/material/measurements/defectSummary) |
-| 004 | `004-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API, 예약 라이브 알림 신청/스케줄러 연동 완료 | 알림 생성 이벤트는 `LIVE_REMINDER` 하나뿐 — 나머지 7종(라이브 시작/입찰/낙찰/주문/배송/포인트) 미반영, unread count API, 탭별 bulk read API |
+| 003 | `003-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 필드(필수+선택 전부: brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId/hostProfileImageUrl/description/material/measurements/defectSummary) 연결 완료 | AI 시착 생성만 남음(서윤/AI 파트) |
+| 004 | `004-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API, 예약 라이브 알림 신청/스케줄러, `LIVE_STARTED`/`AUCTION_OUTBID` 알림 생성 연동 완료 | 알림 생성 이벤트 5종(낙찰/주문/배송/포인트)은 아직 — 낙찰은 Phase 8, 나머지는 서윤 확인 필요. unread count API, 탭별 bulk read API |
 | 005 | `005-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수, 경매 조건 설정, 경매 snapshot/시작/입찰/입찰내역, STOMP(`AUCTION_STARTED`/`BID_PLACED`) 연동 완료 | 경매 종료(`close`)·낙찰자 조회(`winner`)·`AUCTION_CLOSED` 이벤트·자동 종료 스케줄러 |
 | 010 | `010-product-category-optional.md` | Product | 미반영 | `categoryId`가 여전히 `@NotNull`(`ProductCreateRequest`) — 선택 입력 전환 검토 |
 | 011 | `011-product-similar-price-distribution.md` | Product | 미반영 | 상품 상세에 유사 상품 목록(`id`/`title`/`price`) 없음 |
@@ -93,6 +93,19 @@
   (`saleType`은 `DIRECT_SALE`, `condition`은 `conditionGrade`로 이름이 다름). 선택 필드
   (`hostProfileImageUrl`/`description`/`material`/`measurements`/`defectSummary`)와 §3.1(생성용 상품
   조회)·§3.3/3.6(AI 시착 생성)은 아직 남아 있어 문서는 삭제하지 않고 갱신만 했다.
+
+## 2026-08-04 Phase 8 진입 전 정리
+
+- `003-live-tryon-contract.md` §3.5 선택 필드(hostProfileImageUrl/description/material/
+  measurements/defectSummary) 전부 반영 완료. 남은 것은 AI 시착 생성뿐이라 표 상태를 "AI 시착
+  생성만 남음"으로 정리했다.
+- `004-social-notification-contract.md`에 `LIVE_STARTED`(팔로우한 판매자 방송 시작)·
+  `AUCTION_OUTBID`(상위 입찰 발생) 알림 생성을 추가했다 — 둘 다 정윤 도메인 트리거라 서윤을
+  기다리지 않고 반영했다. 계약은 `docs/requests/FE/027-live-optional-fields-and-notifications.md`.
+- `007-unsold-product-disposition.md` 질문 1(미낙찰 상품 처리)에 DB 설계 기준 예비 답변을 남겼다
+  — 최종 검증은 Phase 8 코드가 들어간 뒤.
+- `018-live-broadcast-end-summary.md`(방송 종료 요약 API)는 Phase 8 작업(경매 종료·낙찰/유찰
+  집계)과 데이터가 겹쳐 Phase 8에서 함께 처리한다 — 별도 반영하지 않았다.
 
 ## 2026-08-04 머지 정리 (경매/라이브 알림/검색/홈 대규모 반영)
 

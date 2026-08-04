@@ -6,12 +6,15 @@
 - **관련 기능**: AUCT-014(미낙찰 상품 복원), PROD-005(판매 방식)
 - **상태**: FE는 기존 상품 API로 처리를 **연결 완료**. 아래 두 가지 **의미 확인**만 필요.
 - **2026-08-03 확인**: `PATCH /products/{id}/status`, `/auction-schedule`, `GET /products/{id}`,
-  전체수정(`PATCH /products/{id}`) 자체는 모두 존재한다. 다만 질문 1(미낙찰 상품에도 그대로 호출
-  가능한지)은 **아직 답할 수 없다** — 경매 입찰·종료(AUCT-002~014)가 통째로 미구현이라 상품이
-  실제로 "미낙찰" 상태가 되는 경로 자체가 없다(`SaleStatus`에 경매종료/유찰 값도 없음:
-  `DRAFT/ON_SALE/AUCTION_SCHEDULED/AUCTION_IN_PROGRESS/SOLD`뿐). 경매 진행/종료(AUCT-002 이후)가
-  구현되면 그때 실제로 검증해서 답해야 한다. 질문 2(`/status`가 DIRECT_SALE 전환이 맞는지)는 맞다
-  (`Product.registerDirectSale`).
+  전체수정(`PATCH /products/{id}`) 자체는 모두 존재한다. 질문 2(`/status`가 DIRECT_SALE 전환이
+  맞는지)는 맞다(`Product.registerDirectSale`).
+- **2026-08-04 예비 답변**: 질문 1은 경매 종료(Phase 8)가 아직 코드로 없어 최종 검증은 못 했지만,
+  DB 설계(erd.md §3-1)가 이미 확정돼 있어 미리 답한다. **유찰이면 상품이 자동으로
+  `AUCTION_SCHEDULED`로 돌아간다** — 별도 "복원" 처리가 필요 없다. 그대로 두면 재경매, `/status`
+  호출하면 상시 판매 전환이며 어느 순서로 호출해도 제약에 안 걸린다(`ck_product_price_by_type`은
+  상시 판매에 가격 필수만 강제, 경매 상품 가격 보유는 막지 않음). **지금 연결하신 그대로 쓰면
+  된다.** Phase 8 코드가 들어가면 실제 케이스로 다시 확인해 준다. 상세는
+  `docs/requests/FE/027-live-optional-fields-and-notifications.md` §3 참고.
 
 ## 배경
 

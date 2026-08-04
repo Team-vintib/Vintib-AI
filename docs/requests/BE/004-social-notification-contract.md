@@ -118,22 +118,23 @@ FE 현재 임시 이동:
 | `AUCTION` | `/my?section=auctions` |
 | 기타/null | 이동하지 않고 알림센터에 머묾 |
 
-### 3.2 실제 알림 생성 이벤트 연결 — `LIVE_REMINDER`만 반영, 나머지 7개는 아직
+### 3.2 실제 알림 생성 이벤트 연결 — 라이브/경매 2종 추가 반영(2026-08-04), 나머지 5개는 서윤 확인 필요
 
-`notification` row를 만드는 경로는 코드 전체에서 `LiveReminderService`(→ `NotificationCommandPort`)
-하나뿐이다(2026-08-04 확인) — §3.2.1의 예약 라이브 알림만 실제로 알림을 만든다. 아래 표의 나머지
-7개 이벤트는 여전히 아무 데서도 `notification` row를 만들지 않는다.
+`LiveReminderService`(`LIVE_REMINDER`)에 이어 `LiveService`(`LIVE_STARTED`)·`AuctionService`
+(`AUCTION_OUTBID`)도 `NotificationCommandPort`로 알림을 만든다 — 전부 정윤 도메인 트리거라
+기다리지 않고 반영했다. 계약은 `docs/requests/FE/027-live-optional-fields-and-notifications.md`
+§2 참고. 나머지 5개(주문/배송/포인트)는 그 도메인 서비스에서 호출해야 해서 서윤 확인이 필요하다.
 
 | 이벤트 | 권장 type | 권장 refType/refId | 상태 |
 | --- | --- | --- | --- |
-| 팔로우한 판매자 라이브 시작 | `LIVE_STARTED` | `LIVE` / live id | 미반영 |
+| 팔로우한 판매자 라이브 시작 | `LIVE_STARTED` | `LIVE` / live id | **반영 완료** — 즉시 개설·예약→시작 전이 양쪽 모두 팔로워 전원에게 |
 | 예약 라이브 시작 전 알림 | `LIVE_REMINDER` | `LIVE` / live id | **반영 완료**(§3.2.1) |
-| 상위 입찰 발생 | `AUCTION_OUTBID` | `AUCTION` / auction id | 미반영(경매 입찰 자체는 이번에 구현됨 — `009` 참고) |
-| 낙찰 | `AUCTION_WON` | `AUCTION` / auction id | 미반영(경매 종료 자체가 아직 없음) |
-| 결제 완료 | `ORDER_PAID` | `ORDER` / order id | 미반영 |
-| 송장 등록/배송 시작 | `SHIPMENT_STARTED` | `SHIPMENT` / order or shipment id | 미반영 |
-| 배송 완료 | `SHIPMENT_COMPLETED` | `SHIPMENT` / order or shipment id | 미반영 |
-| 포인트 충전/환불/출금 완료 | `POINT_CHARGED`, `POINT_REFUNDED`, `WITHDRAW_COMPLETED` | `POINT` / point transaction id | 미반영 |
+| 상위 입찰 발생 | `AUCTION_OUTBID` | `AUCTION` / auction id | **반영 완료** — 밀린 최고 입찰자에게 |
+| 낙찰 | `AUCTION_WON` | `AUCTION` / auction id | 미반영(경매 종료 자체가 아직 없음 — Phase 8, `-467`에서 함께) |
+| 결제 완료 | `ORDER_PAID` | `ORDER` / order id | 미반영 — 서윤 확인 필요 |
+| 송장 등록/배송 시작 | `SHIPMENT_STARTED` | `SHIPMENT` / order or shipment id | 미반영 — 서윤 확인 필요 |
+| 배송 완료 | `SHIPMENT_COMPLETED` | `SHIPMENT` / order or shipment id | 미반영 — 서윤 확인 필요 |
+| 포인트 충전/환불/출금 완료 | `POINT_CHARGED`, `POINT_REFUNDED`, `WITHDRAW_COMPLETED` | `POINT` / point transaction id | 미반영 — 서윤 확인 필요 |
 
 ### 3.2.1 예약 라이브 알림 신청과 스케줄러 — 반영 완료 (2026-08-03, 정윤)
 
