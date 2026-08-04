@@ -9,9 +9,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 // 경로는 APIs.md의 `/users/{id}/followers`, `/users/{id}/followings` 스펙을 그대로 따른다.
@@ -70,8 +73,11 @@ public class FollowController {
     })
     @GetMapping("/followers")
     public ResponseEntity<ApiResponse<PageResponse<FollowUserResponse>>> getFollowers(
-            Authentication authentication, @PathVariable Long userId, @PageableDefault(size = 20) Pageable pageable) {
+            Authentication authentication, @PathVariable Long userId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         Long viewerId = authentication != null ? (Long) authentication.getPrincipal() : null;
+        Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(ApiResponse.success(followService.getFollowers(userId, viewerId, pageable)));
     }
 
@@ -83,8 +89,11 @@ public class FollowController {
     })
     @GetMapping("/followings")
     public ResponseEntity<ApiResponse<PageResponse<FollowUserResponse>>> getFollowings(
-            Authentication authentication, @PathVariable Long userId, @PageableDefault(size = 20) Pageable pageable) {
+            Authentication authentication, @PathVariable Long userId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         Long viewerId = authentication != null ? (Long) authentication.getPrincipal() : null;
+        Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(ApiResponse.success(followService.getFollowings(userId, viewerId, pageable)));
     }
 }
