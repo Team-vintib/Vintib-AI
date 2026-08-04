@@ -60,6 +60,10 @@ class CompsFetch:
     items: list[CompItem]
     notes: list[str] = field(default_factory=list)
     reason: ReasonCode | None = None  # 비어 있을 때의 사유. 채워졌으면 None
+    # CH017 진단 필드. BE 계약(`PricingResult`)이 아니라 서비스 내부 로깅·관측 로그용이다 —
+    # 응답 스키마에 노출하려면 별도 승인이 필요하다.
+    finish_reason: str | None = None  # Gemini candidates[0].finishReason. 네트워크 미접촉이면 None
+    truncated: bool = False  # finish_reason이 MAX_TOKENS라 부분 복구했으면 True
 
 
 def build_query(
@@ -148,6 +152,7 @@ class LlmWebSearchCompsSource(CompsSource):
                 model=model,
                 prompt=_comps_prompt(query),
                 timeout=self._config["timeout_seconds"],
+                max_output_tokens=self._config["max_output_tokens"],
             )
         except gms.GmsError as exc:
             raise CompsUnavailable(str(exc)) from exc
@@ -162,6 +167,8 @@ class LlmWebSearchCompsSource(CompsSource):
                 reason=ReasonCode.no_search_performed,
             )
 
+        finish_reason = candidates[0].get("finishReason") or None
+
         grounding = candidates[0].get("groundingMetadata") or {}
         searched = bool(grounding.get("groundingChunks") or grounding.get("webSearchQueries"))
         if not searched:
@@ -171,16 +178,18 @@ class LlmWebSearchCompsSource(CompsSource):
                 items=[],
                 notes=["모델이 웹검색을 수행하지 않아 응답을 사용하지 않았습니다."],
                 reason=ReasonCode.no_search_performed,
+                finish_reason=finish_reason,
             )
 
         parts = candidates[0].get("content", {}).get("parts", [])
         text = "".join(p.get("text", "") for p in parts)
-        rows = _extract_json_array(text)
+        rows, truncated = _extract_json_array_lenient(text)
         if not rows:
             return CompsFetch(
                 items=[],
                 notes=["검색 결과를 구조화하지 못했습니다."],
                 reason=ReasonCode.parse_failed,
+                finish_reason=finish_reason,
             )
 
         items = _rows_to_items(rows, self.key)[: self._config["max_comps"]]
@@ -189,8 +198,12 @@ class LlmWebSearchCompsSource(CompsSource):
                 items=[],
                 notes=["가격을 확인할 수 있는 매물이 없었습니다."],
                 reason=ReasonCode.insufficient_comps,
+                finish_reason=finish_reason,
             )
-        return CompsFetch(items=items)
+        notes = ["응답이 도중에 잘려 완결된 매물만 사용했습니다."] if truncated else []
+        return CompsFetch(
+            items=items, notes=notes, finish_reason=finish_reason, truncated=truncated
+        )
 
 
 def build_comps_source(key: str | None = None) -> CompsSource:
@@ -235,6 +248,47 @@ def _extract_json_array(text: str) -> list[dict]:
     if not isinstance(parsed, list):
         return []
     return [row for row in parsed if isinstance(row, dict)]
+
+
+def _extract_json_array_lenient(text: str) -> tuple[list[dict], bool]:
+    """`_extract_json_array()`가 실패하면 완결된 객체만이라도 건진다(CH017 B2).
+
+    응답이 `maxOutputTokens`에 걸려 잘리면 배열이 `]`로 안 끝나 `_extract_json_array()`가
+    통째로 빈 리스트를 돌려준다. 그런데 잘린 건 보통 마지막 객체뿐이고 앞쪽은 완결돼 있다 —
+    중괄호 짝이 맞는 조각만 하나씩 파싱해서 살린다. 둘째 반환값은 이 부분 복구 경로를
+    탔는지(=응답이 잘렸다고 볼 수 있는지)다.
+    """
+    strict = _extract_json_array(text)
+    if strict:
+        return strict, False
+    return _salvage_json_objects(text), True
+
+
+def _salvage_json_objects(text: str) -> list[dict]:
+    """중괄호 짝이 맞는 `{...}` 조각만 개별적으로 파싱한다. 짝이 안 맞는 마지막 조각(잘린
+    부분)은 짝이 끝까지 맞지 않으므로 자연히 버려진다."""
+    rows: list[dict] = []
+    depth = 0
+    start: int | None = None
+    for index, char in enumerate(text):
+        if char == "{":
+            if depth == 0:
+                start = index
+            depth += 1
+        elif char == "}":
+            if depth == 0:
+                continue
+            depth -= 1
+            if depth == 0 and start is not None:
+                chunk = text[start : index + 1]
+                start = None
+                try:
+                    parsed = json.loads(chunk)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(parsed, dict):
+                    rows.append(parsed)
+    return rows
 
 
 def _rows_to_items(rows: list[dict], source: str) -> list[CompItem]:

@@ -155,7 +155,7 @@
   },
   {
     "image_file": "greyp.png",
-    "subcategory": "SLACKS",
+    "subcategory": "COTTON_PANTS",
     "primary_color": "GRAY",
     "secondary_color": null,
     "shot_type": "hanging",
@@ -177,7 +177,7 @@
   },
   {
     "image_file": "navy_cotton.png",
-    "subcategory": "SLACKS",
+    "subcategory": "COTTON_PANTS",
     "primary_color": "NAVY",
     "secondary_color": null,
     "shot_type": "flat",
@@ -196,5 +196,38 @@
     "needs_human_review": false,
     "synthetic": false,
     "notes": "미디엄 워시 데님 트러커 재킷(Moschino), 나무 옷걸이에 걸어 벽돌 배경 걸이샷."
+  },
+  {
+    "image_file": "apc.png",
+    "subcategory": "CROSS_BAG",
+    "primary_color": "BROWN",
+    "secondary_color": null,
+    "shot_type": "flat",
+    "labeler": "ChoeHyeongSoo",
+    "needs_human_review": false,
+    "synthetic": false,
+    "notes": "브라운 크로스백, 흰 배경 평면샷."
+  },
+  {
+    "image_file": "loaf.png",
+    "subcategory": "DRESS_SHOES",
+    "primary_color": "BLACK",
+    "secondary_color": null,
+    "shot_type": "flat",
+    "labeler": "ChoeHyeongSoo",
+    "needs_human_review": false,
+    "synthetic": false,
+    "notes": "블랙 드레스 신발, 흰 배경 평면샷."
+  },
+  {
+    "image_file": "one.png",
+    "subcategory": "DRESS",
+    "primary_color": "WHITE",
+    "secondary_color": null,
+    "shot_type": "flat",
+    "labeler": "ChoeHyeongSoo",
+    "needs_human_review": false,
+    "synthetic": false,
+    "notes": "화이트 드레스, 흰 배경 평면샷."
   }
 ]

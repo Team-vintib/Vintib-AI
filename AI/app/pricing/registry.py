@@ -30,6 +30,7 @@ class CompsSourceConfig(TypedDict):
     timeout_seconds: float
     max_comps: int  # 이보다 많이 오면 잘라낸다(토큰·응답 크기 방어)
     min_comps_for_pricing: int  # 이 미만이면 가격을 내지 않는다
+    max_output_tokens: int  # Gemini generationConfig.maxOutputTokens — 잘린 응답 방지(CH017)
 
 
 COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
@@ -40,6 +41,7 @@ COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
         "timeout_seconds": 0.0,
         "max_comps": 5,
         "min_comps_for_pricing": 3,
+        "max_output_tokens": 0,  # 미사용(네트워크 호출 없음)
     },
     # 2026-07-31: 메인 시세 검색 모델을 Claude(haiku)에서 Gemini로 전환. LAB-47(웹검색
     # 테스트) V1에서 GMS가 `google_search` 그라운딩을 통과시키는 것까지만 확인했고(쿼리 1건,
@@ -56,6 +58,10 @@ COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
         "timeout_seconds": 90.0,
         "max_comps": 10,
         "min_comps_for_pricing": 1,
+        # CH017 B2: 지정하지 않으면 응답이 중간에 잘려도 알 방법이 없다(finishReason만으로
+        # 사후 확인). 값은 그라운딩 청크+JSON 배열이 넉넉히 들어가는 크기로 임의 설정한
+        # 것이라 근거 있는 값은 아니다 — 실측으로 조정 대상.
+        "max_output_tokens": 4096,
     },
 }
 ACTIVE_COMPS_SOURCE = "mock"  # <- 여기 키만 바꾸면 스왑. llm_web_search 전환은 사용자만(하드 룰)
@@ -124,6 +130,20 @@ CONFIDENCE_LEVEL_BOUNDS: dict[ConfidenceLevel, float] = {
     ConfidenceLevel.high: 0.70,
     ConfidenceLevel.medium: 0.40,
 }
+
+# CH017 B1: comps가 이 개수 미만이면 분산 항(dispersion)을 신뢰도 계산에서 빼고 0으로 둔다.
+# comps 1건은 p25==p75라 분산 항이 만점이 되어 "표본 부족"이 오히려 신뢰도를 올리는 결함이
+# 있었다 — 이 값 이상일 때만 분산 항이 실제로 의미를 갖는다고 본다. 다른 계수들과 같은
+# 성격의 임의값이다.
+CONFIDENCE_DISPERSION_MIN_COMPS = 3
+
+# --- comps 후처리 필터 (CH017) -----------------------------------------------
+# "none"이면 아무 필터도 적용하지 않는다(지금까지와 동작 동일). "keyword_mad"는
+# 브랜드 키워드 미포함 제거 + 가격 MAD 이상치 제거를 켠다(app/pricing/filters.py).
+# 기본을 off로 두는 이유: 표본이 평균 1.7건뿐인 백엔드에서 필터가 표본을 0건으로 만들
+# 위험이 실재하고, 켜는 게 정확도를 올리는지 내리는지 아직 실측하지 않았다.
+ACTIVE_COMPS_FILTER = "none"  # none / keyword_mad
+COMPS_FILTER_MAD_THRESHOLD = 3.5  # 이 값보다 큰 표준화 편차는 이상치로 본다(임의값)
 
 # --- 실행 제어 -------------------------------------------------------------
 # 컨테이너 안에서 백그라운드 스레드로 도는데, 그 스레드풀을 게이트웨이 엔드포인트
