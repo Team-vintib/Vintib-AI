@@ -58,7 +58,6 @@ type ProductSaleStatusDto =
   | 'AUCTION_IN_PROGRESS'
   | 'AUCTION_FAILED'
   | 'SOLD'
-  | 'PRIVATE'
 
 interface MyProductApiDto {
   id: number
