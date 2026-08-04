@@ -863,9 +863,11 @@ def run_index(
     accessory_root: Path | None = None,
     accessory_cap: int | None = None,
     allow_cap_overflow: bool = False,
+    accessory_shot_type: str | None = None,
 ) -> str:
     stats = LoadStats()
     records: list[Record] = []
+    dropped_no_image_shot_type = 0
     if root is not None:
         for label in load_labels(root, limit=limit, progress_every=progress_every, stats=stats):
             record, _reason = to_record(label, short_pants_max_cm=short_pants_max_cm)
@@ -887,6 +889,13 @@ def run_index(
             load_stats=stats,
         ):
             if record.subcategory is None and record.color is None:
+                continue
+            # 라벨은 착용샷("worn")이 훨씬 많은데(실측 94%), 그 실물 이미지(VS_제품 착용_*)는
+            # 받지 않는 게 이 스파이크의 방침이다(90GB짜리라 스킵). 필터 없이 층화 샘플링하면
+            # 카테고리 상한 대부분이 이미지 없는 worn 행으로 채워져 STEP 3에서 missing_image로
+            # 버려진다 — 그래서 여기서 미리 걸러 상한이 "실제로 쓸 수 있는" 행만 채우게 한다.
+            if accessory_shot_type and record.shot_type != accessory_shot_type:
+                dropped_no_image_shot_type += 1
                 continue
             records.append(record)
 
@@ -928,6 +937,12 @@ def run_index(
         f"층화 샘플     : {sum(len(v) for v in selected.values()):,}  → {sample_path}",
         "",
     ]
+    if accessory_shot_type:
+        lines.append(
+            f"액세서리 촬영유형 필터 '{accessory_shot_type}' 적용 — "
+            f"{dropped_no_image_shot_type:,}건 제외(다른 촬영유형)"
+        )
+        lines.append("")
     # 빈 split은 조용히 넘어가면 안 된다 — 학습/평가가 그대로 깨진다.
     empty = [name for name in ("train", "val", "test") if not selected[name]]
     if empty:
@@ -1143,6 +1158,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="색상 쿼터를 채우려고 카테고리 상한을 넘겨도 되게 한다(기본은 상한 엄수)",
     )
+    index.add_argument(
+        "--accessory-shot-type",
+        default=None,
+        help="액세서리 행을 이 촬영유형(예: product)만 남기고 거른다. 착용샷(worn) 실물"
+        "이미지를 안 받았으면 반드시 줄 것 — 안 주면 상한 대부분이 이미지 없는 행으로 "
+        "채워져 STEP 3에서 버려진다",
+    )
     return parser
 
 
@@ -1206,6 +1228,7 @@ def main(argv: list[str] | None = None) -> int:
         eval_cap=args.eval_cap,
         progress_every=args.progress_every,
         accessory_root=args.accessory_root,
+        accessory_shot_type=args.accessory_shot_type,
         accessory_cap=args.accessory_cap,
         allow_cap_overflow=args.allow_cap_overflow,
     )
