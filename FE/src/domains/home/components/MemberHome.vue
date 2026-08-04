@@ -2,7 +2,7 @@
 import { RouterLink } from 'vue-router'
 
 import CategoryProductTabs from '@/domains/home/components/CategoryProductTabs.vue'
-import HomeHero from '@/domains/home/components/HomeHero.vue'
+import HomeHeroCarousel from '@/domains/home/components/HomeHeroCarousel.vue'
 import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
 import LiveCard from '@/domains/home/components/LiveCard.vue'
@@ -35,22 +35,7 @@ const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
   <div class="member-home">
     <HomeSearchPanel />
 
-    <HomeHero
-      title-id="member-home-title"
-      eyebrow="For you"
-      title="팔로우한 셀러와 취향 상품을 모아봤어요"
-      description="관심 셀러의 라이브와 새 상품, 최근 둘러본 취향에 맞는 빈티지 아이템을 바로 확인하세요."
-      image-url="https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1400&q=80"
-    >
-      <template #actions>
-        <RouterLink class="member-hero__primary" :to="ROUTE_PATHS.FOLLOWING_HOME"
-          >팔로잉 보기</RouterLink
-        >
-        <RouterLink class="member-hero__secondary" :to="ROUTE_PATHS.PRODUCT_LIST"
-          >상품 둘러보기</RouterLink
-        >
-      </template>
-    </HomeHero>
+    <HomeHeroCarousel :home-data="homeData" />
 
     <HomeSection
       title-id="followed-seller-title"
@@ -182,30 +167,6 @@ const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
   justify-items: stretch;
   gap: var(--space-12);
   padding-bottom: var(--space-16);
-}
-
-.member-hero__primary,
-.member-hero__secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 48px;
-  padding: 0 var(--space-4);
-  border-radius: 14px;
-  font-weight: 800;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
-.member-hero__primary {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.member-hero__secondary {
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--color-text-inverse);
 }
 
 .seller-grid,
