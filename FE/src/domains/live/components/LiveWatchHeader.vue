@@ -88,7 +88,7 @@ const audienceLabel = computed(() => {
       :aria-pressed="isFollowing"
       @click="$emit('toggleFollow')"
     >
-      {{ isFollowing ? '팔로잉' : '팔로우' }}
+      {{ isFollowing ? '언팔로우' : '팔로우' }}
     </button>
   </header>
 </template>
