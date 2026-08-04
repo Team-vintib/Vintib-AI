@@ -179,10 +179,10 @@ onMounted(load)
   max-width: 320px;
   margin: 0 auto;
   overflow: hidden;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 3 / 5;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
-  background: var(--color-surface-secondary);
+  background: var(--color-image-frame);
   place-items: center;
 }
 
@@ -190,6 +190,7 @@ onMounted(load)
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: saturate(0.86) contrast(1.04);
 }
 
 .tryon-composer__photo-empty {
@@ -216,11 +217,12 @@ onMounted(load)
   left: var(--space-3);
   bottom: var(--space-3);
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-chip);
-  background: rgb(24 24 22 / 72%);
-  color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: 600;
+  border-radius: var(--radius-badge);
+  background: rgba(10, 10, 10, 0.82);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
 }
 
 .tryon-composer__picker {
@@ -295,7 +297,12 @@ onMounted(load)
 }
 
 .tryon-composer__item:hover {
-  transform: translateY(-2px);
+  border-color: var(--color-border-strong);
+  transform: translateY(-3px);
+}
+
+.tryon-composer__item:hover .tryon-composer__item-thumb img {
+  transform: scale(1.045);
 }
 
 .tryon-composer__item--selected {
@@ -303,21 +310,23 @@ onMounted(load)
 }
 
 .tryon-composer__item:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
 .tryon-composer__item-thumb {
   display: block;
   overflow: hidden;
-  aspect-ratio: 3 / 4;
-  background: var(--color-surface-secondary);
+  aspect-ratio: 4 / 5;
+  background: var(--color-image-frame);
 }
 
 .tryon-composer__item-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
+  transition: transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .tryon-composer__item-name {
@@ -339,13 +348,21 @@ onMounted(load)
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.tryon-composer__cta:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 .tryon-composer__cta:disabled {
-  background: var(--color-border-strong);
-  color: var(--color-text-muted);
+  background: var(--color-border-grid);
+  color: var(--color-text-disabled);
   cursor: not-allowed;
 }
 
