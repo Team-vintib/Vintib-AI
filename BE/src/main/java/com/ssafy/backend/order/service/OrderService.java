@@ -131,7 +131,7 @@ public class OrderService {
     /**
      * 송장 등록(SHIP-001) — 판매자만, PAID 상태 + 배송지 등록 완료 후에만 가능하다.
      * deliveryapi.co.kr 웹훅 구독에 성공하면 배송완료는 {@link #markShipmentDelivered}(웹훅 수신)로만
-     * 반영된다. 구독에 실패하면(자격증명 없음, API 오류 등) SY033의 즉시-확정 방식으로 폴백한다.
+     * 반영된다. 구독에 실패하면(자격증명 없음, API 오류 등) 즉시-확정 방식으로 폴백한다.
      */
     @Transactional
     public OrderShipmentResponse registerShipment(Long orderId, Long sellerId, OrderShipmentRegisterRequest request) {
@@ -139,7 +139,7 @@ public class OrderService {
         if (!order.isSeller(sellerId)) {
             throw new CustomException(ErrorCode.ORDER_SELLER_ONLY);
         }
-        if (order.getStatus() != OrderStatus.PAID) {
+        if (order.getStatus() != OrderStatus.PAID || order.isRefundRequested()) {
             throw new CustomException(ErrorCode.INVALID_ORDER_STATE);
         }
         OrderShipment shipment = orderShipmentRepository.findById(orderId)
@@ -193,17 +193,20 @@ public class OrderService {
         return OrderListItemResponse.from(order);
     }
 
-    /** 자동 구매 확정 배치(ORDER-003) — 배송 완료 후 7일이 지난 주문을 같은 확정 로직으로 처리한다. */
+    /**
+     * 자동 구매 확정 배치(ORDER-003) — 배송 완료 후 3일이 지난 주문을 같은 확정 로직으로 처리한다.
+     * 환불 요청이 진행 중인 주문은 조회 단계에서 제외된다.
+     */
     @Transactional
     public void autoConfirmDueOrders() {
-        List<Order> dueOrders = orderRepository.findByStatusAndAutoConfirmAtLessThanEqual(
+        List<Order> dueOrders = orderRepository.findByStatusAndAutoConfirmAtLessThanEqualAndRefundRequestedFalse(
                 OrderStatus.DELIVERED, LocalDateTime.now());
         dueOrders.forEach(this::settle);
     }
 
     /** tradeEscrow → 판매자 정산 + 상태 전이(거래 완료). 수동 확정/자동 배치가 공유한다. */
     private void settle(Order order) {
-        if (order.getStatus() != OrderStatus.DELIVERED) {
+        if (order.getStatus() != OrderStatus.DELIVERED || order.isRefundRequested()) {
             throw new CustomException(ErrorCode.INVALID_ORDER_STATE);
         }
         pointService.settleOrder(

@@ -311,7 +311,7 @@ FE `NOW` 배지와 진입 시 기본 선택 상품의 원천이다. 지금은 �
 - [x] 테스트 — 호스트 아님 403, 편성 안 된 상품 404, 종료 방송 400
 - [x] **연결 상품 카드 필드 보강** — `brandName`·`price`·`saleType`·`conditionGrade`·`thumbnailUrl`
       (FE 요청 `docs/requests/FE/006`에서 "Phase 5에 온다"고 약속한 것)
-- [x] FE 인계 문서 `docs/requests/FE/007-current-product-handoff.md`
+- [x] FE 인계 문서 `docs/requests/FE/012-current-product-handoff.md`
 
 **계획과 달라진 것**
 

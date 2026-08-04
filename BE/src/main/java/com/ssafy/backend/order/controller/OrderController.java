@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 // 주문 리소스(/api/orders). 경로에 userId가 없어 requireSelf 패턴 대신 서비스 내부
 // Order.isPartyOf(principal)/isBuyer/isSeller에 권한 확인을 위임한다(InvoiceController와 동일한 이유).
-@Tag(name = "주문(Orders)", description = "주문 생성/조회, 배송지·송장, 구매 확정 API")
+@Tag(name = "주문 / 배송 / 환불(Orders)", description = "주문 생성/조회, 배송지·송장, 구매 확정, 환불 요청/승인/거절 API")
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
@@ -102,7 +102,9 @@ public class OrderController {
 
     @Operation(summary = "송장 등록(SHIP-001)",
             description = "판매자가 송장 정보를 등록한다. 배송지가 등록된 PAID 상태의 주문만 가능하다. "
-                    + "실제 택배 연동이 없어 등록과 동시에 배송 완료(DELIVERED)까지 반영되고, 7일 뒤 자동 구매 확정 시각이 계산된다.")
+                    + "deliveryapi.co.kr 웹훅 구독에 성공하면 실제 배송완료 신호를 받아야 DELIVERED로 바뀐다. "
+                    + "구독에 실패하면 등록과 동시에 배송 완료(DELIVERED)까지 반영되는 즉시-확정 방식으로 폴백한다. "
+                    + "DELIVERED로 바뀌는 시점부터 3일 뒤 자동 구매 확정 시각이 계산된다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "등록 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "PAID 상태가 아니거나 배송지 미등록"),
@@ -121,7 +123,7 @@ public class OrderController {
 
     @Operation(summary = "구매 확정 처리(ORDER-002/003)",
             description = "구매자가 구매를 확정한다. DELIVERED 상태의 주문만 가능하며, tradeEscrow에 보관된 대금이 "
-                    + "판매자에게 정산되고 주문 상태가 SETTLED로 바뀐다(거래 완료). 배송 완료 후 7일이 지나면 자동으로도 처리된다.")
+                    + "판매자에게 정산되고 주문 상태가 SETTLED로 바뀐다(거래 완료). 배송 완료 후 3일이 지나면 자동으로도 처리된다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "확정 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "DELIVERED 상태가 아님"),

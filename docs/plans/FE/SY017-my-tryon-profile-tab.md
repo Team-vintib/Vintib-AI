@@ -14,7 +14,7 @@
   - `DELETE /users/{id}/tryon`
   - `POST /users/{id}/tryons`
   - `GET/DELETE /users/{userId}/tryons`
-- `docs/requests/BE/007-live-tryon-contract.md`는 FE 사용처 기준으로 `GET /api/me/tryon`, `PUT /api/me/tryon`을 요청하고 있다.
+- `docs/requests/BE/003-live-tryon-contract.md`는 FE 사용처 기준으로 `GET /api/me/tryon`, `PUT /api/me/tryon`을 요청하고 있다.
 - 온보딩 `ONBOARD-003` 구현은 전신 사진, 키, 몸무게, 가슴, 허리, 엉덩이를 선택 입력으로 저장하는 선행 UI와 multipart 요청 함수를 갖고 있다.
 - 마이페이지 `SY016` 구현은 `/my` 단일 페이지에서 `section` query로 섹션을 전환하며, 프로필 섹션 안에 기본 시착 이미지 관리 UI가 일부 들어가 있다.
 - 상품 상세와 라이브 시착 패널은 현재 시착 프로필/생성 API 미연동 상태라 mock 또는 빈 상태로 동작한다.

@@ -259,7 +259,21 @@ class OrderServiceTest {
         orderService.registerShipment(ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest(CourierCode.CJ, "123456789012"));
 
         assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
-        assertThat(realOrder.getAutoConfirmAt()).isAfter(LocalDateTime.now().plusDays(6));
+        assertThat(realOrder.getAutoConfirmAt()).isAfter(LocalDateTime.now().plusDays(2));
+    }
+
+    @Test
+    void 환불_요청_중인_주문은_송장을_등록할_수_없다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        realOrder.markRefundRequested();
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+
+        assertThatThrownBy(() -> orderService.registerShipment(
+                ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest(CourierCode.CJ, "123456789012")))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_ORDER_STATE);
     }
 
     @Test
@@ -320,6 +334,20 @@ class OrderServiceTest {
     }
 
     @Test
+    void 환불_요청_중인_주문은_구매확정할_수_없다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        realOrder.markShipping();
+        realOrder.markDelivered(LocalDateTime.now());
+        realOrder.markRefundRequested();
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+
+        assertThatThrownBy(() -> orderService.confirmOrder(ORDER_ID, BUYER_ID))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_ORDER_STATE);
+    }
+
+    @Test
     void 배송완료_전에는_구매확정할_수_없다() {
         Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
         when(buyer.getId()).thenReturn(BUYER_ID);
@@ -337,7 +365,8 @@ class OrderServiceTest {
         realOrder.markDelivered(LocalDateTime.now().minusDays(8));
         when(buyer.getId()).thenReturn(BUYER_ID);
         when(seller.getId()).thenReturn(SELLER_ID);
-        when(orderRepository.findByStatusAndAutoConfirmAtLessThanEqual(eq(OrderStatus.DELIVERED), any()))
+        when(orderRepository.findByStatusAndAutoConfirmAtLessThanEqualAndRefundRequestedFalse(
+                eq(OrderStatus.DELIVERED), any()))
                 .thenReturn(List.of(realOrder));
 
         orderService.autoConfirmDueOrders();

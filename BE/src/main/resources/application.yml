@@ -100,6 +100,15 @@ delivery-api:
   connect-timeout: 3s
   read-timeout: 5s
 
+# 토스페이먼츠 결제위젯(POINT-001). 결제 승인 실패는 조용히 넘기지 않는다 — DeliveryTrackingClient와
+# 달리 TossPaymentsClient는 실패를 CustomException으로 그대로 전파한다.
+toss-payments:
+  base-url: ${TOSS_BASE_URL:https://api.tosspayments.com}
+  secret-key: ${TOSS_SECRET_KEY:}
+  client-key: ${TOSS_CLIENT_KEY:}
+  connect-timeout: 3s
+  read-timeout: 5s
+
 aws:
   region: ${AWS_REGION:us-east-1}
   access-key: ${AWS_ACCESS_KEY_ID:}

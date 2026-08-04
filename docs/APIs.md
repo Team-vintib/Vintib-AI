@@ -148,17 +148,18 @@
 > 경매 조건 설정 요청 바디: `{ productId, startPrice, bidUnit, durationSeconds }` → 생성된 경매(`status: "READY"`) 반환.
 > 생성(조건 설정)과 시작(`/start`)은 별개 API로 분리한다. 경매 시작 API는 아직 미구현.
 
-## 포인트 / 출금 (Wallet)
+## 포인트 / 출금 (Point)
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
 | 잔액 조회 | GET | `/users/{id}/points` | ✓ | POINT-002, MY-007 | ✓ |
 | 사용 내역 조회 | GET | `/users/{id}/points/logs` | ✓ | POINT-002, MY-007 | ✓ |
-| 포인트 충전 | POST | `/users/{id}/points/charges` | ✓ | POINT-001, MY-007 | ✓ |
+| 포인트 충전 준비 | POST | `/users/{id}/points/charges/ready` | ✓ | POINT-001, MY-007 | ✓ |
+| 포인트 충전 승인 | POST | `/users/{id}/points/charges/confirm` | ✓ | POINT-001, MY-007 | ✓ |
 | 출금 신청 | POST | `/users/{id}/withdrawals` | ✓ | POINT-004, MY-007 | ✓ |
 | 출금 내역 조회 | GET | `/users/{id}/withdrawals` | ✓ | POINT-004, MY-007 | ✓ |
 
-> 포인트 충전은 결제 연동 없이 금액만 반영하는 테스트/데모 전용이다. 출금은 신청까지만 처리하며(관리자 승인 체계 없음), 완료 처리는 DB 직접 조작으로만 가능하다.
+> 포인트 충전은 토스페이먼츠 결제위젯(테스트 키) 연동이다. `ready`로 주문번호(`orderId`)와 위젯 클라이언트 키를 발급받아 FE가 위젯을 띄우고, 결제 성공 리다이렉트에서 받은 `paymentKey`/`orderId`/`amount`로 `confirm`을 호출하면 토스 승인 후 포인트가 적립된다. 계약은 `docs/requests/FE/026-toss-payments-charge-widget.md` 참고. 출금은 신청까지만 처리하며(관리자 승인 체계 없음), 완료 처리는 DB 직접 조작으로만 가능하다.
 
 ## 주문 / 배송 / 환불 (Orders)
 
@@ -173,13 +174,15 @@
 | 송장 정보 조회 | GET | `/orders/{orderId}/shipment` | ✓ | SHIP-002 | ✓ |
 | 송장 정보 등록 | POST | `/orders/{orderId}/shipment` | ✓ | SHIP-001 | ✓ |
 | 배송 조회 웹훅 수신(내부용) | POST | `/webhooks/delivery` |  | SHIP-002 | ✓ |
-| 환불 요청 목록 조회 | GET | `/orders/{id}/refunds` | ✓ | REFUND-001 |  |
-| 환불 요청 등록 | POST | `/orders/{id}/refunds` | ✓ | REFUND-001 |  |
-| 환불 승인, 거절 처리 | PATCH | `/refunds/{id}` | ✓ | REFUND-002 |  |
+| 환불 요청 목록 조회 | GET | `/orders/{id}/refunds` | ✓ | REFUND-001 | ✓ |
+| 환불 요청 등록 | POST | `/orders/{id}/refunds` | ✓ | REFUND-001 | ✓ |
+| 환불 승인, 거절 처리 | PATCH | `/refunds/{id}` | ✓ | REFUND-002 | ✓ |
 
 > 주문 목록 조회는 `role` 쿼리 파라미터(`BUYER`/`SELLER`, 필수)로 구매 내역(MY-003)/판매·정산 내역(MY-004)을 구분한다. 정산 완료 여부는 주문 상태가 `SETTLED`인지로 판단하며, 정산액은 수수료 없이 주문 금액 그대로다.
 >
-> 상시 판매 즉시구매(`POST /orders`)로 주문을 생성하면 결제 금액이 구매자 포인트 `available`에서 `tradeEscrow`(거래 대금 보관)로 옮겨진다. 송장 등록(`POST /orders/{orderId}/shipment`)은 택배사 코드를 고정 목록(`CourierCode`)에서만 받으며, `deliveryapi.co.kr` 웹훅 구독에 성공하면 배송완료(`DELIVERED`)는 그 웹훅(`POST /webhooks/delivery`, 내부용·JWT 인증 아님·서명 검증)이 왔을 때만 반영된다. 구독에 실패하면(자격증명 미설정 등) 등록 즉시 배송완료로 처리하는 폴백을 쓴다. 배송완료 7일 뒤로 자동 구매 확정 시각을 계산해 둔다. 구매 확정(`POST /orders/{orderId}/confirmation`)은 수동 호출 또는 7일 경과 시 스케줄러가 자동으로 처리하며, `tradeEscrow`를 판매자 `available`로 정산하고 주문 상태를 `SETTLED`로 바꾼다(거래 완료). 경매 낙찰 주문(AUCT 연동)은 아직 범위 밖이다.
+> 상시 판매 즉시구매(`POST /orders`)로 주문을 생성하면 결제 금액이 구매자 포인트 `available`에서 `tradeEscrow`(거래 대금 보관)로 옮겨진다. 송장 등록(`POST /orders/{orderId}/shipment`)은 택배사 코드를 고정 목록(`CourierCode`)에서만 받으며, `deliveryapi.co.kr` 웹훅 구독에 성공하면 배송완료(`DELIVERED`)는 그 웹훅(`POST /webhooks/delivery`, 내부용·JWT 인증 아님·서명 검증)이 왔을 때만 반영된다. 구독에 실패하면(자격증명 미설정 등) 등록 즉시 배송완료로 처리하는 폴백을 쓴다. 배송완료 3일 뒤로 자동 구매 확정 시각을 계산해 둔다. 구매 확정(`POST /orders/{orderId}/confirmation`)은 수동 호출 또는 3일 경과 시 스케줄러가 자동으로 처리하며, `tradeEscrow`를 판매자 `available`로 정산하고 주문 상태를 `SETTLED`로 바꾼다(거래 완료). 경매 낙찰 주문(AUCT 연동)은 아직 범위 밖이다.
+>
+> 환불(REFUND-001/002)은 **판매자**가 승인/거절한다(이 프로젝트엔 운영자 역할이 없어 사용자 지시로 결정 — `docs/plans/BE/SY037-refund.md` 참고). 구매자가 `PAID`/`SHIPPING`/`DELIVERED` 상태의 주문에 사유(`NOT_AS_DESCRIBED`/`UNDISCLOSED_DEFECT`/`NOT_SHIPPED`/`DUPLICATE_PAYMENT`/`SYSTEM_ERROR`)와 상세 사유를 담아 요청하면, 판매자가 승인/거절한다. 승인되면 보관 중이던 대금이 판매자에게 정산되지 않고 구매자 `available` 포인트로 바로 환급되며 주문이 `REFUNDED`로 바뀐다. 거절되면 주문은 요청 이전 상태 그대로 이어간다(재요청 가능). 이미 구매 확정·정산된 주문(`CONFIRMED`/`SETTLED`)은 환불 대상이 아니다.
 
 ## AI 가상 시착 (TryOns)
 

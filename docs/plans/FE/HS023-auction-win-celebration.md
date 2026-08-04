@@ -19,7 +19,7 @@
 1. **낙찰 축하 오버레이 컴포넌트 신설**(auction 도메인, 예: `LiveAuctionResultOverlay.vue`): 낙찰자 닉네임 + 낙찰가를 크게 강조, 폭죽/축하 효과, 다크 라이브 테마. reduce-motion 대응.
 2. **`LiveWatchPage`에 오버레이 연결**: 경매 결과가 낙찰(WON)일 때 **영상 스테이지 위**에 표시. mock 트리거는 기존 `?auction=` 쿼리에 `won`(및 `failed`) 시나리오 추가.
 3. **mock 상태·데이터 추가**: `LiveAuctionMockState`에 `WON`(+ `FAILED` 미낙찰) 추가, mock 낙찰자 닉네임·낙찰가 상수 추가. 경매 패널도 종료/낙찰 상태 표기 정합.
-4. **없는 API 문서화**(늘 하던 대로) → `docs/requests/BE/009-auction-chat-contract.md`: 낙찰 결과 조회 + 경매 종료/낙찰 확정 실시간(STOMP 토픽), AUCT-012/013. (입찰 관련은 다음 작업 AUCT-003~006에서 함께 정리)
+4. **없는 API 문서화**(늘 하던 대로) → `docs/requests/BE/005-auction-chat-contract.md`: 낙찰 결과 조회 + 경매 종료/낙찰 확정 실시간(STOMP 토픽), AUCT-012/013. (입찰 관련은 다음 작업 AUCT-003~006에서 함께 정리)
 
 ## 구현 목록
 

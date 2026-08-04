@@ -138,11 +138,18 @@ COMMENT ON TABLE orders IS '주문. 낙찰(AUCT-012) 또는 상시 구매로 생
 COMMENT ON COLUMN orders.auction_id      IS '낙찰로 생성된 주문의 경매. 상시 판매 주문은 NULL.';
 COMMENT ON COLUMN orders.order_price     IS '결제 금액(원).';
 COMMENT ON COLUMN orders.status          IS 'PAID → SHIPPING → DELIVERED → CONFIRMED → SETTLED (+ REFUNDED / CANCELED)';
-COMMENT ON COLUMN orders.auto_confirm_at IS '자동 구매 확정 예정 시각(배송 완료 + 7일). 배송 완료 시점에 채워 넣고 스케줄러가 이 컬럼으로 대상을 찾는다.';
+COMMENT ON COLUMN orders.auto_confirm_at IS '자동 구매 확정 예정 시각(배송 완료 + 3일). 배송 완료 시점에 채워 넣고 스케줄러가 이 컬럼으로 대상을 찾는다.';
+COMMENT ON COLUMN orders.refund_requested IS '진행 중인(REQUESTED) 환불 요청이 있으면 true. 송장 등록·구매 확정(수동/자동)을 막는 용도.';
 
 COMMENT ON TABLE order_shipment IS '배송지·송장 정보 (SHIP-*). 주문 1건당 1행.';
 COMMENT ON COLUMN order_shipment.courier         IS '택배사. 송장 등록 전에는 NULL.';
 COMMENT ON COLUMN order_shipment.tracking_number IS '운송장 번호. 판매자가 등록한다.';
+
+COMMENT ON TABLE refund_request IS '환불 요청·승인/거절 (REFUND-001/002). 구매자가 요청하고 판매자가 승인/거절한다(운영자 아님). 같은 주문에 여러 건 있을 수 있다(거절 후 재요청 허용).';
+COMMENT ON COLUMN refund_request.reason           IS '환불 사유. 단순 변심은 없음(NOT_AS_DESCRIBED/UNDISCLOSED_DEFECT/NOT_SHIPPED/DUPLICATE_PAYMENT/SYSTEM_ERROR).';
+COMMENT ON COLUMN refund_request.status           IS 'REQUESTED → APPROVED 또는 REJECTED.';
+COMMENT ON COLUMN refund_request.rejection_reason IS '거절 사유. REJECTED일 때만 값이 있다.';
+COMMENT ON COLUMN refund_request.reviewed_at      IS '판매자가 승인/거절 처리한 시각. REQUESTED 상태면 NULL.';
 
 COMMENT ON TABLE invoice IS '세금계산서 (BIZ-002). 주문당 1건, 발행 시점 사업자 정보를 스냅샷으로 저장.';
 COMMENT ON COLUMN invoice.business_number      IS '발행 시점 판매자 사업자등록번호(스냅샷).';

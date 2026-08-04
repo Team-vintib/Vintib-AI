@@ -1,11 +1,11 @@
 package com.ssafy.backend.point.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Min;
 
 public record PointChargeRequest(
 
-        @Schema(description = "충전 금액(원). 결제 연동 없이 금액만 반영하는 테스트/데모 전용 API다.", example = "100000")
-        @Positive
+        @Schema(description = "충전 준비 요청 금액(원). 결제위젯에 넘길 orderId를 발급받는다. 최소 10,000원.", example = "100000")
+        @Min(10_000)
         Long amount) {
 }

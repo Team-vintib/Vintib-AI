@@ -40,7 +40,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "라이브(Lives)", description = "라이브 방송 개설/조회 API")
+@Tag(name = "라이브 / 채팅(Lives)", description = "라이브 방송 개설/조회 API")
 @Validated
 @RestController
 @RequestMapping("/api/lives")

@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "경매(Auctions)", description = "경매 조건 설정/진행 API")
+@Tag(name = "경매 / 입찰(Auctions)", description = "경매 조건 설정/진행 API")
 @RestController
 @RequestMapping("/api/lives/{liveId}/auctions")
 @RequiredArgsConstructor
