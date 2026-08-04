@@ -1,12 +1,9 @@
-# 현재 소개 상품(NOW 배지) — 남은 FE 항목
+# 012 현재 소개 상품(NOW 배지) — 남은 FE 항목
 
 - **요청 파트**: BE / **대상 파트**: FE
 - **관련 이슈**: `S15P11A108-87` (LIVE-004)
 
-## 반영 현황 (2026-08-04 확인)
-
-- ✅ `currentProductId` 초기값(라이브 상세) + `/topic/lives/{id}/product` 구독으로 NOW 배지 이동, 호스트 `PATCH /api/lives/{liveId}/current-product`, `saleType`=`DIRECT_SALE`, `conditionGrade` 자유 문자열 — 모두 반영. (`LiveWatchPage.vue`, `LiveProductQueue.vue`, `liveControlApi.ts`, `liveWatchApi.ts`)
-- ⏳ 아래 1건이 남았다.
+> NOW 배지 이동·현재 상품 전환은 반영 완료되어 덜어냈다. 삭제된 상품 표시 1건이 남았다.
 
 ## 남은 항목
 
