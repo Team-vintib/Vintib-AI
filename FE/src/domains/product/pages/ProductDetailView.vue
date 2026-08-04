@@ -17,6 +17,7 @@ import ProductImageGallery from '@/domains/product/components/ProductImageGaller
 import ProductPriceDistribution from '@/domains/product/components/ProductPriceDistribution.vue'
 import ProductPurchaseSummary from '@/domains/product/components/ProductPurchaseSummary.vue'
 import ProductSellerLivePanel from '@/domains/product/components/ProductSellerLivePanel.vue'
+import ProductSimilarRecommendation from '@/domains/product/components/ProductSimilarRecommendation.vue'
 import LiveTryOnPanel from '@/domains/tryon/components/LiveTryOnPanel.vue'
 import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
 import type { ProductDetailViewData } from '@/domains/product/types/productDetail.types'
@@ -307,6 +308,7 @@ onBeforeUnmount(() => {
       />
       <ProductDetailInformation :product="product" />
       <AiQualityAnalysisPanel :analysis="product.aiQualityAnalysis" />
+      <ProductSimilarRecommendation :product-id="product.id" />
     </article>
 
     <div
