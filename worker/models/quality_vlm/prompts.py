@@ -6,23 +6,42 @@ hallucination이 반복 확인됐다 — 크롭 범위 밖 정보를 요구해�
 이미 정확한 `Finding.section`(`worker/models/sam3/prompts.py`의 `SECTION_LABELS_KO`로
 한글 변환)에서 가져오고, VLM에게는 시각적 특징만 맡긴다.
 
-# TODO: 프롬프트 엔지니어링 — AI/validation/QUAL/vlm-description-check/vlm_description_check.ipynb
-#       §4/§5(PROMPT_VARIANTS)에서 먼저 검증한 뒤 이 함수에 반영한다.
-# TODO: One-shot / Few-shot 프롬프팅 — 텍스트 기반 예시로 답변 형식을 고정하는 실험도
-#       같은 노트북에서 먼저 검증한다(이미지 few-shot은 지연시간 비용이 커서 텍스트
-#       예시부터 시도 — vlm_description_check.ipynb의 "TO-DO: 프롬프트 실험 백로그" 참고).
+**Few-shot(CH019)**: 사용자가 확정한 예시 2건을 텍스트로 프롬프트에 포함해 답변 문체를
+고정한다("~이 확인됩니다"체, 재질/색상/형태 위주 객관 묘사, 위치 미언급). 이미지 few-shot이
+아니라 텍스트 예시인 이유는 지연시간 비용 때문(CH011 TODO에서 이미 정함). 예시는 특정
+하자 유형 전용이 아니라 모든 요청에 공통으로 붙는다 — 목적이 "정답을 알려주기"가 아니라
+"문장 스타일·길이·톤을 고정하기"라서, 질문 중인 유형과 예시 유형이 달라도 무방하다.
 
-설계: `.claude/plans/ai/CH011-quality-vlm-production-wiring.md`
+# TODO: 하자 위치 탐지 방법론 고도화 — 지금 3×3 그리드(`sam3/findings.py`의
+#       `_section_no_of`)를 SAM3 시맨틱 파츠 세그먼트(옷 파츠별 마스크)로 대체하는 안은
+#       별도 계획(향후 CH 번호)에서 다룬다. 이 프롬프트 모듈과는 무관.
+
+설계: `.claude/plans/ai/CH011-quality-vlm-production-wiring.md`,
+`.claude/plans/ai/CH019-quality-vlm-fewshot-prompt.md`
 """
+
+# 문체 고정용 few-shot 예시(CH019). 위치를 언급하지 않고 재질/색상/형태만 객관적으로
+# 서술한 뒤 "~이 확인됩니다"로 끝맺는 패턴 — 실제 화면 산출물 예시에서 그대로 가져왔다.
+_FEW_SHOT_EXAMPLES: tuple[str, ...] = (
+    "주변 원단보다 갈색빛이 도는 색상 차이가 확인됩니다.",
+    "원단이 짧게 해지고 올이 드러난 영역이 확인됩니다.",
+)
 
 
 def build_defect_prompt(defect_label: str) -> str:
-    """하자 라벨(한글) -> VLM에게 줄 프롬프트 텍스트. 위치는 절대 묻지 않는다."""
+    """하자 라벨(한글) -> VLM에게 줄 프롬프트 텍스트. 위치는 절대 묻지 않는다.
+
+    앞부분에 few-shot 예시로 답변 문체를 보여주고, 이어서 기존 지시문(위치 언급 금지·
+    한 문장·지어내지 않기)을 그대로 유지한다.
+    """
+    examples = "\n".join(f"- {example}" for example in _FEW_SHOT_EXAMPLES)
     return (
+        "아래는 하자 시각 설명의 좋은 답변 예시입니다.\n"
+        f"{examples}\n\n"
         f"이 이미지는 중고 의류의 '{defect_label}' 하자 부분을 확대한 사진입니다. "
         "옷의 어느 부위인지는 추측하거나 언급하지 마세요. "
-        "색상, 모양, 크기, 질감 등 사진에서 실제로 보이는 시각적 특징만 한국어 한 문장으로 "
-        "설명해 주세요. 보이지 않는 내용은 지어내지 마세요."
+        "색상, 모양, 크기, 질감 등 사진에서 실제로 보이는 시각적 특징만, 위 예시와 같은 "
+        "문체로 한국어 한 문장으로 설명해 주세요. 보이지 않는 내용은 지어내지 마세요."
     )
 
 
