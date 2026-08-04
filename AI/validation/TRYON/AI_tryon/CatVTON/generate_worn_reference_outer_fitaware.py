@@ -24,22 +24,15 @@ FLUX2의 `image=` 참조로 주고 "이 사람에게 이런 핏의 재킷을 입
 """
 
 import os
-import sys
 import time
-from pathlib import Path
 
 import torch
 from diffusers import Flux2KleinPipeline, Flux2Transformer2DModel, GGUFQuantizationConfig
 from PIL import Image
 from transformers import AutoModelForCausalLM, BitsAndBytesConfig
 
-_REPO_ROOT = Path(__file__).resolve().parents[5]
-_WORKER_MODELS_PATH = _REPO_ROOT / "worker" / "models"
-if str(_WORKER_MODELS_PATH) not in sys.path:
-    sys.path.insert(0, str(_WORKER_MODELS_PATH))
-
-from quality_vlm.loader import generate_from_image, load_qwen_vl  # noqa: E402
-from utils import resize_and_crop  # noqa: E402
+from quality_vlm_loader import generate_from_image, load_qwen_vl
+from utils import resize_and_crop
 
 OUT_DIR = "result/worn_references"
 os.makedirs(OUT_DIR, exist_ok=True)
