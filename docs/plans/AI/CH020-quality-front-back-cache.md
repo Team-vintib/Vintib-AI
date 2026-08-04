@@ -22,10 +22,11 @@ AI 쪽 세그멘테이션·`Finding`·`AttentionMap`·`AnnotatedImage`는 이미
   (`SectionScore`에 `image_index`가 없음 — `worker/models/sam3/contracts.py:118-125`). 앞면
   5번 섹션과 뒷면 5번 섹션 확률이 지금은 서로 섞인다. `SectionScore`에 `image_index`를 추가하고
   이미지별로 9개씩(앞/뒤면 총 18개) 내도록 바꾼다.
-- **`summary` 이미지별 분리**: `worker/quality_check_worker_example.py:154`가
-  `summarize(extracted.findings)`를 전체에 대해 한 번만 부른다. `image_index`로 findings를
-  나눠 이미지별 summary를 만든다 — `scoring.summarize()`는 이미 `Sequence[Finding]`을 받으므로
-  로직 변경 없이 호출부에서 필터링만 하면 된다.
+- **`summary` 이미지별 분리 → 구현 시 추가 필드로 결정**: 처음엔 `summary` 자체를 이미지별로
+  바꾸려 했으나, `docs/requests/BE/037`이 이미 `summary`를 단일 문자열로 문서화해둔 상태라
+  깨는 대신 **`image_summaries`(신규 필드)를 추가**하고 `summary`(전체 합산)는 그대로 뒀다.
+  `scoring.summarize_by_image()`가 `image_index`로 findings를 나눠 이미지별 summary를 만든다
+  (하자 0건인 이미지도 빠짐없이 포함).
 - **응답 스키마 동기화**: `AI/app/quality/schemas.py`의 `SectionScore`/`InspectionResult`도
   워커 계약과 맞춰 갱신한다(두 사본 일치는 `AI/test/quality/test_quality_contract.py`가 검사).
 - **바꾸지 않는 것(명시)**: `Finding`(key/no/section_no/bbox 전부 이미 image_index 스코프로
@@ -54,20 +55,28 @@ AI 쪽 세그멘테이션·`Finding`·`AttentionMap`·`AnnotatedImage`는 이미
 
 ## 구현 목록
 
-- [ ] `worker/models/sam3/contracts.py` — `SectionScore`에 `image_index` 추가
-- [ ] `worker/models/sam3/findings.py` — `section_peaks`를 이미지별로 분리해 계산
-- [ ] `worker/quality_check_worker_example.py` — summary를 image_index별로 생성
-- [ ] `AI/app/quality/schemas.py` — `SectionScore`/`InspectionResult` 계약 갱신
-- [ ] `AI/test/quality/test_quality_contract.py` 등 — 계약 동기화 테스트 갱신
-- [ ] 앞/뒤 2장 목업 시나리오로 회귀 테스트(섹션 점수·요약이 이미지별로 분리되는지)
+- [x] `worker/models/sam3/contracts.py` — `SectionScore`에 `image_index` 추가, `ImageSummary` 신설
+- [x] `worker/models/sam3/findings.py` — `section_peaks`를 이미지별로 분리해 계산(max 병합 제거)
+- [x] `worker/models/sam3/scoring.py` — `summarize_by_image()` 추가
+- [x] `worker/quality_check_worker_example.py` — job result에 `image_summaries` 추가
+- [x] `AI/app/quality/schemas.py` — `SectionScore`/`ImageSummary`/`InspectionResult` 계약 갱신
+- [x] `AI/test/quality/test_quality_contract.py`/`test_quality_schemas.py` — 계약 동기화 테스트 갱신
+- [x] 앞/뒤 2장 목업 시나리오로 회귀 테스트(`test_sam3_findings.py`: 섹션 점수가 이미지 간
+      섞이지 않는지, `test_sam3_scoring.py`: 이미지별 summary가 새는지)
+- [x] `docs/requests/BE/038` — `section_scores` 개수 변경 + `image_summaries` 신규 필드를 BE에 통지
+- [x] `ruff check . && black --check . && pytest -q` 통과 후 커밋(푸시는 사용자) —
+      1032 passed, 25 skipped
 - [ ] (B) 지연시간 측정 스크립트 준비 — 실행은 사용자
 - [ ] (B) 프롬프트 캐싱/병렬 처리/시멘틱 캐싱 — 미결정 사항 확정 후 착수
-- [ ] `ruff check . && black --check . && pytest -q` 통과 후 커밋(푸시는 사용자)
 
 ## 확인이 필요한 미결정 사항
 
-- BE 응답 형태를 지금처럼 평면(`image_index` 필드) 구조로 유지할지, `docs/requests/BE/019`가
-  요구한 `images[]` 묶음 구조로 AI가 직접 그룹핑해서 낼지.
+- ~~BE 응답 형태를 지금처럼 평면(`image_index` 필드) 구조로 유지할지, `docs/requests/BE/019`가
+  요구한 `images[]` 묶음 구조로 AI가 직접 그룹핑해서 낼지.~~ → **평면 구조 유지로 결정**(구현
+  완료). 기존 `037` 계약을 깨지 않는 추가 필드(`image_summaries`, `section_scores.image_index`)
+  방식을 택했다. `images[]`로 묶는 건 BE가 `image_index` 기준으로 그룹핑하면 되므로 AI 쪽
+  추가 작업 없이도 019 요구를 충족할 수 있다고 보고 미룬다 — BE가 그룹핑이 부담된다고 하면
+  그때 재검토.
 - "프롬프트 캐싱"이 구체적으로 무엇을 가리키는지(SAM3 프롬프트 임베딩 재사용? 다른 의미?).
 - "시멘틱 캐싱"의 캐시 키·무효화 정책(이미지 임베딩 유사도 기준? 상품 단위 재검수 감지?) —
   판정에 유사도 캐시를 쓰면 오탐/미탐 리스크가 있다는 점은 `chat-advancement-strategy.md`
