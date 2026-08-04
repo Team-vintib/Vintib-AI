@@ -105,26 +105,12 @@ const formatPrice = (value?: number) => {
 </template>
 
 <style scoped lang="scss">
+// 카드 자체는 박스(테두리/배경)를 두르지 않는다 — 페이지 배경과 자연스럽게 연결하고,
+// 얇은 border는 이미지 프레임에만 준다. hover도 뜨는 대신 이미지/보더 대비만 미세하게 바뀐다.
 .product-card {
   position: relative;
   display: grid;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  transition:
-    border-color 220ms ease,
-    background-color 220ms ease,
-    transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.product-card:hover {
-  border-color: var(--color-border-strong);
-  transform: translateY(-3px);
-}
-
-.product-card:hover .product-card__image {
-  transform: scale(1.045);
+  gap: var(--space-2);
 }
 
 .product-card__overlay-link {
@@ -149,7 +135,14 @@ const formatPrice = (value?: number) => {
   display: block;
   overflow: hidden;
   aspect-ratio: 4 / 5;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-media);
   background: var(--color-image-frame);
+  transition: border-color 220ms ease;
+}
+
+.product-card:hover .product-card__media {
+  border-color: var(--color-border-strong);
 }
 
 .product-card__media::after {
@@ -164,7 +157,11 @@ const formatPrice = (value?: number) => {
   height: 100%;
   object-fit: cover;
   filter: saturate(0.88) contrast(1.04) brightness(0.95);
-  transition: transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: filter 220ms ease;
+}
+
+.product-card:hover .product-card__image {
+  filter: saturate(0.88) contrast(1.04) brightness(1.03);
 }
 
 .product-card__tag {
@@ -237,7 +234,7 @@ const formatPrice = (value?: number) => {
 .product-card__body {
   display: grid;
   gap: var(--space-1);
-  padding: var(--space-4);
+  padding: var(--space-2) 0 0;
 }
 
 .product-card__brand {
@@ -263,27 +260,31 @@ const formatPrice = (value?: number) => {
   overflow: hidden;
   margin-top: 2px;
   color: var(--color-text-primary);
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 21px;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
   letter-spacing: -0.01em;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.product-card__price,
-.product-card__bid {
+.product-card__price {
+  margin-top: 2px;
   color: var(--color-text-primary);
   font-family: var(--font-mono);
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 18px;
+  font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: 22px;
+  line-height: 24px;
   font-variant-numeric: tabular-nums;
 }
 
 .product-card__bid {
   color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
   font-size: 13px;
 }
 

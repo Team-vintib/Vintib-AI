@@ -131,7 +131,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
 .schedule-grid,
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-5);
 }
 
