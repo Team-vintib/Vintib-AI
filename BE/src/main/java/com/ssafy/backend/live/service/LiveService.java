@@ -15,10 +15,13 @@ import com.ssafy.backend.live.dto.response.LiveListItemResponse;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveStatus;
+import com.ssafy.backend.live.port.NotificationCommandPort;
 import com.ssafy.backend.live.port.ProductQueryPort.CategorySummary;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.social.entity.Follow;
+import com.ssafy.backend.social.repository.FollowRepository;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -40,6 +43,8 @@ public class LiveService {
     private final LiveProductService liveProductService;
     private final LiveViewerService liveViewerService;
     private final LiveReminderService liveReminderService;
+    private final FollowRepository followRepository;
+    private final NotificationCommandPort notificationCommandPort;
     // 종료 시 정리할 리소스가 늘어나면 구현체만 추가한다 — 종료 로직은 다시 열지 않는다.
     private final List<LiveCleanupHook> cleanupHooks;
 
@@ -48,6 +53,15 @@ public class LiveService {
 
     // 마이페이지 라이브 관리(MY-005) — 본인 조회일 때는 종료·취소 이력까지 전부 본다.
     public static final List<LiveStatus> ALL_STATUSES = List.of(LiveStatus.values());
+
+    /**
+     * 방송 시작 알림을 보낼 팔로워 상한(FE 요청 004 §3.2 LIVE_STARTED).
+     *
+     * <p>팔로워가 아주 많은 판매자라면 알림 INSERT가 방송 시작 트랜잭션을 오래 붙잡는다.
+     * {@link #MAX_VIEWERS_SORT_CANDIDATES}와 같은 이유로 상한을 둔다 — 이 규모에서는 사실상
+     * 전원에게 가지만, 나중에 실제로 잘리는 사례가 생기면 비동기 발송으로 옮긴다.
+     */
+    private static final int MAX_FOLLOWER_NOTIFICATIONS = 500;
 
     /**
      * 시청자 수 정렬에서 한 번에 고려하는 방송 수의 상한.
@@ -106,6 +120,8 @@ public class LiveService {
         // 즉시 개설은 생성 시점에 이미 LIVE 라 여기서 room 을 배정한다. 이름에 ID 가 들어가므로
         // save() 로 ID 가 나온 뒤여야 한다.
         live.assignOpenviduRoom(LiveVideoService.newRoomName(live.getId()));
+
+        notifyFollowersLiveStarted(live);
 
         return LiveResponse.from(live);
     }
@@ -263,12 +279,32 @@ public class LiveService {
         // 이름만 정한다(LiveKit 은 첫 참가자가 들어올 때 room 을 자동 생성한다).
         if (request.status() == LiveStatus.LIVE) {
             live.assignOpenviduRoom(LiveVideoService.newRoomName(live.getId()));
+            notifyFollowersLiveStarted(live);
         }
         if (request.status() == LiveStatus.ENDED) {
             cleanupHooks.forEach(hook -> hook.onLiveEnded(live));
         }
 
         return LiveResponse.from(live);
+    }
+
+    /**
+     * 방송 시작을 팔로워에게 알린다(FE 요청 004 §3.2 LIVE_STARTED). 즉시 개설·예약 개설 후 시작
+     * 두 경로 모두에서 부른다 — "방송이 실제로 시작되는 순간"이 공통 지점이다.
+     */
+    private void notifyFollowersLiveStarted(Live live) {
+        List<Member> followers = followRepository
+                .findByFollowing_Id(live.getHost().getId(), PageRequest.of(0, MAX_FOLLOWER_NOTIFICATIONS))
+                .map(Follow::getFollower)
+                .getContent();
+
+        followers.forEach(follower -> notificationCommandPort.notify(
+                follower,
+                "LIVE_STARTED",
+                "%s님이 라이브를 시작했어요".formatted(live.getHost().getNickname()),
+                live.getTitle(),
+                "LIVE",
+                live.getId()));
     }
 
     /**

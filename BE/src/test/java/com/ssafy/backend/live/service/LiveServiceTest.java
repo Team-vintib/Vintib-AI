@@ -22,9 +22,11 @@ import com.ssafy.backend.live.dto.response.LiveListItemResponse;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveStatus;
+import com.ssafy.backend.live.port.NotificationCommandPort;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.social.repository.FollowRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -71,6 +73,12 @@ class LiveServiceTest {
     @Mock
     private LiveReminderService liveReminderService;
 
+    @Mock
+    private FollowRepository followRepository;
+
+    @Mock
+    private NotificationCommandPort notificationCommandPort;
+
     private LiveService liveService;
 
     @BeforeEach
@@ -81,6 +89,8 @@ class LiveServiceTest {
                 liveProductService,
                 liveViewerService,
                 liveReminderService,
+                followRepository,
+                notificationCommandPort,
                 List.of());
     }
 
@@ -109,6 +119,9 @@ class LiveServiceTest {
         when(memberRepository.findById(HOST_ID)).thenReturn(Optional.of(host));
         when(host.getId()).thenReturn(HOST_ID);
         when(liveRepository.save(any(Live.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // 즉시 개설은 바로 LIVE 라 팔로워 알림 조회가 뒤따른다.
+        when(followRepository.findByFollowing_Id(eq(HOST_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
 
         LiveResponse response = liveService.openLiveNow(HOST_ID, new LiveInstantRequest(TITLE, THUMBNAIL_URL, DESCRIPTION, PRODUCT_IDS));
 
@@ -121,6 +134,26 @@ class LiveServiceTest {
     }
 
     @Test
+    void 즉시_개설하면_팔로워에게_방송_시작_알림이_간다() {
+        when(memberRepository.findById(HOST_ID)).thenReturn(Optional.of(host));
+        when(host.getId()).thenReturn(HOST_ID);
+        when(host.getNickname()).thenReturn("빈티지장인");
+        when(liveRepository.save(any(Live.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Member 팔로워 = org.mockito.Mockito.mock(Member.class);
+        when(followRepository.findByFollowing_Id(eq(HOST_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(
+                        com.ssafy.backend.social.entity.Follow.builder()
+                                .follower(팔로워)
+                                .following(host)
+                                .build())));
+
+        liveService.openLiveNow(HOST_ID, new LiveInstantRequest(TITLE, THUMBNAIL_URL, DESCRIPTION, PRODUCT_IDS));
+
+        verify(notificationCommandPort).notify(
+                eq(팔로워), eq("LIVE_STARTED"), any(), any(), eq("LIVE"), any());
+    }
+
+    @Test
     void 진행_중인_방송을_종료하면_ENDED로_바뀌고_정리_훅이_불린다() {
         LiveService 훅이_달린_서비스 =
                 new LiveService(
@@ -129,6 +162,8 @@ class LiveServiceTest {
                         liveProductService,
                         liveViewerService,
                         liveReminderService,
+                        followRepository,
+                        notificationCommandPort,
                         List.of(cleanupHook));
         when(host.getId()).thenReturn(HOST_ID);
         Live live = Live.openNow(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now());
@@ -150,10 +185,15 @@ class LiveServiceTest {
                         liveProductService,
                         liveViewerService,
                         liveReminderService,
+                        followRepository,
+                        notificationCommandPort,
                         List.of(cleanupHook));
         when(host.getId()).thenReturn(HOST_ID);
         Live live = Live.schedule(host, TITLE, THUMBNAIL_URL, null, LocalDateTime.now().plusDays(1));
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        // LIVE 로 전이되면 팔로워 알림 조회가 뒤따른다.
+        when(followRepository.findByFollowing_Id(eq(HOST_ID), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
 
         LiveResponse response = 훅이_달린_서비스.transitionStatus(
                 HOST_ID, LIVE_ID, new LiveStatusUpdateRequest(LiveStatus.LIVE));
