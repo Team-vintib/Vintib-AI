@@ -70,8 +70,6 @@ CREATE TABLE member_body_profile (
 - `PUT` → 200(생성·수정 겸용 upsert)
 - `DELETE` → 204 / 404
 
-`@Tag(name = "AI 가상 시착 프로필")`로 기존 `TryOnController`("AI 가상 시착(TryOns)")와 Swagger 그룹을 구분한다.
-
 ### 7) `ErrorCode` 추가 (T 구역)
 
 ```java
