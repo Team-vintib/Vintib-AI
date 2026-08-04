@@ -33,6 +33,7 @@ import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.typ
 
 const MY_API_ENABLED = import.meta.env.VITE_MY_API_ENABLED === 'true'
 const MY_LIVE_API_ENABLED = import.meta.env.VITE_LIVE_LIST_API_ENABLED !== 'false'
+const WISH_API_ENABLED = import.meta.env.VITE_WISH_API_ENABLED !== 'false'
 
 interface MyProfileImageResponse {
   profileImageUrl: string | null
@@ -184,7 +185,7 @@ export const getMyPageViewData = async (userId: number): Promise<MyPageViewData>
   const [profileResult, wishesResult, productsResult, livesResult, notificationCountResult] =
     await Promise.allSettled([
       MY_API_ENABLED ? getMyProfile(userId) : Promise.resolve(null),
-      MY_API_ENABLED ? getMyWishList(userId) : Promise.resolve(null),
+      getMyWishList(userId),
       MY_API_ENABLED ? getMySellerProducts(userId) : Promise.resolve(null),
       MY_LIVE_API_ENABLED ? getMyHostLives(userId) : Promise.resolve(null),
       MY_API_ENABLED ? getUnreadNotificationCount(userId) : Promise.resolve(null),
@@ -234,7 +235,7 @@ export const getMyProfile = async (userId: number): Promise<MyProfile> => {
 }
 
 export const getMyWishList = async (userId: number) => {
-  if (!MY_API_ENABLED) {
+  if (!WISH_API_ENABLED) {
     void userId
     const items = PRODUCT_LIST_MOCK_DATA
       .filter((product) => product.isLiked)
@@ -412,7 +413,7 @@ export const updateMyInterests = async (userId: number, request: UpdateMyInteres
 }
 
 export const removeMyWish = async (userId: number, productId: number) => {
-  if (!MY_API_ENABLED) {
+  if (!WISH_API_ENABLED) {
     return
   }
 
