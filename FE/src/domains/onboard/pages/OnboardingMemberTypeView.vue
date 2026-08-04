@@ -293,7 +293,7 @@ const handleComplete = async () => {
 .member-type-option:has(.member-type-option__input:focus-visible) {
   border-color: var(--color-primary);
   outline: none;
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .member-type-option--selected {

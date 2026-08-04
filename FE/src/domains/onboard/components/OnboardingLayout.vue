@@ -107,7 +107,7 @@ const onboardingSteps = [
 
 .onboarding-layout__container {
   width: 100%;
-  max-width: var(--layout-content-max-width);
+  max-width: 900px;
   margin: 0 auto;
 }
 
@@ -117,22 +117,29 @@ const onboardingSteps = [
 }
 
 .onboarding-layout__eyebrow {
-  margin-bottom: var(--space-2);
-  color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  margin-bottom: var(--space-3);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  line-height: 16px;
+  text-transform: uppercase;
 }
 
 .onboarding-layout__title {
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 48px;
+  color: var(--color-text-primary);
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
 }
 
 .onboarding-layout__description {
   margin-top: var(--space-3);
   color: var(--color-text-secondary);
+  font-weight: 300;
   line-height: 24px;
 }
 

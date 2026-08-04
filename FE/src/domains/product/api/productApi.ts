@@ -15,8 +15,13 @@ import type {
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
 import { buildMockAiQualityAnalysis } from '@/domains/product/constants/aiQualityAnalysisMockData'
+import { buildMockProductDetail } from '@/domains/product/constants/productDetailMockData'
+import { PRODUCT_LIST_MOCK_DATA } from '@/domains/product/constants/productListMockData'
 import { http } from '@/shared/api/http'
 import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.types'
+
+// VITE_PRODUCT_API_ENABLED=false 일 때만 mock 목록을 사용합니다(기본값은 실 API).
+const PRODUCT_API_ENABLED = import.meta.env.VITE_PRODUCT_API_ENABLED !== 'false'
 
 type ProductSaleTypeDto = 'DIRECT_SALE' | 'AUCTION'
 type ProductSaleStatusDto =
@@ -159,6 +164,18 @@ export const getProductList = async ({
   size = 20,
   sort = 'LATEST',
 }: ProductListParams = {}) => {
+  if (!PRODUCT_API_ENABLED) {
+    return {
+      items: PRODUCT_LIST_MOCK_DATA,
+      meta: {
+        page: 1,
+        size: PRODUCT_LIST_MOCK_DATA.length,
+        totalElements: PRODUCT_LIST_MOCK_DATA.length,
+        totalPages: 1,
+      } satisfies PageMeta,
+    }
+  }
+
   const response = await http.get<ApiResponse<PageResponse<ProductListDto> | BackendPageResponse<ProductListDto>>>('/products', {
     params: {
       page: Math.max(page - 1, 0),
@@ -183,6 +200,10 @@ export const getProductList = async ({
 }
 
 export const getProductDetail = async (productId: number): Promise<ProductDetailViewData> => {
+  if (!PRODUCT_API_ENABLED) {
+    return buildMockProductDetail(productId)
+  }
+
   const response = await http.get<ApiResponse<ProductDetailDto>>(`/products/${productId}`)
 
   return toProductDetailViewData(unwrapApiData(response.data))

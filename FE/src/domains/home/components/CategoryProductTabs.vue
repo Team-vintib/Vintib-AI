@@ -104,20 +104,27 @@ const getProductPath = (productId: number) => `/products/${productId}`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
+  min-height: 36px;
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-chip);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  font-weight: 700;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 500;
   line-height: 20px;
   white-space: nowrap;
+  transition:
+    border-color 200ms ease,
+    background-color 200ms ease,
+    color 200ms ease;
 }
 
-.category-products__tab:hover,
-.category-products__tab:focus-visible,
+.category-products__tab:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
 .category-products__tab--active {
   border-color: var(--color-primary);
   background: var(--color-primary);
@@ -125,7 +132,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
 }
 
 .category-products__tab:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 

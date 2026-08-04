@@ -28,18 +28,20 @@ defineProps<{
   display: grid;
   min-width: 0;
   min-height: 0;
-  padding: 15px;
+  padding: 26px 28px;
   border-top: 1px solid var(--color-live-border);
   border-left: 1px solid var(--color-live-border);
-  background: var(--color-live-background);
+  background: var(--color-surface-raised);
   grid-template-rows: auto 1fr;
   row-gap: var(--space-3);
 }
 
 .live-auction-panel h2 {
-  color: var(--color-live-text-secondary);
+  color: var(--color-accent);
+  font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 400;
+  letter-spacing: 0.2em;
   line-height: 15px;
   text-transform: uppercase;
 }

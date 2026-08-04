@@ -124,12 +124,12 @@ const getCategoryIcon = (notification: NotificationItem) =>
 .notification-card:hover:not(:disabled),
 .notification-card:focus-visible {
   border-color: var(--color-border-strong);
-  box-shadow: 0 12px 32px rgb(23 24 21 / 10%);
+  box-shadow: none;
   transform: translateY(-1px);
 }
 
 .notification-card:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -139,7 +139,7 @@ const getCategoryIcon = (notification: NotificationItem) =>
 }
 
 .notification-card--read {
-  background: rgb(255 255 255 / 64%);
+  background: transparent;
 }
 
 .notification-card__icon {

@@ -176,21 +176,24 @@ const stageMessage = computed(() => {
   right: var(--space-4);
   align-items: center;
   min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: var(--radius-chip);
-  background: rgba(10, 12, 11, 0.68);
+  padding: 0 12px;
+  border: 1px solid rgba(242, 240, 237, 0.12);
+  border-radius: var(--radius-badge);
+  background: rgba(8, 8, 8, 0.7);
   gap: 6px;
-  color: rgba(255, 255, 255, 0.76);
+  color: var(--color-live-text-secondary);
+  font-family: var(--font-mono);
   font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   backdrop-filter: blur(8px);
 }
 
 .live-video-stage__notice span {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--color-live);
+  width: 4px;
+  height: 4px;
+  background: var(--color-accent);
+  animation: vtPulse 1.7s ease-in-out infinite;
 }
 
 .live-video-stage__reminder {
@@ -200,17 +203,19 @@ const stageMessage = computed(() => {
   align-items: center;
   min-height: 44px;
   padding: 0 var(--space-5);
-  border: 1px solid var(--color-ai);
-  border-radius: 10px;
-  background: var(--color-ai);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-control);
+  background: rgba(10, 10, 10, 0.55);
   gap: var(--space-2);
-  color: #fff;
+  color: var(--color-accent);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
+  backdrop-filter: blur(6px);
 }
 
 .live-video-stage__reminder--active {
-  background: rgba(10, 12, 11, 0.55);
+  background: var(--color-accent);
+  color: var(--color-primary-strong);
 }
 
 .live-video-stage__reminder svg {
@@ -224,7 +229,7 @@ const stageMessage = computed(() => {
 }
 
 .live-video-stage__reminder:focus-visible {
-  outline: 3px solid #fff;
+  outline: 1px solid #fff;
   outline-offset: 2px;
 }
 
@@ -264,35 +269,39 @@ const stageMessage = computed(() => {
   z-index: 2;
   right: var(--space-4);
   bottom: var(--space-4);
-  min-height: 45px;
-  width: 102px;
+  min-height: 44px;
+  width: 108px;
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 0;
-  border-radius: 9px;
-  background: var(--color-ai);
-  box-shadow: 0 2px 16px rgba(111, 91, 211, 0.45);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-control);
+  background: rgba(10, 10, 10, 0.55);
   gap: var(--space-2);
-  color: #fff;
+  color: var(--color-accent);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
+  backdrop-filter: blur(6px);
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
 .live-video-stage__try-on:hover:not(:disabled) {
-  opacity: 0.9;
+  background: var(--color-accent);
+  color: var(--color-primary-strong);
 }
 
 .live-video-stage__try-on:disabled {
   cursor: not-allowed;
-  background: var(--color-live-surface-raised);
-  box-shadow: none;
+  border-color: var(--color-border-input);
+  background: rgba(10, 10, 10, 0.55);
   color: var(--color-live-text-secondary);
   opacity: 0.72;
 }
 
 .live-video-stage__try-on:focus-visible {
-  outline: 3px solid #fff;
+  outline: 1px solid #fff;
   outline-offset: 2px;
 }
 

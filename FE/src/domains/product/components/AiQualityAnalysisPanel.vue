@@ -341,7 +341,7 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 }
 
 .ai-analysis__nav-button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -442,7 +442,7 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 }
 
 .ai-analysis__dot:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 

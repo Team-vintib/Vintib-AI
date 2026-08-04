@@ -2010,7 +2010,7 @@ onMounted(() => {
 .my-tryon-photo__actions button:focus-visible,
 .my-interest-editor__chips button:focus-visible,
 .my-point-panel__actions button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -2025,7 +2025,7 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgb(23 26 31 / 10%);
+  box-shadow: none;
 }
 
 .my-profile-hero__avatar {
@@ -2141,7 +2141,7 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgb(23 26 31 / 10%);
+  box-shadow: none;
 }
 
 .my-dashboard__card {
@@ -2159,7 +2159,7 @@ onMounted(() => {
 
 .my-dashboard__card:hover {
   border-color: var(--color-border-strong);
-  box-shadow: 0 6px 18px rgb(23 26 31 / 10%);
+  box-shadow: none;
   transform: translateY(-1px);
 }
 
@@ -2512,7 +2512,7 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgb(23 26 31 / 8%);
+  box-shadow: none;
 }
 
 .my-product-card__main {
@@ -2603,7 +2603,7 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgb(23 26 31 / 8%);
+  box-shadow: none;
 }
 
 .my-social-card__avatar {
@@ -2815,7 +2815,7 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgb(23 26 31 / 8%);
+  box-shadow: none;
 }
 
 .my-order-card__main {
@@ -3189,7 +3189,7 @@ onMounted(() => {
 
 .my-tryon-fields input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
   outline: none;
 }
 
@@ -3261,7 +3261,7 @@ onMounted(() => {
 .my-profile-form__grid input:focus,
 .my-profile-form__grid select:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
   outline: none;
 }
 
@@ -3359,7 +3359,7 @@ onMounted(() => {
 
 .my-interest-editor__search input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
   outline: none;
 }
 
