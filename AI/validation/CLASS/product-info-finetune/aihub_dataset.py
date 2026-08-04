@@ -105,6 +105,10 @@ DIRECT_CATEGORY_MAP: dict[str, str] = {
     "02top_02t-shirt": "TSHIRT",
     "02top_03sweater": "KNIT",
     "02top_04shirt": "SHIRT",
+    # 사용자 확정(2026-08-04): 블라우스는 SHIRT로 흡수한다. 브리핑 §5는 "흡수 여부 미결정"
+    # 이라 제외 목록에 뒀는데, 그 결정이 내려졌다. 29,719건이 SHIRT 쪽으로 들어온다 —
+    # SHIRT는 폴로 이진 헤드(B)의 음성 클래스이기도 해서 학습량이 늘어나는 게 유리하다.
+    "02top_01blouse": "SHIRT",
     "04bottom_02skirt": "SKIRT",
     "03-1onepiece(dress)": "DRESS",
     "03-2onepiece(jumpsuite)": "JUMPSUIT",
@@ -113,22 +117,18 @@ assert set(DIRECT_CATEGORY_MAP.values()) <= set(ALL_SUBCATEGORIES)
 
 # 우리 코드에 대응이 없거나 흡수 여부가 미결정이라 학습에서 뺀다(브리핑 §5).
 EXCLUDED_CATEGORY_TYPES: dict[str, str] = {
-    "02top_05vest": "taxonomy v2에 VEST가 없다(BE 시드에 없음)",
+    # 사용자 확정(2026-08-04): vest는 제외 유지. taxonomy v2에 VEST가 없고(BE 시드에 없음),
+    # 23,134건을 통째로 SLEEVELESS로 보내면 민소매 상의에 패딩 베스트가 섞인다.
+    "02top_05vest": "제외 확정(2026-08-04) — taxonomy v2에 VEST가 없다",
     "01outer_03jumper": "JACKET 흡수 여부 미결정",
-    "02top_01blouse": "SHIRT 흡수 여부 미결정",
     "04bottom_01pants": "하위 5종 구분 불가 — SHORT_PANTS 파생에만 쓴다",
 }
 
-# 파생 규칙을 **제외 대상 상의**(blouse/vest)에도 적용할지.
+# 파생 규칙(후드/민소매)을 **제외 대상 상의**(= vest)에도 적용할지.
 #
-# 브리핑 §5는 파생 규칙을 `02top_*`로 적어 두고 blouse·vest는 제외 목록에 넣어, 둘이 겹치는
-# 구간(후드 블라우스, 민소매 베스트)의 우선순위를 명시하지 않았다. **제외를 우선**한다 —
-# `04bottom_01pants`에는 "단 SHORT_PANTS 파생에만 사용"이라는 예외가 명시돼 있는데 blouse·
-# vest에는 그런 문구가 없기 때문이다. 특히 vest 23,134건을 통째로 SLEEVELESS로 보내면 우리
-# `SLEEVELESS`(민소매 상의)에 패딩 베스트까지 섞인다.
-#
-# scan이 "이 값을 True로 바꾸면 몇 건이 추가되는지"를 함께 찍어 준다 — 나중에 데이터를 보고
-# 뒤집을 수 있게 하려는 것이고, 지금 기본값은 보수적으로 False다.
+# 기본값 False로 vest를 확실히 뺀다(사용자 확정). blouse는 이제 SHIRT로 매핑되므로 파생
+# 대상에 정상 포함된다 — 후드 블라우스는 HOODIE, 민소매 블라우스는 SLEEVELESS가 된다.
+# scan이 "이 값을 True로 바꾸면 몇 건이 늘어나는지"를 따로 찍어 준다.
 DERIVE_FROM_EXCLUDED_TOPS = False
 
 # AI-Hub `clothes.color` → 우리 팔레트. 대소문자·공백 정규화 후 조회한다(브리핑 §5).
@@ -254,8 +254,11 @@ def parse_label(js: dict, label_path: str = "") -> RawLabel:
 # 라벨 매핑
 # --------------------------------------------------------------------------
 
-# 파생 규칙 1·2를 적용할 상의 타입 — 제외 대상(blouse/vest)은 기본적으로 뺀다.
-_DERIVABLE_TOPS = frozenset({"02top_02t-shirt", "02top_03sweater", "02top_04shirt"})
+# 파생 규칙 1·2(후드/민소매)를 적용할 상의 타입 = **직접 매핑이 되는 상의 전부**.
+# blouse가 SHIRT로 흡수되면서(2026-08-04) 자동으로 여기 들어온다. vest만 남아서 빠진다.
+_DERIVABLE_TOPS = frozenset(
+    code for code in DIRECT_CATEGORY_MAP if code.startswith("02top_")
+)
 
 
 def _is_hood(neck: str | None) -> bool:

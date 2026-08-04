@@ -135,24 +135,42 @@ def test_sleeveless_derivation() -> None:
     assert ad.map_subcategory(label)[0] == "SLEEVELESS"
 
 
-def test_excluded_types_stay_excluded_even_when_derivable() -> None:
-    """blouse·vest는 제외가 이긴다 — `04bottom_01pants`와 달리 예외 문구가 없다."""
-    for source_type in ("02top_01blouse", "02top_05vest"):
-        label = ad.parse_label(
-            _clothes(
-                **{
-                    "metadata.clothes.type": source_type,
-                    "metadata.clothes.sleeve_length_type": "sleeveless",
-                }
-            )
+def test_vest_stays_excluded_even_when_derivable() -> None:
+    """vest는 제외 확정(2026-08-04). 민소매여도 SLEEVELESS로 새어 나가면 안 된다."""
+    label = ad.parse_label(
+        _clothes(
+            **{
+                "metadata.clothes.type": "02top_05vest",
+                "metadata.clothes.sleeve_length_type": "sleeveless",
+            }
         )
-        code, reason = ad.map_subcategory(label)
-        assert code is None, source_type
-        assert "제외" in reason
+    )
+    code, reason = ad.map_subcategory(label)
+    assert code is None
+    assert "제외" in reason
 
-        # 스위치를 켜면 파생된다(scan이 이 건수를 따로 세어 준다).
-        code_on, _ = ad.map_subcategory(label, derive_from_excluded_tops=True)
-        assert code_on == "SLEEVELESS"
+    # 스위치를 켜면 파생된다(scan이 이 건수를 따로 세어 준다).
+    code_on, _ = ad.map_subcategory(label, derive_from_excluded_tops=True)
+    assert code_on == "SLEEVELESS"
+
+
+def test_blouse_maps_to_shirt() -> None:
+    """사용자 확정(2026-08-04) — 블라우스는 SHIRT로 흡수한다."""
+    label = ad.parse_label(_clothes(**{"metadata.clothes.type": "02top_01blouse"}))
+    assert ad.map_subcategory(label) == ("SHIRT", "직접 매핑")
+
+
+def test_blouse_participates_in_derivation_now_that_it_maps() -> None:
+    """SHIRT로 흡수됐으므로 후드/민소매 파생도 정상 적용된다."""
+    sleeveless = ad.parse_label(
+        _clothes(
+            **{
+                "metadata.clothes.type": "02top_01blouse",
+                "metadata.clothes.sleeve_length_type": "sleeveless",
+            }
+        )
+    )
+    assert ad.map_subcategory(sleeveless)[0] == "SLEEVELESS"
 
 
 def test_jumper_is_excluded_pending_decision() -> None:
