@@ -6,10 +6,7 @@ import { LIVE_AUCTION_MOCK_STATES } from '@/domains/auction/constants/liveAuctio
 import LiveAuctionPanel from '@/domains/auction/components/LiveAuctionPanel.vue'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import { issueLiveVideoToken } from '@/domains/live/api/liveControlApi'
-import {
-  isLiveRealtimeApiEnabled,
-  LiveRealtimeClient,
-} from '@/domains/live/api/liveRealtimeClient'
+import { LiveRealtimeClient } from '@/domains/live/api/liveRealtimeClient'
 import {
   cancelLiveReminder,
   getLiveWatchViewData,
@@ -132,9 +129,9 @@ const handleToggleReminder = async () => {
     live.value.isReminderSet = !next
   }
 }
-const realtimeEnabled = isLiveRealtimeApiEnabled()
 let loadRequestId = 0
-let realtimeClient: LiveRealtimeClient | null = null
+let statusSubscription: ReturnType<LiveRealtimeClient['subscribe']> | null = null
+let currentProductSubscription: ReturnType<LiveRealtimeClient['subscribe']> | null = null
 
 const getRouteLiveId = () => {
   const routeValue = Array.isArray(route.params.liveId) ? route.params.liveId[0] : route.params.liveId
@@ -214,7 +211,7 @@ const loadLiveWatch = async () => {
   const liveId = getRouteLiveId()
   const scenario = getMockScenario()
 
-  disconnectRealtime()
+  clearRealtimeSubscriptions()
   live.value = null
   selectedProductId.value = null
   isTryOnOpen.value = false
@@ -252,7 +249,6 @@ const loadLiveWatch = async () => {
 
     if (response.status === 'LIVE') {
       void loadVideoToken(response.id)
-      connectRealtime(response.id)
     }
   } catch (error) {
     if (requestId !== loadRequestId) return
@@ -325,38 +321,33 @@ const loadVideoToken = async (liveId: number) => {
   }
 }
 
-// 방송 상태·현재 상품 전파 구독. 채팅/반응/시청자수는 LiveChatOverlay가 별도 클라이언트로
-// 관리하므로 여기서 건드리지 않는다.
-const connectRealtime = (liveId: number) => {
-  disconnectRealtime()
+// 시청 화면의 STOMP 연결은 LiveChatOverlay 하나만 쓴다(연결 2개 → 세션 2개로 시청자수가
+// 2배 집계되던 문제 수정). 오버레이가 연결되면(realtime-ready) 그 연결에 방송 상태·현재
+// 상품 구독만 얹는다. 채팅/반응/시청자수 구독과 발행은 계속 오버레이가 담당한다.
+const handleRealtimeReady = (client: LiveRealtimeClient) => {
+  clearRealtimeSubscriptions()
 
-  if (!realtimeEnabled) return
+  const liveId = live.value?.id
+  if (liveId === undefined) return
 
-  realtimeClient = new LiveRealtimeClient({
-    onConnect: () => subscribeRealtime(liveId),
-  })
-  realtimeClient.connect()
-}
-
-const subscribeRealtime = (liveId: number) => {
-  if (!realtimeClient) return
-
-  realtimeClient.subscribe(`/topic/lives/${liveId}/status`, (body) => {
+  statusSubscription = client.subscribe(`/topic/lives/${liveId}/status`, (body) => {
     if (isLiveStatusMessage(body)) {
       applyStatusMessage(body)
     }
   })
 
-  realtimeClient.subscribe(`/topic/lives/${liveId}/product`, (body) => {
+  currentProductSubscription = client.subscribe(`/topic/lives/${liveId}/product`, (body) => {
     if (isCurrentProductMessage(body)) {
       applyCurrentProductMessage(body)
     }
   })
 }
 
-const disconnectRealtime = () => {
-  realtimeClient?.disconnect()
-  realtimeClient = null
+const clearRealtimeSubscriptions = () => {
+  statusSubscription?.unsubscribe()
+  currentProductSubscription?.unsubscribe()
+  statusSubscription = null
+  currentProductSubscription = null
 }
 
 // ENDED·CANCELED면 status만 갱신해 기존 종료 상태 UI(헤더 배지·영상 안내)로 전환한다.
@@ -369,7 +360,7 @@ const applyStatusMessage = (message: LiveStatusMessage) => {
       status: message.status,
       endedAt: message.endedAt ?? live.value.endedAt,
     }
-    disconnectRealtime()
+    clearRealtimeSubscriptions()
   }
 }
 
@@ -420,7 +411,7 @@ const elapsedTimer = window.setInterval(() => {
 onBeforeUnmount(() => {
   loadRequestId += 1
   window.clearInterval(elapsedTimer)
-  disconnectRealtime()
+  clearRealtimeSubscriptions()
 })
 </script>
 
@@ -499,6 +490,7 @@ onBeforeUnmount(() => {
                   :host-id="live.hostId"
                   :status="live.status"
                   @viewer-count="updateViewerCount"
+                  @realtime-ready="handleRealtimeReady"
                 />
               </template>
             </LiveVideoStage>
