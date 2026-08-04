@@ -88,7 +88,7 @@ const footerGroups: FooterGroup[] = [
 <style scoped lang="scss">
 .app-footer {
   border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-chrome);
 }
 
 .app-footer__inner {
@@ -97,7 +97,7 @@ const footerGroups: FooterGroup[] = [
   width: 100%;
   max-width: var(--layout-content-max-width);
   min-height: 220px;
-  padding: var(--space-12);
+  padding: var(--space-12) var(--layout-gutter);
   margin-inline: auto;
   gap: var(--space-16);
 }
