@@ -328,6 +328,9 @@ def load_accessory_records(
                 group_key=f"acc:{image.accessory_id}",
                 subcategory=subcategory,
                 color=map_accessory_color(attribute.raw_color),
+                # 접기 전 원본("실버"·"로즈골드" 등). 네이티브 라벨 학습에 쓴다 —
+                # 접히는 손실이 큰 쪽이 바로 이 데이터셋이다(23종 → 14종).
+                color_raw=attribute.raw_color,
                 shot_type=shot,
                 is_polo=False,
                 source_type=attribute.raw_type,

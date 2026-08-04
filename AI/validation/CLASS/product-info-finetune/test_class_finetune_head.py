@@ -25,6 +25,7 @@ def _rows() -> list[dict]:
             "is_polo": True,
             "subcategory": "TSHIRT",
             "color": "BLACK",
+            "color_raw": "Black",
         },
         # 1. 의류 셔츠(셔츠칼라) — polo 음성
         {
@@ -34,6 +35,7 @@ def _rows() -> list[dict]:
             "is_polo": False,
             "subcategory": "SHIRT",
             "color": "WHITE",
+            "color_raw": "White",
         },
         # 2. 의류 티셔츠(라운드넥) — polo 대상 아님
         {
@@ -43,6 +45,7 @@ def _rows() -> list[dict]:
             "is_polo": False,
             "subcategory": "TSHIRT",
             "color": "NAVY",
+            "color_raw": "Navy",
         },
         # 3. 액세서리 은목걸이 — 색상이 GRAY로 들어온다(오염원)
         {
@@ -52,6 +55,7 @@ def _rows() -> list[dict]:
             "is_polo": False,
             "subcategory": "JEWELRY",
             "color": "GRAY",
+            "color_raw": "실버",
         },
         # 4. 액세서리 안경테 — 카테고리는 없고 색상만 있다
         {
@@ -61,6 +65,7 @@ def _rows() -> list[dict]:
             "is_polo": False,
             "subcategory": None,
             "color": "BLACK",
+            "color_raw": "블랙",
         },
     ]
 
@@ -69,17 +74,36 @@ def _embeddings(n: int) -> np.ndarray:
     return np.arange(n * 4, dtype="float32").reshape(n, 4)
 
 
-def test_color_task_takes_every_row_with_a_color() -> None:
+def test_color_task_excludes_jewelry_by_default() -> None:
+    """기본값이 JEWELRY 제외다 — 은목걸이(GRAY)가 의류 색상 경계를 흐리면 안 된다.
+
+    안경테는 subcategory가 None이라 제외 대상이 아니고, 색상(BLACK)은 그대로 쓴다.
+    """
     rows = _rows()
     x, y, kept = th.build_task_dataset(_embeddings(len(rows)), rows, "color")
 
+    assert y == ["BLACK", "WHITE", "NAVY", "BLACK"]
+    assert x.shape == (4, 4)
+    assert all(row.get("subcategory") != "JEWELRY" for row in kept)
+
+
+def test_color_exclusion_can_be_turned_off() -> None:
+    rows = _rows()
+    _x, y, _kept = th.build_task_dataset(_embeddings(len(rows)), rows, "color", color_exclude=())
+
     assert y == ["BLACK", "WHITE", "NAVY", "GRAY", "BLACK"]
-    assert x.shape == (5, 4)
-    assert len(kept) == 5
 
 
-def test_only_source_clothes_drops_accessory_metal_colors() -> None:
-    """색상 헤드의 핵심 방어선 — 은목걸이(GRAY)·안경테(BLACK)가 빠져야 한다."""
+def test_category_head_still_learns_jewelry() -> None:
+    """색상에서만 뺀다 — 카테고리는 액세서리가 유일하게 덮는 클래스라 그대로 배운다."""
+    rows = _rows()
+    _x, y, _kept = th.build_task_dataset(_embeddings(len(rows)), rows, "category")
+
+    assert "JEWELRY" in y
+
+
+def test_only_source_clothes_drops_every_accessory_row() -> None:
+    """소스 필터는 더 센 도구다 — 안경테(BLACK)까지 전부 빠진다."""
     rows = _rows()
     x, y, kept = th.build_task_dataset(_embeddings(len(rows)), rows, "color", only_source="clothes")
 
@@ -87,6 +111,45 @@ def test_only_source_clothes_drops_accessory_metal_colors() -> None:
     assert all(row["source"] == "clothes" for row in kept)
     # 행 필터가 임베딩 행과 어긋나면 안 된다
     assert np.array_equal(x, _embeddings(len(rows))[[0, 1, 2]])
+
+
+# --------------------------------------------------------------------------
+# 네이티브 라벨공간 — 접기는 학습이 아니라 추론 후에
+# --------------------------------------------------------------------------
+
+
+def test_native_label_space_uses_raw_color_strings() -> None:
+    rows = _rows()
+    _x, y, _kept = th.build_task_dataset(
+        _embeddings(len(rows)), rows, "color", label_space="native", color_exclude=()
+    )
+
+    # 접기 전 원본이 나와야 한다 — 실버가 GRAY로 미리 뭉개지지 않는다
+    assert y == ["Black", "White", "Navy", "실버", "블랙"]
+
+
+def test_native_drops_rows_that_cannot_be_collapsed() -> None:
+    """'투명'처럼 팔레트에 접을 데가 없는 색은 배워도 출력할 수 없다."""
+    rows = [
+        {"source": "accessory", "subcategory": "SUNGLASSES", "color": None, "color_raw": "투명"},
+        {"source": "accessory", "subcategory": "SUNGLASSES", "color": "BLACK", "color_raw": "블랙"},
+    ]
+    _x, y, _kept = th.build_task_dataset(
+        _embeddings(2), rows, "color", label_space="native", color_exclude=()
+    )
+
+    assert y == ["블랙"]
+
+
+def test_collapse_map_is_derived_from_the_data() -> None:
+    rows = _rows()
+    mapping = th.build_collapse_map(rows)
+
+    assert mapping["실버"] == "GRAY"
+    assert mapping["Navy"] == "NAVY"
+    assert th.collapse_labels(["실버", "Black"], mapping) == ["GRAY", "BLACK"]
+    # 맵에 없는 값은 그대로 통과시킨다(조용히 None으로 만들지 않는다)
+    assert th.collapse_labels(["모름"], mapping) == ["모름"]
 
 
 def test_only_source_accessory_keeps_only_accessory() -> None:

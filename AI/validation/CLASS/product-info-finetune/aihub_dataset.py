@@ -367,9 +367,16 @@ class Record:
     group_key: str
     subcategory: str | None
     color: str | None
-    shot_type: str | None
-    is_polo: bool
-    source_type: str | None
+    # **접기 전 원본 색상 문자열**("실버", "Gray", "로즈골드" …).
+    #
+    # 팔레트로 미리 접어 학습하면(실버·그레이 → 둘 다 GRAY) 클래스 내부가 시각적으로
+    # 갈라져(금속 광택 vs 직물) 선형 경계가 불리해진다. 네이티브 라벨로 학습한 뒤 argmax를
+    # 접는 쪽이 정보 손실이 없고, 나중에 팔레트를 13종→10종으로 줄여도 **재학습 없이 접는
+    # 맵만 바꾸면 된다**. `aihub_train_head.py --label-space native`가 이 컬럼을 쓴다.
+    color_raw: str | None = None
+    shot_type: str | None = None
+    is_polo: bool = False
+    source_type: str | None = None
     # 원본 `topneck_color_design`. (B) 폴로 이진 헤드가 음성 클래스를 "shirts collar"로
     # 정확히 집어내야 해서(브리핑 §3-B) `is_polo` 불리언만으론 부족하다.
     neck: str | None = None
@@ -402,6 +409,7 @@ def to_record(
         group_key=group_key,
         subcategory=subcategory,
         color=map_color(label.color),
+        color_raw=label.color,
         shot_type=label.shot_type,
         is_polo=is_polo(label.neck),
         source_type=label.source_type,

@@ -33,15 +33,50 @@ DEFAULT_C = 1.0
 DEFAULT_MAX_ITER = 2000
 SEED = 42
 
+# 색상 태스크에서 **제외할 소분류**.
+#
+# JEWELRY는 색상 라벨이 사실상 재질이다 — 실버·골드·로즈골드가 대부분이고, 우리 팔레트로
+# 접으면 GRAY·YELLOW·PINK가 된다. 은목걸이를 회색 니트와 같은 클래스로 학습시키면 14-way
+# 경계가 금속 광택 쪽으로 끌려간다. 게다가 목걸이+귀걸이 2:1 매핑이라 표본이 두 배다.
+#
+# **의류 색상 정확도가 이 작업의 1순위 수용 기준**이므로(브리핑 §11), 그걸 흐리면서까지
+# 주얼리 색상을 배울 이유가 없다. 주얼리 색상은 zero-shot에 맡긴다.
+# HAT·SUNGLASSES는 직물/플라스틱이라 그대로 둔다.
+COLOR_EXCLUDED_SUBCATEGORIES = ("JEWELRY",)
+
 # (B) 폴로 헤드의 학습 대상 정의(브리핑 §3-B).
 POLO_POSITIVE_TYPE = "02top_02t-shirt"
 POLO_NEGATIVE_TYPE = "02top_04shirt"
 POLO_NEGATIVE_NECK = "shirts collar"
 
 
-def head_filename(task: str, variant: str, source: str | None = None) -> str:
-    """헤드 체크포인트 파일명. 학습·평가가 같은 규칙을 공유해야 한다."""
-    return f"head_{task}_{variant}" + (f"_{source}" if source else "") + ".joblib"
+def head_filename(
+    task: str, variant: str, source: str | None = None, label_space: str = "palette"
+) -> str:
+    """헤드 체크포인트 파일명. 학습·평가가 같은 규칙을 공유해야 한다.
+
+    소스와 라벨공간을 파일명에 넣는다 — 조건별 헤드가 서로 덮어쓰면 비교가 불가능하다.
+    """
+    name = f"head_{task}_{variant}"
+    if source:
+        name += f"_{source}"
+    if label_space != "palette":
+        name += f"_{label_space}"
+    return name + ".joblib"
+
+
+def build_collapse_map(rows: list[dict]) -> dict[str, str]:
+    """`{원본 색상 문자열: 팔레트 코드}` — 네이티브 헤드의 예측을 접을 때 쓴다.
+
+    데이터에서 직접 뽑는다(양쪽 컬럼이 같은 행에 있으므로). 매핑 테이블을 다시 import해
+    맞추는 것보다 안전하다 — 학습에 실제로 쓰인 대응 관계 그대로다.
+    """
+    mapping: dict[str, str] = {}
+    for row in rows:
+        raw, palette = row.get("color_raw"), row.get("color")
+        if raw and palette:
+            mapping.setdefault(raw, palette)
+    return mapping
 
 
 def load_split(
@@ -71,18 +106,32 @@ def load_split(
 
 
 def build_task_dataset(
-    embeddings: Any, rows: list[dict], task: str, only_source: str | None = None
+    embeddings: Any,
+    rows: list[dict],
+    task: str,
+    only_source: str | None = None,
+    label_space: str = "palette",
+    color_exclude: tuple[str, ...] = COLOR_EXCLUDED_SUBCATEGORIES,
 ) -> tuple[Any, list[str], list[dict]]:
     """태스크별로 (X, y, 사용된 행)을 만든다. 라벨이 없는 행은 뺀다.
 
-    `only_source`("clothes"|"accessory")를 주면 그 소스 행만 쓴다. **색상 헤드에 이게
-    필요하다** — 액세서리의 금속 색상(실버→GRAY, 골드→YELLOW, 로즈골드→PINK)은
-    `color.py` 팔레트가 상정한 의류 색상과 시각적으로 전혀 다른 물건이라, 은목걸이를
-    회색 니트와 같은 클래스로 학습시키면 14-way 결정 경계가 금속 광택 쪽으로 끌려간다.
-    JEWELRY는 목걸이+귀걸이 2:1로 접혀 표본이 두 배라 영향이 더 크다.
+    `only_source`("clothes"|"accessory")를 주면 그 소스 행만 쓴다. 카테고리 헤드는 두 소스가
+    다 필요하고(액세서리가 HAT·SUNGLASSES·JEWELRY를 유일하게 덮는다), 색상 헤드는 상황에
+    따라 다르다 — 아래 `label_space` 참고. 소스 선택을 임베딩 추출이 아니라 여기서 하는 건
+    GPU를 한 번만 쓰기 위해서다.
 
-    카테고리 헤드는 반대로 두 소스가 다 필요하다(액세서리가 HAT·SUNGLASSES·JEWELRY를
-    유일하게 덮는다). 그래서 소스 선택은 임베딩 추출이 아니라 **여기서** 한다.
+    `label_space`(color 태스크 전용):
+
+    - ``palette`` — 우리 13종+MIXED로 **접힌** 라벨(`color`)로 학습한다.
+    - ``native``  — AI-Hub **원본 색상 문자열**(`color_raw`)로 학습하고, 접기는 추론 후에 한다.
+
+    네이티브가 유리한 이유: 실버와 그레이를 미리 GRAY 하나로 합치면 그 클래스가 시각적으로
+    갈라진 채(금속 광택 vs 직물) 선형 경계를 그려야 해서 불리하다. 따로 배우고 나중에 접으면
+    그 문제가 없다. 접히는 손실은 액세서리 쪽에 몰려 있다(23종 → 14종). 덤으로, 팔레트를
+    13종→10종으로 줄이기로 해도 **재학습 없이 접는 맵만 갈면 된다.**
+
+    네이티브라도 **팔레트로 접히지 않는 행은 제외한다**(투명·기타) — 최종 출력이 팔레트
+    코드여야 하므로 접을 데가 없는 클래스는 배워도 쓸 수 없다.
     """
     import numpy as np
 
@@ -93,8 +142,12 @@ def build_task_dataset(
         if only_source and row.get("source", "clothes") != only_source:
             continue
         if task == "color":
-            label = row.get("color")
-            if label:
+            if color_exclude and row.get("subcategory") in color_exclude:
+                continue  # 주얼리 금속색은 의류 색상 경계를 흐린다(모듈 상단 상수 참고)
+            palette = row.get("color")
+            label = row.get("color_raw") if label_space == "native" else palette
+            # palette가 없으면 접을 데가 없다 → 네이티브에서도 버린다.
+            if label and palette:
                 keep.append(index)
                 labels.append(label)
         elif task == "category":
@@ -160,6 +213,33 @@ def evaluate(model: Any, x: Any, y: list[str]) -> dict:
     }
 
 
+def collapse_labels(labels: list[str], mapping: dict[str, str]) -> list[str]:
+    """네이티브 색상 라벨을 팔레트 코드로 접는다. 맵에 없으면 원본을 그대로 둔다."""
+    return [mapping.get(label, label) for label in labels]
+
+
+def evaluate_collapsed(model: Any, x: Any, y: list[str], mapping: dict[str, str]) -> dict:
+    """네이티브 헤드를 **팔레트 기준**으로 평가한다 — 예측과 정답을 둘 다 접어서 비교한다.
+
+    이게 실제 서비스 출력 기준이고, 팔레트 헤드와 비교할 수 있는 유일한 숫자다.
+    """
+    from collections import Counter
+
+    from sklearn.metrics import accuracy_score
+
+    predicted = collapse_labels(list(model.predict(x)), mapping)
+    truth = collapse_labels(y, mapping)
+    confusion: Counter = Counter()
+    for actual, guess in zip(truth, predicted):
+        if actual != guess:
+            confusion[f"{actual} → {guess}"] += 1
+    return {
+        "n": len(truth),
+        "accuracy": float(accuracy_score(truth, predicted)),
+        "top_confusions": confusion.most_common(10),
+    }
+
+
 def _format_report(task: str, result: dict, label: str) -> str:
     lines = [f"[{label}] n={result['n']:,}  accuracy={result['accuracy']:.4f}"]
     per_class = result["per_class"]
@@ -188,8 +268,22 @@ def main(argv: list[str] | None = None) -> int:
         "--source",
         default=None,
         choices=("clothes", "accessory"),
-        help="이 소스 행만 학습에 쓴다(행 필터). 색상 헤드는 'clothes' 권장 — "
-        "액세서리 금속색(실버→GRAY, 골드→YELLOW)이 의류 색상 경계를 흐린다",
+        help="이 소스 행만 학습에 쓴다(행 필터). 색상 헤드에서 액세서리를 빼고 싶을 때. "
+        "다만 --label-space native 쪽이 데이터를 안 버리는 더 나은 해법이다",
+    )
+    parser.add_argument(
+        "--color-exclude",
+        nargs="*",
+        default=list(COLOR_EXCLUDED_SUBCATEGORIES),
+        help="색상 학습에서 뺄 소분류(기본 JEWELRY — 금속색이라 의류 색상 경계를 흐린다). "
+        "빈 값으로 주면 아무것도 안 뺀다",
+    )
+    parser.add_argument(
+        "--label-space",
+        default="palette",
+        choices=("palette", "native"),
+        help="color 태스크 전용. native면 AI-Hub 원본 색상(실버·로즈골드 등)으로 학습하고 "
+        "접기는 추론 후에 한다. 팔레트를 줄여도 재학습이 필요 없어진다",
     )
     parser.add_argument(
         "--embed-suffix",
@@ -215,11 +309,16 @@ def main(argv: list[str] | None = None) -> int:
     import joblib
 
     class_weight = None if args.class_weight == "none" else "balanced"
+    label_space = args.label_space if args.task == "color" else "palette"
+    if args.label_space == "native" and args.task != "color":
+        print("--label-space는 color 태스크에만 적용된다(무시함)", file=sys.stderr)
 
-    x_train, y_train, _ = build_task_dataset(
+    x_train, y_train, kept_train = build_task_dataset(
         *load_split(args.artifacts, "train", args.variant, args.embed_suffix),
         args.task,
         only_source=args.source,
+        label_space=label_space,
+        color_exclude=tuple(args.color_exclude),
     )
     if len(y_train) == 0:
         print(f"학습 표본이 0개다 (task={args.task}) — 인덱스/필터를 확인할 것", file=sys.stderr)
@@ -233,28 +332,46 @@ def main(argv: list[str] | None = None) -> int:
     )
     model = train(x_train, y_train, C=args.C, max_iter=args.max_iter, class_weight=class_weight)
 
-    reports = [_format_report(args.task, evaluate(model, x_train, y_train), "train")]
+    collapse = build_collapse_map(kept_train) if label_space == "native" else {}
+
+    def report_for(x: Any, y: list[str], name: str) -> list[str]:
+        lines = [_format_report(args.task, evaluate(model, x, y), name)]
+        if collapse:
+            # **네이티브 정확도는 팔레트 헤드와 직접 비교하면 안 된다** — 클래스가 더 많아
+            # 불리하게 나온다. 접은 뒤 숫자가 실제 서비스 출력 기준이고, 이게 비교 대상이다.
+            folded = evaluate_collapsed(model, x, y, collapse)
+            lines.append(f"  ↳ 팔레트로 접은 뒤: accuracy={folded['accuracy']:.4f} (비교 기준)")
+        return lines
+
+    reports = report_for(x_train, y_train, "train")
     for split in ("val", "test"):
         try:
             x_eval, y_eval, _ = build_task_dataset(
                 *load_split(args.artifacts, split, args.variant, args.embed_suffix),
                 args.task,
                 only_source=args.source,
+                label_space=label_space,
+                color_exclude=tuple(args.color_exclude),
             )
         except FileNotFoundError:
             print(f"({split} 임베딩이 없어 건너뜀)", file=sys.stderr)
             continue
         if len(y_eval):
-            reports.append(_format_report(args.task, evaluate(model, x_eval, y_eval), split))
+            reports.extend(report_for(x_eval, y_eval, split))
 
-    # 소스를 파일명에 넣는다 — `--source clothes`로 학습한 색상 헤드가 전체 소스로 학습한
-    # 헤드를 덮어써 버리면 두 조건을 비교할 수가 없다.
-    out_path = args.out or args.artifacts / head_filename(args.task, args.variant, args.source)
+    # 소스·라벨공간을 파일명에 넣는다 — 조건별 헤드가 서로 덮어쓰면 비교가 불가능하다.
+    out_path = args.out or args.artifacts / head_filename(
+        args.task, args.variant, args.source, label_space
+    )
     joblib.dump(
         {
             "task": args.task,
             "variant": args.variant,
             "source": args.source,
+            "label_space": label_space,
+            # 네이티브 헤드의 예측을 팔레트 코드로 접는 표. 평가·서빙이 이걸 그대로 쓴다.
+            # 팔레트를 13종→10종으로 줄이려면 재학습 없이 이 dict만 갈아끼우면 된다.
+            "collapse": collapse,
             "classes": sorted(set(y_train)),
             "class_weight": args.class_weight,
             "C": args.C,

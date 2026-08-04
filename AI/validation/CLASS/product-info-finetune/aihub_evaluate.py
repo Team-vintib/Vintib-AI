@@ -30,7 +30,14 @@ from aihub_dataset import (
     COLOR_CODES,
     EN_COLOR_LABELS,
 )
-from aihub_train_head import build_task_dataset, evaluate, head_filename, load_split
+from aihub_train_head import (
+    build_task_dataset,
+    collapse_labels,
+    evaluate,
+    evaluate_collapsed,
+    head_filename,
+    load_split,
+)
 
 # `product-info-check/classify.py`의 `EmbeddingZeroShotClassifier`와 같은 값 — 기준선을
 # 재현하려면 스코어링 방식이 같아야 한다(CH014 §2-1이 지적한 과신 문제는 임계값 자동채움에만
@@ -94,34 +101,48 @@ def apply_polo_head(
 # --------------------------------------------------------------------------
 
 
-def evaluate_holdout(artifacts: Path, task: str, variant: str, source: str | None) -> str:
-    """`source`는 헤드 학습에 쓴 것과 **같은 값**을 준다 — 파일명과 행 필터 양쪽에 걸린다.
+def evaluate_holdout(
+    artifacts: Path, task: str, variant: str, source: str | None, label_space: str = "palette"
+) -> str:
+    """`source`·`label_space`는 헤드 학습에 쓴 것과 **같은 값**을 준다(파일명이 맞아야 한다).
 
-    색상 헤드를 `--source clothes`로 학습했으면 평가도 그렇게 불러야 같은 헤드를 집는다.
-    다만 아래 소스별 분해는 `only_source`를 걸지 않은 전체 홀드아웃에서만 의미가 있다.
+    네이티브 라벨공간 헤드는 예측을 팔레트로 접은 뒤 채점한다 — 그게 실제 서비스 출력이고,
+    팔레트 헤드와 비교 가능한 유일한 숫자다.
     """
     import joblib
 
-    head_path = artifacts / head_filename(task, variant, source)
+    head_path = artifacts / head_filename(task, variant, source, label_space)
     if not head_path.exists():
         return f"(헤드 없음: {head_path} — aihub_train_head.py를 먼저 돌릴 것)"
     bundle = joblib.load(head_path)
     model = bundle["model"]
+    collapse = bundle.get("collapse") or {}
+    head_space = bundle.get("label_space", "palette")
 
-    label = f"### AI-Hub 홀드아웃 — task={task} variant={variant}"
+    label = f"### AI-Hub 홀드아웃 — task={task} variant={variant} label_space={head_space}"
     lines = [label + (f" source={source}" if source else "")]
+
+    def score(x: Any, y: list[str]) -> dict:
+        """네이티브 헤드면 접어서, 아니면 그대로 채점한다."""
+        if collapse:
+            return evaluate_collapsed(model, x, y, collapse)
+        return evaluate(model, x, y)
+
     for split in ("val", "test"):
         try:
             embeddings, rows = load_split(artifacts, split, variant)
         except FileNotFoundError:
             lines.append(f"- {split}: 임베딩 없음(건너뜀)")
             continue
-        x, y, kept = build_task_dataset(embeddings, rows, task, only_source=source)
+        x, y, kept = build_task_dataset(
+            embeddings, rows, task, only_source=source, label_space=head_space
+        )
         if not y:
             lines.append(f"- {split}: 대상 표본 0건")
             continue
-        result = evaluate(model, x, y)
-        lines.append(f"- **{split}** n={result['n']:,} accuracy={result['accuracy']:.4f}")
+        result = score(x, y)
+        suffix = " (팔레트로 접은 뒤)" if collapse else ""
+        lines.append(f"- **{split}** n={result['n']:,} accuracy={result['accuracy']:.4f}{suffix}")
         for pair, count in result["top_confusions"][:5]:
             lines.append(f"  - {pair}: {count}")
 
@@ -131,7 +152,7 @@ def evaluate_holdout(artifacts: Path, task: str, variant: str, source: str | Non
             by_source.setdefault(row.get("source", "clothes"), []).append(index)
         if len(by_source) > 1:
             for source_name, indices in sorted(by_source.items()):
-                subset = evaluate(model, x[indices], [y[i] for i in indices])
+                subset = score(x[indices], [y[i] for i in indices])
                 lines.append(
                     f"  - [{source_name}] n={subset['n']:,} accuracy={subset['accuracy']:.4f}"
                 )
@@ -212,21 +233,22 @@ def evaluate_ground_truth(
     category_ranked = zero_shot(embeddings, category_texts, category_codes)
     color_ranked = zero_shot(embeddings, color_texts, color_codes)
 
-    def maybe_load(task: str) -> Any:
-        """소스별 헤드를 먼저 찾고 없으면 전체 소스 헤드로 폴백한다.
+    def maybe_load(task: str) -> tuple[Any, dict]:
+        """헤드를 찾아 `(모델, 접는 맵)`을 준다. 없으면 `(None, {})`.
 
-        색상 헤드는 `--source clothes`로 학습하는 걸 권장하므로(액세서리 금속색 오염)
-        `head_color_masked_clothes.joblib`이 있으면 그걸 쓴다. 우리 정답셋은 전부
-        의류라 이쪽이 맞다.
+        조건 조합을 우선순위대로 훑는다 — 네이티브 라벨공간이 팔레트보다 낫다는 게 이
+        스파이크의 가설이므로 먼저 찾고, 소스는 정답셋이 전부 의류라 clothes를 먼저 본다.
         """
-        for candidate in ("clothes", None):
-            path = artifacts / head_filename(task, variant, candidate)
-            if path.exists():
-                return joblib.load(path)["model"]
-        return None
+        for space in ("native", "palette"):
+            for candidate in ("clothes", None):
+                path = artifacts / head_filename(task, variant, candidate, space)
+                if path.exists():
+                    bundle = joblib.load(path)
+                    return bundle["model"], (bundle.get("collapse") or {})
+        return None, {}
 
-    color_head_model = maybe_load("color")
-    polo_head = maybe_load("polo")
+    color_head_model, color_collapse = maybe_load("color")
+    polo_head, _ = maybe_load("polo")
 
     lines = [
         f"### 우리 정답셋 — N={len(usable)} (synthetic 제외, variant={variant})",
@@ -256,7 +278,10 @@ def evaluate_ground_truth(
         if color_head_model is None:
             color_head = color_zero
         else:
-            color_head = str(color_head_model.predict(embeddings[index].reshape(1, -1))[0])
+            raw_prediction = str(color_head_model.predict(embeddings[index].reshape(1, -1))[0])
+            # 네이티브 헤드는 "실버" 같은 원본 라벨을 뱉는다 — 팔레트 코드로 접어야
+            # 정답셋(팔레트 기준)과 비교가 된다.
+            color_head = collapse_labels([raw_prediction], color_collapse)[0]
 
         counters["cat_zero"] += cat_zero == cat_truth
         counters["cat_head"] += cat_head == cat_truth
@@ -301,6 +326,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--variant", default="masked", choices=("raw", "masked"))
     parser.add_argument("--source", default=None, choices=("clothes", "accessory"))
     parser.add_argument(
+        "--label-space",
+        default="palette",
+        choices=("palette", "native"),
+        help="색상 헤드를 어느 라벨공간으로 학습했는지(헤드 파일명이 맞아야 한다). "
+        "native면 예측을 팔레트로 접은 뒤 채점한다",
+    )
+    parser.add_argument(
         "--tasks", nargs="+", default=["color", "polo"], choices=["color", "polo", "category"]
     )
     parser.add_argument(
@@ -316,7 +348,9 @@ def main(argv: list[str] | None = None) -> int:
 
     parts = ["# 분류 헤드 평가 리포트", ""]
     for task in args.tasks:
-        parts.append(evaluate_holdout(args.artifacts, task, args.variant, args.source))
+        # label_space는 color 태스크에만 의미가 있다(polo·category는 항상 palette).
+        space = args.label_space if task == "color" else "palette"
+        parts.append(evaluate_holdout(args.artifacts, task, args.variant, args.source, space))
         parts.append("")
 
     if args.ground_truth_dir:
