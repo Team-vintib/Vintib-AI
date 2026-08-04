@@ -29,22 +29,13 @@ import type {
   InterestCategory,
   UserInterests,
 } from '@/shared/api/mockInterestStorage'
-import {
-  deleteMockProfileImage,
-  readImageFileAsDataUrl,
-  readMockProfileMedia,
-  saveMockProfileImage,
-} from '@/shared/api/mockProfileMediaStorage'
+import { readMockProfileMedia } from '@/shared/api/mockProfileMediaStorage'
 import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.types'
 
 const MY_API_ENABLED = import.meta.env.VITE_MY_API_ENABLED === 'true'
 const MY_LIVE_API_ENABLED = import.meta.env.VITE_LIVE_LIST_API_ENABLED !== 'false'
 const WISH_API_ENABLED = import.meta.env.VITE_WISH_API_ENABLED !== 'false'
 const MOCK_MY_PROFILE_STORAGE_KEY = 'vidtib:mock-my-profile'
-
-interface MyProfileImageResponse {
-  profileImageUrl: string | null
-}
 
 interface MyDefaultTryOnImageResponse {
   defaultTryOnImageUrl: string | null
@@ -363,25 +354,6 @@ export const updateMyProfile = async (
 
   const response = await http.patch<ApiResponse<MyProfile>>(`/users/${userId}`, request)
   return unwrapApiData(response.data, '회원 정보를 저장하지 못했습니다.')
-}
-
-export const updateMyProfileImage = async (userId: number, file: File) => {
-  if (!MY_API_ENABLED) {
-    const profileImageUrl = await readImageFileAsDataUrl(file, '프로필 사진을 읽지 못했습니다.')
-    saveMockProfileImage(userId, profileImageUrl)
-    return { profileImageUrl } satisfies MyProfileImageResponse
-  }
-
-  void file
-  return { profileImageUrl: null } satisfies MyProfileImageResponse
-}
-
-export const deleteMyProfileImage = async (userId: number) => {
-  if (!MY_API_ENABLED) {
-    deleteMockProfileImage(userId)
-  }
-
-  return { profileImageUrl: null } satisfies MyProfileImageResponse
 }
 
 export const updateMyDefaultTryOnImage = async (userId: number, file: File) => {

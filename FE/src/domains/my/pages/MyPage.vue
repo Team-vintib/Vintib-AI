@@ -5,14 +5,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useBusinessVerificationStore } from '@/domains/biz/stores/businessVerificationStore'
 import {
-  deleteMyProfileImage,
   getMyPageViewData,
   getMyInterestOptions,
   getMyInterests,
   updateMyInterests,
   updateMyProfile,
-  updateMyProfileImage,
 } from '@/domains/my/api/myApi'
+import { getPublicProfile } from '@/domains/profile/api/profileApi'
 import {
   MY_BUSINESS_STATUS_LABELS,
   MY_LIVE_STATUS_LABELS,
@@ -67,11 +66,6 @@ const profileForm = ref<MyProfileUpdateRequest>({
 })
 const profileSaveState = ref<'idle' | 'saving' | 'success' | 'error'>('idle')
 const profileSaveMessage = ref('')
-const profileImageInput = ref<HTMLInputElement | null>(null)
-const selectedProfileImageFile = ref<File | null>(null)
-const profileImagePreviewUrl = ref('')
-const isProfileImageRemoved = ref(false)
-const selectedProfileImageName = ref('')
 const tryOnImageInput = ref<HTMLInputElement | null>(null)
 const selectedTryOnImageFile = ref<File | null>(null)
 const tryOnImagePreviewUrl = ref('')
@@ -150,13 +144,7 @@ const profileDisplayName = computed(
   () => profile.value?.nickname?.trim() || profile.value?.name?.trim() || '회원',
 )
 const profileInitial = computed(() => profileDisplayName.value.slice(0, 1))
-const profileImageDisplayUrl = computed(() => {
-  if (isProfileImageRemoved.value) {
-    return ''
-  }
-
-  return profileImagePreviewUrl.value || profile.value?.profileImageUrl || ''
-})
+const profileImageDisplayUrl = computed(() => profile.value?.profileImageUrl || '')
 const profileAvatarUrl = computed(() => profileImageDisplayUrl.value)
 const tryOnImageDisplayUrl = computed(() => {
   if (isTryOnImageRemoved.value) {
@@ -465,10 +453,6 @@ const syncProfileForm = () => {
   }
   profileSaveState.value = 'idle'
   profileSaveMessage.value = ''
-  selectedProfileImageFile.value = null
-  profileImagePreviewUrl.value = ''
-  isProfileImageRemoved.value = false
-  selectedProfileImageName.value = ''
 }
 
 const syncTryOnProfileForm = () => {
@@ -693,47 +677,8 @@ const loadMyInterests = async (userId: number) => {
   }
 }
 
-const openProfileImagePicker = () => {
-  profileImageInput.value?.click()
-}
-
 const openTryOnImagePicker = () => {
   tryOnImageInput.value?.click()
-}
-
-const handleProfileImageChange = async (event: Event) => {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-
-  if (!file) {
-    return
-  }
-
-  if (!file.type.startsWith('image/')) {
-    profileSaveState.value = 'error'
-    profileSaveMessage.value = '이미지 파일만 업로드할 수 있습니다.'
-    input.value = ''
-    return
-  }
-
-  if (file.size > 5 * 1024 * 1024) {
-    profileSaveState.value = 'error'
-    profileSaveMessage.value = '프로필 사진은 5MB 이하로 선택해 주세요.'
-    input.value = ''
-    return
-  }
-
-  try {
-    profileImagePreviewUrl.value = await readImageFileAsDataUrl(file, '프로필 사진을 읽지 못했습니다.')
-    selectedProfileImageFile.value = file
-    isProfileImageRemoved.value = false
-    selectedProfileImageName.value = file.name
-    profileSaveState.value = 'idle'
-    profileSaveMessage.value = ''
-  } catch (error) {
-    profileSaveState.value = 'error'
-    profileSaveMessage.value = normalizeApiError(error).message
-  }
 }
 
 const handleTryOnImageChange = async (event: Event) => {
@@ -768,17 +713,6 @@ const handleTryOnImageChange = async (event: Event) => {
   } catch (error) {
     tryOnProfileSaveState.value = 'error'
     tryOnProfileMessage.value = normalizeApiError(error).message
-  }
-}
-
-const removeProfileImage = () => {
-  selectedProfileImageFile.value = null
-  profileImagePreviewUrl.value = ''
-  selectedProfileImageName.value = ''
-  isProfileImageRemoved.value = true
-
-  if (profileImageInput.value) {
-    profileImageInput.value.value = ''
   }
 }
 
@@ -948,15 +882,6 @@ const submitProfileForm = async () => {
       detailAddress: profileForm.value.detailAddress.trim(),
     }
     const nextProfile = await updateMyProfile(profile.value.id, request)
-    let nextProfileImageUrl = profile.value.profileImageUrl
-
-    if (isProfileImageRemoved.value) {
-      const response = await deleteMyProfileImage(profile.value.id)
-      nextProfileImageUrl = response.profileImageUrl
-    } else if (selectedProfileImageFile.value) {
-      const response = await updateMyProfileImage(profile.value.id, selectedProfileImageFile.value)
-      nextProfileImageUrl = response.profileImageUrl
-    }
 
     await updateMyInterests(profile.value.id, {
       brandIds: [...selectedInterestBrandIds.value],
@@ -971,7 +896,7 @@ const submitProfileForm = async () => {
           ...nextProfile,
           email: nextProfile.email || profile.value.email,
           name: nextProfile.name || profile.value.name,
-          profileImageUrl: nextProfileImageUrl,
+          profileImageUrl: profile.value.profileImageUrl,
           defaultTryOnImageUrl: profile.value.defaultTryOnImageUrl,
           memberType: nextProfile.memberType || profile.value.memberType,
           businessVerificationStatus:
@@ -982,10 +907,6 @@ const submitProfileForm = async () => {
       },
     }
     authStore.updateUser({ nickname: nextProfile.nickname })
-    selectedProfileImageFile.value = null
-    profileImagePreviewUrl.value = ''
-    selectedProfileImageName.value = ''
-    isProfileImageRemoved.value = false
     profileSaveState.value = 'success'
     profileSaveMessage.value = '내 정보가 저장되었습니다.'
     await router.push({ name: ROUTE_NAMES.HOME })
@@ -1032,9 +953,10 @@ const loadMyPage = async () => {
     const nextViewData = await getMyPageViewData(authStore.user.id)
     viewData.value = mergeSessionProfile(nextViewData)
     tryOnProfileLoadState.value = 'loading'
-    const [tryOnProfileResult] = await Promise.allSettled([
+    const [tryOnProfileResult, , publicProfileResult] = await Promise.allSettled([
       getMyTryOnProfile(authStore.user.id),
       loadMyInterests(authStore.user.id),
+      getPublicProfile(authStore.user.id),
     ])
 
     if (tryOnProfileResult.status === 'fulfilled') {
@@ -1054,6 +976,19 @@ const loadMyPage = async () => {
     } else {
       tryOnProfileLoadState.value = 'error'
       tryOnProfileMessage.value = normalizeApiError(tryOnProfileResult.reason).message
+    }
+
+    if (publicProfileResult.status === 'fulfilled') {
+      viewData.value = {
+        ...viewData.value,
+        summary: {
+          ...viewData.value.summary,
+          profile: {
+            ...viewData.value.summary.profile,
+            profileImageUrl: publicProfileResult.value.profileImageUrl,
+          },
+        },
+      }
     }
 
     loadState.value = 'success'
@@ -1374,25 +1309,11 @@ onMounted(() => {
                   </div>
                   <div class="my-profile-photo__body">
                     <strong>프로필 사진</strong>
-                    <p>마이페이지와 판매자 정보에 표시되는 사진입니다. 시착용 사진과 별도로 관리됩니다.</p>
-                    <p v-if="selectedProfileImageName" class="my-profile-photo__file">
-                      {{ selectedProfileImageName }}
+                    <p>
+                      프로필 페이지와 동일한 사진이 표시됩니다.
+                      <router-link :to="{ name: ROUTE_NAMES.PROFILE_ME }">프로필 편집</router-link>에서 변경할 수 있습니다.
                     </p>
-                    <div class="my-profile-photo__actions">
-                      <button type="button" @click="openProfileImagePicker">사진 선택</button>
-                      <button v-if="profileImageDisplayUrl" type="button" @click="removeProfileImage">
-                        사진 삭제
-                      </button>
-                    </div>
                   </div>
-                  <input
-                    ref="profileImageInput"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    class="my-profile-photo__input"
-                    aria-label="프로필 사진 선택"
-                    @change="handleProfileImageChange"
-                  />
                 </div>
 
                 <div class="my-profile-form__grid">
@@ -2059,7 +1980,6 @@ onMounted(() => {
 .my-product-card__main:focus-visible,
 .my-order-card__main:focus-visible,
 .my-business-status button:focus-visible,
-.my-profile-photo__actions button:focus-visible,
 .my-tryon-photo__actions button:focus-visible,
 .my-interest-editor__chips button:focus-visible,
 .my-point-panel__actions button:focus-visible {
@@ -3110,45 +3030,9 @@ onMounted(() => {
   line-height: 20px;
 }
 
-.my-profile-photo__file {
-  color: var(--color-primary) !important;
+.my-profile-photo p a {
+  color: var(--color-primary);
   font-weight: var(--font-weight-semibold);
-}
-
-.my-profile-photo__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-
-.my-profile-photo__actions button {
-  min-height: var(--button-height-small);
-  padding: 0 var(--space-4);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: var(--font-size-button-small);
-  font-weight: var(--font-weight-bold);
-}
-
-.my-profile-photo__actions button:first-child {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.my-profile-photo__actions button:hover {
-  background: var(--color-surface);
-}
-
-.my-profile-photo__actions button:first-child:hover {
-  background: var(--color-primary-hover);
-}
-
-.my-profile-photo__input {
-  display: none;
 }
 
 .my-tryon-photo {
