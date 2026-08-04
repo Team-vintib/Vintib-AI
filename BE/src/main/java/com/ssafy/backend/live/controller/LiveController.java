@@ -40,7 +40,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "라이브(Lives)", description = "라이브 방송 개설/조회 API")
+@Tag(name = "라이브 / 채팅(Lives)", description = "라이브 방송 개설/조회 API")
 @Validated
 @RestController
 @RequestMapping("/api/lives")
@@ -96,7 +96,9 @@ public class LiveController {
                     + "`sort=VIEWERS_DESC`(시청자 수 많은 순)는 Redis 값으로 정렬하므로 최대 500개 방송까지만 "
                     + "대상으로 삼고, 그때 `totalElements`는 정렬 대상이 된 수를 뜻한다. "
                     + "`hostId`에 인증된 본인 ID를 넘기면 마이페이지 라이브 관리(MY-005)로 쓸 수 있다 — "
-                    + "이때는 종료·취소된 방송까지 전부 조회된다(타인의 hostId를 넘기면 공개 상태만 보인다).")
+                    + "이때는 종료·취소된 방송까지 전부 조회된다(타인의 hostId를 넘기면 공개 상태만 보인다). "
+                    + "**토큰을 함께 보내면 카드마다 `isHost`가 채워진다** — `hostId`를 직접 비교하지 말고 "
+                    + "이 값으로 '내 라이브'를 판정해야 한다(상세 조회의 `isHost`와 같은 이유).")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "허용되지 않는 status·sort 값 또는 음수 page·size")
@@ -118,7 +120,7 @@ public class LiveController {
 
         List<LiveStatus> statuses = resolveStatuses(status, selfView);
         PageResponse<LiveListItemResponse> response =
-                liveService.getLives(categoryIds, hostId, statuses, sort, page, size);
+                liveService.getLives(categoryIds, hostId, statuses, sort, page, size, viewerId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

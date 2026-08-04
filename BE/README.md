@@ -1,4 +1,4 @@
-# BE
+﻿# BE
 
 빈티지·세컨핸드 의류 라이브 경매 플랫폼 백엔드.
 
@@ -157,9 +157,13 @@ BE/
 │   │   ├── entity/              # ChatMessage, SenderType
 │   │   ├── repository/
 │   │   └── dto/
-│   ├── auction/                 # 경매 조건 설정/진행 (AUCT) — 정윤
-│   │   ├── entity/              # Auction, AuctionStatus
-│   │   └── repository/
+│   ├── auction/                 # 경매 조건 설정/진행/입찰 (AUCT) — 정윤
+│   │   ├── controller/          # AuctionController(조건 설정·현황), AuctionActionController(시작·입찰·내역)
+│   │   ├── service/             # AuctionService
+│   │   ├── entity/              # Auction, AuctionStatus, Bid, BidStatus
+│   │   ├── repository/          # AuctionRepository(findByIdForUpdate 비관적 락), BidRepository
+│   │   ├── port/                # ProductCommandPort·PointCommandPort — 상품/포인트 도메인 참조를 격리
+│   │   └── dto/
 │   ├── tryon/                    # AI 가상 시착 결과·프로필 저장/조회/삭제 (TRYON) — 서윤
 │   │   ├── controller/           # TryOnController(결과), TryOnProfileController(프로필)
 │   │   ├── service/
@@ -184,21 +188,28 @@ BE/
 │   │   ├── entity/               # BusinessInfo, BusinessVerificationStatus
 │   │   ├── repository/
 │   │   └── dto/
-│   ├── order/                    # 주문 FK 대상 엔티티(생성 API 없음) + 세금계산서(BIZ-002) + 구매/판매 내역(MY-003/004) — 서윤
-│   │   ├── controller/           # InvoiceController, OrderController(구매/판매 내역)
+│   ├── order/                    # 주문 생성(SALE-002)·배송지/송장(ORDER-001, SHIP-001/002)·구매확정/정산(ORDER-002/003)·세금계산서(BIZ-002)·구매/판매 내역(MY-003/004) — 서윤
+│   │   ├── controller/           # InvoiceController, OrderController(생성/조회/배송지/송장/확정), MyOrderController(구매/판매 내역)
 │   │   ├── service/              # InvoiceService, OrderService
-│   │   ├── entity/               # Order(package-private 빌더), OrderStatus, Invoice
-│   │   ├── repository/           # OrderRepository, InvoiceRepository
-│   │   └── dto/response/
-│   ├── point/                    # 포인트 잔액/충전/출금 (MY-007) — 서윤
+│   │   ├── entity/               # Order, OrderStatus, OrderShipment(배송지+송장, 공유 PK 1:1), Invoice
+│   │   ├── repository/           # OrderRepository, OrderShipmentRepository, InvoiceRepository
+│   │   ├── scheduler/            # OrderAutoConfirmScheduler(ORDER-003, 배송완료 3일 후 자동 구매확정)
+│   │   └── dto/
+│   ├── point/                    # 포인트 잔액/충전/출금(MY-007), 주문 결제·정산(SALE-002/ORDER-002·003), 환불 환급(REFUND-002) — 서윤 / 입찰 보류·해제(AUCT-007~009) — 정윤
 │   │   ├── controller/
-│   │   ├── service/
-│   │   ├── entity/               # PointAccount(공유 PK 1:1), PointTransaction(원장), PointTransactionType
+│   │   ├── service/              # PointService — pay(결제)/settleOrder(정산)/refundOrder(환불 환급)/readyCharge·confirmCharge(토스 결제위젯 충전, POINT-001). 입찰 보류/해제는 auction/port/PointCommandAdapter가 이 패키지 엔티티를 직접 조립
+│   │   ├── entity/               # PointAccount(공유 PK 1:1, holdForBid/releaseHold/pay/releaseEscrow/settle/refund), PointTransaction(원장), PointTransactionType, PointHold(AUCT-007~009), PointHoldStatus, PointCharge(충전 준비/승인 상태), PointChargeStatus, WithdrawalAccount(출금 계좌, 공유 PK 1:1, POINT-003)
 │   │   ├── repository/
 │   │   └── dto/
+│   ├── refund/                   # 환불 요청/승인/거절(REFUND-001/002, 판매자 승인) — 서윤
+│   │   ├── controller/           # RefundController
+│   │   ├── service/              # RefundService
+│   │   ├── entity/               # RefundRequest, RefundReason, RefundStatus
+│   │   ├── repository/           # RefundRequestRepository
+│   │   └── dto/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
-│       ├── client/              # AiClient — Spring → FastAPI
-│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig
+│       ├── client/              # AiClient(Spring → FastAPI), DeliveryTrackingClient(deliveryapi.co.kr 배송 조회 웹훅), TossPaymentsClient(결제위젯 승인)
+│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig, SchedulingConfig, DeliveryApiConfig, TossPaymentsConfig
 │       ├── entity/              # BaseTimeEntity 등 공통 베이스 엔티티
 │       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
 │       ├── health/              # HealthController

@@ -2,18 +2,33 @@ package com.ssafy.backend.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.ssafy.backend.global.client.DeliveryTrackingClient;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
+import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.order.dto.request.OrderCreateRequest;
 import com.ssafy.backend.order.dto.request.OrderRole;
+import com.ssafy.backend.order.dto.request.OrderShipmentAddressRequest;
+import com.ssafy.backend.order.dto.request.OrderShipmentRegisterRequest;
 import com.ssafy.backend.order.dto.response.OrderListItemResponse;
+import com.ssafy.backend.order.dto.response.OrderShipmentResponse;
+import com.ssafy.backend.order.entity.CourierCode;
 import com.ssafy.backend.order.entity.Order;
+import com.ssafy.backend.order.entity.OrderShipment;
 import com.ssafy.backend.order.entity.OrderStatus;
 import com.ssafy.backend.order.repository.OrderRepository;
+import com.ssafy.backend.order.repository.OrderShipmentRepository;
+import com.ssafy.backend.point.service.PointService;
 import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.repository.ProductRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,9 +46,25 @@ class OrderServiceTest {
     private static final Long BUYER_ID = 1L;
     private static final Long SELLER_ID = 2L;
     private static final Long ORDER_ID = 10L;
+    private static final Long PRODUCT_ID = 20L;
 
     @Mock
     private OrderRepository orderRepository;
+
+    @Mock
+    private OrderShipmentRepository orderShipmentRepository;
+
+    @Mock
+    private ProductRepository productRepository;
+
+    @Mock
+    private MemberRepository memberRepository;
+
+    @Mock
+    private PointService pointService;
+
+    @Mock
+    private DeliveryTrackingClient deliveryTrackingClient;
 
     @Mock
     private Order order;
@@ -51,7 +82,15 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository);
+        orderService = new OrderService(
+                orderRepository, orderShipmentRepository, productRepository, memberRepository, pointService,
+                deliveryTrackingClient);
+    }
+
+    private Product realDirectSaleProduct() {
+        Product real = Product.builder().seller(seller).categoryId(1L).title("빈티지 자켓").build();
+        real.registerDirectSale(50_000L);
+        return real;
     }
 
     private void stubOrderFields() {
@@ -138,5 +177,201 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.getOrderDetail(ORDER_ID, outsiderId))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVOICE_FORBIDDEN);
+    }
+
+    @Test
+    void 상시_판매_상품을_구매하면_주문이_생성되고_결제된다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        Product realProduct = realDirectSaleProduct();
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(realProduct));
+        when(memberRepository.findById(BUYER_ID)).thenReturn(Optional.of(buyer));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderListItemResponse response = orderService.createOrder(BUYER_ID, new OrderCreateRequest(PRODUCT_ID));
+
+        assertThat(response.orderPrice()).isEqualTo(50_000L);
+        assertThat(response.status()).isEqualTo("PAID");
+        assertThat(realProduct.getSaleStatus().name()).isEqualTo("SOLD");
+        verify(pointService).pay(eq(BUYER_ID), eq(50_000L), any());
+    }
+
+    @Test
+    void 본인_상품은_구매할_수_없다() {
+        when(seller.getId()).thenReturn(BUYER_ID);
+        Product realProduct = realDirectSaleProduct();
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(realProduct));
+
+        assertThatThrownBy(() -> orderService.createOrder(BUYER_ID, new OrderCreateRequest(PRODUCT_ID)))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SELF_PURCHASE_NOT_ALLOWED);
+    }
+
+    @Test
+    void 배송지를_처음_등록하면_새로_생성된다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+        when(orderShipmentRepository.findById(ORDER_ID)).thenReturn(Optional.empty());
+        when(orderShipmentRepository.save(any(OrderShipment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderShipmentResponse response = orderService.registerAddress(
+                ORDER_ID, BUYER_ID, new OrderShipmentAddressRequest("홍길동", "010-1234-5678", "06134", "테헤란로 1", null));
+
+        assertThat(response.recipientName()).isEqualTo("홍길동");
+    }
+
+    private OrderShipment newShipmentFor(Order realOrder) {
+        return OrderShipment.builder()
+                .order(realOrder).recipientName("홍길동").recipientPhone("010-1234-5678")
+                .zipcode("06134").address1("테헤란로 1").build();
+    }
+
+    @Test
+    void 웹훅_구독에_성공하면_송장만_등록하고_아직_배송완료로_바뀌지_않는다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+        OrderShipment shipment = newShipmentFor(realOrder);
+        when(orderShipmentRepository.findById(ORDER_ID)).thenReturn(Optional.of(shipment));
+        when(deliveryTrackingClient.subscribe(CourierCode.CJ, "123456789012", ORDER_ID)).thenReturn(true);
+
+        OrderShipmentResponse response = orderService.registerShipment(
+                ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest(CourierCode.CJ, "123456789012"));
+
+        assertThat(response.trackingNumber()).isEqualTo("123456789012");
+        assertThat(response.courierCode()).isEqualTo(CourierCode.CJ);
+        assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.SHIPPING);
+        assertThat(realOrder.getAutoConfirmAt()).isNull();
+    }
+
+    @Test
+    void 웹훅_구독에_실패하면_즉시_배송완료로_폴백한다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+        OrderShipment shipment = newShipmentFor(realOrder);
+        when(orderShipmentRepository.findById(ORDER_ID)).thenReturn(Optional.of(shipment));
+        when(deliveryTrackingClient.subscribe(CourierCode.CJ, "123456789012", ORDER_ID)).thenReturn(false);
+
+        orderService.registerShipment(ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest(CourierCode.CJ, "123456789012"));
+
+        assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
+        assertThat(realOrder.getAutoConfirmAt()).isAfter(LocalDateTime.now().plusDays(2));
+    }
+
+    @Test
+    void 환불_요청_중인_주문은_송장을_등록할_수_없다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        realOrder.markRefundRequested();
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+
+        assertThatThrownBy(() -> orderService.registerShipment(
+                ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest(CourierCode.CJ, "123456789012")))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_ORDER_STATE);
+    }
+
+    @Test
+    void 배송지_미등록시_송장등록하면_예외를_던진다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+        when(orderShipmentRepository.findById(ORDER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.registerShipment(
+                ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest(CourierCode.CJ, "123456789012")))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ORDER_SHIPMENT_ADDRESS_REQUIRED);
+    }
+
+    @Test
+    void 배송완료_웹훅을_받으면_SHIPPING_주문이_배송완료로_바뀐다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        realOrder.markShipping();
+        OrderShipment shipment = newShipmentFor(realOrder);
+        when(orderShipmentRepository.findByCourierAndTrackingNumber(CourierCode.CJ, "123456789012"))
+                .thenReturn(Optional.of(shipment));
+
+        orderService.markShipmentDelivered(CourierCode.CJ, "123456789012");
+
+        assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
+        assertThat(shipment.getDeliveredAt()).isNotNull();
+    }
+
+    @Test
+    void 이미_배송완료된_주문에_중복_웹훅이_와도_조용히_무시한다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        realOrder.markShipping();
+        realOrder.markDelivered(LocalDateTime.now());
+        OrderShipment shipment = newShipmentFor(realOrder);
+        when(orderShipmentRepository.findByCourierAndTrackingNumber(CourierCode.CJ, "123456789012"))
+                .thenReturn(Optional.of(shipment));
+
+        orderService.markShipmentDelivered(CourierCode.CJ, "123456789012");
+
+        assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
+    }
+
+    @Test
+    void 배송완료_상태에서_구매확정하면_정산되고_SETTLED로_바뀐다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        realOrder.markShipping();
+        realOrder.markDelivered(LocalDateTime.now());
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+
+        OrderListItemResponse response = orderService.confirmOrder(ORDER_ID, BUYER_ID);
+
+        assertThat(response.status()).isEqualTo(OrderStatus.SETTLED.name());
+        verify(pointService).settleOrder(BUYER_ID, SELLER_ID, 50_000L, realOrder.getId());
+    }
+
+    @Test
+    void 환불_요청_중인_주문은_구매확정할_수_없다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        realOrder.markShipping();
+        realOrder.markDelivered(LocalDateTime.now());
+        realOrder.markRefundRequested();
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+
+        assertThatThrownBy(() -> orderService.confirmOrder(ORDER_ID, BUYER_ID))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_ORDER_STATE);
+    }
+
+    @Test
+    void 배송완료_전에는_구매확정할_수_없다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
+
+        assertThatThrownBy(() -> orderService.confirmOrder(ORDER_ID, BUYER_ID))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_ORDER_STATE);
+    }
+
+    @Test
+    void 배송완료_경과일이_지난_주문은_자동으로_구매확정된다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        realOrder.markShipping();
+        realOrder.markDelivered(LocalDateTime.now().minusDays(8));
+        when(buyer.getId()).thenReturn(BUYER_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(orderRepository.findByStatusAndAutoConfirmAtLessThanEqualAndRefundRequestedFalse(
+                eq(OrderStatus.DELIVERED), any()))
+                .thenReturn(List.of(realOrder));
+
+        orderService.autoConfirmDueOrders();
+
+        assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.SETTLED);
+        verify(pointService).settleOrder(BUYER_ID, SELLER_ID, 50_000L, realOrder.getId());
     }
 }

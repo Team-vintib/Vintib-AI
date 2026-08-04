@@ -73,7 +73,7 @@ ONBOARD-002(`PUT /users/{id}/interests`)가 이미 `/users/{id}` + `requesterId 
 - [x] `UserController`: `PATCH /api/users/{id}/member-type` + Swagger
 - [x] `UserServiceTest`: 기존 온보딩완료 단언 수정 + 신규 케이스 추가
 - [x] `APIs.md`에 ONBOARD-004 행 추가(인증 필요 ✓, 구현 완료 ✓)
-- [x] `docs/requests/FE/006-onboarding-member-type-contract.md` 작성 (엔드포인트 경로가 FE 초안과 다름을 안내)
+- [x] `docs/requests/FE/011-onboarding-member-type-contract.md` 작성 (엔드포인트 경로가 FE 초안과 다름을 안내)
 - [x] `docs/requests/BE/002-onboarding-contract.md`의 3.1/3.2/3.4절 반영 정리 — 3.3(AI 시착)만 남김
 - [x] `docs/plans/BE/SY019-onboarding-enforcement.md`에 "완료 시점은 SY021로 확정"으로 갱신,
       남은 인터셉터/화이트리스트 이슈만 남기기

@@ -3,7 +3,7 @@
 ## 배경/목표
 
 `docs/requests/BE/001-auth-contract.md`, `011-user-mypage-contract.md` 두 문서가 독립적으로
-`GET /api/me`(내 정보 조회)를 요청했고, `docs/requests/BE/012-be-request-index.md`에도 미해결로
+`GET /api/me`(내 정보 조회)를 요청했고, `docs/requests/BE/006-be-request-index.md`에도 미해결로
 남아 있다. 엔드포인트 경로는 사용자 확인대로 `GET /api/users/me`로 확정한다 — `APIs.md`에 이미
 "내 정보 조회 | GET | `/users/me` | | MY-001 |" 행으로 예고돼 있고, 기존 `UserController`가
 `/api/users` 베이스라 그 관례를 그대로 따른다(FE 요청 문서의 `/api/me` 초안과 다르게 결정 —
@@ -64,7 +64,7 @@ ONBOARD-001/002/004와 같은 이유).
 - [ ] `UserController`: `GET /api/users/me` + Swagger
 - [ ] `UserServiceTest` 케이스 추가
 - [ ] `APIs.md` — "내 정보 조회" 행 인증 필요 ✓, 구현 완료 ✓ 표시
-- [ ] `docs/requests/BE/001-auth-contract.md`, `011-user-mypage-contract.md`, `012-be-request-index.md` —
+- [ ] `docs/requests/BE/001-auth-contract.md`, `011-user-mypage-contract.md`, `006-be-request-index.md` —
       `GET /api/me` 반영 정리(엔드포인트가 `/api/users/me`로 다름을 안내). 001 문서엔 `user`/`nextStep`
       항목이 아직 남으므로 전체 삭제하지 않고 해당 절만 덜어낸다. 011은 이 항목만 있었다면 삭제 가능
       (문서 확인 후 판단).

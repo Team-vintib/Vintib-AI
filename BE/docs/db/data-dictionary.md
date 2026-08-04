@@ -146,6 +146,7 @@
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `parent_id` | `bigint` |  |  | FK→category | 상위 카테고리. 최상위는 NULL. |
 | `name` | `varchar(100)` | NOT NULL |  |  | 카테고리명. |
+| `name_en` | `varchar(100)` | NOT NULL |  |  | 카테고리 영문 코드(예: JACKET). AI/FE 연동용. |
 | `depth` | `smallint` | NOT NULL | `1` |  | 계층 깊이. 최상위가 1. |
 
 ---
@@ -288,6 +289,8 @@
 | `member_type` | `varchar(20)` | NOT NULL | `'GENERAL'` |  | GENERAL(일반) \| BUSINESS(사업자) |
 | `status` | `varchar(20)` | NOT NULL | `'ACTIVE'` |  | ACTIVE \| SUSPENDED(정지) \| WITHDRAWN(탈퇴) |
 | `profile_image_url` | `varchar(500)` |  |  |  | 프로필 이미지 URL. |
+| `description` | `varchar(500)` |  |  |  | 소개글. 공개 프로필에 노출된다. |
+| `cover_image_url` | `varchar(500)` |  |  |  | 커버 이미지 URL. 공개 프로필에 노출된다. |
 | `onboarding_done` | `boolean` | NOT NULL | `false` |  | 온보딩(관심 브랜드·카테고리·신체 정보) 완료 여부. |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
@@ -407,6 +410,10 @@
 | `shipped_at` | `timestamptz` |  |  |  | 발송 시각. 송장 등록 시점. |
 | `delivered_at` | `timestamptz` |  |  |  | 배송 완료 시각. orders.auto_confirm_at 계산 기준. |
 
+**CHECK 제약**
+
+- `ck_order_shipment_courier` — `CHECK (((courier)::text = ANY ((ARRAY['LOTTE'::character varying, 'CJ'::character varying, 'HANJIN'::character varying, 'POST'::character varying, 'KYUNGDONG'::character varying, 'DAESIN'::character varying, 'LOGEN'::character varying, 'HAPDONG'::character varying, 'COUPANG'::character varying, 'WOORI'::character varying])::text[])))`
+
 ---
 
 ### `orders`
@@ -422,7 +429,8 @@
 | `auction_id` | `bigint` |  |  | FK→auction | 낙찰로 생성된 주문의 경매. 상시 판매 주문은 NULL. |
 | `order_price` | `bigint` | NOT NULL |  |  | 결제 금액(원). |
 | `status` | `varchar(30)` | NOT NULL | `'PAID'` |  | PAID → SHIPPING → DELIVERED → CONFIRMED → SETTLED (+ REFUNDED / CANCELED) |
-| `auto_confirm_at` | `timestamptz` |  |  |  | 자동 구매 확정 예정 시각(배송 완료 + 7일). 배송 완료 시점에 채워 넣고 스케줄러가 이 컬럼으로 대상을 찾는다. |
+| `auto_confirm_at` | `timestamptz` |  |  |  | 자동 구매 확정 예정 시각(배송 완료 + 3일). 배송 완료 시점에 채워 넣고 스케줄러가 이 컬럼으로 대상을 찾는다. |
+| `refund_requested` | `boolean` | NOT NULL | `false` |  | 진행 중인(REQUESTED) 환불 요청이 있으면 true. 송장 등록·구매 확정(수동/자동)을 막는 용도. |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
 
@@ -456,6 +464,31 @@
 **CHECK 제약**
 
 - `ck_point_non_negative` — `CHECK (((available >= 0) AND (bid_held >= 0) AND (trade_escrow >= 0) AND (settling >= 0) AND (withdrawing >= 0)))`
+
+---
+
+### `point_charge`
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `member_id` | `bigint` | NOT NULL |  | FK→member | 대상 회원. |
+| `order_id` | `varchar(64)` | NOT NULL |  | UQ | 대상 주문. |
+| `amount` | `bigint` | NOT NULL |  |  |  |
+| `status` | `varchar(20)` | NOT NULL | `'READY'` |  |  |
+| `payment_key` | `varchar(200)` |  |  |  |  |
+| `approved_at` | `timestamptz` |  |  |  |  |
+| `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
+
+**CHECK 제약**
+
+- `ck_point_charge_amount_positive` — `CHECK ((amount > 0))`
+- `ck_point_charge_status` — `CHECK (((status)::text = ANY ((ARRAY['READY'::character varying, 'DONE'::character varying, 'FAILED'::character varying])::text[])))`
+
+**인덱스**
+
+- `ix_point_charge_member` — `CREATE INDEX ix_point_charge_member ON public.point_charge USING btree (member_id, created_at DESC)`
+- `uq_point_charge_order_id` — `CREATE UNIQUE INDEX uq_point_charge_order_id ON public.point_charge USING btree (order_id)`
 
 ---
 
@@ -579,6 +612,33 @@
 
 ---
 
+### `refund_request`
+
+환불 요청·승인/거절 (REFUND-001/002). 구매자가 요청하고 판매자가 승인/거절한다(운영자 아님). 같은 주문에 여러 건 있을 수 있다(거절 후 재요청 허용).
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `order_id` | `bigint` | NOT NULL |  | FK→orders | 대상 주문. |
+| `reason` | `varchar(30)` | NOT NULL |  |  | 환불 사유. 단순 변심은 없음(NOT_AS_DESCRIBED/UNDISCLOSED_DEFECT/NOT_SHIPPED/DUPLICATE_PAYMENT/SYSTEM_ERROR). |
+| `detail_reason` | `text` | NOT NULL |  |  |  |
+| `status` | `varchar(20)` | NOT NULL | `'REQUESTED'` |  | REQUESTED → APPROVED 또는 REJECTED. |
+| `rejection_reason` | `text` |  |  |  | 거절 사유. REJECTED일 때만 값이 있다. |
+| `reviewed_at` | `timestamptz` |  |  |  | 판매자가 승인/거절 처리한 시각. REQUESTED 상태면 NULL. |
+| `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
+| `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
+
+**CHECK 제약**
+
+- `ck_refund_request_reason` — `CHECK (((reason)::text = ANY ((ARRAY['NOT_AS_DESCRIBED'::character varying, 'UNDISCLOSED_DEFECT'::character varying, 'NOT_SHIPPED'::character varying, 'DUPLICATE_PAYMENT'::character varying, 'SYSTEM_ERROR'::character varying])::text[])))`
+- `ck_refund_request_status` — `CHECK (((status)::text = ANY ((ARRAY['REQUESTED'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying])::text[])))`
+
+**인덱스**
+
+- `ix_refund_request_order` — `CREATE INDEX ix_refund_request_order ON public.refund_request USING btree (order_id, created_at DESC)`
+
+---
+
 ### `tryon_result`
 
 AI 가상 시착 합성 결과물. 생성(POST) 자체는 AI 계약 확정 전이라 저장/조회/삭제만 다룬다.
@@ -607,4 +667,16 @@ AI 가상 시착 합성 결과물. 생성(POST) 자체는 AI 계약 확정 전�
 | `member_id` | `bigint` | NOT NULL |  | FK→member, PK | 대상 회원. |
 | `product_id` | `bigint` | NOT NULL |  | FK→product, PK | 대상 상품. |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
+
+---
+
+### `withdrawal_account`
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `member_id` | `bigint` | NOT NULL |  | FK→member, PK | 대상 회원. |
+| `bank_name` | `varchar(50)` | NOT NULL |  |  |  |
+| `account_number` | `varchar(30)` | NOT NULL |  |  |  |
+| `account_holder_name` | `varchar(50)` | NOT NULL |  |  |  |
+| `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
 

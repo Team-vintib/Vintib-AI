@@ -127,4 +127,95 @@ public class Auction extends BaseTimeEntity {
             Live live, Long productId, Long startPrice, Long bidUnit, Integer durationSeconds) {
         return new Auction(live, productId, startPrice, bidUnit, durationSeconds);
     }
+
+    /**
+     * 경매를 시작한다(AUCT-002). {@code READY → RUNNING}이며 종료 예정 시각이 이때 확정된다.
+     *
+     * <p><b>시각은 서버가 준다.</b> 종료 판정도 서버 시각 기준이라 시간 축이 둘로 갈리면
+     * "브라우저에서는 아직 남았는데 서버는 이미 끝난" 구간이 생긴다(erd.md §6).
+     *
+     * <p>전이 가능 여부는 {@link #isReady()}로 미리 확인해야 한다 — 왜 안 되는지를 에러 코드로
+     * 구분해 돌려주는 책임은 서비스에 있다.
+     */
+    public void start(LocalDateTime at) {
+        this.status = AuctionStatus.RUNNING;
+        this.startedAt = at;
+        this.scheduledEndAt = at.plusSeconds(durationSeconds);
+    }
+
+    public boolean isReady() {
+        return status == AuctionStatus.READY;
+    }
+
+    public boolean isRunning() {
+        return status == AuctionStatus.RUNNING;
+    }
+
+    /**
+     * 다음에 넣어야 하는 최소 입찰가.
+     *
+     * <p><b>첫 입찰은 시작가 그대로다.</b> 시작가에 증액 단위를 더해 버리면 시작가로는 아무도
+     * 살 수 없게 되어 "시작가"라는 말이 무의미해진다. 두 번째부터 현재가 + 증액 단위다.
+     *
+     * <p>FE 입찰 버튼이 이 값을 그대로 눌러 보내면 되도록 서버가 계산해 내려준다 — 클라이언트가
+     * 같은 계산을 다시 하면 정책이 바뀔 때 두 곳이 어긋난다.
+     */
+    public long nextBidPrice() {
+        return hasBid() ? currentPrice + bidUnit : startPrice;
+    }
+
+    /** 입찰이 한 번이라도 들어왔는지. 현재가가 아니라 최고 입찰자 유무로 판정한다 — 시작가가 0일 수 있다. */
+    public boolean hasBid() {
+        return topBidderId != null;
+    }
+
+    /** 종료 임박 시 자동 연장할 기준(초). 종료까지 이 값 이하로 남았으면 입찰이 들어올 때마다 밀린다. */
+    private static final int EXTEND_THRESHOLD_SECONDS = 3;
+
+    /** 한 번 연장될 때 늘어나는 시간(초). */
+    private static final int EXTEND_BY_SECONDS = 5;
+
+    /**
+     * 지금 입찰을 받을 수 있는 상태인지(AUCT-002~006). {@code RUNNING}이고 종료 예정 시각
+     * 전이어야 한다 — 스케줄러가 아직 강제 종료 처리를 하지 않았더라도, 시각이 지났으면
+     * 더 이상 유효한 입찰이 아니다.
+     */
+    public boolean isOpenForBidding(LocalDateTime at) {
+        return isRunning() && scheduledEndAt != null && at.isBefore(scheduledEndAt);
+    }
+
+    /**
+     * 이 회원이 지금 입찰할 수 있는지(AUCT-006). <b>직전 최고 입찰자 본인은 연속으로 입찰할 수
+     * 없다</b> — 자기 자신을 상위 입찰하는 것은 의미가 없고, 포인트 보류 쪽에서도 "이미 HELD를
+     * 쥐고 있어 두 번째 보류를 만들 수 없다"는 전제가 이 규칙에 기대고 있다.
+     */
+    public boolean isBiddableBy(Long bidderId) {
+        return !hasBid() || !topBidderId.equals(bidderId);
+    }
+
+    /**
+     * 요청한 금액이 지금 유효한 입찰가인지. <b>{@link #nextBidPrice()}와 정확히 같아야 한다</b>
+     * (erd.md §4) — 그 이상도 허용하면 "얼마를 불렀는지"가 불명확해지고, FE가 그 값을 그대로
+     * 보내도록 설계했으므로 어긋난 값은 화면이 낡았다는 신호다.
+     */
+    public boolean isValidBidPrice(Long bidPrice) {
+        return bidPrice != null && bidPrice.longValue() == nextBidPrice();
+    }
+
+    /**
+     * 새 최고 입찰을 반영한다. 유효성 검증({@link #isOpenForBidding}·{@link #isBiddableBy}·
+     * {@link #isValidBidPrice})은 서비스가 미리 확인해야 한다 — 여기서 다시 막지 않는 이유는
+     * {@link #transitionTo}와 같다.
+     *
+     * <p>종료 임박(3초 이하) 입찰이면 <b>같은 문장에서</b> 5초 연장한다(AUCT-010) — 별도
+     * 트랜잭션으로 나누면 그 사이에 다른 입찰이 끼어들 여지가 생긴다.
+     */
+    public void applyBid(Long bidderId, long bidPrice, LocalDateTime at) {
+        this.topBidderId = bidderId;
+        this.currentPrice = bidPrice;
+        if (!scheduledEndAt.minusSeconds(EXTEND_THRESHOLD_SECONDS).isAfter(at)) {
+            this.scheduledEndAt = scheduledEndAt.plusSeconds(EXTEND_BY_SECONDS);
+            this.extensionCount = (short) (extensionCount + 1);
+        }
+    }
 }

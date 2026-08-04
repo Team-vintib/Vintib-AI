@@ -330,7 +330,8 @@ CREATE TABLE bid (
 
 -- 같은 경매에서 동일 가격 단계는 단 한 번만 성립한다.
 -- 중복 클릭(AUCT-004)과 동시 입찰 경합(AUCT-005)을 DB 레벨에서 차단하는 최후 방어선.
--- Redis 분산락이 1차 방어이고, 이 제약은 락이 실패했을 때의 안전망이다.
+-- 1차 방어는 Redis 분산락이 아니라 DB 비관적 락(AuctionRepository.findByIdForUpdate)이다 —
+-- 같은 경매의 입찰은 이 행 잠금으로 직렬화된다. 이 제약은 그 잠금이 실패했을 때의 안전망이다.
 CREATE UNIQUE INDEX ux_bid_auction_price ON bid (auction_id, bid_price);
 
 CREATE INDEX ix_bid_auction_created ON bid (auction_id, created_at DESC);
@@ -382,6 +383,33 @@ CREATE TABLE point_transaction (
 
 CREATE INDEX ix_point_tx_member ON point_transaction (member_id, created_at DESC);
 
+-- 포인트 충전 결제 준비/승인 상태(POINT-001). order_id 는 토스에 넘기는 주문번호(BE 발급, orders 테이블과 무관).
+CREATE TABLE point_charge (
+    id           BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    member_id    BIGINT      NOT NULL REFERENCES member (id),
+    order_id     VARCHAR(64) NOT NULL,
+    amount       BIGINT      NOT NULL,
+    status       VARCHAR(20) NOT NULL DEFAULT 'READY',
+    payment_key  VARCHAR(200),
+    approved_at  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_point_charge_order_id UNIQUE (order_id),
+    CONSTRAINT ck_point_charge_status CHECK (status IN ('READY', 'DONE', 'FAILED')),
+    CONSTRAINT ck_point_charge_amount_positive CHECK (amount > 0)
+);
+
+CREATE INDEX ix_point_charge_member ON point_charge (member_id, created_at DESC);
+
+-- 출금(현금화) 계좌 정보(POINT-003). point_account 와 같은 공유 PK 1:1 — 회원당 한 행만 존재한다.
+-- 실제 은행 송금 연동은 범위 밖이라 계좌 정보만 평문으로 남긴다(business_info 와 동일한 전제).
+CREATE TABLE withdrawal_account (
+    member_id           BIGINT      PRIMARY KEY REFERENCES member (id),
+    bank_name           VARCHAR(50) NOT NULL,
+    account_number      VARCHAR(30) NOT NULL,
+    account_holder_name VARCHAR(50) NOT NULL,
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- 입찰 보류 상태. 입찰 내역 ↔ 포인트 보류를 잇는 테이블.
 CREATE TABLE point_hold (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -425,16 +453,19 @@ CREATE TABLE orders (
     auction_id      BIGINT      REFERENCES auction (id),  -- 상시 판매 주문은 NULL
     order_price     BIGINT      NOT NULL,
     status          VARCHAR(30) NOT NULL DEFAULT 'PAID',
-    -- 배송 완료 후 7일 경과 시 자동 구매 확정. 스케줄러가 이 컬럼으로 대상을 찾는다.
+    -- 배송 완료 후 3일 경과 시 자동 구매 확정. 스케줄러가 이 컬럼으로 대상을 찾는다.
     -- 배송 완료 시점(delivered_at)에 계산해 채운다.
-    auto_confirm_at TIMESTAMPTZ,
+    auto_confirm_at   TIMESTAMPTZ,
+    -- 진행 중인(REQUESTED) 환불 요청이 있는 동안 true. 송장 등록·구매 확정(수동/자동)을 막는 용도로만
+    -- 쓴다 — 요청 중에도 status는 바꾸지 않는다(REFUND-001/002).
+    refund_requested  BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT ck_order_status CHECK (status IN (
         'PAID',        -- 결제 완료, 거래 대금 보관 중
         'SHIPPING',    -- 송장 등록·배송 중 (SHIP-*)
         'DELIVERED',   -- 배송 완료
-        'CONFIRMED',   -- 구매 확정 (수동 또는 7일 자동)
+        'CONFIRMED',   -- 구매 확정 (수동 또는 3일 자동)
         'SETTLED',     -- 판매자 정산 완료
         'REFUNDED',
         'CANCELED'
@@ -456,11 +487,39 @@ CREATE TABLE order_shipment (
     zipcode         VARCHAR(10)  NOT NULL,
     address1        VARCHAR(255) NOT NULL,
     address2        VARCHAR(255),
+    -- deliveryapi.co.kr이 지원하는 국내 택배사 10개로 한정한다(SY034) — 자유 문자열 금지.
     courier         VARCHAR(50),
     tracking_number VARCHAR(50),
     shipped_at      TIMESTAMPTZ,
-    delivered_at    TIMESTAMPTZ
+    -- 더 이상 송장 등록 시점에 즉시 채우지 않는다 — deliveryapi.co.kr 웹훅으로 실제 배송완료
+    -- 신호를 받았을 때만 채운다(웹훅 구독 실패 시에는 예외적으로 즉시 채우는 폴백을 쓴다).
+    delivered_at    TIMESTAMPTZ,
+    CONSTRAINT ck_order_shipment_courier CHECK (courier IN (
+        'LOTTE', 'CJ', 'HANJIN', 'POST', 'KYUNGDONG',
+        'DAESIN', 'LOGEN', 'HAPDONG', 'COUPANG', 'WOORI'
+    ))
 );
+
+-- 환불 요청·승인/거절 (REFUND-001/002). 구매자가 요청하고 판매자가 승인/거절한다(운영자 승인 아님 —
+-- 이 프로젝트엔 관리자 역할이 없다). 승인되면 보관 중이던 대금을 판매자 정산 없이 구매자 포인트로
+-- 돌려준다(point_transaction의 REFUND 타입). 같은 주문에 여러 건 있을 수 있다(거절 후 재요청 허용).
+CREATE TABLE refund_request (
+    id               BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    order_id         BIGINT      NOT NULL REFERENCES orders (id),
+    reason           VARCHAR(30) NOT NULL,
+    detail_reason    TEXT        NOT NULL,
+    status           VARCHAR(20) NOT NULL DEFAULT 'REQUESTED',
+    rejection_reason TEXT,
+    reviewed_at      TIMESTAMPTZ,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_refund_request_reason CHECK (reason IN (
+        'NOT_AS_DESCRIBED', 'UNDISCLOSED_DEFECT', 'NOT_SHIPPED', 'DUPLICATE_PAYMENT', 'SYSTEM_ERROR'
+    )),
+    CONSTRAINT ck_refund_request_status CHECK (status IN ('REQUESTED', 'APPROVED', 'REJECTED'))
+);
+
+CREATE INDEX ix_refund_request_order ON refund_request (order_id, created_at DESC);
 
 -- 세금계산서 (BIZ-002). 법적 문서라 발행 시점 사업자 정보를 스냅샷으로 저장한다 —
 -- 이후 판매자가 business_info를 바꿔도 이미 발행된 계산서는 바뀌지 않는다.

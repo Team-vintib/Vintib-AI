@@ -129,7 +129,7 @@ Phase 5까지 끝낸 시점에서 두 갈래를 점검했다.
 - [x] `GET /api/search` 통합 검색 + 테스트 (결정 1)
 - [x] 예약 라이브 알림 신청·취소·스케줄러 + 테스트 (결정 2)
 - [x] 처리 끝난 FE 요청 문서 정리 — `004`·`005`·`013` 삭제, `007`·`008`·`012` 축소
-- [x] FE 핸드오프 문서 `docs/requests/FE/016-pre-auction-batch-handoff.md`
+- [x] FE 핸드오프 문서 `docs/requests/FE/022-pre-auction-batch-handoff.md`
 
 ## 이번 범위에서 뺀 것 (핸드오프 문서 §6에 사유 기재)
 

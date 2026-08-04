@@ -48,12 +48,40 @@ public enum ErrorCode {
     BID_LOWER_THAN_CURRENT(HttpStatus.BAD_REQUEST, "A002", "입찰 금액이 현재 최고가보다 낮습니다."),
     AUCTION_ALREADY_CLOSED(HttpStatus.BAD_REQUEST, "A003", "이미 종료된 경매입니다."),
     AUCTION_ALREADY_CONFIGURED(HttpStatus.CONFLICT, "A004", "해당 상품에 이미 설정된 경매가 있습니다."),
+    AUCTION_NOT_FOUND(HttpStatus.NOT_FOUND, "A005", "존재하지 않는 경매입니다."),
+    AUCTION_NOT_STARTABLE(HttpStatus.BAD_REQUEST, "A006", "시작할 수 있는 상태의 경매가 아닙니다."),
+    // 한 라이브에서 동시에 진행 중인 경매는 1개다 (LIVE-004).
+    AUCTION_ALREADY_RUNNING(HttpStatus.CONFLICT, "A007", "이 방송에 이미 진행 중인 경매가 있습니다."),
+    BID_PRICE_MISMATCH(HttpStatus.BAD_REQUEST, "A008", "입찰 금액이 현재 필요한 금액과 다릅니다. 최신 금액으로 다시 시도해 주세요."),
+    // 직전 최고 입찰자 본인은 연속으로 입찰할 수 없다 (AUCT-006).
+    CONSECUTIVE_BID_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "A009", "직전 최고 입찰자는 연속으로 입찰할 수 없습니다."),
+    // 같은 경매·같은 금액 입찰의 중복 클릭·경합을 막는다 (AUCT-004/005).
+    DUPLICATE_BID_PRICE(HttpStatus.CONFLICT, "A010", "이미 같은 금액으로 입찰이 접수됐습니다."),
+    // 최고 입찰자인 동안 다른 경매에 입찰할 수 없다 (AUCT-009).
+    ACTIVE_HOLD_ELSEWHERE(HttpStatus.CONFLICT, "A011", "이미 다른 경매에 최고 입찰자로 참여 중입니다."),
 
     // [지갑/주문]
     INSUFFICIENT_POINTS(HttpStatus.BAD_REQUEST, "W001", "포인트 잔액이 부족합니다."),
     WITHDRAWAL_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "W002", "출금 가능 금액을 초과했습니다."),
+    PAYMENT_CHARGE_NOT_FOUND(HttpStatus.NOT_FOUND, "W003", "존재하지 않는 결제 준비 정보입니다."),
+    PAYMENT_ALREADY_PROCESSED(HttpStatus.BAD_REQUEST, "W004", "이미 처리된 결제입니다."),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "W005", "결제 금액이 준비된 금액과 일치하지 않습니다."),
+    PAYMENT_CONFIRM_FAILED(HttpStatus.BAD_REQUEST, "W006", "결제 승인에 실패했습니다."),
+    WITHDRAWAL_ACCOUNT_REQUIRED(HttpStatus.BAD_REQUEST, "W007", "등록된 출금 계좌가 없습니다. 먼저 계좌를 등록해주세요."),
+    WITHDRAWAL_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "W008", "등록된 출금 계좌가 없습니다."),
     INVALID_ORDER_STATE(HttpStatus.BAD_REQUEST, "O001", "현재 상태에서는 해당 처리를 할 수 없습니다."),
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "O002", "존재하지 않는 주문입니다."),
+    SELF_PURCHASE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "O003", "본인이 등록한 상품은 구매할 수 없습니다."),
+    PRODUCT_NOT_AVAILABLE_FOR_PURCHASE(HttpStatus.BAD_REQUEST, "O004", "구매할 수 없는 상품입니다."),
+    ORDER_BUYER_ONLY(HttpStatus.FORBIDDEN, "O005", "구매자만 처리할 수 있습니다."),
+    ORDER_SELLER_ONLY(HttpStatus.FORBIDDEN, "O006", "판매자만 처리할 수 있습니다."),
+    ORDER_SHIPMENT_ADDRESS_REQUIRED(HttpStatus.BAD_REQUEST, "O007", "배송지가 아직 등록되지 않았습니다."),
+    ORDER_SHIPMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "O008", "등록된 배송지/송장 정보가 없습니다."),
+
+    // [환불]
+    REFUND_NOT_FOUND(HttpStatus.NOT_FOUND, "R001", "존재하지 않는 환불 요청입니다."),
+    REFUND_ALREADY_REQUESTED(HttpStatus.CONFLICT, "R002", "이미 진행 중인 환불 요청이 있습니다."),
+    REFUND_ALREADY_REVIEWED(HttpStatus.BAD_REQUEST, "R003", "이미 처리된 환불 요청입니다."),
 
     // [사업자]
     BUSINESS_CERTIFICATE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "B001", "업로드가 확인되지 않았습니다. 먼저 사업자등록증을 업로드해주세요."),

@@ -4,6 +4,7 @@ import com.ssafy.backend.live.entity.LiveProduct;
 import com.ssafy.backend.live.port.ProductQueryPort.ProductCard;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * 라이브에 연결된 상품 응답(LIVE-003).
@@ -51,6 +52,19 @@ public record LiveProductResponse(
         @Schema(description = "대표 이미지 URL. 등록된 이미지가 없으면 null")
         String thumbnailUrl,
 
+        @Schema(description = "소재. 등록하지 않았으면 null", example = "코튼 100%")
+        String material,
+
+        @Schema(description = "실측 치수(cm). 항목이 상품마다 달라 키-값으로 내려간다. 없으면 null",
+                example = "{\"어깨너비\": 45, \"총장\": 70}")
+        Map<String, Integer> measurements,
+
+        @Schema(
+                description = "하자 요약. 등록된 하자 항목을 쉼표로 이어 붙인 한 줄 문자열. 없으면 null "
+                        + "— 상세 목록이 필요하면 상품 상세(GET /api/products/{id})를 연다",
+                example = "밑단 오염, 우측 소매 실밥 풀림")
+        String defectSummary,
+
         @Schema(description = "노출 순서", example = "0")
         Short sortOrder,
 
@@ -74,6 +88,9 @@ public record LiveProductResponse(
                 card == null ? null : card.saleType(),
                 card == null ? null : card.conditionGrade(),
                 card == null ? null : card.thumbnailUrl(),
+                card == null ? null : card.material(),
+                card == null ? null : card.measurements(),
+                card == null ? null : card.defectSummary(),
                 liveProduct.getSortOrder(),
                 liveProduct.getAddedAt());
     }
