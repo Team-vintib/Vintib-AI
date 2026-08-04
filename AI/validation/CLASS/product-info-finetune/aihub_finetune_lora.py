@@ -51,9 +51,23 @@ DEFAULT_LR_ADAPTER = 1e-4
 DEFAULT_LR_HEAD = 1e-3
 
 
-def run_name(task: str, variant: str, r: int, lr_adapter: float) -> str:
-    """`lora_`로 시작 — 노트북의 `method_of()`가 이 접두어로 LoRA를 분류한다."""
-    return f"lora_r{r}_{task}_{variant}_lr{lr_adapter:g}"
+def run_name(
+    task: str,
+    variant: str,
+    r: int,
+    lr_adapter: float,
+    *,
+    alpha: int = DEFAULT_ALPHA,
+    dropout: float = DEFAULT_DROPOUT,
+    target_modules: tuple[str, ...] = DEFAULT_TARGET_MODULES,
+) -> str:
+    """`lora_`로 시작 — 노트북의 `method_of()`가 이 접두어로 LoRA를 분류한다.
+
+    `alpha`/`dropout`/`target_modules`도 이름에 반영한다 — `r`·`lr_adapter`만 반영하던
+    이전 버전은 이 셋만 바꿔 스윕하면 폴더명이 겹쳐 이전 run을 덮어썼다.
+    """
+    modules_tag = "".join(sorted(m.split("_")[0] for m in target_modules))
+    return f"lora_r{r}_a{alpha}_d{dropout:g}_{modules_tag}_{task}_{variant}_lr{lr_adapter:g}"
 
 
 def load_model(
@@ -190,7 +204,15 @@ def main(argv: list[str] | None = None) -> int:
         f"test_accuracy={test_result['accuracy']:.4f}"
     )
 
-    name = run_name(args.task, args.variant, args.r, args.lr_adapter)
+    name = run_name(
+        args.task,
+        args.variant,
+        args.r,
+        args.lr_adapter,
+        alpha=args.alpha,
+        dropout=args.dropout,
+        target_modules=tuple(args.target_modules),
+    )
     out_dir = args.out_dir or (args.pixel_cache_dir.parent / "artifacts_finetune")
     run_dir = out_dir / name
     run_dir.mkdir(parents=True, exist_ok=True)
