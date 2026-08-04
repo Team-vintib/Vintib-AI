@@ -652,6 +652,7 @@ def run_scan(
     sample_paths: int,
     short_pants_max_cm: float | None,
     progress_every: int,
+    color_top: int = 20,
 ) -> str:
     """라벨 JSON을 훑어 게이트 2개와 분포를 텍스트로 만든다. 이미지는 열지 않는다."""
     stats = LoadStats()
@@ -739,11 +740,23 @@ def run_scan(
             out.append(f"    {example}")
 
     section("게이트 2 — metadata.clothes.color (Navy 실재 여부)")
+    # 콤마로 묶인 다색 조합("Black,White" 등)이 값 종류를 수백 개로 불려서 표가 감당 안 될
+    # 만큼 길어진다(2026-08-04 실측: 500줄 이상). 색상은 이 작업의 우선순위가 아니므로
+    # 기본으로 상위 N개만 찍고 나머지는 합계 한 줄로 접는다. 전체가 필요하면 --color-top 0.
+    all_color_items = color_counts.most_common()
+    shown_colors = all_color_items if color_top <= 0 else all_color_items[:color_top]
     rows = []
-    for value, count in color_counts.most_common():
+    for value, count in shown_colors:
         mapped = map_color(value) or "(매핑 없음)"
         rows.append((value, f"{count:,}", _pct(count, total), mapped))
     out.append(_table(rows, ("원본 값", "건수", "비율", "우리 코드")))
+    hidden = all_color_items[len(shown_colors) :]
+    if hidden:
+        hidden_total = sum(count for _value, count in hidden)
+        out.append(
+            f"  ... 이하 {len(hidden):,}종 생략 (합계 {hidden_total:,}건, {_pct(hidden_total, total)})"
+            f" — 전체를 보려면 --color-top 0"
+        )
     navy_count = sum(count for value, count in color_counts.items() if map_color(value) == "NAVY")
     out.append("")
     out.append(f">>> Navy 실측 건수: {navy_count:,}")
@@ -1104,6 +1117,13 @@ def build_parser() -> argparse.ArgumentParser:
     scan = sub.add_parser("scan", help="착수 게이트 2개 + 분포를 텍스트 표로 출력")
     add_common(scan)
     scan.add_argument("--sample-paths", type=int, default=5, help="촬영유형별로 찍을 예시 경로 수")
+    scan.add_argument(
+        "--color-top",
+        type=int,
+        default=20,
+        help="게이트 2 색상 표에 상위 몇 종까지 찍을지(다색 조합이 수백 종이라 기본은 요약). "
+        "0이면 전체 출력",
+    )
     scan.add_argument("--out", type=Path, default=None, help="출력을 파일로도 저장")
 
     index = sub.add_parser("index", help="파싱+매핑+분할+층화샘플 → JSONL")
@@ -1159,6 +1179,7 @@ def main(argv: list[str] | None = None) -> int:
                     sample_paths=args.sample_paths,
                     short_pants_max_cm=args.short_pants_max_cm,
                     progress_every=args.progress_every,
+                    color_top=args.color_top,
                 )
             )
         if args.accessory_root is not None:

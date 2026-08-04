@@ -113,7 +113,14 @@ def embed_rows(
     device: str,
     batch_size: int,
     progress_every: int = 2000,
+    accessory_label_root: Path | None = None,
 ) -> tuple[Any, list[dict], dict]:
+    """`accessory_label_root`가 없으면 액세서리 행도 `label_root`(의류 라벨 폴더)로
+
+    폴리곤을 찾으려다 실패한다 — `sample.jsonl`이 두 소스를 섞고 있고 `label_path`가
+    소스마다 다른 루트 기준 상대경로이기 때문이다(2026-08-04 실측으로 확인). `raw`
+    variant는 폴리곤이 필요 없어 이 문제와 무관하다.
+    """
     """행 목록 → (임베딩 배열, 성공한 행 목록, 집계). 실패한 행은 조용히 빼고 센다."""
     import numpy as np
     from PIL import Image
@@ -150,8 +157,11 @@ def embed_rows(
 
         polygon = None
         if variant == "masked":
+            row_label_root = label_root
+            if row.get("source") == "accessory" and accessory_label_root is not None:
+                row_label_root = accessory_label_root
             polygon = aihub_preprocess.load_polygon(
-                label_root / row["label_path"], row.get("width"), row.get("height")
+                row_label_root / row["label_path"], row.get("width"), row.get("height")
             )
             if polygon is None:
                 stats["no_polygon"] += 1
@@ -179,7 +189,14 @@ def embed_rows(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="fashion_clip(동결) 임베딩 추출 — GPU 1회")
     parser.add_argument("--index", type=Path, required=True, help="sample.jsonl 또는 index.jsonl")
-    parser.add_argument("--label-root", type=Path, required=True)
+    parser.add_argument("--label-root", type=Path, required=True, help="의류(clothes) 라벨 루트")
+    parser.add_argument(
+        "--accessory-label-root",
+        type=Path,
+        default=None,
+        help="액세서리 라벨 루트. sample.jsonl이 두 소스를 섞으므로 masked variant에서 "
+        "액세서리 행이 있으면 반드시 줘야 한다(안 주면 label_path가 안 맞아 폴리곤을 못 찾는다)",
+    )
     parser.add_argument("--image-root", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--split", default="train", choices=("train", "val", "test", "all"))
@@ -222,6 +239,14 @@ def main(argv: list[str] | None = None) -> int:
         print("대상 행이 0개다 — --split/--source/--shot-type 필터를 확인할 것", file=sys.stderr)
         return 1
 
+    has_accessory_rows = any(row.get("source") == "accessory" for row in rows)
+    if args.variant == "masked" and has_accessory_rows and args.accessory_label_root is None:
+        print(
+            "⚠ masked variant인데 액세서리 행이 있고 --accessory-label-root가 없다 — "
+            "그 행들은 의류 라벨 폴더에서 폴리곤을 찾으려다 실패해 마스크 없이(원본 그대로) 처리된다.",
+            file=sys.stderr,
+        )
+
     print(f"모델 {args.model_id} · device={device} · {len(rows):,}행 · variant={args.variant}")
     embeddings, kept, stats = embed_rows(
         rows,
@@ -231,6 +256,7 @@ def main(argv: list[str] | None = None) -> int:
         model_id=args.model_id,
         device=device,
         batch_size=args.batch_size,
+        accessory_label_root=args.accessory_label_root,
     )
 
     np.save(npy_path, embeddings)
