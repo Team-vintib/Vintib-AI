@@ -65,6 +65,12 @@ public enum ErrorCode {
     WITHDRAWAL_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "W002", "출금 가능 금액을 초과했습니다."),
     INVALID_ORDER_STATE(HttpStatus.BAD_REQUEST, "O001", "현재 상태에서는 해당 처리를 할 수 없습니다."),
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "O002", "존재하지 않는 주문입니다."),
+    SELF_PURCHASE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "O003", "본인이 등록한 상품은 구매할 수 없습니다."),
+    PRODUCT_NOT_AVAILABLE_FOR_PURCHASE(HttpStatus.BAD_REQUEST, "O004", "구매할 수 없는 상품입니다."),
+    ORDER_BUYER_ONLY(HttpStatus.FORBIDDEN, "O005", "구매자만 처리할 수 있습니다."),
+    ORDER_SELLER_ONLY(HttpStatus.FORBIDDEN, "O006", "판매자만 처리할 수 있습니다."),
+    ORDER_SHIPMENT_ADDRESS_REQUIRED(HttpStatus.BAD_REQUEST, "O007", "배송지가 아직 등록되지 않았습니다."),
+    ORDER_SHIPMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "O008", "등록된 배송지/송장 정보가 없습니다."),
 
     // [사업자]
     BUSINESS_CERTIFICATE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "B001", "업로드가 확인되지 않았습니다. 먼저 사업자등록증을 업로드해주세요."),

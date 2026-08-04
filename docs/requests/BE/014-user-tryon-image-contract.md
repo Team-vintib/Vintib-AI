@@ -9,67 +9,27 @@
 
 온보딩에서 사용자의 AI 시착용 기본 사진을 받고, 이후 마이페이지 `내 정보 변경`에서 같은 사진을 조회/변경/삭제할 수 있어야 한다. 이 사진은 프로필 표시용 사진과 별개이며, 사용자가 추후 별도로 프로필 사진을 선택하지 않는 한 `profileImageUrl`로 사용하지 않는다.
 
-## 요청 내용
+## 남은 요청 내용
 
-- 프로필 표시 사진과 AI 시착용 기본 사진을 분리한다.
-  - `profileImageUrl`: 공개 프로필/헤더/판매자 카드 표시용. 온보딩에서는 받지 않는다.
-  - `defaultTryOnImageUrl`: AI 시착 기본 입력 이미지. 온보딩에서 받고 마이페이지에서 관리한다.
-- 마이페이지에서 프로필 표시 사진 조회/변경/삭제가 가능해야 한다.
-  - 조회 대상: `GET /api/users/{userId}/mypage` 또는 `GET /api/me`
-  - 필드: `profileImageUrl: string | null`
-  - 업로드/수정 후보: `PUT /api/me/profile-image`
-  - 파일 필드: `profileImage`
-  - 삭제 후보: `DELETE /api/me/profile-image`
-  - 이 API는 `defaultTryOnImageUrl`을 변경하지 않아야 한다.
-- 온보딩 시착 프로필 저장 API의 사진 필드를 기본 시착 사진으로 저장한다.
-  - 기존 후보: `PUT /api/me/tryon`
-  - 파일 필드: `bodyPhoto`
-  - 저장 결과가 이후 `defaultTryOnImageUrl`로 조회되어야 한다.
-- 마이페이지에서 시착용 기본 사진 조회/변경/삭제가 가능해야 한다.
-  - 조회 후보: `GET /api/me/tryon`
-  - 업로드/수정 후보: `PUT /api/me/tryon`
-  - 삭제 후보: `DELETE /api/me/tryon/image`
-- 마이페이지 요약 응답에도 현재 기본 시착 사진 URL 포함이 필요하다.
-  - 대상 후보: `GET /api/users/{userId}/mypage`
-  - 필드: `summary.profile.defaultTryOnImageUrl: string | null`
-- 허용 파일
-  - `image/jpeg`, `image/png`, `image/webp`
-  - 권장 제한: 5MB 이하
+프로필 사진/시착 기본 사진 API 자체는 아래 "확인 결과"에 정리된 대로 이미 있다. 남은 건 하나뿐이다.
 
-## 응답 예시
+- 마이페이지 요약 응답(`GET /api/users/{userId}/mypage`)에 현재 시착 기본 사진 URL을 포함해달라.
+  - 필드 제안: `user.bodyPhotoUrl: string | null` (기존 `user.profileImageUrl`과 같은 레벨)
+  - `TryOnProfileController`의 `bodyPhotoUrl`과 같은 값을 내려주면 된다.
 
-프로필 사진 변경:
+## 2026-08-03 확인 결과 — 실제로는 대부분 구현되어 있음(경로가 `/me/*`가 아닐 뿐)
 
-```json
-{
-  "success": true,
-  "data": {
-    "profileImageUrl": "https://.../profile.jpg"
-  },
-  "error": null
-}
-```
+`/api/me/*` 경로로는 없지만, 이 프로젝트 전체 컨벤션대로 `/api/users/{userId}/*`(본인 확인은 JWT
+principal과 대조) 경로에 이미 구현돼 있다. FE가 `/me` 계열로만 찾아서 "미구현"으로 판단한 것으로 보인다.
 
-AI 시착용 기본 사진 변경:
+- 프로필 표시 사진: `POST /api/users/{id}/profile-image/upload-url`(presigned 발급) →
+  `PUT /api/users/{id}/profile-image`(확정) → `DELETE /api/users/{id}/profile-image`
+  (`UserController`, `docs/APIs.md` 회원 섹션에 이미 문서화됨 — 2단계 presigned 업로드다,
+  `{profileImage}` 단일 파일 필드로 바로 PUT하는 방식이 아니다).
+- AI 시착용 기본 사진: `GET/PUT/DELETE /api/users/{userId}/tryon`(`TryOnProfileController`) —
+  응답 필드명은 `defaultTryOnImageUrl`이 아니라 `bodyPhotoUrl`이다.
+- 두 API는 서로 다른 리소스라 요청서에서 우려한 "한쪽이 다른 쪽을 건드리는" 문제는 애초에 없다.
 
-```json
-{
-  "success": true,
-  "data": {
-    "defaultTryOnImageUrl": "https://.../tryon-default.jpg"
-  },
-  "error": null
-}
-```
-
-## FE 임시 처리
-
-- API 확정 전까지 마이페이지는 선택한 이미지를 미리보기/mock 상태로 반영한다.
-- 실제 저장 연동 시 `profileImageUrl`은 건드리지 않고 `defaultTryOnImageUrl`만 갱신해야 한다.
-- 프로필 사진 변경 UI는 같은 저장 버튼 안에서 mock 상태로 반영하되, 실제 API 연동 시에는 `profileImageUrl` 전용 API만 호출해야 한다.
-
-## 2026-08-02 확인 결과
-
-- BE 컨트롤러 기준으로 `GET/PUT /api/me/tryon`, `DELETE /api/me/tryon/image`, `PUT/DELETE /api/me/profile-image` 구현은 확인되지 않았다.
-- FE는 온보딩 AI 시착용 기본 사진과 마이페이지 프로필/시착용 사진 관리를 mock/local fallback으로 유지한다.
-- `GET /api/users/{userId}/tryons`, `GET /api/users/{userId}/tryons/{id}`, `DELETE /api/users/{userId}/tryons/{id}`는 시착 결과 내역용 API로 확인되며, 기본 시착 사진 저장/조회 API와는 용도가 다르므로 이번 마이페이지 사진 관리에는 직접 연결하지 않는다.
+**여전히 없는 것**: `GET /api/users/{userId}/mypage`(`MypageSummaryResponse.User`)에
+`bodyPhotoUrl`(또는 `defaultTryOnImageUrl`) 필드가 없다 — `profileImageUrl`만 있다. 마이페이지 요약에
+시착 기본 사진을 같이 보여주려면 이 필드 추가가 필요하다(아래 요청 내용 중 이 항목만 남는다).
