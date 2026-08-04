@@ -405,7 +405,7 @@ onMounted(() => {
 .brand-option:focus-visible {
   border-color: var(--color-primary);
   outline: none;
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .brand-option--selected {
@@ -458,7 +458,7 @@ onMounted(() => {
 
 .category-option:has(.category-option__input:focus-visible) {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .category-option--selected {
