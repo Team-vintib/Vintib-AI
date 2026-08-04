@@ -1,4 +1,4 @@
-# BE
+﻿# BE
 
 빈티지·세컨핸드 의류 라이브 경매 플랫폼 백엔드.
 
@@ -157,9 +157,13 @@ BE/
 │   │   ├── entity/              # ChatMessage, SenderType
 │   │   ├── repository/
 │   │   └── dto/
-│   ├── auction/                 # 경매 조건 설정/진행 (AUCT) — 정윤
-│   │   ├── entity/              # Auction, AuctionStatus
-│   │   └── repository/
+│   ├── auction/                 # 경매 조건 설정/진행/입찰 (AUCT) — 정윤
+│   │   ├── controller/          # AuctionController(조건 설정·현황), AuctionActionController(시작·입찰·내역)
+│   │   ├── service/             # AuctionService
+│   │   ├── entity/              # Auction, AuctionStatus, Bid, BidStatus
+│   │   ├── repository/          # AuctionRepository(findByIdForUpdate 비관적 락), BidRepository
+│   │   ├── port/                # ProductCommandPort·PointCommandPort — 상품/포인트 도메인 참조를 격리
+│   │   └── dto/
 │   ├── tryon/                    # AI 가상 시착 결과·프로필 저장/조회/삭제 (TRYON) — 서윤
 │   │   ├── controller/           # TryOnController(결과), TryOnProfileController(프로필)
 │   │   ├── service/
@@ -190,10 +194,10 @@ BE/
 │   │   ├── entity/               # Order(package-private 빌더), OrderStatus, Invoice
 │   │   ├── repository/           # OrderRepository, InvoiceRepository
 │   │   └── dto/response/
-│   ├── point/                    # 포인트 잔액/충전/출금 (MY-007) — 서윤
+│   ├── point/                    # 포인트 잔액/충전/출금 (MY-007, 서윤) + 입찰 보류/해제 (AUCT-007~009, 정윤)
 │   │   ├── controller/
-│   │   ├── service/
-│   │   ├── entity/               # PointAccount(공유 PK 1:1), PointTransaction(원장), PointTransactionType
+│   │   ├── service/               # PointService(MY-007). 입찰 보류/해제는 auction/port/PointCommandAdapter가 이 패키지 엔티티를 직접 조립
+│   │   ├── entity/               # PointAccount(공유 PK 1:1, holdForBid/releaseHold 포함), PointTransaction(원장), PointTransactionType, PointHold(AUCT-007~009), PointHoldStatus
 │   │   ├── repository/
 │   │   └── dto/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
