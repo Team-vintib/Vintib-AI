@@ -32,11 +32,12 @@ public class LiveProductController {
 
     @Operation(
             summary = "라이브 상품 연결",
-            description = "라이브에 판매할 상품을 건다. 방송 전·중 모두 가능하며 개수 제한은 없다. "
+            description = "라이브에 판매할 상품을 건다. **예정(SCHEDULED) 상태에서만 가능하다** — "
+                    + "방송이 시작되면(LIVE) 편성을 더 이상 바꿀 수 없다(운영 정책). 개수 제한은 없다. "
                     + "호스트 본인이 등록한 상품만 연결할 수 있고, 이미 연결된 상품은 중복 연결되지 않는다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "연결 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패 또는 종료·취소된 방송"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패 또는 예정(SCHEDULED) 상태가 아닌 방송"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 라이브가 아니거나 본인 상품이 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "라이브 또는 상품 없음"),
@@ -55,10 +56,11 @@ public class LiveProductController {
 
     @Operation(
             summary = "라이브 상품 연결 해제",
-            description = "라이브에서 상품을 제외한다. 기록은 남기고 목록에서만 빠진다(다시보기 타임라인 근거).")
+            description = "라이브에서 상품을 제외한다. 기록은 남기고 목록에서만 빠진다(다시보기 타임라인 근거). "
+                    + "연결과 같은 규칙으로 **예정(SCHEDULED) 상태에서만 가능하다.**")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "해제 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "종료·취소된 방송"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "예정(SCHEDULED) 상태가 아닌 방송"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 라이브가 아님"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "라이브 없음 또는 연결되지 않은 상품")
