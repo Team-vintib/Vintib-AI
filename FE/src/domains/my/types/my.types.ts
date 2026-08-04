@@ -13,7 +13,6 @@ export type MySectionId =
   | 'social'
   | 'points'
   | 'business'
-  | 'cart'
 
 export type MyMemberType = 'GENERAL' | 'BUSINESS'
 export type MyBusinessVerificationStatus = 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED'
