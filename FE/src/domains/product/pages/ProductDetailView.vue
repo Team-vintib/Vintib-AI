@@ -41,10 +41,6 @@ const actionMessage = ref('')
 let actionMessageTimer: ReturnType<typeof setTimeout> | undefined
 let loadRequestId = 0
 
-const selectedImage = computed(() =>
-  product.value?.images.find((image) => image.id === selectedImageId.value),
-)
-
 const isSold = computed(() => product.value?.saleStatus === 'SOLD')
 const isLiked = computed(() =>
   product.value ? wishStore.isProductWished(product.value.id, product.value.isLiked) : false,
@@ -310,10 +306,7 @@ onBeforeUnmount(() => {
         @view-live="handleViewLive"
       />
       <ProductDetailInformation :product="product" />
-      <AiQualityAnalysisPanel
-        :analysis="product.aiQualityAnalysis"
-        :selected-image="selectedImage"
-      />
+      <AiQualityAnalysisPanel :analysis="product.aiQualityAnalysis" />
     </article>
 
     <div
