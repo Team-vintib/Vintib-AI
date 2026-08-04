@@ -1,5 +1,7 @@
 package com.ssafy.backend.home.dto.response;
 
+import com.ssafy.backend.live.entity.Live;
+import com.ssafy.backend.live.entity.LiveStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 
@@ -20,6 +22,12 @@ public record LiveCardResponse(
 
         @Schema(description = "방송명", example = "빈티지 데님 라이브")
         String title,
+
+        @Schema(
+                description = "판매자(호스트) 회원 ID. 카드에서 판매자 프로필로 이동할 때 쓴다 "
+                        + "(FE 요청 004 §3.1)",
+                example = "10")
+        Long hostId,
 
         @Schema(description = "판매자(호스트) 닉네임", example = "빈티지장인")
         String hostNickname,
@@ -42,4 +50,29 @@ public record LiveCardResponse(
         @Schema(description = "연결된 상품 수", example = "5")
         Integer productCount
 ) {
+
+    /**
+     * 라이브 엔티티에서 카드를 만든다. 홈(HOME-001)과 팔로잉 홈(HOME-002)이 같은 규칙으로 그려야
+     * 해서 조립을 여기 한 곳에 둔다.
+     *
+     * <p><b>진행 중이 아니면 {@code viewerCount}는 null이다.</b> 예약 방송의 0명과 "집계 대상이
+     * 아님"은 다른 뜻인데, 0으로 내리면 FE가 "아무도 안 보는 방송"으로 표시한다.
+     *
+     * @param viewerCount  현재 시청자 수(진행 중일 때만 의미 있음)
+     * @param productCount 편성 상품 수
+     */
+    public static LiveCardResponse of(Live live, int viewerCount, int productCount) {
+        boolean onAir = live.getStatus() == LiveStatus.LIVE;
+        return new LiveCardResponse(
+                live.getId(),
+                live.getTitle(),
+                live.getHost().getId(),
+                live.getHost().getNickname(),
+                live.getThumbnailUrl(),
+                live.getStatus().name(),
+                live.getScheduledAt(),
+                live.getStartedAt(),
+                onAir ? viewerCount : null,
+                productCount);
+    }
 }

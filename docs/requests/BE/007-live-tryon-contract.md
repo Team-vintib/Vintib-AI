@@ -1,59 +1,33 @@
-# 007 Live/TryOn API 요청
+# 007 Live/TryOn API 요청 (AI 시착만 남음)
 
 ## 1. 요청 개요
 
 - 요청 파트: FE
 - 대상 파트: BE
-- 요청 목적: 라이브 목록/상세/생성 연동 상태와 라이브 생성 보조, 영상 토큰, AI 시착 API 요청을 정리한다.
+- 요청 목적: **AI 시착 생성 API**를 요청한다. 라이브 쪽 항목은 전부 반영돼 이 문서에서 뺐다.
 - 우선순위: P0
-- 시연 필수 여부: 라이브 목록/상세/생성은 필수. 영상 토큰과 AI 시착은 실제 방송/시착 시연 범위에 따라 필수.
+- 시연 필수 여부: AI 시착 시연 범위에 따라 결정
+
+> **2026-08-03 정윤 정리** — 라이브 관련 요청은 모두 처리됐다. 무엇을 어떻게 반영했는지는
+> `docs/requests/FE/016-pre-auction-batch-handoff.md`에 정리해 뒀다.
+>
+> | 원래 항목 | 결과 |
+> | --- | --- |
+> | 3.1 생성용 연결 가능 상품 조회 | **기존 API로 충족** — `GET /api/users/{userId}/products`(본인 상품 전체, DRAFT 포함). 새 엔드포인트를 만들지 않았다 |
+> | 3.5 `LiveProductResponse` 필드 보강 | **반영 완료** — brandName·price·thumbnailUrl·saleType·conditionGrade |
+> | 3.5 `LiveDetailResponse.currentProductId` | **반영 완료** |
+> | 3.5 `LiveDetailResponse.hostProfileImageUrl` | **반영 완료** |
+> | 3.5 `LiveDetailResponse.description` | **반영 완료** — 개설 요청에도 `description`(선택, 1000자)이 추가됐다 |
+> | 3.5 `material`/`measurements`/`defectSummary` | **미반영** — 선택 항목이고 상품 상세(`GET /api/products/{id}`)에 이미 있다. 시청 화면 카드에 넣으면 편성 상품 수만큼 상세를 더 읽어야 한다 |
+> | 3.5 불필요 필드(`addedAt`·`liveId`·연결 `id`) 제거 | **미반영(유지)** — 이미 쓰고 있는 FE 코드가 깨진다. 남아 있어도 무시하면 된다 |
+> | 5. `PATCH /api/lives/{liveId}/status` | **연결 가능** — 전이 결과가 `/topic/lives/{liveId}/status`로 전파된다 |
 
 ## 2. 현재 연동 상태
 
-- FE 구현 완료 범위
-  - 라이브 목록 화면
-  - 라이브 상세/시청 화면
-  - 라이브 즉시 생성/예약 생성 화면
-  - 라이브에 연결할 상품 선택 UI
-- 현재 임시 처리 또는 Mock 사용 여부
-  - 생성용 상품 조회 전용 API가 없어 상품 선택 후보는 별도 연결이 필요하다.
-  - 영상 송출 토큰과 AI 시착 생성은 실제 API가 없어 기능 연결이 보류되어 있다.
-  - `thumbnailUrl`은 현재 FE에서 null 전송 가능하다.
+- FE 구현 완료 범위: 라이브 목록/상세/생성, 상품 선택 UI, 라이브 시착 패널, 상품 상세 시착 팝업
+- 현재 임시 처리: 시착 생성은 실제 API가 없어 mock으로 동작한다.
 
 ## 3. 추가 구현 요청
-
-### 3.1 생성용 연결 가능 상품 조회
-
-- Method / Endpoint: `GET /api/lives/create/products`
-- 요청 목적: 라이브 생성 시 현재 사용자가 연결할 수 있는 상품 목록을 조회한다.
-- FE 사용처: `LiveCreatePage.vue`
-- 요청 데이터
-  - Header: `Authorization: Bearer {accessToken}`
-  - Query: `page`, `size`, `keyword` 선택
-- 응답 데이터: 기존 product card DTO 또는 간소 상품 DTO 목록
-- 응답 예시
-
-```json
-{
-  "success": true,
-  "data": {
-    "content": [
-      {
-        "productId": 1,
-        "title": "빈티지 자켓",
-        "thumbnailUrl": null,
-        "saleStatus": "ON_SALE"
-      }
-    ],
-    "page": 0,
-    "size": 20,
-    "totalElements": 1,
-    "totalPages": 1,
-    "hasNext": false
-  },
-  "error": null
-}
-```
 
 ### 3.3 라이브 AI 시착 생성
 
@@ -67,16 +41,11 @@
   - `tryonId`: number
   - `status`: `PENDING` | `PROCESSING` | `DONE` | `FAILED`
   - `resultImageUrl`: string | null
-- 응답 예시
 
 ```json
 {
   "success": true,
-  "data": {
-    "tryonId": 1,
-    "status": "PENDING",
-    "resultImageUrl": null
-  },
+  "data": { "tryonId": 1, "status": "PENDING", "resultImageUrl": null },
   "error": null
 }
 ```
@@ -101,8 +70,11 @@
 ### 3.6 상품 상세 AI 시착 생성 (TRYON-003)
 
 - 대상: 상품 상세(`ProductDetailView`)의 AI 시착 팝업 (라이브 밖, 상품 단위 시착)
-- 배경: 상품 상세 "AI 시착" 버튼에 팝업(모달)을 구현했다. 등록 상품 이미지를 회원 전신 사진에 합성(TRYON-003). BE에 (a) 회원 전신 사진 조회, (b) 상품 단위 시착 생성 API가 없어 팝업은 mock으로 동작한다.
 - 요청
+  - **전신 사진 조회**: `GET /api/users/{userId}/tryon`(시착 프로필, 구현 완료)로 회원 전신 사진 URL을 내려주면 팝업 초기 이미지로 사용한다.
+  - **상품 시착 생성(비 라이브)**: `POST /api/users/{userId}/tryons` 또는 `POST /api/products/{productId}/tryons`
+  - 응답: `tryonId`, `status`(`PENDING|PROCESSING|DONE|FAILED`), `resultImageUrl`(null 가능)
+- 참고: 시착 결과 저장(TRYON-005)은 "추가" 우선순위로 범위 밖. 결과 조회/삭제는 이미 존재한다.
   - **전신 사진 조회**: `GET /api/users/{userId}/tryon`(시착 프로필, 구현 완료 — `docs/requests/FE/009-tryon-profile-presigned-upload.md` 참고)로 회원 전신 사진 URL을 내려주면 팝업 초기 이미지로 사용한다.
   - **상품 시착 생성(비 라이브)**: `POST /api/users/{userId}/tryons` 또는 `POST /api/products/{productId}/tryons` — 상품 이미지 + 회원 전신 사진 합성 결과를 생성한다. 3.3(라이브 시착 생성)과 같은 합성이나 라이브 컨텍스트가 아니다.
   - 응답: `tryonId`, `status`(`PENDING|PROCESSING|DONE|FAILED`), `resultImageUrl`(null 가능). polling vs STOMP push 방식은 3.3과 동일 정책을 따른다.
@@ -131,14 +103,5 @@
 
 ## 6. 협의 필요 사항
 
-- FE·BE 간 결정이 필요한 내용
-  - 생성용 상품 조회 필터 기준
-  - AI 시착 결과 polling 또는 STOMP push 방식
-- 아직 확정되지 않은 응답 구조나 정책
-  - 라이브 status enum 이름
-  - 시착 실패 사유 응답 구조
-
-## 7. 추가 요청 없음
-
-- 이미 정상 연동된 API: 없음
-- 기존 규격을 유지하면 되는 기능: 없음
+- AI 시착 결과 polling 또는 STOMP push 방식
+- 시착 실패 사유 응답 구조

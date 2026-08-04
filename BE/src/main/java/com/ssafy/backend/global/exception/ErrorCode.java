@@ -48,6 +48,17 @@ public enum ErrorCode {
     BID_LOWER_THAN_CURRENT(HttpStatus.BAD_REQUEST, "A002", "입찰 금액이 현재 최고가보다 낮습니다."),
     AUCTION_ALREADY_CLOSED(HttpStatus.BAD_REQUEST, "A003", "이미 종료된 경매입니다."),
     AUCTION_ALREADY_CONFIGURED(HttpStatus.CONFLICT, "A004", "해당 상품에 이미 설정된 경매가 있습니다."),
+    AUCTION_NOT_FOUND(HttpStatus.NOT_FOUND, "A005", "존재하지 않는 경매입니다."),
+    AUCTION_NOT_STARTABLE(HttpStatus.BAD_REQUEST, "A006", "시작할 수 있는 상태의 경매가 아닙니다."),
+    // 한 라이브에서 동시에 진행 중인 경매는 1개다 (LIVE-004).
+    AUCTION_ALREADY_RUNNING(HttpStatus.CONFLICT, "A007", "이 방송에 이미 진행 중인 경매가 있습니다."),
+    BID_PRICE_MISMATCH(HttpStatus.BAD_REQUEST, "A008", "입찰 금액이 현재 필요한 금액과 다릅니다. 최신 금액으로 다시 시도해 주세요."),
+    // 직전 최고 입찰자 본인은 연속으로 입찰할 수 없다 (AUCT-006).
+    CONSECUTIVE_BID_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "A009", "직전 최고 입찰자는 연속으로 입찰할 수 없습니다."),
+    // 같은 경매·같은 금액 입찰의 중복 클릭·경합을 막는다 (AUCT-004/005).
+    DUPLICATE_BID_PRICE(HttpStatus.CONFLICT, "A010", "이미 같은 금액으로 입찰이 접수됐습니다."),
+    // 최고 입찰자인 동안 다른 경매에 입찰할 수 없다 (AUCT-009).
+    ACTIVE_HOLD_ELSEWHERE(HttpStatus.CONFLICT, "A011", "이미 다른 경매에 최고 입찰자로 참여 중입니다."),
 
     // [지갑/주문]
     INSUFFICIENT_POINTS(HttpStatus.BAD_REQUEST, "W001", "포인트 잔액이 부족합니다."),

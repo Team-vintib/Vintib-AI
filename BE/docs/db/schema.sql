@@ -208,6 +208,7 @@ CREATE TABLE live (
     host_id           BIGINT       NOT NULL REFERENCES member (id),
     title             VARCHAR(200) NOT NULL,
     thumbnail_url     VARCHAR(500),
+    description       VARCHAR(1000),                  -- 방송 설명(선택). 시청 화면 헤더 표시용
     status            VARCHAR(20)  NOT NULL DEFAULT 'SCHEDULED',
     scheduled_at      TIMESTAMPTZ,                    -- 예약 라이브만. 즉시 라이브는 NULL
     started_at        TIMESTAMPTZ,
@@ -245,6 +246,23 @@ CREATE TABLE live_product (
 -- 같은 상품을 같은 라이브에 중복 연결하지 못하게 한다(제외된 건은 재연결 허용).
 CREATE UNIQUE INDEX ux_live_product_active
     ON live_product (live_id, product_id) WHERE removed_at IS NULL;
+
+
+-- 예약 라이브 시작 알림 신청 (FE 요청 008 §3.2.1).
+-- notified_at 이 중복 발송을 막는 유일한 근거다 — 스케줄러는 이 값이 비어 있는 신청만 집고,
+-- 알림 생성과 같은 트랜잭션에서 채운다. 서버가 재기동돼도 이미 보낸 건은 다시 잡히지 않는다.
+CREATE TABLE live_reminder (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    live_id     BIGINT      NOT NULL REFERENCES live (id),
+    member_id   BIGINT      NOT NULL REFERENCES member (id),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    notified_at TIMESTAMPTZ,                        -- NULL 이면 아직 안 보냄
+    CONSTRAINT ux_live_reminder UNIQUE (live_id, member_id)
+);
+
+-- 스케줄러가 "아직 안 보낸 것"만 훑는다. 보낸 건이 쌓여도 스캔 대상이 늘지 않게 부분 인덱스로 둔다.
+CREATE INDEX ix_live_reminder_pending
+    ON live_reminder (live_id) WHERE notified_at IS NULL;
 
 
 -- =============================================================================
@@ -312,7 +330,8 @@ CREATE TABLE bid (
 
 -- 같은 경매에서 동일 가격 단계는 단 한 번만 성립한다.
 -- 중복 클릭(AUCT-004)과 동시 입찰 경합(AUCT-005)을 DB 레벨에서 차단하는 최후 방어선.
--- Redis 분산락이 1차 방어이고, 이 제약은 락이 실패했을 때의 안전망이다.
+-- 1차 방어는 Redis 분산락이 아니라 DB 비관적 락(AuctionRepository.findByIdForUpdate)이다 —
+-- 같은 경매의 입찰은 이 행 잠금으로 직렬화된다. 이 제약은 그 잠금이 실패했을 때의 안전망이다.
 CREATE UNIQUE INDEX ux_bid_auction_price ON bid (auction_id, bid_price);
 
 CREATE INDEX ix_bid_auction_created ON bid (auction_id, created_at DESC);

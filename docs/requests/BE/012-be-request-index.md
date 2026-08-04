@@ -11,13 +11,13 @@
 ## 2. 현재 연동 상태
 
 - FE 구현 완료 범위
-  - Onboarding, Search, Auction, Commerce, MyPage는 mock 또는 미구현 범위가 남아 있음
+  - Onboarding, Commerce, MyPage는 mock 또는 미구현 범위가 남아 있음
+  - Home/Search는 BE 구현 완료(팀원 쪽에서 반영) — `004-home-contract.md`/`005-search-contract.md`는
+    반영 완료로 삭제됨
   - Business는 BE 구현 완료(제출/조회/재제출) — FE는 아직 mock 사용 중(`docs/requests/FE/011-business-invoice-contract.md` 반영 필요)
 - 현재 임시 처리 또는 Mock 사용 여부
   - Onboarding: mock-success fallback
   - Business: FE가 아직 `docs/requests/FE/011-business-invoice-contract.md` 미반영 — mock `PENDING` fallback 유지 중
-  - Search: mock data 기반 화면
-  - Auction: mock snapshot
   - Commerce/Wallet, MyPage: FE 화면 없음
 
 ## 3. 추가 구현 요청
@@ -34,12 +34,10 @@
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
 | 001 | `001-auth-contract.md` | Auth | 이메일 auth API 연결 완료 | `GET /api/me`, auth 응답 `user/nextStep`, SSAFY SSO |
-| 004 | `004-home-contract.md` | Home | 홈/팔로잉 홈 연결 완료 | live card `hostId`, 정렬/노출 정책 문서화 |
-| 005 | `005-search-contract.md` | Search | FE 화면/adapter 있음, BE `/api/search` 없음 | 통합 검색 API |
 | 006 | `006-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
 | 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 상품/헤더 필수 필드(brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId) 연결 완료 | 생성용 상품 조회, AI 시착 생성, 선택 필드(hostProfileImageUrl/description/material/measurements/defectSummary) |
-| 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API 연동 완료. 알림 seed 제거 후 실제 생성 데이터 없음 | 알림 type/ref 문서화, 실제 알림 생성 이벤트, 예약 라이브 알림 신청/스케줄러, 탭별 bulk read |
-| 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수, 경매 조건 설정 연결 완료 | 경매 snapshot/start/bid/close/STOMP |
+| 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API 연동 완료 | ⚠️ 이번 머지로 라이브 알림 신청(`LiveReminderController`/`LiveReminderScheduler`)이 새로 들어옴 — 실제 알림 생성 이벤트 상태 재확인 필요 |
+| 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수 연결 완료 | ⚠️ 이번 머지로 경매 시작/입찰/종료(`AuctionActionController`, `Bid`, `PointHold`)가 새로 들어옴 — 문서 자체 재확인 필요(FE 인계는 `docs/requests/FE/017-auction-snapshot-start-contract.md`/`018-auction-bid-contract.md` 참고) |
 
 ## 4. 기존 API 변경 요청
 
@@ -47,12 +45,10 @@
   - 세부 내용은 각 도메인 문서의 4번 섹션을 따른다.
 - 추가할 필드
   - Auth: `user`, `nextStep`
-  - Home: live card `hostId`
-  - Social/Notification: 알림 `type/refType/refId` 문서화, 도메인 이벤트별 알림 생성 정책, 예약 라이브 알림 신청/스케줄러, 탭별 읽음 처리 API
+  - Social/Notification: 알림 `type/refType/refId` 문서화, 탭별 읽음 처리 API
 - 변경 영향 범위
   - route guard
   - 홈/상품/라이브 카드 이동
-  - 검색/상품 필터
   - 알림 클릭 이동
 
 ## 5. 보류 또는 시연 제외 범위
@@ -94,3 +90,15 @@
   (`saleType`은 `DIRECT_SALE`, `condition`은 `conditionGrade`로 이름이 다름). 선택 필드
   (`hostProfileImageUrl`/`description`/`material`/`measurements`/`defectSummary`)와 §3.1(생성용 상품
   조회)·§3.3/3.6(AI 시착 생성)은 아직 남아 있어 문서는 삭제하지 않고 갱신만 했다.
+
+## 2026-08-04 머지 정리 (경매/라이브 알림/검색/홈 대규모 반영)
+
+- `004-home-contract.md`, `005-search-contract.md`는 팀원(정윤) 쪽에서 홈 `hostId`·통합 검색을
+  구현하며 직접 삭제 처리했다 — 위 표에서도 뺐다.
+- 경매 시작/입찰/종료(AUCT-002~014), 라이브 예약 알림 신청/스케줄러가 이번 머지로 대량 반영됐다.
+  008/009 행은 위 표에 ⚠️로 표시해 뒀다 — 상세 내용은 다음 세션에서 실제 코드 대조 후 갱신 필요
+  (FE 인계 문서: `docs/requests/FE/016-pre-auction-batch-handoff.md`,
+  `017-auction-snapshot-start-contract.md`, `018-auction-bid-contract.md`).
+- BE가 새로 요청한 문서 3개도 생겼다: `016-product-category-optional.md`,
+  `016-product-similar-price-distribution.md`, `017-product-ai-tryon-registration-fields.md` —
+  아직 이 인덱스 표에는 반영 전, 다음 세션에서 정리 필요.

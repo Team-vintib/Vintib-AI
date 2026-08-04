@@ -26,7 +26,7 @@ FE/AI 코드는 직접 수정하지 않는다. FE나 AI 쪽 변경이 필요하�
 - Lombok 사용 가능(`@Getter`, `@Builder` 등). 단 엔티티에 `@Setter`를 습관적으로 붙이지 않는다 — 상태 변경은 의도가 드러나는 메서드로 한다.
 - 요청 DTO는 Bean Validation(`@Valid` + `jakarta.validation` 애너테이션)으로 검증한다.
 - 새 도메인 로직을 추가하면 최소 하나 이상의 테스트를 함께 작성한다(서비스 단위 테스트 또는 `@WebMvcTest`/`@SpringBootTest`). 테스트 메서드명은 한글로 작성해 검증 의도를 그대로 드러낸다 (예: `인증코드가_일치하면_토큰을_발급한다()`). 자바 식별자는 유니코드를 허용하므로 컴파일·테스트 리포트 모두 문제없다.
-- 경매(AUCT) 등 동시성이 걸리는 로직은 Redis 분산 락/Pub-Sub 설계가 아직 미확정이므로, 구현 전 접근 방식을 사용자와 먼저 확인한다.
+- 경매(AUCT) 동시성은 **DB 비관적 락**(`AuctionRepository.findByIdForUpdate`, `PESSIMISTIC_WRITE`)으로 처리한다 — Redis 분산락·MQ는 검토 후 채택하지 않았다(이유는 `docs/plans/BE/JY008-live-screen-complete.md` 설계 판단 1). 같은 경매에 대한 입찰은 이 행 잠금으로 직렬화되고, `ux_bid_auction_price`·`ux_point_hold_member_active` 부분 UNIQUE 인덱스는 잠금이 실패했을 때의 최후 방어선이다.
 
 ## 팀 간 계약
 

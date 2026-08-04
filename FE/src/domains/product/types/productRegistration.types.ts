@@ -13,6 +13,8 @@ export type ProductRegistrationPhotoRole = 'front' | 'back' | 'additional'
 
 export type ProductRegistrationSaleType = 'DIRECT' | 'AUCTION'
 
+export type ProductRegistrationAiModelGender = 'FEMALE' | 'MALE'
+
 export type ProductRegistrationAiCheckStatus =
   | 'idle'
   | 'analyzing'
@@ -25,7 +27,6 @@ export type ProductRegistrationAiCheckStatus =
 export interface ProductRegistrationStep {
   id: ProductRegistrationStepId
   label: string
-  description: string
 }
 
 export interface ProductRegistrationOption {
@@ -85,6 +86,7 @@ export interface ProductRegistrationDraft {
   color: string
   customColor: string
   categoryId: string
+  customCategory: string
   description: string
   purchasedAt: string
   purchasedCountry: string
@@ -96,6 +98,8 @@ export interface ProductRegistrationDraft {
   sellerDefectDescription: string
   aiCheckPhotoIds: string[]
   aiPhotoResults: ProductRegistrationAiPhotoResult[]
+  aiModelEnabled: boolean
+  aiModelGender: ProductRegistrationAiModelGender | null
   saleType: ProductRegistrationSaleType | ''
   directSalePrice: string
   auctionStartPrice: string

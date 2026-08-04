@@ -22,6 +22,9 @@ public record LiveResponse(
         @Schema(description = "썸네일 URL", example = "https://cdn.example.com/live/101.jpg")
         String thumbnailUrl,
 
+        @Schema(description = "방송 설명. 없으면 null", example = "90년대 리바이스 위주로 소개합니다")
+        String description,
+
         @Schema(description = "방송 상태", example = "SCHEDULED")
         LiveStatus status,
 
@@ -30,6 +33,12 @@ public record LiveResponse(
 
         @Schema(description = "방송 시작 시각. 예약 개설 직후에는 null", example = "2026-07-28T21:30:00")
         LocalDateTime startedAt,
+
+        @Schema(
+                description = "방송 종료 시각. 종료 전이면 null. **상태 전이(`PATCH /status`) 응답에서 "
+                        + "종료 시각을 확인하는 용도**이며 개설 직후에는 항상 null이다",
+                example = "2026-07-28T22:30:00")
+        LocalDateTime endedAt,
 
         @Schema(description = "생성 시각", example = "2026-07-28T11:00:00")
         LocalDateTime createdAt
@@ -41,9 +50,11 @@ public record LiveResponse(
                 live.getHost().getId(),
                 live.getTitle(),
                 live.getThumbnailUrl(),
+                live.getDescription(),
                 live.getStatus(),
                 live.getScheduledAt(),
                 live.getStartedAt(),
+                live.getEndedAt(),
                 live.getCreatedAt());
     }
 }

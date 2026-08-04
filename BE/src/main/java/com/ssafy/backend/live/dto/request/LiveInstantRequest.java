@@ -24,6 +24,13 @@ public record LiveInstantRequest(
         String thumbnailUrl,
 
         @Schema(
+                description = "방송 설명. **선택**이며 없으면 null",
+                example = "지금 막 들어온 물건들 바로 보여드립니다",
+                maxLength = 1000)
+        @Size(max = 1000)
+        String description,
+
+        @Schema(
                 description = "판매할 상품 ID 목록. **개설 시점에 정하며 최소 1개가 필요하다.** "
                         + "즉시 개설은 곧바로 방송이 시작돼 이후 편성을 바꿀 수 없다",
                 example = "[2001, 2002]")

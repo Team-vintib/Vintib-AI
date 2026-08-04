@@ -20,6 +20,24 @@
   - 경매 snapshot과 입찰 진행은 mock snapshot 기반으로 표시 중이다.
   - 경매 시작/입찰/종료 STOMP 이벤트는 실제 계약이 필요하다.
 
+> **2026-08-04 정윤 — 추가 반영.** 입찰(`POST .../bids`)·입찰 내역 조회(`GET .../bids`)·
+> `BID_PLACED` 이벤트까지 구현했다. 포인트 보류/해제(AUCT-007~008, 이 문서에는 없던 내용이지만
+> 입찰과 원자적으로 묶여 있어 함께 반영)도 들어갔다. 계약은
+> `docs/requests/FE/018-auction-bid-contract.md` 참고.
+> **남은 것은 종료(`close`)·낙찰자 조회·자동 연장 스케줄러·`AUCTION_CLOSED` 이벤트다.**
+>
+> **2026-08-03 정윤 — 부분 반영.** snapshot 조회(§3.1)와 경매 시작(§3.2 중 `start`), 시작 이벤트
+> 전파(§3.3)는 구현했다. 계약은 `docs/requests/FE/017-auction-snapshot-start-contract.md` 참고.
+>
+> §6에서 물어보신 것 중 정한 것:
+>
+> | 질문 | 정한 것 |
+> | --- | --- |
+> | 경매 topic 을 live 기준으로 통일할지 | **live 기준 하나만** (`/topic/lives/{liveId}/auctions`). 시청자는 이미 라이브 단위로 구독 중이라 축이 둘이면 구독 정리가 두 벌이 된다 |
+> | `serverNow` 포함 여부 | **포함한다.** 없으면 카운트다운이 서버와 어긋난다 |
+> | 경매 상태 enum | `READY`·`RUNNING`·`SUCCESS`·`FAILED`·`CANCELED`. 종료를 낙찰/유찰로 나눈다(낙찰 연출 판단을 FE에 넘기지 않기 위해) |
+> | 최고 입찰자가 본인일 때 재입찰 | **미정** — 다음 단계에서 확정한다 |
+
 ## 3. 추가 구현 요청
 
 ### 3.1 경매 snapshot

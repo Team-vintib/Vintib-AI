@@ -108,7 +108,7 @@ const handleComplete = async () => {
     const destination =
       memberType === 'GENERAL' ? ROUTE_PATHS.HOME : ROUTE_PATHS.BIZ_VERIFY
 
-    authStore.updateUser({ onboardingCompleted: true })
+    authStore.updateUser({ onboardingCompleted: response.data?.onboardingCompleted ?? true })
 
     await router.push(destination)
   } catch (error: unknown) {

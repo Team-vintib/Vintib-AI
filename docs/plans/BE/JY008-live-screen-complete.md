@@ -325,33 +325,70 @@ FE `NOW` 배지와 진입 시 기본 선택 상품의 원천이다. 지금은 �
 **`productId: null`은 오류가 아니라 해제다.** `@NotNull`을 걸지 않은 이유 — 호스트가 잡담 구간으로
 넘어가면 아무 상품도 소개하지 않는 상태가 필요한데, 필수로 막으면 한번 지정한 뒤 되돌릴 방법이 없다.
 
-### Phase 6 — 경매 조회·시작 · `-96`(AUCT-002) 신규 작업 · 브랜치 `feat/209-auction-start`
+### Phase 6 — 경매 조회·시작 · `-460` `-461`(AUCT-002) · 브랜치 `feat/209-auction-start` ✅ 완료 (2026-08-03)
 
-- [ ] `GET /api/lives/{liveId}/auctions/current` — snapshot. 없으면 200 + `null` (설계 판단 5)
-- [ ] snapshot 필드 — `auctionId`, `productId`, `status`, `startPrice`, `bidUnit`, `currentPrice`, **`nextBidPrice`**, `topBidderId`, `topBidderNickname`, `scheduledEndAt`, `extensionCount`
-- [ ] `POST /api/lives/{liveId}/auctions/{auctionId}/start` — `READY → RUNNING`, `scheduled_end_at` 계산
-- [ ] `ux_auction_live_running` 위반을 400으로 변환 — 한 라이브에 진행 중 경매는 1개
-- [ ] `/topic/lives/{liveId}/auction` 시작 이벤트
-- [ ] **`ProductCommandPort` 신설** — 경매가 상품 상태를 바꾸는 통로. `product`는 서윤 영역이라 `ProductQueryPort`와 같은 방식으로 격리한다 (설계 판단 11)
-- [ ] **경매 시작 시 `AUCTION_SCHEDULED → AUCTION_IN_PROGRESS`** (설계 판단 10)
-- [ ] **`-394` 보완 — 경매 조건 설정 시 `AUCTION_SCHEDULED`로 전이.** 이미 머지된 코드에 빠져 있어 지금은 상품이 `DRAFT`·`ON_SALE`에 머문다
-- [ ] Swagger + 테스트 (상태 전이 검증 포함)
+- [x] `GET /api/lives/{liveId}/auctions/current` — snapshot. 없으면 200 + `null` (설계 판단 5). 비회원 공개
+- [x] snapshot 필드 — FE 요청 009 §3.1 이름을 그대로 따랐다(`highestBidderId`/`highestBidderNickname`/`endsAt`/`serverNow`) + `nextBidPrice`·`extensionCount`·`durationSeconds`
+- [x] `POST /api/auctions/{auctionId}/start` — `READY → RUNNING`, `endsAt` 계산
+- [x] 한 라이브에 진행 중 경매는 1개 — 앱에서 409(`A007`)로 막고, 부분 UNIQUE 인덱스가 최후 방어선
+- [x] `/topic/lives/{liveId}/auctions` 시작 이벤트 (`AUCTION_STARTED` + 현황 전체)
+- [x] **`ProductCommandPort` 신설** (설계 판단 11)
+- [x] **경매 시작 시 → `AUCTION_IN_PROGRESS`** (설계 판단 10)
+- [x] **`-394` 보완 — 조건 설정 시 `AUCTION_SCHEDULED`로 전이**
+- [x] Swagger + 테스트 (서비스 16건, 컨트롤러 15건, STOMP 2건)
 
-### Phase 7 — 입찰 · `-97`(AUCT-003) `-98`(AUCT-004~006) 신규 작업 · 브랜치 `feat/209-auction-bid`
+**계획과 달라진 것**
 
-**이 계획의 핵심이자 가장 위험한 구간.** 설계 판단 1·2를 그대로 따른다.
+| 항목 | 계획 | 실제 | 이유 |
+| --- | --- | --- | --- |
+| 시작 엔드포인트 | `POST /api/lives/{liveId}/auctions/{auctionId}/start` | `POST /api/auctions/{auctionId}/start` | `auctionId`만으로 유일하게 정해지고, **FE 요청서(009 §3.2)가 이 형태로 요청**했다 |
+| 토픽 | `/topic/lives/{liveId}/auction` | `/topic/lives/{liveId}/auctions` | FE 요청서 표기를 따랐다 |
+| snapshot 필드명 | `topBidderId`·`scheduledEndAt` | `highestBidderId`·`endsAt` | 같은 이유 |
+| `Bid` 엔티티 | Phase 7 | **Phase 6에서 생성**(읽기만) | snapshot 의 `bidCount`를 0으로 하드코딩하면 그대로 남는다. 쓰기 경로는 Phase 7 그대로 |
 
-- [ ] `AuctionRepository.findByIdForUpdate` — `@Lock(PESSIMISTIC_WRITE)`
-- [ ] `POST /api/lives/{liveId}/auctions/{auctionId}/bids` — 동기 응답으로 성공 snapshot 반환
-- [ ] 한 트랜잭션에서 — 경매 행 잠금 → 유효 입찰 판정 → `bid` 삽입 → `current_price`·`top_bidder_id` 갱신 → 자동 연장 판정
-- [ ] 유효 입찰 판정 — `RUNNING` 상태, 종료 시각 전, `bidPrice == currentPrice + bidUnit`(첫 입찰은 `startPrice`)
-- [ ] **연속 입찰 제한**(AUCT-006) — 직전 최고 입찰자가 본인이면 거부. Redis 불필요, `top_bidder_id`로 판정된다
-- [ ] 중복 클릭(AUCT-004) — `ux_bid_auction_price` 유니크 위반을 409로 변환
-- [ ] 밀린 입찰 `ACTIVE → OUTBID` 전이
-- [ ] `GET /api/auctions/{auctionId}/bids` — 커서 페이징, `isMine` 포함
-- [ ] 커밋 후 `/topic/lives/{liveId}/auction` 전파
-- [ ] 테스트 — **동시 입찰 경합 테스트 필수**(스레드 2개 이상), 연속 입찰 거부, 종료 후 입찰 거부
-- [ ] `schema.sql`·`erd.md`의 "Redis 분산락 1차 방어" 주석 정정
+**Phase 6에서 새로 드러난 문제 — 부분 인덱스가 실제 DB에 없었다**
+
+`schema.sql`이 동시성 안전망으로 선언한 부분 UNIQUE 인덱스 세 개(`ux_auction_live_running`,
+`ux_bid_auction_price`, `ux_live_product_active`)가 **운영·로컬 DB에 존재하지 않았다.** JPA는
+`WHERE` 절이 붙은 인덱스를 표현할 수 없는데 우리는 `ddl-auto`로 엔티티에서 스키마를 만들기
+때문이다. 즉 "락이 실패했을 때의 최후 방어선"이 통째로 비어 있었다 — **Phase 7 입찰 동시성
+설계가 이 인덱스를 전제로 하고 있어 그대로 갔으면 안전망 없이 갔을 것이다.**
+
+`PartialIndexInitializer`(`ApplicationRunner`)가 기동 시 `CREATE ... IF NOT EXISTS`로 만든다.
+나중에 Flyway를 도입하면 `schema.sql`이 그대로 기준이 되므로 이 클래스는 지운다.
+
+### Phase 7 — 입찰 + 포인트 보류 · `-462`~`-465`(AUCT-003~006) `-469`(AUCT-007~009) · 브랜치 `feat/209-auction-start` ✅ 완료 (2026-08-04)
+
+**이 계획의 핵심이자 가장 위험한 구간.** 설계 판단 1·2를 그대로 따랐다.
+
+- [x] `AuctionRepository.findByIdForUpdate` — `@Lock(PESSIMISTIC_WRITE)`
+- [x] `POST /api/auctions/{auctionId}/bids` — 동기 응답으로 성공 snapshot 반환 (경로는 Phase 6과 같은 이유로 `liveId` 없이)
+- [x] 한 트랜잭션에서 — 경매 행 잠금 → 유효 입찰 판정 → (상위 입찰이면) 직전 보류 해제·OUTBID 전이 → `bid` 삽입 → 포인트 보류 → `current_price`·`top_bidder_id` 갱신·자동 연장
+- [x] 유효 입찰 판정 — `RUNNING` 상태, 종료 시각 전, `bidPrice == nextBidPrice()`(첫 입찰은 `startPrice`) — `Auction.isOpenForBidding`/`isValidBidPrice`
+- [x] **연속 입찰 제한**(AUCT-006) — `Auction.isBiddableBy`. `top_bidder_id`로 판정, Redis 불필요
+- [x] 밀린 입찰 `ACTIVE → OUTBID` 전이
+- [x] `GET /api/auctions/{auctionId}/bids` — 커서 페이징, `isMine` 포함, 비회원 공개
+- [x] 커밋 후 `/topic/lives/{liveId}/auctions`에 `BID_PLACED` 전파
+- [x] 테스트 — **동시 입찰 경합 테스트**(진짜 스레드 2개 + `RANDOM_PORT` 실 HTTP, `AuctionBidStompTest`), 연속 입찰 거부, 종료 후 입찰 거부, 잔액 부족, 다른 경매 참여 중 거부
+- [x] `schema.sql`·`erd.md`·`BE/CLAUDE.md`의 "Redis 분산락 1차 방어" 주석을 "DB 비관적 락 1차 방어"로 정정
+
+**`-469`(AUCT-007~009, 포인트 보류)를 서윤을 기다리지 않고 함께 구현했다** — 정윤 지시("도메인이
+겹치면 먼저 해도 된다", 2026-08-04). 확인해 보니 `PointAccount.bidHeld` 컬럼·`PointTransactionType.
+BID_HOLD/BID_RELEASE`·`point_hold` 테이블(erd.md §4)까지 스키마·타입은 이미 있었고 **동작 메서드만
+없었다.** 기다릴 이유가 없었다.
+
+- [x] `PointAccount.holdForBid`/`releaseHold` — `available ↔ bidHeld` 이동 (`point` 패키지에 직접 추가, 기존 `charge`/`withdraw`와 같은 자리)
+- [x] `PointHold`/`PointHoldStatus` 엔티티 신설 (`point` 패키지 — 테이블명·"포인트 상태" 성격에 맞춰) — `auctionId`/`bidId`는 연관관계가 아니라 식별자로만(`Auction.productId`와 같은 이유, `point`→`auction` 역방향 결합 방지)
+- [x] **`PointCommandPort` 신설**(`auction/port`) — `ProductCommandPort`와 같은 방식으로 포인트 도메인 조립을 격리
+- [x] `ux_point_hold_member_active` 부분 인덱스를 `PartialIndexInitializer`에 추가 — AUCT-006·AUCT-009를 동시에 만족시키는 제약(erd.md §4 참고)이라 Phase 6에서 놓쳤던 것과 같은 문제가 있었다
+- [x] 에러코드 A008(금액 불일치)·A009(연속 입찰)·A010(중복 금액, 미사용— 락이 이미 직렬화해 실제로 안 걸림)·A011(다른 경매 참여 중) 신설. `INSUFFICIENT_POINTS`(W001, 기존)는 400 — 컨트롤러 Swagger 상태 코드 서술을 잘못 409로 적었다가 테스트에서 잡아 정정
+
+**계획과 달라진 것**
+
+| 항목 | 계획 | 실제 | 이유 |
+| --- | --- | --- | --- |
+| 포인트 보류 | Phase 8 이후로 미룸(서윤 선행 필요) | **Phase 7에 합침** | 스키마·타입이 이미 있어 기다릴 이유가 없었다(위 참고) |
+| `ux_bid_auction_price` 위반 → 409 변환 | 명시적 catch 필요 예상 | **사실상 발동하지 않는다** | 행 잠금이 같은 경매의 입찰을 이미 직렬화해서, 서버가 계산한 `nextBidPrice`로만 입찰이 들어오는 한 같은 경매·같은 가격이 두 번 성립할 경로가 없다. A010은 만약을 위해 남겨 뒀다 |
 
 ### Phase 8 — 자동 연장·낙찰·유찰 · `-100` `-101` `-103` 신규 작업 · 브랜치 `feat/209-auction-close`
 

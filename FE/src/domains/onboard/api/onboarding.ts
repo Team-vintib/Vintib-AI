@@ -61,6 +61,12 @@ export interface CompleteOnboardingOptions {
   userId?: number | null
 }
 
+export interface CompleteOnboardingResponse {
+  onboardingCompleted: boolean
+  memberType: OnboardingMemberType
+  status: string
+}
+
 export const saveOnboardingBasicInfo = async (
   request: SaveBasicInfoRequest,
   options: SaveBasicInfoOptions = {},
@@ -117,7 +123,7 @@ export const saveOnboardingTryOnProfile = async (
 export const completeOnboarding = async (
   request: CompleteOnboardingRequest,
   options: CompleteOnboardingOptions = {},
-) => {
+): Promise<ApiResponse<CompleteOnboardingResponse | null>> => {
   if (!options.userId) {
     if (!ONBOARDING_API_ENABLED) {
       return ONBOARDING_SUCCESS_RESPONSE
@@ -126,7 +132,7 @@ export const completeOnboarding = async (
     throw new Error('온보딩을 완료할 회원 ID가 없습니다.')
   }
 
-  const { data } = await http.patch<ApiResponse<null>>(
+  const { data } = await http.patch<ApiResponse<CompleteOnboardingResponse | null>>(
     `/users/${options.userId}/member-type`,
     request,
   )

@@ -13,6 +13,7 @@ import com.ssafy.backend.live.dto.response.CurrentProductResponse;
 import com.ssafy.backend.live.dto.response.LiveDetailResponse;
 import com.ssafy.backend.live.dto.response.LiveListItemResponse;
 import com.ssafy.backend.live.dto.response.LiveResponse;
+import com.ssafy.backend.live.dto.response.LiveStatusResponse;
 import com.ssafy.backend.live.entity.LiveStatus;
 import com.ssafy.backend.live.service.LiveService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -139,14 +140,19 @@ public class LiveController {
                     + "영상 접속 토큰은 별도 발급 API가 담당한다. "
                     + "`currentViewerCount`는 현재 동시 시청자 수의 **초기값**이다 — 이후 변화는 "
                     + "`/topic/lives/{liveId}/viewers` 구독으로 받으며, 구독 직후 브로드캐스트가 오는 것은 "
-                    + "보장되지 않으므로 초기값을 토픽에서 기다리면 안 된다.")
+                    + "보장되지 않으므로 초기값을 토픽에서 기다리면 안 된다.\n\n"
+                    + "**토큰을 함께 보내면 `isHost`가 채워진다.** 비회원도 200이지만 그때는 항상 false다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "라이브 없음")
     })
     @GetMapping("/{liveId}")
-    public ResponseEntity<ApiResponse<LiveDetailResponse>> getLiveDetail(@PathVariable Long liveId) {
-        LiveDetailResponse response = liveService.getLiveDetail(liveId);
+    public ResponseEntity<ApiResponse<LiveDetailResponse>> getLiveDetail(
+            Authentication authentication, @PathVariable Long liveId) {
+        // 공개 엔드포인트라 authentication 이 null 일 수 있다. 토큰이 붙어 있으면
+        // JwtAuthenticationFilter 가 이미 채워 두므로 여기서는 꺼내 쓰기만 한다.
+        Long viewerId = authentication != null ? (Long) authentication.getPrincipal() : null;
+        LiveDetailResponse response = liveService.getLiveDetail(liveId, viewerId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -188,7 +194,10 @@ public class LiveController {
             summary = "방송 상태 전이",
             description = "방송 상태를 바꾼다. 허용되는 전이는 예정→진행(LIVE), 예정→취소(CANCELED), "
                     + "진행→종료(ENDED) 세 가지다. 종료·취소된 방송은 더 이상 전이되지 않는다. "
-                    + "전이 시각은 서버 시각으로 기록된다.")
+                    + "전이 시각은 서버 시각으로 기록된다.\n\n"
+                    + "**전이는 `/topic/lives/{liveId}/status`로 모든 시청자에게 전파된다.** "
+                    + "시청 중인 화면은 이 이벤트로 종료 안내로 전환하면 된다 — 이게 없으면 "
+                    + "호스트가 종료해도 시청자 화면이 그대로 남는다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "전이 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패 또는 허용되지 않는 전이"),
@@ -203,6 +212,12 @@ public class LiveController {
             @Valid @RequestBody LiveStatusUpdateRequest request) {
         Long hostId = (Long) authentication.getPrincipal();
         LiveResponse response = liveService.transitionStatus(hostId, liveId, request);
+
+        // 커밋이 끝난 뒤에 나간다 — 현재 소개 상품 전환과 같은 이유다. 커밋 전에 쏘면 롤백 시
+        // 시청자 화면만 "종료됨"으로 넘어간 채 서버는 여전히 진행 중인 상태가 된다.
+        messagingTemplate.convertAndSend(
+                "/topic/lives/" + liveId + "/status", LiveStatusResponse.from(response));
+
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
