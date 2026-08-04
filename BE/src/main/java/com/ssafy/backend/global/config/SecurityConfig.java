@@ -100,6 +100,8 @@ public class SecurityConfig {
                         // 경매 현황 조회(AUCT-002)도 비회원 공개. 시청이 열려 있으니 지금 무엇이
                         // 얼마에 팔리는지도 보여야 한다. 입찰은 인증 필요로 남긴다.
                         .requestMatchers(HttpMethod.GET, "/api/lives/{liveId}/auctions/current").permitAll()
+                        // 입찰 내역 조회도 관전이지 참여가 아니다. 입찰(POST)은 인증 필요로 남긴다.
+                        .requestMatchers(HttpMethod.GET, "/api/auctions/{auctionId}/bids").permitAll()
                         // 영상 접속 토큰도 비회원 발급 대상이다. 시청이 열려 있으니 영상도 열어야 한다.
                         // 발행 권한은 토큰 안에서 갈린다 — 호스트 본인일 때만 송출이 허용된다.
                         .requestMatchers(HttpMethod.POST, "/api/lives/{liveId}/video-token").permitAll()

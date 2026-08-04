@@ -1,15 +1,21 @@
 package com.ssafy.backend.auction.service;
 
 import com.ssafy.backend.auction.dto.request.AuctionConfigRequest;
+import com.ssafy.backend.auction.dto.request.BidRequest;
 import com.ssafy.backend.auction.dto.response.AuctionResponse;
 import com.ssafy.backend.auction.dto.response.AuctionSnapshotResponse;
+import com.ssafy.backend.auction.dto.response.BidResponse;
 import com.ssafy.backend.auction.entity.Auction;
 import com.ssafy.backend.auction.entity.AuctionStatus;
+import com.ssafy.backend.auction.entity.Bid;
+import com.ssafy.backend.auction.entity.BidStatus;
+import com.ssafy.backend.auction.port.PointCommandPort;
 import com.ssafy.backend.auction.port.ProductCommandPort;
 import com.ssafy.backend.auction.repository.AuctionRepository;
 import com.ssafy.backend.auction.repository.BidRepository;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import com.ssafy.backend.global.response.CursorPageResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.port.ProductQueryPort;
 import com.ssafy.backend.live.repository.LiveProductRepository;
@@ -24,14 +30,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 경매 조건 설정(AUCT-001)과 현황 조회·시작(AUCT-002).
+ * 경매 조건 설정(AUCT-001)부터 현황 조회·시작·입찰(AUCT-002~006)까지.
  *
- * <p><b>여기에는 아직 락이 없다.</b> 조건 설정·시작은 호스트 한 사람만 하는 동작이라 경합이
- * 생기지 않는다. 입찰 경합(AUCT-003~006)은 다음 단계에서 비관적 락과 함께 다룬다.
+ * <p><b>입찰 동시성의 1차 방어는 {@code AuctionRepository.findByIdForUpdate}의 행 잠금이다.</b>
+ * 같은 경매에 대한 입찰은 이 잠금으로 직렬화되므로 "락은 풀렸는데 커밋은 안 된" 창이 원리적으로
+ * 없다. Redis 분산락·MQ는 검토 후 채택하지 않았다 — 계획 문서(JY008) 설계 판단 1 참고.
+ * 조건 설정·시작은 호스트 한 사람만 하는 동작이라 잠글 필요가 없다.
  *
  * <p>라이브 조회는 포트를 거치지 않고 리포지토리를 직접 쓴다. 상품 도메인과 달리 라이브는
- * 같은 담당자의 안정된 도메인이라 격리 이득이 없다. 반대로 <b>상품은 서윤 영역이라</b>
- * 조회는 {@link ProductQueryPort}, 상태 변경은 {@link ProductCommandPort}로만 건드린다.
+ * 같은 담당자의 안정된 도메인이라 격리 이득이 없다. 반대로 <b>상품·포인트는 서윤 영역이라</b>
+ * {@link ProductQueryPort}/{@link ProductCommandPort}/{@link PointCommandPort}로만 건드린다.
  */
 @Service
 @RequiredArgsConstructor
@@ -49,6 +57,7 @@ public class AuctionService {
     private final MemberRepository memberRepository;
     private final ProductQueryPort productQueryPort;
     private final ProductCommandPort productCommandPort;
+    private final PointCommandPort pointCommandPort;
 
     /**
      * 경매 조건을 설정한다. 결과는 {@code READY} 상태이며 시작은 별도 API(AUCT-002)가 한다.
@@ -138,6 +147,86 @@ public class AuctionService {
         productCommandPort.markAuctionInProgress(auction.getProductId());
 
         return toSnapshot(auction);
+    }
+
+    /**
+     * 입찰한다(AUCT-003~006). <b>이 메서드가 이 계획의 핵심이자 가장 위험한 구간이다.</b>
+     *
+     * <p>한 트랜잭션에서 — 경매 행 잠금 → 유효성 검증 → (상위 입찰이면) 직전 최고 입찰자
+     * 보류 해제 → 새 입찰 저장 → 포인트 보류 → 현재가·최고 입찰자 갱신·자동 연장 순으로
+     * 처리한다. 어느 한 단계라도 실패하면 전부 롤백된다 — "포인트는 빠졌는데 입찰은 안 된"
+     * 상태가 생길 수 없다.
+     *
+     * <p><b>포인트 보류가 입찰 저장 다음인 이유.</b> {@code point_hold.bid_id}가 특정 입찰
+     * 행을 가리켜야 하는데, 그 ID는 {@code Bid}를 저장해야만 나온다.
+     */
+    @Transactional
+    public AuctionSnapshotResponse placeBid(Long bidderId, Long auctionId, BidRequest request) {
+        Auction auction = auctionRepository.findByIdForUpdate(auctionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.AUCTION_NOT_FOUND));
+
+        LocalDateTime now = LocalDateTime.now();
+        if (!auction.isOpenForBidding(now)) {
+            throw new CustomException(ErrorCode.AUCTION_NOT_ACTIVE);
+        }
+        // AUCT-006 — 직전 최고 입찰자 본인은 연속으로 입찰할 수 없다. 포인트 보류 쪽이
+        // "최고 입찰자는 이미 HELD를 쥐고 있다"를 전제하므로 여기서 먼저 막아야 한다.
+        if (!auction.isBiddableBy(bidderId)) {
+            throw new CustomException(ErrorCode.CONSECUTIVE_BID_NOT_ALLOWED);
+        }
+
+        long nextBidPrice = auction.nextBidPrice();
+        if (request.amount() < nextBidPrice) {
+            throw new CustomException(ErrorCode.BID_LOWER_THAN_CURRENT);
+        }
+        if (request.amount() > nextBidPrice) {
+            // 화면에 보이던 nextBidPrice 가 그 사이 바뀌었다는 뜻이다 — 최신 값으로 다시 시도해야 한다.
+            throw new CustomException(ErrorCode.BID_PRICE_MISMATCH);
+        }
+
+        Member bidder = memberRepository.findById(bidderId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // 상위 입찰이 들어왔다 — 직전 최고 입찰자의 보류를 풀고, 그의 입찰을 OUTBID로 내린다.
+        // 첫 입찰(hasBid() == false)에는 풀어 줄 대상이 없다.
+        if (auction.hasBid()) {
+            pointCommandPort.releaseHoldForAuction(auction.getId());
+            bidRepository.findByAuction_IdAndStatus(auction.getId(), BidStatus.ACTIVE)
+                    .ifPresent(Bid::outbid);
+        }
+
+        Bid bid;
+        try {
+            // IDENTITY 전략이라 save() 시점에 즉시 INSERT 된다 — ux_bid_auction_price 위반이
+            // 있다면 여기서 바로 터진다. 행 잠금이 같은 경매의 입찰을 이미 직렬화하고 가격도
+            // 서버가 매번 다시 계산하므로 정상 경로에서는 사실상 발동하지 않는다. 그래도
+            // 이 안전망이 실제로 뚫렸다는 뜻이라 명확한 에러로 바꿔 둔다.
+            bid = bidRepository.save(Bid.place(auction, bidder, request.amount(), now));
+        } catch (org.springframework.dao.DataIntegrityViolationException duplicatePrice) {
+            throw new CustomException(ErrorCode.DUPLICATE_BID_PRICE);
+        }
+
+        // 여기서 실패(잔액 부족·다른 경매 보류 중)하면 위에서 만든 입찰·해제까지 전부 롤백된다.
+        pointCommandPort.holdForBid(bidderId, auction.getId(), bid.getId(), request.amount());
+
+        auction.applyBid(bidderId, request.amount(), now);
+
+        return toSnapshot(auction);
+    }
+
+    /**
+     * 입찰 내역 커서 페이징(AUCT-003). <b>비회원도 조회할 수 있다</b> — 시청자가 지금 얼마까지
+     * 붙었는지 보는 것은 경매 참여가 아니라 관전이다.
+     *
+     * @param viewerId 조회한 회원 ID. 비회원이면 {@code null}이며 이때 {@code isMine}은 항상 false
+     */
+    public CursorPageResponse<BidResponse> getBidHistory(Long auctionId, Long cursor, int size, Long viewerId) {
+        if (!auctionRepository.existsById(auctionId)) {
+            throw new CustomException(ErrorCode.AUCTION_NOT_FOUND);
+        }
+        List<Bid> found =
+                bidRepository.findPageByAuctionId(auctionId, cursor, PageRequest.of(0, size + 1));
+        return CursorPageResponse.of(found, size, bid -> BidResponse.of(bid, viewerId), Bid::getId);
     }
 
     /** 상품명·입찰자 닉네임·입찰 수를 붙여 현황 한 장으로 만든다. */

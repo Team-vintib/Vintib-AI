@@ -2,12 +2,14 @@ package com.ssafy.backend.auction.repository;
 
 import com.ssafy.backend.auction.entity.Auction;
 import com.ssafy.backend.auction.entity.AuctionStatus;
+import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -66,4 +68,19 @@ public interface AuctionRepository extends JpaRepository<Auction, Long> {
 
     @EntityGraph(attributePaths = "live")
     Optional<Auction> findWithLiveById(Long id);
+
+    /**
+     * 입찰 처리용 행 잠금 조회(AUCT-003).
+     *
+     * <p><b>이 프로젝트의 입찰 동시성 1차 방어다.</b> 같은 경매에 대한 입찰 요청은 이 잠금으로
+     * 직렬화된다 — 두 요청이 동시에 들어와도 하나가 끝나야 다음이 시작되므로 "락은 풀렸는데
+     * 커밋은 안 된" 창이 원리적으로 없다(트랜잭션과 잠금의 생명주기가 같다). Redis 분산락이나
+     * MQ는 검토 후 채택하지 않았다 — 이유는 계획 문서(JY008) 설계 판단 1 참고.
+     *
+     * <p>{@code ux_bid_auction_price} 부분 UNIQUE 인덱스는 이 잠금이 실패했을 때(버그·재시도
+     * 등)의 최후 방어선이지, 대체재가 아니다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Auction a WHERE a.id = :id")
+    Optional<Auction> findByIdForUpdate(@Param("id") Long id);
 }
