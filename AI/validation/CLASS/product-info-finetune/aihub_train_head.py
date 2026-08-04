@@ -65,6 +65,38 @@ def head_filename(
     return name + ".joblib"
 
 
+def next_versioned_path(path: Path) -> Path:
+    """`path`가 이미 있으면 안 겹치는 `_v2`, `_v3`, … 파일명을 찾아 반환한다.
+
+    없으면 `path`를 그대로 돌려준다(첫 저장은 버전 접미어가 안 붙는다). 학습을 여러 번
+    돌리며 조건(C·class-weight 등)을 바꿔볼 때 이전 헤드를 조용히 덮어쓰지 않기 위해서다.
+    """
+    if not path.exists():
+        return path
+    version = 2
+    while True:
+        candidate = path.with_name(f"{path.stem}_v{version}{path.suffix}")
+        if not candidate.exists():
+            return candidate
+        version += 1
+
+
+def latest_existing_version(path: Path) -> Path | None:
+    """`path`와 그 버전들(`_v2`, `_v3`, …) 중 **실제로 존재하는 가장 최신 버전**을 찾는다.
+
+    평가·서빙 쪽이 "가장 최근에 학습한 헤드"를 자동으로 집으려고 쓴다. 아무 버전도 없으면
+    `None`.
+    """
+    latest = path if path.exists() else None
+    version = 2
+    while True:
+        candidate = path.with_name(f"{path.stem}_v{version}{path.suffix}")
+        if not candidate.exists():
+            return latest
+        latest = candidate
+        version += 1
+
+
 def build_collapse_map(rows: list[dict]) -> dict[str, str]:
     """`{원본 색상 문자열: 팔레트 코드}` — 네이티브 헤드의 예측을 접을 때 쓴다.
 
@@ -304,6 +336,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="기본값: <artifacts>/head_<task>_<variant>[_<source>].joblib",
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="같은 이름의 기존 헤드를 덮어쓴다. 기본은 버전을 올려 저장한다"
+        "(head_..._v2.joblib, _v3, …) — 조건 바꿔가며 재학습할 때 이전 결과가 안 지워진다",
+    )
     args = parser.parse_args(argv)
 
     import joblib
@@ -363,6 +401,8 @@ def main(argv: list[str] | None = None) -> int:
     out_path = args.out or args.artifacts / head_filename(
         args.task, args.variant, args.source, label_space
     )
+    if not args.overwrite:
+        out_path = next_versioned_path(out_path)
     joblib.dump(
         {
             "task": args.task,

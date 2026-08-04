@@ -36,6 +36,7 @@ from aihub_train_head import (
     evaluate,
     evaluate_collapsed,
     head_filename,
+    latest_existing_version,
     load_split,
 )
 
@@ -111,16 +112,18 @@ def evaluate_holdout(
     """
     import joblib
 
-    head_path = artifacts / head_filename(task, variant, source, label_space)
-    if not head_path.exists():
-        return f"(헤드 없음: {head_path} — aihub_train_head.py를 먼저 돌릴 것)"
+    base_path = artifacts / head_filename(task, variant, source, label_space)
+    # 저장이 버전을 올려 쌓이므로(head_..._v2.joblib, …) 가장 최신 버전을 자동으로 집는다.
+    head_path = latest_existing_version(base_path)
+    if head_path is None:
+        return f"(헤드 없음: {base_path} — aihub_train_head.py를 먼저 돌릴 것)"
     bundle = joblib.load(head_path)
     model = bundle["model"]
     collapse = bundle.get("collapse") or {}
     head_space = bundle.get("label_space", "palette")
 
     label = f"### AI-Hub 홀드아웃 — task={task} variant={variant} label_space={head_space}"
-    lines = [label + (f" source={source}" if source else "")]
+    lines = [label + (f" source={source}" if source else "") + f" [{head_path.name}]"]
 
     def score(x: Any, y: list[str]) -> dict:
         """네이티브 헤드면 접어서, 아니면 그대로 채점한다."""
@@ -241,8 +244,9 @@ def evaluate_ground_truth(
         """
         for space in ("native", "palette"):
             for candidate in ("clothes", None):
-                path = artifacts / head_filename(task, variant, candidate, space)
-                if path.exists():
+                base_path = artifacts / head_filename(task, variant, candidate, space)
+                path = latest_existing_version(base_path)
+                if path is not None:
                     bundle = joblib.load(path)
                     return bundle["model"], (bundle.get("collapse") or {})
         return None, {}

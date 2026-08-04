@@ -179,6 +179,39 @@ def test_polo_task_uses_only_the_confusable_pair() -> None:
     assert [row["neck"] for row in kept] == ["polo collar", "shirts collar"]
 
 
+def test_next_versioned_path_returns_bare_name_when_absent(tmp_path) -> None:
+    target = tmp_path / "head_color_masked.joblib"
+    assert th.next_versioned_path(target) == target
+
+
+def test_next_versioned_path_bumps_version_when_taken(tmp_path) -> None:
+    base = tmp_path / "head_color_masked.joblib"
+    base.write_bytes(b"v1")
+    assert th.next_versioned_path(base) == tmp_path / "head_color_masked_v2.joblib"
+
+    (tmp_path / "head_color_masked_v2.joblib").write_bytes(b"v2")
+    assert th.next_versioned_path(base) == tmp_path / "head_color_masked_v3.joblib"
+
+
+def test_latest_existing_version_none_when_nothing_saved(tmp_path) -> None:
+    assert th.latest_existing_version(tmp_path / "head_color_masked.joblib") is None
+
+
+def test_latest_existing_version_picks_highest(tmp_path) -> None:
+    base = tmp_path / "head_color_masked.joblib"
+    base.write_bytes(b"v1")
+    assert th.latest_existing_version(base) == base
+
+    (tmp_path / "head_color_masked_v2.joblib").write_bytes(b"v2")
+    assert th.latest_existing_version(base) == tmp_path / "head_color_masked_v2.joblib"
+
+    (tmp_path / "head_color_masked_v3.joblib").write_bytes(b"v3")
+    assert th.latest_existing_version(base) == tmp_path / "head_color_masked_v3.joblib"
+
+    # v2가 없이 v4만 있어도(수동 삭제 등) 순차 탐색이라 v3에서 멈춘다 — 의도된 동작:
+    # 버전은 저장 시 항상 순차로 채워지므로 구멍이 생기는 건 사람이 지운 경우뿐이다.
+
+
 def test_head_filename_separates_sources() -> None:
     """소스별 헤드가 서로 덮어쓰면 두 조건을 비교할 수 없다."""
     assert th.head_filename("color", "masked") == "head_color_masked.joblib"
