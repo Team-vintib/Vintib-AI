@@ -49,6 +49,7 @@ zero-shot이 담당한다** — 그래서 백본을 동결한다(브리핑 §3).
 | `aihub_accessory.py` | (모듈) | ✗ | 액세서리 소스 파싱/매핑. `aihub_dataset.py`가 부른다 |
 | `aihub_preprocess.py` | STEP 2.5 | ✗ | Polygon → 마스크 → bbox 크롭 + 배경 흰색. CLI는 미리보기용 |
 | `aihub_embed.py` | STEP 3 | **✓** | fashion_clip(동결) 임베딩 → `.npy`. **여기만 GPU** |
+| `aihub_cache_pixels.py` | STEP 3.5(선택) | ✗ | ViT 파인튜닝용 입력 텐서(`pixel_values`) 캐싱. 모델 미로드라 GPU 불필요 |
 | `aihub_train_head.py` | STEP 4 | ✗ | 색상/폴로/카테고리 헤드 학습 → `.joblib` (수 초) |
 | `aihub_evaluate.py` | STEP 5 | △ | 홀드아웃 평가. 정답셋 평가를 켜면 모델 로드가 필요 |
 | `aihub_pipeline.ipynb` | 전체 | — | 위 5개를 순서대로 호출하는 드라이버 |
@@ -162,6 +163,33 @@ done
 산출물 3종(행 순서 일치): `<split>_<variant>.npy` · `.jsonl` · `.meta.json`.
 `.meta.json`의 `failures.missing_image`가 크면 `--image-root`가 틀린 것이다.
 
+## STEP 3.5 — (선택) ViT 파인튜닝용 입력 텐서 캐싱
+
+선형 헤드만 쓸 거면 건너뛴다. **ViT 백본 마지막 N개 블록을 언프리즈해 파인튜닝**을
+비교 실험할 때만 필요하다 — 같은 이미지를 epoch마다 다시 디코드·크롭하는 비용을
+없애려고, 모델에 넣기 직전의 `pixel_values` 텐서를 한 번만 만들어 캐시해 둔다.
+
+```bash
+python validation/CLASS/product-info-finetune/aihub_cache_pixels.py \
+    --index      .../artifacts/sample.jsonl \
+    --label-root           /path/to/aihub/008.의류_통합_데이터 \
+    --accessory-label-root /path/to/aihub/009.패션_액세서리_착용_데이터 \
+    --image-root /path/to/aihub \
+    --out-dir    .../artifacts \
+    --split train --variant masked --batch-size 64
+```
+
+`aihub_embed.py`와 달리 **모델 가중치를 안 실어서 GPU가 필요 없다**(이미지 프로세서만
+쓴다) — `pixel_values`에서 멈추고 `model.get_image_features()`까지 가지 않는다. 언프리즈
+경계(마지막 몇 개 블록인지, LoRA인지)가 바뀌어도 이 캐시는 그대로 재사용된다 — 모델
+구조가 아니라 입력 단계에서 멈추기 때문이다. 기본 dtype은 `float16`(저장 공간 절반).
+
+산출물은 `aihub_embed.py`와 같은 폴더에 둬도 된다 — 파일명에 `_pixels` 접미사가 붙어
+임베딩 `.npy`와 안 겹친다: `<split>_<variant>[_<source>]_pixels.{npy,jsonl,meta.json}`.
+
+⚠️ 이 캐시는 **선형 헤드 산출물(`head_*.joblib`, 임베딩 `.npy`)과 완전히 별개**다 — 지우거나
+덮어써도 이미 검증된 선형 프로브 베이스라인에는 영향이 없다.
+
 ## STEP 4 — 헤드 학습 (CPU, 수 초)
 
 ```bash
@@ -231,5 +259,7 @@ black --check .
 pytest -q
 ```
 
-테스트 3종(`test_class_finetune_{dataset,accessory,preprocess}.py`)은 무거운 의존성이 없어
-CI에서 그대로 돈다 — 파싱 함정, 매핑 우선순위, 그룹 분할 누수, 폴리곤 좌표 처리를 고정한다.
+테스트 6종(`test_class_finetune_{dataset,accessory,preprocess,head,evaluate,cache_pixels}.py`)은
+무거운 의존성이 없어 CI에서 그대로 돈다 — 파싱 함정, 매핑 우선순위, 그룹 분할 누수, 폴리곤
+좌표 처리, 태스크별 행 선택, zero-shot 채점 수학, 캐시 파일명 분리를 고정한다. 각 스크립트의
+무거운 본체(모델 로드·학습·추론)는 CI 밖(서버)에서만 검증한다.
