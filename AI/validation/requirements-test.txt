@@ -59,6 +59,8 @@ optimum[onnxruntime]>=1.23
 # open_clip 래퍼를 trust_remote_code로 싣기 때문에 transformers만으로는 로드가 실패한다.
 # fashion_clip / zooclaw_fashion_siglip2는 순정 아키텍처라 이게 없어도 돌아간다.
 open_clip_torch>=2.24
+# aihub_finetune_lora.py — ViT 비전 인코더 LoRA 파인튜닝 비교 실험(last-N 언프리즈 대안).
+peft>=0.13
 # vlm_control.py — QUAL/vlm-description-check와 동일 이유(RTX 4070 Laptop 8GB, bf16 풀로드 불가)로
 # 4bit 양자화 필수. transformers>=5.0이 필요해 위 Kanana 핀(<5)과 충돌한다 — 이 스파이크의
 # vlm_control.py를 실행하려면 QUAL/vlm-description-check와 같은 별도 환경(예: conda env "qual")에

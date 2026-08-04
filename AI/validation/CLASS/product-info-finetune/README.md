@@ -51,6 +51,7 @@ zero-shot이 담당한다** — 그래서 백본을 동결한다(브리핑 §3).
 | `aihub_embed.py` | STEP 3 | **✓** | fashion_clip(동결) 임베딩 → `.npy`. **여기만 GPU** |
 | `aihub_cache_pixels.py` | STEP 3.5(선택) | ✗ | ViT 파인튜닝용 입력 텐서(`pixel_values`) 캐싱. 모델 미로드라 GPU 불필요 |
 | `aihub_finetune_vit.py` | STEP 3.6(선택, 실험) | **✓** | 비전 인코더 마지막 N개 블록 파인튜닝 — 선형 프로브 대비 비교 |
+| `aihub_finetune_lora.py` | STEP 3.7(선택, 실험) | **✓** | 비전 인코더 LoRA 파인튜닝 — last-N 언프리즈 대비 비교 |
 | `aihub_train_head.py` | STEP 4 | ✗ | 색상/폴로/카테고리 헤드 학습 → `.joblib` (수 초) |
 | `aihub_evaluate.py` | STEP 5 | △ | 홀드아웃 평가. 정답셋 평가를 켜면 모델 로드가 필요 |
 | `aihub_pipeline.ipynb` | 전체 | — | 위 5개를 순서대로 호출하는 드라이버 |
@@ -218,6 +219,25 @@ STEP 3.5의 `pixel_values` 캐시가 미리 있어야 한다. 첫 실행은 `--u
 헤드와 구조가 다르다** — `aihub_evaluate.py`로는 못 읽는다. 비교는 이 스크립트가 찍는
 test accuracy 숫자를 STEP 5 리포트의 헤드/zero-shot 숫자와 나란히 놓고 보는 식이다.
 
+## STEP 3.7 — (선택, 실험) LoRA 파인튜닝
+
+STEP 3.6(last-N 언프리즈)의 대안이다. last-N은 마지막 몇 개 블록을 **통째로** 학습하고,
+LoRA는 반대로 **모든 레이어**의 attention 사영에 저랭크 어댑터만 얹어 학습한다 — 건드리는
+레이어 수는 많지만 레이어당 변화 폭은 훨씬 작다.
+
+```bash
+tmux new -s aihub-lora
+pip install peft  # 서버에 아직 없으면
+python validation/CLASS/product-info-finetune/aihub_finetune_lora.py \
+    --pixel-cache-dir .../artifacts \
+    --task category --variant masked \
+    --r 8 --alpha 16 --epochs 10 --batch-size 32
+```
+
+`--r`(rank)이 핵심 손잡이다 — 크면 last-N에 가까워지고 작으면 원본 보존이 강해진다.
+산출물은 STEP 3.6과 같은 `artifacts_finetune/`에 쌓이되 폴더 이름이 `lora_r{r}_...`로
+시작해 `vit_last{N}_...`(STEP 3.6)와 안 겹친다.
+
 ## STEP 4 — 헤드 학습 (CPU, 수 초)
 
 ```bash
@@ -287,8 +307,8 @@ black --check .
 pytest -q
 ```
 
-테스트 7종(`test_class_finetune_{dataset,accessory,preprocess,head,evaluate,cache_pixels,
-finetune_vit}.py`)은 무거운 의존성이 없어 CI에서 그대로 돈다 — 파싱 함정, 매핑 우선순위,
-그룹 분할 누수, 폴리곤 좌표 처리, 태스크별 행 선택, zero-shot 채점 수학, 캐시 파일명 분리,
-라벨 인코딩/미지 클래스 필터링을 고정한다. 각 스크립트의 무거운 본체(모델 로드·학습·추론)는
-CI 밖(서버)에서만 검증한다.
+테스트 8종(`test_class_finetune_{dataset,accessory,preprocess,head,evaluate,cache_pixels,
+finetune_vit,finetune_lora}.py`)은 무거운 의존성이 없어 CI에서 그대로 돈다 — 파싱 함정,
+매핑 우선순위, 그룹 분할 누수, 폴리곤 좌표 처리, 태스크별 행 선택, zero-shot 채점 수학,
+캐시 파일명 분리, 라벨 인코딩/미지 클래스 필터링, run_name 접두어(방법 분류/충돌 방지)를
+고정한다. 각 스크립트의 무거운 본체(모델 로드·학습·추론)는 CI 밖(서버)에서만 검증한다.
