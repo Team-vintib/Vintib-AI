@@ -152,6 +152,7 @@ const slides = computed<HeroSlide[]>(() => [
 const shouldPauseAutoPlay = computed(
   () => isHovered.value || isFocused.value || isDragging.value || manualPause.value,
 )
+const activeSlide = computed(() => slides.value[activeIndex.value])
 
 const trackStyle = computed(() => ({
   transform: `translateX(calc(${-activeIndex.value * 100}% + ${dragDeltaX.value}px))`,
@@ -229,6 +230,11 @@ function handleKeydown(event: KeyboardEvent) {
     pauseAfterManualInteraction()
     moveNext()
   }
+
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    navigateToActiveSlide()
+  }
 }
 
 function handlePointerDown(event: PointerEvent) {
@@ -277,11 +283,13 @@ function handlePointerEnd() {
 
   window.setTimeout(() => {
     didDrag.value = false
-  }, 0)
+  }, 150)
 }
 
-function handleSlideClick(slide: HeroSlide) {
-  if (didDrag.value) {
+function navigateToActiveSlide() {
+  const slide = activeSlide.value
+
+  if (!slide || didDrag.value) {
     return
   }
 
@@ -349,6 +357,7 @@ onBeforeUnmount(() => {
       @pointerup="handlePointerEnd"
       @pointercancel="handlePointerEnd"
       @pointerleave="handlePointerEnd"
+      @click="navigateToActiveSlide"
     >
       <div
         class="home-hero-carousel__track"
@@ -361,7 +370,6 @@ onBeforeUnmount(() => {
           class="home-hero-slide"
           :class="[`home-hero-slide--${slide.tone}`, { 'home-hero-slide--active': index === activeIndex }]"
           :aria-hidden="index !== activeIndex"
-          @click="handleSlideClick(slide)"
         >
           <img
             class="home-hero-slide__background"
@@ -644,35 +652,36 @@ onBeforeUnmount(() => {
   position: absolute;
   z-index: 3;
   top: 50%;
-  display: inline-grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.54);
-  border-radius: 50%;
-  background: rgba(18, 18, 18, 0.22);
+  display: inline-flex;
+  width: 32px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
   color: var(--color-text-inverse);
-  font-size: 30px;
+  font-size: 44px;
+  font-weight: 300;
   line-height: 1;
-  opacity: 0.54;
+  opacity: 0.62;
   transform: translateY(-50%);
   transition:
-    background 160ms ease,
+    color 160ms ease,
     opacity 160ms ease;
 }
 
 .home-hero-carousel:hover .home-hero-carousel__arrow,
 .home-hero-carousel:focus-within .home-hero-carousel__arrow {
-  background: rgba(18, 18, 18, 0.52);
+  color: var(--color-text-inverse);
   opacity: 1;
 }
 
 .home-hero-carousel__arrow--previous {
-  left: var(--space-5);
+  left: var(--space-4);
 }
 
 .home-hero-carousel__arrow--next {
-  right: var(--space-5);
+  right: var(--space-4);
 }
 
 .home-hero-carousel__indicators {
