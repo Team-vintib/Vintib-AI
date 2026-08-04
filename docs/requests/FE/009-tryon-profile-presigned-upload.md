@@ -73,7 +73,7 @@ FE가 이미 multipart 기준으로 화면을 구현해뒀다면(`OnboardingTryO
 
 ## 관련 자료
 
-- Swagger: `/swagger-ui/index.html` — "AI 가상 시착 프로필" 태그
+- Swagger: `/swagger-ui/index.html` — "AI 가상 시착(TryOns)" 태그(시착 결과 조회/삭제와 같은 태그로 통합됨)
 - `BE/src/main/java/com/ssafy/backend/tryon/controller/TryOnProfileController.java`
 - 참고 선례: `docs/requests/FE/001-product-image-presigned-upload.md`(상품 이미지, 동일한 3단계 흐름)
 

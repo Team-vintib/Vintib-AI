@@ -14,6 +14,9 @@
 ### 1. 충전 준비 — `POST /users/{id}/points/charges/ready`
 
 - 요청 바디: `{ amount }` (기존과 동일)
+  - `amount`는 최소 10,000원(`@Min(10_000)`)이다. 미달이면 Bean Validation 오류(400,
+    `INVALID_INPUT_VALUE`)로 거부된다 — FE도 위젯 호출 전 같은 기준으로 막아주면 좋다. 출금 신청
+    (`POST /users/{id}/withdrawals`)도 동일하게 최소 10,000원이다.
 - 응답: `{ orderId, amount, clientKey }`
   - `orderId`: BE가 발급한 주문번호. 결제위젯 `requestPayment` 호출 시 그대로 넘긴다.
   - `clientKey`: 토스 결제위젯 초기화용 공개 키. FE가 직접 갖고 있지 않아도 이 응답으로 받으면 된다.

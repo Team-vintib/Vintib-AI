@@ -81,26 +81,22 @@
 }
 ```
 
-### 3.5 라이브 시청 화면 상품/상세 필드 보강 (LIVE-005)
+### 3.5 라이브 시청 화면 상품/상세 필드 보강 (LIVE-005) — 필수 항목 구현 완료, 선택 항목 일부 남음
 
-- 대상: `LiveDetailResponse`, `LiveProductResponse`
-- 배경: 시청 화면(`LiveWatchPage`)이 `GET /api/lives/{liveId}`를 연결했으나, 상품 카드·헤더에 필요한 필드가 응답에 없어 FE에서 `null`로 비워 둔다(임의 확정 금지 → BE 확정 대기). 현재 FE는 `LiveProductResponse`의 `productId/productTitle/sortOrder`만 사용 중.
-- 요청 필드 (필수/선택 구분)
+`LiveProductResponse`(필수 요청 4개 전부 반영, 이름 2개는 다름):
+- `brandName`: string | null — 반영됨
+- `price`: number | null — 반영됨
+- `thumbnailUrl`: string | null — 반영됨
+- `saleType`: 반영됨. 단 값이 `AUCTION | FIXED_PRICE`가 아니라 **`AUCTION | DIRECT_SALE`**이다 (`FIXED_PRICE`는 이 프로젝트에서 안 쓰는 이름 — PROD-005 상시 판매 표기와 통일)
+- `condition`(선택) → **`conditionGrade`**라는 이름으로 반영됨(등급 체계 미확정이라 자유 문자열, enum으로 굳히지 말 것)
+- `material`/`measurements`/`defectSummary`(선택) — 아직 없음
 
-`LiveProductResponse`에 추가:
-- (필수) `brandName`: string | null — 상품 카드 브랜드
-- (필수) `price`: number | null — 가격(경매 시작가/즉시판매가)
-- (필수) `thumbnailUrl`: string | null — 상품 썸네일 (현재 FE는 fallback 이미지로 대체 중)
-- (필수) `saleType`: `AUCTION` | `FIXED_PRICE` — 경매/즉시판매 구분 (경매 패널 초기화에 필요)
-- (선택) `condition`: string | null — 상품 상태 등급
-- (선택) `material` / `measurements` / `defectSummary`: string | null — 상세 정보. 있으면 표시, 없어도 화면은 동작
+`LiveDetailResponse`:
+- `currentProductId`: number | null — 반영됨
+- `hostProfileImageUrl`(선택) — 아직 없음
+- `description`(선택) — 아직 없음
 
-`LiveDetailResponse`에 추가:
-- (선택) `currentProductId`: number | null — 현재 판매/노출 중인 상품. 없으면 FE는 첫 상품을 기본 선택
-- (선택) `hostProfileImageUrl`: string | null — 헤더 호스트 프로필 이미지
-- (선택) `description`: string | null — 방송 설명
-
-- **필요 없는 것(FE 미사용)**: `LiveProductResponse`의 `addedAt`, `liveId`, 연결 `id`는 시청 화면에서 쓰지 않는다 → 유지/제거는 BE 판단(우선순위 낮음).
+- **필요 없는 것(FE 미사용)**: `LiveProductResponse`의 `addedAt`, `liveId`, 연결 `id`는 시청 화면에서 쓰지 않는다 → 유지/제거는 BE 판단(우선순위 낮음). 그대로 유지됨.
 
 ### 3.6 상품 상세 AI 시착 생성 (TRYON-003)
 
@@ -115,9 +111,9 @@
 ## 4. 기존 API 변경 요청
 
 - 기존 요청·응답에서 변경할 내용
-  - 라이브 상세는 연결됐으나, 시청 화면 상품 카드·헤더 표시를 위해 **3.5의 필드 보강**이 필요
+  - 3.5 필수 필드는 반영 완료. 남은 건 선택 필드(호스트 프로필 이미지, 방송 설명, 상품 소재/치수/하자 요약)뿐
 - 추가할 필드
-  - 3.5 참고 — `LiveProductResponse`: brand/price/thumbnail/saleType/condition 등, `LiveDetailResponse`: currentProductId/host 프로필/description
+  - 3.5 참고 — `LiveDetailResponse.hostProfileImageUrl`/`description`, `LiveProductResponse.material`/`measurements`/`defectSummary`
 - 변경 영향 범위
   - 라이브 상세 상품 큐
   - 경매 패널 초기화
@@ -139,7 +135,6 @@
   - 생성용 상품 조회 필터 기준
   - AI 시착 결과 polling 또는 STOMP push 방식
 - 아직 확정되지 않은 응답 구조나 정책
-  - `thumbnailUrl` 필수 여부
   - 라이브 status enum 이름
   - 시착 실패 사유 응답 구조
 

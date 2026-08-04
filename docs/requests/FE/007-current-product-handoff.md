@@ -183,14 +183,15 @@ ws.onopen = () => {
 cd BE && ./gradlew test --tests '*LiveCurrentProductStompTest' --tests '*LiveControllerTest'
 ```
 
-## 6. `006`에서 아직 안 채워진 것
+## 6. `006`에서 아직 안 채워진 것 (2026-08-04 갱신)
 
 | 항목 | 상태 |
 | --- | --- |
-| 경매 패널 | ❌ Phase 6~8 |
-| `hostProfileImageUrl` | ❌ `Member` 엔티티에 필드가 없다 (서윤 의존) |
-| `live.description` | ❓ **개설 화면에서 실제로 입력받는지 알려 달라** — 넣기로 하면 컬럼을 추가한다 |
-| `material`·`measurements`·`defectSummary` | ❌ `product`에 컬럼 자체가 없다 |
+| 경매 패널 | ❌ Phase 6~8(조건 설정만 있고 시작/입찰/종료/조회 없음) |
+| `hostProfileImageUrl` | ❌ 아직 없음. **막던 이유는 해소됨** — `Member` 엔티티에 `profileImageUrl`이 이제 있다. `LiveDetailResponse` 노출만 안 됨 |
+| `live.description` | ❓ **개설 화면에서 실제로 입력받는지 알려 달라** — 넣기로 하면 컬럼을 추가한다(`live` 테이블에 여전히 없음) |
+| `material`·`measurements` | ⚠️ `product` 엔티티에는 이제 있다. `LiveProductResponse` 노출만 안 됨 |
+| `defectSummary` | ❌ `product`에도 아직 컬럼 자체가 없다 |
 
 ## 7. FE에서 확인 부탁
 

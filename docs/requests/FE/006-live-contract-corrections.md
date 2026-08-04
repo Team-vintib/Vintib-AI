@@ -109,9 +109,12 @@ FE 문서: `AUCTION` | `FIXED_PRICE` → **실제: `AUCTION` | `DIRECT_SALE`**
 `FIXED_PRICE`는 없다. 상품 도메인 enum이라 BE가 임의로 바꾸지 않는다.
 
 같은 맥락에서 홈 카드의 `sellStatus`(`ON_SALE`/`RESERVED`/`SOLD_OUT`)도 **현재 Mock 값일 뿐**
-실제 `product.sale_status`와 다르다. 실제 값은
-`DRAFT`, `ON_SALE`, `AUCTION_SCHEDULED`, `AUCTION_IN_PROGRESS`, `AUCTION_FAILED`, `SOLD`이며
-**`RESERVED`에 대응하는 상태가 없다.** 홈 실데이터 전환 시 매핑을 다시 확정한다.
+실제 `product.sale_status`와 다르다. 실제 값은(2026-08-04 기준)
+`DRAFT`, `ON_SALE`, `AUCTION_SCHEDULED`, `AUCTION_IN_PROGRESS`, `SOLD` **다섯 개뿐이다** —
+`PRIVATE`는 제거됐고(003 참고), `AUCTION_FAILED`(미낙찰)는 **아직 enum에 없다**(경매 입찰/종료
+자체가 미구현이라 그 상태로 갈 경로가 없음 — `014-unsold-product-disposition.md` 참고). 이전에
+`AUCTION_FAILED`가 곧 추가된다고 안내했는데 아직 반영 전이다. **`RESERVED`에 대응하는 상태는
+여전히 없다.** 홈 실데이터 전환 시 매핑을 다시 확정한다.
 
 ## 🟡 6. `status=ENDED`를 보내면 400이다
 
@@ -157,10 +160,10 @@ GET /api/lives/{liveId}  →  currentViewerCount (초기값)
 
 ---
 
-## 라이브 상세에서 아직 비어 있는 것
+## 라이브 상세에서 아직 비어 있는 것 (2026-08-04 갱신)
 
-실 API를 켜면 **채팅·시청자수·반응·영상은 동작하지만 상품 패널은 거의 빈다.**
-"BE가 깨졌다"고 오해하지 않도록 미리 적어 둔다.
+**연결 상품 상세 필수 필드와 `currentProductId`는 이제 채워진다.** 상품 패널이 더 이상 거의
+비어 있지 않다 — 아래 표를 최신 상태로 갱신했다.
 
 | 항목 | 지금 | 언제 |
 | --- | --- | --- |
@@ -168,12 +171,13 @@ GET /api/lives/{liveId}  →  currentViewerCount (초기값)
 | 시청자 수 | ✅ 동작 | — |
 | 반응 이모지 | ✅ 동작 | — |
 | 영상 접속 토큰 | ✅ 동작 | — |
-| **연결 상품 상세** | ⚠️ **`productTitle`만.** `brandName`·`price`·`thumbnailUrl`·`saleType` 없음 | Phase 5 |
-| **`currentProductId`** (`NOW` 배지) | ❌ 없음 | Phase 5 |
-| **경매 패널** | ❌ API 자체가 없음 | Phase 6~8 |
-| `hostProfileImageUrl` | ❌ `Member` 엔티티에 필드가 없다 | 서윤 의존 |
-| `description` | ❌ `live` 테이블에 컬럼이 없다 | **입력 항목인지 FE 확인 필요** |
-| `material`·`measurements`·`defectSummary` | ❌ `product`에 컬럼 자체가 없다 | 상품 도메인 확장 선행 |
+| **연결 상품 상세** | ✅ `brandName`·`price`·`thumbnailUrl`·`saleType`·`conditionGrade`(요청한 `condition`과 이름 다름) 반영됨 | — |
+| **`currentProductId`** (`NOW` 배지) | ✅ 반영됨 | — |
+| **경매 패널** | ❌ API 자체가 없음(조건 설정만 있음, 시작/입찰/종료/조회 없음) | Phase 6~8 |
+| `hostProfileImageUrl` | ❌ 아직 없음. **막던 이유는 해소됨** — `Member` 엔티티에 `profileImageUrl` 필드가 이제 있다. `LiveDetailResponse`에 노출만 안 돼 있는 상태 | 응답 필드 추가만 남음 |
+| `description` | ❌ `live` 테이블에 여전히 컬럼이 없다 | **입력 항목인지 FE 확인 필요** |
+| `material`·`measurements` | ⚠️ `product` 엔티티에는 이제 있다(`conditionGrade`/`material`/`measurements`). **`LiveProductResponse`에 아직 노출 안 됨** | 응답 필드 추가만 남음 |
+| `defectSummary` | ❌ `product`에도 아직 컬럼 자체가 없다 | 상품 도메인 확장 선행 |
 
 ## FE에서 확인 부탁
 

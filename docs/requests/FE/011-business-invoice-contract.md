@@ -9,7 +9,7 @@
 
 BIZ-001은 FE 요청 문서(`docs/requests/BE/003-business-contract.md`)의 §3.1/§3.2가 요청한 계약과 실제 구현이 다르다 — 이 프로젝트의 다른 온보딩류 API와 동일하게 경로가 `/api/users/{userId}/business`로 확정됐고, `multipart/form-data` 한 번에 제출하는 대신 상품 이미지·시착 프로필과 동일한 **presigned 2단계 업로드**를 쓴다. 관리자 승인/거절 API는 이 프로젝트에 관리자 권한 체계 자체가 없어(회원 유형은 `GENERAL`/`BUSINESS`뿐) 이번 범위 밖이다 — 승인 상태 전환은 현재 DB를 직접 조작해야만 일어난다.
 
-BIZ-002(세금계산서)는 FE가 요청한 적이 없는 BE 주도 신규 API다. **주문(order) 생성 API가 아직 없어**, 이 API를 실제로 호출할 수 있는 진짜 주문이 지금은 존재하지 않는다 — 계약만 먼저 공유한다. 주문 생성 API가 생기면(Commerce/Wallet, `docs/requests/BE/010-commerce-wallet-contract.md` 참고) 실제 연동이 가능해진다.
+BIZ-002(세금계산서)는 FE가 요청한 적이 없는 BE 주도 신규 API다. **주문(order) 생성 API가 이제 있다**(`POST /api/orders`, 상시 판매 즉시구매) — 실제 주문을 만들어 이 API를 호출해 볼 수 있다. 배송지·송장·구매확정·환불까지 Commerce/Wallet 쪽도 전부 구현 완료됐다(요청 문서는 반영 완료로 삭제됨).
 
 ## 요청 내용
 

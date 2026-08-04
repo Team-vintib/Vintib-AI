@@ -15,8 +15,10 @@
 | 구매/판매 내역 | GET | `/users/{id}/orders?role=BUYER\|SELLER` | `role` 필수 |
 | 주문 상세 | GET | `/orders/{orderId}` | 당사자만 |
 | 라이브 관리 | GET | `/lives?hostId={id}` | 본인이면 종료·취소 이력까지 |
-| 포인트 잔액 / 내역 / 충전 | GET·GET·POST | `/users/{id}/points`, `/points/logs`, `/points/charges` | 충전은 테스트 전용 |
-| 출금 신청 / 내역 | POST·GET | `/users/{id}/withdrawals` | 신청까지만(승인 없음) |
+| 포인트 잔액 / 내역 | GET·GET | `/users/{id}/points`, `/points/logs` | |
+| 포인트 충전 | POST·POST | `/users/{id}/points/charges/ready`, `/points/charges/confirm` | **경로 바뀜.** 단일 `POST .../charges`가 아니라 토스페이먼츠 결제위젯 준비/승인 2단계다(`018-toss-payments-charge-widget.md` 참고). 최소 충전 금액 10,000원 |
+| 출금 계좌 등록/조회 | PUT·GET | `/users/{id}/points/account` | **신규.** 출금 신청 전 계좌 등록 필요 |
+| 출금 신청 / 내역 | POST·GET | `/users/{id}/withdrawals` | 신청까지만(승인 없음). 최소 출금 금액 10,000원. 계좌 미등록 시 400(`W007`) |
 | 마이페이지 요약 | GET | `/users/{id}/mypage` | 카운터 + 포인트 잔액 |
 
 전부 인증 필요(본인만), 실패 시 403.
@@ -40,7 +42,7 @@
 
 ## 주의
 
-- 주문 생성 API가 아직 없어 `orders`, `counts.orders`/`counts.sales`는 항상 빈 값/0이다.
+- **주문 생성 API가 이제 있다**(`POST /api/orders`, 상시 판매 즉시구매) — `orders`, `counts.orders`/`counts.sales`가 실제 값으로 채워진다. 배송지·송장·구매확정·환불까지 전부 구현됐다. 상세 계약은 필요하면 별도로 공유한다.
 - `bio`에서 `coverImageUrl` 필드는 제거됐다 — 커버 이미지는 이제 업로드 API로만 설정한다.
 
 ## FE 요청 사항

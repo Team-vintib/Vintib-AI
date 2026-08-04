@@ -27,8 +27,10 @@
 - 화이트리스트(온보딩 미완료여도 허용):
   - `POST /api/auth/reissue`(토큰 재발급), `POST /api/auth/logout`
   - `PATCH /api/users/{id}`(ONBOARD-001), `PUT /api/users/{id}/interests`(ONBOARD-002),
-    `PATCH /api/users/{id}/member-type`(ONBOARD-004) — `PUT /api/me/tryon`(ONBOARD-003)은
-    아직 BE 미구현이라 실제로는 호출할 수 없다
+    `PATCH /api/users/{id}/member-type`(ONBOARD-004), `PUT /api/users/{id}/tryon`과
+    `POST /api/users/{id}/tryon/upload-url`(ONBOARD-003, 시착 프로필 — 이제 구현 완료·화이트리스트에
+    포함됨. 엔드포인트는 `/api/me/tryon`이 아니라 `/api/users/{id}/tryon`이다 —
+    `009-tryon-profile-presigned-upload.md` 참고)
 - 그 외 상품/라이브/경매/채팅/찜/알림 등 나머지 API는 전부 차단 대상이다.
 
 ## ONBOARD-004에서 새로 추가된 오류
