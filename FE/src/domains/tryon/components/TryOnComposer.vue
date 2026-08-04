@@ -18,19 +18,27 @@ const emit = defineEmits<{
 const authStore = useAuthStore()
 const router = useRouter()
 
+interface PreviewResult {
+  result: TryOnResult
+  productName: string
+  saved: boolean
+}
+
 const bodyPhotoUrl = ref<string | null>(null)
 const wishItems = ref<ProductListItem[]>([])
-const selectedProductId = ref<number | null>(null)
+const selectedProductIds = ref<number[]>([])
 const isLoading = ref(true)
 const isGenerating = ref(false)
-const generatedResult = ref<TryOnResult | null>(null)
+const generatedResults = ref<PreviewResult[]>([])
 const carouselTrack = ref<HTMLElement | null>(null)
 
 const userId = computed(() => authStore.user?.id ?? null)
-const selectedProduct = computed(
-  () => wishItems.value.find((item) => item.id === selectedProductId.value) ?? null,
+const selectedProducts = computed(() =>
+  wishItems.value.filter((item) => selectedProductIds.value.includes(item.id)),
 )
-const canTryOn = computed(() => Boolean(bodyPhotoUrl.value) && selectedProduct.value !== null && !isGenerating.value)
+const canTryOn = computed(
+  () => Boolean(bodyPhotoUrl.value) && selectedProducts.value.length > 0 && !isGenerating.value,
+)
 
 const load = async () => {
   isLoading.value = true
@@ -53,8 +61,27 @@ const load = async () => {
   }
 }
 
+// AI 시착 페이지에서만 여러 옷을 동시에 고를 수 있다(라이브·상품 상세 시착은 단일 선택).
+// 단 카테고리당 1개만 유지한다.
 const selectProduct = (productId: number) => {
-  selectedProductId.value = productId
+  const target = wishItems.value.find((item) => item.id === productId)
+  if (!target) return
+
+  if (selectedProductIds.value.includes(productId)) {
+    selectedProductIds.value = selectedProductIds.value.filter((id) => id !== productId)
+    return
+  }
+
+  // 같은 카테고리로 이미 고른 옷은 교체한다(카테고리 없으면 교체하지 않음).
+  const sameCategoryIds = target.categoryName
+    ? wishItems.value
+        .filter((item) => item.categoryName === target.categoryName)
+        .map((item) => item.id)
+    : []
+  selectedProductIds.value = [
+    ...selectedProductIds.value.filter((id) => !sameCategoryIds.includes(id)),
+    productId,
+  ]
 }
 
 const scrollCarousel = (direction: 1 | -1) => {
@@ -69,29 +96,49 @@ const nowWallClock = () => {
 }
 
 const tryOn = () => {
-  const product = selectedProduct.value
+  const products = selectedProducts.value
 
-  if (!canTryOn.value || !product) {
+  if (!canTryOn.value || products.length === 0) {
     return
   }
 
   isGenerating.value = true
+  // 새로 입어보면 이전 미리보기는 버린다(저장 안 한 결과는 남기지 않는다).
+  generatedResults.value = []
 
-  // 실제 AI 합성(POST /users/{id}/tryons)이 미구현이라 mock 결과를 만든다.
-  // 합성 API가 붙으면 이 자리에서 실제 결과를 받아 emit 한다.
+  // 실제 AI 합성(POST /users/{id}/tryons)이 미구현이라 선택한 옷마다 mock 결과를 만든다.
+  // 합성 API가 붙으면 이 자리에서 실제 결과들을 받아 미리보기에 채운다.
   window.setTimeout(() => {
-    const result: TryOnResult = {
-      id: Date.now(),
-      productId: product.id,
-      imageUrl: buildMockTryOnResultImage(`${product.name} 시착`),
-      createdAt: nowWallClock(),
-      category: product.categoryName ?? null,
-    }
-
-    generatedResult.value = result
+    const createdAt = nowWallClock()
+    generatedResults.value = products.map((product, index) => ({
+      result: {
+        id: Date.now() + index,
+        productId: product.id,
+        imageUrl: buildMockTryOnResultImage(`${product.name} 시착`),
+        createdAt,
+        category: product.categoryName ?? null,
+      },
+      productName: product.name,
+      saved: false,
+    }))
     isGenerating.value = false
-    emit('generated', result)
   }, 700)
+}
+
+// 각 미리보기가 맘에 들 때만 저장 → 이때 갤러리에 추가된다(입어보기만으로 자동 저장하지 않는다).
+const saveResult = (resultId: number) => {
+  const preview = generatedResults.value.find((item) => item.result.id === resultId)
+  if (!preview || preview.saved) {
+    return
+  }
+
+  emit('generated', preview.result)
+  preview.saved = true
+}
+
+// 저장하지 않은 것까지 미리보기 전체를 버린다.
+const discardResults = () => {
+  generatedResults.value = []
 }
 
 const goToProfile = () => {
@@ -105,12 +152,7 @@ onMounted(load)
   <section class="tryon-composer" aria-label="AI 입어보기">
     <div class="tryon-composer__body">
       <div class="tryon-composer__photo">
-        <img
-          v-if="generatedResult"
-          :src="generatedResult.imageUrl"
-          alt="AI 입어보기 결과 미리보기"
-        />
-        <img v-else-if="bodyPhotoUrl" :src="bodyPhotoUrl" alt="등록한 전신 사진" />
+        <img v-if="bodyPhotoUrl" :src="bodyPhotoUrl" alt="등록한 전신 사진" />
         <div v-else class="tryon-composer__photo-empty">
           <p>등록된 전신 사진이 없습니다.</p>
           <button type="button" class="tryon-composer__photo-link" @click="goToProfile">
@@ -121,7 +163,37 @@ onMounted(load)
         <span v-if="isGenerating" class="tryon-composer__photo-loading" role="status">
           AI 시착 이미지를 생성하고 있습니다…
         </span>
-        <span v-else-if="generatedResult" class="tryon-composer__photo-tag">미리보기 · mock</span>
+      </div>
+
+      <div v-if="generatedResults.length && !isGenerating" class="tryon-composer__results">
+        <div class="tryon-composer__results-head">
+          <span>입어본 결과 · 맘에 드는 것만 저장하세요</span>
+          <button type="button" class="tryon-composer__results-clear" @click="discardResults">
+            다시 입어보기
+          </button>
+        </div>
+        <ul class="tryon-composer__results-list">
+          <li
+            v-for="preview in generatedResults"
+            :key="preview.result.id"
+            class="tryon-composer__result-card"
+          >
+            <span class="tryon-composer__result-thumb">
+              <img :src="preview.result.imageUrl" :alt="`${preview.productName} 시착 결과 미리보기`" />
+              <span class="tryon-composer__result-mock">mock</span>
+            </span>
+            <span class="tryon-composer__result-name">{{ preview.productName }}</span>
+            <button
+              v-if="!preview.saved"
+              type="button"
+              class="tryon-composer__result-save"
+              @click="saveResult(preview.result.id)"
+            >
+              저장
+            </button>
+            <span v-else class="tryon-composer__result-saved" role="status">저장됨</span>
+          </li>
+        </ul>
       </div>
 
       <div class="tryon-composer__picker">
@@ -143,8 +215,8 @@ onMounted(load)
             <button
               type="button"
               class="tryon-composer__item"
-              :class="{ 'tryon-composer__item--selected': selectedProductId === item.id }"
-              :aria-pressed="selectedProductId === item.id"
+              :class="{ 'tryon-composer__item--selected': selectedProductIds.includes(item.id) }"
+              :aria-pressed="selectedProductIds.includes(item.id)"
               @click="selectProduct(item.id)"
             >
               <span class="tryon-composer__item-thumb">
@@ -156,10 +228,16 @@ onMounted(load)
         </ul>
 
         <button type="button" class="tryon-composer__cta" :disabled="!canTryOn" @click="tryOn">
-          {{ isGenerating ? '생성 중…' : '입어보기' }}
+          {{
+            isGenerating
+              ? '생성 중…'
+              : selectedProducts.length
+                ? `입어보기 (${selectedProducts.length})`
+                : '입어보기'
+          }}
         </button>
         <p class="tryon-composer__hint">
-          실제 AI 합성 연결 전까지는 미리보기(mock)로 동작합니다.
+          카테고리별로 하나씩 여러 옷을 골라 함께 입어볼 수 있어요. 실제 합성 전까지는 미리보기(mock)입니다.
         </p>
       </div>
     </div>
@@ -371,5 +449,124 @@ onMounted(load)
   color: var(--color-text-muted);
   font-size: 12px;
   text-align: center;
+}
+
+.tryon-composer__results {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.tryon-composer__results-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.tryon-composer__results-clear {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.tryon-composer__results-clear:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.tryon-composer__results-list {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-bottom: var(--space-2);
+  list-style: none;
+  overflow-x: auto;
+}
+
+.tryon-composer__result-card {
+  display: flex;
+  width: 148px;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tryon-composer__result-thumb {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 3 / 5;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-image-frame);
+}
+
+.tryon-composer__result-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.86) contrast(1.04);
+}
+
+.tryon-composer__result-mock {
+  position: absolute;
+  left: var(--space-2);
+  bottom: var(--space-2);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-badge);
+  background: rgba(10, 10, 10, 0.82);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.tryon-composer__result-name {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tryon-composer__result-save {
+  height: 34px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 13px;
+  font-weight: 500;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.tryon-composer__result-save:hover {
+  background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
+}
+
+.tryon-composer__result-saved {
+  display: grid;
+  height: 34px;
+  border-radius: var(--radius-control);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 600;
+  place-items: center;
 }
 </style>
