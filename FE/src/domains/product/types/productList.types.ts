@@ -7,7 +7,6 @@ export type ProductSaleStatus =
   | 'AUCTION_IN_PROGRESS'
   | 'AUCTION_FAILED'
   | 'SOLD'
-  | 'PRIVATE'
 
 export type ProductSortOption = 'LATEST' | 'PRICE_ASC' | 'PRICE_DESC'
 
