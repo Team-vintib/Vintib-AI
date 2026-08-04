@@ -26,6 +26,7 @@ import com.ssafy.backend.global.response.CursorPageResponse;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.live.entity.Live;
+import com.ssafy.backend.live.port.NotificationCommandPort;
 import com.ssafy.backend.live.port.ProductQueryPort;
 import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
@@ -75,6 +76,9 @@ class AuctionServiceTest {
     private PointCommandPort pointCommandPort;
 
     @Mock
+    private NotificationCommandPort notificationCommandPort;
+
+    @Mock
     private Member host;
 
     @Mock
@@ -92,7 +96,8 @@ class AuctionServiceTest {
                 memberRepository,
                 productQueryPort,
                 productCommandPort,
-                pointCommandPort);
+                pointCommandPort,
+                notificationCommandPort);
     }
 
     private Live 진행중인_라이브() {
@@ -390,6 +395,18 @@ class AuctionServiceTest {
 
         assertThat(직전_입찰.getStatus()).isEqualTo(BidStatus.OUTBID);
         verify(pointCommandPort).releaseHoldForAuction(AUCTION_ID);
+        verify(notificationCommandPort).notify(
+                eq(host), eq("AUCTION_OUTBID"), any(), any(), eq("AUCTION"), eq(AUCTION_ID));
+    }
+
+    @Test
+    void 첫_입찰에는_밀린_사람이_없어_알림도_없다() {
+        Auction auction = 진행중인_경매();
+        입찰_처리를_준비한다(auction);
+
+        auctionService.placeBid(OTHER_MEMBER_ID, AUCTION_ID, new BidRequest(10_000L));
+
+        verify(notificationCommandPort, never()).notify(any(), any(), any(), any(), any(), any());
     }
 
     @Test
