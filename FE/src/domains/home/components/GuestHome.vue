@@ -123,7 +123,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
 .guest-home {
   display: grid;
   justify-items: stretch;
-  gap: var(--space-12);
+  gap: var(--space-16);
   padding-bottom: var(--space-16);
 }
 

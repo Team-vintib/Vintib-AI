@@ -165,7 +165,7 @@ const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
 .member-home {
   display: grid;
   justify-items: stretch;
-  gap: var(--space-12);
+  gap: var(--space-16);
   padding-bottom: var(--space-16);
 }
 
@@ -184,20 +184,18 @@ const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
   display: grid;
   min-height: 132px;
   border: 1px solid var(--color-border);
-  border-radius: 20px;
+  border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text-primary) 5%, transparent);
   color: inherit;
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+    border-color 220ms ease,
+    background-color 220ms ease,
+    transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .seller-card:hover {
   border-color: var(--color-border-strong);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--color-text-primary) 7%, transparent);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
 }
 
 .seller-card__body {
@@ -223,18 +221,22 @@ const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
   color: var(--color-text-primary);
   display: -webkit-box;
   overflow: hidden;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 26px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+  letter-spacing: -0.01em;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
 .seller-card__stats {
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 400;
-  line-height: 20px;
+  letter-spacing: -0.01em;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
 }
 
 .seller-card__stats {
