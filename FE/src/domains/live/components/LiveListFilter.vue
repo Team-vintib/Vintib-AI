@@ -71,8 +71,11 @@ const handleCategoryChange = (event: Event) => {
 
 .live-list-filter__heading h2 {
   color: var(--color-text-primary);
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-bold);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
 }
 
 .live-list-filter__heading button {
@@ -91,7 +94,7 @@ const handleCategoryChange = (event: Event) => {
 
 .live-list-filter__heading button:focus-visible,
 .live-list-filter__group input:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
