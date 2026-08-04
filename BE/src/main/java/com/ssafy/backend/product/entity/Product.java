@@ -20,6 +20,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.type.SqlTypes;
@@ -37,7 +38,10 @@ import org.hibernate.type.SqlTypes;
                                 + "'DRAFT', 'ON_SALE', 'AUCTION_SCHEDULED', 'AUCTION_IN_PROGRESS', 'SOLD')"),
                 @CheckConstraint(
                         name = "ck_product_price_by_type",
-                        constraint = "sale_type <> 'DIRECT_SALE' OR price IS NOT NULL")
+                        constraint = "sale_type <> 'DIRECT_SALE' OR price IS NOT NULL"),
+                @CheckConstraint(
+                        name = "ck_product_ai_model_gender",
+                        constraint = "ai_model_enabled = false OR ai_model_gender IS NOT NULL")
         })
 @SQLRestriction("deleted_at IS NULL")
 @Getter
@@ -96,6 +100,17 @@ public class Product extends BaseTimeEntity {
 
     private Long price;
 
+    // 마네킹 사진 기반 AI 착용컷 사용 여부. true면 aiModelGender가 반드시 있어야 한다
+    // (ck_product_ai_model_gender). 프로필 표시용이 아니라 "합성 시 어떤 성별 모델 사진을 쓸지"를
+    // 판매자가 정하는 값이다.
+    @ColumnDefault("false")
+    @Column(name = "ai_model_enabled", nullable = false)
+    private boolean aiModelEnabled;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_model_gender", length = 10)
+    private AiModelGender aiModelGender;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -110,7 +125,9 @@ public class Product extends BaseTimeEntity {
             String sizeLabel,
             String color,
             String material,
-            Map<String, Integer> measurements) {
+            Map<String, Integer> measurements,
+            boolean aiModelEnabled,
+            AiModelGender aiModelGender) {
         this.seller = seller;
         this.categoryId = categoryId;
         this.brandId = brandId;
@@ -121,6 +138,8 @@ public class Product extends BaseTimeEntity {
         this.color = color;
         this.material = material;
         this.measurements = measurements;
+        this.aiModelEnabled = aiModelEnabled;
+        this.aiModelGender = aiModelGender;
         this.saleStatus = SaleStatus.DRAFT;
     }
 

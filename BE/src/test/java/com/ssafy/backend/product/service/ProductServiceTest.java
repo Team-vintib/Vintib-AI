@@ -101,7 +101,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null, false, null);
 
         ProductResponse response = productService.createProduct(SELLER_ID, request);
 
@@ -129,7 +129,9 @@ class ProductServiceTest {
                 "블랙",
                 "데님",
                 Map.of("총장", 70),
-                List.of("소매 끝 실밥 풀림", "안감 얼룩"));
+                List.of("소매 끝 실밥 풀림", "안감 얼룩"),
+                false,
+                null);
 
         ProductResponse response = productService.createProduct(SELLER_ID, request);
 
@@ -154,7 +156,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null, false, null);
 
         productService.createProduct(SELLER_ID, request);
 
@@ -166,7 +168,7 @@ class ProductServiceTest {
         when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.empty());
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", null, CATEGORY_ID, null, null, null, null, null, null, null);
+                "빈티지 자켓", null, CATEGORY_ID, null, null, null, null, null, null, null, false, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class);
@@ -180,12 +182,46 @@ class ProductServiceTest {
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(false);
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null, false, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CATEGORY_NOT_FOUND);
         verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void AI_착용컷을_활성화하면서_모델_성별을_지정하지_않으면_예외를_던진다() {
+        when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.of(seller));
+        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
+
+        ProductCreateRequest request = new ProductCreateRequest(
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null, true, null);
+
+        assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AI_MODEL_GENDER_REQUIRED);
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void AI_착용컷_활성화와_모델_성별을_함께_저장한다() {
+        when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.of(seller));
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ProductCreateRequest request = new ProductCreateRequest(
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null,
+                true, com.ssafy.backend.product.entity.AiModelGender.FEMALE);
+
+        ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
+        productService.createProduct(SELLER_ID, request);
+
+        verify(productRepository).save(captor.capture());
+        assertThat(captor.getValue().isAiModelEnabled()).isTrue();
+        assertThat(captor.getValue().getAiModelGender())
+                .isEqualTo(com.ssafy.backend.product.entity.AiModelGender.FEMALE);
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.ssafy.backend.product.dto.response;
 
+import com.ssafy.backend.product.entity.AiModelGender;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.entity.SaleType;
@@ -32,6 +33,9 @@ public record ProductDetailResponse(
         Long sellerFollowerCount,
         Long sellerProductCount,
         LinkedLiveSummaryResponse linkedLive,
+        @Schema(description = "마네킹 사진 기반 AI 착용컷 사용 여부", example = "true") boolean aiModelEnabled,
+        @Schema(description = "AI 착용컷 모델 성별. aiModelEnabled=false면 null", example = "FEMALE")
+                AiModelGender aiModelGender,
         @Schema(example = "2026-07-29T12:00:00") LocalDateTime createdAt,
         @Schema(example = "2026-07-29T12:00:00") LocalDateTime updatedAt) {
 
@@ -69,6 +73,8 @@ public record ProductDetailResponse(
                 sellerFollowerCount,
                 sellerProductCount,
                 linkedLive,
+                product.isAiModelEnabled(),
+                product.getAiModelGender(),
                 product.getCreatedAt(),
                 product.getUpdatedAt());
     }

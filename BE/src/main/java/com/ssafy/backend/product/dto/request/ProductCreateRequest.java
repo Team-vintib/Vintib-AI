@@ -1,5 +1,6 @@
 package com.ssafy.backend.product.dto.request;
 
+import com.ssafy.backend.product.entity.AiModelGender;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -38,5 +39,13 @@ public record ProductCreateRequest(
         Map<String, Integer> measurements,
 
         @Schema(description = "판매자가 직접 입력한 하자 목록. 선택 입력", example = "[\"소매 끝 실밥 풀림\"]")
-        List<String> defects) {
+        List<String> defects,
+
+        @Schema(description = "마네킹 사진 기반 AI 착용컷 사용 여부", example = "true")
+        boolean aiModelEnabled,
+
+        @Schema(
+                description = "AI 착용컷 모델 성별. aiModelEnabled=true면 필수, false면 null",
+                example = "FEMALE")
+        AiModelGender aiModelGender) {
 }

@@ -59,6 +59,10 @@ public class ProductService {
         if (!categoryRepository.existsById(request.categoryId())) {
             throw new CustomException(ErrorCode.CATEGORY_NOT_FOUND);
         }
+        // aiModelEnabled=true인데 gender가 없으면 어떤 성별 모델 사진으로 합성할지 정할 수 없다.
+        if (request.aiModelEnabled() && request.aiModelGender() == null) {
+            throw new CustomException(ErrorCode.AI_MODEL_GENDER_REQUIRED);
+        }
 
         Product product = Product.builder()
                 .seller(seller)
@@ -71,6 +75,8 @@ public class ProductService {
                 .color(request.color())
                 .material(request.material())
                 .measurements(request.measurements())
+                .aiModelEnabled(request.aiModelEnabled())
+                .aiModelGender(request.aiModelEnabled() ? request.aiModelGender() : null)
                 .build();
 
         Product saved = productRepository.save(product);
