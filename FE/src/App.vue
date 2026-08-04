@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import { RouterView } from 'vue-router'
+import { RouterView, useRouter } from 'vue-router'
 
 import movingLogoImage from '@/assets/images/vintib_moving_logo.gif'
+import { setupScrollReveal } from '@/shared/utils/scrollReveal'
+
+const router = useRouter()
 
 const SPLASH_SEEN_KEY = 'vintib_initial_splash_seen'
 const SPLASH_DURATION_MS = 3690
@@ -19,6 +22,8 @@ const isSplashVisible = ref(shouldShowSplash())
 let splashTimer: ReturnType<typeof window.setTimeout> | undefined
 
 onMounted(() => {
+  setupScrollReveal(router)
+
   if (!isSplashVisible.value) {
     return
   }
