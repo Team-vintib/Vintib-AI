@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 
-import type { HomeLiveCardItem, HomeViewData } from '@/domains/home/types/homeView.types'
-import { ROUTE_PATHS } from '@/shared/constants/routes'
+import type { HomeProductCardItem, HomeViewData } from '@/domains/home/types/homeView.types'
+import { ROUTE_NAMES } from '@/shared/constants/routes'
 import type { RouteLocationRaw } from 'vue-router'
 
 const props = defineProps<{
@@ -25,7 +25,6 @@ interface HeroSlide {
   imageUrl: string
   imageAlt: string
   metaText?: string
-  scheduleText?: string
   collageImages?: string[]
 }
 
@@ -37,13 +36,13 @@ const fallbackImages = {
   live:
     'https://images.unsplash.com/photo-1516762689617-e1cffcef479d?auto=format&fit=crop&w=1200&q=80',
   discover:
-    'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1000&q=80',
+    'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1200&q=80',
   jacket:
     'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=80',
   knit:
     'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=900&q=80',
   studio:
-    'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
 }
 
 const router = useRouter()
@@ -69,6 +68,21 @@ const selectedScheduledLive = computed(() =>
     return firstTime - secondTime
   })[0],
 )
+const productImageCandidates = computed(() =>
+  getUniqueImageUrls([
+    ...props.homeData.recommendedProducts,
+    ...props.homeData.directSaleProducts,
+    ...props.homeData.upcomingAuctionProducts,
+    ...props.homeData.categoryProductSections.flatMap((section) => section.products),
+  ]),
+)
+const discoverCollageImages = computed(() =>
+  fillImageSlots(productImageCandidates.value, [
+    fallbackImages.discover,
+    fallbackImages.jacket,
+    fallbackImages.knit,
+  ]),
+)
 
 const liveEntrySlide = computed<HeroSlide>(() => {
   if (selectedLive.value) {
@@ -80,7 +94,7 @@ const liveEntrySlide = computed<HeroSlide>(() => {
       title: '지금 놓치면 다시 만나기 어려워요',
       description: '실시간으로 상품을 확인하고,\n원하는 가격에 입찰해 보세요.',
       ctaLabel: '진행 중인 라이브 보기',
-      to: `/lives/${live.id}`,
+      to: getLiveWatchRoute(live.id),
       tone: 'live',
       visualKind: 'live',
       imageUrl: live.thumbnailUrl || fallbackImages.live,
@@ -97,13 +111,12 @@ const liveEntrySlide = computed<HeroSlide>(() => {
     title: '다음 빈티지 드롭을 기다려 보세요',
     description: '곧 시작되는 라이브에서\n새로운 빈티지 상품을 만나보세요.',
     ctaLabel: '예약 라이브 확인하기',
-    to: scheduledLive ? `/lives/${scheduledLive.id}` : ROUTE_PATHS.LIVE_LIST,
+    to: scheduledLive ? getLiveWatchRoute(scheduledLive.id) : { name: ROUTE_NAMES.LIVE_LIST },
     tone: 'live',
     visualKind: 'scheduled',
     imageUrl: scheduledLive?.thumbnailUrl || fallbackImages.live,
     imageAlt: scheduledLive?.title ?? '예약 라이브 대표 이미지',
     metaText: scheduledLive?.hostName,
-    scheduleText: formatLiveSchedule(scheduledLive?.scheduledAt),
   }
 })
 
@@ -115,12 +128,12 @@ const slides = computed<HeroSlide[]>(() => [
     title: '하나뿐인 빈티지를,\n가장 생생하게',
     description: '라이브로 상태를 확인하고\n경매와 바로 구매로 만나보세요.',
     ctaLabel: '빈티지 둘러보기',
-    to: ROUTE_PATHS.PRODUCT_LIST,
+    to: { name: ROUTE_NAMES.PRODUCT_LIST },
     tone: 'discover',
     visualKind: 'collage',
     imageUrl: fallbackImages.discover,
     imageAlt: '매거진 화보처럼 배치된 빈티지 의류',
-    collageImages: [fallbackImages.discover, fallbackImages.jacket, fallbackImages.knit],
+    collageImages: discoverCollageImages.value,
   },
   {
     id: 'sell-vintage',
@@ -128,7 +141,7 @@ const slides = computed<HeroSlide[]>(() => [
     title: '옷장 속 빈티지,\n새로운 주인을 만나게 해주세요',
     description: '사진과 상품 정보만으로\n간편하게 판매를 시작할 수 있어요.',
     ctaLabel: '상품 등록하기',
-    to: ROUTE_PATHS.PRODUCT_CREATE,
+    to: { name: ROUTE_NAMES.PRODUCT_CREATE },
     tone: 'sell',
     visualKind: 'studio',
     imageUrl: fallbackImages.studio,
@@ -148,27 +161,19 @@ function formatViewerCount(value?: number) {
   return new Intl.NumberFormat('ko-KR').format(value ?? 0)
 }
 
-function formatLiveSchedule(value?: string) {
-  if (!value) {
-    return '일정 확인 중'
+function getLiveWatchRoute(liveId: number): RouteLocationRaw {
+  return {
+    name: ROUTE_NAMES.LIVE_WATCH,
+    params: { liveId },
   }
+}
 
-  const date = new Date(value)
-  const today = new Date()
-  const dateLabel =
-    date.toDateString() === today.toDateString()
-      ? '오늘'
-      : new Intl.DateTimeFormat('ko-KR', {
-          month: 'long',
-          day: 'numeric',
-        }).format(date)
-  const timeLabel = new Intl.DateTimeFormat('ko-KR', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(date)
+function getUniqueImageUrls(products: HomeProductCardItem[]) {
+  return [...new Set(products.map((product) => product.primaryImageUrl).filter(Boolean))]
+}
 
-  return `${dateLabel} ${timeLabel}`
+function fillImageSlots(imageUrls: string[], fallbackUrls: string[]) {
+  return [...new Set([...imageUrls, ...fallbackUrls])].slice(0, 3)
 }
 
 function moveTo(index: number) {
@@ -280,6 +285,11 @@ function handleSlideClick(slide: HeroSlide) {
     return
   }
 
+  navigateToSlide(slide)
+}
+
+function navigateToSlide(slide: HeroSlide) {
+  pauseAfterManualInteraction()
   void router.push(slide.to)
 }
 
@@ -353,49 +363,42 @@ onBeforeUnmount(() => {
           :aria-hidden="index !== activeIndex"
           @click="handleSlideClick(slide)"
         >
+          <img
+            class="home-hero-slide__background"
+            :src="slide.imageUrl"
+            :alt="slide.imageAlt"
+            @error="handleImageError"
+          />
           <div class="home-hero-slide__content">
             <p class="home-hero-slide__label">{{ slide.label }}</p>
             <h1 v-if="index === 0" class="home-hero-slide__title">{{ slide.title }}</h1>
             <h2 v-else class="home-hero-slide__title">{{ slide.title }}</h2>
             <p class="home-hero-slide__description">{{ slide.description }}</p>
-            <RouterLink
+            <button
               class="home-hero-slide__cta"
-              :to="slide.to"
+              type="button"
               :tabindex="index === activeIndex ? 0 : -1"
-              @click.stop
+              @click.stop="navigateToSlide(slide)"
             >
               {{ slide.ctaLabel }}
-            </RouterLink>
+            </button>
           </div>
 
-          <div class="home-hero-slide__media" :class="`home-hero-slide__media--${slide.visualKind}`">
-            <template v-if="slide.visualKind === 'collage'">
-              <img
-                v-for="(imageUrl, imageIndex) in slide.collageImages"
-                :key="imageUrl"
-                class="home-hero-slide__collage-image"
-                :class="`home-hero-slide__collage-image--${imageIndex + 1}`"
-                :src="imageUrl"
-                :alt="imageIndex === 0 ? slide.imageAlt : ''"
-                @error="handleImageError"
-              />
-              <span class="home-hero-slide__media-note">LIVE · AUCTION · DIRECT</span>
-            </template>
-
-            <template v-else>
-              <img
-                class="home-hero-slide__image"
-                :src="slide.imageUrl"
-                :alt="slide.imageAlt"
-                @error="handleImageError"
-              />
-              <span v-if="slide.visualKind === 'live'" class="home-hero-slide__live-badge">LIVE</span>
-              <span v-if="slide.visualKind === 'scheduled'" class="home-hero-slide__schedule-card">
-                {{ slide.scheduleText }}
-              </span>
-              <span v-if="slide.metaText" class="home-hero-slide__meta">{{ slide.metaText }}</span>
-            </template>
+          <div
+            v-if="slide.visualKind === 'collage' && slide.collageImages"
+            class="home-hero-slide__collage"
+          >
+            <img
+              v-for="(imageUrl, imageIndex) in slide.collageImages"
+              :key="imageUrl"
+              class="home-hero-slide__collage-image"
+              :class="`home-hero-slide__collage-image--${imageIndex + 1}`"
+              :src="imageUrl"
+              alt=""
+              @error="handleImageError"
+            />
           </div>
+          <span v-if="slide.metaText" class="home-hero-slide__meta">{{ slide.metaText }}</span>
         </article>
       </div>
     </div>
@@ -476,37 +479,53 @@ onBeforeUnmount(() => {
 .home-hero-slide {
   position: relative;
   flex: 0 0 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1.04fr) minmax(0, 0.96fr);
+  display: block;
   height: 300px;
   overflow: hidden;
   isolation: isolate;
-  background:
-    linear-gradient(105deg, rgba(244, 239, 230, 0.98) 0%, rgba(244, 239, 230, 0.86) 52%, transparent 72%),
-    var(--hero-warm-paper);
+  background: var(--hero-ink-black);
   cursor: pointer;
 }
 
-.home-hero-slide--live {
+.home-hero-slide::before {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   background:
-    linear-gradient(105deg, rgba(18, 18, 18, 0.92) 0%, rgba(18, 18, 18, 0.74) 48%, rgba(18, 18, 18, 0.16) 76%),
-    var(--hero-ink-black);
+    linear-gradient(90deg, rgba(18, 18, 18, 0.88) 0%, rgba(18, 18, 18, 0.7) 38%, rgba(18, 18, 18, 0.18) 68%, rgba(18, 18, 18, 0.04) 100%),
+    linear-gradient(0deg, rgba(18, 18, 18, 0.26), transparent 56%);
+  content: '';
+}
+
+.home-hero-slide__background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1.02);
+}
+
+.home-hero-slide--live {
   color: var(--color-text-inverse);
 }
 
-.home-hero-slide--discover {
+.home-hero-slide--discover::before {
   background:
-    linear-gradient(105deg, rgba(244, 239, 230, 0.98) 0%, rgba(244, 239, 230, 0.9) 50%, rgba(74, 107, 87, 0.1) 82%),
-    var(--hero-warm-paper);
+    linear-gradient(90deg, rgba(244, 239, 230, 0.96) 0%, rgba(244, 239, 230, 0.84) 39%, rgba(244, 239, 230, 0.24) 72%, rgba(244, 239, 230, 0.06) 100%),
+    linear-gradient(0deg, rgba(74, 107, 87, 0.16), transparent 58%);
 }
 
-.home-hero-slide--sell {
+.home-hero-slide--sell::before {
   background:
-    linear-gradient(105deg, rgba(244, 239, 230, 0.98) 0%, rgba(244, 239, 230, 0.86) 52%, rgba(200, 166, 106, 0.14) 86%),
-    var(--hero-warm-paper);
+    linear-gradient(90deg, rgba(244, 239, 230, 0.95) 0%, rgba(244, 239, 230, 0.82) 40%, rgba(244, 239, 230, 0.2) 72%, rgba(244, 239, 230, 0.04) 100%),
+    linear-gradient(0deg, rgba(200, 166, 106, 0.18), transparent 58%);
 }
 
 .home-hero-slide__content {
+  position: relative;
   z-index: 2;
   display: grid;
   align-content: center;
@@ -553,6 +572,7 @@ onBeforeUnmount(() => {
   min-height: 48px;
   padding: 0 var(--space-5);
   margin-top: var(--space-2);
+  border: 0;
   border-radius: 14px;
   background: var(--hero-vintage-green);
   color: var(--color-text-inverse);
@@ -570,80 +590,9 @@ onBeforeUnmount(() => {
   background: var(--hero-ink-black);
 }
 
-.home-hero-slide__media {
-  position: relative;
-  min-width: 0;
-  height: 100%;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--hero-film-gray) 30%, var(--hero-warm-paper));
-}
-
-.home-hero-slide__media::after {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background:
-    linear-gradient(90deg, rgba(18, 18, 18, 0.24), transparent 34%),
-    linear-gradient(0deg, rgba(18, 18, 18, 0.42), transparent 48%);
-  content: '';
-  pointer-events: none;
-}
-
-.home-hero-slide__image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.home-hero-slide__live-badge,
-.home-hero-slide__schedule-card,
-.home-hero-slide__meta,
-.home-hero-slide__media-note {
+.home-hero-slide__meta {
   position: absolute;
   z-index: 2;
-}
-
-.home-hero-slide__live-badge {
-  top: var(--space-6);
-  left: var(--space-6);
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 30px;
-  padding: 0 12px;
-  border-radius: var(--radius-chip);
-  background: var(--hero-accent-red);
-  color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 18px;
-}
-
-.home-hero-slide__live-badge::before {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-  content: '';
-}
-
-.home-hero-slide__schedule-card {
-  top: var(--space-6);
-  left: var(--space-6);
-  display: inline-flex;
-  min-height: 38px;
-  align-items: center;
-  padding: 0 var(--space-4);
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  border-radius: 12px;
-  background: rgba(244, 239, 230, 0.9);
-  color: var(--hero-ink-black);
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 20px;
-}
-
-.home-hero-slide__meta {
   right: var(--space-6);
   bottom: var(--space-6);
   max-width: calc(100% - var(--space-12));
@@ -656,17 +605,11 @@ onBeforeUnmount(() => {
   line-height: 20px;
 }
 
-.home-hero-slide__media--collage {
-  display: grid;
-  height: 300px;
-  padding: var(--space-6);
-  background:
-    linear-gradient(135deg, rgba(74, 107, 87, 0.16), rgba(244, 239, 230, 0.22)),
-    var(--hero-warm-paper);
-}
-
-.home-hero-slide__media--collage::after {
-  background: linear-gradient(0deg, rgba(18, 18, 18, 0.12), transparent 48%);
+.home-hero-slide__collage {
+  position: absolute;
+  inset: 0 0 0 46%;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .home-hero-slide__collage-image {
@@ -695,24 +638,6 @@ onBeforeUnmount(() => {
   top: 13%;
   width: 26%;
   height: 38%;
-}
-
-.home-hero-slide__media-note {
-  right: var(--space-6);
-  bottom: var(--space-6);
-  padding: 8px 12px;
-  border-radius: var(--radius-chip);
-  background: rgba(74, 107, 87, 0.88);
-  color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 18px;
-}
-
-.home-hero-slide__media--studio::after {
-  background:
-    linear-gradient(90deg, rgba(244, 239, 230, 0.3), transparent 38%),
-    linear-gradient(0deg, rgba(18, 18, 18, 0.3), transparent 52%);
 }
 
 .home-hero-carousel__arrow {
@@ -785,8 +710,6 @@ onBeforeUnmount(() => {
   }
 
   .home-hero-slide {
-    grid-template-columns: 1fr;
-    grid-template-rows: 180px 160px;
     height: 340px;
   }
 
@@ -810,20 +733,21 @@ onBeforeUnmount(() => {
     min-height: 50px;
   }
 
-  .home-hero-slide__media,
-  .home-hero-slide__image,
-  .home-hero-slide__media--collage {
-    height: 160px;
+  .home-hero-slide::before {
+    background:
+      linear-gradient(180deg, rgba(18, 18, 18, 0.82) 0%, rgba(18, 18, 18, 0.56) 54%, rgba(18, 18, 18, 0.16) 100%),
+      linear-gradient(90deg, rgba(18, 18, 18, 0.44), transparent 70%);
+  }
+
+  .home-hero-slide--discover::before,
+  .home-hero-slide--sell::before {
+    background:
+      linear-gradient(180deg, rgba(244, 239, 230, 0.95) 0%, rgba(244, 239, 230, 0.78) 58%, rgba(244, 239, 230, 0.18) 100%),
+      linear-gradient(90deg, rgba(244, 239, 230, 0.62), transparent 72%);
   }
 
   .home-hero-carousel__arrow {
     display: none;
-  }
-
-  .home-hero-slide__live-badge,
-  .home-hero-slide__schedule-card {
-    top: var(--space-4);
-    left: var(--space-4);
   }
 
   .home-hero-slide__meta {
@@ -834,26 +758,31 @@ onBeforeUnmount(() => {
   }
 
   .home-hero-slide__collage-image--1 {
-    right: 14%;
-    bottom: 8%;
-    width: 40%;
-    height: 70%;
+    right: 8%;
+    bottom: 7%;
+    width: 42%;
+    height: 42%;
   }
 
   .home-hero-slide__collage-image--2 {
-    left: 8%;
-    width: 38%;
+    top: auto;
+    bottom: 10%;
+    left: 10%;
+    width: 34%;
+    height: 34%;
   }
 
   .home-hero-slide__collage-image--3 {
-    right: 8%;
-    width: 28%;
+    top: auto;
+    right: 22%;
+    bottom: 30%;
+    width: 24%;
+    height: 28%;
   }
 }
 
 @media (max-width: 520px) {
   .home-hero-slide {
-    grid-template-rows: 190px 150px;
     height: 340px;
   }
 
