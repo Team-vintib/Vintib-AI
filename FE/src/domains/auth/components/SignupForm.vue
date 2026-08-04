@@ -624,7 +624,7 @@ const applyDuplicateEmailError = (message?: string) => {
 
     <button
       v-if="duplicateEmail"
-      class="h-11 w-full rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+      class="h-11 w-full rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
       type="button"
       :disabled="isSubmitting"
       @click="handleMoveToLogin"
@@ -643,9 +643,9 @@ const applyDuplicateEmailError = (message?: string) => {
         <input
           id="signup-name"
           v-model="form.name"
-          class="h-12 w-full rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+          class="h-12 w-full rounded-[var(--radius-control)] border bg-transparent px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)]"
           :class="
-            errors.name ? 'border-[var(--color-error)]' : 'border-[var(--color-border-strong)]'
+            errors.name ? 'border-[var(--color-error)]' : 'border-[var(--color-border-input)]'
           "
           type="text"
           autocomplete="name"
@@ -699,11 +699,11 @@ const applyDuplicateEmailError = (message?: string) => {
           <input
             id="signup-password"
             v-model="form.password"
-            class="h-12 w-full rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 pr-20 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+            class="h-12 w-full rounded-[var(--radius-control)] border bg-transparent px-4 pr-20 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)]"
             :class="
               errors.password
                 ? 'border-[var(--color-error)]'
-                : 'border-[var(--color-border-strong)]'
+                : 'border-[var(--color-border-input)]'
             "
             :type="isPasswordVisible ? 'text' : 'password'"
             autocomplete="new-password"
@@ -714,7 +714,7 @@ const applyDuplicateEmailError = (message?: string) => {
             @blur="handleFieldBlur('password')"
           />
           <button
-            class="absolute right-2 top-1/2 h-9 -translate-y-1/2 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+            class="absolute right-2 top-1/2 h-9 -translate-y-1/2 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
             type="button"
             :aria-pressed="isPasswordVisible"
             @click="togglePasswordVisibility"
@@ -741,11 +741,11 @@ const applyDuplicateEmailError = (message?: string) => {
         <input
           id="signup-password-confirm"
           v-model="form.passwordConfirm"
-          class="h-12 w-full rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+          class="h-12 w-full rounded-[var(--radius-control)] border bg-transparent px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)]"
           :class="
             errors.passwordConfirm
               ? 'border-[var(--color-error)]'
-              : 'border-[var(--color-border-strong)]'
+              : 'border-[var(--color-border-input)]'
           "
           :type="isPasswordVisible ? 'text' : 'password'"
           autocomplete="new-password"
@@ -823,7 +823,7 @@ const applyDuplicateEmailError = (message?: string) => {
 
     <section class="space-y-3" aria-label="회원가입 실행">
       <button
-        class="h-[var(--button-height-major)] w-full rounded-[var(--radius-control)] px-5 text-[15px] font-semibold transition focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+        class="h-[var(--button-height-major)] w-full rounded-[var(--radius-control)] px-5 text-[15px] font-semibold transition focus:outline-none"
         :class="
           !isSubmitting
             ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)] hover:bg-[var(--color-primary-hover)]'
@@ -836,7 +836,7 @@ const applyDuplicateEmailError = (message?: string) => {
       </button>
 
       <button
-        class="h-12 w-full rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+        class="h-12 w-full rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
         type="button"
         :disabled="isSubmitting"
         @click="handleSsafySignUp"

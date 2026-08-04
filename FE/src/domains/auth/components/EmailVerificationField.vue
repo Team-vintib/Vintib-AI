@@ -64,9 +64,9 @@ const handleVerificationCodeInput = (event: Event) => {
       <div class="flex gap-2 max-sm:flex-col">
         <input
           id="signup-email"
-          class="h-12 min-w-0 flex-1 rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+          class="h-12 min-w-0 flex-1 rounded-[var(--radius-control)] border bg-transparent px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)]"
           :class="
-            emailError ? 'border-[var(--color-error)]' : 'border-[var(--color-border-strong)]'
+            emailError ? 'border-[var(--color-error)]' : 'border-[var(--color-border-input)]'
           "
           type="email"
           autocomplete="email"
@@ -79,7 +79,7 @@ const handleVerificationCodeInput = (event: Event) => {
           @blur="emit('emailBlur')"
         />
         <button
-          class="h-12 shrink-0 rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+          class="h-12 shrink-0 rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-4 text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           type="button"
           :disabled="
             !canCheckDuplicate ||
@@ -115,11 +115,11 @@ const handleVerificationCodeInput = (event: Event) => {
       <div class="flex gap-2 max-sm:flex-col">
         <input
           id="signup-verification-code"
-          class="h-12 min-w-0 flex-1 rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+          class="h-12 min-w-0 flex-1 rounded-[var(--radius-control)] border bg-transparent px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)]"
           :class="
             verificationCodeError
               ? 'border-[var(--color-error)]'
-              : 'border-[var(--color-border-strong)]'
+              : 'border-[var(--color-border-input)]'
           "
           type="text"
           inputmode="numeric"
@@ -134,7 +134,7 @@ const handleVerificationCodeInput = (event: Event) => {
           @blur="emit('verificationCodeBlur')"
         />
         <button
-          class="h-12 shrink-0 rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+          class="h-12 shrink-0 rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-4 text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           type="button"
           :disabled="
             !canSendCode ||
@@ -150,7 +150,7 @@ const handleVerificationCodeInput = (event: Event) => {
           {{ isSendingCode ? '발송 중' : '인증코드 발송' }}
         </button>
         <button
-          class="h-12 shrink-0 rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-4 text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+          class="h-12 shrink-0 rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-4 text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           type="button"
           :disabled="
             !canVerifyCode ||
