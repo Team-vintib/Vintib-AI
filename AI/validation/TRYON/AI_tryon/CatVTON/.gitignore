@@ -20,6 +20,7 @@ result/*
 !result/attention_map_result/
 !result/fit_types_result/
 !result/size_fit_*/
+!result/size_quiz_*/
 !result/worn_reference_result/
 !result/worn_reference_matched_result/
 !result/worn_references/

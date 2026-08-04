@@ -36,21 +36,22 @@ WIDTH, HEIGHT = 768, 1024
 NUM_STEPS = 8
 GARMENT_PATH = os.path.join("image", "alpha_3", "jeans_cropped.png")
 
-# 사람마다 본인 AI 모델 생성 프롬프트와 동일한 몸 묘사 + 셔츠 색 + 허리둘레 가정값(§9에서
-# 확립). 셔츠 색을 본인 베이스 사진과 다르게 주면(예: 영희는 실제로 흰 티인데 회색으로
-# 생성) 마스크 경계에서 그 색이 새어나오는 아티팩트가 생긴다 -- 반드시 맞춰야 한다.
+# 사람마다 본인 AI 모델 생성 프롬프트와 동일한 몸 묘사 + 셔츠 색 + 허리둘레/키 가정값
+# (§9에서 확립). 셔츠 색을 본인 베이스 사진과 다르게 주면(예: 영희는 실제로 흰 티인데
+# 회색으로 생성) 마스크 경계에서 그 색이 새어나오는 아티팩트가 생긴다 -- 반드시 맞춰야
+# 한다. 키는 총장(길이) 차이를 "그 사람 기준 %"로 정규화하는 데 쓴다 -- 폭 축이
+# body_waist_cm로 정규화하는 것과 같은 원리(§7.5).
 PEOPLE = {
-    # NOTE: 영희만 셔츠 색이 실제와 안 맞아서(흰색인데 회색으로 생성) 4장만 다시 만든다 --
-    # 확인되면 아래 세 줄 복구.
-    # "cheolsu": ("a young Korean man", "grey", 75.0),
-    "younghee": ("a young Korean woman", "white", 65.0),
-    # "dooly": ("a heavyset plus-size Korean man with a bigger, larger build", "grey", 110.0),
-    # "maikol": ("a tall, slim young Black man", "grey", 72.0),
+    # NOTE: 둘리 M(ratio=0.727, 물리적으로 30cm나 작은 사이즈)이 여전히 안 타이트해
+    # 보여서 "extremely tight" 문구를 더 극단적으로 강화하고 둘리만 다시 만든다.
+    # "cheolsu": ("a young Korean man", "grey", 75.0, 175.0),
+    # "younghee": ("a young Korean woman", "white", 65.0, 162.0),
+    "dooly": ("a heavyset plus-size Korean man with a bigger, larger build", "grey", 110.0, 172.0),
+    # "maikol": ("a tall, slim young Black man", "grey", 72.0, 188.0),
 }
-SIZE_TABLE_WAIST_WIDTH_CM = {"M": 40.0, "L": 42.5, "XL": 45.0, "2XL": 47.5}
-# 총장(cm) -- 사이즈가 커질수록 기장도 길어진다(실제 사이즈표 값). 신장 가정값이 없어서
-# 절대 기준은 없지만, M을 기준으로 나머지가 얼마나 더 긴지(발목에 더 떨어지는지)는
-# 상대적으로 표현할 수 있다.
+SIZE_TABLE_WAIST_WIDTH_CM = {"M": 40.0}  # NOTE: M만 먼저 튜닝 확인 -- 확인되면 L/XL/2XL 복구
+# SIZE_TABLE_WAIST_WIDTH_CM = {"M": 40.0, "L": 42.5, "XL": 45.0, "2XL": 47.5}
+# 총장(cm, 실제 사이즈표 값) -- 사이즈가 커질수록 기장도 길어진다.
 LENGTH_TABLE_CM = {"M": 106.5, "L": 108.0, "XL": 109.5, "2XL": 111.0}
 
 
@@ -68,36 +69,50 @@ def fit_descriptor(ratio: float) -> str:
     pct = abs(ratio - 1.0) * 100
     if ratio < 1.0:
         if ratio <= 0.75:
-            base = "worn extremely tight with the denim straining and stretched taut across the hips and thighs"
+            base = (
+                "worn drastically too small, barely able to be worn, the button "
+                "straining and unable to close fully, a large muffin-top bulge of flesh "
+                "spilling over the waistband, the denim stretched so tight over the "
+                "belly, hips, and thighs that the fabric is taut like a drum and the "
+                "belt loops are pulled sideways, deep compression creases radiating "
+                "from the crotch, the calves also tightly squeezed by the narrow leg "
+                "opening"
+            )
         elif ratio <= 0.85:
-            base = "worn very tight with the denim visibly stretched across the hips and thighs"
+            base = (
+                "worn very tight, the denim visibly stretched across the waist, hips, "
+                "thighs, and calves, the waistband snug against the skin with a slight "
+                "bulge above it"
+            )
         else:
-            base = "worn snugly, slightly tight through the hips and thighs"
+            base = "worn snugly, fitting close and slightly tight against the hips, thighs, and calves"
         return f"{base}, about {pct:.0f}% too small at the waist"
     if ratio <= 1.05:
         return "fitting comfortably in a regular fit"
     if ratio <= 1.15:
-        base = "worn in a relaxed, slightly loose fit"
+        base = "worn in a relaxed, slightly loose fit through the hips, thighs, and calves"
     elif ratio <= 1.30:
-        base = "worn in a loose, baggy fit with extra room through the hips and thighs"
+        base = "worn in a loose, baggy fit with extra room through the hips, thighs, and calves"
     else:
-        base = "worn in an extremely loose, oversized fit with excess room through the hips and thighs"
+        base = "worn in an extremely loose, oversized fit with excess room through the hips, thighs, and calves"
     return f"{base}, about {pct:.0f}% too big at the waist"
 
 
-def length_descriptor(length_delta_cm: float) -> str:
-    """M(가장 짧은 사이즈) 대비 총장이 얼마나 긴지 -> 기장(발목 쪽) 묘사 절.
+def length_descriptor(length_delta_cm: float, height_cm: float) -> str:
+    """M(가장 짧은 사이즈) 대비 총장 차이를 그 사람 키 대비 %로 정규화해서 기장 묘사 절을
+    고른다 -- 같은 절대 cm라도 키가 작으면 더 크게, 크면 더 작게 체감된다는 걸 반영한다
+    (폭 축이 body_waist_cm로 정규화하는 것과 동일한 원리).
 
-    신장 가정값이 없어서 절대 기준은 못 쓰고, M을 0cm 기준점 삼아 상대적으로만
-    표현한다. 0이면 문구 없음(M 자신).
+    0이면(M 자신) 문구 없음.
     """
     if length_delta_cm <= 0:
         return ""
-    if length_delta_cm <= 2.0:
-        return f", the hem breaking gently right at the shoes ({length_delta_cm:.1f}cm longer than the shortest size)"
+    pct = length_delta_cm / height_cm * 100
+    if pct <= 1.2:
+        return f", the hem breaking gently right at the shoes (about {pct:.1f}% of their height longer than the shortest size)"
     return (
-        f", the extra {length_delta_cm:.1f}cm of length pooling and bunching slightly "
-        "over the shoes"
+        f", the extra length (about {pct:.1f}% of their height more than the shortest "
+        "size) pooling and bunching noticeably over the shoes"
     )
 
 
@@ -149,12 +164,12 @@ pipe = Flux2KleinPipeline.from_pretrained(
 )
 pipe.enable_model_cpu_offload()
 
-for person_name, (body_desc, shirt_color, waist_cm) in PEOPLE.items():
+for person_name, (body_desc, shirt_color, waist_cm, height_cm) in PEOPLE.items():
     for size_label, garment_waist_width_cm in SIZE_TABLE_WAIST_WIDTH_CM.items():
         ratio = garment_waist_width_cm / (waist_cm / 2.0)
         fit_phrase = fit_descriptor(ratio)
         length_delta_cm = LENGTH_TABLE_CM[size_label] - LENGTH_TABLE_CM["M"]
-        length_phrase = length_descriptor(length_delta_cm)
+        length_phrase = length_descriptor(length_delta_cm, height_cm)
         hem_phrase = length_phrase if length_phrase else ", ending cleanly right at the ankles above the shoes"
 
         prompt = (
