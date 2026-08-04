@@ -18,9 +18,16 @@ interface InterestOption {
   label: string
 }
 
+// 관심 카테고리는 성별(depth 1)을 빼고 대분류(depth 2)만 보여준다.
+// 성별마다 중복되는 대분류(예: 남/여/공용 상의)를 이름으로 묶고, 선택 시 그 이름의 모든 성별 id를 함께 담는다.
+interface CategoryGroup {
+  label: string
+  ids: number[]
+}
+
 const brandSearchQuery = ref('')
 const brands = ref<InterestOption[]>([])
-const categories = ref<InterestOption[]>([])
+const categories = ref<CategoryGroup[]>([])
 const selectedBrandIds = ref<number[]>([])
 const selectedCategoryIds = ref<number[]>([])
 const isSubmitting = ref(false)
@@ -112,9 +119,24 @@ const handleSave = async (skip = false) => {
   }
 }
 
-const handleCategoryChange = () => {
+const isCategorySelected = (ids: number[]) =>
+  ids.length > 0 && ids.every((id) => selectedCategoryIds.value.includes(id))
+
+// 대분류 그룹을 토글한다 — 성별 구분 없이 그 이름의 모든 성별 id를 함께 넣거나 뺀다.
+const toggleCategory = (ids: number[]) => {
   submitError.value = ''
+
+  if (isCategorySelected(ids)) {
+    selectedCategoryIds.value = selectedCategoryIds.value.filter((id) => !ids.includes(id))
+    return
+  }
+
+  selectedCategoryIds.value = [...new Set([...selectedCategoryIds.value, ...ids])]
 }
+
+const selectedCategoryCount = computed(
+  () => categories.value.filter((category) => isCategorySelected(category.ids)).length,
+)
 
 const loadInterestOptions = async () => {
   try {
@@ -124,12 +146,15 @@ const loadInterestOptions = async () => {
       id: brand.id,
       label: brand.nameEn ? `${brand.name} (${brand.nameEn})` : brand.name,
     }))
-    categories.value = categoryResponse
-      .filter((category) => category.depth <= 2)
-      .map((category) => ({
-        id: category.id,
-        label: category.name,
-      }))
+    const categoryGroups = new Map<string, number[]>()
+    categoryResponse
+      .filter((category) => category.depth === 2)
+      .forEach((category) => {
+        const ids = categoryGroups.get(category.name) ?? []
+        ids.push(category.id)
+        categoryGroups.set(category.name, ids)
+      })
+    categories.value = [...categoryGroups.entries()].map(([label, ids]) => ({ label, ids }))
   } catch {
     brands.value = []
     categories.value = []
@@ -224,7 +249,7 @@ onMounted(() => {
         <legend class="interest-group__legend">
           <span>관심 카테고리</span>
           <span class="interest-group__count" aria-live="polite">
-            {{ selectedCategoryIds.length }}개 선택
+            {{ selectedCategoryCount }}개 선택
           </span>
         </legend>
 
@@ -233,29 +258,21 @@ onMounted(() => {
         </p>
 
         <div class="category-options">
-          <label
+          <button
             v-for="category in categories"
-            :key="category.id"
+            :key="category.label"
+            type="button"
             class="category-option"
-            :class="{
-              'category-option--selected': selectedCategoryIds.includes(category.id),
-            }"
+            :class="{ 'category-option--selected': isCategorySelected(category.ids) }"
+            :aria-pressed="isCategorySelected(category.ids)"
+            @click="toggleCategory(category.ids)"
           >
-            <input
-              v-model="selectedCategoryIds"
-              class="category-option__input"
-              type="checkbox"
-              name="interest-category"
-              :value="category.id"
-              @change="handleCategoryChange"
-            />
-
             <span class="category-option__label">{{ category.label }}</span>
 
             <span class="category-option__check" aria-hidden="true">
-              {{ selectedCategoryIds.includes(category.id) ? '✓' : '' }}
+              {{ isCategorySelected(category.ids) ? '✓' : '' }}
             </span>
-          </label>
+          </button>
         </div>
       </fieldset>
 

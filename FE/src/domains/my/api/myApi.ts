@@ -10,12 +10,14 @@ import { PRODUCT_LIST_MOCK_DATA } from '@/domains/product/constants/productListM
 import type {
   MyLiveItem,
   MyOrderItem,
+  MyOrderStatus,
   MyPageViewData,
   MyProductItem,
   MyProductStatus,
   MyProfile,
   MyProfileUpdateRequest,
   MySaleItem,
+  MySettlementStatus,
   MyWishItem,
 } from '@/domains/my/types/my.types'
 import type {
@@ -58,7 +60,6 @@ type ProductSaleStatusDto =
   | 'AUCTION_IN_PROGRESS'
   | 'AUCTION_FAILED'
   | 'SOLD'
-  | 'PRIVATE'
 
 interface MyProductApiDto {
   id: number
@@ -93,6 +94,33 @@ interface MyLiveApiDto {
   scheduledAt: string | null
   startedAt: string | null
   viewerCount: number
+}
+
+interface OrderProductDto {
+  id: number
+  sellerId: number
+  categoryId: number | null
+  brandId: number | null
+  title: string
+  description?: string | null
+  conditionGrade?: string | null
+  sizeLabel?: string | null
+  saleType: ProductSaleTypeDto
+  saleStatus?: ProductSaleStatusDto
+  price: number | null
+  createdAt: string
+}
+
+interface OrderListItemDto {
+  orderId: number
+  product: OrderProductDto
+  buyerId: number
+  buyerNickname: string
+  sellerId: number
+  sellerNickname: string
+  orderPrice: number
+  status: string
+  createdAt: string
 }
 
 interface BackendPageResponse<T> {
@@ -182,26 +210,39 @@ const createEmptyMyPageViewData = (userId: number): MyPageViewData => ({
 export const getMyPageViewData = async (userId: number): Promise<MyPageViewData> => {
   const baseViewData = createEmptyMyPageViewData(userId)
 
-  const [profileResult, wishesResult, productsResult, livesResult, notificationCountResult] =
-    await Promise.allSettled([
-      getMyProfile(userId),
-      getMyWishList(userId),
-      MY_API_ENABLED ? getMySellerProducts(userId) : Promise.resolve(null),
-      MY_LIVE_API_ENABLED ? getMyHostLives(userId) : Promise.resolve(null),
-      MY_API_ENABLED ? getUnreadNotificationCount(userId) : Promise.resolve(null),
-    ])
+  const [
+    profileResult,
+    wishesResult,
+    productsResult,
+    livesResult,
+    notificationCountResult,
+    ordersResult,
+    salesResult,
+  ] = await Promise.allSettled([
+    getMyProfile(userId),
+    getMyWishList(userId),
+    MY_API_ENABLED ? getMySellerProducts(userId) : Promise.resolve(null),
+    MY_LIVE_API_ENABLED ? getMyHostLives(userId) : Promise.resolve(null),
+    MY_API_ENABLED ? getUnreadNotificationCount(userId) : Promise.resolve(null),
+    MY_API_ENABLED ? getMyOrders(userId, 'BUYER') : Promise.resolve(null),
+    MY_API_ENABLED ? getMyOrders(userId, 'SELLER') : Promise.resolve(null),
+  ])
 
   const profile = getSettledValue(profileResult)
   const wishes = getSettledValue(wishesResult)
   const products = getSettledValue(productsResult)
   const lives = getSettledValue(livesResult)
   const unreadNotifications = getSettledValue(notificationCountResult)
+  const orders = getSettledValue(ordersResult)?.map(toMyOrderItem) ?? null
+  const sales = getSettledValue(salesResult)?.map(toMySaleItem) ?? null
 
   return {
     ...baseViewData,
     products: products ?? [],
     lives: lives ?? [],
     wishes: wishes?.items ?? [],
+    orders: orders ?? [],
+    sales: sales ?? [],
     wishMeta: wishes?.meta ?? EMPTY_PAGE_META,
     summary: {
       ...baseViewData.summary,
@@ -210,6 +251,8 @@ export const getMyPageViewData = async (userId: number): Promise<MyPageViewData>
         ...baseViewData.summary.counts,
         wishes: wishes?.items.length ?? 0,
         unreadNotifications: unreadNotifications ?? 0,
+        orders: orders?.length ?? 0,
+        sales: sales?.length ?? 0,
       },
       productStatusCounts: products ? getProductStatusCounts(products) : baseViewData.summary.productStatusCounts,
       todoCounts: {
@@ -299,6 +342,26 @@ const getMySellerProducts = async (userId: number): Promise<MyProductItem[]> => 
   )
 
   return products.filter((item): item is MyProductItem => item !== null)
+}
+
+const getMyOrders = async (
+  userId: number,
+  role: 'BUYER' | 'SELLER',
+): Promise<OrderListItemDto[]> => {
+  const response = await http.get<
+    ApiResponse<PageResponse<OrderListItemDto> | BackendPageResponse<OrderListItemDto>>
+  >(`/users/${userId}/orders`, {
+    params: {
+      role,
+      page: 0,
+      size: 100,
+    },
+  })
+  const pageResponse = normalizePageResponse(
+    unwrapApiData(response.data, '주문 목록을 불러오지 못했습니다.'),
+  )
+
+  return pageResponse.items
 }
 
 const getMyHostLives = async (userId: number): Promise<MyLiveItem[]> => {
@@ -508,6 +571,54 @@ const toMyLiveItem = (live: MyLiveApiDto): MyLiveItem | null => {
     viewerCount: live.viewerCount,
     broadcastAt: live.startedAt ?? live.scheduledAt ?? '',
   }
+}
+
+const toMyOrderItem = (order: OrderListItemDto): MyOrderItem => ({
+  id: order.orderId,
+  type: order.product.saleType === 'AUCTION' ? 'AUCTION' : 'DIRECT',
+  status: order.status as MyOrderStatus,
+  productName: order.product.title,
+  productThumbnailUrl: '',
+  sellerNickname: order.sellerNickname,
+  paidAmount: order.orderPrice,
+  createdAt: order.createdAt,
+  recipientName: '',
+  recipientPhoneNumber: '',
+  postalCode: '',
+  address: '',
+  detailAddress: '',
+})
+
+const toMySaleItem = (order: OrderListItemDto): MySaleItem => ({
+  id: order.orderId,
+  status: order.status as MyOrderStatus,
+  settlementStatus: toMySettlementStatus(order.status),
+  productName: order.product.title,
+  productThumbnailUrl: '',
+  buyerNickname: order.buyerNickname,
+  paidAmount: order.orderPrice,
+  createdAt: order.createdAt,
+  recipientName: '',
+  recipientPhoneNumber: '',
+  postalCode: '',
+  address: '',
+  detailAddress: '',
+})
+
+const toMySettlementStatus = (status: string): MySettlementStatus => {
+  if (status === 'SETTLED') {
+    return 'SETTLED'
+  }
+
+  if (status === 'CONFIRMED') {
+    return 'PENDING'
+  }
+
+  if (status === 'REFUNDED') {
+    return 'REFUND_REQUESTED'
+  }
+
+  return 'ESCROW'
 }
 
 const toProductListItem = async (product: MyProductApiDto): Promise<ProductListItem> => {

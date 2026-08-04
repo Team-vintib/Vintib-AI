@@ -68,3 +68,17 @@ export interface PointTransactionQuery {
   size?: number
   type?: PointTransactionType | 'ALL'
 }
+
+/** 충전 준비(POINT-001) 응답 — 토스페이먼츠 결제위젯에 그대로 넘긴다. */
+export interface PointChargeReady {
+  orderId: string
+  amount: number
+  clientKey: string
+}
+
+/** 충전 승인(POINT-001) 요청 — 결제위젯이 successUrl로 돌려준 값을 그대로 담는다. */
+export interface PointChargeConfirmRequest {
+  orderId: string
+  paymentKey: string
+  amount: number
+}

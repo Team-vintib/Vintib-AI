@@ -21,7 +21,7 @@ const label = computed(() => {
     return '처리 중'
   }
 
-  return props.isFollowing ? '팔로잉' : '팔로우'
+  return props.isFollowing ? '언팔로우' : '팔로우'
 })
 </script>
 

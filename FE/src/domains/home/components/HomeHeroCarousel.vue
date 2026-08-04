@@ -487,7 +487,7 @@ onBeforeUnmount(() => {
   position: relative;
   flex: 0 0 100%;
   display: block;
-  height: 300px;
+  height: 440px;
   overflow: hidden;
   isolation: isolate;
   background: var(--hero-ink-black);
@@ -535,7 +535,7 @@ onBeforeUnmount(() => {
   justify-items: start;
   gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-8) var(--space-10);
+  padding: var(--space-12) var(--space-10);
 }
 
 .home-hero-slide__label {
@@ -730,12 +730,12 @@ onBeforeUnmount(() => {
   }
 
   .home-hero-slide {
-    height: 340px;
+    height: 400px;
   }
 
   .home-hero-slide__content {
     align-content: start;
-    padding: var(--space-5) var(--space-5) var(--space-4);
+    padding: var(--space-8) var(--space-5) var(--space-4);
   }
 
   .home-hero-slide__title {

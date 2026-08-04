@@ -7,7 +7,6 @@ export type ProductDetailSaleStatus =
   | 'AUCTION_IN_PROGRESS'
   | 'AUCTION_FAILED'
   | 'SOLD'
-  | 'PRIVATE'
 
 export type AiQualityAnalysisStatus =
   | 'NOT_REQUESTED'

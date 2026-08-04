@@ -30,6 +30,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   viewerCount: [count: number]
+  realtimeReady: [client: LiveRealtimeClient]
 }>()
 
 interface LiveReactionParticle {
@@ -111,6 +112,12 @@ const connectRealtime = () => {
       isConnected.value = true
       errorMessage.value = ''
       subscribeRealtime()
+
+      // 시청 화면(LiveWatchPage)이 이 연결에 방송 상태·현재 상품 구독을 얹을 수 있도록
+      // 연결된 클라이언트를 부모에 넘긴다(연결을 하나로 합쳐 시청자수 중복 집계 방지).
+      if (realtimeClient) {
+        emit('realtimeReady', realtimeClient)
+      }
     },
     onDisconnect: () => {
       isConnected.value = false
