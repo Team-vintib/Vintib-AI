@@ -15,6 +15,7 @@ import type {
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
 import { buildMockAiQualityAnalysis } from '@/domains/product/constants/aiQualityAnalysisMockData'
+import { buildMockProductDetail } from '@/domains/product/constants/productDetailMockData'
 import { PRODUCT_LIST_MOCK_DATA } from '@/domains/product/constants/productListMockData'
 import { http } from '@/shared/api/http'
 import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.types'
@@ -199,6 +200,10 @@ export const getProductList = async ({
 }
 
 export const getProductDetail = async (productId: number): Promise<ProductDetailViewData> => {
+  if (!PRODUCT_API_ENABLED) {
+    return buildMockProductDetail(productId)
+  }
+
   const response = await http.get<ApiResponse<ProductDetailDto>>(`/products/${productId}`)
 
   return toProductDetailViewData(unwrapApiData(response.data))
