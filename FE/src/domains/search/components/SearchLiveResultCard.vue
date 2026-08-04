@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import fallbackLiveThumbnail from '@/assets/images/products/product-denim-jacket.webp'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 
 import type { SearchLiveResult } from '@/domains/search/types/search.types'
@@ -9,6 +10,16 @@ import type { SearchLiveResult } from '@/domains/search/types/search.types'
 const props = defineProps<{
   live: SearchLiveResult
 }>()
+
+const displayThumbnailUrl = computed(() => props.live.thumbnailUrl || fallbackLiveThumbnail)
+const handleThumbnailError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackLiveThumbnail
+  }
+}
 
 const statusLabel = computed(() => {
   if (props.live.status === 'LIVE') {
@@ -51,7 +62,12 @@ const displayTime = computed(() => {
       class="search-live-card__media"
       :to="{ name: ROUTE_NAMES.LIVE_WATCH, params: { liveId: live.id } }"
     >
-      <img class="search-live-card__image" :src="live.thumbnailUrl" :alt="live.title" />
+      <img
+        class="search-live-card__image"
+        :src="displayThumbnailUrl"
+        :alt="live.title"
+        @error="handleThumbnailError"
+      />
       <span class="search-live-card__badge" :class="statusClass">{{ statusLabel }}</span>
     </RouterLink>
 
