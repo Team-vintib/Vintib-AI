@@ -2,16 +2,7 @@
 
 - **작성자 파트**: BE (정윤) / **대상 파트**: FE
 
-## 반영 현황 (2026-08-04 확인)
-
-원 문서의 대부분이 FE 코드에 반영됐다:
-
-- ✅ **§1 시각 9시간 보정 훅 없음** — KST 벽시계 문자열을 그대로 파싱(`LiveWatchPage.vue` 등, `+9h`/`-9h` 보정 코드 없음)
-- ✅ **§2.2 `isHost` 사용** — `hostId` 직접 비교 대신 응답 `isHost` 사용 + `GET /api/lives/{liveId}`에 인증 헤더 첨부 (`liveWatchApi.ts`, `LiveWatchPage.vue`, `LiveBroadcastPage.vue`)
-- ✅ **§2.3 `/topic/lives/{liveId}/status` 구독** — 종료 시 시청 화면 전환
-- ✅ **§3 홈 실데이터 전환**(mock 제거), **§4 통합 검색 실 API**, **§5 예약 라이브 알림 토글**
-
-> ⚠️ **목록 화면 `isHost`(§2.2와 별개)는 아직**입니다 — `028-live-auto-start-isHost-viewercount.md` §2 참고.
+> 대부분(§1 시각 보정 없음, §2.2 상세 `isHost`, §2.3 status 구독, §3 홈 실데이터, §4 통합 검색, §5 예약 알림 토글)은 반영 완료되어 덜어냈다. §2.4 1건 + 시각 계약만 남긴다.
 
 ## 남은 항목
 
