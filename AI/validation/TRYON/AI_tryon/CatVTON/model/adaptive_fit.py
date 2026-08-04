@@ -56,7 +56,9 @@ def _clamp(value: float, low: float, high: float) -> float:
 
 def ratio_to_dilation_px(
     ratio: float | None,
-    scale_px: float = 20.0,
+    scale_px: float = 60.0,  # 실험: 20 -> 60. 실제 사이즈표(§9)로 테스트해보니 20은 M~4XL
+    # 스윙 전체가 몇 px밖에 안 돼서 육안으로 거의 안 보였다 -- 캘리브레이션 실험 진행 중,
+    # production(worker/models/catvton/)에는 아직 반영하지 않았다.
     max_px: float = 40.0,
 ) -> float:
     """폭 비율(1.0 근처가 중립)을 실제 팽창 픽셀 수로 매핑한다.

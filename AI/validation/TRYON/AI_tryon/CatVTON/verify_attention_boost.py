@@ -26,7 +26,7 @@ from model.cloth_masker import AutoMasker
 from model.pipeline import CatVTONPipeline
 from utils import init_weight_dtype, resize_and_crop, resize_and_padding
 
-OUT_DIR = "attention_boost_result"
+OUT_DIR = "result/attention_boost_result"
 os.makedirs(OUT_DIR, exist_ok=True)
 
 WIDTH, HEIGHT = 768, 1024
@@ -42,7 +42,7 @@ PEOPLE = {
     "younghee": os.path.join("..", "models_ai_generated", "younghee.png"),
     "dooly": os.path.join("..", "models_ai_generated", "dooly.png"),
 }
-WORN_REF_DIR = "worn_references"
+WORN_REF_DIR = "result/worn_references"
 
 print("=== 파이프라인 초기화 ===")
 repo_path = snapshot_download(repo_id="zhengchong/CatVTON")

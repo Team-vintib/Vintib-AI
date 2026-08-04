@@ -11,4 +11,19 @@ densepose_
 playground.py
 output
 model/cloth_masker_segformer.py
-result/
+
+# CatVTON 자체 데모 산출물은 무시하되, 우리가 result/ 밑에 정리해둔 PoC 결과 폴더(비포/애프터
+# 비교용으로 커밋 대상)는 예외로 되살린다 -- 타임스탬프 붙은 일회성 폴더(alpha_test_* 등)는
+# 계속 무시된다.
+result/*
+!result/attention_boost_result/
+!result/attention_map_result/
+!result/fit_types_result/
+!result/size_fit_*/
+!result/size_quiz_*/
+!result/worn_reference_result/
+!result/worn_reference_matched_result/
+!result/worn_references/
+!result/top_worn_ref_as_person/
+!result/outer_worn_ref_as_person/
+!result/alpha3_hat_shoes/
