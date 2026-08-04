@@ -75,6 +75,10 @@ public interface ProductQueryPort {
      * @param saleType       {@code DIRECT_SALE} / {@code AUCTION}. 판매 방식 미정이면 {@code null}
      * @param conditionGrade 중고 상태 등급. 등급 체계가 미확정이라 자유 문자열이다
      * @param thumbnailUrl   대표 이미지 URL. 등록된 이미지가 없으면 {@code null}
+     * @param material       소재. 등록하지 않았으면 {@code null}(FE 요청 003 §3.5 선택 필드)
+     * @param measurements   실측 치수(cm). 항목이 상품마다 달라 키-값으로 받는다. 없으면 {@code null}
+     * @param defectSummary  하자 요약. 등록된 하자 항목을 순서대로 이어 붙인 문자열. 없으면 {@code null}
+     *                       — FE는 목록 형태가 아니라 한 줄 요약을 요청했다(003 §3.5)
      */
     record ProductCard(
             Long id,
@@ -83,7 +87,10 @@ public interface ProductQueryPort {
             Long price,
             String saleType,
             String conditionGrade,
-            String thumbnailUrl) {
+            String thumbnailUrl,
+            String material,
+            Map<String, Integer> measurements,
+            String defectSummary) {
     }
 
     /** 카테고리 표시용 최소 정보. */

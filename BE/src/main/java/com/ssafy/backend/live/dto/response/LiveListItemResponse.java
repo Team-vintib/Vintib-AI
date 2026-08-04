@@ -25,6 +25,14 @@ public record LiveListItemResponse(
         @Schema(description = "호스트 닉네임", example = "빈티지장인")
         String hostNickname,
 
+        @Schema(
+                description = "**요청자가 이 방송의 호스트인지.** 비회원이거나 토큰이 없으면 false. "
+                        + "마이페이지 라이브 관리(MY-005)에서 '내 라이브' 배지·편집 진입을 이 값으로 가른다 — "
+                        + "`hostId`를 클라이언트에서 직접 비교하면 회원 정보 복원이 늦을 때 판정이 뒤집힌다 "
+                        + "(상세 조회의 `isHost`와 같은 이유)",
+                example = "false")
+        boolean isHost,
+
         @Schema(description = "썸네일 URL. 없으면 null이며 FE가 기본 이미지를 쓴다")
         String thumbnailUrl,
 
@@ -55,13 +63,17 @@ public record LiveListItemResponse(
         Long currentProductId
 ) {
 
+    /**
+     * @param viewerId 조회한 회원 ID. <b>비회원이면 {@code null}</b>이며 이때 {@code isHost}는 false다.
+     */
     public static LiveListItemResponse of(
-            Live live, List<LiveCategoryResponse> categories, int viewerCount) {
+            Live live, List<LiveCategoryResponse> categories, int viewerCount, Long viewerId) {
         return new LiveListItemResponse(
                 live.getId(),
                 live.getTitle(),
                 live.getHost().getId(),
                 live.getHost().getNickname(),
+                live.isHostedBy(viewerId),
                 live.getThumbnailUrl(),
                 live.getStatus(),
                 categories,

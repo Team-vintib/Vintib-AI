@@ -15,21 +15,27 @@ import com.ssafy.backend.live.dto.response.LiveListItemResponse;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveStatus;
+import com.ssafy.backend.live.port.NotificationCommandPort;
 import com.ssafy.backend.live.port.ProductQueryPort.CategorySummary;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.social.entity.Follow;
+import com.ssafy.backend.social.repository.FollowRepository;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -40,6 +46,8 @@ public class LiveService {
     private final LiveProductService liveProductService;
     private final LiveViewerService liveViewerService;
     private final LiveReminderService liveReminderService;
+    private final FollowRepository followRepository;
+    private final NotificationCommandPort notificationCommandPort;
     // 종료 시 정리할 리소스가 늘어나면 구현체만 추가한다 — 종료 로직은 다시 열지 않는다.
     private final List<LiveCleanupHook> cleanupHooks;
 
@@ -50,6 +58,15 @@ public class LiveService {
     public static final List<LiveStatus> ALL_STATUSES = List.of(LiveStatus.values());
 
     /**
+     * 방송 시작 알림을 보낼 팔로워 상한(FE 요청 004 §3.2 LIVE_STARTED).
+     *
+     * <p>팔로워가 아주 많은 판매자라면 알림 INSERT가 방송 시작 트랜잭션을 오래 붙잡는다.
+     * {@link #MAX_VIEWERS_SORT_CANDIDATES}와 같은 이유로 상한을 둔다 — 이 규모에서는 사실상
+     * 전원에게 가지만, 나중에 실제로 잘리는 사례가 생기면 비동기 발송으로 옮긴다.
+     */
+    private static final int MAX_FOLLOWER_NOTIFICATIONS = 500;
+
+    /**
      * 시청자 수 정렬에서 한 번에 고려하는 방송 수의 상한.
      *
      * <p>이 정렬은 SQL 로 자를 수 없어 후보를 모두 읽어 메모리에서 세운다. 상한이 없으면 방송이
@@ -58,6 +75,12 @@ public class LiveService {
      * 두고 SQL 정렬로 바꾸는 것이 맞다.
      */
     private static final int MAX_VIEWERS_SORT_CANDIDATES = 500;
+
+    /**
+     * 자동 시작(JY010) 한 주기에 처리하는 예약 라이브 상한. 밀린 예약이 쌓여 있어도 한 번에
+     * 전부 전이시키지 않는다 — 나머지는 다음 주기(30초 뒤)에 이어서 처리된다.
+     */
+    private static final int MAX_AUTO_START_BATCH_SIZE = 200;
 
     /**
      * 예약 라이브 개설(LIVE-001). 방송 예정 시각이 미래인지는 요청 DTO({@code @Future})가 검증한다.
@@ -107,6 +130,8 @@ public class LiveService {
         // save() 로 ID 가 나온 뒤여야 한다.
         live.assignOpenviduRoom(LiveVideoService.newRoomName(live.getId()));
 
+        notifyFollowersLiveStarted(live);
+
         return LiveResponse.from(live);
     }
 
@@ -148,9 +173,12 @@ public class LiveService {
      * @param categoryIds 비어 있으면 카테고리 필터를 걸지 않는다
      * @param hostId      null이면 호스트 필터를 걸지 않는다
      * @param statuses    조회 대상 상태 목록(컨트롤러가 이미 공개/본인 조회 여부에 맞게 확정한 값)
+     * @param viewerId    조회한 회원 ID. <b>비회원이면 null</b>. 카드마다 {@code isHost}를 서버가
+     *                    계산해 내려주기 위해 받는다(상세 조회의 {@code isHost}와 같은 이유)
      */
     public PageResponse<LiveListItemResponse> getLives(
-            List<Long> categoryIds, Long hostId, List<LiveStatus> statuses, LiveListSort sort, int page, int size) {
+            List<Long> categoryIds, Long hostId, List<LiveStatus> statuses, LiveListSort sort,
+            int page, int size, Long viewerId) {
         boolean filterByCategory = categoryIds != null && !categoryIds.isEmpty();
         List<Long> productIds = filterByCategory
                 ? liveProductService.findProductIdsInCategories(categoryIds)
@@ -163,7 +191,8 @@ public class LiveService {
         boolean filterByHost = hostId != null;
 
         if (sort.isInMemory()) {
-            return getLivesByViewerCount(statuses, filterByCategory, productIds, filterByHost, hostId, page, size);
+            return getLivesByViewerCount(
+                    statuses, filterByCategory, productIds, filterByHost, hostId, page, size, viewerId);
         }
 
         Page<Live> lives = liveRepository.findPublicLives(
@@ -175,7 +204,8 @@ public class LiveService {
                 liveProductService.getCategoriesByLiveIds(liveIds);
         Map<Long, Integer> viewerCounts = liveViewerService.getViewerCounts(liveIds);
 
-        return PageResponse.from(lives.map(live -> toListItem(live, categoriesByLiveId, viewerCounts)));
+        return PageResponse.from(
+                lives.map(live -> toListItem(live, categoriesByLiveId, viewerCounts, viewerId)));
     }
 
     /**
@@ -190,7 +220,7 @@ public class LiveService {
      */
     private PageResponse<LiveListItemResponse> getLivesByViewerCount(
             List<LiveStatus> statuses, boolean filterByCategory, List<Long> productIds,
-            boolean filterByHost, Long hostId, int page, int size) {
+            boolean filterByHost, Long hostId, int page, int size, Long viewerId) {
         List<Live> candidates = liveRepository.findPublicLives(
                         statuses,
                         filterByCategory,
@@ -218,7 +248,7 @@ public class LiveService {
         Map<Long, List<CategorySummary>> categoriesByLiveId =
                 liveProductService.getCategoriesByLiveIds(idsOf(pageContent));
         List<LiveListItemResponse> items = pageContent.stream()
-                .map(live -> toListItem(live, categoriesByLiveId, viewerCounts))
+                .map(live -> toListItem(live, categoriesByLiveId, viewerCounts, viewerId))
                 .toList();
 
         return PageResponse.from(new PageImpl<>(items, PageRequest.of(page, size), sorted.size()));
@@ -227,13 +257,15 @@ public class LiveService {
     private LiveListItemResponse toListItem(
             Live live,
             Map<Long, List<CategorySummary>> categoriesByLiveId,
-            Map<Long, Integer> viewerCounts) {
+            Map<Long, Integer> viewerCounts,
+            Long viewerId) {
         return LiveListItemResponse.of(
                 live,
                 categoriesByLiveId.getOrDefault(live.getId(), List.of()).stream()
                         .map(LiveCategoryResponse::from)
                         .toList(),
-                viewerCounts.getOrDefault(live.getId(), 0));
+                viewerCounts.getOrDefault(live.getId(), 0),
+                viewerId);
     }
 
     private List<Long> idsOf(List<Live> lives) {
@@ -263,12 +295,67 @@ public class LiveService {
         // 이름만 정한다(LiveKit 은 첫 참가자가 들어올 때 room 을 자동 생성한다).
         if (request.status() == LiveStatus.LIVE) {
             live.assignOpenviduRoom(LiveVideoService.newRoomName(live.getId()));
+            notifyFollowersLiveStarted(live);
         }
         if (request.status() == LiveStatus.ENDED) {
             cleanupHooks.forEach(hook -> hook.onLiveEnded(live));
         }
 
         return LiveResponse.from(live);
+    }
+
+    /**
+     * 예정 시각이 지난 예약 라이브를 자동으로 시작한다(JY010). {@link LiveAutoStartScheduler}가
+     * 주기적으로 부른다.
+     *
+     * <p>전이 자체는 {@link #transitionStatus}를 그대로 재사용한다 — 그 라이브의 실제 호스트
+     * ID로 호출하면 권한 검증도 자연히 통과하고, room 배정·{@code LIVE_STARTED} 알림까지 수동
+     * 시작과 완전히 같은 경로를 탄다. 한 라이브가 실패해도 나머지는 마저 처리해야 하므로
+     * 라이브 단위로 예외를 잡는다 — 배치 전체가 한 번의 실패로 멈추면 안 된다.
+     *
+     * @return 이번 호출에서 실제로 LIVE 로 전이된 라이브들의 응답. 스케줄러가 이 목록으로
+     *         {@code /topic/lives/{liveId}/status} 를 브로드캐스트한다(컨트롤러 경로와 달리
+     *         여기는 HTTP 응답이 없어 스스로 알려야 한다)
+     */
+    @Transactional
+    public List<LiveResponse> autoStartDueLives() {
+        List<Live> due = liveRepository.findByStatusAndScheduledAtLessThanEqualOrderByScheduledAtAsc(
+                LiveStatus.SCHEDULED, LocalDateTime.now(),
+                PageRequest.of(0, MAX_AUTO_START_BATCH_SIZE));
+
+        return due.stream()
+                .map(this::autoStartOne)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private LiveResponse autoStartOne(Live live) {
+        try {
+            return transitionStatus(
+                    live.getHost().getId(), live.getId(), new LiveStatusUpdateRequest(LiveStatus.LIVE));
+        } catch (RuntimeException e) {
+            log.warn("예약 라이브 자동 시작 실패 - liveId={}, 다음 주기에 재시도한다", live.getId(), e);
+            return null;
+        }
+    }
+
+    /**
+     * 방송 시작을 팔로워에게 알린다(FE 요청 004 §3.2 LIVE_STARTED). 즉시 개설·예약 개설 후 시작
+     * 두 경로 모두에서 부른다 — "방송이 실제로 시작되는 순간"이 공통 지점이다.
+     */
+    private void notifyFollowersLiveStarted(Live live) {
+        List<Member> followers = followRepository
+                .findByFollowing_Id(live.getHost().getId(), PageRequest.of(0, MAX_FOLLOWER_NOTIFICATIONS))
+                .map(Follow::getFollower)
+                .getContent();
+
+        followers.forEach(follower -> notificationCommandPort.notify(
+                follower,
+                "LIVE_STARTED",
+                "%s님이 라이브를 시작했어요".formatted(live.getHost().getNickname()),
+                live.getTitle(),
+                "LIVE",
+                live.getId()));
     }
 
     /**
