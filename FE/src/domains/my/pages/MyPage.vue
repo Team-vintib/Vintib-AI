@@ -146,7 +146,10 @@ const isGuest = computed(() => loadState.value === 'guest')
 const hasLoadError = computed(() => loadState.value === 'error')
 const isProfileSaving = computed(() => profileSaveState.value === 'saving')
 const isTryOnProfileSaving = computed(() => tryOnProfileSaveState.value === 'saving')
-const profileInitial = computed(() => (profile.value?.nickname || profile.value?.name || '회').slice(0, 1))
+const profileDisplayName = computed(
+  () => profile.value?.nickname?.trim() || profile.value?.name?.trim() || '회원',
+)
+const profileInitial = computed(() => profileDisplayName.value.slice(0, 1))
 const profileImageDisplayUrl = computed(() => {
   if (isProfileImageRemoved.value) {
     return ''
@@ -966,8 +969,15 @@ const submitProfileForm = async () => {
         ...viewData.value.summary,
         profile: {
           ...nextProfile,
+          email: nextProfile.email || profile.value.email,
+          name: nextProfile.name || profile.value.name,
           profileImageUrl: nextProfileImageUrl,
           defaultTryOnImageUrl: profile.value.defaultTryOnImageUrl,
+          memberType: nextProfile.memberType || profile.value.memberType,
+          businessVerificationStatus:
+            nextProfile.businessVerificationStatus || profile.value.businessVerificationStatus,
+          onboardingCompleted:
+            nextProfile.onboardingCompleted || profile.value.onboardingCompleted,
         },
       },
     }
@@ -978,6 +988,7 @@ const submitProfileForm = async () => {
     isProfileImageRemoved.value = false
     profileSaveState.value = 'success'
     profileSaveMessage.value = '내 정보가 저장되었습니다.'
+    await router.push({ name: ROUTE_NAMES.HOME })
   } catch (error) {
     profileSaveState.value = 'error'
     profileSaveMessage.value = normalizeApiError(error).message
@@ -1061,6 +1072,7 @@ const mergeSessionProfile = (data: MyPageViewData): MyPageViewData => {
 
   const profile = data.summary.profile
   const sessionName = sessionUser.name?.trim() || sessionUser.email || ''
+  const sessionNickname = sessionUser.nickname?.trim() || ''
 
   return {
     ...data,
@@ -1071,7 +1083,7 @@ const mergeSessionProfile = (data: MyPageViewData): MyPageViewData => {
         id: sessionUser.id,
         email: profile.email || sessionUser.email,
         name: profile.name || sessionName,
-        nickname: profile.nickname || sessionUser.name?.trim() || '',
+        nickname: profile.nickname || sessionNickname || '',
         onboardingCompleted:
           profile.onboardingCompleted || sessionUser.onboardingCompleted === true,
       },
@@ -1151,7 +1163,7 @@ onMounted(() => {
               <span v-else>{{ profileInitial }}</span>
             </div>
             <div>
-              <strong>{{ profile.name }} 님</strong>
+              <strong>{{ profileDisplayName }} 님</strong>
               <span>{{ profile.memberType === 'BUSINESS' ? '사업자 회원' : '일반 회원' }}</span>
             </div>
           </div>
@@ -1193,7 +1205,7 @@ onMounted(() => {
               </div>
               <div class="my-profile-hero__body">
                 <div class="my-profile-hero__title">
-                  <h2>{{ profile.name }} 님</h2>
+                  <h2>{{ profileDisplayName }} 님</h2>
                   <span>{{ MY_BUSINESS_STATUS_LABELS[profile.businessVerificationStatus] }}</span>
                 </div>
                 <p>
