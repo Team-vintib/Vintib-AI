@@ -182,6 +182,13 @@ const loadLiveWatch = async () => {
 
     if (requestId !== loadRequestId) return
 
+    // 개설자가 접속하면 무조건 판매자 화면으로 보낸다(LiveBroadcastPage의 반대 가드, BE 016 §2.2 isHost).
+    // mock 프리뷰(apiEnabled=false)는 isHost가 항상 false이므로 가드를 건너뛴다.
+    if (apiEnabled && response.isHost) {
+      void router.replace({ name: ROUTE_NAMES.LIVE_BROADCAST, params: { liveId } })
+      return
+    }
+
     live.value = response
     selectedProductId.value =
       response.currentProductId ?? response.products.at(0)?.id ?? null
