@@ -49,8 +49,7 @@ PEOPLE = {
     "dooly": ("a heavyset plus-size Korean man with a bigger, larger build", "grey", 110.0, 172.0),
     # "maikol": ("a tall, slim young Black man", "grey", 72.0, 188.0),
 }
-SIZE_TABLE_WAIST_WIDTH_CM = {"M": 40.0}  # NOTE: M만 먼저 튜닝 확인 -- 확인되면 L/XL/2XL 복구
-# SIZE_TABLE_WAIST_WIDTH_CM = {"M": 40.0, "L": 42.5, "XL": 45.0, "2XL": 47.5}
+SIZE_TABLE_WAIST_WIDTH_CM = {"M": 40.0, "L": 42.5, "XL": 45.0, "2XL": 47.5}
 # 총장(cm, 실제 사이즈표 값) -- 사이즈가 커질수록 기장도 길어진다.
 LENGTH_TABLE_CM = {"M": 106.5, "L": 108.0, "XL": 109.5, "2XL": 111.0}
 
@@ -70,19 +69,18 @@ def fit_descriptor(ratio: float) -> str:
     if ratio < 1.0:
         if ratio <= 0.75:
             base = (
-                "worn drastically too small, barely able to be worn, the button "
-                "straining and unable to close fully, a large muffin-top bulge of flesh "
-                "spilling over the waistband, the denim stretched so tight over the "
-                "belly, hips, and thighs that the fabric is taut like a drum and the "
-                "belt loops are pulled sideways, deep compression creases radiating "
-                "from the crotch, the calves also tightly squeezed by the narrow leg "
-                "opening"
+                "stretched to its absolute limit, clinging tightly to the exact contour "
+                "of the belly, hips, thighs, and calves like a pair of skinny jeans "
+                "with almost no slack fabric anywhere, a second-skin silhouette instead "
+                "of the garment's normal straight-leg cut, a muffin-top bulge visible "
+                "just above the waistband, the button straining hard to stay closed"
             )
         elif ratio <= 0.85:
             base = (
-                "worn very tight, the denim visibly stretched across the waist, hips, "
-                "thighs, and calves, the waistband snug against the skin with a slight "
-                "bulge above it"
+                "clinging closely to the contour of the hips, thighs, and calves with "
+                "very little slack fabric, a noticeably narrower, more skinny-fit "
+                "silhouette than the garment's normal straight-leg cut, the waistband "
+                "snug against the skin with a slight bulge above it"
             )
         else:
             base = "worn snugly, fitting close and slightly tight against the hips, thighs, and calves"
@@ -172,13 +170,28 @@ for person_name, (body_desc, shirt_color, waist_cm, height_cm) in PEOPLE.items()
         length_phrase = length_descriptor(length_delta_cm, height_cm)
         hem_phrase = length_phrase if length_phrase else ", ending cleanly right at the ankles above the shoes"
 
-        prompt = (
-            f"full body studio photo of {body_desc} standing straight, facing camera, "
-            f"wearing a fitted plain {shirt_color} t-shirt and {garment_caption} jeans, "
-            f"{fit_phrase}{hem_phrase}, plain solid white "
-            "background, soft even studio lighting, photorealistic, sharp focus, "
-            "e-commerce fashion model photo"
-        )
+        if ratio <= 0.85:
+            # LLM 텍스트 인코더는 문장 앞쪽 내용에 더 강하게 반응하는 것으로 보인다 --
+            # "체격이 큰 사람"을 먼저 말하면 모델이 "그럼 루즈핏"이라는 학습된 편향으로
+            # 돌아가버린다. 타이트한 실루엣을 문장 맨 앞으로 옮기고, 무엇이 "아닌지"도
+            # 명시해서 편향을 상쇄한다.
+            prompt = (
+                f"IMPORTANT: the {garment_caption} jeans must look extremely "
+                f"skin-tight and skinny-fit -- NOT a loose, straight-leg, or relaxed "
+                f"cut. full body studio photo of {body_desc} standing straight, facing "
+                f"camera, wearing a fitted plain {shirt_color} t-shirt and jeans that "
+                f"are {fit_phrase}{hem_phrase}, plain solid white background, soft even "
+                "studio lighting, photorealistic, sharp focus, e-commerce fashion "
+                "model photo"
+            )
+        else:
+            prompt = (
+                f"full body studio photo of {body_desc} standing straight, facing camera, "
+                f"wearing a fitted plain {shirt_color} t-shirt and "
+                f"{garment_caption} jeans, {fit_phrase}{hem_phrase}, plain solid white "
+                "background, soft even studio lighting, photorealistic, sharp focus, "
+                "e-commerce fashion model photo"
+            )
         print(f"\n=== 생성: {person_name}_{size_label} (ratio={ratio:.3f}, length_delta={length_delta_cm:.1f}cm) ===")
         print(f"프롬프트: {prompt!r}")
 
