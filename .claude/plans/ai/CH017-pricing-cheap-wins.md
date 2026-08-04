@@ -7,6 +7,14 @@
 > 산출 범위: **설계 + 구현.** BE·DB 의존 없이 지금 바로 완결 가능한 항목만 다룬다.
 > 실제 GMS 실호출 검증(구조화 출력 지원 여부, 사이트 비교)은 스크립트만 준비하고
 > **실행은 사용자가 직접 한다**(`AI/CLAUDE.md` 하드 룰).
+>
+> **2026-08-04 구현 완료** — §1~4(신뢰도 결함·잘린 응답 복구·규칙 필터·관측 로그)는 코드+테스트
+> 완료(`ruff`/`black`/`pytest` 전부 통과, 105/105 pricing 테스트). §5·6(사이트 A/B/C 비교,
+> 구조화 출력 스모크)은 스크립트 작성까지 완료 — **GMS 실행은 사용자 몫**:
+> ```bash
+> python validation/PRICE/pricing-model-check/site_scope_comparison.py --limit 1
+> python validation/PRICE/pricing-model-check/smoke_gms.py --structured-output
+> ```
 
 ---
 
