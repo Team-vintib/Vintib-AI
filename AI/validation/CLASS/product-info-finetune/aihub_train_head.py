@@ -214,12 +214,14 @@ def train(
 ) -> Any:
     from sklearn.linear_model import LogisticRegression
 
+    # `multi_class`는 예전 scikit-learn의 ovr/multinomial 선택 인자였다. "auto"가 기본값과
+    # 동일했고, 최신 scikit-learn(실측: 서버 환경)은 이 인자를 아예 없앴다 —
+    # `LogisticRegression.__init__() got an unexpected keyword argument 'multi_class'`.
+    # 버전 무관하게 동작하도록 아예 안 넘긴다(라이브러리 자체 기본 동작을 그대로 쓴다).
     model = LogisticRegression(
         C=C,
         max_iter=max_iter,
         class_weight=class_weight,
-        multi_class="auto",
-        n_jobs=None,
         random_state=SEED,
     )
     model.fit(x_train, y_train)
