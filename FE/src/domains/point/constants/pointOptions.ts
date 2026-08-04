@@ -6,10 +6,10 @@ import type {
   WithdrawalHistory,
 } from '@/domains/point/types/point.types'
 
-export const POINT_CHARGE_MIN_AMOUNT = 1_000
+// BE PointChargeRequest.amount는 @Min(10_000) — 결제위젯 준비(ready) 요청이 그 미만이면 400.
+export const POINT_CHARGE_MIN_AMOUNT = 10_000
 export const POINT_WITHDRAWAL_MIN_AMOUNT = 10_000
 export const POINT_QUICK_CHARGE_AMOUNTS = [10_000, 30_000, 50_000, 100_000]
-export const POINT_PAYMENT_METHODS = ['신용/체크카드', '계좌이체', '간편결제'] as const
 
 export const POINT_TRANSACTION_FILTERS: Array<{
   id: PointTransactionType | 'ALL'

@@ -1,24 +1,30 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
+import type { TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
-import {
-  POINT_CHARGE_MIN_AMOUNT,
-  POINT_PAYMENT_METHODS,
-  POINT_QUICK_CHARGE_AMOUNTS,
-} from '@/domains/point/constants/pointOptions'
+import { readyPointCharge } from '@/domains/point/api/pointApi'
+import { POINT_CHARGE_MIN_AMOUNT, POINT_QUICK_CHARGE_AMOUNTS } from '@/domains/point/constants/pointOptions'
+import { ROUTE_PATHS } from '@/shared/constants/routes'
+
+const PAYMENT_METHOD_SELECTOR = '#toss-payment-method'
+const AGREEMENT_SELECTOR = '#toss-agreement'
 
 const props = defineProps<{
+  userId: number
   currentBalance: number
-  isSubmitting: boolean
 }>()
 
 const emit = defineEmits<{
-  charge: [amount: number]
+  error: [message: string]
 }>()
 
 const amount = ref('')
-const paymentMethod = ref<(typeof POINT_PAYMENT_METHODS)[number]>(POINT_PAYMENT_METHODS[0])
 const errorMessage = ref('')
+const isPreparing = ref(true)
+const isRequesting = ref(false)
+
+let widgets: TossPaymentsWidgets | null = null
 
 const parsedAmount = computed(() => Number(amount.value))
 const afterBalance = computed(() =>
@@ -28,26 +34,96 @@ const afterBalance = computed(() =>
 )
 const canSubmit = computed(
   () =>
-    !props.isSubmitting &&
+    !isPreparing.value &&
+    !isRequesting.value &&
+    widgets !== null &&
     Number.isInteger(parsedAmount.value) &&
     parsedAmount.value >= POINT_CHARGE_MIN_AMOUNT,
 )
 
-watch(amount, () => {
+watch(amount, (next) => {
   errorMessage.value = ''
+  const nextAmount = Number(next)
+
+  if (widgets && Number.isInteger(nextAmount) && nextAmount >= POINT_CHARGE_MIN_AMOUNT) {
+    void widgets.setAmount({ currency: 'KRW', value: nextAmount })
+  }
 })
 
 const selectQuickAmount = (nextAmount: number) => {
   amount.value = String(nextAmount)
 }
 
-const submitCharge = () => {
+// 결제수단/약관 위젯을 미리 그려 둬야 "충전하기"를 눌렀을 때 바로 결제를 요청할 수 있다.
+// clientKey는 BE ready 응답에서만 받을 수 있어, 위젯 준비 목적으로 최소 금액으로 한 번 ready를 호출한다.
+const initWidgets = async () => {
+  isPreparing.value = true
+
+  try {
+    const ready = await readyPointCharge(props.userId, POINT_CHARGE_MIN_AMOUNT)
+
+    if (!ready.clientKey) {
+      throw new Error('missing client key')
+    }
+
+    const tossPayments = await loadTossPayments(ready.clientKey)
+    const nextWidgets = tossPayments.widgets({ customerKey: `member-${props.userId}` })
+
+    await nextWidgets.setAmount({ currency: 'KRW', value: POINT_CHARGE_MIN_AMOUNT })
+    await nextWidgets.renderPaymentMethods({ selector: PAYMENT_METHOD_SELECTOR })
+    await nextWidgets.renderAgreement({ selector: AGREEMENT_SELECTOR })
+
+    widgets = nextWidgets
+  } catch {
+    emit('error', '결제 수단을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.')
+  } finally {
+    isPreparing.value = false
+  }
+}
+
+onMounted(() => {
+  void initWidgets()
+})
+
+onBeforeUnmount(() => {
+  widgets = null
+})
+
+const submitCharge = async () => {
   if (!Number.isInteger(parsedAmount.value) || parsedAmount.value < POINT_CHARGE_MIN_AMOUNT) {
     errorMessage.value = `충전 금액은 최소 ${POINT_CHARGE_MIN_AMOUNT.toLocaleString('ko-KR')}P 이상이어야 합니다.`
     return
   }
 
-  emit('charge', parsedAmount.value)
+  if (!widgets) {
+    errorMessage.value = '결제 수단을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.'
+    return
+  }
+
+  isRequesting.value = true
+  errorMessage.value = ''
+
+  try {
+    // 위젯 준비 때 발급받은 orderId는 최소 금액용이라 그대로 쓰지 않는다 — 최종 금액으로 다시
+    // ready를 호출해 confirm 단계에서 금액이 어긋나지 않는(PAYMENT_AMOUNT_MISMATCH) orderId를 받는다.
+    const ready = await readyPointCharge(props.userId, parsedAmount.value)
+    await widgets.setAmount({ currency: 'KRW', value: ready.amount })
+    await widgets.requestPayment({
+      orderId: ready.orderId,
+      orderName: `포인트 충전 ${ready.amount.toLocaleString('ko-KR')}P`,
+      successUrl: `${window.location.origin}${ROUTE_PATHS.POINT_CHARGE_SUCCESS}`,
+      failUrl: `${window.location.origin}${ROUTE_PATHS.POINT_CHARGE_FAIL}`,
+    })
+    // 성공하면 브라우저가 successUrl로 리다이렉트되어 이 아래 코드는 보통 실행되지 않는다.
+  } catch (error) {
+    const message =
+      error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+        ? error.message
+        : '결제 요청 중 오류가 발생했습니다. 다시 시도해 주세요.'
+    errorMessage.value = message
+  } finally {
+    isRequesting.value = false
+  }
 }
 </script>
 
@@ -55,7 +131,7 @@ const submitCharge = () => {
   <section class="point-panel" aria-labelledby="point-charge-title">
     <header>
       <h2 id="point-charge-title">충전</h2>
-      <p>충전 금액과 결제 수단을 선택해 주세요.</p>
+      <p>충전 금액을 선택하고 결제 수단을 골라 주세요.</p>
     </header>
 
     <div class="point-charge__section">
@@ -66,7 +142,7 @@ const submitCharge = () => {
           :key="quickAmount"
           type="button"
           :class="{ 'point-charge__quick--active': parsedAmount === quickAmount }"
-          :disabled="isSubmitting"
+          :disabled="isRequesting"
           @click="selectQuickAmount(quickAmount)"
         >
           {{ quickAmount.toLocaleString('ko-KR') }}P
@@ -78,23 +154,22 @@ const submitCharge = () => {
         <input
           v-model="amount"
           type="number"
-          min="1000"
+          :min="POINT_CHARGE_MIN_AMOUNT"
           step="1000"
           inputmode="numeric"
           placeholder="충전할 금액 입력"
-          :disabled="isSubmitting"
+          :disabled="isRequesting"
         />
       </label>
     </div>
 
     <div class="point-charge__section">
       <h3>결제 수단</h3>
-      <div class="point-charge__methods">
-        <label v-for="method in POINT_PAYMENT_METHODS" :key="method">
-          <input v-model="paymentMethod" type="radio" name="payment-method" :value="method" />
-          <span>{{ method }}</span>
-        </label>
-      </div>
+      <p v-if="isPreparing" class="point-charge__widget-loading" role="status">
+        결제 수단을 불러오는 중입니다…
+      </p>
+      <div :id="PAYMENT_METHOD_SELECTOR.slice(1)" class="point-charge__toss-widget"></div>
+      <div :id="AGREEMENT_SELECTOR.slice(1)" class="point-charge__toss-widget"></div>
     </div>
 
     <dl class="point-charge__summary">
@@ -116,7 +191,7 @@ const submitCharge = () => {
       :disabled="!canSubmit"
       @click="submitCharge"
     >
-      {{ isSubmitting ? '충전 처리 중' : '충전하기' }}
+      {{ isRequesting ? '결제 요청 중' : '충전하기' }}
     </button>
   </section>
 </template>
@@ -163,7 +238,6 @@ const submitCharge = () => {
 }
 
 .point-charge__quick,
-.point-charge__methods,
 .point-charge__summary {
   display: grid;
   gap: var(--space-2);
@@ -203,14 +277,12 @@ const submitCharge = () => {
   font-size: 15px;
 }
 
-.point-charge__methods label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 40px;
-  color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: var(--font-weight-semibold);
+.point-charge__widget-loading {
+  color: var(--color-text-secondary);
+}
+
+.point-charge__toss-widget {
+  min-height: 1px;
 }
 
 .point-charge__summary {

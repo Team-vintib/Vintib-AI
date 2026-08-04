@@ -227,4 +227,16 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/domains/point/pages/PointWalletPage.vue'),
     meta: { requiresAuth: true, title: '포인트' },
   },
+  {
+    path: ROUTE_PATHS.POINT_CHARGE_SUCCESS,
+    name: ROUTE_NAMES.POINT_CHARGE_SUCCESS,
+    component: () => import('@/domains/point/pages/PointChargeSuccessPage.vue'),
+    meta: { requiresAuth: true, title: '포인트 충전 완료' },
+  },
+  {
+    path: ROUTE_PATHS.POINT_CHARGE_FAIL,
+    name: ROUTE_NAMES.POINT_CHARGE_FAIL,
+    component: () => import('@/domains/point/pages/PointChargeFailPage.vue'),
+    meta: { requiresAuth: true, title: '포인트 충전 실패' },
+  },
 ]
