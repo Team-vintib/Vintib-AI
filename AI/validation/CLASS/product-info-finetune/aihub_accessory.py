@@ -143,7 +143,14 @@ _MAX_DEPTH = 6
 
 
 def _walk_dicts(node: Any, depth: int = 0) -> Iterator[dict]:
-    """중첩 dict/list를 훑으며 모든 dict를 낸다(깊이 제한 — 세그멘테이션 좌표 배열 방어)."""
+    """중첩 dict/list를 훑으며 모든 dict를 낸다(깊이 제한 — 세그멘테이션 좌표 배열 방어).
+
+    ⚠️ 예전엔 리스트를 순회할 때 `node[:64]`로 앞 64개만 봤다. 좌표 배열(숫자만 있는 리스트)
+    방어 목적이었는데, 좌표는 애초에 dict/list가 아니라서 `isinstance` 체크에 걸러져 재귀가
+    안 들어간다 — 즉 이 상한선은 좌표 방어에 아무 효과가 없었고, `accessory_meta.json`처럼
+    **레코드 501개가 든 진짜 배열**만 64개로 잘라먹었다(실측 2026-08-04: 속성 테이블이
+    64개로 고정된 원인이었다). 깊이 제한(`_MAX_DEPTH`)만으로 좌표 배열 방어는 충분하다.
+    """
     if depth > _MAX_DEPTH:
         return
     if isinstance(node, dict):
@@ -152,7 +159,7 @@ def _walk_dicts(node: Any, depth: int = 0) -> Iterator[dict]:
             if isinstance(value, (dict, list)):
                 yield from _walk_dicts(value, depth + 1)
     elif isinstance(node, list):
-        for value in node[:64]:  # 좌표 리스트를 통째로 순회하지 않는다
+        for value in node:
             if isinstance(value, (dict, list)):
                 yield from _walk_dicts(value, depth + 1)
 

@@ -88,6 +88,22 @@ def test_iter_attributes_finds_nested_records() -> None:
         assert found[0].raw_color == "실버"
 
 
+def test_iter_attributes_does_not_truncate_large_top_level_lists() -> None:
+    """회귀 가드 — 실측(2026-08-04)에서 `accessory_meta.json`(실제 속성 파일, 리스트 501개)이
+
+    `_walk_dicts`의 옛 `node[:64]` 상한선에 걸려 64개로 잘렸다. 좌표 배열 방어를 노린
+    거였지만 좌표는 dict/list가 아니라 애초에 걸러져서 그 상한선은 방어 효과가 없었고,
+    accessory_meta.json 같은 진짜 레코드 배열만 잘라먹었다.
+    """
+    big_list = [
+        {"accessory_id": f"A{i:04d}", "accessory_type1": "모자", "accessory_color": "블랙"}
+        for i in range(501)
+    ]
+    found = list(acc.iter_attributes(big_list))
+    assert len(found) == 501
+    assert found[-1].accessory_id == "A0500"
+
+
 def test_iter_images_reads_info_block() -> None:
     images = list(acc.iter_images(IMAGE_JSON))
     assert len(images) == 1
