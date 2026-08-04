@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import logoImage from '@/assets/images/logo.png'
 import LoginForm from '@/domains/auth/components/LoginForm.vue'
+import { ROUTE_NAMES } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 </script>
 
@@ -11,7 +12,13 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
       aria-labelledby="login-title"
     >
       <header class="login-header">
-        <img class="login-header__logo" :src="logoImage" alt="VinTib" />
+        <RouterLink
+          class="login-header__logo-link"
+          :to="{ name: ROUTE_NAMES.HOME }"
+          aria-label="VinTib 홈"
+        >
+          <img class="login-header__logo" :src="logoImage" alt="VinTib" />
+        </RouterLink>
         <h1 id="login-title" class="login-header__title text-[var(--color-text-primary)]">
           이메일 로그인
         </h1>
@@ -35,14 +42,25 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
   margin-bottom: var(--space-10);
 }
 
-.login-header__logo {
+.login-header__logo-link {
   display: block;
   width: min(180px, 52vw);
-  height: auto;
   margin-right: auto;
   margin-bottom: var(--space-2);
   margin-left: auto;
+  border-radius: var(--radius-control);
+}
+
+.login-header__logo {
+  display: block;
+  width: 100%;
+  height: auto;
   object-fit: contain;
+}
+
+.login-header__logo-link:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 3px;
 }
 
 .login-header__title {

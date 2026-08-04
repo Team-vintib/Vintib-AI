@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import logoImage from '@/assets/images/logo.png'
 import SignupForm from '@/domains/auth/components/SignupForm.vue'
+import { ROUTE_NAMES } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 </script>
 
@@ -11,7 +12,13 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
       aria-labelledby="signup-title"
     >
       <header class="signup-header">
-        <img class="signup-header__logo" :src="logoImage" alt="VinTib" />
+        <RouterLink
+          class="signup-header__logo-link"
+          :to="{ name: ROUTE_NAMES.HOME }"
+          aria-label="VinTib 홈"
+        >
+          <img class="signup-header__logo" :src="logoImage" alt="VinTib" />
+        </RouterLink>
         <h1 id="signup-title" class="signup-header__title text-[var(--color-text-primary)]">
           이메일 회원가입
         </h1>
@@ -35,14 +42,25 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
   margin-bottom: var(--space-10);
 }
 
-.signup-header__logo {
+.signup-header__logo-link {
   display: block;
   width: min(180px, 52vw);
-  height: auto;
   margin-right: auto;
   margin-bottom: var(--space-2);
   margin-left: auto;
+  border-radius: var(--radius-control);
+}
+
+.signup-header__logo {
+  display: block;
+  width: 100%;
+  height: auto;
   object-fit: contain;
+}
+
+.signup-header__logo-link:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 3px;
 }
 
 .signup-header__title {
