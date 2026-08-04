@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterView, useRouter } from 'vue-router'
 
-import movingLogoImage from '@/assets/images/vintib_moving_logo.gif'
+import movingLogoImage from '@/assets/images/vintib_moving_logo_white.gif'
 import { setupScrollReveal } from '@/shared/utils/scrollReveal'
 
 const router = useRouter()
@@ -59,7 +59,7 @@ onUnmounted(() => {
   width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--color-surface, #ffffff);
+  background: var(--color-page, #0a0a0a);
 }
 
 .app-splash__logo {
