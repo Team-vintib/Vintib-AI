@@ -38,9 +38,6 @@
 | 003 | `003-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 상품/헤더 필수 필드(brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId) 연결 완료 | 생성용 상품 조회, AI 시착 생성, 선택 필드(hostProfileImageUrl/description/material/measurements/defectSummary) |
 | 004 | `004-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API, 예약 라이브 알림 신청/스케줄러 연동 완료 | 알림 생성 이벤트는 `LIVE_REMINDER` 하나뿐 — 나머지 7종(라이브 시작/입찰/낙찰/주문/배송/포인트) 미반영, unread count API, 탭별 bulk read API |
 | 005 | `005-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수, 경매 조건 설정, 경매 snapshot/시작/입찰/입찰내역, STOMP(`AUCTION_STARTED`/`BID_PLACED`) 연동 완료 | 경매 종료(`close`)·낙찰자 조회(`winner`)·`AUCTION_CLOSED` 이벤트·자동 종료 스케줄러 |
-| 010 | `010-product-category-optional.md` | Product | 미반영 | `categoryId`가 여전히 `@NotNull`(`ProductCreateRequest`) — 선택 입력 전환 검토 |
-| 011 | `011-product-similar-price-distribution.md` | Product | 미반영 | 상품 상세에 유사 상품 목록(`id`/`title`/`price`) 없음 |
-| 012 | `012-product-ai-tryon-registration-fields.md` | Product | 미반영 | `aiModelEnabled`/`aiModelGender` 필드가 `ProductCreateRequest`에 없음 |
 
 ## 4. 기존 API 변경 요청
 
@@ -108,3 +105,12 @@
 - 2026-08-04: 이 폴더 및 `FE`/`AI` 요청 문서 전체를 001부터 빈틈없이 재넘버링했다(팀원별로 독립적으로
   번호를 매겨 BE 014·016, FE 001·002·003·005·006·007·016·018, AI 002가 중복돼 있었음). 이 문서 자체도
   012 → 006으로 바뀌었다.
+
+## 2026-08-04 정리 (상품 응답 필드 보강)
+
+- `009-product-list-primary-image.md`(목록 대표 이미지), `011-product-similar-price-distribution.md`
+  (유사 상품 목록), `012-product-ai-tryon-registration-fields.md`(AI 착용컷 필드) 전부 반영 완료돼
+  삭제했다 — 위 표에서도 뺐다. 계획은 `docs/plans/BE/SY038-product-enrichment.md` 참고.
+- `010-product-category-optional.md`(categoryId 선택 입력 전환)는 **반영하지 않기로 결정**하고
+  삭제했다 — AI가 카테고리를 자동 판별해 채워주고 사용자가 필요시 수정하는 흐름이라 실질적으로
+  미분류 상태가 생기지 않는다. `categoryId` `@NotNull`은 그대로 유지한다.

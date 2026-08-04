@@ -18,9 +18,14 @@ public record ProductResponse(
         @Schema(example = "DIRECT_SALE") SaleType saleType,
         @Schema(example = "ON_SALE") SaleStatus saleStatus,
         @Schema(example = "50000") Long price,
-        @Schema(example = "2026-07-29T12:00:00") LocalDateTime createdAt) {
+        @Schema(example = "2026-07-29T12:00:00") LocalDateTime createdAt,
+        @Schema(description = "대표 이미지 URL. 등록된 이미지가 없으면 null") String primaryImageUrl) {
 
     public static ProductResponse from(Product product) {
+        return from(product, null);
+    }
+
+    public static ProductResponse from(Product product, String primaryImageUrl) {
         return new ProductResponse(
                 product.getId(),
                 product.getSeller().getId(),
@@ -33,6 +38,7 @@ public record ProductResponse(
                 product.getSaleType(),
                 product.getSaleStatus(),
                 product.getPrice(),
-                product.getCreatedAt());
+                product.getCreatedAt(),
+                primaryImageUrl);
     }
 }
