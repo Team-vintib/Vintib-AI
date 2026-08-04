@@ -1,3 +1,4 @@
+import { homeMockData } from '@/domains/home/constants/homeMockData'
 import type {
   HomeCategoryProductSection,
   HomeFollowedSellerItem,
@@ -9,6 +10,9 @@ import type {
 } from '@/domains/home/types/homeView.types'
 import { http } from '@/shared/api/http'
 import type { ApiResponse } from '@/shared/types/api.types'
+
+// VITE_HOME_API_ENABLED=false 일 때만 mock 데이터를 사용합니다(기본값은 실 API).
+const HOME_API_ENABLED = import.meta.env.VITE_HOME_API_ENABLED !== 'false'
 
 type HomeLiveBroadcastStatus = 'LIVE' | 'SCHEDULED'
 type HomeProductSellType = 'NORMAL' | 'AUCTION_SCHEDULED'
@@ -140,6 +144,10 @@ const SMALL_CATEGORY_TO_MIDDLE_CATEGORY: Record<string, (typeof MIDDLE_CATEGORY_
 export const getHomeViewData = async ({
   isAuthenticated = false,
 }: GetHomeViewDataOptions = {}): Promise<HomeViewData> => {
+  if (!HOME_API_ENABLED) {
+    return homeMockData
+  }
+
   const homeContent = await getHomeContent()
   const followingContent = isAuthenticated ? await getOptionalFollowingContent() : null
 
