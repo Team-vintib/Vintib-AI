@@ -32,11 +32,15 @@ provider마다 인증 헤더가 다르므로(Anthropic `x-api-key` / Gemini `x-g
     python validation/PRICE/pricing-model-check/smoke_gms.py --quick   # 0층만 (연결 확인)
     python validation/PRICE/pricing-model-check/smoke_gms.py           # 전체
     python validation/PRICE/pricing-model-check/smoke_gms.py --model claude-haiku-4-5-20251001
+
+    # CH017 — Gemini 구조화 출력(responseSchema) + 웹검색 조합이 GMS를 통과하는지만 확인
+    python validation/PRICE/pricing-model-check/smoke_gms.py --structured-output
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from dataclasses import dataclass
 
@@ -258,6 +262,81 @@ def probe_gemini(api_key: str, model: str, tool_key: str) -> Verdict:
     )
 
 
+def probe_gemini_structured_output(api_key: str, model: str) -> Verdict:
+    """CH017 — Gemini `responseSchema`(+ `google_search`)를 GMS가 통과시키는지 확인한다.
+
+    지금 `comps.py`는 "JSON 배열로만 답해라" 프롬프트 + 관대한 문자열 파싱으로 받는다.
+    구조화 출력을 안 쓴 이유는 코드 주석 그대로 "GMS 프록시가 그 파라미터를 통과시키는지
+    미확인"이었다 — 이 프로브가 그 답을 준다. 구조화 출력과 웹검색 그라운딩을 같은 요청에
+    함께 쓸 수 있는지는 Gemini API 자체의 제약일 수도 있어 여기서 확정하지 않는다.
+
+    층 판정: 1=조합 자체가 거부(400), 2=응답은 왔으나 그라운딩·구조화 중 하나가 깨짐,
+    3=그라운딩 + 스키마를 지킨 JSON 배열까지 전부 성공.
+    """
+    schema = {
+        "type": "ARRAY",
+        "items": {
+            "type": "OBJECT",
+            "properties": {
+                "title": {"type": "STRING"},
+                "price": {"type": "INTEGER"},
+                "url": {"type": "STRING"},
+                "listed_at": {"type": "STRING"},
+                "is_used": {"type": "BOOLEAN"},
+            },
+            "required": ["title", "price"],
+        },
+    }
+    body = {
+        "contents": [{"parts": [{"text": PROBE}]}],
+        "tools": [{"google_search": {}}],
+        "generationConfig": {"responseMimeType": "application/json", "responseSchema": schema},
+    }
+    tool_label = "responseSchema+google_search"
+    try:
+        resp = gemini_post(api_key, model, "generateContent", body)
+    except Exception as exc:
+        return Verdict("gemini", model, tool_label, 0, f"{type(exc).__name__}: {exc}")
+
+    if resp.status_code != 200:
+        return Verdict(
+            "gemini", model, tool_label, 1, f"조합 거부({resp.status_code}) {resp.text[:200]}"
+        )
+
+    candidates = resp.json().get("candidates", [])
+    if not candidates:
+        return Verdict("gemini", model, tool_label, 2, "응답에 candidates 없음")
+
+    meta = candidates[0].get("groundingMetadata") or {}
+    grounded = bool(meta.get("groundingChunks") or meta.get("webSearchQueries"))
+
+    parts = candidates[0].get("content", {}).get("parts", [])
+    text = "".join(p.get("text", "") for p in parts)
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return Verdict(
+            "gemini", model, tool_label, 2, f"grounded={grounded}, JSON 파싱 실패: {text[:100]!r}"
+        )
+    if not isinstance(parsed, list):
+        return Verdict(
+            "gemini",
+            model,
+            tool_label,
+            2,
+            f"grounded={grounded}, 배열이 아님: {type(parsed).__name__}",
+        )
+
+    return Verdict(
+        "gemini",
+        model,
+        tool_label,
+        3,
+        f"grounded={grounded}, 구조화된 매물 {len(parsed)}건",
+        len(parsed),
+    )
+
+
 def _probe_provider(candidates: list[str], tools: list[str], probe) -> list[Verdict]:
     """모델 × 툴 규격을 순회하되, **한 조합이라도 통과하면 즉시 멈춘다.**
 
@@ -285,12 +364,27 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="GMS 웹검색 지원 여부 점검")
     parser.add_argument("--quick", action="store_true", help="0층(연결 확인)만 하고 종료")
     parser.add_argument("--model", default="", help="Anthropic 후보를 이 ID 하나로 고정")
+    parser.add_argument(
+        "--structured-output",
+        action="store_true",
+        help="CH017 — Gemini responseSchema(+google_search) 통과 여부만 확인하고 종료",
+    )
     args = parser.parse_args()
 
     api_key = gms_key()
     if not api_key:
         print("GMS_API_KEY 가 없다. AI/.env 또는 환경변수에 설정한 뒤 다시 실행할 것.")
         return 2
+
+    if args.structured_output:
+        model = args.model or GEMINI_CANDIDATES[-1]  # 그라운딩 실측 확인된 모델을 기본값으로
+        verdict = probe_gemini_structured_output(api_key, model)
+        print(f"[CH017] 구조화 출력 + 웹검색 조합 확인 — {verdict}")
+        if verdict.ok:
+            print("통과 — comps.py에 responseSchema 반영을 검토할 수 있다.")
+        else:
+            print("미통과 — comps.py는 지금처럼 관대한 문자열 파싱을 유지한다.")
+        return 0 if verdict.ok else 1
 
     print("\n[0층] 연결 확인 — 키가 사는지, provider별 인증이 통과하는지")
     connect_model = args.model or CONNECT_ANTHROPIC_MODEL

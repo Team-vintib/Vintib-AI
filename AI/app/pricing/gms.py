@@ -38,19 +38,26 @@ def generate_content(
     model: str,
     prompt: str,
     timeout: float = 90.0,
+    max_output_tokens: int = 0,
 ) -> dict:
     """`POST /models/{model}:generateContent` 1회, `google_search` 그라운딩 포함.
 
     응답 JSON을 그대로 돌려준다 — 그라운딩 여부 판정(`groundingMetadata`)과 텍스트 추출은
     `comps.py`가 한다. 무거운 import(`httpx`)를 함수 안에 두는 이유는 모듈 로딩 시점을 늦추기
     위해서다 — comps 백엔드가 mock이면 이 함수 자체가 호출되지 않는다.
+
+    `max_output_tokens`(0이면 지정 안 함)를 CH017에서 추가했다 — 이전에는 상한이 없어 응답이
+    중간에 잘려도 알 방법이 없었다. `finishReason`(`STOP`/`MAX_TOKENS` 등)은 응답 JSON에
+    그대로 들어 있으므로 이 함수에서 추출하지 않는다 — 판정은 `comps.py`의 몫이다.
     """
     import httpx
 
-    body = {
+    body: dict = {
         "contents": [{"parts": [{"text": prompt}]}],
         "tools": [{"google_search": {}}],
     }
+    if max_output_tokens > 0:
+        body["generationConfig"] = {"maxOutputTokens": max_output_tokens}
     try:
         response = httpx.post(
             f"{GMS_GEMINI_BASE}/models/{model}:generateContent",

@@ -11,7 +11,9 @@ from app.pricing.comps import (
     LlmWebSearchCompsSource,
     MockCompsSource,
     _extract_json_array,
+    _extract_json_array_lenient,
     _rows_to_items,
+    _salvage_json_objects,
     build_comps_source,
     build_query,
 )
@@ -86,6 +88,36 @@ def test_no_array_returns_empty():
 
 def test_non_dict_rows_are_dropped():
     assert _extract_json_array('["문자열", {"price": 100}]') == [{"price": 100}]
+
+
+# --- 부분 복구(CH017 B2 — 응답이 잘려 배열이 안 닫힌 경우) --------------------------
+
+
+def test_salvage_recovers_completed_objects_before_truncation():
+    """마지막 객체가 잘려도 그 앞의 완결된 객체들은 살린다."""
+    text = '[{"title": "a", "price": 1000}, {"title": "b", "price": 2000}, {"title": "c", "pr'
+    assert _salvage_json_objects(text) == [
+        {"title": "a", "price": 1000},
+        {"title": "b", "price": 2000},
+    ]
+
+
+def test_salvage_returns_empty_when_nothing_completed():
+    assert _salvage_json_objects('[{"title": "잘림 시작') == []
+
+
+def test_lenient_prefers_strict_parse_when_array_is_well_formed():
+    """배열이 완결돼 있으면 부분 복구를 타지 않는다 — truncated=False."""
+    rows, truncated = _extract_json_array_lenient('[{"title": "a", "price": 1000}]')
+    assert rows == [{"title": "a", "price": 1000}]
+    assert truncated is False
+
+
+def test_lenient_falls_back_to_salvage_when_array_is_truncated():
+    text = '[{"title": "a", "price": 1000}, {"title": "b", "pr'
+    rows, truncated = _extract_json_array_lenient(text)
+    assert rows == [{"title": "a", "price": 1000}]
+    assert truncated is True
 
 
 # --- 행 → CompItem ----------------------------------------------------------
@@ -189,3 +221,38 @@ def test_parse_reports_parse_failed_when_grounded_but_unstructured():
     result = LlmWebSearchCompsSource()._parse(response)
     assert result.items == []
     assert result.reason == ReasonCode.parse_failed
+
+
+def test_parse_captures_finish_reason():
+    """CH017 진단 필드 — BE 계약이 아니라 서비스 내부 로깅용이다."""
+    response = {
+        "candidates": [
+            {
+                "finishReason": "STOP",
+                "groundingMetadata": {"webSearchQueries": ["q"]},
+                "content": {"parts": [{"text": '[{"title": "a", "price": 1000}]'}]},
+            }
+        ]
+    }
+    result = LlmWebSearchCompsSource()._parse(response)
+    assert result.finish_reason == "STOP"
+    assert result.truncated is False
+
+
+def test_parse_salvages_items_when_response_is_truncated():
+    """회귀 방지(CH017 B2) — 예전엔 배열이 안 닫히면 검색·과금이 됐어도 0건으로 버렸다."""
+    truncated_text = '[{"title": "a", "price": 1000}, {"title": "b", "pr'
+    response = {
+        "candidates": [
+            {
+                "finishReason": "MAX_TOKENS",
+                "groundingMetadata": {"webSearchQueries": ["q"]},
+                "content": {"parts": [{"text": truncated_text}]},
+            }
+        ]
+    }
+    result = LlmWebSearchCompsSource()._parse(response)
+    assert result.items[0].price == 1000
+    assert result.truncated is True
+    assert result.finish_reason == "MAX_TOKENS"
+    assert result.notes  # 잘렸다는 사실을 밝힌다

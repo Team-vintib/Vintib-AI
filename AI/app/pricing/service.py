@@ -23,7 +23,7 @@ import uuid
 from functools import lru_cache
 
 from app.gateway.router import store_job_result
-from app.pricing import registry
+from app.pricing import registry, store
 from app.pricing.comps import CompsSource, CompsUnavailable, build_comps_source, build_query
 from app.pricing.pricer import Pricer, build_pricer
 from app.pricing.retail import RetailSource, build_retail_source
@@ -79,6 +79,7 @@ class PricingService:
         started = time.perf_counter()
         query = build_query(request.product_name, request.brand, request.category)
         fetched = self._comps_source.fetch(query)
+        self._log_observation(query, fetched.items)
         retail_items, retail_notes = (
             self._fetch_retail(query)
             if request.include_retail
@@ -123,6 +124,19 @@ class PricingService:
             retail_notes=retail_notes,
             latency_ms=round((time.perf_counter() - started) * 1000, 3),
         )
+
+    def _log_observation(self, query: str, items: list[CompItem]) -> None:
+        """실제 검색 결과를 관측 로그(CH017)에 적재한다. mock은 가짜 데이터라 적재하지 않는다.
+
+        **여기서 나는 예외는 가격 산정을 막지 않는다** — `_fetch_retail()`과 같은 계약이다.
+        관측 로그는 캐시·사후 검수용 부가 기능일 뿐 가격 산정의 필수 입력이 아니다.
+        """
+        if self._comps_source.key == "mock" or not items:
+            return
+        try:
+            store.save_observations(query, self._comps_source.key, items)
+        except Exception:  # noqa: BLE001 — 로그 적재 실패가 job을 죽이면 안 된다
+            logger.exception("관측 로그 적재 실패 (query=%s)", query)
 
     def _fetch_retail(self, query: str) -> tuple[list[CompItem], list[str]]:
         """신상품가 수집. **여기서 나는 예외는 가격 산정을 막지 않는다.**

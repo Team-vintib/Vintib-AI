@@ -184,8 +184,13 @@ class RuleBaselinePricer(Pricer):
 
     def _confidence(self, count: int, used_ratio: float, median: int, p25: int, p75: int) -> float:
         sample = min(count / registry.CONFIDENCE_SATURATION_COMPS, 1.0)
-        spread = (p75 - p25) / median if median > 0 else 1.0
-        dispersion = _clamp(1.0 - spread, 0.0, 1.0)
+        # comps가 너무 적으면 p25==p75(퍼짐이 0)가 되어 분산 항이 만점을 받는다 — 표본 부족이
+        # 오히려 신뢰도를 올리는 결함이라, 최소 표본 미달이면 분산 항을 아예 신뢰하지 않는다.
+        if count < registry.CONFIDENCE_DISPERSION_MIN_COMPS:
+            dispersion = 0.0
+        else:
+            spread = (p75 - p25) / median if median > 0 else 1.0
+            dispersion = _clamp(1.0 - spread, 0.0, 1.0)
         raw = _W_SAMPLE * sample + _W_USED * used_ratio + _W_DISPERSION * dispersion
         return round(_clamp(raw, 0.0, 1.0), 3)
 

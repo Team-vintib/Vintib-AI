@@ -131,6 +131,29 @@ def test_retail_price_only_adds_a_rationale_line():
     assert len(with_retail.rationale) > len(without.rationale)
 
 
+def test_single_comp_gets_low_confidence_not_medium():
+    """회귀 방지(CH017 B1) — comps 1건은 p25==p75라 분산 항이 예전엔 만점을 받아 MEDIUM이
+    나왔다. 최소 표본 미달이면 분산 항을 0으로 둬서 신뢰도가 낮게 나와야 한다."""
+    outcome = _price([_comp(20_000)])
+
+    assert outcome.confidence < registry.CONFIDENCE_LEVEL_BOUNDS[ConfidenceLevel.medium]
+    assert outcome.confidence_level is ConfidenceLevel.low
+
+
+def test_dispersion_term_only_counts_once_min_comps_reached():
+    """표본이 임계치 미만이면 분산이 0(=변동 없어 보임)이어도 그 항을 신뢰하지 않는다.
+
+    가격을 전부 동일하게 둬서 두 경우 모두 spread=0(분산 없음)으로 만든 뒤, 표본 수만
+    임계치 아래/위로 다르게 준다. 분산 항을 무조건 신뢰했다면 표본 수와 무관하게 만점을
+    받았을 것이므로, 표본이 적은 쪽의 신뢰도가 **더 낮아야** 이 게이트가 작동하는 것이다.
+    """
+    min_comps = registry.CONFIDENCE_DISPERSION_MIN_COMPS
+    below = _price([_comp(20_000) for _ in range(max(min_comps - 1, 1))]).confidence
+    at_or_above = _price([_comp(20_000) for _ in range(min_comps + 2)]).confidence
+
+    assert below < at_or_above
+
+
 def test_llm_pricer_is_declared_but_not_implemented():
     """레지스트리에 키만 있고 구현이 없다는 걸 명시적으로 고정한다."""
     try:
