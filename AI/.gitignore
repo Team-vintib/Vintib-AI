@@ -52,3 +52,9 @@ validation/CLASS/product-info-check/.onnx_cache/
 validation/CLASS/crawl-collector/out/
 validation/CLASS/crawl-collector/**/out/
 
+
+# 분류 헤드 학습 스파이크 산출물(임베딩 캐시·헤드 체크포인트) — 재생성 가능
+validation/CLASS/product-info-finetune/artifacts/
+# ViT 파인튜닝 비교 실험 산출물(pixel 텐서 캐시 재사용 시 별도 out-dir을 준 경우·파인튜닝
+# 체크포인트) — 선형 프로브 베이스라인(위 artifacts/)과 분리해 재생성 가능
+validation/CLASS/product-info-finetune/artifacts_finetune/
