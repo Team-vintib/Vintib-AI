@@ -125,6 +125,13 @@ CONFIDENCE_LEVEL_BOUNDS: dict[ConfidenceLevel, float] = {
     ConfidenceLevel.medium: 0.40,
 }
 
+# CH017 B1: comps가 이 개수 미만이면 분산 항(dispersion)을 신뢰도 계산에서 빼고 0으로 둔다.
+# comps 1건은 p25==p75라 분산 항이 만점이 되어 "표본 부족"이 오히려 신뢰도를 올리는 결함이
+# 있었다 — 이 값 이상일 때만 분산 항이 실제로 의미를 갖는다고 본다. 다른 계수들과 같은
+# 성격의 임의값이다.
+CONFIDENCE_DISPERSION_MIN_COMPS = 3
+
+
 # --- 실행 제어 -------------------------------------------------------------
 # 컨테이너 안에서 백그라운드 스레드로 도는데, 그 스레드풀을 게이트웨이 엔드포인트
 # (`GET /ai/jobs/{id}` 폴링 포함)와 공유한다. 상한이 없으면 가격 job이 풀을 채워서
