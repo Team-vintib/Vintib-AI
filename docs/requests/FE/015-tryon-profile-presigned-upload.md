@@ -5,7 +5,7 @@
 
 ## 배경/이유
 
-AI 가상 시착 프로필(전신 사진 + 신체 치수) 등록/조회/수정/삭제 API를 구현했다(SY025). FE 요청 문서(`docs/requests/BE/002-onboarding-contract.md` §3.3, `007-live-tryon-contract.md` §3.4)는 `PUT /api/me/tryon`을 `multipart/form-data`로 요청했지만, 실제 구현은 두 가지가 다르게 확정됐다.
+AI 가상 시착 프로필(전신 사진 + 신체 치수) 등록/조회/수정/삭제 API를 구현했다(SY025). FE 요청 문서(`docs/requests/BE/002-onboarding-contract.md` §3.3, `003-live-tryon-contract.md` §3.4)는 `PUT /api/me/tryon`을 `multipart/form-data`로 요청했지만, 실제 구현은 두 가지가 다르게 확정됐다.
 
 1. 경로: 이 프로젝트의 다른 온보딩 API들과 동일하게 `/api/me/...`가 아니라 `/api/users/{userId}/tryon`이다.
 2. 업로드 방식: 서버가 파일을 직접 받는 multipart가 아니라, 상품 이미지와 동일한 **presigned 2단계**(브라우저가 S3에 직접 업로드)다. 전신 사진은 비공개 버킷에 저장되고 본인만 열람 가능한 presigned GET URL로만 노출된다.
@@ -75,7 +75,7 @@ FE가 이미 multipart 기준으로 화면을 구현해뒀다면(`OnboardingTryO
 
 - Swagger: `/swagger-ui/index.html` — "AI 가상 시착(TryOns)" 태그(시착 결과 조회/삭제와 같은 태그로 통합됨)
 - `BE/src/main/java/com/ssafy/backend/tryon/controller/TryOnProfileController.java`
-- 참고 선례: `docs/requests/FE/001-product-image-presigned-upload.md`(상품 이미지, 동일한 3단계 흐름)
+- 참고 선례: `docs/requests/FE/002-product-image-presigned-upload.md`(상품 이미지, 동일한 3단계 흐름)
 
 ## 처리 결과
 

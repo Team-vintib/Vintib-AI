@@ -1,4 +1,4 @@
-# 008 언팔로우 확인 팝업 요청
+# 014 언팔로우 확인 팝업 요청
 
 ## 1. 요청 개요
 
@@ -20,5 +20,5 @@
 
 ## 4. 관련 자료
 
-- API 스펙: `docs/plans/BE/SY024-follow.md` (팔로우/언팔로우 API 설계 — `docs/requests/BE/008-social-notification-contract.md`의 해당 요청은 반영 완료로 문서에서 제거됨)
+- API 스펙: `docs/plans/BE/SY024-follow.md` (팔로우/언팔로우 API 설계 — `docs/requests/BE/004-social-notification-contract.md`의 해당 요청은 반영 완료로 문서에서 제거됨)
 - BE 설계 계획(멱등 정책 근거): `docs/plans/BE/SY024-follow.md`

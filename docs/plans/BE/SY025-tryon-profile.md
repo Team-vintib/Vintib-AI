@@ -4,7 +4,7 @@
 
 온보딩(ONBOARD-003)과 라이브 시착 패널에서 재사용할 "AI 가상 시착 프로필"(전신 사진 + 키/몸무게/가슴·허리·엉덩이둘레)을 등록·조회·수정·삭제하는 API가 아직 없다. `APIs.md`에는 `GET/PUT/DELETE /users/{id}/tryon`(TRYON-001/002)이 미구현으로 등록돼 있고, DB에는 `member_body_profile` 테이블 초안(`BE/docs/db/schema.sql` 57~64행)만 있을 뿐 JPA 엔티티는 아직 없다. 이미 구현된 `/api/users/{userId}/tryons`(복수형, TRYON-005 — 시착 "결과" 저장/조회/삭제)와는 다른 리소스다.
 
-FE 요청 문서(`docs/requests/BE/002-onboarding-contract.md` §3.3, `007-live-tryon-contract.md` §3.4)는 `PUT /api/me/tryon`을 multipart로 요청했다. 이번 설계는 다음 두 가지를 사용자와 논의해 확정한 뒤 진행한다.
+FE 요청 문서(`docs/requests/BE/002-onboarding-contract.md` §3.3, `003-live-tryon-contract.md` §3.4)는 `PUT /api/me/tryon`을 multipart로 요청했다. 이번 설계는 다음 두 가지를 사용자와 논의해 확정한 뒤 진행한다.
 
 1. **경로**: 이 프로젝트에서 반복된 전례(같은 002 문서의 §3.1/3.2/3.4가 전부 `/api/me/X` → `/api/users/{id}/X`로 정정됨)를 따라 `/api/users/{userId}/tryon`으로 간다.
 2. **업로드 방식**: 상품 이미지와 동일한 **presigned 2단계**로 간다. 개인 신체 사진이라 비공개 버킷에 저장해야 하고(업로드 방식과는 무관하게 어차피 그렇게 할 계획이었음), 기존 컨벤션과의 일관성도 고려해 이 방식으로 확정했다. FE가 이미 구현해둔 multipart 업로드 화면은 재작업이 필요하므로 계약 변경 요청 문서를 새로 남긴다.
@@ -90,9 +90,9 @@ new WhitelistEntry(null, "/api/users/*/tryon"),
 new WhitelistEntry(null, "/api/users/*/tryon/upload-url"),
 ```
 
-### 9) FE 계약 변경 요청 문서 — `docs/requests/FE/009-tryon-profile-presigned-upload.md` (신규)
+### 9) FE 계약 변경 요청 문서 — `docs/requests/FE/015-tryon-profile-presigned-upload.md` (신규)
 
-`docs/requests/FE/001-product-image-presigned-upload.md`와 동일 형식(배경/이유, 요청 내용에 API 스펙 4단계 + 에러코드 표, 관련 자료, 처리 결과는 비워둠).
+`docs/requests/FE/002-product-image-presigned-upload.md`와 동일 형식(배경/이유, 요청 내용에 API 스펙 4단계 + 에러코드 표, 관련 자료, 처리 결과는 비워둠).
 
 - `POST /api/users/{userId}/tryon/upload-url` → `{ key, uploadUrl, expiresInSeconds }`
 - S3 직접 PUT (상품 이미지와 동일)
@@ -102,7 +102,7 @@ new WhitelistEntry(null, "/api/users/*/tryon/upload-url"),
 
 ### 10) 기존 FE 요청 문서 갱신
 
-- `docs/requests/BE/002-onboarding-contract.md` §3.3, `docs/requests/BE/007-live-tryon-contract.md` §3.4를 같은 문서의 §3.1/3.2/3.4가 이미 쓴 톤("구현 완료, 계약은 다르게 확정됨" + 새 문서 링크)으로 갱신.
+- `docs/requests/BE/002-onboarding-contract.md` §3.3, `docs/requests/BE/003-live-tryon-contract.md` §3.4를 같은 문서의 §3.1/3.2/3.4가 이미 쓴 톤("구현 완료, 계약은 다르게 확정됨" + 새 문서 링크)으로 갱신.
 
 ### 11) 테스트 — `TryOnProfileServiceTest` (Mockito 단위, `TryOnResultServiceTest` 스타일)
 
@@ -126,8 +126,8 @@ new WhitelistEntry(null, "/api/users/*/tryon/upload-url"),
 - [x] `tryon/controller/TryOnProfileController.java` (Swagger 포함)
 - [x] `ErrorCode`에 `T005`, `T006` 추가
 - [x] `OnboardingRequiredFilter` 화이트리스트 수정
-- [x] `docs/requests/FE/009-tryon-profile-presigned-upload.md` 신규 작성
-- [x] `docs/requests/BE/002-onboarding-contract.md` §3.3, `007-live-tryon-contract.md` §3.4 갱신(+ `012-be-request-index.md` 인덱스 갱신)
+- [x] `docs/requests/FE/015-tryon-profile-presigned-upload.md` 신규 작성
+- [x] `docs/requests/BE/002-onboarding-contract.md` §3.3, `003-live-tryon-contract.md` §3.4 갱신(+ `006-be-request-index.md` 인덱스 갱신)
 - [x] `TryOnProfileServiceTest` (10건: 업로드URL발급, 지원안하는타입, 프로필없음404, 최초등록, 부분병합, 사진교체, 업로드미확인, 삭제, 사진없이삭제, 없는프로필삭제404)
 - [x] `BE/README.md` 갱신
 - [x] `.claude/skills/BE:verify` 기준 `./gradlew build` 통과 확인 (`BUILD SUCCESSFUL`, 전체 301건 테스트 green, 신규 10건 포함)

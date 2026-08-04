@@ -1,4 +1,4 @@
-# 012 BE 요청 문서 인덱스
+# 006 BE 요청 문서 인덱스
 
 ## 1. 요청 개요
 
@@ -14,10 +14,10 @@
   - Onboarding, Commerce, MyPage는 mock 또는 미구현 범위가 남아 있음
   - Home/Search는 BE 구현 완료(팀원 쪽에서 반영) — `004-home-contract.md`/`005-search-contract.md`는
     반영 완료로 삭제됨
-  - Business는 BE 구현 완료(제출/조회/재제출) — FE는 아직 mock 사용 중(`docs/requests/FE/011-business-invoice-contract.md` 반영 필요)
+  - Business는 BE 구현 완료(제출/조회/재제출) — FE는 아직 mock 사용 중(`docs/requests/FE/017-business-invoice-contract.md` 반영 필요)
 - 현재 임시 처리 또는 Mock 사용 여부
   - Onboarding: mock-success fallback
-  - Business: FE가 아직 `docs/requests/FE/011-business-invoice-contract.md` 미반영 — mock `PENDING` fallback 유지 중
+  - Business: FE가 아직 `docs/requests/FE/017-business-invoice-contract.md` 미반영 — mock `PENDING` fallback 유지 중
   - Commerce/Wallet, MyPage: FE 화면 없음
 
 ## 3. 추가 구현 요청
@@ -34,10 +34,13 @@
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
 | 001 | `001-auth-contract.md` | Auth | 이메일 auth API 연결 완료 | `GET /api/me`, auth 응답 `user/nextStep`, SSAFY SSO |
-| 006 | `006-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
-| 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 상품/헤더 필수 필드(brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId) 연결 완료 | 생성용 상품 조회, AI 시착 생성, 선택 필드(hostProfileImageUrl/description/material/measurements/defectSummary) |
-| 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API 연동 완료 | ⚠️ 이번 머지로 라이브 알림 신청(`LiveReminderController`/`LiveReminderScheduler`)이 새로 들어옴 — 실제 알림 생성 이벤트 상태 재확인 필요 |
-| 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수 연결 완료 | ⚠️ 이번 머지로 경매 시작/입찰/종료(`AuctionActionController`, `Bid`, `PointHold`)가 새로 들어옴 — 문서 자체 재확인 필요(FE 인계는 `docs/requests/FE/017-auction-snapshot-start-contract.md`/`018-auction-bid-contract.md` 참고) |
+| 002 | `002-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
+| 003 | `003-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 상품/헤더 필수 필드(brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId) 연결 완료 | 생성용 상품 조회, AI 시착 생성, 선택 필드(hostProfileImageUrl/description/material/measurements/defectSummary) |
+| 004 | `004-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API, 예약 라이브 알림 신청/스케줄러 연동 완료 | 알림 생성 이벤트는 `LIVE_REMINDER` 하나뿐 — 나머지 7종(라이브 시작/입찰/낙찰/주문/배송/포인트) 미반영, unread count API, 탭별 bulk read API |
+| 005 | `005-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수, 경매 조건 설정, 경매 snapshot/시작/입찰/입찰내역, STOMP(`AUCTION_STARTED`/`BID_PLACED`) 연동 완료 | 경매 종료(`close`)·낙찰자 조회(`winner`)·`AUCTION_CLOSED` 이벤트·자동 종료 스케줄러 |
+| 010 | `010-product-category-optional.md` | Product | 미반영 | `categoryId`가 여전히 `@NotNull`(`ProductCreateRequest`) — 선택 입력 전환 검토 |
+| 011 | `011-product-similar-price-distribution.md` | Product | 미반영 | 상품 상세에 유사 상품 목록(`id`/`title`/`price`) 없음 |
+| 012 | `012-product-ai-tryon-registration-fields.md` | Product | 미반영 | `aiModelEnabled`/`aiModelGender` 필드가 `ProductCreateRequest`에 없음 |
 
 ## 4. 기존 API 변경 요청
 
@@ -86,7 +89,7 @@
 - `010-commerce-wallet-contract.md`는 남아 있던 환불(REFUND-001/002, 이슈 509)·출금 계좌·최소 충전/출금
   금액(10,000원)까지 전부 반영돼 삭제했다 — 위 표에서도 뺐다. 환불 승인 주체는 운영자가 아니라
   판매자로 확정했다(`docs/plans/BE/SY037-refund.md` 참고).
-- `007-live-tryon-contract.md` §3.5(라이브 시청 화면 필드 보강)는 필수 필드 4개가 전부 반영돼 있었다
+- `003-live-tryon-contract.md` §3.5(라이브 시청 화면 필드 보강)는 필수 필드 4개가 전부 반영돼 있었다
   (`saleType`은 `DIRECT_SALE`, `condition`은 `conditionGrade`로 이름이 다름). 선택 필드
   (`hostProfileImageUrl`/`description`/`material`/`measurements`/`defectSummary`)와 §3.1(생성용 상품
   조회)·§3.3/3.6(AI 시착 생성)은 아직 남아 있어 문서는 삭제하지 않고 갱신만 했다.
@@ -95,10 +98,13 @@
 
 - `004-home-contract.md`, `005-search-contract.md`는 팀원(정윤) 쪽에서 홈 `hostId`·통합 검색을
   구현하며 직접 삭제 처리했다 — 위 표에서도 뺐다.
-- 경매 시작/입찰/종료(AUCT-002~014), 라이브 예약 알림 신청/스케줄러가 이번 머지로 대량 반영됐다.
-  008/009 행은 위 표에 ⚠️로 표시해 뒀다 — 상세 내용은 다음 세션에서 실제 코드 대조 후 갱신 필요
-  (FE 인계 문서: `docs/requests/FE/016-pre-auction-batch-handoff.md`,
-  `017-auction-snapshot-start-contract.md`, `018-auction-bid-contract.md`).
-- BE가 새로 요청한 문서 3개도 생겼다: `016-product-category-optional.md`,
-  `016-product-similar-price-distribution.md`, `017-product-ai-tryon-registration-fields.md` —
-  아직 이 인덱스 표에는 반영 전, 다음 세션에서 정리 필요.
+- 경매 시작/입찰/입찰내역(AUCT-002~010), 라이브 예약 알림 신청/스케줄러가 이번 머지로 반영됐다 —
+  008/009 문서를 코드와 대조해 갱신 완료(009 §3.1~3.3, 008 §3.1~3.2). 남은 것: 경매 종료/낙찰자
+  조회(009), 알림 생성 이벤트 7종·unread count·탭별 bulk read(008).
+- BE가 새로 요청한 문서 3개도 생겼다: `010-product-category-optional.md`,
+  `011-product-similar-price-distribution.md`, `012-product-ai-tryon-registration-fields.md` —
+  코드 확인 결과(categoryId `@NotNull` 그대로, similarProducts/aiModelEnabled·aiModelGender 필드 없음)
+  전부 미반영 확인 후 표에 추가했다.
+- 2026-08-04: 이 폴더 및 `FE`/`AI` 요청 문서 전체를 001부터 빈틈없이 재넘버링했다(팀원별로 독립적으로
+  번호를 매겨 BE 014·016, FE 001·002·003·005·006·007·016·018, AI 002가 중복돼 있었음). 이 문서 자체도
+  012 → 006으로 바뀌었다.

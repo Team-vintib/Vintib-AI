@@ -76,7 +76,7 @@
 - [x] `SecurityConfig` PUBLIC_ENDPOINTS에 웹훅 경로 추가
 - [x] `docs/db/schema.sql` 갱신
 - [x] `docs/APIs.md`에 웹훅 엔드포인트(내부용, 인증 불필요) 추가, 실제 웹훅 연동 흐름으로 설명 갱신
-- [x] `docs/requests/FE/016-shipment-courier-code-contract.md` 작성
+- [x] `docs/requests/FE/023-shipment-courier-code-contract.md` 작성
 - [x] `FE/docs/notion/기능 정의서.md` 히스토리에 SHIP-002 실연동 반영 기록
 - [x] `.claude/skills/BE:verify`로 최종 검증(자격증명 없이도 폴백 경로가 통과하는지 포함)
 

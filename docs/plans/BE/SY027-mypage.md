@@ -98,7 +98,7 @@
 
 ## 구현 목록
 
-계획 대비 실제 구현은 일부 경로/구조가 바뀌었다 — 확정된 최종 계약은 `docs/requests/FE/012-mypage-contract.md`와 `docs/APIs.md` 참고.
+계획 대비 실제 구현은 일부 경로/구조가 바뀌었다 — 확정된 최종 계약은 `docs/requests/FE/018-mypage-contract.md`와 `docs/APIs.md` 참고.
 
 - [x] MY-001: `MemberProfileResponse`에 `businessVerificationStatus` 추가, `UserService.getProfile`, `UserController GET /{id}`
 - [x] MY-002: `MyProductController`, `ProductRepository.findBySeller_Id`, 서비스 메서드

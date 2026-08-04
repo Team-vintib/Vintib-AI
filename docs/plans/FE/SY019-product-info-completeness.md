@@ -40,5 +40,5 @@
 ## 확인 필요 사항
 
 - 완성도 점수는 선택 정보 입력 유도용이며 등록 가능 여부와 무관하다.
-- 현재 BE 요청 필수값 중 카테고리는 FE에서 선택 처리되어 있으나, BE 계약 변경 요청은 기존 `docs/requests/BE/016-product-category-optional.md`에 남아 있다.
+- 현재 BE 요청 필수값 중 카테고리는 FE에서 선택 처리되어 있으나, BE 계약 변경 요청은 기존 `docs/requests/BE/010-product-category-optional.md`에 남아 있다.
 - 가격 단계에는 별도 선택형 가격 보조 필드가 없어 완성도 항목을 추가하지 않는다.

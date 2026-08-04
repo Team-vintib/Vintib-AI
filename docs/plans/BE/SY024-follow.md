@@ -4,7 +4,7 @@
 
 ## 배경/목표
 
-`social` 패키지에는 `Follow` 엔티티(서로게이트 PK, `follower`/`following` FK, DB `@Check`로 자기팔로우 방지)만 있고 CUD·조회 API가 없다. `APIs.md` "팔로우 / 찜 (Socials)" 섹션과 FE 계약 문서(`docs/requests/BE/008-social-notification-contract.md`, 반영 후 해당 섹션은 문서에서 제거됨)에 스펙이 이미 합의돼 있으므로 이를 API로 구현한다. 아울러 `home` 패키지 `FollowingService.getFollowingContent`가 전부 Mock인 것 중 "팔로우한 판매자"·"그 판매자들의 상품" 두 섹션을 실데이터로 전환한다.
+`social` 패키지에는 `Follow` 엔티티(서로게이트 PK, `follower`/`following` FK, DB `@Check`로 자기팔로우 방지)만 있고 CUD·조회 API가 없다. `APIs.md` "팔로우 / 찜 (Socials)" 섹션과 FE 계약 문서(`docs/requests/BE/004-social-notification-contract.md`, 반영 후 해당 섹션은 문서에서 제거됨)에 스펙이 이미 합의돼 있으므로 이를 API로 구현한다. 아울러 `home` 패키지 `FollowingService.getFollowingContent`가 전부 Mock인 것 중 "팔로우한 판매자"·"그 판매자들의 상품" 두 섹션을 실데이터로 전환한다.
 
 ## 작업 내용
 

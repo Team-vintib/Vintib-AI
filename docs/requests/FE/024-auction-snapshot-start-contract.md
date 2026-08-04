@@ -1,9 +1,9 @@
-# 017 경매 현황 조회·시작 계약 (AUCT-002)
+# 024 경매 현황 조회·시작 계약 (AUCT-002)
 
 - **작성자 파트**: BE (정윤) / **대상 파트**: FE
 - **작성일**: 2026-08-03
 - **관련 이슈**: [-460](https://ssafy.atlassian.net/browse/S15P11A108-460), [-461](https://ssafy.atlassian.net/browse/S15P11A108-461)
-- **원 요청**: `docs/requests/BE/009-auction-chat-contract.md` §3.1 · §3.2 · §3.3
+- **원 요청**: `docs/requests/BE/005-auction-chat-contract.md` §3.1 · §3.2 · §3.3
 
 `009`에서 요청하신 경매 API 중 **snapshot 조회와 시작**이 나왔습니다. 입찰·종료·입찰 내역·낙찰자는
 다음 단계입니다(§4).

@@ -1,4 +1,4 @@
-# 016 경매 진입 전 일괄 반영 — FE 요청 처리 결과
+# 022 경매 진입 전 일괄 반영 — FE 요청 처리 결과
 
 - **작성자 파트**: BE (정윤) / **대상 파트**: FE
 - **작성일**: 2026-08-03
@@ -333,7 +333,7 @@ GET /api/users/{userId}/products?page=0&size=20
 ### D. `007` §3.3·§3.6 AI 시착 생성 — 미반영 (**내 담당이 아닙니다**)
 
 시착(TRYON)은 서윤·AI 파트 범위입니다. 요청 문서
-`docs/requests/BE/007-live-tryon-contract.md`에 **시착 항목만 남겨** 두었으니 그쪽에서 처리됩니다.
+`docs/requests/BE/003-live-tryon-contract.md`에 **시착 항목만 남겨** 두었으니 그쪽에서 처리됩니다.
 제가 임의로 만들면 AI 서버 계약과 어긋납니다.
 
 ### E. `008` §3.2.1 `reminderCount` — 미반영

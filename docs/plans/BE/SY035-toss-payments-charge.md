@@ -71,7 +71,7 @@
 
 ### 5. FE 계약 전달
 
-- `docs/requests/FE/018-toss-payments-charge-widget.md` 작성 — 아래를 계약으로 정리한다.
+- `docs/requests/FE/026-toss-payments-charge-widget.md` 작성 — 아래를 계약으로 정리한다.
   - 위젯 초기화: `ready` 응답의 `clientKey`/`orderId`/`amount`로 `requestPayment` 호출
   - 성공 리다이렉트(`successUrl`) 쿼리 파라미터: `paymentKey`, `orderId`, `amount` → 그대로
     `confirm` 바디로 전달
@@ -91,7 +91,7 @@
 - [x] `PointController`의 기존 `POST /charges` 제거, `POST /charges/ready`·`POST /charges/confirm` 추가 + Swagger 문서화
 - [x] `ErrorCode`에 W003~W006 추가
 - [x] `docs/APIs.md` 포인트 충전 섹션 갱신(요청/응답 계약 변경 반영)
-- [x] `docs/requests/FE/018-toss-payments-charge-widget.md` 작성
+- [x] `docs/requests/FE/026-toss-payments-charge-widget.md` 작성
 - [x] `.claude/skills/BE:verify`로 최종 검증 — `PointServiceTest`/`TossPaymentsClientTest`/`DeliveryTrackingClientTest`/`OrderServiceTest` 전부 통과. 전체 `./gradlew build`는 이 작업과 무관한 사전 존재 이슈(로컬 Postgres의 `category.name_en` 컬럼 누락, auction/live/home 5개 테스트 클래스)로 실패했으나 이번 변경과는 무관함을 확인
 - [x] `.env.example`/`docker-compose.yml`/`infra/ci/deploy.sh`/`.gitlab-ci.yml`에 `TOSS_SECRET_KEY`/`TOSS_CLIENT_KEY` 설정 전달 추가(루트 세션에서 진행 — BE 세션은 앱 코드만 담당)
 

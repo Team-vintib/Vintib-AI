@@ -1,4 +1,4 @@
-# 006 Product API 요청
+# 002 Product API 요청
 
 ## 1. 요청 개요
 
@@ -38,14 +38,14 @@
 ### 3.1 상품 목록 필터 구현/문서화 — 구현 완료, 계약은 다르게 확정됨
 
 요청 그대로의 파라미터명으로 구현했다. `keyword`(검색어)만 통합 검색(005) 범위로 미룬 상태다.
-확정 계약은 `docs/requests/FE/010-product-list-detail-contract.md` 참고.
+확정 계약은 `docs/requests/FE/016-product-list-detail-contract.md` 참고.
 
 ### 3.2 상품 상세 응답 보강 — 구현 완료, 계약은 다르게 확정됨
 
 `categoryName`/`brandName`/`isWished`/`sellerFollowerCount`/`sellerProductCount`/`linkedLive`를
 추가했다. `seller` 중첩 객체 대신 최상위 평탄 필드로 냈고, 요청한 `relatedLive`는 `linkedLive`로
 이름이 다르다. `similarProducts`/`priceDistribution`/이미지 `role`은 이번 범위 밖. 확정 계약은
-`docs/requests/FE/010-product-list-detail-contract.md` 참고.
+`docs/requests/FE/016-product-list-detail-contract.md` 참고.
 
 ### 3.3 AI 품질 분석/가격 추천
 

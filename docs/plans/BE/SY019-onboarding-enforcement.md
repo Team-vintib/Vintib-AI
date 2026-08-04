@@ -91,7 +91,7 @@ ONBOARD-004(회원 유형 저장, `PATCH /api/users/{id}/member-type`) 시점으
       `onboardingCompleted == false`면 403 `ONBOARDING_REQUIRED`, `SecurityConfig`에 `JwtAuthenticationFilter` 바로 뒤로 등록
 - [x] 표시명 대체 규칙 제거 — `ChatMessage.senderDisplayName`, `LiveReactionService`,
       `LiveVideoService.displayName`의 `nickname != null ? nickname : name` 우회 제거
-- [x] `docs/requests/FE/007-onboarding-required-gate.md` 작성
+- [x] `docs/requests/FE/013-onboarding-required-gate.md` 작성
 - [x] 테스트: `OnboardingRequiredFilterTest`(신규), `UserServiceTest`(닉네임 선행 검증 케이스 추가),
       `ChatMessageTest`(표시명 대체 제거 반영)
 - [x] `BE:verify` 통과 확인

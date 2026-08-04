@@ -18,7 +18,7 @@ FE가 요청한 경로는 기존 자기 정보 조회와 동일한 `GET /api/use
 
 - `GET /api/users/{userId}/profile` — 공개 프로필(비회원 조회 가능)
 
-FE 계약 문서(`docs/requests/FE/012-mypage-contract.md`)에 경로 변경 사유를 명시해 전달한다.
+FE 계약 문서(`docs/requests/FE/018-mypage-contract.md`)에 경로 변경 사유를 명시해 전달한다.
 (이번 요청 범위 내 MY-005 `hostId` 쿼리 파라미터, MY-007 `points`/`logs` 명칭처럼, 계획 대비 실제
 경로가 조정되는 전례를 따르는 것.)
 
@@ -79,8 +79,8 @@ FE 요청 필드: `id`, `nickname`, `profileImageUrl`, `coverImageUrl`, `descrip
 - [x] `SecurityConfig` permitAll 추가
 - [x] `UserServiceTest`에 단위 테스트 추가(정상 조회/비회원 isFollowing=false/로그인 회원
       isFollowing=true/사업자 인증 승인·대기 구분/대상 회원 없음 404)
-- [x] `docs/APIs.md`, `docs/requests/BE/011`, `docs/requests/BE/012`(인덱스) 갱신, 신규
-      `docs/requests/FE/014-public-profile-contract.md` 작성(마이페이지 계약과 성격이 달라 `012`에
+- [x] `docs/APIs.md`, `docs/requests/BE/011`, `docs/requests/BE/006`(인덱스) 갱신, 신규
+      `docs/requests/FE/020-public-profile-contract.md` 작성(마이페이지 계약과 성격이 달라 `018`에
       합치지 않고 별도 번호로 분리)
 - [x] `./gradlew build` 통과
 

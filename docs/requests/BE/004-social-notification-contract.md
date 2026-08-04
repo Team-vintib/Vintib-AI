@@ -1,4 +1,4 @@
-# 008 Social/Notification API 요청
+# 004 Social/Notification API 요청
 
 ## 1. 요청 개요
 
@@ -86,6 +86,10 @@
 }
 ```
 
+2026-08-04 확인: `Notification.type`/`refType`은 DB enum이 아니라 자유 문자열이고, 실제로 생성되는
+값은 현재 `type=LIVE_REMINDER`/`refType=LIVE` 하나뿐이다(§3.2 참고). 나머지 요청 사항은 이벤트가
+더 생겨야 의미가 있어 아직 그대로 남겨둔다.
+
 확정 요청:
 
 - `type` enum 전체 목록과 각 값의 발생 이벤트를 문서화해 주세요.
@@ -114,31 +118,27 @@ FE 현재 임시 이동:
 | `AUCTION` | `/my?section=auctions` |
 | 기타/null | 이동하지 않고 알림센터에 머묾 |
 
-### 3.2 실제 알림 생성 이벤트 연결
+### 3.2 실제 알림 생성 이벤트 연결 — `LIVE_REMINDER`만 반영, 나머지 7개는 아직
 
-- Method / Endpoint: 내부 도메인 이벤트 또는 서비스 호출
-- 요청 목적: FE가 mock 없이 실제 DB/API로만 알림센터를 확인할 수 있도록 주요 도메인 이벤트에서 `notification` row가 생성되어야 한다.
-- FE 사용처: 알림센터, 공통 헤더 알림 팝업
-- 요청 데이터: 해당 없음
-- 응답 데이터: 해당 없음
+`notification` row를 만드는 경로는 코드 전체에서 `LiveReminderService`(→ `NotificationCommandPort`)
+하나뿐이다(2026-08-04 확인) — §3.2.1의 예약 라이브 알림만 실제로 알림을 만든다. 아래 표의 나머지
+7개 이벤트는 여전히 아무 데서도 `notification` row를 만들지 않는다.
 
-우선 생성 요청 이벤트:
-
-| 이벤트 | 권장 type | 권장 refType/refId |
-| --- | --- | --- |
-| 팔로우한 판매자 라이브 시작 | `LIVE_STARTED` | `LIVE` / live id |
-| 예약 라이브 시작 전 알림 | `LIVE_REMINDER` | `LIVE` / live id |
-| 상위 입찰 발생 | `AUCTION_OUTBID` | `AUCTION` / auction id |
-| 낙찰 | `AUCTION_WON` | `AUCTION` / auction id |
-| 결제 완료 | `ORDER_PAID` | `ORDER` / order id |
-| 송장 등록/배송 시작 | `SHIPMENT_STARTED` | `SHIPMENT` / order or shipment id |
-| 배송 완료 | `SHIPMENT_COMPLETED` | `SHIPMENT` / order or shipment id |
-| 포인트 충전/환불/출금 완료 | `POINT_CHARGED`, `POINT_REFUNDED`, `WITHDRAW_COMPLETED` | `POINT` / point transaction id |
+| 이벤트 | 권장 type | 권장 refType/refId | 상태 |
+| --- | --- | --- | --- |
+| 팔로우한 판매자 라이브 시작 | `LIVE_STARTED` | `LIVE` / live id | 미반영 |
+| 예약 라이브 시작 전 알림 | `LIVE_REMINDER` | `LIVE` / live id | **반영 완료**(§3.2.1) |
+| 상위 입찰 발생 | `AUCTION_OUTBID` | `AUCTION` / auction id | 미반영(경매 입찰 자체는 이번에 구현됨 — `009` 참고) |
+| 낙찰 | `AUCTION_WON` | `AUCTION` / auction id | 미반영(경매 종료 자체가 아직 없음) |
+| 결제 완료 | `ORDER_PAID` | `ORDER` / order id | 미반영 |
+| 송장 등록/배송 시작 | `SHIPMENT_STARTED` | `SHIPMENT` / order or shipment id | 미반영 |
+| 배송 완료 | `SHIPMENT_COMPLETED` | `SHIPMENT` / order or shipment id | 미반영 |
+| 포인트 충전/환불/출금 완료 | `POINT_CHARGED`, `POINT_REFUNDED`, `WITHDRAW_COMPLETED` | `POINT` / point transaction id | 미반영 |
 
 ### 3.2.1 예약 라이브 알림 신청과 스케줄러 — 반영 완료 (2026-08-03, 정윤)
 
 `POST`/`DELETE /api/lives/{liveId}/reminders`, `GET /api/lives/{liveId}`의 `isReminderSet`, 발송 스케줄러까지 구현했다.
-계약·정책·미반영 필드(`reminderCount`)는 `docs/requests/FE/016-pre-auction-batch-handoff.md` 참고.
+계약·정책·미반영 필드(`reminderCount`)는 `docs/requests/FE/022-pre-auction-batch-handoff.md` 참고.
 
 ### 3.3 unread count 전용 API 검토
 

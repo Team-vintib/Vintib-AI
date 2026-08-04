@@ -17,7 +17,7 @@ BE에서는 `PRIVATE`를 enum·DB 제약에서 완전히 제거했다(`SaleStatu
   - `FE/src/domains/product/types/productDetail.types.ts` — `SaleStatus` 유니온 타입에서 `'PRIVATE'` 제거
   - `FE/src/domains/product/components/ProductPurchaseSummary.vue` — `isPurchaseDisabled`,
     `isCartDisabled` 계산 프로퍼티의 상태 배열에서 `'PRIVATE'` 제거
-- API 응답의 `saleStatus` 필드는 현재(2026-08-04) `DRAFT | ON_SALE | AUCTION_SCHEDULED | AUCTION_IN_PROGRESS | SOLD` 중 하나만 온다. `AUCTION_FAILED`(미낙찰)는 아직 enum에 없다 — 경매 입찰/종료 자체가 미구현이라 그 상태가 될 경로가 없다(`docs/requests/BE/014-unsold-product-disposition.md` 참고). 추가되면 다시 알린다.
+- API 응답의 `saleStatus` 필드는 현재(2026-08-04) `DRAFT | ON_SALE | AUCTION_SCHEDULED | AUCTION_IN_PROGRESS | SOLD` 중 하나만 온다. `AUCTION_FAILED`(미낙찰)는 아직 enum에 없다 — 경매 입찰/종료 자체가 미구현이라 그 상태가 될 경로가 없다(`docs/requests/BE/007-unsold-product-disposition.md` 참고). 추가되면 다시 알린다.
 
 ## 관련 자료
 

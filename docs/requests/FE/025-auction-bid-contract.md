@@ -1,4 +1,4 @@
-# 018 입찰 계약 (AUCT-003~006)
+# 025 입찰 계약 (AUCT-003~006)
 
 - **작성자 파트**: BE (정윤) / **대상 파트**: FE
 - **작성일**: 2026-08-04
@@ -7,7 +7,7 @@
   [-464](https://ssafy.atlassian.net/browse/S15P11A108-464),
   [-465](https://ssafy.atlassian.net/browse/S15P11A108-465),
   [-469](https://ssafy.atlassian.net/browse/S15P11A108-469)
-- **원 요청**: `docs/requests/BE/009-auction-chat-contract.md` §3.2 · §3.3
+- **원 요청**: `docs/requests/BE/005-auction-chat-contract.md` §3.2 · §3.3
 
 `017`에서 이어지는 입찰 계약입니다. 이제 실제로 입찰이 됩니다.
 
