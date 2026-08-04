@@ -75,7 +75,7 @@ defineProps<{
 }
 
 .search-member-card:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 3px;
 }
 </style>

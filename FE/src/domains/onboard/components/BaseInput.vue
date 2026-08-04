@@ -73,41 +73,36 @@ defineExpose({ focus })
   width: 100%;
   height: var(--button-height-standard);
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border-input);
   border-radius: var(--radius-control);
-  background: var(--color-surface);
+  background: transparent;
   color: var(--color-text-primary);
+  font-weight: 300;
   outline: none;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+  transition: border-color 160ms ease;
 }
 
 .base-input::placeholder {
-  color: var(--color-text-muted);
+  color: var(--color-text-caption);
 }
 
 .base-input:hover:not(:read-only, :disabled) {
-  border-color: var(--color-text-muted);
+  border-color: var(--color-border-strong);
 }
 
 .base-input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 
 .base-input--invalid {
   border-color: var(--color-error);
 }
 
-.base-input--invalid:focus {
-  box-shadow: 0 0 0 3px var(--color-error-soft);
-}
-
 .base-input:read-only,
 .base-input:disabled {
-  background: var(--color-surface-secondary);
-  color: var(--color-text-secondary);
+  border-color: var(--color-border-grid);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
 }
 
 .base-input:disabled {

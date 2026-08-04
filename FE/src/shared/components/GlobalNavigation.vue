@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import logoImage from '@/assets/images/logo.png'
+import logoImage from '@/assets/images/logo-white.png'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { getMyProfile } from '@/domains/my/api/myApi'
 import NotificationPopup from '@/domains/notification/components/NotificationPopup.vue'
@@ -454,7 +454,7 @@ onUnmounted(() => {
   top: 0;
   z-index: 50;
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-chrome);
 }
 
 .global-nav__inner {
@@ -464,7 +464,7 @@ onUnmounted(() => {
   max-width: var(--layout-content-max-width);
   height: 64px;
   margin: 0 auto;
-  padding: 0 var(--space-12);
+  padding: 0 var(--layout-gutter);
   gap: 0;
 }
 
@@ -481,8 +481,8 @@ onUnmounted(() => {
 }
 
 .global-nav__brand-logo {
-  width: 116px;
-  height: 40px;
+  width: auto;
+  height: 30px;
   object-fit: contain;
 }
 
@@ -523,7 +523,9 @@ onUnmounted(() => {
 
 .global-nav__points {
   color: var(--color-primary);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .global-nav__points:hover,
@@ -659,7 +661,6 @@ onUnmounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
-  box-shadow: 0 18px 48px rgb(23 24 21 / 14%);
   opacity: 0;
   pointer-events: none;
   transform: translateY(-4px);
@@ -729,11 +730,13 @@ onUnmounted(() => {
   justify-content: center;
   width: 28px;
   height: 28px;
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-chip);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .global-nav__chevron {
@@ -766,6 +769,7 @@ onUnmounted(() => {
 
 .global-nav__guest-primary:hover {
   background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 .global-nav__brand:focus-visible,
@@ -812,8 +816,8 @@ onUnmounted(() => {
   }
 
   .global-nav__brand-logo {
-    width: 96px;
-    height: 34px;
+    width: auto;
+    height: 26px;
   }
 
   .global-nav__menu {

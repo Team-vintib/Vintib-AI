@@ -188,14 +188,17 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 }
 
 .product-filter__group + .product-filter__group {
-  margin-top: var(--space-8);
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border);
 }
 
 .product-filter__legend {
   margin-bottom: var(--space-4);
   color: var(--color-text-primary);
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-bold);
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: -0.01em;
 }
 
 .product-filter__option {
@@ -253,8 +256,7 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 }
 
 .product-filter__price-control:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  border-color: var(--color-border-underline);
 }
 
 .product-filter__price-control input {
@@ -266,7 +268,9 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
   outline: 0;
   background: transparent;
   color: var(--color-text-primary);
+  font-family: var(--font-mono);
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .product-filter__price-control input::placeholder {
@@ -313,7 +317,7 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 }
 
 .product-filter__button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 

@@ -232,7 +232,6 @@ const handleFileChange = (event: Event) => {
 
 .product-photo-uploader__item--representative {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 
 .product-photo-uploader__item img {

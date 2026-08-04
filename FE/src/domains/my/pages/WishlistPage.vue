@@ -493,7 +493,7 @@ onMounted(() => {
 .wishlist-filter__price input:focus {
   border-color: var(--color-primary);
   outline: 0;
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .wishlist-filter__actions button,
@@ -624,7 +624,7 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgb(23 26 31 / 8%);
+  box-shadow: none;
 }
 
 .wishlist-card__main {

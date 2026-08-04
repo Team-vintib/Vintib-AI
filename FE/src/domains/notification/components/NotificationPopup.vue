@@ -88,7 +88,7 @@ const handleMarkAllAsRead = async () => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
-  box-shadow: 0 18px 48px rgb(23 24 21 / 14%);
+  box-shadow: none;
 }
 
 .notification-popup__header {

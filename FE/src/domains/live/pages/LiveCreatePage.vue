@@ -1054,17 +1054,22 @@ onMounted(() => {
 
 .live-create__eyebrow,
 .live-create__section-label {
-  color: var(--color-live);
-  font-size: 13px;
-  font-weight: var(--font-weight-bold);
-  line-height: 18px;
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  line-height: 16px;
+  text-transform: uppercase;
 }
 
 .live-create__header h1 {
   color: var(--color-text-primary);
-  font-size: 36px;
-  font-weight: var(--font-weight-extrabold);
-  line-height: 48px;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
 }
 
 .live-create__header p:last-child,
@@ -1205,7 +1210,7 @@ onMounted(() => {
 
 .live-create__method--selected {
   border-color: var(--color-live);
-  box-shadow: 0 0 0 3px var(--color-auction-soft);
+  box-shadow: none;
 }
 
 .live-create__info-form {
@@ -1340,7 +1345,7 @@ onMounted(() => {
 .live-create__field input:focus,
 .live-create__field textarea:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
   outline: none;
 }
 
@@ -1656,7 +1661,7 @@ onMounted(() => {
 
 .live-create__product--selected {
   border-color: var(--color-live);
-  box-shadow: 0 0 0 3px var(--color-auction-soft);
+  box-shadow: none;
 }
 
 .live-create__product img {

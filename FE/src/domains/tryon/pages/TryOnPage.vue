@@ -75,14 +75,18 @@ onMounted(loadResults)
 }
 
 .tryon-page__header h1 {
-  font-size: 30px;
-  font-weight: 700;
-  line-height: 40px;
+  color: var(--color-text-primary);
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1;
 }
 
 .tryon-page__header p {
-  margin-top: var(--space-2);
+  margin-top: var(--space-3);
   color: var(--color-text-secondary);
+  font-weight: 300;
   line-height: 24px;
 }
 </style>

@@ -491,7 +491,7 @@ watch(
   border: 0;
   border-radius: 9px;
   background: #c43d46;
-  box-shadow: 0 6px 18px rgba(196, 61, 70, 0.2);
+  box-shadow: none;
   color: #fff;
   font-size: 14px;
   font-weight: 700;
