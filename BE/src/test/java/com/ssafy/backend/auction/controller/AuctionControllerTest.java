@@ -14,6 +14,8 @@ import com.ssafy.backend.member.entity.Gender;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.entity.MemberType;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.point.entity.PointAccount;
+import com.ssafy.backend.point.repository.PointAccountRepository;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
@@ -65,8 +67,12 @@ class AuctionControllerTest {
     @Autowired
     private LiveProductRepository liveProductRepository;
 
+    @Autowired
+    private PointAccountRepository pointAccountRepository;
+
     private MockMvc mockMvc;
     private String hostToken;
+    private Member hostMember;
     private Long liveId;
     private Long linkedProductId;
 
@@ -88,6 +94,7 @@ class AuctionControllerTest {
         host.updateBasicInfo(nickname, "01000000000", "서울", "1층", null, Gender.MALE);
         host.completeOnboarding(MemberType.GENERAL);
         host = memberRepository.save(host);
+        hostMember = host;
         hostToken = jwtTokenProvider.createAccessToken(host.getId(), email);
 
         // 카테고리는 필수다(PROD-001). 시드된 마스터에서 아무거나 하나 집는다 — 경매 검증에
@@ -102,6 +109,36 @@ class AuctionControllerTest {
         Live live = liveRepository.save(Live.openNow(host, "빈티지 데님 라이브", null, null, LocalDateTime.now()));
         liveId = live.getId();
         liveProductRepository.save(LiveProduct.link(live, linkedProductId, (short) 0, LocalDateTime.now()));
+    }
+
+    /** 입찰 가능한 잔액을 쥔 신규 회원 토큰을 만든다. */
+    private String 회원_토큰(long pointBalance) {
+        String email = "auction-bidder-" + UUID.randomUUID() + "@example.com";
+        Member member = Member.builder().email(email).password("encoded").name("입찰자").build();
+        String nickname = "bidder-" + UUID.randomUUID().toString().substring(0, 8);
+        member.updateBasicInfo(nickname, "01000000001", "서울", "2층", null, Gender.MALE);
+        member.completeOnboarding(MemberType.GENERAL);
+        member = memberRepository.save(member);
+
+        PointAccount account = PointAccount.builder().member(member).build();
+        account.charge(pointBalance);
+        pointAccountRepository.save(account);
+
+        return jwtTokenProvider.createAccessToken(member.getId(), email);
+    }
+
+    private String bidRequestBody(long amount) {
+        return """
+                {"amount":%d}
+                """.formatted(amount);
+    }
+
+    /** 조건 설정 → 시작까지 마친 경매 ID. 시작가 10,000원, 증액 단위 1,000원. */
+    private Long 진행_중인_경매_ID() throws Exception {
+        Long auctionId = 설정된_경매_ID();
+        mockMvc.perform(post("/api/auctions/{auctionId}/start", auctionId)
+                .header("Authorization", "Bearer " + hostToken)).andExpect(status().isOk());
+        return auctionId;
     }
 
     private String configRequestBody(Long productId, Long startPrice, Long bidUnit, Integer durationSeconds) {
@@ -245,7 +282,7 @@ class AuctionControllerTest {
                 .header("Authorization", "Bearer " + hostToken)).andExpect(status().isOk());
 
         Product another = productRepository.save(Product.builder()
-                .seller(memberRepository.findAll().get(0))
+                .seller(hostMember)
                 .categoryId(categoryRepository.findAll().get(0).getId())
                 .title("두 번째 상품")
                 .build());
@@ -277,6 +314,189 @@ class AuctionControllerTest {
     void 존재하지_않는_경매를_시작하면_404다() throws Exception {
         mockMvc.perform(post("/api/auctions/{auctionId}/start", 999_999_999L)
                         .header("Authorization", "Bearer " + hostToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("A005"));
+    }
+
+    // ---------- 입찰 (AUCT-003~006) ----------
+
+    @Test
+    void 시작가로_입찰하면_현재가와_최고_입찰자가_갱신된다() throws Exception {
+        Long auctionId = 진행_중인_경매_ID();
+        String bidderToken = 회원_토큰(100_000L);
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/bids", auctionId)
+                        .header("Authorization", "Bearer " + bidderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bidRequestBody(10_000L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.currentPrice").value(10_000))
+                .andExpect(jsonPath("$.data.nextBidPrice").value(11_000))
+                .andExpect(jsonPath("$.data.bidCount").value(1));
+    }
+
+    @Test
+    void 상위_입찰이_들어오면_직전_최고_입찰자의_입찰이_밀린다() throws Exception {
+        Long auctionId = 진행_중인_경매_ID();
+        String first = 회원_토큰(100_000L);
+        String second = 회원_토큰(100_000L);
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/bids", auctionId)
+                        .header("Authorization", "Bearer " + first)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bidRequestBody(10_000L)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/bids", auctionId)
+                        .header("Authorization", "Bearer " + second)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bidRequestBody(11_000L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.currentPrice").value(11_000))
+                .andExpect(jsonPath("$.data.bidCount").value(2));
+    }
+
+    @Test
+    void 다음_입찰가와_다른_금액을_보내면_400이다() throws Exception {
+        Long auctionId = 진행_중인_경매_ID();
+        String bidderToken = 회원_토큰(100_000L);
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/bids", auctionId)
+                        .header("Authorization", "Bearer " + bidderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bidRequestBody(50_000L)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("A008"));
+    }
+
+    @Test
+    void 직전_최고_입찰자_본인은_연속으로_입찰하면_400이다() throws Exception {
+        Long auctionId = 진행_중인_경매_ID();
+        String bidderToken = 회원_토큰(100_000L);
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/bids", auctionId)
+                        .header("Authorization", "Bearer " + bidderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bidRequestBody(10_000L)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/bids", auctionId)
+                        .header("Authorization", "Bearer " + bidderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bidRequestBody(11_000L)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("A009"));
+    }
+
+    @Test
+    void 잔액이_부족하면_400이다() throws Exception {
+        Long auctionId = 진행_중인_경매_ID();
+        String poorBidderToken = 회원_토큰(5_000L); // 시작가(10,000원)보다 적다
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/bids", auctionId)
+                        .header("Authorization", "Bearer " + poorBidderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bidRequestBody(10_000L)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("W001"));
+    }
+
+    @Test
+    void 다른_경매에_이미_최고_입찰자면_409다() throws Exception {
+        // AUCT-009 — 최고 입찰자인 동안 다른 경매에 입찰할 수 없다.
+        Long firstAuctionId = 진행_중인_경매_ID();
+        String bidderToken = 회원_토큰(1_000_000L);
+        mockMvc.perform(post("/api/auctions/{auctionId}/bids", firstAuctionId)
+                        .header("Authorization", "Bearer " + bidderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bidRequestBody(10_000L)))
+                .andExpect(status().isOk());
+
+        Product secondProduct = productRepository.save(Product.builder()
+                .seller(hostMember)
+                .categoryId(categoryRepository.findAll().get(0).getId())
+                .title("두 번째 상품")
+                .build());
+        Live secondLive = liveRepository.save(
+                Live.openNow(hostMember, "다른 방송", null, null, LocalDateTime.now()));
+        liveProductRepository.save(
+                LiveProduct.link(secondLive, secondProduct.getId(), (short) 0, LocalDateTime.now()));
+        String body = mockMvc.perform(post("/api/lives/{liveId}/auctions", secondLive.getId())
+                        .header("Authorization", "Bearer " + hostToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configRequestBody(secondProduct.getId(), 5_000L, 500L, 60)))
+                .andReturn().getResponse().getContentAsString();
+        Long secondAuctionId = Long.parseLong(body.replaceAll(".*\"id\":(\\d+).*", "$1"));
+        mockMvc.perform(post("/api/auctions/{auctionId}/start", secondAuctionId)
+                .header("Authorization", "Bearer " + hostToken)).andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/bids", secondAuctionId)
+                        .header("Authorization", "Bearer " + bidderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bidRequestBody(5_000L)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("A011"));
+    }
+
+    @Test
+    void 진행_중이_아닌_경매에_입찰하면_400이다() throws Exception {
+        Long auctionId = 설정된_경매_ID(); // READY, 아직 시작 전
+        String bidderToken = 회원_토큰(100_000L);
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/bids", auctionId)
+                        .header("Authorization", "Bearer " + bidderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bidRequestBody(10_000L)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("A001"));
+    }
+
+    @Test
+    void 입찰은_미인증이면_401이다() throws Exception {
+        Long auctionId = 진행_중인_경매_ID();
+
+        mockMvc.perform(post("/api/auctions/{auctionId}/bids", auctionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bidRequestBody(10_000L)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 입찰_내역이_최신순으로_조회되고_본인_여부가_표시된다() throws Exception {
+        Long auctionId = 진행_중인_경매_ID();
+        String bidderToken = 회원_토큰(100_000L);
+        mockMvc.perform(post("/api/auctions/{auctionId}/bids", auctionId)
+                        .header("Authorization", "Bearer " + bidderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bidRequestBody(10_000L)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/auctions/{auctionId}/bids", auctionId)
+                        .header("Authorization", "Bearer " + bidderToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(1))
+                .andExpect(jsonPath("$.data.content[0].amount").value(10_000))
+                .andExpect(jsonPath("$.data.content[0].isMine").value(true));
+    }
+
+    @Test
+    void 비회원도_입찰_내역을_조회할_수_있다() throws Exception {
+        Long auctionId = 진행_중인_경매_ID();
+        String bidderToken = 회원_토큰(100_000L);
+        mockMvc.perform(post("/api/auctions/{auctionId}/bids", auctionId)
+                        .header("Authorization", "Bearer " + bidderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bidRequestBody(10_000L)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/auctions/{auctionId}/bids", auctionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].isMine").value(false));
+    }
+
+    @Test
+    void 존재하지_않는_경매의_입찰_내역을_조회하면_404다() throws Exception {
+        mockMvc.perform(get("/api/auctions/{auctionId}/bids", 999_999_999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("A005"));
     }
