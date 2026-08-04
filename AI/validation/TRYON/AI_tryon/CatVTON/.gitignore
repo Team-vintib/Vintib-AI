@@ -25,3 +25,4 @@ result/*
 !result/worn_reference_matched_result/
 !result/worn_references/
 !result/top_worn_ref_as_person/
+!result/outer_worn_ref_as_person/
