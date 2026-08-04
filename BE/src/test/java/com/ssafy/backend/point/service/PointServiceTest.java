@@ -113,6 +113,48 @@ class PointServiceTest {
     }
 
     @Test
+    void 결제하면_available이_줄고_tradeEscrow로_보관된다() {
+        PointAccount account = newAccount();
+        account.charge(100_000L);
+        when(pointAccountRepository.findById(MEMBER_ID)).thenReturn(Optional.of(account));
+
+        pointService.pay(MEMBER_ID, 60_000L, 10L);
+
+        assertThat(account.getAvailable()).isEqualTo(40_000L);
+        assertThat(account.getTradeEscrow()).isEqualTo(60_000L);
+    }
+
+    @Test
+    void 결제시_잔액이_부족하면_예외를_던진다() {
+        PointAccount account = newAccount();
+        account.charge(10_000L);
+        when(pointAccountRepository.findById(MEMBER_ID)).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> pointService.pay(MEMBER_ID, 60_000L, 10L))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INSUFFICIENT_POINTS);
+    }
+
+    @Test
+    void 구매확정_정산시_구매자_tradeEscrow가_줄고_판매자_available이_늘어난다() {
+        Long sellerId = 2L;
+        Member seller = org.mockito.Mockito.mock(Member.class);
+
+        PointAccount buyerAccount = newAccount();
+        buyerAccount.charge(100_000L);
+        buyerAccount.pay(60_000L);
+        when(pointAccountRepository.findById(MEMBER_ID)).thenReturn(Optional.of(buyerAccount));
+
+        PointAccount sellerAccount = PointAccount.builder().member(seller).build();
+        when(pointAccountRepository.findById(sellerId)).thenReturn(Optional.of(sellerAccount));
+
+        pointService.settleOrder(MEMBER_ID, sellerId, 60_000L, 10L);
+
+        assertThat(buyerAccount.getTradeEscrow()).isZero();
+        assertThat(sellerAccount.getAvailable()).isEqualTo(60_000L);
+    }
+
+    @Test
     void 출금_내역_조회시_WITHDRAW_타입만_반환한다() {
         Pageable pageable = PageRequest.of(0, 20);
         PointTransaction withdrawal = PointTransaction.builder()

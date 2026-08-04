@@ -38,18 +38,7 @@
 | 007 | `007-live-tryon-contract.md` | Live/TryOn | 라이브 전 항목 반영 완료 | **AI 시착 생성만 남음**(라이브 안/밖) |
 | 008 | `008-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API 연동 완료 | 알림 type/ref 문서화, 실제 알림 생성 이벤트, 탭별 bulk read (예약 라이브 알림은 반영 완료) |
 | 009 | `009-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수, 경매 조건 설정 연결 완료 | 경매 snapshot/start/bid/close/STOMP |
-| 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | FE 화면 없음, BE controller 없음 | 주문 생성/배송/환불/포인트 전체(세금계산서 발행/조회는 구현 완료 — `docs/requests/FE/011-business-invoice-contract.md` §4~5, 단 주문 생성 API가 없어 아직 실호출 불가) |
-
-### 2026-08-03 정윤 처리 — 삭제된 문서
-
-아래 문서는 요청이 전부 반영돼 삭제했다. 무엇을 어떻게 반영했는지는
-`docs/requests/FE/016-pre-auction-batch-handoff.md`에 항목별로 정리돼 있다.
-
-| 삭제된 문서 | 도메인 | 결과 |
-| --- | --- | --- |
-| `004-home-contract.md` | Home | live card `hostId` 추가, 홈 전 섹션 실데이터 전환(종료 라이브 노출 버그 해소), 노출 정책 문서화 |
-| `005-search-contract.md` | Search | `GET /api/search` 구현 |
-| `013-live-seller-control.md` | Live | 현재 소개 상품 전환 API·전파(Phase 5), 방송 종료 실시간 전파(`/topic/lives/{id}/status`) |
+| 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | 주문 생성/목록/상세, 배송지, 송장(실 택배 조회 웹훅 포함), 구매확정, 포인트 잔액/내역/충전/출금 신청·내역 전부 구현 완료(계약은 요청과 다름 — 010 참고) | 환불(REFUND-001/002), 출금 계좌 관리(POINT-003), 오류 코드 명 확정 |
 
 ## 4. 기존 API 변경 요청
 
@@ -89,8 +78,8 @@
 - 이미 정상 연동된 API: 없음(완료된 항목은 각 도메인 문서에서 삭제하고 이 목록에도 남기지 않는다 — 반영 내용은 커밋/Jira에 남는다)
 - 기존 규격을 유지하면 되는 기능
   - BE에는 있지만 FE 화면/진입점이 없어 아직 미연결인 API는 각 도메인 화면 설계 후 연결한다.
-## 2026-08-01 추가 반영
 
-| 번호 | 문서 | 도메인 | FE 기준 상태 | 핵심 BE 요청 |
-| --- | --- | --- | --- | --- |
-| 010 | `010-commerce-wallet-contract.md` | Commerce/Wallet | `/points`, `/points/history` FE 화면 구현, mock fallback | 포인트 잔액, 거래 내역, 충전, 출금 계좌, 출금 신청/내역 상세 계약을 010에 병합 |
+## 2026-08-03 정리
+
+- `013-live-seller-control.md`는 완전히 반영돼(현재 소개 상품 전환 + STOMP 전파까지 확인) 삭제했다 — 위 표에서도 뺐다.
+- `010`은 주문/배송/포인트 대부분이 구현 완료됐다 — 남은 건 환불/출금 계좌/오류 코드뿐(010 문서 참고).

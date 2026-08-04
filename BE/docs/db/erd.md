@@ -219,7 +219,10 @@ stateDiagram-v2
 | 회원 발언은 작성자 필수 (CHAT-001) | `ck_chat_user_has_member` | ✅ 거부됨 |
 | 자기 자신 팔로우 방지 | `ck_follow_not_self` | ✅ 거부됨 |
 
-> `ux_bid_auction_price`는 Redis 분산락의 **대체재가 아니라 안전망이다.** 1차 방어는 락이고, 이 제약은 락이 실패했을 때 데이터 정합성이 깨지는 것을 막는다.
+> `ux_bid_auction_price`는 DB 비관적 락의 **대체재가 아니라 안전망이다.** 1차 방어는
+> `AuctionRepository.findByIdForUpdate`가 거는 행 잠금이다(Redis 분산락·MQ는 검토 후
+> 채택하지 않았다 — Phase 7 계획 문서 설계 판단 1 참고). 이 제약은 그 잠금이 실패했을 때
+> 데이터 정합성이 깨지는 것을 막는다.
 
 ### ⚠️ AUCT-006과 AUCT-009가 같은 제약으로 처리되는 것에 대해
 

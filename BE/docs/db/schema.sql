@@ -330,7 +330,8 @@ CREATE TABLE bid (
 
 -- 같은 경매에서 동일 가격 단계는 단 한 번만 성립한다.
 -- 중복 클릭(AUCT-004)과 동시 입찰 경합(AUCT-005)을 DB 레벨에서 차단하는 최후 방어선.
--- Redis 분산락이 1차 방어이고, 이 제약은 락이 실패했을 때의 안전망이다.
+-- 1차 방어는 Redis 분산락이 아니라 DB 비관적 락(AuctionRepository.findByIdForUpdate)이다 —
+-- 같은 경매의 입찰은 이 행 잠금으로 직렬화된다. 이 제약은 그 잠금이 실패했을 때의 안전망이다.
 CREATE UNIQUE INDEX ux_bid_auction_price ON bid (auction_id, bid_price);
 
 CREATE INDEX ix_bid_auction_created ON bid (auction_id, created_at DESC);
@@ -456,10 +457,17 @@ CREATE TABLE order_shipment (
     zipcode         VARCHAR(10)  NOT NULL,
     address1        VARCHAR(255) NOT NULL,
     address2        VARCHAR(255),
+    -- deliveryapi.co.kr이 지원하는 국내 택배사 10개로 한정한다(SY034) — 자유 문자열 금지.
     courier         VARCHAR(50),
     tracking_number VARCHAR(50),
     shipped_at      TIMESTAMPTZ,
-    delivered_at    TIMESTAMPTZ
+    -- 더 이상 송장 등록 시점에 즉시 채우지 않는다 — deliveryapi.co.kr 웹훅으로 실제 배송완료
+    -- 신호를 받았을 때만 채운다(웹훅 구독 실패 시에는 예외적으로 즉시 채우는 폴백을 쓴다).
+    delivered_at    TIMESTAMPTZ,
+    CONSTRAINT ck_order_shipment_courier CHECK (courier IN (
+        'LOTTE', 'CJ', 'HANJIN', 'POST', 'KYUNGDONG',
+        'DAESIN', 'LOGEN', 'HAPDONG', 'COUPANG', 'WOORI'
+    ))
 );
 
 -- 세금계산서 (BIZ-002). 법적 문서라 발행 시점 사업자 정보를 스냅샷으로 저장한다 —
