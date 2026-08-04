@@ -109,6 +109,19 @@ def test_shot_type_distinguishes_product_cut_from_worn() -> None:
     assert acc.shot_type_of(product) == "product"
 
 
+def test_shot_type_ignores_model_id_dummy_values() -> None:
+    """회귀 가드 — 실측(2026-08-04)에서 `VS_제품_*`(제품 단독컷) 이미지도 `model_id`가
+
+    "M000" 같은 더미 값으로 채워져 있어서, model_id 유무로 판정했을 때 5,392건이 전부
+    "worn"으로 잘못 찍혔다. 경로만으로 판정해야 한다 — model_id가 뭐든 무관하다.
+    """
+    product_json = json.loads(json.dumps(IMAGE_JSON))
+    product_json["info"][0]["image"]["path"] = "/원천데이터/제품/모자/KAHA0001M000P00A1.jpg"
+    product_json["info"][0]["model_id"] = "M000"  # 더미 값 — 실제 착용 모델이 아니다
+    product = list(acc.iter_images(product_json))[0]
+    assert acc.shot_type_of(product) == "product"
+
+
 def test_end_to_end_join_produces_records(tmp_path) -> None:
     (tmp_path / "라벨링데이터").mkdir()
     (tmp_path / "라벨링데이터" / "attr.json").write_text(

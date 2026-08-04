@@ -213,16 +213,19 @@ def iter_images(js: Any) -> Iterator[AccessoryImage]:
 
 
 def shot_type_of(image: AccessoryImage) -> str:
-    """`model_id`가 있으면 착용샷, 없으면 제품 단독컷.
+    """경로가 "제품 착용"이면 착용샷, 아니면 제품 단독컷.
 
     **우리 서비스 입력(flat/hanging)에 가까운 건 제품 단독컷이다.** 게이트 1이 의류 쪽에서
-    묻는 것과 같은 질문이라, 이 값을 층화 평가에 그대로 쓴다. 경로에 "제품 착용"이 박혀
-    있으면 그걸 우선한다(모델 메타가 비어 있는 파일 대비).
+    묻는 것과 같은 질문이라, 이 값을 층화 평가에 그대로 쓴다.
+
+    ⚠️ `model_id`는 신호로 쓰지 않는다 — 실측(2026-08-04)에서 `VS_제품_*`(제품 단독컷) 경로의
+    이미지도 `model_id`가 "M000" 같은 더미 값으로 채워져 있어서, model_id 유무로 판정하면
+    5,392건이 **전부** "worn"으로 잘못 찍혔다(실제로는 100% product). 경로가 유일하게
+    믿을 수 있는 신호다 — `VS_제품_*.zip`은 "제품", `VS_제품 착용_*.zip`은 "제품 착용"으로
+    폴더명 자체가 갈린다.
     """
     path = image.image_path or ""
     if "제품 착용" in path or "제품착용" in path:
-        return "worn"
-    if image.model_id:
         return "worn"
     return "product"
 
