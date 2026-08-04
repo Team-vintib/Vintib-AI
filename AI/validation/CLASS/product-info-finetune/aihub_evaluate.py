@@ -80,6 +80,16 @@ def zero_shot(
     return ranked
 
 
+def zero_shot_labels_for_embeddings(x: Any, text_embeddings: Any, codes: list[str]) -> list[str]:
+    """캐시된 이미지 임베딩에 대해 zero-shot top-1 라벨만 뽑는다.
+
+    이미지를 다시 열 필요가 없다 — `aihub_embed.py`가 저장한 `.npy`가 이미 L2 정규화된
+    값이라, 텍스트 임베딩만 새로 인코딩하면 코사인 유사도(내적)로 바로 계산된다.
+    """
+    ranked = zero_shot(x, text_embeddings, codes)
+    return [row[0][0] for row in ranked]
+
+
 def apply_polo_head(
     ranked: list[tuple[str, float]], embedding: Any, polo_head: Any
 ) -> tuple[str, bool]:
@@ -103,12 +113,22 @@ def apply_polo_head(
 
 
 def evaluate_holdout(
-    artifacts: Path, task: str, variant: str, source: str | None, label_space: str = "palette"
+    artifacts: Path,
+    task: str,
+    variant: str,
+    source: str | None,
+    label_space: str = "palette",
+    zero_shot_texts: tuple[list[str], Any] | None = None,
 ) -> str:
     """`source`·`label_space`는 헤드 학습에 쓴 것과 **같은 값**을 준다(파일명이 맞아야 한다).
 
     네이티브 라벨공간 헤드는 예측을 팔레트로 접은 뒤 채점한다 — 그게 실제 서비스 출력이고,
     팔레트 헤드와 비교 가능한 유일한 숫자다.
+
+    `zero_shot_texts`를 주면(`(코드 목록, 텍스트 임베딩)`) **같은 test 행에** zero-shot
+    top-1도 같이 채점해 헤드와 나란히 보여준다 — "GPU로 뽑은 헤드가 zero-shot보다 실제로
+    나은가"를 같은 표본으로 직접 비교하는 부분이다. `task="polo"`는 zero-shot 자체가
+    없는 개념(카테고리 zero-shot의 top-2 보정일 뿐)이라 무시한다.
     """
     import joblib
 
@@ -148,6 +168,19 @@ def evaluate_holdout(
         lines.append(f"- **{split}** n={result['n']:,} accuracy={result['accuracy']:.4f}{suffix}")
         for pair, count in result["top_confusions"][:5]:
             lines.append(f"  - {pair}: {count}")
+
+        if zero_shot_texts is not None and task != "polo":
+            codes, text_embeddings = zero_shot_texts
+            zs_labels = zero_shot_labels_for_embeddings(x, text_embeddings, codes)
+            # 헤드 쪽과 같은 기준으로 채점한다 — 네이티브 헤드면 정답도 팔레트로 접은 뒤 비교.
+            truth = collapse_labels(y, collapse) if collapse else y
+            zs_correct = sum(a == b for a, b in zip(zs_labels, truth))
+            zs_accuracy = zs_correct / len(truth)
+            delta = result["accuracy"] - zs_accuracy
+            lines.append(
+                f"  ↳ zero-shot 기준선: accuracy={zs_accuracy:.4f}  "
+                f"(헤드 대비 {delta:+.4f}p, 같은 {len(truth):,}건)"
+            )
 
         # 소스별로 쪼개 본다 — 액세서리를 섞었을 때 의류 성능이 깎이지 않았는지 확인.
         by_source: dict[str, list[int]] = {}
@@ -347,20 +380,62 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--model-id", default="patrickjohncyh/fashion-clip")
     parser.add_argument("--device", default=None)
+    parser.add_argument(
+        "--zero-shot-compare",
+        action="store_true",
+        help="AI-Hub val/test에서 헤드와 zero-shot을 같은 표본으로 나란히 비교한다"
+        "(fashion_clip 텍스트 인코더 로드 필요, category/color에만 적용 — 폴로는 zero-shot "
+        "자체가 없는 개념이다)",
+    )
     parser.add_argument("--out", type=Path, default=None, help="마크다운 리포트 저장 경로")
     args = parser.parse_args(argv)
+
+    needs_model = bool(args.ground_truth_dir) or args.zero_shot_compare
+    device = None
+    if needs_model:
+        import torch
+
+        device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
+
+    # 텍스트 인코딩은 태스크당 한 번만 — 이미지는 다시 안 읽는다. `aihub_embed.py`가 저장한
+    # `.npy`가 이미 L2 정규화돼 있어 텍스트 임베딩만 새로 뽑으면 코사인 유사도가 바로 나온다.
+    zero_shot_cache: dict[str, tuple[list[str], Any]] = {}
+    if args.zero_shot_compare:
+        import aihub_embed
+
+        zs_model, zs_processor = aihub_embed.load_model(args.model_id, device)
+        if "category" in args.tasks:
+            codes = list(ALL_SUBCATEGORIES)
+            texts = [CATEGORY_PROMPT(code) for code in codes]
+            zero_shot_cache["category"] = (
+                codes,
+                encode_texts(texts, zs_model, zs_processor, device),
+            )
+        if "color" in args.tasks:
+            codes = list(COLOR_CODES)
+            texts = [f"a photo of {EN_COLOR_LABELS[code]} clothing" for code in codes]
+            zero_shot_cache["color"] = (
+                codes,
+                encode_texts(texts, zs_model, zs_processor, device),
+            )
 
     parts = ["# 분류 헤드 평가 리포트", ""]
     for task in args.tasks:
         # label_space는 color 태스크에만 의미가 있다(polo·category는 항상 palette).
         space = args.label_space if task == "color" else "palette"
-        parts.append(evaluate_holdout(args.artifacts, task, args.variant, args.source, space))
+        parts.append(
+            evaluate_holdout(
+                args.artifacts,
+                task,
+                args.variant,
+                args.source,
+                space,
+                zero_shot_texts=zero_shot_cache.get(task),
+            )
+        )
         parts.append("")
 
     if args.ground_truth_dir:
-        import torch
-
-        device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
         parts.append(
             evaluate_ground_truth(
                 args.ground_truth_dir, args.artifacts, args.variant, args.model_id, device
