@@ -155,11 +155,24 @@ done
 ## STEP 4 — 헤드 학습 (CPU, 수 초)
 
 ```bash
-for task in color polo category; do
-  python validation/CLASS/product-info-finetune/aihub_train_head.py \
-      --artifacts .../artifacts --task "$task" --variant masked --class-weight balanced
-done
+T=validation/CLASS/product-info-finetune/aihub_train_head.py
+# 색상은 의류만 (아래 "소스 분리" 참고)
+python $T --artifacts .../artifacts --task color --variant masked --source clothes --class-weight balanced
+# 카테고리는 두 소스 다
+python $T --artifacts .../artifacts --task category --variant masked --class-weight balanced
+python $T --artifacts .../artifacts --task polo     --variant masked --class-weight balanced
 ```
+
+### ⚠️ 소스 분리 — 색상 헤드에 액세서리를 넣지 마라
+
+액세서리 색상 23종을 우리 팔레트로 접으면 **실버→GRAY · 골드→YELLOW · 로즈골드→PINK**가
+된다. 그런데 `color.py`의 팔레트는 의류 색상으로 정의돼 있다(`GRAY: #9B9B9B`). 은목걸이를
+회색 니트와 같은 클래스로 학습시키면 14-way 결정 경계가 금속 광택 쪽으로 끌려간다. JEWELRY는
+목걸이+귀걸이 2:1로 접혀 표본이 두 배라 영향이 더 크다.
+
+`--source`는 **행 필터**다(파일명 태그가 아니다) — 임베딩은 한 번만 뽑고 여기서 거른다.
+헤드 파일명에 소스가 붙어(`head_color_masked_clothes.joblib`) 두 조건을 나란히 비교할 수 있다.
+임베딩을 소스별로 따로 뽑았다면 그때만 `--embed-suffix`를 쓴다.
 
 - **color** — 14-way 로지스틱 회귀. 색상은 라벨 커버리지 100%라 가장 확실하다.
 - **polo** — TSHIRT vs SHIRT 이진. 양성 = `02top_02t-shirt` + topneck에 `polo`,

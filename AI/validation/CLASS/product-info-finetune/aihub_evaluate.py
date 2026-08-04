@@ -30,7 +30,7 @@ from aihub_dataset import (
     COLOR_CODES,
     EN_COLOR_LABELS,
 )
-from aihub_train_head import build_task_dataset, evaluate, load_split
+from aihub_train_head import build_task_dataset, evaluate, head_filename, load_split
 
 # `product-info-check/classify.py`의 `EmbeddingZeroShotClassifier`와 같은 값 — 기준선을
 # 재현하려면 스코어링 방식이 같아야 한다(CH014 §2-1이 지적한 과신 문제는 임계값 자동채움에만
@@ -95,22 +95,28 @@ def apply_polo_head(
 
 
 def evaluate_holdout(artifacts: Path, task: str, variant: str, source: str | None) -> str:
+    """`source`는 헤드 학습에 쓴 것과 **같은 값**을 준다 — 파일명과 행 필터 양쪽에 걸린다.
+
+    색상 헤드를 `--source clothes`로 학습했으면 평가도 그렇게 불러야 같은 헤드를 집는다.
+    다만 아래 소스별 분해는 `only_source`를 걸지 않은 전체 홀드아웃에서만 의미가 있다.
+    """
     import joblib
 
-    head_path = artifacts / f"head_{task}_{variant}.joblib"
+    head_path = artifacts / head_filename(task, variant, source)
     if not head_path.exists():
         return f"(헤드 없음: {head_path} — aihub_train_head.py를 먼저 돌릴 것)"
     bundle = joblib.load(head_path)
     model = bundle["model"]
 
-    lines = [f"### AI-Hub 홀드아웃 — task={task} variant={variant}"]
+    label = f"### AI-Hub 홀드아웃 — task={task} variant={variant}"
+    lines = [label + (f" source={source}" if source else "")]
     for split in ("val", "test"):
         try:
-            embeddings, rows = load_split(artifacts, split, variant, source)
+            embeddings, rows = load_split(artifacts, split, variant)
         except FileNotFoundError:
             lines.append(f"- {split}: 임베딩 없음(건너뜀)")
             continue
-        x, y, kept = build_task_dataset(embeddings, rows, task)
+        x, y, kept = build_task_dataset(embeddings, rows, task, only_source=source)
         if not y:
             lines.append(f"- {split}: 대상 표본 0건")
             continue
@@ -207,8 +213,17 @@ def evaluate_ground_truth(
     color_ranked = zero_shot(embeddings, color_texts, color_codes)
 
     def maybe_load(task: str) -> Any:
-        path = artifacts / f"head_{task}_{variant}.joblib"
-        return joblib.load(path)["model"] if path.exists() else None
+        """소스별 헤드를 먼저 찾고 없으면 전체 소스 헤드로 폴백한다.
+
+        색상 헤드는 `--source clothes`로 학습하는 걸 권장하므로(액세서리 금속색 오염)
+        `head_color_masked_clothes.joblib`이 있으면 그걸 쓴다. 우리 정답셋은 전부
+        의류라 이쪽이 맞다.
+        """
+        for candidate in ("clothes", None):
+            path = artifacts / head_filename(task, variant, candidate)
+            if path.exists():
+                return joblib.load(path)["model"]
+        return None
 
     color_head_model = maybe_load("color")
     polo_head = maybe_load("polo")

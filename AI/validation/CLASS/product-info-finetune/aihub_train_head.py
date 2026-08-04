@@ -39,13 +39,23 @@ POLO_NEGATIVE_TYPE = "02top_04shirt"
 POLO_NEGATIVE_NECK = "shirts collar"
 
 
+def head_filename(task: str, variant: str, source: str | None = None) -> str:
+    """헤드 체크포인트 파일명. 학습·평가가 같은 규칙을 공유해야 한다."""
+    return f"head_{task}_{variant}" + (f"_{source}" if source else "") + ".joblib"
+
+
 def load_split(
-    out_dir: Path, split: str, variant: str, source: str | None = None
+    out_dir: Path, split: str, variant: str, embed_suffix: str | None = None
 ) -> tuple[Any, list[dict]]:
-    """`aihub_embed.py` 산출물 한 쌍(.npy + .jsonl)을 읽는다. 행 순서가 일치한다."""
+    """`aihub_embed.py` 산출물 한 쌍(.npy + .jsonl)을 읽는다. 행 순서가 일치한다.
+
+    `embed_suffix`는 **파일명 태그**다(`aihub_embed.py --source`로 소스별로 따로 뽑았을 때만
+    쓴다). 소스별 학습은 이걸로 하지 말고 `build_task_dataset(only_source=...)`를 써라 —
+    임베딩은 한 번만 뽑고 행 단위로 거르는 게 GPU를 아낀다.
+    """
     import numpy as np
 
-    tag = f"{split}_{variant}" + (f"_{source}" if source else "")
+    tag = f"{split}_{variant}" + (f"_{embed_suffix}" if embed_suffix else "")
     npy_path = out_dir / f"{tag}.npy"
     jsonl_path = out_dir / f"{tag}.jsonl"
     if not npy_path.exists():
@@ -61,15 +71,27 @@ def load_split(
 
 
 def build_task_dataset(
-    embeddings: Any, rows: list[dict], task: str
+    embeddings: Any, rows: list[dict], task: str, only_source: str | None = None
 ) -> tuple[Any, list[str], list[dict]]:
-    """태스크별로 (X, y, 사용된 행)을 만든다. 라벨이 없는 행은 뺀다."""
+    """태스크별로 (X, y, 사용된 행)을 만든다. 라벨이 없는 행은 뺀다.
+
+    `only_source`("clothes"|"accessory")를 주면 그 소스 행만 쓴다. **색상 헤드에 이게
+    필요하다** — 액세서리의 금속 색상(실버→GRAY, 골드→YELLOW, 로즈골드→PINK)은
+    `color.py` 팔레트가 상정한 의류 색상과 시각적으로 전혀 다른 물건이라, 은목걸이를
+    회색 니트와 같은 클래스로 학습시키면 14-way 결정 경계가 금속 광택 쪽으로 끌려간다.
+    JEWELRY는 목걸이+귀걸이 2:1로 접혀 표본이 두 배라 영향이 더 크다.
+
+    카테고리 헤드는 반대로 두 소스가 다 필요하다(액세서리가 HAT·SUNGLASSES·JEWELRY를
+    유일하게 덮는다). 그래서 소스 선택은 임베딩 추출이 아니라 **여기서** 한다.
+    """
     import numpy as np
 
     keep: list[int] = []
     labels: list[str] = []
 
     for index, row in enumerate(rows):
+        if only_source and row.get("source", "clothes") != only_source:
+            continue
         if task == "color":
             label = row.get("color")
             if label:
@@ -162,7 +184,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--artifacts", type=Path, required=True, help="aihub_embed.py의 --out-dir")
     parser.add_argument("--task", required=True, choices=TASKS)
     parser.add_argument("--variant", default="masked", choices=("raw", "masked"))
-    parser.add_argument("--source", default=None, choices=("clothes", "accessory"))
+    parser.add_argument(
+        "--source",
+        default=None,
+        choices=("clothes", "accessory"),
+        help="이 소스 행만 학습에 쓴다(행 필터). 색상 헤드는 'clothes' 권장 — "
+        "액세서리 금속색(실버→GRAY, 골드→YELLOW)이 의류 색상 경계를 흐린다",
+    )
+    parser.add_argument(
+        "--embed-suffix",
+        default=None,
+        help="임베딩을 소스별로 따로 뽑았을 때의 파일명 접미사. 보통 필요 없다",
+    )
     parser.add_argument("--C", type=float, default=DEFAULT_C)
     parser.add_argument("--max-iter", type=int, default=DEFAULT_MAX_ITER)
     parser.add_argument(
@@ -172,7 +205,10 @@ def main(argv: list[str] | None = None) -> int:
         help="클래스 불균형 보정. 층화 상한과 함께 쓰는 두 번째 비중 손잡이",
     )
     parser.add_argument(
-        "--out", type=Path, default=None, help="기본값: <artifacts>/head_<task>_<variant>.joblib"
+        "--out",
+        type=Path,
+        default=None,
+        help="기본값: <artifacts>/head_<task>_<variant>[_<source>].joblib",
     )
     args = parser.parse_args(argv)
 
@@ -181,7 +217,9 @@ def main(argv: list[str] | None = None) -> int:
     class_weight = None if args.class_weight == "none" else "balanced"
 
     x_train, y_train, _ = build_task_dataset(
-        *load_split(args.artifacts, "train", args.variant, args.source), args.task
+        *load_split(args.artifacts, "train", args.variant, args.embed_suffix),
+        args.task,
+        only_source=args.source,
     )
     if len(y_train) == 0:
         print(f"학습 표본이 0개다 (task={args.task}) — 인덱스/필터를 확인할 것", file=sys.stderr)
@@ -199,7 +237,9 @@ def main(argv: list[str] | None = None) -> int:
     for split in ("val", "test"):
         try:
             x_eval, y_eval, _ = build_task_dataset(
-                *load_split(args.artifacts, split, args.variant, args.source), args.task
+                *load_split(args.artifacts, split, args.variant, args.embed_suffix),
+                args.task,
+                only_source=args.source,
             )
         except FileNotFoundError:
             print(f"({split} 임베딩이 없어 건너뜀)", file=sys.stderr)
@@ -207,7 +247,9 @@ def main(argv: list[str] | None = None) -> int:
         if len(y_eval):
             reports.append(_format_report(args.task, evaluate(model, x_eval, y_eval), split))
 
-    out_path = args.out or args.artifacts / f"head_{args.task}_{args.variant}.joblib"
+    # 소스를 파일명에 넣는다 — `--source clothes`로 학습한 색상 헤드가 전체 소스로 학습한
+    # 헤드를 덮어써 버리면 두 조건을 비교할 수가 없다.
+    out_path = args.out or args.artifacts / head_filename(args.task, args.variant, args.source)
     joblib.dump(
         {
             "task": args.task,
