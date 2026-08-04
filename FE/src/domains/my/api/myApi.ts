@@ -29,15 +29,13 @@ import type {
   InterestCategory,
   UserInterests,
 } from '@/shared/api/mockInterestStorage'
+import { readMockProfileMedia } from '@/shared/api/mockProfileMediaStorage'
 import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.types'
 
 const MY_API_ENABLED = import.meta.env.VITE_MY_API_ENABLED === 'true'
 const MY_LIVE_API_ENABLED = import.meta.env.VITE_LIVE_LIST_API_ENABLED !== 'false'
 const WISH_API_ENABLED = import.meta.env.VITE_WISH_API_ENABLED !== 'false'
-
-interface MyProfileImageResponse {
-  profileImageUrl: string | null
-}
+const MOCK_MY_PROFILE_STORAGE_KEY = 'vidtib:mock-my-profile'
 
 interface MyDefaultTryOnImageResponse {
   defaultTryOnImageUrl: string | null
@@ -105,6 +103,8 @@ interface BackendPageResponse<T> {
   totalPages: number
   hasNext: boolean
 }
+
+type MockMyProfileMap = Record<string, Partial<MyProfile>>
 
 const EMPTY_PAGE_META: PageMeta = {
   page: 1,
@@ -184,7 +184,7 @@ export const getMyPageViewData = async (userId: number): Promise<MyPageViewData>
 
   const [profileResult, wishesResult, productsResult, livesResult, notificationCountResult] =
     await Promise.allSettled([
-      MY_API_ENABLED ? getMyProfile(userId) : Promise.resolve(null),
+      getMyProfile(userId),
       getMyWishList(userId),
       MY_API_ENABLED ? getMySellerProducts(userId) : Promise.resolve(null),
       MY_LIVE_API_ENABLED ? getMyHostLives(userId) : Promise.resolve(null),
@@ -222,7 +222,11 @@ export const getMyPageViewData = async (userId: number): Promise<MyPageViewData>
 
 export const getMyProfile = async (userId: number): Promise<MyProfile> => {
   if (!MY_API_ENABLED) {
-    return createEmptyProfile(userId)
+    return {
+      ...createEmptyProfile(userId),
+      ...readMockMyProfile(userId),
+      ...readMockProfileMedia(userId),
+    }
   }
 
   const response = await http.get<ApiResponse<MyProfileApiDto>>(`/users/${userId}`)
@@ -338,25 +342,18 @@ export const updateMyProfile = async (
   request: MyProfileUpdateRequest,
 ): Promise<MyProfile> => {
   if (!MY_API_ENABLED) {
-    return {
+    const nextProfile = {
       ...createEmptyProfile(userId),
+      ...readMockMyProfile(userId),
       ...request,
     }
+
+    writeMockMyProfile(userId, nextProfile)
+    return nextProfile
   }
 
   const response = await http.patch<ApiResponse<MyProfile>>(`/users/${userId}`, request)
   return unwrapApiData(response.data, '회원 정보를 저장하지 못했습니다.')
-}
-
-export const updateMyProfileImage = async (userId: number, file: File) => {
-  void userId
-  void file
-  return { profileImageUrl: null } satisfies MyProfileImageResponse
-}
-
-export const deleteMyProfileImage = async (userId: number) => {
-  void userId
-  return { profileImageUrl: null } satisfies MyProfileImageResponse
 }
 
 export const updateMyDefaultTryOnImage = async (userId: number, file: File) => {
@@ -424,6 +421,40 @@ export const isMyApiEnabled = () => MY_API_ENABLED
 
 const getSettledValue = <T>(result: PromiseSettledResult<T>) =>
   result.status === 'fulfilled' ? result.value : null
+
+const getMockMyProfileKey = (userId: number) => String(userId)
+
+const readMockMyProfileMap = (): MockMyProfileMap => {
+  if (typeof window === 'undefined') {
+    return {}
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(MOCK_MY_PROFILE_STORAGE_KEY)
+
+    if (!storedValue) {
+      return {}
+    }
+
+    return JSON.parse(storedValue) as MockMyProfileMap
+  } catch {
+    return {}
+  }
+}
+
+const readMockMyProfile = (userId: number): Partial<MyProfile> =>
+  readMockMyProfileMap()[getMockMyProfileKey(userId)] ?? {}
+
+const writeMockMyProfile = (userId: number, profile: MyProfile) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const profileMap = readMockMyProfileMap()
+
+  profileMap[getMockMyProfileKey(userId)] = profile
+  window.localStorage.setItem(MOCK_MY_PROFILE_STORAGE_KEY, JSON.stringify(profileMap))
+}
 
 const normalizePageResponse = <T>(
   response: PageResponse<T> | BackendPageResponse<T>,
