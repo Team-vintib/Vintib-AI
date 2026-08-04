@@ -76,6 +76,11 @@ PALETTE_CODES: tuple[str, ...] = tuple(_color.PALETTE)
 MIXED_LABEL: str = _color.MIXED_LABEL
 COLOR_CODES: tuple[str, ...] = PALETTE_CODES + (MIXED_LABEL,)
 
+# zero-shot 기준선을 재현할 때 쓰는 라벨 문구(정본 그대로). `aihub_evaluate.py`가 쓴다 —
+# 여기서 한 번 노출해 두면 평가 스크립트가 `product-info-check`를 sys.path에 얹지 않아도 된다.
+CATEGORY_PROMPT = _taxonomy.PROMPT_TEMPLATES["en_clip_style"]
+EN_COLOR_LABELS: dict[str, str] = _color.EN_COLOR_LABELS
+
 # --------------------------------------------------------------------------
 # 재현성 상수 — 학습·평가 스크립트가 같은 값을 공유해 split을 재현한다(`AI/CLAUDE.md` 관례).
 # --------------------------------------------------------------------------
@@ -88,6 +93,14 @@ assert abs(TRAIN_RATIO + VAL_RATIO + TEST_RATIO - 1.0) < 1e-9
 # 층화 샘플링 상한(브리핑 §8). 550k 전부 쓰지 않는다.
 CATEGORY_CAP_PER_CLASS = 3000
 COLOR_CAP_PER_CLASS = 2000
+# 액세서리 소스 전용 상한 — **소스별 비중 조절 손잡이**.
+#
+# 기본값을 의류와 같게 둔 건 선형 분류 헤드에서 중요한 건 "소스별 총량"이 아니라 "클래스당
+# 표본 수"이기 때문이다. 액세서리는 3종(HAT/SUNGLASSES/JEWELRY)뿐이라 같은 상한이어도
+# 전체의 20% 남짓이다. 다만 이 데이터셋은 착용컷 비중이 높아(모델이 쓴 모자·낀 선글라스)
+# 우리 입력(제품 단독컷)과 도메인이 어긋날 수 있다 — scan의 제품/착용 비율을 보고 낮추거나,
+# `aihub_embed.py --shot-type product`로 제품컷만 골라 쓸 것.
+ACCESSORY_CAP_PER_CLASS = 3000
 # 홀드아웃 평가셋: 커버 클래스당 이 개수(브리핑 §11의 "커버 11종 × 100장").
 EVAL_CAP_PER_CLASS = 100
 
@@ -256,9 +269,7 @@ def parse_label(js: dict, label_path: str = "") -> RawLabel:
 
 # 파생 규칙 1·2(후드/민소매)를 적용할 상의 타입 = **직접 매핑이 되는 상의 전부**.
 # blouse가 SHIRT로 흡수되면서(2026-08-04) 자동으로 여기 들어온다. vest만 남아서 빠진다.
-_DERIVABLE_TOPS = frozenset(
-    code for code in DIRECT_CATEGORY_MAP if code.startswith("02top_")
-)
+_DERIVABLE_TOPS = frozenset(code for code in DIRECT_CATEGORY_MAP if code.startswith("02top_"))
 
 
 def _is_hood(neck: str | None) -> bool:
@@ -359,6 +370,14 @@ class Record:
     shot_type: str | None
     is_polo: bool
     source_type: str | None
+    # 원본 `topneck_color_design`. (B) 폴로 이진 헤드가 음성 클래스를 "shirts collar"로
+    # 정확히 집어내야 해서(브리핑 §3-B) `is_polo` 불리언만으론 부족하다.
+    neck: str | None = None
+    # 어느 AI-Hub 데이터셋에서 왔는지. 두 소스를 섞어 학습하므로 **소스별 비중을 조절하고
+    # 소스별로 성능을 따로 보려면** 이 컬럼이 반드시 필요하다.
+    #   "clothes"   — 008. 의류 통합 데이터 (dataSetSn 71501)
+    #   "accessory" — 009. 패션 액세서리 착용 데이터 (dataSetSn 71441)
+    source: str = "clothes"
 
 
 def to_record(
@@ -386,6 +405,7 @@ def to_record(
         shot_type=label.shot_type,
         is_polo=is_polo(label.neck),
         source_type=label.source_type,
+        neck=label.neck,
     )
     return record, reason
 
@@ -505,33 +525,66 @@ def select_stratified(
     *,
     category_cap: int,
     color_cap: int,
+    accessory_cap: int | None = None,
+    allow_cap_overflow: bool = False,
     seed: int = SEED,
 ) -> list[Record]:
     """클래스당 상한을 걸어 뽑는다. 카테고리 셋과 색상 셋의 **합집합**(중복 제거)이다.
 
     브리핑 §8: 색상 클래스당 2,000 × 14 + 커버 카테고리당 3,000 × 11 → 합쳐 5만 장 내외.
+
+    **소스별 비중 조절** — `accessory_cap`을 주면 액세서리 소스 레코드에만 다른 상한을
+    적용한다. 두 데이터셋은 규모가 딴판이라(의류 550,634건 vs 액세서리 착용컷만 수십만 건)
+    같은 상한을 쓰면 액세서리 3종(HAT/SUNGLASSES/JEWELRY)이 의류 11종과 같은 비중을
+    차지해 버린다. 특히 JEWELRY는 목걸이+귀걸이 2:1 매핑이라 혼자 두 배로 들어온다.
+
+    **카테고리 상한은 기본적으로 진짜 상한이다.** 색상 쿼터를 채우는 2패스가 카테고리
+    상한을 무시하면 상한을 걸어도 안 걸린다 — 실제로 `--accessory-cap 4`인데 JEWELRY가
+    17건 들어오는 걸 확인했다(2026-08-04 스모크). 그래서 색상 패스도 카테고리 상한을
+    존중한다. 그 대가로 희귀 색상의 쿼터가 덜 찰 수 있어, 못 채운 양을 함께 돌려준다.
+    옛 동작(색상 우선, 카테고리 초과 허용)이 필요하면 `allow_cap_overflow=True`.
+
+    중복 제거 키는 `(source, label_path, name)`이다 — 액세서리는 라벨 JSON 하나에 여러
+    이미지가 들어 있어 `label_path`만으로는 유일하지 않다.
     """
     shuffled = list(records)
     random.Random(seed).shuffle(shuffled)
 
-    chosen: dict[str, Record] = {}
+    def cap_of(record: Record) -> int:
+        if accessory_cap is not None and record.source == "accessory":
+            return accessory_cap
+        return category_cap
+
+    def key_of(record: Record) -> tuple[str, str, str]:
+        return (record.source, record.label_path, record.name)
+
+    chosen: set[tuple[str, str, str]] = set()
     category_counts: Counter[str] = Counter()
     for record in shuffled:
-        if record.subcategory and category_counts[record.subcategory] < category_cap:
+        if record.subcategory and category_counts[record.subcategory] < cap_of(record):
             category_counts[record.subcategory] += 1
-            chosen[record.label_path] = record
+            chosen.add(key_of(record))
 
     color_counts: Counter[str] = Counter()
     for record in shuffled:
-        if record.label_path in chosen:
+        if key_of(record) in chosen:
             if record.color:
                 color_counts[record.color] += 1
             continue
-        if record.color and color_counts[record.color] < color_cap:
-            color_counts[record.color] += 1
-            chosen[record.label_path] = record
+        if not record.color or color_counts[record.color] >= color_cap:
+            continue
+        if (
+            not allow_cap_overflow
+            and record.subcategory
+            and category_counts[record.subcategory] >= cap_of(record)
+        ):
+            continue  # 카테고리 상한을 넘겨서까지 색상 쿼터를 채우지 않는다
+        color_counts[record.color] += 1
+        if record.subcategory:
+            category_counts[record.subcategory] += 1
+        chosen.add(key_of(record))
 
-    return [record for record in shuffled if record.label_path in chosen]
+    return [record for record in shuffled if key_of(record) in chosen]
 
 
 # --------------------------------------------------------------------------
@@ -775,7 +828,7 @@ def run_scan(
 
 
 def run_index(
-    root: Path,
+    root: Path | None,
     out_dir: Path,
     *,
     limit: int | None,
@@ -784,14 +837,35 @@ def run_index(
     color_cap: int,
     eval_cap: int,
     progress_every: int,
+    accessory_root: Path | None = None,
+    accessory_cap: int | None = None,
+    allow_cap_overflow: bool = False,
 ) -> str:
     stats = LoadStats()
     records: list[Record] = []
-    for label in load_labels(root, limit=limit, progress_every=progress_every, stats=stats):
-        record, _reason = to_record(label, short_pants_max_cm=short_pants_max_cm)
-        if record.subcategory is None and record.color is None:
-            continue  # 카테고리도 색상도 못 뽑으면 학습에 쓸 데가 없다
-        records.append(record)
+    if root is not None:
+        for label in load_labels(root, limit=limit, progress_every=progress_every, stats=stats):
+            record, _reason = to_record(label, short_pants_max_cm=short_pants_max_cm)
+            if record.subcategory is None and record.color is None:
+                continue  # 카테고리도 색상도 못 뽑으면 학습에 쓸 데가 없다
+            records.append(record)
+
+    accessory_stats = None
+    if accessory_root is not None:
+        # 지연 import — `aihub_accessory`가 이 모듈을 최상단에서 import하므로 여기서 들여온다.
+        import aihub_accessory
+
+        accessory_stats = aihub_accessory.AccessoryStats()
+        for record in aihub_accessory.load_accessory_records(
+            accessory_root,
+            limit=limit,
+            progress_every=progress_every,
+            stats=accessory_stats,
+            load_stats=stats,
+        ):
+            if record.subcategory is None and record.color is None:
+                continue
+            records.append(record)
 
     assignment = split_groups(records)
     by_split: dict[str, list[Record]] = defaultdict(list)
@@ -808,7 +882,11 @@ def run_index(
 
     selected: dict[str, list[Record]] = {
         "train": select_stratified(
-            by_split["train"], category_cap=category_cap, color_cap=color_cap
+            by_split["train"],
+            category_cap=category_cap,
+            color_cap=color_cap,
+            accessory_cap=accessory_cap,
+            allow_cap_overflow=allow_cap_overflow,
         ),
         "val": select_stratified(by_split["val"], category_cap=eval_cap, color_cap=eval_cap),
         "test": select_stratified(by_split["test"], category_cap=eval_cap, color_cap=eval_cap),
@@ -844,19 +922,140 @@ def run_index(
     lines.append(_table(rows, ("split", "전체", "층화 샘플", "그룹 수")))
 
     lines.append("")
-    lines.append("층화 샘플의 카테고리 분포:")
-    counts: Counter[str] = Counter()
+    lines.append("층화 샘플의 카테고리 분포 (소스별):")
+    per_code: dict[str, Counter[str]] = defaultdict(Counter)
     for split_records in selected.values():
-        counts.update(r.subcategory for r in split_records if r.subcategory)
-    lines.append(_table([(k, f"{v:,}") for k, v in counts.most_common()], ("코드", "건수")))
+        for record in split_records:
+            if record.subcategory:
+                per_code[record.subcategory][record.source] += 1
+    rows = [
+        (code, f"{sum(sources.values()):,}", f"{sources['clothes']:,}", f"{sources['accessory']:,}")
+        for code, sources in sorted(per_code.items(), key=lambda kv: -sum(kv[1].values()))
+    ]
+    lines.append(_table(rows, ("코드", "합계", "의류", "액세서리")))
 
     lines.append("")
     lines.append("층화 샘플의 색상 분포:")
-    counts = Counter()
+    counts: Counter[str] = Counter()
     for split_records in selected.values():
         counts.update(r.color for r in split_records if r.color)
     lines.append(_table([(k, f"{v:,}") for k, v in counts.most_common()], ("코드", "건수")))
+
+    lines.append("")
+    lines.append("소스별 비중 (이 표를 보고 --category-cap / --accessory-cap을 조절한다):")
+    source_counts: Counter[str] = Counter()
+    for split_records in selected.values():
+        source_counts.update(r.source for r in split_records)
+    grand_total = sum(source_counts.values())
+    lines.append(
+        _table(
+            [
+                (name, f"{count:,}", _pct(count, grand_total))
+                for name, count in source_counts.most_common()
+            ],
+            ("소스", "건수", "비율"),
+        )
+    )
+    if accessory_stats is not None:
+        lines.append("")
+        lines.append(
+            f"액세서리 조인: 속성 {accessory_stats.attributes:,}개 / "
+            f"이미지 {accessory_stats.images:,}개 / "
+            f"조인 실패 {accessory_stats.unmatched_images:,}개"
+        )
     return "\n".join(lines)
+
+
+def run_accessory_scan(root: Path, *, limit: int | None, sample_paths: int) -> str:
+    """액세서리 데이터셋(71441) 전용 scan.
+
+    의류 쪽과 묻는 게 다르다 — 여기선 **조인이 실제로 성립하는지**(속성 라벨과 이미지
+    라벨이 `accessory_id`로 붙는지)와 **제품컷/착용컷 비율**이 핵심이다. 파서가 AI-Hub
+    공개 명세만 보고 쓰였기 때문에(`aihub_accessory` 모듈 docstring) 이 출력이 곧 파서가
+    맞았는지에 대한 답이다.
+    """
+    import aihub_accessory
+
+    stats = aihub_accessory.AccessoryStats()
+    load = LoadStats()
+    records = list(
+        aihub_accessory.load_accessory_records(
+            root, limit=limit, progress_every=0, stats=stats, load_stats=load
+        )
+    )
+
+    out: list[str] = []
+    out.append("")
+    out.append("=" * 78)
+    out.append("액세서리 데이터셋 (009. 패션 액세서리 착용 데이터)")
+    out.append("=" * 78)
+    out.append(f"루트            : {root}")
+    out.append(f"JSON 파일       : {load.total_files:,} (파싱 실패 {load.parse_errors:,})")
+    out.append(f"  속성 라벨 파일 : {stats.attribute_files:,}")
+    out.append(f"  이미지 라벨    : {stats.image_files:,}")
+    out.append(f"  그 외          : {stats.other_files:,}  (메타/페어 등)")
+    out.append(f"속성 테이블     : {stats.attributes:,}개 accessory_id")
+    out.append(f"이미지 레코드   : {stats.images:,}  (조인 실패 {stats.unmatched_images:,})")
+    out.append("")
+
+    if not records and not stats.attributes:
+        out.append(">>> ⚠ 아무것도 못 찾았다. 파서가 실제 구조와 다르다는 뜻이다.")
+        out.append("    (기대: 속성 JSON에 accessory_type1/accessory_color,")
+        out.append("     이미지 JSON에 info[].accessory_id + info[].image.path)")
+        return "\n".join(out)
+
+    out.append("accessory_type1 분포:")
+    rows = []
+    for value, count in stats.type_counts.most_common():
+        mapped, _reason = aihub_accessory.map_accessory_type(value)
+        rows.append((value, f"{count:,}", mapped or "(제외/미매핑)"))
+    out.append(_table(rows, ("원본 값", "건수", "우리 코드")))
+
+    out.append("")
+    out.append("accessory_color 분포:")
+    rows = []
+    for value, count in stats.color_counts.most_common():
+        mapped = aihub_accessory.map_accessory_color(value)
+        rows.append((value, f"{count:,}", mapped or "(제외/미매핑)"))
+    out.append(_table(rows, ("원본 값", "건수", "우리 코드")))
+
+    out.append("")
+    out.append("촬영유형 (제품 단독컷 vs 착용컷):")
+    total = sum(stats.shot_counts.values())
+    rows = [
+        (value, f"{count:,}", _pct(count, total))
+        for value, count in stats.shot_counts.most_common()
+    ]
+    out.append(_table(rows, ("값", "건수", "비율")))
+    out.append("")
+    out.append(">>> 우리 서비스 입력(flat/hanging)에 가까운 건 'product'(제품 단독컷)다.")
+    out.append("    아래 경로를 열어 실제로 그런지 확인할 것.")
+    for value, examples in stats.examples.items():
+        out.append(f"  [{value}]")
+        for example in examples[:sample_paths]:
+            out.append(f"    {example}")
+
+    out.append("")
+    out.append("매핑된 우리 코드별 건수:")
+    counts: Counter[str] = Counter(r.subcategory for r in records if r.subcategory)
+    out.append(
+        _table([(k, f"{v:,}") for k, v in counts.most_common()], ("코드", "건수"))
+        if counts
+        else "(매핑된 건 없음)"
+    )
+
+    out.append("")
+    out.append("그룹 키(accessory_id) 크기 분포:")
+    group_sizes = Counter(r.group_key for r in records)
+    size_dist = Counter(group_sizes.values())
+    out.append(
+        _table(
+            [(str(size), f"{n:,}", f"{size * n:,}") for size, n in sorted(size_dist.items())],
+            ("그룹 크기", "그룹 수", "이미지 수"),
+        )
+    )
+    out.append(f"총 그룹 수: {len(group_sizes):,}")
+    return "\n".join(out)
 
 
 # --------------------------------------------------------------------------
@@ -874,8 +1073,14 @@ def build_parser() -> argparse.ArgumentParser:
         target.add_argument(
             "--root",
             type=Path,
-            required=True,
-            help="라벨 JSON이 들어 있는 디렉터리(하위 전체를 재귀 탐색한다)",
+            default=None,
+            help="의류 통합 데이터(71501) 라벨 JSON 디렉터리(하위 전체를 재귀 탐색)",
+        )
+        target.add_argument(
+            "--accessory-root",
+            type=Path,
+            default=None,
+            help="패션 액세서리 착용 데이터(71441) 라벨 JSON 디렉터리. 생략하면 안 쓴다",
         )
         target.add_argument("--limit", type=int, default=None, help="앞에서부터 N개만 읽는다")
         target.add_argument(
@@ -897,6 +1102,17 @@ def build_parser() -> argparse.ArgumentParser:
     index.add_argument("--category-cap", type=int, default=CATEGORY_CAP_PER_CLASS)
     index.add_argument("--color-cap", type=int, default=COLOR_CAP_PER_CLASS)
     index.add_argument("--eval-cap", type=int, default=EVAL_CAP_PER_CLASS)
+    index.add_argument(
+        "--accessory-cap",
+        type=int,
+        default=ACCESSORY_CAP_PER_CLASS,
+        help="액세서리 소스의 클래스당 상한(소스별 비중 조절). 의류와 따로 건다",
+    )
+    index.add_argument(
+        "--allow-cap-overflow",
+        action="store_true",
+        help="색상 쿼터를 채우려고 카테고리 상한을 넘겨도 되게 한다(기본은 상한 엄수)",
+    )
     return parser
 
 
@@ -915,18 +1131,33 @@ def _force_utf8_stdout() -> None:
 def main(argv: list[str] | None = None) -> int:
     _force_utf8_stdout()
     args = build_parser().parse_args(argv)
-    if not args.root.exists():
-        print(f"--root 경로가 없다: {args.root}", file=sys.stderr)
+    if args.root is None and args.accessory_root is None:
+        print("--root 또는 --accessory-root 중 하나는 있어야 한다", file=sys.stderr)
         return 2
+    for label, path in (("--root", args.root), ("--accessory-root", args.accessory_root)):
+        if path is not None and not path.exists():
+            print(f"{label} 경로가 없다: {path}", file=sys.stderr)
+            return 2
 
     if args.mode == "scan":
-        report = run_scan(
-            args.root,
-            limit=args.limit,
-            sample_paths=args.sample_paths,
-            short_pants_max_cm=args.short_pants_max_cm,
-            progress_every=args.progress_every,
-        )
+        parts: list[str] = []
+        if args.root is not None:
+            parts.append(
+                run_scan(
+                    args.root,
+                    limit=args.limit,
+                    sample_paths=args.sample_paths,
+                    short_pants_max_cm=args.short_pants_max_cm,
+                    progress_every=args.progress_every,
+                )
+            )
+        if args.accessory_root is not None:
+            parts.append(
+                run_accessory_scan(
+                    args.accessory_root, limit=args.limit, sample_paths=args.sample_paths
+                )
+            )
+        report = "\n".join(parts)
         print(report)
         if args.out:
             args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -943,6 +1174,9 @@ def main(argv: list[str] | None = None) -> int:
         color_cap=args.color_cap,
         eval_cap=args.eval_cap,
         progress_every=args.progress_every,
+        accessory_root=args.accessory_root,
+        accessory_cap=args.accessory_cap,
+        allow_cap_overflow=args.allow_cap_overflow,
     )
     print(report)
     return 0
