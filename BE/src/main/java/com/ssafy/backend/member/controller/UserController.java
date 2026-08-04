@@ -1,6 +1,9 @@
 package com.ssafy.backend.member.controller;
 
 import com.ssafy.backend.global.response.ApiResponse;
+import com.ssafy.backend.live.dto.request.LiveThumbnailUploadUrlRequest;
+import com.ssafy.backend.live.dto.response.LiveThumbnailUploadUrlResponse;
+import com.ssafy.backend.live.service.LiveThumbnailService;
 import com.ssafy.backend.member.dto.request.MemberImageKeyRequest;
 import com.ssafy.backend.member.dto.request.MemberImageUploadUrlRequest;
 import com.ssafy.backend.member.dto.request.UpdateBioRequest;
@@ -44,6 +47,7 @@ public class UserController {
 
     private final UserService userService;
     private final MemberImageService memberImageService;
+    private final LiveThumbnailService liveThumbnailService;
 
     @Operation(
             summary = "회원 기본 정보 조회",
@@ -336,5 +340,27 @@ public class UserController {
         Long requesterId = (Long) authentication.getPrincipal();
         memberImageService.deleteCoverImage(requesterId, id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "라이브 썸네일 업로드 URL 발급",
+            description = "라이브 썸네일을 S3에 직접 업로드할 수 있는 presigned URL을 발급한다(FE 요청 021). "
+                    + "라이브 생성 전이라 확정(confirm) 단계가 없다 — 응답의 `url`을 그대로 "
+                    + "`POST /api/lives` 또는 `/api/lives/schedule`의 `thumbnailUrl`에 실어 보내면 된다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "발급 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "지원하지 않는 이미지 형식"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 발급 불가"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않는 회원")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping("/{id}/lives/thumbnail/upload-url")
+    public ResponseEntity<ApiResponse<LiveThumbnailUploadUrlResponse>> createLiveThumbnailUploadUrl(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody LiveThumbnailUploadUrlRequest request) {
+        Long requesterId = (Long) authentication.getPrincipal();
+        return ResponseEntity.ok(ApiResponse.success(
+                liveThumbnailService.createUploadUrl(requesterId, id, request)));
     }
 }
