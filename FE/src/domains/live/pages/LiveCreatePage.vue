@@ -1080,7 +1080,7 @@ onMounted(() => {
 
 .live-create__method--selected {
   border-color: var(--color-live);
-  box-shadow: 0 0 0 3px var(--color-auction-soft);
+  box-shadow: none;
 }
 
 .live-create__info-form {
@@ -1137,7 +1137,7 @@ onMounted(() => {
 .live-create__field input:focus,
 .live-create__field textarea:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
   outline: none;
 }
 
@@ -1453,7 +1453,7 @@ onMounted(() => {
 
 .live-create__product--selected {
   border-color: var(--color-live);
-  box-shadow: 0 0 0 3px var(--color-auction-soft);
+  box-shadow: none;
 }
 
 .live-create__product img {
