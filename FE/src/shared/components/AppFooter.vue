@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import logoImage from '@/assets/images/logo.png'
+import logoImage from '@/assets/images/logo-white.png'
 import { ROUTE_PATHS, type RoutePath } from '@/shared/constants/routes'
 
 interface FooterLink {
@@ -109,8 +109,8 @@ const footerGroups: FooterGroup[] = [
 }
 
 .app-footer__logo {
-  width: 116px;
-  height: 40px;
+  width: auto;
+  height: 30px;
   object-fit: contain;
 }
 

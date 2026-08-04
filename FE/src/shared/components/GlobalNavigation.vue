@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import logoImage from '@/assets/images/logo.png'
+import logoImage from '@/assets/images/logo-white.png'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { getMyProfile } from '@/domains/my/api/myApi'
 import NotificationPopup from '@/domains/notification/components/NotificationPopup.vue'
@@ -481,8 +481,8 @@ onUnmounted(() => {
 }
 
 .global-nav__brand-logo {
-  width: 116px;
-  height: 40px;
+  width: auto;
+  height: 30px;
   object-fit: contain;
 }
 
@@ -816,8 +816,8 @@ onUnmounted(() => {
   }
 
   .global-nav__brand-logo {
-    width: 96px;
-    height: 34px;
+    width: auto;
+    height: 26px;
   }
 
   .global-nav__menu {
