@@ -30,6 +30,7 @@ class CompsSourceConfig(TypedDict):
     timeout_seconds: float
     max_comps: int  # 이보다 많이 오면 잘라낸다(토큰·응답 크기 방어)
     min_comps_for_pricing: int  # 이 미만이면 가격을 내지 않는다
+    max_output_tokens: int  # Gemini generationConfig.maxOutputTokens — 잘린 응답 방지(CH017)
 
 
 COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
@@ -40,6 +41,7 @@ COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
         "timeout_seconds": 0.0,
         "max_comps": 5,
         "min_comps_for_pricing": 3,
+        "max_output_tokens": 0,  # 미사용(네트워크 호출 없음)
     },
     # 2026-07-31: 메인 시세 검색 모델을 Claude(haiku)에서 Gemini로 전환. LAB-47(웹검색
     # 테스트) V1에서 GMS가 `google_search` 그라운딩을 통과시키는 것까지만 확인했고(쿼리 1건,
@@ -56,6 +58,10 @@ COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
         "timeout_seconds": 90.0,
         "max_comps": 10,
         "min_comps_for_pricing": 1,
+        # CH017 B2: 지정하지 않으면 응답이 중간에 잘려도 알 방법이 없다(finishReason만으로
+        # 사후 확인). 값은 그라운딩 청크+JSON 배열이 넉넉히 들어가는 크기로 임의 설정한
+        # 것이라 근거 있는 값은 아니다 — 실측으로 조정 대상.
+        "max_output_tokens": 4096,
     },
 }
 ACTIVE_COMPS_SOURCE = "mock"  # <- 여기 키만 바꾸면 스왑. llm_web_search 전환은 사용자만(하드 룰)
