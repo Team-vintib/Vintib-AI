@@ -24,6 +24,7 @@ const selectedProductId = ref<number | null>(null)
 const isLoading = ref(true)
 const isGenerating = ref(false)
 const generatedResult = ref<TryOnResult | null>(null)
+const isSaved = ref(false)
 const carouselTrack = ref<HTMLElement | null>(null)
 
 const userId = computed(() => authStore.user?.id ?? null)
@@ -76,22 +77,38 @@ const tryOn = () => {
   }
 
   isGenerating.value = true
+  // 새로 입어보면 이전 미리보기·저장 상태는 버린다(저장 안 한 결과는 남기지 않는다).
+  generatedResult.value = null
+  isSaved.value = false
 
   // 실제 AI 합성(POST /users/{id}/tryons)이 미구현이라 mock 결과를 만든다.
-  // 합성 API가 붙으면 이 자리에서 실제 결과를 받아 emit 한다.
+  // 합성 API가 붙으면 이 자리에서 실제 결과를 받아 미리보기에 채운다.
   window.setTimeout(() => {
-    const result: TryOnResult = {
+    generatedResult.value = {
       id: Date.now(),
       productId: product.id,
       imageUrl: buildMockTryOnResultImage(`${product.name} 시착`),
       createdAt: nowWallClock(),
       category: product.categoryName ?? null,
     }
-
-    generatedResult.value = result
     isGenerating.value = false
-    emit('generated', result)
   }, 700)
+}
+
+// 미리보기가 맘에 들 때만 저장 → 이때 갤러리에 추가된다(입어보기만으로 자동 저장하지 않는다).
+const saveResult = () => {
+  if (!generatedResult.value || isSaved.value) {
+    return
+  }
+
+  emit('generated', generatedResult.value)
+  isSaved.value = true
+}
+
+// 저장하지 않고 미리보기를 버린다.
+const discardResult = () => {
+  generatedResult.value = null
+  isSaved.value = false
 }
 
 const goToProfile = () => {
@@ -122,6 +139,21 @@ onMounted(load)
           AI 시착 이미지를 생성하고 있습니다…
         </span>
         <span v-else-if="generatedResult" class="tryon-composer__photo-tag">미리보기 · mock</span>
+      </div>
+
+      <div v-if="generatedResult && !isGenerating" class="tryon-composer__result-actions">
+        <template v-if="isSaved">
+          <span class="tryon-composer__saved" role="status">저장됨</span>
+          <button type="button" class="tryon-composer__discard" @click="discardResult">
+            새로 입어보기
+          </button>
+        </template>
+        <template v-else>
+          <button type="button" class="tryon-composer__save" @click="saveResult">저장</button>
+          <button type="button" class="tryon-composer__discard" @click="discardResult">
+            다시 입어보기
+          </button>
+        </template>
       </div>
 
       <div class="tryon-composer__picker">
@@ -371,5 +403,63 @@ onMounted(load)
   color: var(--color-text-muted);
   font-size: 12px;
   text-align: center;
+}
+
+.tryon-composer__result-actions {
+  display: flex;
+  max-width: 320px;
+  margin: var(--space-4) auto 0;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+.tryon-composer__save {
+  flex: 1;
+  height: var(--button-height-major);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.tryon-composer__save:hover {
+  background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
+}
+
+.tryon-composer__discard {
+  flex: 1;
+  height: var(--button-height-major);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.tryon-composer__discard:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.tryon-composer__saved {
+  display: grid;
+  flex: 1;
+  height: var(--button-height-major);
+  border-radius: var(--radius-control);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 600;
+  place-items: center;
 }
 </style>
