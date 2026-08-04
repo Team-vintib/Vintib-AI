@@ -161,17 +161,22 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 .purchase-summary__title {
   margin-top: var(--space-3);
   color: var(--color-text-primary);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 36px;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
 }
 
 .purchase-summary__price {
-  margin-top: var(--space-2);
-  font-size: 32px;
+  margin-top: var(--space-3);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: 34px;
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  line-height: 40px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 .purchase-summary__seller {
@@ -189,11 +194,13 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
   display: grid;
   width: 44px;
   height: 44px;
-  border-radius: 50%;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-badge);
   background: var(--color-surface-secondary);
-  color: var(--color-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 500;
   place-items: center;
 }
 
@@ -228,25 +235,28 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 .purchase-summary__quick-info {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
   margin-top: var(--space-6);
-  border-top: 1px solid var(--color-border);
-  border-left: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-grid);
   border-radius: var(--radius-control);
+  background: var(--color-border-grid);
   overflow: hidden;
 }
 
 .purchase-summary__quick-info div {
   min-width: 0;
   padding: var(--space-4);
-  border-right: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
 
 .purchase-summary__quick-info dt {
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 400;
-  line-height: 18px;
+  letter-spacing: 0.06em;
+  line-height: 16px;
+  text-transform: uppercase;
 }
 
 .purchase-summary__quick-info dd {
@@ -347,7 +357,9 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 }
 
 .purchase-summary__purchase:hover {
+  border-color: var(--color-primary-hover);
   background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 .purchase-summary__purchase:disabled {
@@ -365,7 +377,7 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 }
 
 .purchase-summary button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 

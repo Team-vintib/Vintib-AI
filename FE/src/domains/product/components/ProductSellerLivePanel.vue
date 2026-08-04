@@ -163,7 +163,7 @@ const formatLiveDate = (date: string) =>
 }
 
 .seller-live button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 

@@ -116,7 +116,7 @@ const closeZoom = () => {
   aspect-ratio: 4 / 5;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-media);
-  background: var(--color-surface-secondary);
+  background: var(--color-image-frame);
   place-items: center;
 }
 
@@ -124,6 +124,7 @@ const closeZoom = () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
   transition: transform 180ms ease;
 }
 
@@ -182,12 +183,13 @@ const closeZoom = () => {
   top: var(--space-4);
   right: var(--space-4);
   display: grid;
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(225, 224, 218, 0.8);
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(10, 10, 10, 0.55);
   color: var(--color-text-secondary);
+  backdrop-filter: blur(2px);
   place-items: center;
   transition:
     background-color 160ms ease,
@@ -213,8 +215,13 @@ const closeZoom = () => {
 
 .product-gallery__thumbnail:focus-visible,
 .product-gallery__zoom:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+.product-gallery__thumbnail img,
+.product-gallery__dialog-image img {
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
 }
 
 .product-gallery__dialog {
