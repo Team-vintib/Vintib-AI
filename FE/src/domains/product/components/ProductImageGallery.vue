@@ -1,12 +1,22 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import fallbackProductImage from '@/assets/images/products/product-denim-jacket.webp'
 import type { ProductDetailImage } from '@/domains/product/types/productDetail.types'
 
 const props = defineProps<{
   images: ProductDetailImage[]
   selectedImageId: string
 }>()
+
+const handleImageError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackProductImage
+  }
+}
 
 const emit = defineEmits<{
   selectImage: [imageId: string]
@@ -54,7 +64,7 @@ const closeZoom = () => {
         :aria-pressed="image.id === representativeImage?.id"
         @click="emit('selectImage', image.id)"
       >
-        <img :src="image.url" alt="" />
+        <img :src="image.url" alt="" @error="handleImageError" />
       </button>
     </div>
 
@@ -65,6 +75,7 @@ const closeZoom = () => {
         :src="representativeImage.url"
         :alt="representativeImage.alt"
         :style="representativeImageStyle"
+        @error="handleImageError"
       />
       <div v-else class="product-gallery__empty">등록된 상품 이미지가 없습니다.</div>
 
@@ -94,6 +105,7 @@ const closeZoom = () => {
           :src="representativeImage.url"
           :alt="`${representativeImage.alt} 확대 이미지`"
           :style="representativeImageStyle"
+          @error="handleImageError"
         />
       </div>
     </dialog>
