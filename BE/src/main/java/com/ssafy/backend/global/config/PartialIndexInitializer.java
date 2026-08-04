@@ -22,6 +22,9 @@ import org.springframework.stereotype.Component;
  *   <li>{@code ux_auction_live_running} — 한 라이브에서 동시에 진행 중인 경매는 1개 (LIVE-004)</li>
  *   <li>{@code ux_bid_auction_price} — 같은 경매의 같은 가격 단계는 단 한 번만 성립
  *       (중복 클릭 AUCT-004 · 동시 입찰 경합 AUCT-005의 최후 방어선)</li>
+ *   <li>{@code ux_point_hold_member_active} — 한 회원이 전체 경매를 통틀어 가질 수 있는
+ *       {@code HELD} 보류는 1개(연속 입찰 금지 AUCT-006 · 다른 경매 동시 참여 금지 AUCT-009의
+ *       최후 방어선)</li>
  *   <li>{@code ux_live_product_active} — 제외되지 않은 같은 상품을 같은 라이브에 두 번 연결 불가</li>
  * </ul>
  *
@@ -59,6 +62,10 @@ public class PartialIndexInitializer implements ApplicationRunner {
                 ON bid (auction_id, bid_price)
             """,
             """
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_point_hold_member_active
+                ON point_hold (member_id) WHERE status = 'HELD'
+            """,
+            """
             CREATE UNIQUE INDEX IF NOT EXISTS ux_live_product_active
                 ON live_product (live_id, product_id) WHERE removed_at IS NULL
             """,
@@ -73,14 +80,21 @@ public class PartialIndexInitializer implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
+            int succeeded = 0;
             for (String ddl : STATEMENTS) {
-                statement.execute(ddl);
+                // 각 문장을 따로 잡는다 — 하나가 실패해도(예: 기존 데이터 중복) 나머지 안전망은
+                // 그대로 만들어져야 한다. 한 번 실패했다고 다음 문장을 건너뛰면 안 된다.
+                try {
+                    statement.execute(ddl);
+                    succeeded++;
+                } catch (Exception e) {
+                    log.error("!! 부분 인덱스 생성 실패 - 이 안전망 없이 뜬다. "
+                            + "기존 데이터에 중복이 있는지 확인할 것: {}", ddl, e);
+                }
             }
-            log.info("부분 인덱스 확인 완료 - {}개", STATEMENTS.size());
+            log.info("부분 인덱스 확인 완료 - {}/{}개", succeeded, STATEMENTS.size());
         } catch (Exception e) {
-            // 기존 데이터에 중복이 있으면 UNIQUE 생성이 실패한다. 그 경우 원인을 알려야 한다.
-            log.error("!! 부분 인덱스 생성 실패 - 동시성 안전망이 없는 상태로 뜬다. "
-                    + "기존 데이터에 중복이 있는지 확인할 것", e);
+            log.error("!! 부분 인덱스 초기화 자체가 실패했다 - DB 연결을 확인할 것", e);
         }
     }
 }
