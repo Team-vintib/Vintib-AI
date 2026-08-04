@@ -1,3 +1,4 @@
+import { liveListMockData } from '@/domains/live/constants/liveListMockData'
 import { http } from '@/shared/api/http'
 
 import type {
@@ -127,17 +128,25 @@ const normalizePageResponse = <T>(
   }
 }
 
-const getEmptyLiveList = async (scenario: LiveListMockScenario): Promise<LiveListViewData> => {
+const getMockLiveList = async (scenario: LiveListMockScenario): Promise<LiveListViewData> => {
   await wait(MOCK_DELAY_MS)
 
   if (scenario === 'error') {
     throw new Error('LIVE_LIST_ERROR')
   }
 
+  if (scenario === 'empty') {
+    return {
+      items: [],
+      totalElements: 0,
+      totalPages: 0,
+    }
+  }
+
   return {
-    items: [],
-    totalElements: 0,
-    totalPages: 0,
+    items: liveListMockData,
+    totalElements: liveListMockData.length,
+    totalPages: 1,
   }
 }
 
@@ -149,7 +158,7 @@ export const getLiveListViewData = (
     return requestLiveList(query)
   }
 
-  return getEmptyLiveList(scenario)
+  return getMockLiveList(scenario)
 }
 
 export const isLiveListApiEnabled = () => LIVE_LIST_API_ENABLED
