@@ -137,6 +137,13 @@ CONFIDENCE_LEVEL_BOUNDS: dict[ConfidenceLevel, float] = {
 # 성격의 임의값이다.
 CONFIDENCE_DISPERSION_MIN_COMPS = 3
 
+# --- comps 후처리 필터 (CH017) -----------------------------------------------
+# "none"이면 아무 필터도 적용하지 않는다(지금까지와 동작 동일). "keyword_mad"는
+# 브랜드 키워드 미포함 제거 + 가격 MAD 이상치 제거를 켠다(app/pricing/filters.py).
+# 기본을 off로 두는 이유: 표본이 평균 1.7건뿐인 백엔드에서 필터가 표본을 0건으로 만들
+# 위험이 실재하고, 켜는 게 정확도를 올리는지 내리는지 아직 실측하지 않았다.
+ACTIVE_COMPS_FILTER = "none"  # none / keyword_mad
+COMPS_FILTER_MAD_THRESHOLD = 3.5  # 이 값보다 큰 표준화 편차는 이상치로 본다(임의값)
 
 # --- 실행 제어 -------------------------------------------------------------
 # 컨테이너 안에서 백그라운드 스레드로 도는데, 그 스레드풀을 게이트웨이 엔드포인트
