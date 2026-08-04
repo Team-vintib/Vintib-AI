@@ -31,7 +31,6 @@ const currentBid = ref(0)
 const highestBidder = ref<string | null>(null)
 const remainingSeconds = ref(0)
 const bidderCount = ref(0)
-const isExtendFlashing = ref(false)
 const isConfiguring = ref(false)
 const configError = ref('')
 
@@ -93,7 +92,6 @@ const resetToIdle = () => {
   highestBidder.value = null
   remainingSeconds.value = 0
   bidderCount.value = 0
-  isExtendFlashing.value = false
   isConfiguring.value = false
   configError.value = ''
   startPrice.value = props.product?.price ?? SELLER_AUCTION_DEFAULT_START_PRICE
@@ -124,7 +122,6 @@ const startAuction = async () => {
   highestBidder.value = null
   bidderCount.value = 0
   remainingSeconds.value = durationSeconds.value
-  isExtendFlashing.value = false
   phase.value = 'RUNNING'
 
 }

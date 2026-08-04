@@ -9,7 +9,6 @@ import {
   getMyPageViewData,
   getMyInterestOptions,
   getMyInterests,
-  removeMyWish,
   updateMyInterests,
   updateMyProfile,
   updateMyProfileImage,
@@ -103,8 +102,6 @@ const selectedInterestCategoryIds = ref<number[]>([])
 const interestBrandSearchQuery = ref('')
 const isInterestLoading = ref(false)
 const interestLoadMessage = ref('')
-const wishRemoveProductId = ref<number | null>(null)
-const wishActionMessage = ref('')
 type ProductFilterId = 'ALL' | Extract<MyProductStatus, 'ON_SALE' | 'SOLD'>
 const productFilterOptions = [
   { id: 'ALL', label: '전체' },
@@ -753,13 +750,13 @@ const handleTryOnImageChange = async (event: Event) => {
 
   if (file.size > 5 * 1024 * 1024) {
     tryOnProfileSaveState.value = 'error'
-    tryOnProfileMessage.value = 'AI 시착용 사진은 5MB 이하로 선택해 주세요.'
+    tryOnProfileMessage.value = '시착용 사진은 5MB 이하로 선택해 주세요.'
     input.value = ''
     return
   }
 
   try {
-    tryOnImagePreviewUrl.value = await readImageFileAsDataUrl(file, 'AI 시착용 사진을 읽지 못했습니다.')
+    tryOnImagePreviewUrl.value = await readImageFileAsDataUrl(file, '시착용 사진을 읽지 못했습니다.')
     selectedTryOnImageFile.value = file
     isTryOnImageRemoved.value = false
     selectedTryOnImageName.value = file.name
@@ -885,7 +882,7 @@ const submitTryOnProfileForm = async () => {
     selectedTryOnImageName.value = ''
     isTryOnImageRemoved.value = false
     tryOnProfileSaveState.value = 'success'
-    tryOnProfileMessage.value = 'AI 시착 정보가 저장되었습니다.'
+    tryOnProfileMessage.value = '시착 정보가 저장되었습니다.'
   } catch (error) {
     tryOnProfileSaveState.value = 'error'
     tryOnProfileMessage.value = normalizeApiError(error).message
@@ -916,7 +913,7 @@ const deleteTryOnProfile = async () => {
     }
     syncTryOnProfileForm()
     tryOnProfileSaveState.value = 'success'
-    tryOnProfileMessage.value = 'AI 시착 정보를 삭제했습니다.'
+    tryOnProfileMessage.value = '시착 정보를 삭제했습니다.'
   } catch (error) {
     tryOnProfileSaveState.value = 'error'
     tryOnProfileMessage.value = normalizeApiError(error).message
@@ -974,6 +971,7 @@ const submitProfileForm = async () => {
         },
       },
     }
+    authStore.updateUser({ nickname: nextProfile.nickname })
     selectedProfileImageFile.value = null
     profileImagePreviewUrl.value = ''
     selectedProfileImageName.value = ''
@@ -1090,44 +1088,6 @@ const goToProductDetail = (productId: number) => {
     name: ROUTE_NAMES.PRODUCT_DETAIL,
     params: { productId },
   })
-}
-
-const removeWishItem = async (productId: number) => {
-  if (!authStore.user?.id || !viewData.value) {
-    return
-  }
-
-  wishRemoveProductId.value = productId
-  wishActionMessage.value = ''
-
-  try {
-    await removeMyWish(authStore.user.id, productId)
-
-    const nextWishes = viewData.value.wishes.filter((wish) => wish.product.id !== productId)
-
-    viewData.value = {
-      ...viewData.value,
-      summary: {
-        ...viewData.value.summary,
-        counts: {
-          ...viewData.value.summary.counts,
-          wishes: nextWishes.length,
-        },
-      },
-      wishes: nextWishes,
-      wishMeta: {
-        ...viewData.value.wishMeta,
-        totalElements: nextWishes.length,
-        totalPages: nextWishes.length > 0 ? 1 : 0,
-      },
-    }
-
-    wishActionMessage.value = '찜한 상품에서 제거했습니다.'
-  } catch (error) {
-    wishActionMessage.value = normalizeApiError(error).message
-  } finally {
-    wishRemoveProductId.value = null
-  }
 }
 
 const goToBusinessVerification = () => {
@@ -1402,7 +1362,7 @@ onMounted(() => {
                   </div>
                   <div class="my-profile-photo__body">
                     <strong>프로필 사진</strong>
-                    <p>마이페이지와 판매자 정보에 표시되는 사진입니다. AI 시착용 사진과 별도로 관리됩니다.</p>
+                    <p>마이페이지와 판매자 정보에 표시되는 사진입니다. 시착용 사진과 별도로 관리됩니다.</p>
                     <p v-if="selectedProfileImageName" class="my-profile-photo__file">
                       {{ selectedProfileImageName }}
                     </p>
@@ -1538,11 +1498,11 @@ onMounted(() => {
               <form class="my-profile-form" @submit.prevent="submitTryOnProfileForm">
                 <div class="my-card__title">
                   <div>
-                    <h2>AI 시착 정보</h2>
-                    <p>상품 상세와 라이브 AI 시착에서 사용할 전신 사진과 신체 기준입니다.</p>
+                    <h2>시착 정보</h2>
+                    <p>상품 상세와 라이브 시착에서 사용할 전신 사진과 신체 기준입니다.</p>
                   </div>
                   <button type="submit" :disabled="isTryOnProfileSaving">
-                    {{ isTryOnProfileSaving ? '저장 중' : 'AI 시착 정보 저장' }}
+                    {{ isTryOnProfileSaving ? '저장 중' : '시착 정보 저장' }}
                   </button>
                 </div>
 
@@ -1555,7 +1515,7 @@ onMounted(() => {
                 </p>
 
                 <div v-if="tryOnProfileLoadState === 'loading'" class="my-state">
-                  AI 시착 정보를 불러오는 중입니다.
+                  시착 정보를 불러오는 중입니다.
                 </div>
 
                 <div class="my-tryon-photo">
@@ -1563,13 +1523,13 @@ onMounted(() => {
                     <img
                       v-if="tryOnImageDisplayUrl"
                       :src="tryOnImageDisplayUrl"
-                      :alt="`${profile.name} AI 시착용 사진 미리보기`"
+                      :alt="`${profile.name} 시착용 사진 미리보기`"
                     />
                     <span v-else>{{ profileInitial }}</span>
                   </div>
                   <div class="my-tryon-photo__body">
                     <strong>전신 사진</strong>
-                    <p>상품과 라이브의 AI 시착 합성에 사용하는 기준 사진입니다. JPG, PNG, WebP 이미지를 5MB 이하로 업로드할 수 있습니다.</p>
+                    <p>상품과 라이브 시착 합성에 사용하는 기준 사진입니다. JPG, PNG, WebP 이미지를 5MB 이하로 업로드할 수 있습니다.</p>
                     <p v-if="selectedTryOnImageName" class="my-tryon-photo__file">
                       {{ selectedTryOnImageName }}
                     </p>
@@ -1592,7 +1552,7 @@ onMounted(() => {
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     class="my-tryon-photo__input"
-                    aria-label="AI 시착용 전신 사진 선택"
+                    aria-label="시착용 전신 사진 선택"
                     @change="handleTryOnImageChange"
                   />
                 </div>
@@ -1818,46 +1778,6 @@ onMounted(() => {
               <p v-if="!filteredLives.length" class="my-order-empty">
                 해당 상태의 라이브가 없습니다.
               </p>
-            </template>
-
-            <template v-else-if="selectedSection === 'wishlist'">
-              <div class="my-card__title">
-                <h2>찜한 상품</h2>
-              </div>
-              <p v-if="wishActionMessage" class="my-wish-message" role="status">
-                {{ wishActionMessage }}
-              </p>
-              <div v-if="viewData.wishes.length" class="my-product-grid">
-                <article
-                  v-for="wish in viewData.wishes"
-                  :key="wish.product.id"
-                  class="my-product-card my-wish-card"
-                >
-                  <button
-                    type="button"
-                    class="my-product-card__main"
-                    @click="goToProductDetail(wish.product.id)"
-                  >
-                    <img :src="wish.product.imageUrl" :alt="wish.product.imageAlt" />
-                    <span>찜</span>
-                    <strong>{{ wish.product.name }}</strong>
-                    <p>{{ wish.product.price.toLocaleString('ko-KR') }}P</p>
-                  </button>
-                  <div class="my-wish-card__meta">
-                    <span>{{ wish.product.brand }}</span>
-                    <span>{{ formatOrderDate(wish.wishedAt) }}</span>
-                  </div>
-                  <button
-                    type="button"
-                    class="my-wish-card__remove"
-                    :disabled="wishRemoveProductId === wish.product.id"
-                    @click="removeWishItem(wish.product.id)"
-                  >
-                    {{ wishRemoveProductId === wish.product.id ? '해제 중' : '찜 해제' }}
-                  </button>
-                </article>
-              </div>
-              <p v-else class="my-product-empty">찜한 상품이 없습니다.</p>
             </template>
 
             <template v-else-if="selectedSection === 'social'">
@@ -2126,7 +2046,6 @@ onMounted(() => {
 .my-order-tabs button:focus-visible,
 .my-product-card__main:focus-visible,
 .my-order-card__main:focus-visible,
-.my-wish-card__remove:focus-visible,
 .my-business-status button:focus-visible,
 .my-profile-photo__actions button:focus-visible,
 .my-tryon-photo__actions button:focus-visible,
@@ -2708,63 +2627,6 @@ onMounted(() => {
   font-size: 14px;
   line-height: 22px;
   text-align: center;
-}
-
-.my-wish-card {
-  align-content: start;
-}
-
-.my-wish-card__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: var(--space-3) var(--space-4) 0;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.my-wish-card__meta span {
-  overflow: hidden;
-  min-width: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.my-wish-card__remove {
-  min-height: 36px;
-  padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  margin: var(--space-3) var(--space-4) var(--space-4);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: var(--font-weight-bold);
-  line-height: 20px;
-  cursor: pointer;
-}
-
-.my-wish-card__remove:hover:not(:disabled) {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.my-wish-card__remove:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.my-wish-message {
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-secondary);
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
 }
 
 .my-social-grid {

@@ -68,16 +68,21 @@ const getProductPath = (productId: number) => `/products/${productId}`
         role="tabpanel"
         :aria-labelledby="`category-product-tab-${activeSection.id}`"
       >
-        <ProductCard
-          v-for="product in activeSection.products"
-          :key="product.id"
-          :product="product"
-          :to="getProductPath(product.id)"
-          :badge-label="product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'"
-          :badge-variant="product.saleType === 'AUCTION' ? 'auction' : 'direct'"
-          :is-wished="wishedProductIds.has(product.id)"
-          @toggle-wish="emit('toggleWish', $event)"
-        />
+        <template v-if="activeSection.products.length">
+          <ProductCard
+            v-for="product in activeSection.products"
+            :key="product.id"
+            :product="product"
+            :to="getProductPath(product.id)"
+            :badge-label="product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'"
+            :badge-variant="product.saleType === 'AUCTION' ? 'auction' : 'direct'"
+            :is-wished="wishedProductIds.has(product.id)"
+            @toggle-wish="emit('toggleWish', $event)"
+          />
+        </template>
+        <p v-else class="category-products__empty">
+          이 카테고리에 표시할 상품이 없습니다.
+        </p>
       </div>
     </div>
   </HomeSection>
@@ -128,6 +133,19 @@ const getProductPath = (productId: number) => `/products/${productId}`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-5);
+}
+
+.category-products__empty {
+  grid-column: 1 / -1;
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 @media (max-width: 768px) {

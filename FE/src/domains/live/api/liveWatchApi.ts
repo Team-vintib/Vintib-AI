@@ -36,12 +36,14 @@ const wait = (delay: number) =>
 const mapLiveProductDto = (dto: LiveProductDto): LiveWatchProduct => ({
   id: dto.productId,
   title: dto.productTitle,
-  brandName: null,
-  price: null,
-  thumbnailUrl: null,
-  saleType: null,
+  brandName: dto.brandName ?? null,
+  price: dto.price ?? null,
+  thumbnailUrl: dto.thumbnailUrl ?? null,
+  saleType: dto.saleType ?? null,
+  // material·measurements·defectSummary는 LiveProductResponse에 없음(BE 016 §6-B).
+  // 필요 시 상품 상세(GET /products/{id})에서 상세 패널로 가져온다.
   material: null,
-  condition: null,
+  condition: dto.conditionGrade ?? null,
   measurements: null,
   defectSummary: null,
 })
@@ -50,9 +52,11 @@ const mapLiveDetailDto = (dto: LiveDetailDto): LiveWatchViewData => ({
   id: dto.id,
   hostId: dto.hostId,
   hostNickname: dto.hostNickname,
-  hostProfileImageUrl: null, // BE 확인 필요: LiveDetailResponse 미제공 (docs/requests/BE/007 3.5)
+  hostProfileImageUrl: dto.hostProfileImageUrl ?? null,
+  isHost: dto.isHost ?? false,
+  isReminderSet: dto.isReminderSet ?? false,
   title: dto.title,
-  description: null,
+  description: dto.description ?? null,
   posterUrl: dto.thumbnailUrl || null,
   status: dto.status,
   scheduledAt: dto.scheduledAt,
@@ -60,7 +64,7 @@ const mapLiveDetailDto = (dto: LiveDetailDto): LiveWatchViewData => ({
   endedAt: dto.endedAt,
   currentViewerCount: dto.currentViewerCount ?? null,
   peakViewerCount: dto.peakViewerCount,
-  currentProductId: null, // BE 확인 필요: 현재 판매 상품 미제공 → 첫 상품 fallback (docs/requests/BE/007 3.5)
+  currentProductId: dto.currentProductId ?? null,
   products: [...dto.products]
     .sort((first, second) => first.sortOrder - second.sortOrder)
     .map(mapLiveProductDto),
@@ -69,9 +73,9 @@ const mapLiveDetailDto = (dto: LiveDetailDto): LiveWatchViewData => ({
 
 const requestLiveWatch = async (liveId: number): Promise<LiveWatchViewData> => {
   try {
-    const response = await http.get<ApiResponse<LiveDetailDto>>(`/lives/${liveId}`, {
-      skipAuth: true,
-    })
+    // skipAuth 없음: 로그인 상태면 토큰이 붙어 isHost/isReminderSet가 채워지고,
+    // 비회원은 토큰 없이 공개 조회되어 두 값 모두 false로 온다 (BE 016 §2.2).
+    const response = await http.get<ApiResponse<LiveDetailDto>>(`/lives/${liveId}`)
     const responseBody = response.data
 
     if (!responseBody.success || !responseBody.data) {
@@ -111,6 +115,8 @@ const getEmptyLiveWatch = async (
     hostId: 0,
     hostNickname: '',
     hostProfileImageUrl: null,
+    isHost: false,
+    isReminderSet: false,
     title: '',
     description: null,
     posterUrl: null,
@@ -138,3 +144,30 @@ export const getLiveWatchViewData = (
 }
 
 export const isLiveWatchApiEnabled = () => LIVE_WATCH_API_ENABLED
+
+export interface LiveReminderResult {
+  liveId: number
+  isReminderSet: boolean
+}
+
+const unwrapReminderResult = (body: ApiResponse<LiveReminderResult>): LiveReminderResult => {
+  if (!body.success || !body.data) {
+    throw new Error(body.error?.message ?? '알림 설정을 변경하지 못했습니다.')
+  }
+
+  return body.data
+}
+
+// 예약 라이브 시작 알림 신청/취소 (BE 016 §5). 인증 필요.
+// 같은 상태로 두 번 호출해도 200이므로 응답의 isReminderSet로 토글 상태를 확정한다.
+export const registerLiveReminder = async (liveId: number): Promise<LiveReminderResult> => {
+  const { data } = await http.post<ApiResponse<LiveReminderResult>>(`/lives/${liveId}/reminders`)
+
+  return unwrapReminderResult(data)
+}
+
+export const cancelLiveReminder = async (liveId: number): Promise<LiveReminderResult> => {
+  const { data } = await http.delete<ApiResponse<LiveReminderResult>>(`/lives/${liveId}/reminders`)
+
+  return unwrapReminderResult(data)
+}

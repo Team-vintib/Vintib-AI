@@ -12,17 +12,22 @@ const props = withDefaults(
     tryOnOpen?: boolean
     showTryOn?: boolean
     connectionLabel?: string
+    showReminder?: boolean
+    reminderActive?: boolean
   }>(),
   {
     tryOnDisabled: false,
     tryOnOpen: false,
     showTryOn: true,
     connectionLabel: '',
+    showReminder: false,
+    reminderActive: false,
   },
 )
 
 const emit = defineEmits<{
   openTryOn: []
+  toggleReminder: []
 }>()
 
 const stageMessage = computed(() => {
@@ -53,6 +58,21 @@ const stageMessage = computed(() => {
       <span aria-hidden="true"></span>
       {{ stageMessage }}
     </div>
+
+    <button
+      v-if="showReminder"
+      class="live-video-stage__reminder"
+      :class="{ 'live-video-stage__reminder--active': reminderActive }"
+      type="button"
+      :aria-pressed="reminderActive"
+      @click="emit('toggleReminder')"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+        <path d="M10.3 21a2 2 0 0 0 3.4 0" />
+      </svg>
+      {{ reminderActive ? '알림 받는 중' : '시작 알림 받기' }}
+    </button>
 
     <div class="live-video-stage__controls" aria-hidden="true">
       <span>
@@ -171,6 +191,41 @@ const stageMessage = computed(() => {
   height: 5px;
   border-radius: 50%;
   background: var(--color-live);
+}
+
+.live-video-stage__reminder {
+  display: inline-flex;
+  position: relative;
+  z-index: 2;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  border: 1px solid var(--color-ai);
+  border-radius: 10px;
+  background: var(--color-ai);
+  gap: var(--space-2);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.live-video-stage__reminder--active {
+  background: rgba(10, 12, 11, 0.55);
+}
+
+.live-video-stage__reminder svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.live-video-stage__reminder:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
 }
 
 .live-video-stage__controls {

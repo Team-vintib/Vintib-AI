@@ -21,19 +21,16 @@ const selectedImageIndex = computed(() => {
 
 const representativeImage = computed(() => props.images[selectedImageIndex.value])
 
-const hasMultipleImages = computed(() => props.images.length > 1)
+const representativeImageStyle = computed(() => {
+  const detailStyles = [
+    { transform: 'scale(1)', transformOrigin: '50% 50%' },
+    { transform: 'scale(1.35)', transformOrigin: '50% 26%' },
+    { transform: 'scale(1.45)', transformOrigin: '45% 78%' },
+    { transform: 'scale(1.45)', transformOrigin: '90% 78%' },
+  ]
 
-// 이미지 개수 무관 캐러셀. images[].role(앞/뒤)은 BE 미제공(010)이라 역할 구분 없이
-// 정렬된 순서 그대로 좌우로 넘겨 본다. 양 끝에서는 순환(wrap-around)한다.
-const goToOffset = (offset: number) => {
-  if (!props.images.length) {
-    return
-  }
-
-  const nextIndex =
-    (selectedImageIndex.value + offset + props.images.length) % props.images.length
-  emit('selectImage', props.images[nextIndex].id)
-}
+  return detailStyles[selectedImageIndex.value] ?? detailStyles[0]
+})
 
 const openZoom = () => {
   zoomDialog.value?.showModal()
@@ -46,60 +43,7 @@ const closeZoom = () => {
 
 <template>
   <section class="product-gallery" aria-label="상품 이미지">
-    <div class="product-gallery__main">
-      <img
-        v-if="representativeImage"
-        class="product-gallery__main-image"
-        :src="representativeImage.url"
-        :alt="representativeImage.alt"
-      />
-      <div v-else class="product-gallery__empty">등록된 상품 이미지가 없습니다.</div>
-
-      <button
-        v-if="hasMultipleImages"
-        class="product-gallery__nav product-gallery__nav--prev"
-        type="button"
-        aria-label="이전 이미지"
-        @click="goToOffset(-1)"
-      >
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="m15 18-6-6 6-6" />
-        </svg>
-      </button>
-      <button
-        v-if="hasMultipleImages"
-        class="product-gallery__nav product-gallery__nav--next"
-        type="button"
-        aria-label="다음 이미지"
-        @click="goToOffset(1)"
-      >
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="m9 6 6 6-6 6" />
-        </svg>
-      </button>
-
-      <span v-if="hasMultipleImages" class="product-gallery__counter" aria-hidden="true">
-        {{ selectedImageIndex + 1 }} / {{ images.length }}
-      </span>
-
-      <button
-        v-if="representativeImage"
-        class="product-gallery__zoom"
-        type="button"
-        aria-label="상품 이미지 확대"
-        @click="openZoom"
-      >
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="m15 15 5 5m-2-9a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
-        </svg>
-      </button>
-    </div>
-
-    <div
-      v-if="hasMultipleImages"
-      class="product-gallery__thumbnails"
-      aria-label="상품 이미지 목록"
-    >
+    <div v-if="images.length" class="product-gallery__thumbnails" aria-label="상품 이미지 목록">
       <button
         v-for="image in images"
         :key="image.id"
@@ -111,6 +55,29 @@ const closeZoom = () => {
         @click="emit('selectImage', image.id)"
       >
         <img :src="image.url" alt="" />
+      </button>
+    </div>
+
+    <div class="product-gallery__main">
+      <img
+        v-if="representativeImage"
+        class="product-gallery__main-image"
+        :src="representativeImage.url"
+        :alt="representativeImage.alt"
+        :style="representativeImageStyle"
+      />
+      <div v-else class="product-gallery__empty">등록된 상품 이미지가 없습니다.</div>
+
+      <button
+        v-if="representativeImage"
+        class="product-gallery__zoom"
+        type="button"
+        aria-label="상품 이미지 확대"
+        @click="openZoom"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path d="m15 15 5 5m-2-9a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
+        </svg>
       </button>
     </div>
 
@@ -126,6 +93,7 @@ const closeZoom = () => {
           v-if="representativeImage"
           :src="representativeImage.url"
           :alt="`${representativeImage.alt} 확대 이미지`"
+          :style="representativeImageStyle"
         />
       </div>
     </dialog>
@@ -134,8 +102,9 @@ const closeZoom = () => {
 
 <style scoped lang="scss">
 .product-gallery {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: start;
   gap: var(--space-4);
   min-width: 0;
 }
@@ -155,6 +124,7 @@ const closeZoom = () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 180ms ease;
 }
 
 .product-gallery__empty {
@@ -166,58 +136,45 @@ const closeZoom = () => {
   text-align: center;
 }
 
-.product-gallery__nav {
-  position: absolute;
-  top: 50%;
+.product-gallery__thumbnails {
   display: grid;
-  width: 44px;
-  height: 44px;
-  border: 1px solid rgba(225, 224, 218, 0.8);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--color-text-secondary);
-  place-items: center;
-  transform: translateY(-50%);
-  transition:
-    background-color 160ms ease,
-    color 160ms ease;
+  gap: var(--space-3);
 }
 
-.product-gallery__nav--prev {
-  left: var(--space-4);
-}
-
-.product-gallery__nav--next {
-  right: var(--space-4);
-}
-
-.product-gallery__nav svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
-}
-
-.product-gallery__nav:hover {
+.product-gallery__thumbnail {
+  overflow: hidden;
+  width: 72px;
+  aspect-ratio: 4 / 5;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
   background: var(--color-surface);
-  color: var(--color-primary);
+  transition: border-color 160ms ease;
 }
 
-.product-gallery__counter {
-  position: absolute;
-  bottom: var(--space-4);
-  left: 50%;
-  padding: 4px 10px;
-  border-radius: var(--radius-badge);
-  background: rgba(24, 24, 22, 0.72);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 16px;
-  transform: translateX(-50%);
+.product-gallery__thumbnail--selected {
+  border: 2px solid var(--color-primary);
+}
+
+.product-gallery__thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-gallery__thumbnail:nth-child(2) img {
+  transform: scale(1.35);
+  transform-origin: 50% 26%;
+}
+
+.product-gallery__thumbnail:nth-child(3) img {
+  transform: scale(1.45);
+  transform-origin: 45% 78%;
+}
+
+.product-gallery__thumbnail:nth-child(4) img {
+  transform: scale(1.45);
+  transform-origin: 90% 78%;
 }
 
 .product-gallery__zoom {
@@ -245,49 +202,17 @@ const closeZoom = () => {
   stroke-width: 1.6;
 }
 
+.product-gallery__thumbnail:hover {
+  border-color: var(--color-border-strong);
+}
+
 .product-gallery__zoom:hover {
   background: var(--color-surface);
   color: var(--color-primary);
 }
 
-.product-gallery__thumbnails {
-  display: flex;
-  gap: var(--space-3);
-  overflow-x: auto;
-  padding-bottom: var(--space-1);
-  scroll-snap-type: x mandatory;
-}
-
-.product-gallery__thumbnail {
-  flex: 0 0 auto;
-  overflow: hidden;
-  width: 72px;
-  aspect-ratio: 4 / 5;
-  padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-  scroll-snap-align: start;
-  transition: border-color 160ms ease;
-}
-
-.product-gallery__thumbnail--selected {
-  border: 2px solid var(--color-primary);
-}
-
-.product-gallery__thumbnail img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.product-gallery__thumbnail:hover {
-  border-color: var(--color-border-strong);
-}
-
 .product-gallery__thumbnail:focus-visible,
-.product-gallery__zoom:focus-visible,
-.product-gallery__nav:focus-visible {
+.product-gallery__zoom:focus-visible {
   outline: 3px solid var(--color-primary-soft);
   outline-offset: 2px;
 }
@@ -336,13 +261,13 @@ const closeZoom = () => {
 }
 
 @media (max-width: 520px) {
-  .product-gallery__thumbnail {
-    width: 56px;
+  .product-gallery {
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: var(--space-3);
   }
 
-  .product-gallery__nav {
-    width: 38px;
-    height: 38px;
+  .product-gallery__thumbnail {
+    width: 56px;
   }
 }
 </style>

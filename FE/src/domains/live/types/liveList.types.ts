@@ -48,6 +48,7 @@ export interface LiveListDto {
 
 export interface LiveListQuery {
   categoryId?: number
+  hostId?: number
   status?: Exclude<LiveBroadcastStatus, 'ENDED'>
   sort?: LiveSortOption
   page: number

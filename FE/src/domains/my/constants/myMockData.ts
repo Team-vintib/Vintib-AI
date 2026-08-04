@@ -19,14 +19,12 @@ export const MY_SECTION_OPTIONS: Array<{ id: MySectionId; label: string }> = [
   { id: 'dashboard', label: '마이페이지' },
   { id: 'seller', label: '판매자 대시보드' },
   { id: 'profile', label: '내 정보 변경' },
-  { id: 'tryon', label: 'AI 시착' },
+  { id: 'tryon', label: '시착 정보' },
   { id: 'products', label: '판매 상품 관리' },
   { id: 'orders', label: '구매·낙찰 내역' },
   { id: 'sales', label: '판매·정산 내역' },
   { id: 'lives', label: '라이브 관리' },
-  { id: 'wishlist', label: '찜한 상품' },
   { id: 'social', label: '팔로워·팔로잉' },
-  { id: 'points', label: '포인트·출금' },
   { id: 'business', label: '사업자 정보' },
 ]
 

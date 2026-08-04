@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
-
 import CategoryProductTabs from '@/domains/home/components/CategoryProductTabs.vue'
-import HomeHero from '@/domains/home/components/HomeHero.vue'
+import HomeHeroCarousel from '@/domains/home/components/HomeHeroCarousel.vue'
 import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
 import LiveCard from '@/domains/home/components/LiveCard.vue'
@@ -27,21 +25,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
   <div class="guest-home">
     <HomeSearchPanel />
 
-    <HomeHero
-      title-id="guest-home-title"
-      eyebrow="Vintage live auction"
-      title="라이브로 확인하고 경매로 만나는"
-      nowrap-suffix="빈티지 쇼핑"
-      description="지금 진행 중인 라이브와 상시 판매 상품을 둘러보세요."
-      image-url="https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1400&q=80"
-    >
-      <template #actions>
-        <RouterLink class="home-hero__primary" :to="ROUTE_PATHS.LIVE_LIST"
-          >라이브 둘러보기</RouterLink
-        >
-        <RouterLink class="home-hero__secondary" :to="ROUTE_PATHS.AUTH_LOGIN">로그인</RouterLink>
-      </template>
-    </HomeHero>
+    <HomeHeroCarousel :home-data="homeData" />
 
     <HomeSection
       title-id="live-now-title"
@@ -76,7 +60,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
           :live="live"
           variant="scheduled"
           :action-to="ROUTE_PATHS.AUTH_LOGIN"
-          action-label="방송 알림 받기"
+          action-label="예약하기"
         />
       </div>
     </HomeSection>
@@ -141,30 +125,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
   justify-items: stretch;
   gap: var(--space-12);
   padding-bottom: var(--space-16);
-}
-
-.home-hero__primary,
-.home-hero__secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 48px;
-  padding: 0 var(--space-4);
-  border-radius: 14px;
-  font-weight: 700;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
-.home-hero__primary {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.home-hero__secondary {
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--color-text-inverse);
 }
 
 .live-grid,

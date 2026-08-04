@@ -3,6 +3,7 @@ import axios from 'axios'
 import type {
   ProductConditionGrade,
   ProductListItem,
+  ProductSaleStatus,
   ProductSaleType,
   ProductSaleTypeTab,
   ProductSortOption,
@@ -13,6 +14,7 @@ import type {
   ProductRegistrationPhotoDraft,
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
+import { buildMockAiQualityAnalysis } from '@/domains/product/constants/aiQualityAnalysisMockData'
 import { http } from '@/shared/api/http'
 import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.types'
 
@@ -24,6 +26,7 @@ type ProductSaleStatusDto =
   | 'AUCTION_IN_PROGRESS'
   | 'AUCTION_FAILED'
   | 'SOLD'
+  | 'PRIVATE'
 
 export interface BrandDto {
   id: number
@@ -61,7 +64,13 @@ interface ProductListDto {
   price: number | null
   primaryImageUrl?: string | null
   isWished?: boolean
+  isLiked?: boolean
   createdAt: string
+}
+
+interface ProductWishDto {
+  product: Pick<ProductListDto, 'id'>
+  wishedAt: string
 }
 
 interface BackendPageResponse<T> {
@@ -129,6 +138,7 @@ interface ProductListParams {
   minPrice?: number | null
   page?: number
   saleType?: ProductSaleTypeTab['id']
+  sellerId?: number
   size?: number
   sort?: ProductSortOption
 }
@@ -138,17 +148,6 @@ interface ProductSubmitOptions {
   categories?: CategoryDto[]
 }
 
-const EMPTY_AI_QUALITY_ANALYSIS = {
-  status: 'NOT_REQUESTED',
-  originalImageUrl: '',
-  originalImageAlt: '',
-  analyzedImageUrl: '',
-  analyzedImageAlt: '',
-  summary: '',
-  findings: [],
-  disclaimer: '',
-} satisfies ProductDetailViewData['aiQualityAnalysis']
-
 export const getProductList = async ({
   categoryIds = [],
   conditionGrades = [],
@@ -156,6 +155,7 @@ export const getProductList = async ({
   minPrice = null,
   page = 1,
   saleType = 'ALL',
+  sellerId,
   size = 20,
   sort = 'LATEST',
 }: ProductListParams = {}) => {
@@ -170,6 +170,7 @@ export const getProductList = async ({
       minPrice: minPrice ?? undefined,
       maxPrice: maxPrice ?? undefined,
       saleType: toSaleTypeParam(saleType),
+      sellerId,
     },
   })
   const pageResponse = normalizePageResponse(unwrapApiData(response.data))
@@ -229,6 +230,30 @@ export const addWish = async (userId: number, productId: number) => {
 
 export const removeWish = async (userId: number, productId: number) => {
   await http.delete(`/users/${userId}/wishes/${productId}`)
+}
+
+export const getWishProductIds = async (userId: number) => {
+  const productIds: number[] = []
+  let page = 0
+  let totalPages = 1
+
+  do {
+    const response = await http.get<
+      ApiResponse<PageResponse<ProductWishDto> | BackendPageResponse<ProductWishDto>>
+    >(`/users/${userId}/wishes`, {
+      params: {
+        page,
+        size: 100,
+      },
+    })
+    const pageResponse = normalizePageResponse(unwrapApiData(response.data))
+
+    productIds.push(...pageResponse.items.map((wish) => wish.product.id))
+    totalPages = pageResponse.meta.totalPages
+    page += 1
+  } while (page < totalPages)
+
+  return productIds
 }
 
 export const submitProduct = async (
@@ -359,9 +384,12 @@ const toProductListItem = async (product: ProductListDto): Promise<ProductListIt
     price: product.price ?? 0,
     conditionGrade: product.conditionGrade,
     saleType: toProductSaleType(product.saleType),
+    saleStatus: product.saleStatus satisfies ProductSaleStatus,
+    categoryId: product.categoryId,
+    categoryName: product.categoryName ?? fallbackCategoryLabel(product.categoryId),
     imageUrl,
     imageAlt: `${product.title} 상품 이미지`,
-    isLiked: product.isWished ?? false,
+    isLiked: product.isWished ?? product.isLiked,
   }
 }
 
@@ -389,7 +417,7 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
     price: product.price ?? 0,
     saleType: product.saleType,
     saleStatus: product.saleStatus,
-    isLiked: product.isWished ?? false,
+    isLiked: product.isWished ?? product.isLiked ?? false,
     images,
     seller: {
       id: product.sellerId,
@@ -404,10 +432,9 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
       title: defect,
       description: '',
     })),
-    aiQualityAnalysis: {
-      ...EMPTY_AI_QUALITY_ANALYSIS,
-      findings: [],
-    },
+    // ⚠️ Mock 전용 · BE/AI 확인 필요 — 실제 AI 검수(다중 이미지) 계약 전까지 데모용.
+    //   → docs/requests/BE/019-product-quality-multi-image.md
+    aiQualityAnalysis: buildMockAiQualityAnalysis(images),
   }
 }
 

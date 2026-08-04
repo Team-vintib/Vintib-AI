@@ -11,7 +11,13 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
       aria-labelledby="signup-entry-title"
     >
       <header class="signup-entry-header">
-        <img class="signup-entry-header__logo" :src="logoImage" alt="VinTib" />
+        <RouterLink
+          class="signup-entry-header__logo-link"
+          :to="{ name: ROUTE_NAMES.HOME }"
+          aria-label="VinTib 홈"
+        >
+          <img class="signup-entry-header__logo" :src="logoImage" alt="VinTib" />
+        </RouterLink>
         <h1
           id="signup-entry-title"
           class="signup-entry-header__title text-[var(--color-text-primary)]"
@@ -56,13 +62,19 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
   margin-bottom: var(--space-10);
 }
 
-.signup-entry-header__logo {
+.signup-entry-header__logo-link {
   display: block;
   width: min(180px, 52vw);
-  height: auto;
   margin-right: auto;
   margin-bottom: var(--space-2);
   margin-left: auto;
+  border-radius: var(--radius-control);
+}
+
+.signup-entry-header__logo {
+  display: block;
+  width: 100%;
+  height: auto;
   object-fit: contain;
 }
 
@@ -125,6 +137,7 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 
 .signup-entry-primary-link:focus-visible,
 .signup-entry-secondary-link:focus-visible,
+.signup-entry-header__logo-link:focus-visible,
 .signup-entry-footer__link:focus-visible {
   outline: 3px solid var(--color-primary);
   outline-offset: 3px;

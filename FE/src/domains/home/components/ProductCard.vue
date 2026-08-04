@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import type { HomeProductCardItem } from '@/domains/home/types/homeView.types'
 import type { RouteLocationRaw } from 'vue-router'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     product: HomeProductCardItem
     isWished?: boolean
@@ -32,6 +33,7 @@ const emit = defineEmits<{
 
 const fallbackImageUrl =
   'https://images.unsplash.com/photo-1516762689617-e1cffcef479d?auto=format&fit=crop&w=900&q=80'
+const productImageUrl = computed(() => props.product.primaryImageUrl || fallbackImageUrl)
 
 const handleImageError = (event: Event) => {
   if (event.target instanceof HTMLImageElement) {
@@ -57,7 +59,7 @@ const formatPrice = (value?: number) => {
     <span class="product-card__media">
       <img
         class="product-card__image"
-        :src="product.primaryImageUrl"
+        :src="productImageUrl"
         :alt="product.title"
         @error="handleImageError"
       />
@@ -107,10 +109,10 @@ const formatPrice = (value?: number) => {
   position: relative;
   display: grid;
   overflow: hidden;
-  border: 1px solid #e6e1d8;
+  border: 1px solid var(--color-border);
   border-radius: 20px;
   background: var(--color-surface);
-  box-shadow: 0 8px 24px rgb(18 18 18 / 5%);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text-primary) 5%, transparent);
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -118,8 +120,8 @@ const formatPrice = (value?: number) => {
 }
 
 .product-card:hover {
-  border-color: #ded8ce;
-  box-shadow: 0 10px 26px rgb(18 18 18 / 7%);
+  border-color: var(--color-border-strong);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--color-text-primary) 7%, transparent);
   transform: translateY(-2px);
 }
 

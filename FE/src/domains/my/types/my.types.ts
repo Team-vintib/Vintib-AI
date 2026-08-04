@@ -10,11 +10,9 @@ export type MySectionId =
   | 'orders'
   | 'sales'
   | 'lives'
-  | 'wishlist'
   | 'social'
   | 'points'
   | 'business'
-  | 'cart'
 
 export type MyMemberType = 'GENERAL' | 'BUSINESS'
 export type MyBusinessVerificationStatus = 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED'
