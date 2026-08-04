@@ -5,6 +5,7 @@ import com.ssafy.backend.global.storage.S3StorageService;
 import com.ssafy.backend.product.entity.Brand;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.entity.ProductDefect;
 import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
@@ -34,6 +35,7 @@ public class ProductQueryAdapter implements ProductQueryPort {
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
     private final ProductImageQueryRepository productImageQueryRepository;
+    private final ProductDefectQueryRepository productDefectQueryRepository;
     private final S3StorageService s3StorageService;
     private final AwsProperties awsProperties;
 
@@ -50,6 +52,7 @@ public class ProductQueryAdapter implements ProductQueryPort {
 
         Map<Long, String> brandNameById = brandNames(products);
         Map<Long, String> thumbnailByProductId = thumbnails(products);
+        Map<Long, String> defectSummaryByProductId = defectSummaries(products);
 
         return products.stream().collect(Collectors.toMap(
                 Product::getId,
@@ -60,7 +63,22 @@ public class ProductQueryAdapter implements ProductQueryPort {
                         product.getPrice(),
                         product.getSaleType() == null ? null : product.getSaleType().name(),
                         product.getConditionGrade(),
-                        thumbnailByProductId.get(product.getId()))));
+                        thumbnailByProductId.get(product.getId()),
+                        product.getMaterial(),
+                        product.getMeasurements(),
+                        defectSummaryByProductId.get(product.getId()))));
+    }
+
+    /**
+     * 하자 목록을 한 줄로 이어 붙인다(FE 요청 003 §3.5). FE는 목록이 아니라 카드에 바로 쓸 요약
+     * 문자열을 요청했다 — 상세 목록이 필요하면 상품 상세(GET /api/products/{id})를 따로 연다.
+     */
+    private Map<Long, String> defectSummaries(List<Product> products) {
+        return productDefectQueryRepository
+                .findAllByProductIds(products.stream().map(Product::getId).toList()).stream()
+                .collect(Collectors.groupingBy(
+                        defect -> defect.getProduct().getId(),
+                        Collectors.mapping(ProductDefect::getContent, Collectors.joining(", "))));
     }
 
     private Map<Long, String> brandNames(List<Product> products) {
