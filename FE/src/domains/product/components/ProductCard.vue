@@ -91,16 +91,27 @@ const saleTypeLabel = computed(() =>
     transform 160ms ease;
 }
 
+.product-card {
+  transition:
+    border-color 220ms ease,
+    background-color 220ms ease,
+    transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .product-card:hover {
   border-color: var(--color-border-strong);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+}
+
+.product-card:hover .product-card__image {
+  transform: scale(1.045);
 }
 
 .product-card__media {
   position: relative;
   overflow: hidden;
   aspect-ratio: 4 / 5;
-  background: var(--color-surface-secondary);
+  background: var(--color-image-frame);
 }
 
 .product-card__detail-link {
@@ -118,33 +129,38 @@ const saleTypeLabel = computed(() =>
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
+  transition: transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .product-card__grade {
   position: absolute;
-  top: var(--space-3);
-  left: var(--space-3);
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-badge);
-  background: rgba(255, 255, 255, 0.9);
+  top: 0;
+  left: 0;
+  padding: 3px var(--space-2);
+  border-radius: 0 0 var(--radius-badge) 0;
+  background: rgba(10, 10, 10, 0.82);
   color: var(--color-text-primary);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 18px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 16px;
 }
 
 .product-card__like-button {
   position: absolute;
-  top: var(--space-3);
-  right: var(--space-3);
+  top: var(--space-2);
+  right: var(--space-2);
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(225, 224, 218, 0.8);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-badge);
+  background: rgba(10, 10, 10, 0.55);
   color: var(--color-text-secondary);
+  backdrop-filter: blur(2px);
 }
 
 .product-card__like-button svg {
@@ -167,7 +183,7 @@ const saleTypeLabel = computed(() =>
 }
 
 .product-card__like-button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -177,27 +193,32 @@ const saleTypeLabel = computed(() =>
 }
 
 .product-card__detail-link:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: -3px;
 }
 
 .product-card__brand {
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
   line-height: 18px;
   text-overflow: ellipsis;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
 .product-card__name {
   overflow: hidden;
-  min-height: 24px;
+  min-height: 22px;
   margin-top: var(--space-1);
   color: var(--color-text-primary);
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 22px;
+  letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -212,10 +233,12 @@ const saleTypeLabel = computed(() =>
 
 .product-card__price {
   color: var(--color-text-primary);
-  font-size: 16px;
+  font-family: var(--font-mono);
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  line-height: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 22px;
 }
 
 .product-card__price-prefix {
@@ -227,16 +250,18 @@ const saleTypeLabel = computed(() =>
 .product-card__sale-badge {
   flex: 0 0 auto;
   padding: 3px var(--space-2);
+  border: 1px solid var(--color-border-input);
   border-radius: var(--radius-badge);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 600;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 400;
   line-height: 16px;
 }
 
 .product-card__sale-badge--auction {
-  background: var(--color-auction-soft);
-  color: var(--color-auction);
+  border-color: var(--color-accent);
+  background: transparent;
+  color: var(--color-accent);
 }
 </style>

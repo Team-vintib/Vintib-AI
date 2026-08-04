@@ -395,20 +395,23 @@ onMounted(() => {
 
 .product-list-page__header h1 {
   color: var(--color-text-primary);
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 48px;
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1;
 }
 
 .product-list-page__header p {
   color: var(--color-text-secondary);
-  font-size: 16px;
-  line-height: 26px;
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 24px;
 }
 
 .product-list-page__content {
   display: grid;
-  grid-template-columns: 224px minmax(0, 1fr);
+  grid-template-columns: var(--filter-panel-width) minmax(0, 1fr);
   align-items: start;
   gap: var(--space-8);
   margin-top: var(--space-8);
@@ -450,7 +453,7 @@ onMounted(() => {
 }
 
 .product-list-page__tab:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: -3px;
 }
 
@@ -461,6 +464,12 @@ onMounted(() => {
   padding-bottom: var(--space-2);
   color: var(--color-text-secondary);
   font-size: 13px;
+}
+
+.product-list-page__toolbar p {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .product-list-page__toolbar select {
@@ -475,8 +484,7 @@ onMounted(() => {
 }
 
 .product-list-page__toolbar select:focus-visible {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  border-color: var(--color-border-underline);
 }
 
 .product-list-page__notice {
@@ -548,7 +556,7 @@ onMounted(() => {
 }
 
 .product-list-page__empty button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -568,6 +576,8 @@ onMounted(() => {
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .product-list-page__pagination button:hover:not(:disabled),
@@ -578,7 +588,7 @@ onMounted(() => {
 }
 
 .product-list-page__pagination button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
