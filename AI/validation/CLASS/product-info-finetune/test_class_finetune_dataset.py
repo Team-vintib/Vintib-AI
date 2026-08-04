@@ -173,11 +173,10 @@ def test_blouse_participates_in_derivation_now_that_it_maps() -> None:
     assert ad.map_subcategory(sleeveless)[0] == "SLEEVELESS"
 
 
-def test_jumper_is_excluded_pending_decision() -> None:
+def test_jumper_is_absorbed_into_jacket() -> None:
+    """사용자 확정(2026-08-04) — 점퍼는 JACKET으로 흡수한다."""
     label = ad.parse_label(_clothes(**{"metadata.clothes.type": "01outer_03jumper"}))
-    code, reason = ad.map_subcategory(label)
-    assert code is None
-    assert "미결정" in reason
+    assert ad.map_subcategory(label) == ("JACKET", "직접 매핑")
 
 
 def test_pants_needs_threshold_for_short_pants() -> None:

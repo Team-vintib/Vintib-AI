@@ -114,6 +114,9 @@ SHORT_PANTS_MAX_CM: float | None = None
 DIRECT_CATEGORY_MAP: dict[str, str] = {
     "01outer_01coat": "COAT",
     "01outer_02jacket": "JACKET",
+    # 사용자 확정(2026-08-04): 점퍼는 JACKET으로 흡수한다. 브리핑 §5는 "흡수 여부 미결정"
+    # 이라 제외 목록에 뒀는데, 그 결정이 내려졌다. 3,467건이 JACKET 쪽으로 들어온다.
+    "01outer_03jumper": "JACKET",
     "01outer_04cardigan": "CARDIGAN",
     "02top_02t-shirt": "TSHIRT",
     "02top_03sweater": "KNIT",
@@ -133,7 +136,6 @@ EXCLUDED_CATEGORY_TYPES: dict[str, str] = {
     # 사용자 확정(2026-08-04): vest는 제외 유지. taxonomy v2에 VEST가 없고(BE 시드에 없음),
     # 23,134건을 통째로 SLEEVELESS로 보내면 민소매 상의에 패딩 베스트가 섞인다.
     "02top_05vest": "제외 확정(2026-08-04) — taxonomy v2에 VEST가 없다",
-    "01outer_03jumper": "JACKET 흡수 여부 미결정",
     "04bottom_01pants": "하위 5종 구분 불가 — SHORT_PANTS 파생에만 쓴다",
 }
 
