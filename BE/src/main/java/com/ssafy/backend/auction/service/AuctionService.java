@@ -4,6 +4,7 @@ import com.ssafy.backend.auction.dto.request.AuctionConfigRequest;
 import com.ssafy.backend.auction.dto.request.BidRequest;
 import com.ssafy.backend.auction.dto.response.AuctionResponse;
 import com.ssafy.backend.auction.dto.response.AuctionSnapshotResponse;
+import com.ssafy.backend.auction.dto.response.AuctionWinnerResponse;
 import com.ssafy.backend.auction.dto.response.BidResponse;
 import com.ssafy.backend.auction.entity.Auction;
 import com.ssafy.backend.auction.entity.AuctionStatus;
@@ -240,6 +241,26 @@ public class AuctionService {
         List<Bid> found =
                 bidRepository.findPageByAuctionId(auctionId, cursor, PageRequest.of(0, size + 1));
         return CursorPageResponse.of(found, size, bid -> BidResponse.of(bid, viewerId), Bid::getId);
+    }
+
+    /**
+     * 경매 결과 조회(AUCT-012). <b>비회원도 조회할 수 있다</b> — 입찰 내역과 같은 이유로
+     * 누가 얼마에 가져갔는지는 관전 정보다.
+     *
+     * <p>아직 끝나지 않은 경매도 그대로 돌려준다 — 종료 여부 판단은 {@code status}로 한다.
+     */
+    public AuctionWinnerResponse getWinner(Long auctionId) {
+        Auction auction = auctionRepository.findWithLiveById(auctionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.AUCTION_NOT_FOUND));
+
+        String winnerNickname = auction.getWinnerId() == null
+                ? null
+                : memberRepository.findById(auction.getWinnerId())
+                        .map(Member::getNickname)
+                        .orElse(null);
+
+        return AuctionWinnerResponse.of(
+                auction, winnerNickname, bidRepository.countByAuction_Id(auctionId));
     }
 
     /** 상품명·입찰자 닉네임·입찰 수를 붙여 현황 한 장으로 만든다. */

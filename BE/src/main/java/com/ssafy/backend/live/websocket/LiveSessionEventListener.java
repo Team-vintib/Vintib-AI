@@ -1,6 +1,8 @@
 package com.ssafy.backend.live.websocket;
 
+import com.ssafy.backend.global.websocket.StompPrincipal;
 import com.ssafy.backend.live.service.LiveViewerService;
+import java.security.Principal;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +24,9 @@ import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
  * <p><b>집계에서 예외를 밖으로 던지지 않는다.</b> 이 리스너는 클라이언트 inbound 채널에서 돌아서,
  * Redis 장애로 예외가 새어 나가면 시청자 수뿐 아니라 <b>채팅·경매 구독까지 함께 끊긴다.</b>
  * 시청자 수는 부가 정보이므로 실패해도 실시간 기능 본체는 살아 있어야 한다.
+ *
+ * <p><b>호스트는 시청자에서 빠진다.</b> 그래서 구독 주체({@code StompPrincipal})를 함께 넘긴다 —
+ * 판단은 {@link LiveViewerService}가 한다.
  */
 @Slf4j
 @Component
@@ -51,7 +56,14 @@ public class LiveSessionEventListener {
             return;
         }
 
-        run("구독", sessionId, () -> liveViewerService.enter(sessionId, subscriptionId, liveId));
+        // CONNECT 에서 심어 둔 주체다. 비회원이면 null 이며 그대로 시청자로 센다.
+        Long memberId = memberIdOf(accessor.getUser());
+
+        run("구독", sessionId, () -> liveViewerService.enter(sessionId, subscriptionId, liveId, memberId));
+    }
+
+    private Long memberIdOf(Principal principal) {
+        return principal instanceof StompPrincipal stompPrincipal ? stompPrincipal.memberId() : null;
     }
 
     @EventListener

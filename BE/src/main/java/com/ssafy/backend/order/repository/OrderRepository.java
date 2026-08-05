@@ -7,6 +7,8 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
@@ -28,4 +30,22 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * 롤백돼 나머지 정상 주문까지 실패하므로, 쿼리 단계에서 걸러낸다({@code RefundService} 참고).
      */
     List<Order> findByStatusAndAutoConfirmAtLessThanEqualAndRefundRequestedFalse(OrderStatus status, LocalDateTime now);
+
+    /**
+     * 방송 종료 요약(LIVE-006)의 즉시구매분 — 이 방송에서 <b>경매를 거치지 않고</b> 팔린 주문.
+     *
+     * <p>{@code auction IS NULL}로 낙찰 주문을 뺀다. 낙찰분은 경매 쪽에서 이미 집계하므로 여기까지
+     * 세면 같은 상품이 두 번 잡힌다.
+     *
+     * <p>환불된 주문은 뺀다 — 돌려준 돈을 방송 판매액에 남겨 둘 이유가 없다. 배송 중·구매 확정
+     * 등 진행 단계는 구분하지 않는다(팔린 것은 팔린 것이다).
+     */
+    @Query("""
+            SELECT o FROM Order o
+            WHERE o.live.id = :liveId
+              AND o.auction IS NULL
+              AND o.status <> com.ssafy.backend.order.entity.OrderStatus.REFUNDED
+              AND o.status <> com.ssafy.backend.order.entity.OrderStatus.CANCELED
+            """)
+    List<Order> findLiveDirectSaleOrders(@Param("liveId") Long liveId);
 }

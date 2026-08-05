@@ -93,4 +93,17 @@ public class PointHold {
         this.status = PointHoldStatus.RELEASED;
         this.releasedAt = at;
     }
+
+    /**
+     * 낙찰되어 거래 대금으로 전환됐다(AUCT-012). {@link #release}와 마찬가지로 활성 보류에서
+     * 빠지므로 {@code ux_point_hold_member_active}가 풀린다 — 낙찰자가 이후 다른 경매에 다시
+     * 입찰할 수 있어야 하기 때문에 이 전이가 반드시 일어나야 한다.
+     *
+     * <p>해제와 상태를 나누는 이유는 <b>돈이 어디로 갔는지가 다르기 때문</b>이다. 해제는
+     * 잔액으로 돌아가고, 전환은 거래 대금 보관(trade_escrow)으로 넘어간다.
+     */
+    public void convert(LocalDateTime at) {
+        this.status = PointHoldStatus.CONVERTED;
+        this.releasedAt = at;
+    }
 }

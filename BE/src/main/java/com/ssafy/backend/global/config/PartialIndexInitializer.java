@@ -28,6 +28,10 @@ import org.springframework.stereotype.Component;
  *   <li>{@code ux_live_product_active} — 제외되지 않은 같은 상품을 같은 라이브에 두 번 연결 불가</li>
  * </ul>
  *
+ * <p>규칙을 강제하지 않는 <b>조회용 부분 인덱스</b>도 같은 이유로 여기서 만든다
+ * ({@code ix_live_reminder_pending}, {@code ix_orders_live}) — JPA 로 표현할 수 없는 것은
+ * UNIQUE 든 아니든 이 자리로 온다.
+ *
  * <p>그런데 <b>JPA 는 부분 인덱스({@code WHERE} 절이 붙은 인덱스)를 표현할 수 없고</b>, 우리
  * 운영/로컬은 {@code ddl-auto}(create/update)로 엔티티에서 스키마를 만든다. 즉 이 인덱스들은
  * <b>문서에만 있고 실제 DB 에는 없었다.</b> 애플리케이션 검증이 1차 방어인 것은 맞지만, 동시
@@ -72,6 +76,10 @@ public class PartialIndexInitializer implements ApplicationRunner {
             """
             CREATE INDEX IF NOT EXISTS ix_live_reminder_pending
                 ON live_reminder (live_id) WHERE notified_at IS NULL
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS ix_orders_live
+                ON orders (live_id) WHERE live_id IS NOT NULL
             """);
 
     private final DataSource dataSource;
