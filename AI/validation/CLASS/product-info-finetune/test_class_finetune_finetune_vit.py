@@ -100,3 +100,34 @@ def test_next_versioned_dir_bumps_version_when_taken(tmp_path) -> None:
 
     (tmp_path / "vit_last4_category_masked_lr1e-05_v2").mkdir()
     assert fv.next_versioned_dir(base_dir) == tmp_path / "vit_last4_category_masked_lr1e-05_v3"
+
+
+class _FakeTensor:
+    """`.shape`만 있으면 되는 자리표시자 — 진짜 torch 텐서 없이 shape 비교 로직만 검증한다."""
+
+    def __init__(self, shape: tuple[int, ...]) -> None:
+        self.shape = shape
+
+
+class _FakeModel:
+    def __init__(self, state: dict) -> None:
+        self._state = state
+
+    def state_dict(self) -> dict:
+        return self._state
+
+
+def test_drop_incompatible_keys_filters_shape_mismatch_and_unknown_keys() -> None:
+    """`--r`을 체크포인트와 다르게 주면 LoRA A/B 행렬 shape가 안 맞아 `load_state_dict`가
+    그대로 터졌다(2026-08-05 실측) — `strict=False`는 shape 불일치까진 안 봐준다. 그래서
+    shape까지 직접 비교해 걸러내는 이 함수가 필요하다."""
+    model = _FakeModel({"a": _FakeTensor((16, 768)), "b": _FakeTensor((5,))})
+    checkpoint_state = {
+        "a": _FakeTensor((16, 768)),  # 모델과 shape 일치 -> 유지
+        "b": _FakeTensor((32, 768)),  # 이름은 같지만 shape 불일치 -> 제외
+        "c": _FakeTensor((1,)),  # 모델에 아예 없는 키 -> 제외
+    }
+
+    kept = fv.drop_incompatible_keys(checkpoint_state, model)
+
+    assert set(kept) == {"a"}

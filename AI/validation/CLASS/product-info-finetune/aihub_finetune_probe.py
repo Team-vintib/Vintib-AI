@@ -62,7 +62,8 @@ def load_frozen_backbone(
         model = lora.load_model(model_id, r, alpha, dropout, target_modules, device)
 
     checkpoint = torch.load(checkpoint_path, map_location=device)
-    model.load_state_dict(checkpoint["backbone_state_dict"], strict=False)
+    compatible_state = vit.drop_incompatible_keys(checkpoint["backbone_state_dict"], model)
+    model.load_state_dict(compatible_state, strict=False)
     for parameter in model.parameters():
         parameter.requires_grad_(False)
     model.eval()
