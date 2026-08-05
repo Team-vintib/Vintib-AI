@@ -77,7 +77,7 @@ const handleVerificationCodeInput = (event: Event) => {
       <p
         v-if="emailError || statusMessage"
         id="signup-email-message"
-        class="text-[13px] leading-5"
+        class="text-[var(--font-size-caption)] leading-5"
         :class="emailError ? 'text-[var(--color-error)]' : 'text-[var(--color-text-secondary)]'"
       >
         {{ emailError || statusMessage }}
@@ -144,7 +144,7 @@ const handleVerificationCodeInput = (event: Event) => {
       <p
         v-if="verificationCodeError"
         id="signup-verification-code-error"
-        class="text-[13px] leading-5 text-[var(--color-error)]"
+        class="text-[var(--font-size-caption)] leading-5 text-[var(--color-error)]"
       >
         {{ verificationCodeError }}
       </p>
@@ -173,9 +173,9 @@ const handleVerificationCodeInput = (event: Event) => {
 
 .verification-code-timer {
   color: var(--color-error);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 16px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-xs);
 }
 
 input {

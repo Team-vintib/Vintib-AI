@@ -532,7 +532,7 @@ onBeforeUnmount(() => {
 
 .live-watch-page__body {
   display: grid;
-  min-height: calc(100vh - 52px);
+  min-height: calc(100vh - var(--button-height-major));
   grid-template-columns: 220px minmax(0, 1fr);
 }
 
@@ -540,7 +540,7 @@ onBeforeUnmount(() => {
   display: grid;
   min-width: 0;
   min-height: 0;
-  height: calc(100vh - 52px);
+  height: calc(100vh - var(--button-height-major));
   grid-template-rows: minmax(420px, 1fr) 164px;
 }
 
@@ -570,7 +570,7 @@ onBeforeUnmount(() => {
 }
 
 .live-watch-loading__header {
-  height: 52px;
+  height: var(--button-height-major);
   border-bottom: 1px solid var(--color-live-border);
   background:
     linear-gradient(
@@ -586,7 +586,7 @@ onBeforeUnmount(() => {
 
 .live-watch-loading__body {
   display: grid;
-  min-height: calc(100vh - 52px);
+  min-height: calc(100vh - var(--button-height-major));
   grid-template-columns: 220px minmax(0, 1fr);
 }
 
@@ -642,7 +642,7 @@ onBeforeUnmount(() => {
 
   .live-watch-page__content {
     height: auto;
-    grid-template-rows: 320px auto;
+    grid-template-rows: var(--surface-min-height-lg) auto;
   }
 
   .live-watch-page__stage,
@@ -671,7 +671,7 @@ onBeforeUnmount(() => {
   }
 
   .live-watch-loading__body > main {
-    grid-template-rows: 320px 180px;
+    grid-template-rows: var(--surface-min-height-lg) 180px;
   }
 }
 

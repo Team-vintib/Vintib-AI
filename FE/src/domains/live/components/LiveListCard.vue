@@ -188,9 +188,9 @@ const handleActionClick = () => {
   border-radius: var(--radius-card);
   background: var(--color-surface);
   transition:
-    border-color 220ms ease,
-    background-color 220ms ease,
-    transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+    border-color var(--transition-standard),
+    background-color var(--transition-standard),
+    transform var(--transition-emphasized);
 }
 
 .live-list-card--clickable {
@@ -224,7 +224,7 @@ const handleActionClick = () => {
   height: 100%;
   object-fit: cover;
   filter: saturate(0.86) contrast(1.05) brightness(0.94);
-  transition: transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform var(--transition-emphasized);
 }
 
 .live-list-card--clickable:hover .live-list-card__image {
@@ -241,8 +241,8 @@ const handleActionClick = () => {
   border-radius: 0 0 var(--radius-badge) 0;
   color: var(--color-text-primary);
   font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 500;
+  font-size: var(--font-size-3xs);
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.16em;
   line-height: 1;
 }
@@ -254,20 +254,20 @@ const handleActionClick = () => {
 }
 
 .live-list-card__badge--live::before {
-  width: 4px;
-  height: 4px;
+  width: var(--space-1);
+  height: var(--space-1);
   background: currentColor;
   content: '';
-  animation: vtPulse 1.7s ease-in-out infinite;
+  animation: vtPulse var(--duration-pulse) ease-in-out infinite;
 }
 
 .live-list-card__badge--scheduled {
-  background: rgba(10, 10, 10, 0.82);
+  background: var(--overlay-scrim-strong);
   color: var(--color-text-primary);
 }
 
 .live-list-card__badge--ended {
-  background: rgba(10, 10, 10, 0.82);
+  background: var(--overlay-scrim-strong);
   color: var(--color-text-caption);
 }
 
@@ -281,8 +281,8 @@ const handleActionClick = () => {
   display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
   line-height: 1.35;
   letter-spacing: -0.02em;
   -webkit-box-orient: vertical;
@@ -292,9 +292,9 @@ const handleActionClick = () => {
 .live-list-card__seller,
 .live-list-card__meta {
   color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 300;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-snug);
 }
 
 .live-list-card__viewer {
@@ -303,21 +303,21 @@ const handleActionClick = () => {
   gap: 7px;
   color: var(--color-text-secondary);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   letter-spacing: 0.02em;
-  line-height: 18px;
+  line-height: var(--line-height-snug);
   font-variant-numeric: tabular-nums;
 }
 
 .live-list-card__viewer span {
   color: var(--color-accent);
-  font-size: 8px;
+  font-size: var(--font-size-4xs);
 }
 
 .live-list-card__action {
   justify-self: start;
   min-width: 104px;
-  height: 40px;
+  height: var(--button-height-sm);
   margin-top: var(--space-2);
   padding: 0 var(--space-4);
   border: 1px solid var(--color-primary);
@@ -327,9 +327,9 @@ const handleActionClick = () => {
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-medium);
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease;
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .live-list-card__action:hover:not(:disabled) {
@@ -361,7 +361,7 @@ const handleActionClick = () => {
 .live-list-card__message {
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 @media (max-width: 640px) {
@@ -370,8 +370,8 @@ const handleActionClick = () => {
   }
 
   .live-list-card__title {
-    font-size: 16px;
-    line-height: 24px;
+    font-size: var(--font-size-md);
+    line-height: var(--line-height-body);
   }
 }
 </style>

@@ -1944,13 +1944,13 @@ onMounted(() => {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: var(--search-input-height);
+  height: var(--search-input-height);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-extrabold);
   overflow: hidden;
 }
@@ -1967,16 +1967,16 @@ onMounted(() => {
 .my-empty strong {
   display: block;
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
-  line-height: 21px;
+  line-height: var(--line-height-comfortable);
 }
 
 .my-sidebar__profile span {
   display: block;
   color: var(--color-text-secondary);
-  font-size: 11px;
-  line-height: 17px;
+  font-size: var(--font-size-2xs);
+  line-height: var(--line-height-2xs);
 }
 
 .my-sidebar__nav {
@@ -1998,7 +1998,7 @@ onMounted(() => {
   color: var(--color-text-secondary);
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-semibold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
   text-align: left;
 }
 
@@ -2029,9 +2029,9 @@ onMounted(() => {
 
 .my-content__header h1 {
   color: var(--color-text-primary);
-  font-size: 28px;
+  font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-extrabold);
-  line-height: 36px;
+  line-height: var(--line-height-2xl-plus);
 }
 
 .my-content__header p,
@@ -2040,8 +2040,8 @@ onMounted(() => {
 .my-empty p {
   margin-top: 2px;
   color: var(--color-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
 }
 
 .my-content__actions {
@@ -2061,10 +2061,10 @@ onMounted(() => {
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .my-content__actions button:first-child,
@@ -2121,12 +2121,12 @@ onMounted(() => {
 .my-profile-hero__avatar {
   display: grid;
   place-items: center;
-  width: 88px;
-  height: 88px;
+  width: var(--avatar-size-lg);
+  height: var(--avatar-size-lg);
   border-radius: 50%;
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 32px;
+  font-size: var(--font-size-4xl);
   font-weight: var(--font-weight-extrabold);
   overflow: hidden;
 }
@@ -2150,26 +2150,26 @@ onMounted(() => {
 
 .my-profile-hero__title h2 {
   color: var(--color-text-primary);
-  font-size: 28px;
+  font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-extrabold);
-  line-height: 36px;
+  line-height: var(--line-height-2xl-plus);
 }
 
 .my-profile-hero__title span {
-  min-height: 28px;
+  min-height: var(--badge-height-md);
   padding: 5px 12px;
   border-radius: var(--radius-badge);
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
 }
 
 .my-profile-hero__body > p {
   margin-top: 4px;
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
 }
 
 .my-profile-hero__stats {
@@ -2191,7 +2191,7 @@ onMounted(() => {
 
 .my-profile-hero__stats strong {
   color: var(--color-text-primary);
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-extrabold);
   line-height: 30px;
@@ -2199,7 +2199,7 @@ onMounted(() => {
 
 .my-profile-hero__stats span {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -2237,14 +2237,14 @@ onMounted(() => {
 .my-dashboard__card {
   display: grid;
   gap: 8px;
-  min-height: 128px;
+  min-height: var(--surface-min-height-3xs);
   padding: 20px;
   border-radius: var(--radius-card);
   text-align: left;
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-base);
 }
 
 .my-dashboard__card:hover {
@@ -2255,30 +2255,30 @@ onMounted(() => {
 
 .my-dashboard--home .my-dashboard__card {
   align-content: center;
-  min-height: 128px;
+  min-height: var(--surface-min-height-3xs);
   padding: 22px;
 }
 
 .my-dashboard__card span {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .my-dashboard__card strong {
   color: var(--color-text-primary);
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-extrabold);
-  line-height: 32px;
+  line-height: var(--line-height-2xl);
 }
 
 .my-dashboard__card small {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .my-point-panel {
@@ -2311,22 +2311,22 @@ onMounted(() => {
 
 .my-point-panel__grid span {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
 }
 
 .my-point-panel__grid strong {
   color: var(--color-text-primary);
-  font-size: 22px;
+  font-size: var(--font-size-xl);
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-extrabold);
 }
 
 .my-point-panel__grid p {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .my-point-panel__actions {
@@ -2344,9 +2344,9 @@ onMounted(() => {
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .my-point-panel__actions button:first-child {
@@ -2391,7 +2391,7 @@ onMounted(() => {
 
 .my-card--revenue .my-card__title > strong {
   color: var(--color-text-primary);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-extrabold);
 }
@@ -2418,9 +2418,9 @@ onMounted(() => {
 .my-revenue-chart__item small {
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   font-weight: var(--font-weight-medium);
-  line-height: 16px;
+  line-height: var(--line-height-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2429,7 +2429,7 @@ onMounted(() => {
   display: flex;
   align-items: end;
   justify-content: center;
-  height: 128px;
+  height: var(--surface-min-height-3xs);
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   overflow: hidden;
@@ -2445,9 +2445,9 @@ onMounted(() => {
 
 .my-revenue-chart__item b {
   color: var(--color-text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .my-card--todo {
@@ -2459,7 +2459,7 @@ onMounted(() => {
   align-items: center;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
-  min-height: 48px;
+  min-height: var(--space-12);
   padding: 0;
   border: 0;
   border-bottom: 1px solid var(--color-border);
@@ -2474,13 +2474,13 @@ onMounted(() => {
 
 .my-todo-row span {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
 }
 
 .my-todo-row strong {
   color: var(--color-text-primary);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-extrabold);
 }
@@ -2503,13 +2503,13 @@ onMounted(() => {
 
 .my-status-grid span {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
 
 .my-status-grid strong {
   color: var(--color-text-primary);
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-extrabold);
 }
@@ -2517,9 +2517,9 @@ onMounted(() => {
 .my-card h2,
 .my-card__title h2 {
   color: var(--color-text-primary);
-  font-size: 16px;
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-extrabold);
-  line-height: 24px;
+  line-height: var(--line-height-body);
 }
 
 .my-card__title {
@@ -2578,8 +2578,8 @@ onMounted(() => {
 .my-product-tabs button span,
 .my-order-tabs button span {
   color: inherit;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
 }
 
 .my-order-tabs {
@@ -2636,25 +2636,25 @@ onMounted(() => {
 
 .my-product-card__main span {
   justify-self: start;
-  min-height: 24px;
+  min-height: var(--badge-height-compact);
   padding: 2px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-badge);
   margin-top: var(--space-4);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .my-product-card__main strong {
   overflow: hidden;
   margin-top: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-extrabold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2662,9 +2662,9 @@ onMounted(() => {
 .my-product-card__main p {
   margin-top: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-extrabold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
 }
 
 .my-product-empty {
@@ -2673,8 +2673,8 @@ onMounted(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
   text-align: center;
 }
 
@@ -2699,13 +2699,13 @@ onMounted(() => {
 .my-social-card__avatar {
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  width: var(--button-height-tall);
+  height: var(--button-height-tall);
   overflow: hidden;
   border-radius: 50%;
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-extrabold);
 }
 
@@ -2724,9 +2724,9 @@ onMounted(() => {
 .my-social-card__body strong {
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-extrabold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2735,8 +2735,8 @@ onMounted(() => {
   display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }

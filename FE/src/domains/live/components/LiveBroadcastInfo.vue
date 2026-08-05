@@ -91,20 +91,20 @@ const productCountLabel = computed(() => `${props.live.products.length}개`)
 
 .live-broadcast-info__header h2 {
   color: var(--color-live-text-primary);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
 }
 
 .live-broadcast-info__status {
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
+  min-height: var(--badge-height-xs);
   padding: 0 8px;
   border-radius: var(--radius-badge);
   background: var(--color-live-surface-raised);
   color: var(--color-live-text-secondary);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-bold);
 }
 
 .live-broadcast-info__status--live {
@@ -114,8 +114,8 @@ const productCountLabel = computed(() => `${props.live.products.length}개`)
 
 .live-broadcast-info__description {
   color: var(--color-live-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
 }
 
 .live-broadcast-info__meta {
@@ -132,13 +132,13 @@ const productCountLabel = computed(() => `${props.live.products.length}개`)
 
 .live-broadcast-info__meta dt {
   color: var(--color-live-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 .live-broadcast-info__meta dd {
   color: var(--color-live-text-primary);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
 }
 
@@ -151,12 +151,12 @@ const productCountLabel = computed(() => `${props.live.products.length}개`)
 .live-broadcast-info__categories span {
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
+  min-height: var(--badge-height-xs);
   padding: 0 8px;
   border: 1px solid var(--color-live-border);
   border-radius: var(--radius-badge);
   color: var(--color-live-text-secondary);
-  font-size: 10px;
-  font-weight: 600;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-semibold);
 }
 </style>

@@ -79,15 +79,15 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 }
 
 .signup-entry-header__title {
-  font-size: 32px;
-  font-weight: 700;
-  line-height: 44px;
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-4xl);
 }
 
 .signup-entry-header__description {
   margin-top: var(--space-3);
-  font-size: 15px;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 .signup-entry-actions {
@@ -105,14 +105,14 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
   height: var(--button-height-major);
   padding: 0 var(--space-5);
   border-radius: var(--radius-control);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    color var(--transition-base),
+    transform var(--transition-base);
 }
 
 .signup-entry-primary-link {
@@ -139,8 +139,8 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 .signup-entry-secondary-link:focus-visible,
 .signup-entry-header__logo-link:focus-visible,
 .signup-entry-footer__link:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 3px;
+  outline: var(--focus-ring-width) solid var(--color-primary);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .signup-entry-primary-link:active,
@@ -151,14 +151,14 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 .signup-entry-footer {
   margin-top: var(--space-6);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
   text-align: center;
 }
 
 .signup-entry-footer__link {
   color: var(--color-primary);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 @media (max-width: 560px) {
@@ -171,8 +171,8 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
   }
 
   .signup-entry-header__title {
-    font-size: 28px;
-    line-height: 38px;
+    font-size: var(--font-size-3xl);
+    line-height: var(--line-height-3xl);
   }
 }
 </style>

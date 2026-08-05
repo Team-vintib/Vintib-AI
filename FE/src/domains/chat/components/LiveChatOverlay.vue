@@ -420,7 +420,7 @@ function getRealtimeErrorMessage(body: unknown) {
 <style scoped lang="scss">
 .live-chat-overlay {
   position: absolute;
-  z-index: 1;
+  z-index: var(--z-layer-1);
   inset: 0;
   pointer-events: none;
 }
@@ -437,13 +437,13 @@ function getRealtimeErrorMessage(body: unknown) {
 
 .live-chat-overlay__reactions button {
   width: 24px;
-  height: 26px;
+  height: var(--badge-height-sm);
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--color-live-text-primary);
-  font-size: 18px;
-  line-height: 26px;
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-lg);
   transition:
     background-color 150ms ease,
     opacity 150ms ease,
@@ -468,7 +468,7 @@ function getRealtimeErrorMessage(body: unknown) {
 .live-chat-overlay__reactions button:focus-visible,
 .live-chat-overlay__composer button:focus-visible,
 .live-chat-overlay__composer input:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--color-primary-strong);
   outline-offset: 2px;
 }
 
@@ -484,7 +484,7 @@ function getRealtimeErrorMessage(body: unknown) {
 .live-chat-overlay__reaction-burst span {
   position: absolute;
   bottom: 0;
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   line-height: 28px;
   opacity: 0;
   filter: drop-shadow(0 5px 7px rgba(0, 0, 0, 0.45));
@@ -498,7 +498,7 @@ function getRealtimeErrorMessage(body: unknown) {
   left: 20px;
   width: 340px;
   padding: 14px;
-  border: 1px solid rgba(242, 240, 237, 0.1);
+  border: 1px solid var(--overlay-hairline);
   border-radius: var(--radius-control);
   background: rgba(8, 8, 8, 0.68);
   backdrop-filter: blur(12px);
@@ -511,7 +511,7 @@ function getRealtimeErrorMessage(body: unknown) {
   overflow-y: auto;
   padding: 0 6px 0 0;
   list-style: none;
-  scrollbar-color: rgba(242, 240, 237, 0.28) transparent;
+  scrollbar-color: var(--overlay-scrollbar) transparent;
   scrollbar-width: thin;
 }
 
@@ -520,7 +520,7 @@ function getRealtimeErrorMessage(body: unknown) {
 }
 
 .live-chat-overlay__messages::-webkit-scrollbar-thumb {
-  background: rgba(242, 240, 237, 0.28);
+  background: var(--overlay-scrollbar);
 }
 
 .live-chat-overlay__messages li {
@@ -537,8 +537,8 @@ function getRealtimeErrorMessage(body: unknown) {
   flex: 0 0 auto;
   color: var(--color-live-text-secondary);
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.06em;
   line-height: 1.5;
   text-transform: uppercase;
@@ -550,8 +550,8 @@ function getRealtimeErrorMessage(body: unknown) {
 
 .live-chat-overlay__message {
   color: #d8d4d0;
-  font-size: 12px;
-  font-weight: 300;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-light);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -559,8 +559,8 @@ function getRealtimeErrorMessage(body: unknown) {
 .live-chat-overlay__error {
   margin: 0 0 6px;
   color: var(--color-accent);
-  font-size: 11px;
-  line-height: 15px;
+  font-size: var(--font-size-2xs);
+  line-height: var(--line-height-tight);
 }
 
 .live-chat-overlay__composer {
@@ -569,7 +569,7 @@ function getRealtimeErrorMessage(body: unknown) {
   box-sizing: border-box;
   align-items: center;
   padding: 4px 0 0;
-  border-top: 1px solid rgba(242, 240, 237, 0.1);
+  border-top: 1px solid var(--overlay-hairline);
   gap: 6px;
 }
 
@@ -580,9 +580,9 @@ function getRealtimeErrorMessage(body: unknown) {
   outline: 0;
   background: transparent;
   color: var(--color-live-text-primary);
-  font-size: 12px;
-  font-weight: 300;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-snug);
   flex: 1;
 }
 
@@ -594,7 +594,7 @@ function getRealtimeErrorMessage(body: unknown) {
   display: grid;
   flex: 0 0 auto;
   width: 26px;
-  height: 26px;
+  height: var(--badge-height-sm);
   padding: 0;
   border: 0;
   background: transparent;
@@ -609,8 +609,8 @@ function getRealtimeErrorMessage(body: unknown) {
 }
 
 .live-chat-overlay__composer svg {
-  width: 15px;
-  height: 15px;
+  width: var(--icon-size-xs);
+  height: var(--icon-size-xs);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -635,7 +635,7 @@ function getRealtimeErrorMessage(body: unknown) {
     bottom: auto;
     left: 15px;
     width: 180px;
-    height: 42px;
+    height: var(--button-height-tight);
   }
 
   .live-chat-overlay__reaction-burst span {

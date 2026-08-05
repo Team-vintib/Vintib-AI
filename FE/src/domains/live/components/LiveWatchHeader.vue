@@ -97,9 +97,9 @@ const audienceLabel = computed(() => {
 .live-watch-header {
   display: flex;
   position: relative;
-  z-index: 10;
+  z-index: var(--z-layer-header);
   align-items: center;
-  min-height: 56px;
+  min-height: var(--button-height-tall);
   padding: 0 var(--space-6);
   border-bottom: 1px solid var(--color-live-border);
   background: var(--color-live-background);
@@ -110,7 +110,7 @@ const audienceLabel = computed(() => {
   display: grid;
   flex: 0 0 auto;
   width: 36px;
-  height: 36px;
+  height: var(--button-height-small);
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
@@ -124,8 +124,8 @@ const audienceLabel = computed(() => {
 }
 
 .live-watch-header__back svg {
-  width: 20px;
-  height: 20px;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -137,14 +137,14 @@ const audienceLabel = computed(() => {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  min-height: 24px;
+  min-height: var(--space-6);
   padding: 0 9px;
   border-radius: var(--radius-badge);
   background: var(--color-live-surface-raised);
   color: var(--color-live-text-secondary);
   font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 500;
+  font-size: var(--font-size-3xs);
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.16em;
 }
 
@@ -155,10 +155,10 @@ const audienceLabel = computed(() => {
 }
 
 .live-watch-header__status--live span {
-  width: 4px;
-  height: 4px;
+  width: var(--space-1);
+  height: var(--space-1);
   background: currentColor;
-  animation: vtPulse 1.7s ease-in-out infinite;
+  animation: vtPulse var(--duration-pulse) ease-in-out infinite;
 }
 
 .live-watch-header__identity {
@@ -173,15 +173,15 @@ const audienceLabel = computed(() => {
   flex: 0 0 auto;
   align-self: center;
   width: 28px;
-  height: 28px;
+  height: var(--badge-height-md);
   overflow: hidden;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   background: var(--color-live-surface-raised);
   color: var(--color-live-text-primary);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .live-watch-header__avatar img {
@@ -193,9 +193,9 @@ const audienceLabel = computed(() => {
 .live-watch-header__identity strong,
 .live-watch-header__identity h1 {
   overflow: hidden;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 22px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-relaxed);
   letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -228,15 +228,15 @@ const audienceLabel = computed(() => {
   gap: 6px;
   color: var(--color-live-text-secondary);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .live-watch-header__meta-item svg {
-  width: 15px;
-  height: 15px;
+  width: var(--icon-size-xs);
+  height: var(--icon-size-xs);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -247,17 +247,17 @@ const audienceLabel = computed(() => {
 .live-watch-header__follow {
   flex: 0 0 auto;
   min-width: 70px;
-  min-height: 34px;
+  min-height: var(--button-height-2xs);
   padding: 0 var(--space-4);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-live-text-primary);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
   transition:
-    border-color 160ms ease,
-    color 160ms ease;
+    border-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .live-watch-header__follow:hover {

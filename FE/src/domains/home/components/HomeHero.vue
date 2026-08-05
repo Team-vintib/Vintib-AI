@@ -53,7 +53,7 @@ defineProps<{
 
 .home-hero__content {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-layer-1);
   display: grid;
   max-width: 780px;
   gap: var(--space-4);
@@ -62,16 +62,16 @@ defineProps<{
 
 .home-hero__eyebrow {
   color: var(--color-text-inverse);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-control);
 }
 
 .home-hero__title {
   color: var(--color-text-inverse);
-  font-size: 34px;
-  font-weight: 800;
-  line-height: 44px;
+  font-size: var(--font-size-hero-display);
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-4xl);
 }
 
 .home-hero__nowrap {
@@ -80,7 +80,7 @@ defineProps<{
 
 .home-hero__description {
   color: var(--color-live-text-secondary);
-  font-size: 16px;
+  font-size: var(--font-size-md);
   line-height: 26px;
 }
 
@@ -100,13 +100,13 @@ defineProps<{
   }
 
   .home-hero__title {
-    font-size: 28px;
-    line-height: 38px;
+    font-size: var(--font-size-3xl);
+    line-height: var(--line-height-3xl);
   }
 
   .home-hero__description {
-    font-size: 15px;
-    line-height: 24px;
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
   }
 }
 

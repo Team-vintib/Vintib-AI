@@ -145,12 +145,12 @@
 }
 
 .product-detail-skeleton__actions span {
-  height: 44px;
+  height: var(--button-height-compact);
   border-radius: var(--radius-control);
 }
 
 .product-detail-skeleton__purchase {
-  height: 52px;
+  height: var(--button-height-major);
   border-radius: var(--radius-control);
 }
 

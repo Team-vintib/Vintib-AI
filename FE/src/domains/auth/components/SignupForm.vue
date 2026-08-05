@@ -653,7 +653,7 @@ const applyDuplicateEmailError = (message?: string) => {
 
     <button
       v-if="duplicateEmail"
-      class="h-11 w-full rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
+      class="h-11 w-full rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-5 text-[var(--font-size-body)] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
       type="button"
       :disabled="isSubmitting"
       @click="handleMoveToLogin"
@@ -687,7 +687,7 @@ const applyDuplicateEmailError = (message?: string) => {
         <p
           v-if="errors.name"
           id="signup-name-error"
-          class="text-[13px] leading-5 text-[var(--color-error)]"
+          class="text-[var(--font-size-caption)] leading-5 text-[var(--color-error)]"
         >
           {{ errors.name }}
         </p>
@@ -751,7 +751,7 @@ const applyDuplicateEmailError = (message?: string) => {
         </div>
         <p
           id="signup-password-message"
-          class="text-[13px] leading-5"
+          class="text-[var(--font-size-caption)] leading-5"
           :class="errors.password ? 'text-[var(--color-error)]' : 'text-[var(--color-text-muted)]'"
         >
           {{ errors.password || '8~20자, 영문과 숫자를 포함해 입력해주세요.' }}
@@ -785,7 +785,7 @@ const applyDuplicateEmailError = (message?: string) => {
         <p
           v-if="errors.passwordConfirm"
           id="signup-password-confirm-error"
-          class="text-[13px] leading-5 text-[var(--color-error)]"
+          class="text-[var(--font-size-caption)] leading-5 text-[var(--color-error)]"
         >
           {{ errors.passwordConfirm }}
         </p>
@@ -842,7 +842,7 @@ const applyDuplicateEmailError = (message?: string) => {
       <p
         v-if="agreementError"
         id="agreement-error"
-        class="mt-3 text-[13px] leading-5 text-[var(--color-error)]"
+        class="mt-3 text-[var(--font-size-caption)] leading-5 text-[var(--color-error)]"
       >
         {{ agreementError }}
       </p>
@@ -850,7 +850,7 @@ const applyDuplicateEmailError = (message?: string) => {
 
     <section class="space-y-3" aria-label="회원가입 실행">
       <button
-        class="h-[var(--button-height-major)] w-full rounded-[var(--radius-control)] px-5 text-[15px] font-semibold transition focus:outline-none"
+        class="h-[var(--button-height-major)] w-full rounded-[var(--radius-control)] px-5 text-[var(--font-size-body)] font-semibold transition focus:outline-none"
         :class="
           !isSubmitting
             ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)] hover:bg-[var(--color-primary-hover)]'
@@ -863,7 +863,7 @@ const applyDuplicateEmailError = (message?: string) => {
       </button>
 
       <button
-        class="h-12 w-full rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
+        class="h-12 w-full rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-5 text-[var(--font-size-body)] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
         type="button"
         :disabled="isSubmitting"
         @click="handleSsafySignUp"
@@ -920,7 +920,7 @@ input:not([type='checkbox']) {
 }
 
 #signup-password {
-  padding-right: 80px;
+  padding-right: var(--space-20);
 }
 
 section[aria-labelledby='agreement-title'] {
