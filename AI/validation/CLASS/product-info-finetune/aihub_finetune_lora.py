@@ -221,7 +221,8 @@ def main(argv: list[str] | None = None) -> int:
                 "겹치는 파라미터만 로드되고 나머지는 새로 초기화된 채로 남는다",
                 file=sys.stderr,
             )
-        model.load_state_dict(checkpoint["backbone_state_dict"], strict=False)
+        compatible_state = base.drop_incompatible_keys(checkpoint["backbone_state_dict"], model)
+        model.load_state_dict(compatible_state, strict=False)
         print(f"backbone 웜스타트: {args.init_checkpoint} (task={checkpoint.get('task')})")
 
     if args.freeze_backbone:

@@ -89,6 +89,33 @@ def next_versioned_dir(path: Path) -> Path:
         version += 1
 
 
+def drop_incompatible_keys(checkpoint_state_dict: dict, model: Any) -> dict:
+    """`--init-checkpoint`의 state_dict 중 현재 모델에 없거나 **shape가 다른** 키를 걸러낸다.
+
+    `model.load_state_dict(..., strict=False)`는 아예 없는(missing/unexpected) 키는
+    조용히 넘어가지만, **같은 키인데 shape만 다른 경우는 봐주지 않고 그대로 RuntimeError를
+    던진다**(실측: `--r`을 체크포인트와 다르게 줬을 때 LoRA A/B 행렬 크기가 안 맞아 터짐,
+    2026-08-05). 그래서 shape까지 직접 비교해 안 맞는 건 미리 빼고 넘긴다 — 하이퍼파라미터가
+    체크포인트와 다르면 겹치는 파라미터만 조용히 로드되고 나머지는 새로 초기화된 채로
+    남는다(문서에 이미 그렇게 적어뒀던 동작을 실제로 보장한다).
+    """
+    model_state = model.state_dict()
+    compatible: dict = {}
+    skipped: list[str] = []
+    for key, value in checkpoint_state_dict.items():
+        if key in model_state and model_state[key].shape == value.shape:
+            compatible[key] = value
+        else:
+            skipped.append(key)
+    if skipped:
+        print(
+            f"⚠ shape/이름이 안 맞아 건너뛴 파라미터 {len(skipped)}개"
+            f"(예: {skipped[:3]}) — 하이퍼파라미터가 체크포인트와 다른 것 같다",
+            file=sys.stderr,
+        )
+    return compatible
+
+
 def pixel_split_tag(split: str, variant: str) -> str:
     """`aihub_cache_pixels.pixel_tag(split, variant)`와 같은 규칙(소스 필터 없이 캐시했다고
     가정 — STEP 3.5 셀이 그렇게 돈다). 두 모듈이 따로 규칙을 들고 있으면 언젠가 어긋나므로
@@ -370,7 +397,8 @@ def main(argv: list[str] | None = None) -> int:
                 "로드되고 나머지는 새로 초기화된 채로 남는다",
                 file=sys.stderr,
             )
-        model.load_state_dict(checkpoint["backbone_state_dict"], strict=False)
+        compatible_state = drop_incompatible_keys(checkpoint["backbone_state_dict"], model)
+        model.load_state_dict(compatible_state, strict=False)
         print(f"backbone 웜스타트: {args.init_checkpoint} (task={checkpoint.get('task')})")
 
     if args.freeze_backbone:

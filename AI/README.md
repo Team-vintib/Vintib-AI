@@ -14,6 +14,33 @@
 - 라이브 자막용 STT 연동 (LIVE-06)
 - 개인화 상품 추천 / 브랜드 유사도 그래프 (REC)
 
+## 상품 등록 AI 파이프라인
+
+판매자가 상품명을 쓰고 사진을 등록하면, 두 브랜치가 병렬로 돈다 — 가벼운 분류 브랜치가 폼을
+먼저 채우고, 무거운 품질검수 브랜치는 비동기로 뒤따라온다(`.claude/plans/ai/CH012-~2.MD`).
+
+```
+[사진 업로드]
+      │
+      ├─ 브랜치A: FashionCLIP(분류) → RAG(시세): 사용자가 확정한 정보 기반 - 마지막 섹션에 요청 전송
+      │
+      └─ 브랜치B: SAM3(세그먼트) → Qwen-VL(요약 생성) → JSON(bbox+텍스트)
+```
+
+화면 흐름: 판매자 상품명 작성 및 상품 사진 등록 → 상품 정보 분류 후 수정 가능하게 제공(카테고리
+선택) → 하자 검수(하자 bbox 이미지 제공 / 상품 설명에 넘버링 리스트로 하자별 한줄요약) → 시세
+조회 후 가격 책정 페이지에 그래프로 제공(x축 가격 범주, y축 상품 컨디션).
+
+| 단계 | 모델 | 상태 |
+| --- | --- | --- |
+| 1. 상품 분류(카테고리·색상) | FashionCLIP 파인튜닝 — 카테고리: last-N=4 언프리즈, 색상: LoRA r16(카테고리 체크포인트에서 warm-start). 두 축이 독립적으로 스왑 가능해 별도 모델 2개로 배포한다 | 검증 완료(`AI/validation/CLASS/`), `worker/models/product_classifier/registry.py`엔 아직 `mock`만 등록 — 실배포 전 real backend 등록 필요 |
+| 2. 품질 검수(하자 세그먼트+요약) | SAM3(`facebook/sam3`, Promptable Concept Segmentation)로 하자 마스크/bbox 추출 + Qwen3-VL-4B-Instruct(4bit 양자화)로 하자별 한줄 설명(sVLM) 생성 | `worker/models/sam3/registry.py`·`worker/models/quality_vlm/registry.py` 둘 다 `mock`이 기본값, real backend(`sam3_pcs`/`qwen3_vl`)는 등록돼 있으나 미활성 |
+| 3. 시세 조회 | 내부 데이터 RAG(임베딩 기반 유사 매물 검색)는 없다. Gemini(`gemini-3.5-flash`)를 GMS(SSAFY 공용 LLM 게이트웨이) 경유로 호출해 `google_search` 그라운딩으로 웹의 중고 매물을 검색·집계(`AI/app/pricing/`) | 운영 중(comps 커버리지 실측은 아직 제한적 — `gms.py` 주석 참고) |
+
+세 단계 모두 "유일한 모델 스왑 지점"으로 레지스트리 패턴(`*_BACKENDS` dict + `ACTIVE_*` 상수 +
+`*_config()` 조회 함수)을 공유한다 — 모델을 바꾸거나 mock→real로 전환할 때 코드 변경 없이
+이 레지스트리 값만 등록/전환하면 된다.
+
 ## 기술 스택
 
 - Python 3.12+, FastAPI 0.139.0, Uvicorn(standard), Pydantic v2 / pydantic-settings
