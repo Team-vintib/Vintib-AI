@@ -7,15 +7,18 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.stereotype.Component;
 
 // 카테고리/브랜드 마스터 시드(SY007). 마이그레이션 도구(Flyway 등) 없이, 카테고리 테이블이
 // 비어 있을 때만 실행해 재기동·재배포 시 중복 삽입을 막는다.
+// ProductSeeder(@Order(2))가 이 시드에 의존하므로 @Order(1)로 먼저 실행되게 한다.
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@Order(1)
 public class CategoryBrandSeeder implements ApplicationRunner {
 
     private final CategoryRepository categoryRepository;

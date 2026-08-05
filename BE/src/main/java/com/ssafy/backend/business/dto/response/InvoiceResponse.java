@@ -1,4 +1,4 @@
-package com.ssafy.backend.order.dto.response;
+package com.ssafy.backend.business.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;

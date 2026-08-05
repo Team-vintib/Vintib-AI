@@ -50,6 +50,26 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     }
 
     /**
+     * 상품 상세의 유사 상품 목록(PROD-006, 011). 같은 카테고리 상품 중 같은 브랜드를 우선 노출한다.
+     *
+     * <p>{@code brandId}가 null(비지정 상품)이면 브랜드 일치 조건이 아무 행과도 매칭되지 않아
+     * 전부 후순위로 취급되고, 결과적으로 최신순 정렬만 적용된다 — SQL의 {@code NULL = NULL}이
+     * false인 동작을 그대로 이용한다.
+     */
+    @Query("""
+            SELECT p FROM Product p
+            WHERE p.categoryId = :categoryId
+              AND p.id <> :excludeProductId
+              AND p.saleStatus <> 'DRAFT'
+            ORDER BY CASE WHEN p.brandId = :brandId THEN 0 ELSE 1 END, p.createdAt DESC
+            """)
+    List<Product> findSimilarProducts(
+            @Param("categoryId") Long categoryId,
+            @Param("excludeProductId") Long excludeProductId,
+            @Param("brandId") Long brandId,
+            Pageable pageable);
+
+    /**
      * 선택적 필터·정렬을 지원하는 상품 목록 조회 (PROD-008).
      *
      * <p>각 boolean 플래그가 false 이면 대응하는 WHERE 절을 건너뛴다
