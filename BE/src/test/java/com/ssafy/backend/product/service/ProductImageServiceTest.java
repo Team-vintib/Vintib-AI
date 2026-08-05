@@ -214,4 +214,30 @@ class ProductImageServiceTest {
                 SELLER_ID, PRODUCT_ID, 5L, new ProductImageUpdateRequest((short) 1, null)))
                 .isInstanceOf(CustomException.class);
     }
+
+    @Test
+    void 여러_상품의_대표_이미지_URL을_배치로_조회한다() {
+        when(imageProduct.getId()).thenReturn(PRODUCT_ID);
+        ProductImage primaryImage = ProductImage.builder()
+                .product(imageProduct)
+                .imageKey("product-images/1/a.jpg")
+                .sortOrder((short) 0)
+                .primary(true)
+                .build();
+        when(productImageRepository.findByProduct_IdInAndPrimaryTrue(java.util.List.of(PRODUCT_ID)))
+                .thenReturn(java.util.List.of(primaryImage));
+        when(s3StorageService.publicUrl(PUBLIC_BUCKET, "product-images/1/a.jpg"))
+                .thenReturn("https://s3.example/product-images/1/a.jpg");
+
+        java.util.Map<Long, String> result = productImageService.getPrimaryImageUrls(java.util.List.of(PRODUCT_ID));
+
+        assertThat(result).containsEntry(PRODUCT_ID, "https://s3.example/product-images/1/a.jpg");
+    }
+
+    @Test
+    void 상품_ID_목록이_비어있으면_배치_조회_없이_빈_맵을_반환한다() {
+        java.util.Map<Long, String> result = productImageService.getPrimaryImageUrls(java.util.List.of());
+
+        assertThat(result).isEmpty();
+    }
 }

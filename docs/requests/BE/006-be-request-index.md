@@ -38,18 +38,15 @@
 | 003 | `003-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 필드(필수+선택 전부: brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId/hostProfileImageUrl/description/material/measurements/defectSummary) 연결 완료 | AI 시착 생성만 남음(서윤/AI 파트) |
 | 004 | `004-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API, 예약 라이브 알림 신청/스케줄러, `LIVE_STARTED`/`AUCTION_OUTBID`/`AUCTION_WON` 알림 생성 연동 완료 | 알림 생성 이벤트 4종(주문/배송/포인트)은 서윤 확인 필요. unread count API, 탭별 bulk read API |
 | 008 | `008-user-tryon-image-contract.md` | TryOn | — | 서윤/AI 파트 |
-| 009 | `009-product-list-primary-image.md` | Product | 미반영 | `GET /api/products` 응답에 대표 이미지 URL 없음 — FE가 상세를 추가 호출 중 |
-| 011 | `011-product-similar-price-distribution.md` | Product | 미반영 | 상품 상세에 유사 상품 목록(`id`/`title`/`price`) 없음 |
-| 012 | `012-product-ai-tryon-registration-fields.md` | Product | 미반영 | `aiModelEnabled`/`aiModelGender` 필드가 `ProductCreateRequest`에 없음 |
 | 019 | `019-product-quality-multi-image.md` | Product | 미반영 | 서윤 파트 |
 | 020 | `020-tryon-result-category.md` | TryOn | 미반영 | 서윤/AI 파트 |
-| 021 | `021-live-thumbnail-upload.md` | Live | **반영 완료** | 없음 — `POST /api/users/{id}/lives/thumbnail/upload-url`. 계약은 `FE/029`. 다음 정리 때 삭제 |
 | 022 | `022-product-list-sold-exclusion.md` | Product | 미확인 | 서윤 파트 |
 | 023 | `023-product-similar-list.md` | Product | 미확인 | 서윤 파트 |
-| 024 | `024-live-created-at.md` | Live | **미확인 — 정윤 확인 필요** | 다음 배치에서 코드 대조 |
 | 025 | `025-product-same-price-chart.md` | Product | 미확인 | 서윤 파트 |
-| 026 | `026-live-list-latest-sort.md` | Live | **미확인 — 정윤 확인 필요** | 다음 배치에서 코드 대조 |
-| 026 | `026-toss-client-key-widget-type.md` | Point | 미확인 | 서윤 파트. ⚠️ **번호가 위와 중복이다** — 다음에 손대는 사람이 하나를 027로 옮길 것 |
+| 026 | `026-toss-client-key-widget-type.md` | Point | 미확인 | 서윤 파트 |
+
+**정윤(라이브·경매·채팅·홈·검색) 담당 요청은 전부 반영돼 이 표에 남은 것이 없다.** 위 목록은
+모두 서윤·AI 파트다.
 
 ## 4. 기존 API 변경 요청
 
@@ -153,6 +150,29 @@
 **`021`~`026`은 Phase 8 머지 때 함께 들어온 것을 뒤늦게 표에 채웠다.** 그중 `024`(라이브 생성
 시각)·`026`(라이브 목록 최신순)은 정윤 도메인인데 아직 코드와 대조하지 못했다 — 다음 배치에서
 확인한다. `026` 번호가 둘 있으니 손대는 김에 하나를 `027`로 옮기는 편이 좋다.
+
+## 2026-08-05 라이브 잔여 요청 정리
+
+정윤 담당 요청을 전부 코드와 대조해 처리했다. 삭제한 문서는 넷이다.
+
+- `021-live-thumbnail-upload.md` — 프리사인드 업로드 API 구현 완료. 계약은 `FE/029`
+- `024-live-created-at.md` — 라이브 상세·목록 응답에 `createdAt` 추가
+- `026-live-list-latest-sort.md` — `sort=LATEST` 를 `createdAt` 내림차순으로 변경
+- `027-auction-close-phase8.md` — Phase 8(경매 마감·낙찰·유찰)이 이미 반영됐다. 계약은 `FE/030`
+
+`026` 번호 중복도 이것으로 해소됐다(라이브 쪽이 삭제돼 토스 건만 남는다).
+
+이번 배치에서 시청자 수 집계 기준도 **회원 ID 기준으로 바꿨다** — 재연결·멀티탭이 여러 명으로
+잡히던 문제다. 계약은 `FE/032`.
+
+## 2026-08-04 정리 (상품 응답 필드 보강)
+
+- `009-product-list-primary-image.md`(목록 대표 이미지), `011-product-similar-price-distribution.md`
+  (유사 상품 목록), `012-product-ai-tryon-registration-fields.md`(AI 착용컷 필드) 전부 반영 완료돼
+  삭제했다 — 위 표에서도 뺐다. 계획은 `docs/plans/BE/SY038-product-enrichment.md` 참고.
+- `010-product-category-optional.md`(categoryId 선택 입력 전환)는 **반영하지 않기로 결정**하고
+  삭제했다 — AI가 카테고리를 자동 판별해 채워주고 사용자가 필요시 수정하는 흐름이라 실질적으로
+  미분류 상태가 생기지 않는다. `categoryId` `@NotNull`은 그대로 유지한다.
 
 ## 2026-08-04 라이브 이슈 4건 정리
 

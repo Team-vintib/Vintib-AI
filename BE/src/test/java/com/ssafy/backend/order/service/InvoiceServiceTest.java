@@ -11,7 +11,7 @@ import com.ssafy.backend.business.repository.BusinessInfoRepository;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.entity.Member;
-import com.ssafy.backend.order.dto.response.InvoiceResponse;
+import com.ssafy.backend.business.dto.response.InvoiceResponse;
 import com.ssafy.backend.order.entity.Invoice;
 import com.ssafy.backend.order.entity.Order;
 import com.ssafy.backend.order.repository.InvoiceRepository;

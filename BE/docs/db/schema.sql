@@ -142,6 +142,8 @@ CREATE TABLE product (
     sale_status     VARCHAR(30)  NOT NULL DEFAULT 'DRAFT',
     price           BIGINT,                          -- 상시 판매가. 경매 예정 상품은 NULL
     view_count      INTEGER      NOT NULL DEFAULT 0,
+    ai_model_enabled BOOLEAN     NOT NULL DEFAULT FALSE, -- 마네킹 사진 기반 AI 착용컷 사용 여부(PROD-001)
+    ai_model_gender VARCHAR(10),                     -- MALE|FEMALE. ai_model_enabled=true면 필수
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     deleted_at      TIMESTAMPTZ,
@@ -158,6 +160,9 @@ CREATE TABLE product (
     -- sale_type 과 price 갱신 순서를 애플리케이션이 자유롭게 잡을 수 있어야 한다.
     CONSTRAINT ck_product_price_by_type CHECK (
         sale_type <> 'DIRECT_SALE' OR price IS NOT NULL
+    ),
+    CONSTRAINT ck_product_ai_model_gender CHECK (
+        ai_model_enabled = FALSE OR ai_model_gender IS NOT NULL
     )
 );
 

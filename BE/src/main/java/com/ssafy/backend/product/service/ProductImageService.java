@@ -13,9 +13,11 @@ import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductImage;
 import com.ssafy.backend.product.repository.ProductImageRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -113,6 +115,23 @@ public class ProductImageService {
 
         s3StorageService.delete(awsProperties.s3().publicBucket(), image.getImageKey());
         productImageRepository.delete(image);
+    }
+
+    /**
+     * 여러 상품의 대표 이미지 URL을 한 번에 가져온다(목록 응답용, N+1 방지).
+     *
+     * <p>대표 이미지가 없는 상품은 반환되는 Map에 키 자체가 없다 — 호출부에서 {@code get()}이
+     * {@code null}이면 대표 이미지 없음으로 처리한다.
+     */
+    public Map<Long, String> getPrimaryImageUrls(Collection<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return Map.of();
+        }
+        String bucket = awsProperties.s3().publicBucket();
+        return productImageRepository.findByProduct_IdInAndPrimaryTrue(productIds).stream()
+                .collect(Collectors.toMap(
+                        image -> image.getProduct().getId(),
+                        image -> s3StorageService.publicUrl(bucket, image.getImageKey())));
     }
 
     public List<ProductImageResponse> getImages(Long productId) {

@@ -1,7 +1,7 @@
-package com.ssafy.backend.order.controller;
+package com.ssafy.backend.business.controller;
 
 import com.ssafy.backend.global.response.ApiResponse;
-import com.ssafy.backend.order.dto.response.InvoiceResponse;
+import com.ssafy.backend.business.dto.response.InvoiceResponse;
 import com.ssafy.backend.order.service.InvoiceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 // 경로에 {userId}가 없어 requireSelf 패턴 대신 서비스 내부에서 Order.isPartyOf(principal)로
 // 권한을 확인한다(구매자/판매자 둘 다 호출 가능).
-@Tag(name = "사업자(Businesses)", description = "사업자 인증 정보 제출/조회 API")
+@Tag(name = "사업자(Businesses)", description = "사업자 인증 정보 제출/조회, 세금계산서 발행/조회 API")
 @RestController
 @RequestMapping("/api/orders/{orderId}/invoices")
 @RequiredArgsConstructor

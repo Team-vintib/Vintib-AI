@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 // 관리자 승인/거절, 정보 수정(MY-008)은 범위 밖 — 제출/조회/재제출까지만 다룬다.
 // 사업자등록증 업로드는 상품 이미지·시착 프로필과 동일한 presigned 2단계를 쓴다.
-@Tag(name = "사업자(Businesses)", description = "사업자 인증 정보 제출/조회 API")
+@Tag(name = "사업자(Businesses)", description = "사업자 인증 정보 제출/조회, 세금계산서 발행/조회 API")
 @RestController
 @RequestMapping("/api/users/{userId}/business")
 @RequiredArgsConstructor
