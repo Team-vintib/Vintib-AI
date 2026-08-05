@@ -271,7 +271,9 @@ body {
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-light);
   line-height: var(--line-height-body);
+  overflow-wrap: anywhere;
   text-rendering: optimizeLegibility;
+  word-break: keep-all;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

@@ -1270,12 +1270,7 @@ onBeforeUnmount(() => {
 
 <template>
   <DefaultLayout content-max-width="1280px">
-    <section class="product-registration" aria-labelledby="product-registration-title">
-      <header class="product-registration__header">
-        <h1 id="product-registration-title">상품 등록</h1>
-        <p>사진과 상품 정보를 단계별로 입력해 판매 상품을 등록합니다.</p>
-      </header>
-
+    <section class="product-registration" aria-label="상품 등록">
       <nav class="product-registration__steps" aria-label="상품 등록 단계">
         <ol>
           <li
@@ -1287,7 +1282,7 @@ onBeforeUnmount(() => {
             }"
             :aria-current="index === currentStepIndex ? 'step' : undefined"
           >
-            <span>{{ index + 1 }}</span>
+            <span>{{ index < currentStepIndex ? '✓' : index + 1 }}</span>
             <strong>{{ step.label }}</strong>
           </li>
         </ol>
@@ -2479,26 +2474,6 @@ onBeforeUnmount(() => {
   padding-bottom: var(--space-16);
 }
 
-.product-registration__header {
-  display: grid;
-  gap: var(--space-2);
-  padding-top: var(--space-6);
-}
-
-.product-registration__header h1 {
-  color: var(--color-text-primary);
-  font-family: var(--font-display);
-  font-size: 40px;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.035em;
-  line-height: 1.08;
-}
-
-.product-registration__header p {
-  color: var(--color-text-secondary);
-  font-weight: var(--font-weight-light);
-}
-
 .product-registration__steps ol {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2512,46 +2487,47 @@ onBeforeUnmount(() => {
   flex-direction: column;
   min-width: 0;
   gap: var(--space-2);
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   text-align: center;
 }
 
 .product-registration__steps li:not(:last-child)::after {
   position: absolute;
-  top: 15px;
-  left: calc(50% + 22px);
-  width: calc(100% - 44px);
+  top: 17px;
+  left: calc(50% + 24px);
+  width: calc(100% - 48px);
   height: 2px;
-  background: var(--color-border-strong);
+  background: var(--color-border);
   content: '';
 }
 
 .product-registration__step--complete:not(:last-child)::after {
-  background: var(--color-live);
+  background: var(--color-primary);
 }
 
 .product-registration__steps span {
   position: relative;
   z-index: var(--z-layer-1);
   display: grid;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-badge);
   background: var(--color-surface);
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   flex: 0 0 auto;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
   place-items: center;
 }
 
 .product-registration__steps strong {
-  overflow: hidden;
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: var(--line-height-snug);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .product-registration__step--current {
@@ -2560,14 +2536,13 @@ onBeforeUnmount(() => {
 
 .product-registration__step--current span,
 .product-registration__step--complete span {
-  border-color: var(--color-live);
-  background: var(--color-live);
+  border-color: var(--color-primary);
+  background: var(--color-primary);
   color: var(--color-text-inverse);
 }
 
-.product-registration__step--current strong,
-.product-registration__step--complete strong {
-  color: var(--color-text-primary);
+.product-registration__step--current strong {
+  color: var(--color-primary);
 }
 
 .product-registration__body {
@@ -3605,7 +3580,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 960px) {
-  .product-registration__steps ol,
   .product-registration__body {
     grid-template-columns: 1fr;
   }

@@ -47,12 +47,7 @@ onMounted(loadResults)
 
 <template>
   <DefaultLayout>
-    <div class="tryon-page">
-      <header class="tryon-page__header">
-        <h1>AI 시착</h1>
-        <p>등록한 전신 사진에 찜한 옷을 입어보고, 저장된 시착 결과를 카테고리별로 확인하세요.</p>
-      </header>
-
+    <section class="tryon-page" aria-label="AI 시착">
       <TryOnComposer @generated="handleGenerated" />
 
       <TryOnResultGallery
@@ -61,7 +56,7 @@ onMounted(loadResults)
         @delete="handleDelete"
         @retry="loadResults"
       />
-    </div>
+    </section>
   </DefaultLayout>
 </template>
 
@@ -70,23 +65,4 @@ onMounted(loadResults)
   padding-bottom: var(--space-10);
 }
 
-.tryon-page__header {
-  margin-bottom: var(--space-8);
-}
-
-.tryon-page__header h1 {
-  color: var(--color-text-primary);
-  font-family: var(--font-display);
-  font-size: 44px;
-  font-weight: 600;
-  letter-spacing: -0.04em;
-  line-height: 1;
-}
-
-.tryon-page__header p {
-  margin-top: var(--space-3);
-  color: var(--color-text-secondary);
-  font-weight: 300;
-  line-height: 24px;
-}
 </style>
