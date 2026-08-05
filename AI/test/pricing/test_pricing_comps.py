@@ -1,4 +1,4 @@
-"""comps 수집 — 파싱·쿼리 조립·mock 결정성 검증.
+﻿"""comps 수집 — 파싱·쿼리 조립·mock 결정성 검증.
 
 **네트워크에 절대 닿지 않는다.** LLM 백엔드도 키가 없을 때 fetch 전에 끊기는 것만 확인한다
 (`AI/CLAUDE.md` 하드 룰: GMS 호출은 사람이 직접 실행한다).
@@ -8,6 +8,7 @@ import pytest
 
 from app.pricing.comps import (
     CompsUnavailable,
+    InternalClipCompsSource,
     LlmWebSearchCompsSource,
     MockCompsSource,
     _extract_json_array,
@@ -151,6 +152,74 @@ def test_non_boolean_is_used_becomes_none():
 def test_boolean_is_used_is_preserved():
     items = _rows_to_items([{"price": 100, "is_used": False}], "llm")
     assert items[0].is_used is False
+
+
+# --- internal_clip 백엔드 (CH020, torch/실제 코퍼스 미접촉 — monkeypatch로 격리) --------
+
+
+def test_internal_clip_without_image_url_reports_no_image():
+    result = InternalClipCompsSource().fetch("아무 쿼리")
+    assert result.items == []
+    assert result.reason == ReasonCode.no_image_provided
+
+
+def test_internal_clip_promotes_embed_failure_to_comps_unavailable(monkeypatch):
+    from app.pricing import clip_embed
+
+    def _explode(*args, **kwargs):
+        raise clip_embed.ClipEmbedNotReady("체크포인트 없음")
+
+    monkeypatch.setattr(clip_embed, "embed_image_from_url", _explode)
+
+    with pytest.raises(CompsUnavailable, match="체크포인트 없음"):
+        InternalClipCompsSource().fetch("아무 쿼리", image_url="https://example.com/a.jpg")
+
+
+def test_internal_clip_promotes_missing_corpus_to_comps_unavailable(monkeypatch):
+    from app.pricing import clip_embed, internal_corpus
+
+    monkeypatch.setattr(clip_embed, "embed_image_from_url", lambda *a, **k: [0.1, 0.2])
+
+    def _explode(*args, **kwargs):
+        raise internal_corpus.CorpusNotReady("코퍼스 없음")
+
+    monkeypatch.setattr(internal_corpus, "get_corpus", _explode)
+
+    with pytest.raises(CompsUnavailable, match="코퍼스 없음"):
+        InternalClipCompsSource().fetch("아무 쿼리", image_url="https://example.com/a.jpg")
+
+
+def test_internal_clip_reports_insufficient_comps_when_no_matches(monkeypatch):
+    from app.pricing import clip_embed, internal_corpus
+
+    monkeypatch.setattr(clip_embed, "embed_image_from_url", lambda *a, **k: [0.1, 0.2])
+    monkeypatch.setattr(internal_corpus, "get_corpus", lambda *a, **k: object())
+    monkeypatch.setattr(internal_corpus, "query_similar", lambda *a, **k: [])
+
+    result = InternalClipCompsSource().fetch("아무 쿼리", image_url="https://example.com/a.jpg")
+
+    assert result.items == []
+    assert result.reason == ReasonCode.insufficient_comps
+
+
+def test_internal_clip_converts_matches_to_comp_items(monkeypatch):
+    from app.pricing import clip_embed, internal_corpus
+
+    monkeypatch.setattr(clip_embed, "embed_image_from_url", lambda *a, **k: [0.1, 0.2])
+    monkeypatch.setattr(internal_corpus, "get_corpus", lambda *a, **k: object())
+    match_item = internal_corpus.CorpusItem(
+        aihub_category="JACKET", synthetic_price=120_000, data_source="synthetic_aihub"
+    )
+    monkeypatch.setattr(internal_corpus, "query_similar", lambda *a, **k: [(match_item, 0.9)])
+
+    result = InternalClipCompsSource().fetch("아무 쿼리", image_url="https://example.com/a.jpg")
+
+    assert result.reason is None
+    assert len(result.items) == 1
+    assert result.items[0].price == 120_000
+    assert result.items[0].source == "internal_clip"
+    assert result.items[0].is_used is None
+    assert result.notes  # 합성 데이터라는 경고가 있어야 한다
 
 
 # --- LLM 백엔드 (네트워크 미접촉) ---------------------------------------------
