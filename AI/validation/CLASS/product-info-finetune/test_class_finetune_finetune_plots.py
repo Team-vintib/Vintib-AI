@@ -23,14 +23,26 @@ def test_method_of_falls_back_to_etc_for_unknown_prefix() -> None:
     assert fp.method_of("random_experiment_x") == "기타"
 
 
-def test_parse_baseline_splits_label_and_value() -> None:
-    assert fp.parse_baseline("선형 프로브 val=0.8058") == ("선형 프로브 val", 0.8058)
+def test_parse_baseline_without_task_prefix_applies_to_all() -> None:
+    """태스크 접두어가 없으면 (None, 라벨, 값) — 모든 태스크의 베스트-run 플랏에 그려진다."""
+    assert fp.parse_baseline("선형 프로브 val=0.8058") == (None, "선형 프로브 val", 0.8058)
+
+
+def test_parse_baseline_with_task_prefix_scopes_to_that_task() -> None:
+    """color/category는 val_accuracy 절대값이 비교 대상이 아니라서, 기준선도 태스크별로
+    분리해야 한다 — 그래서 접두어를 준 값은 그 태스크 플랏에만 그려져야 한다."""
+    assert fp.parse_baseline("category:선형 프로브 val=0.8058") == (
+        "category",
+        "선형 프로브 val",
+        0.8058,
+    )
+    assert fp.parse_baseline("color:zero-shot val=0.5951") == ("color", "zero-shot val", 0.5951)
 
 
 def test_parse_baseline_uses_rightmost_equals_when_label_has_one() -> None:
     """라벨 자체에 '='가 들어갈 일은 거의 없지만, rpartition이라 마지막 '='만 값 구분자로
     쓴다는 걸 고정해둔다."""
-    assert fp.parse_baseline("a=b val=0.5") == ("a=b val", 0.5)
+    assert fp.parse_baseline("a=b val=0.5") == (None, "a=b val", 0.5)
 
 
 def test_parse_baseline_rejects_missing_equals() -> None:
