@@ -201,7 +201,19 @@ public class Product extends BaseTimeEntity {
         return deletedAt != null;
     }
 
+    /**
+     * 상품 내용(제목·설명·사진 등)을 고칠 수 있는 상태인지.
+     *
+     * <p><b>{@code AUCTION_SCHEDULED}를 허용한다</b>(FE 요청 007) — 유찰된 상품은 이 상태로
+     * 돌아오는데, 판매자 입장에서 "안 팔렸으니 설명을 고쳐 다시 걸자"가 자연스러운 흐름이다.
+     * 막아 두면 상시 판매로 전환했다가 되돌리는 우회로를 강요하게 된다.
+     *
+     * <p><b>{@code AUCTION_IN_PROGRESS}는 계속 막는다.</b> 입찰이 붙는 도중에 상품 정보가 바뀌면
+     * 입찰자가 보고 판단한 것과 실제로 받는 물건이 달라진다. {@code SOLD}도 마찬가지로 막힌다.
+     */
     public boolean isEditable() {
-        return saleStatus == SaleStatus.DRAFT || saleStatus == SaleStatus.ON_SALE;
+        return saleStatus == SaleStatus.DRAFT
+                || saleStatus == SaleStatus.ON_SALE
+                || saleStatus == SaleStatus.AUCTION_SCHEDULED;
     }
 }
