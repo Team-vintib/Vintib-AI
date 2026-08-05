@@ -2,12 +2,12 @@
 import { computed, ref, watch } from 'vue'
 
 import HomeSection from '@/domains/home/components/HomeSection.vue'
-import ProductCard from '@/domains/home/components/ProductCard.vue'
-import type { HomeCategoryProductSection } from '@/domains/home/types/homeView.types'
+import ProductCard from '@/domains/product/components/ProductCard.vue'
+import type { ProductCategoryTabSection } from '@/domains/product/types/productList.types'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
 const props = defineProps<{
-  sections: HomeCategoryProductSection[]
+  sections: ProductCategoryTabSection[]
   wishedProductIds: Set<number>
 }>()
 
@@ -30,8 +30,6 @@ const activeSection = computed(
   () =>
     props.sections.find((section) => section.id === activeSectionId.value) ?? props.sections[0],
 )
-
-const getProductPath = (productId: number) => `/products/${productId}`
 </script>
 
 <template>
@@ -73,11 +71,8 @@ const getProductPath = (productId: number) => `/products/${productId}`
             v-for="product in activeSection.products"
             :key="product.id"
             :product="product"
-            :to="getProductPath(product.id)"
-            :badge-label="product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'"
-            :badge-variant="product.saleType === 'AUCTION' ? 'auction' : 'direct'"
-            :is-wished="wishedProductIds.has(product.id)"
-            @toggle-wish="emit('toggleWish', $event)"
+            :is-liked="wishedProductIds.has(product.id)"
+            @toggle-like="emit('toggleWish', $event)"
           />
         </template>
         <p v-else class="category-products__empty">

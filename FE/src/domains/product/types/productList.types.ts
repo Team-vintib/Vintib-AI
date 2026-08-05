@@ -47,3 +47,9 @@ export interface ProductSortItem {
   id: ProductSortOption
   label: string
 }
+
+export interface ProductCategoryTabSection {
+  id: string
+  title: string
+  products: ProductListItem[]
+}
