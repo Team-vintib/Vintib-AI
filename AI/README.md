@@ -35,7 +35,7 @@
 | --- | --- | --- |
 | 1. 상품 분류(카테고리·색상) | FashionCLIP 파인튜닝 — 카테고리: last-N=4 언프리즈, 색상: LoRA r16(카테고리 체크포인트에서 warm-start). 두 축이 독립적으로 스왑 가능해 별도 모델 2개로 배포한다 | 검증 완료(`AI/validation/CLASS/`), `worker/models/product_classifier/registry.py`엔 아직 `mock`만 등록 — 실배포 전 real backend 등록 필요 |
 | 2. 품질 검수(하자 세그먼트+요약) | SAM3(`facebook/sam3`, Promptable Concept Segmentation)로 하자 마스크/bbox 추출 + Qwen3-VL-4B-Instruct(4bit 양자화)로 하자별 한줄 설명(sVLM) 생성 | `worker/models/sam3/registry.py`·`worker/models/quality_vlm/registry.py` 둘 다 `mock`이 기본값, real backend(`sam3_pcs`/`qwen3_vl`)는 등록돼 있으나 미활성 |
-| 3. 시세 조회 | 내부 데이터 RAG(임베딩 기반 유사 매물 검색)는 없다. Gemini(`gemini-3.5-flash`)를 GMS(SSAFY 공용 LLM 게이트웨이) 경유로 호출해 `google_search` 그라운딩으로 웹의 중고 매물을 검색·집계(`AI/app/pricing/`) | 운영 중(comps 커버리지 실측은 아직 제한적 — `gms.py` 주석 참고) |
+| 3. 시세 조회 | 두 백엔드가 공존한다: (a) Gemini(`gemini-3.5-flash`)를 GMS 경유로 호출해 `google_search` 그라운딩으로 웹의 중고 매물을 검색·집계, (b) 내부 데이터 CLIP 이미지 유사도 검색(`internal_clip`, CH020) — 카테고리 파인튜닝 백본으로 AI-Hub 이미지 코퍼스에서 유사 상품을 찾는다(`AI/app/pricing/`) | 커밋 기본값은 `mock`(`AI/CLAUDE.md` 하드 룰). `internal_clip`은 이번 라운드엔 합성 코퍼스(AI-Hub 이미지+가상 가격)뿐이고 torch가 필요해 로컬 검증용 — EC2 배포는 큐+워커 재배선 후속 작업. `llm_web_search`는 comps 커버리지 실측이 아직 제한적(`gms.py` 주석 참고) |
 
 세 단계 모두 "유일한 모델 스왑 지점"으로 레지스트리 패턴(`*_BACKENDS` dict + `ACTIVE_*` 상수 +
 `*_config()` 조회 함수)을 공유한다 — 모델을 바꾸거나 mock→real로 전환할 때 코드 변경 없이
