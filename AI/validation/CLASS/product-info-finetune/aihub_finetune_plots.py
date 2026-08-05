@@ -63,9 +63,47 @@ def parse_baseline(spec: str) -> tuple[str, float]:
     return label, float(value)
 
 
+_KOREAN_FONT_CANDIDATES = (
+    "NanumGothic",
+    "NanumBarunGothic",
+    "Noto Sans CJK KR",
+    "Noto Sans KR",
+    "Malgun Gothic",
+    "AppleGothic",
+)
+
+
+def _configure_korean_font() -> None:
+    """제목·범례에 한글(방법 이름, `--baseline` 라벨)이 들어가는데, matplotlib 기본
+    폰트(DejaVu Sans)엔 한글 글리프가 없어 렌더링될 때마다 `Glyph ... missing` 경고가
+    쏟아진다. 설치된 한글 폰트를 찾아 자동으로 쓰고, 없으면 경고 한 줄만 남긴다
+    (그림 자체는 만들어지지만 한글 부분이 빈 네모로 나올 수 있다는 뜻)."""
+    import warnings
+
+    import matplotlib
+    from matplotlib import font_manager
+
+    available = {f.name for f in font_manager.fontManager.ttflist}
+    for name in _KOREAN_FONT_CANDIDATES:
+        if name in available:
+            matplotlib.rcParams["font.family"] = name
+            matplotlib.rcParams["axes.unicode_minus"] = False
+            return
+
+    print(
+        "⚠ 한글 폰트를 못 찾았다 — 플랏의 한글 라벨이 빈 네모로 보일 수 있다"
+        "(그림 자체엔 지장 없음). 서버에 `fonts-nanum` 등을 설치하면 해결된다.",
+        file=sys.stderr,
+    )
+    # 폰트가 없어도 경고를 계속 쏟아내진 않는다 — 위에서 한 번 알렸으니 충분하다.
+    warnings.filterwarnings("ignore", message="Glyph .* missing from font")
+
+
 def plot_per_method(runs: list[dict[str, Any]], out_dir: Path) -> list[Path]:
     """방법별로 1장씩 — 그 안의 run(하이퍼파라미터 조합)을 전부 겹쳐 그린다."""
     import matplotlib.pyplot as plt
+
+    _configure_korean_font()
 
     by_method: dict[str, list[dict[str, Any]]] = {}
     for run in runs:
@@ -101,6 +139,8 @@ def plot_best_per_method(
 ) -> Path:
     """방법별 최고 run(`best_val_accuracy` 기준)만 뽑아 한 플랏에서 비교한다."""
     import matplotlib.pyplot as plt
+
+    _configure_korean_font()
 
     best_per_method: dict[str, dict[str, Any]] = {}
     for run in runs:
