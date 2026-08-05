@@ -4,14 +4,13 @@ import { onMounted, ref } from 'vue'
 import {
   convertProductToDirectSale,
   getProductDetail,
-  scheduleProductAuction,
 } from '@/domains/product/api/productApi'
 import { normalizeApiError } from '@/shared/api/http'
 
-import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
+import type { LiveUnsoldProduct } from '@/domains/auction/types/liveAuction.types'
 
 const props = defineProps<{
-  product: LiveWatchProduct
+  product: LiveUnsoldProduct
 }>()
 
 const emit = defineEmits<{
@@ -27,15 +26,15 @@ const errorMessage = ref('')
 // 등록된 상품 정보 — GET /products/{id}로 채우고, 실패 시 라이브 상품 데이터로 대체.
 const infoLoading = ref(true)
 const imageUrl = ref<string | null>(props.product.thumbnailUrl)
-const brand = ref<string | null>(props.product.brandName)
-const conditionLabel = ref<string | null>(props.product.condition)
-const registeredPrice = ref<number | null>(props.product.price)
+const brand = ref<string | null>(null)
+const conditionLabel = ref<string | null>(null)
+const registeredPrice = ref<number | null>(props.product.startPrice)
 const priceInput = ref('')
 
 const loadDetail = async () => {
   infoLoading.value = true
   try {
-    const detail = await getProductDetail(props.product.id)
+    const detail = await getProductDetail(props.product.productId)
     imageUrl.value = detail.images[0]?.url ?? imageUrl.value
     brand.value = detail.brand || brand.value
     conditionLabel.value = detail.conditionLabel || conditionLabel.value
@@ -72,29 +71,21 @@ const confirmDirectSale = async () => {
   errorMessage.value = ''
 
   try {
-    await convertProductToDirectSale(props.product.id, price)
+    await convertProductToDirectSale(props.product.productId, price)
     doneLabel.value = `상시 판매 전환 · ${price.toLocaleString('ko-KR')}P`
     mode.value = 'done'
-    emit('handled', props.product.id)
+    emit('handled', props.product.productId)
   } catch (error) {
     errorMessage.value = normalizeApiError(error).message || '처리에 실패했습니다. 다시 시도해 주세요.'
     mode.value = 'direct-form'
   }
 }
 
-const chooseAuction = async () => {
-  mode.value = 'processing'
+const keepAuctionScheduled = () => {
   errorMessage.value = ''
-
-  try {
-    await scheduleProductAuction(props.product.id)
-    doneLabel.value = '경매 예정'
-    mode.value = 'done'
-    emit('handled', props.product.id)
-  } catch (error) {
-    errorMessage.value = normalizeApiError(error).message || '처리에 실패했습니다. 다시 시도해 주세요.'
-    mode.value = 'idle'
-  }
+  doneLabel.value = '경매 예정 유지'
+  mode.value = 'done'
+  emit('handled', props.product.productId)
 }
 </script>
 
@@ -123,10 +114,10 @@ const chooseAuction = async () => {
 
     <!-- 상시 판매 가격 입력 -->
     <div v-else-if="mode === 'direct-form'" class="unsold-item__direct">
-      <label :for="`unsold-price-${product.id}`">상시 판매 가격</label>
+      <label :for="`unsold-price-${product.productId}`">상시 판매 가격</label>
       <div class="unsold-item__price-row">
         <input
-          :id="`unsold-price-${product.id}`"
+          :id="`unsold-price-${product.productId}`"
           v-model="priceInput"
           type="number"
           inputmode="numeric"
@@ -158,9 +149,9 @@ const chooseAuction = async () => {
         type="button"
         class="unsold-item__choice unsold-item__choice--auction"
         :disabled="mode === 'processing'"
-        @click="chooseAuction"
+        @click="keepAuctionScheduled"
       >
-        경매 예정
+        경매 예정 유지
       </button>
     </div>
 

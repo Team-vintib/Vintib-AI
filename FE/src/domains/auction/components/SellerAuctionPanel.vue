@@ -1,16 +1,21 @@
-﻿<script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+<script setup lang="ts">
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
+import {
+  configureAuction,
+  getAuctionErrorMessage,
+  getCurrentAuction,
+  startAuction,
+} from '@/domains/auction/api/auctionApi'
 import {
   SELLER_AUCTION_DEFAULT_CONFIG,
   SELLER_AUCTION_DEFAULT_START_PRICE,
   SELLER_AUCTION_DURATION_PRESETS,
-  SELLER_AUCTION_DURATION_RANGE,
   SELLER_AUCTION_INCREMENT_PRESETS,
-} from '@/domains/auction/constants/sellerAuctionMockData'
-import { configureLiveAuction } from '@/domains/live/api/liveControlApi'
+  SELLER_AUCTION_MIN_DURATION_SECONDS,
+} from '@/domains/auction/constants/sellerAuctionOptions'
 
-import type { SellerAuctionPhase } from '@/domains/auction/types/sellerAuction.types'
+import type { AuctionSnapshot } from '@/domains/auction/types/liveAuction.types'
 import type {
   LiveWatchProduct,
   LiveWatchStatus,
@@ -20,31 +25,51 @@ const props = defineProps<{
   liveId: number
   product: LiveWatchProduct | null
   status: LiveWatchStatus
+  snapshot: AuctionSnapshot | null
+  isLoading: boolean
+  loadError: string
 }>()
 
-const phase = ref<SellerAuctionPhase>('IDLE')
+const emit = defineEmits<{
+  'snapshot-change': [snapshot: AuctionSnapshot]
+  'auction-closed': [snapshot: AuctionSnapshot]
+}>()
+
 const startPrice = ref(SELLER_AUCTION_DEFAULT_START_PRICE)
 const increment = ref(SELLER_AUCTION_DEFAULT_CONFIG.increment)
 const durationSeconds = ref(SELLER_AUCTION_DEFAULT_CONFIG.durationSeconds)
+const isStarting = ref(false)
+const actionError = ref('')
+const dismissedTerminalAuctionId = ref<number | null>(null)
+const lastEmittedClosedAuctionId = ref<number | null>(null)
+const clockNow = ref(Date.now())
+const snapshotReceivedAt = ref(Date.now())
+const remainingAtReceiptMs = ref(0)
 
-const currentBid = ref(0)
-const highestBidder = ref<string | null>(null)
-const remainingSeconds = ref(0)
-const bidderCount = ref(0)
-const isConfiguring = ref(false)
-const configError = ref('')
+const activeSnapshot = computed(() => {
+  const snapshot = props.snapshot
+
+  if (!snapshot || dismissedTerminalAuctionId.value === snapshot.auctionId) {
+    return null
+  }
+
+  if (snapshot.status === 'READY' || snapshot.status === 'RUNNING') {
+    return snapshot
+  }
+
+  return snapshot.productId === props.product?.id ? snapshot : null
+})
 
 const isDurationValid = computed(
   () =>
     Number.isFinite(durationSeconds.value) &&
-    durationSeconds.value >= SELLER_AUCTION_DURATION_RANGE.min &&
-    durationSeconds.value <= SELLER_AUCTION_DURATION_RANGE.max,
+    durationSeconds.value >= SELLER_AUCTION_MIN_DURATION_SECONDS,
 )
 
 const isConfigValid = computed(
   () =>
     Number.isFinite(startPrice.value) &&
-    startPrice.value > 0 &&
+    startPrice.value >= 0 &&
     Number.isFinite(increment.value) &&
     increment.value > 0 &&
     isDurationValid.value,
@@ -55,14 +80,22 @@ const canStart = computed(
     props.product !== null &&
     props.status === 'LIVE' &&
     isConfigValid.value &&
-    !isConfiguring.value,
+    !isStarting.value &&
+    activeSnapshot.value?.status !== 'RUNNING',
 )
 
-const formattedRemaining = computed(() => {
-  const total = Math.max(0, remainingSeconds.value)
-  const minutes = Math.floor(total / 60)
-  const seconds = total % 60
+const remainingSeconds = computed(() => {
+  if (activeSnapshot.value?.status !== 'RUNNING' || !activeSnapshot.value.endsAt) {
+    return 0
+  }
 
+  const elapsed = clockNow.value - snapshotReceivedAt.value
+  return Math.max(0, Math.ceil((remainingAtReceiptMs.value - elapsed) / 1000))
+})
+
+const formattedRemaining = computed(() => {
+  const minutes = Math.floor(remainingSeconds.value / 60)
+  const seconds = remainingSeconds.value % 60
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 })
 
@@ -72,111 +105,202 @@ const durationLabel = computed(() => {
 
   if (minutes > 0 && seconds === 0) return `${minutes}분`
   if (minutes > 0) return `${minutes}분 ${seconds}초`
-
   return `${seconds}초`
 })
 
+const phaseLabel = computed(() => {
+  if (activeSnapshot.value?.status === 'RUNNING') return '진행 중'
+  if (activeSnapshot.value?.status === 'READY') return '시작 대기'
+  if (activeSnapshot.value?.status === 'SUCCESS') return '낙찰'
+  if (activeSnapshot.value?.status === 'FAILED') return '유찰'
+  return '설정'
+})
+
 const applyDurationPreset = (seconds: number) => {
-  configError.value = ''
+  actionError.value = ''
   durationSeconds.value = seconds
 }
 
 const applyIncrementPreset = (value: number) => {
-  configError.value = ''
+  actionError.value = ''
   increment.value = value
 }
 
-const resetToIdle = () => {
-  phase.value = 'IDLE'
-  currentBid.value = 0
-  highestBidder.value = null
-  remainingSeconds.value = 0
-  bidderCount.value = 0
-  isConfiguring.value = false
-  configError.value = ''
-  startPrice.value = props.product?.price ?? SELLER_AUCTION_DEFAULT_START_PRICE
-}
-
-const startAuction = async () => {
+const runAuctionStart = async () => {
   if (!canStart.value || !props.product) return
 
-  isConfiguring.value = true
-  configError.value = ''
+  isStarting.value = true
+  actionError.value = ''
 
   try {
-    await configureLiveAuction(props.liveId, {
-      productId: props.product.id,
-      startPrice: startPrice.value,
-      bidUnit: increment.value,
-      durationSeconds: durationSeconds.value,
-    })
+    const auctionId =
+      activeSnapshot.value?.status === 'READY'
+        ? activeSnapshot.value.auctionId
+        : (
+            await configureAuction(props.liveId, {
+              productId: props.product.id,
+              startPrice: startPrice.value,
+              bidUnit: increment.value,
+              durationSeconds: durationSeconds.value,
+            })
+          ).id
+    const snapshot = await startAuction(auctionId)
+    emit('snapshot-change', snapshot)
   } catch (error) {
-    configError.value =
-      error instanceof Error ? error.message : '경매 조건을 저장하지 못했습니다.'
-    return
+    actionError.value = getAuctionErrorMessage(error)
+    const latestSnapshot = await getCurrentAuction(props.liveId).catch(() => null)
+    if (latestSnapshot) {
+      emit('snapshot-change', latestSnapshot)
+    }
   } finally {
-    isConfiguring.value = false
+    isStarting.value = false
   }
-
-  currentBid.value = startPrice.value
-  highestBidder.value = null
-  bidderCount.value = 0
-  remainingSeconds.value = durationSeconds.value
-  phase.value = 'RUNNING'
-
 }
 
-// PROD-005 판매 방식 선택은 별도 구현 전까지 안내만 표시한다.
-const relistPlaceholderNotice = ref(false)
-const openRelistFlow = () => {
-  relistPlaceholderNotice.value = true
+const prepareNextAuction = () => {
+  dismissedTerminalAuctionId.value = activeSnapshot.value?.auctionId ?? null
+  actionError.value = ''
 }
 
 watch(
   () => props.product?.id,
   () => {
-    resetToIdle()
+    actionError.value = ''
+    dismissedTerminalAuctionId.value = null
+    startPrice.value = props.product?.price ?? SELLER_AUCTION_DEFAULT_START_PRICE
   },
   { immediate: true },
 )
 
-// 방송이 종료/취소되면 진행 중인 경매도 정리한다.
 watch(
-  () => props.status,
-  (status) => {
-    if (status !== 'LIVE' && phase.value === 'RUNNING') {
-      resetToIdle()
+  () => props.snapshot,
+  (snapshot) => {
+    snapshotReceivedAt.value = Date.now()
+    remainingAtReceiptMs.value =
+      snapshot?.endsAt && snapshot.serverNow
+        ? Math.max(0, new Date(snapshot.endsAt).getTime() - new Date(snapshot.serverNow).getTime())
+        : 0
+
+    if (
+      snapshot &&
+      (snapshot.status === 'SUCCESS' || snapshot.status === 'FAILED') &&
+      lastEmittedClosedAuctionId.value !== snapshot.auctionId
+    ) {
+      lastEmittedClosedAuctionId.value = snapshot.auctionId
+      emit('auction-closed', snapshot)
     }
   },
+  { immediate: true },
 )
 
+const clockTimer = window.setInterval(() => {
+  clockNow.value = Date.now()
+}, 250)
+
+onBeforeUnmount(() => {
+  window.clearInterval(clockTimer)
+})
 </script>
 
 <template>
   <section class="seller-auction" aria-labelledby="seller-auction-title">
     <div class="seller-auction__header">
       <h2 id="seller-auction-title">경매 설정</h2>
-      <span
-        class="seller-auction__phase"
-        :class="`seller-auction__phase--${phase.toLowerCase()}`"
-      >
-        {{
-          phase === 'RUNNING'
-            ? '진행 중'
-            : phase === 'ENDED_WON'
-              ? '낙찰'
-              : phase === 'ENDED_FAILED'
-                ? '미낙찰'
-                : '설정'
-        }}
+      <span class="seller-auction__phase" :class="`seller-auction__phase--${activeSnapshot?.status.toLowerCase() || 'idle'}`">
+        {{ phaseLabel }}
       </span>
     </div>
 
-    <p v-if="!product" class="seller-auction__empty">
+    <p v-if="isLoading" class="seller-auction__empty" role="status">
+      경매 정보를 불러오는 중입니다.
+    </p>
+    <p v-else-if="loadError" class="seller-auction__hint seller-auction__hint--error" role="alert">
+      {{ loadError }}
+    </p>
+    <p v-else-if="!product" class="seller-auction__empty">
       경매를 진행할 상품을 선택해 주세요.
     </p>
 
-    <template v-else-if="phase === 'IDLE'">
+    <template v-else-if="activeSnapshot?.status === 'RUNNING'">
+      <p class="seller-auction__target">
+        <span>진행 상품</span>
+        <strong>{{ activeSnapshot.productTitle || product.title }}</strong>
+      </p>
+
+      <div class="seller-auction__metrics">
+        <div class="seller-auction__metric seller-auction__metric--current">
+          <span>현재가</span>
+          <strong>
+            {{
+              activeSnapshot.currentPrice > 0
+                ? `${activeSnapshot.currentPrice.toLocaleString('ko-KR')}P`
+                : '입찰 전'
+            }}
+          </strong>
+        </div>
+        <div class="seller-auction__metric">
+          <span>남은 시간</span>
+          <strong :class="{ 'seller-auction__timer--urgent': remainingSeconds <= 10 }">
+            {{ formattedRemaining }}
+          </strong>
+        </div>
+        <div class="seller-auction__metric">
+          <span>최고 입찰자</span>
+          <strong>{{ activeSnapshot.highestBidderNickname ?? '입찰 대기 중' }}</strong>
+        </div>
+        <div class="seller-auction__metric">
+          <span>입찰 수</span>
+          <strong>{{ activeSnapshot.bidCount.toLocaleString('ko-KR') }}회</strong>
+        </div>
+      </div>
+
+      <p v-if="activeSnapshot.extensionCount > 0" class="seller-auction__extend">
+        종료 직전 입찰로 {{ activeSnapshot.extensionCount }}회 자동 연장됐습니다.
+      </p>
+      <p v-else-if="remainingSeconds === 0" class="seller-auction__hint">
+        서버의 경매 마감 결과를 기다리고 있습니다.
+      </p>
+    </template>
+
+    <template v-else-if="activeSnapshot?.status === 'READY'">
+      <p class="seller-auction__target">
+        <span>설정 완료 상품</span>
+        <strong>{{ activeSnapshot.productTitle || product.title }}</strong>
+      </p>
+      <dl class="seller-auction__ready">
+        <div><dt>시작가</dt><dd>{{ activeSnapshot.startPrice.toLocaleString('ko-KR') }}P</dd></div>
+        <div><dt>입찰 단위</dt><dd>{{ activeSnapshot.bidUnit.toLocaleString('ko-KR') }}P</dd></div>
+        <div><dt>진행 시간</dt><dd>{{ activeSnapshot.durationSeconds }}초</dd></div>
+      </dl>
+      <button class="seller-auction__start" type="button" :disabled="!canStart" @click="runAuctionStart">
+        {{ isStarting ? '경매 시작 중' : '설정된 경매 시작' }}
+      </button>
+    </template>
+
+    <template v-else-if="activeSnapshot?.status === 'SUCCESS'">
+      <div class="seller-auction__result seller-auction__result--won">
+        <strong>낙찰되었습니다.</strong>
+        <dl>
+          <div><dt>낙찰자</dt><dd>{{ activeSnapshot.highestBidderNickname }}</dd></div>
+          <div><dt>낙찰가</dt><dd>{{ activeSnapshot.currentPrice.toLocaleString('ko-KR') }}P</dd></div>
+        </dl>
+      </div>
+      <button class="seller-auction__relist" type="button" @click="prepareNextAuction">
+        다음 경매 설정
+      </button>
+    </template>
+
+    <template v-else-if="activeSnapshot?.status === 'FAILED'">
+      <div class="seller-auction__result seller-auction__result--failed">
+        <strong>유찰되었습니다.</strong>
+        <p>상품은 경매 예정 상태로 돌아갔습니다.</p>
+      </div>
+      <button class="seller-auction__relist" type="button" @click="prepareNextAuction">
+        다시 경매 설정
+      </button>
+    </template>
+
+    <template v-else>
       <p class="seller-auction__target">
         <span>대상 상품</span>
         <strong>{{ product.title }}</strong>
@@ -185,14 +309,7 @@ watch(
       <div class="seller-auction__field">
         <label for="seller-auction-start-price">시작가</label>
         <div class="seller-auction__input">
-          <input
-            id="seller-auction-start-price"
-            v-model.number="startPrice"
-            type="number"
-            min="0"
-            step="1000"
-            inputmode="numeric"
-          />
+          <input id="seller-auction-start-price" v-model.number="startPrice" type="number" min="0" step="1000" inputmode="numeric" />
           <span>P</span>
         </div>
       </div>
@@ -211,14 +328,7 @@ watch(
           </button>
         </div>
         <div class="seller-auction__input">
-          <input
-            v-model.number="increment"
-            type="number"
-            min="0"
-            step="1000"
-            inputmode="numeric"
-            aria-label="입찰 단위 직접 입력"
-          />
+          <input v-model.number="increment" type="number" min="1" step="1000" inputmode="numeric" aria-label="입찰 단위 직접 입력" />
           <span>P</span>
         </div>
       </div>
@@ -237,99 +347,24 @@ watch(
           </button>
         </div>
         <div class="seller-auction__input">
-          <input
-            v-model.number="durationSeconds"
-            type="number"
-            :min="SELLER_AUCTION_DURATION_RANGE.min"
-            :max="SELLER_AUCTION_DURATION_RANGE.max"
-            step="10"
-            inputmode="numeric"
-            aria-label="진행 시간 직접 입력(초)"
-          />
+          <input v-model.number="durationSeconds" type="number" :min="SELLER_AUCTION_MIN_DURATION_SECONDS" step="10" inputmode="numeric" aria-label="진행 시간 직접 입력(초)" />
           <span>초</span>
         </div>
         <p v-if="!isDurationValid" class="seller-auction__hint seller-auction__hint--error">
-          {{ SELLER_AUCTION_DURATION_RANGE.min }}~{{ SELLER_AUCTION_DURATION_RANGE.max }}초 사이로
-          입력해 주세요.
+          1초 이상의 진행 시간을 입력해 주세요.
         </p>
         <p v-else class="seller-auction__hint">{{ durationLabel }} 동안 진행합니다.</p>
       </div>
 
-      <button
-        class="seller-auction__start"
-        type="button"
-        :disabled="!canStart"
-        @click="startAuction"
-      >
-        {{ isConfiguring ? '경매 설정 중' : '경매 시작' }}
+      <button class="seller-auction__start" type="button" :disabled="!canStart" @click="runAuctionStart">
+        {{ isStarting ? '경매 시작 중' : '경매 시작' }}
       </button>
-      <p v-if="configError" class="seller-auction__hint seller-auction__hint--error">
-        {{ configError }}
-      </p>
-      <p v-if="status !== 'LIVE'" class="seller-auction__hint">
-        방송 중일 때 경매를 시작할 수 있습니다.
-      </p>
+      <p v-if="status !== 'LIVE'" class="seller-auction__hint">방송 중일 때 경매를 시작할 수 있습니다.</p>
     </template>
 
-    <template v-else-if="phase === 'RUNNING'">
-      <p class="seller-auction__target">
-        <span>진행 상품</span>
-        <strong>{{ product.title }}</strong>
-      </p>
-
-      <div class="seller-auction__metrics">
-        <div class="seller-auction__metric seller-auction__metric--current">
-          <span>현재가</span>
-          <strong>{{ currentBid.toLocaleString('ko-KR') }}P</strong>
-        </div>
-        <div class="seller-auction__metric">
-          <span>남은 시간</span>
-          <strong :class="{ 'seller-auction__timer--urgent': remainingSeconds <= 30 }">
-            {{ formattedRemaining }}
-          </strong>
-        </div>
-        <div class="seller-auction__metric">
-          <span>최고 입찰자</span>
-          <strong>{{ highestBidder ?? '입찰 대기 중' }}</strong>
-        </div>
-        <div class="seller-auction__metric">
-          <span>입찰 수</span>
-          <strong>{{ bidderCount.toLocaleString('ko-KR') }}회</strong>
-        </div>
-      </div>
-
-      <p class="seller-auction__hint">입찰 진행 상태는 실제 경매 API 연결 후 표시됩니다.</p>
-    </template>
-
-    <template v-else-if="phase === 'ENDED_WON'">
-      <div class="seller-auction__result seller-auction__result--won">
-        <strong>낙찰되었습니다.</strong>
-        <dl>
-          <div>
-            <dt>낙찰자</dt>
-            <dd>{{ highestBidder }}</dd>
-          </div>
-          <div>
-            <dt>낙찰가</dt>
-            <dd>{{ currentBid.toLocaleString('ko-KR') }}P</dd>
-          </div>
-        </dl>
-      </div>
-    </template>
-
-    <template v-else>
-      <div class="seller-auction__result seller-auction__result--failed">
-        <strong>미낙찰</strong>
-        <p>입찰자가 없어 상품이 판매 관리 목록으로 돌아갑니다.</p>
-      </div>
-      <button class="seller-auction__relist" type="button" @click="openRelistFlow">
-        판매 방식 선택
-        <span class="seller-auction__soon">준비 중</span>
-      </button>
-      <p v-if="relistPlaceholderNotice" class="seller-auction__hint">
-        판매 방식 선택(PROD-005)은 이후 연결됩니다.
-      </p>
-    </template>
+    <p v-if="actionError" class="seller-auction__hint seller-auction__hint--error" role="alert">
+      {{ actionError }}
+    </p>
   </section>
 </template>
 
@@ -344,7 +379,9 @@ watch(
   background: var(--color-live-surface);
 }
 
-.seller-auction__header {
+.seller-auction__header,
+.seller-auction__ready div,
+.seller-auction__result dl div {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -373,12 +410,13 @@ watch(
   color: var(--color-primary-strong);
 }
 
-.seller-auction__phase--ended_won {
+.seller-auction__phase--success {
   background: var(--color-live);
   color: var(--color-text-inverse);
 }
 
-.seller-auction__empty {
+.seller-auction__empty,
+.seller-auction__hint {
   color: var(--color-live-text-secondary);
   font-size: var(--font-size-xs);
   line-height: var(--line-height-snug);
@@ -392,7 +430,12 @@ watch(
   border-bottom: 1px solid var(--color-live-border);
 }
 
-.seller-auction__target span {
+.seller-auction__target span,
+.seller-auction__field > label,
+.seller-auction__label,
+.seller-auction__metric span,
+.seller-auction__ready dt,
+.seller-auction__result dt {
   color: var(--color-live-text-secondary);
   font-size: var(--font-size-badge);
 }
@@ -412,13 +455,6 @@ watch(
   gap: 6px;
 }
 
-.seller-auction__field > label,
-.seller-auction__label {
-  color: var(--color-live-text-secondary);
-  font-size: var(--font-size-2xs);
-  font-weight: var(--font-weight-semibold);
-}
-
 .seller-auction__presets {
   display: flex;
   gap: 6px;
@@ -433,10 +469,6 @@ watch(
   color: var(--color-live-text-secondary);
   font-size: var(--font-size-2xs);
   font-weight: var(--font-weight-semibold);
-}
-
-.seller-auction__presets button:hover {
-  color: var(--color-live-text-primary);
 }
 
 .seller-auction__preset--active {
@@ -459,15 +491,12 @@ watch(
   width: 100%;
   height: var(--button-height-2xs);
   border: 0;
+  outline: 0;
   background: transparent;
   color: var(--color-live-text-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
-}
-
-.seller-auction__input input:focus {
-  outline: none;
 }
 
 .seller-auction__input span {
@@ -475,35 +504,23 @@ watch(
   font-size: var(--font-size-xs);
 }
 
-.seller-auction__hint {
-  color: var(--color-live-text-secondary);
-  font-size: var(--font-size-badge);
-  line-height: var(--line-height-tight);
-}
-
 .seller-auction__hint--error {
   color: var(--color-error);
 }
 
-.seller-auction__start {
+.seller-auction__start,
+.seller-auction__relist {
   min-height: var(--button-height-compact);
-  margin-top: var(--space-1);
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--color-auction);
-  box-shadow: none;
   color: var(--color-primary-strong);
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
-.seller-auction__start:hover:not(:disabled) {
-  background: var(--color-auction);
-}
-
 .seller-auction__start:disabled {
   background: var(--color-live-surface-raised);
-  box-shadow: none;
   color: var(--color-live-text-secondary);
 }
 
@@ -513,22 +530,14 @@ watch(
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.seller-auction__metric {
-  min-width: 0;
-}
-
-.seller-auction__metric span {
-  display: block;
-  color: var(--color-live-text-secondary);
-  font-size: var(--font-size-badge);
-}
-
-.seller-auction__metric strong {
+.seller-auction__metric strong,
+.seller-auction__ready dd,
+.seller-auction__result dd {
   display: block;
   margin-top: 1px;
   overflow: hidden;
   color: var(--color-live-text-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
@@ -555,6 +564,12 @@ watch(
   text-align: center;
 }
 
+.seller-auction__ready,
+.seller-auction__result dl {
+  display: grid;
+  gap: 6px;
+}
+
 .seller-auction__result {
   display: flex;
   flex-direction: column;
@@ -571,67 +586,24 @@ watch(
   background: var(--color-live-surface-raised);
 }
 
-.seller-auction__result strong {
+.seller-auction__result > strong {
   color: var(--color-live-text-primary);
   font-size: var(--font-size-body);
-  font-weight: var(--font-weight-extrabold);
 }
 
 .seller-auction__result p {
   color: var(--color-live-text-secondary);
   font-size: var(--font-size-xs);
-  line-height: var(--line-height-snug);
-}
-
-.seller-auction__result dl {
-  display: grid;
-  gap: 4px;
-}
-
-.seller-auction__result dl div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.seller-auction__result dt {
-  color: var(--color-live-text-secondary);
-  font-size: var(--font-size-2xs);
-}
-
-.seller-auction__result dd {
-  color: var(--color-live-text-primary);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-bold);
-  font-variant-numeric: tabular-nums;
 }
 
 .seller-auction__relist {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--button-height-sm);
-  gap: 6px;
   border: 1px solid var(--color-live-border);
-  border-radius: var(--radius-control);
   background: var(--color-live-background);
   color: var(--color-live-text-primary);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-bold);
 }
 
-.seller-auction__soon {
-  padding: 1px 6px;
-  border-radius: var(--radius-badge);
-  background: var(--color-live-surface-raised);
-  color: var(--color-live-text-secondary);
-  font-size: var(--font-size-3xs);
-  font-weight: var(--font-weight-bold);
-}
-
-.seller-auction__start:focus-visible,
-.seller-auction__relist:focus-visible,
-.seller-auction__presets button:focus-visible {
+.seller-auction button:focus-visible,
+.seller-auction input:focus-visible {
   outline: 2px solid var(--color-ai);
   outline-offset: 2px;
 }

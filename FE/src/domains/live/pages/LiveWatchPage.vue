@@ -2,8 +2,12 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { LIVE_AUCTION_MOCK_STATES } from '@/domains/auction/constants/liveAuctionMockData'
+import {
+  getCurrentAuction,
+  isAuctionEventMessage,
+} from '@/domains/auction/api/auctionApi'
 import LiveAuctionPanel from '@/domains/auction/components/LiveAuctionPanel.vue'
+import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import { issueLiveVideoToken } from '@/domains/live/api/liveControlApi'
@@ -34,7 +38,7 @@ import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import LiveLayout from '@/shared/layouts/LiveLayout.vue'
 
-import type { LiveAuctionMockState } from '@/domains/auction/types/liveAuction.types'
+import type { AuctionSnapshot } from '@/domains/auction/types/liveAuction.types'
 import type {
   CurrentProductMessage,
   LiveStatusMessage,
@@ -74,6 +78,10 @@ const wishMessage = ref('')
 const isTryOnOpen = ref(false)
 const now = ref(Date.now())
 const videoConnectionLabel = ref('')
+const auctionSnapshot = ref<AuctionSnapshot | null>(null)
+const isAuctionLoading = ref(false)
+const auctionLoadError = ref('')
+const dismissedAuctionResultId = ref<number | null>(null)
 const apiEnabled = isLiveWatchApiEnabled()
 
 const loadHostFollowState = async (hostId: number) => {
@@ -142,6 +150,7 @@ const handleToggleReminder = async () => {
 let loadRequestId = 0
 let statusSubscription: ReturnType<LiveRealtimeClient['subscribe']> | null = null
 let currentProductSubscription: ReturnType<LiveRealtimeClient['subscribe']> | null = null
+let auctionSubscription: ReturnType<LiveRealtimeClient['subscribe']> | null = null
 
 const getRouteLiveId = () => {
   const routeValue = Array.isArray(route.params.liveId) ? route.params.liveId[0] : route.params.liveId
@@ -157,16 +166,6 @@ const getMockScenario = (): LiveWatchMockScenario => {
     ? (queryValue as LiveWatchMockScenario)
     : 'default'
 }
-
-const auctionMockState = computed<LiveAuctionMockState>(() => {
-  const queryValue = Array.isArray(route.query.auction)
-    ? route.query.auction[0]
-    : route.query.auction
-
-  return LIVE_AUCTION_MOCK_STATES.includes(queryValue as LiveAuctionMockState)
-    ? (queryValue as LiveAuctionMockState)
-    : 'BIDDABLE'
-})
 
 const tryOnMockScenario = computed<LiveTryOnMockScenario>(() => {
   const queryValue = Array.isArray(route.query.tryon)
@@ -191,6 +190,24 @@ const isSelectedProductWished = computed(
     selectedProductId.value !== null &&
     wishStore.isProductWished(selectedProductId.value),
 )
+
+const auctionWin = computed(() => {
+  const snapshot = auctionSnapshot.value
+
+  if (
+    dismissedAuctionResultId.value === snapshot?.auctionId ||
+    snapshot?.status !== 'SUCCESS' ||
+    !snapshot.highestBidderNickname
+  ) {
+    return null
+  }
+
+  return {
+    winnerNickname: snapshot.highestBidderNickname,
+    winningBid: snapshot.currentPrice,
+    productTitle: snapshot.productTitle,
+  }
+})
 
 const elapsedSeconds = computed(() => {
   if (!live.value?.startedAt) return 0
@@ -228,6 +245,9 @@ const loadLiveWatch = async () => {
   loadState.value = 'loading'
   errorMessage.value = ''
   videoConnectionLabel.value = ''
+  auctionSnapshot.value = null
+  auctionLoadError.value = ''
+  dismissedAuctionResultId.value = null
 
   if (liveId === null) {
     loadState.value = 'not-found'
@@ -257,6 +277,7 @@ const loadLiveWatch = async () => {
     loadState.value = 'success'
     void loadHostFollowState(response.hostId)
     void loadProductWishState(response.products.map((product) => product.id))
+    void loadAuction(response.id)
 
     if (response.status === 'LIVE') {
       void loadVideoToken(response.id)
@@ -277,6 +298,45 @@ const loadLiveWatch = async () => {
         : apiError.message
     loadState.value = 'error'
   }
+}
+
+const loadAuction = async (liveId: number) => {
+  if (!apiEnabled) {
+    auctionSnapshot.value = null
+    isAuctionLoading.value = false
+    auctionLoadError.value = ''
+    return
+  }
+
+  isAuctionLoading.value = true
+  auctionLoadError.value = ''
+
+  try {
+    const snapshot = await getCurrentAuction(liveId)
+    if (live.value?.id === liveId) {
+      auctionSnapshot.value = snapshot
+    }
+  } catch (error) {
+    if (live.value?.id === liveId) {
+      auctionSnapshot.value = null
+      auctionLoadError.value =
+        error instanceof Error ? error.message : '경매 정보를 불러오지 못했습니다.'
+    }
+  } finally {
+    if (live.value?.id === liveId) {
+      isAuctionLoading.value = false
+    }
+  }
+}
+
+const applyAuctionSnapshot = (snapshot: AuctionSnapshot | null) => {
+  auctionSnapshot.value = snapshot
+  auctionLoadError.value = ''
+
+}
+
+const closeAuctionResult = () => {
+  dismissedAuctionResultId.value = auctionSnapshot.value?.auctionId ?? null
 }
 
 const goBack = () => {
@@ -394,13 +454,21 @@ const handleRealtimeReady = (client: LiveRealtimeClient) => {
       applyCurrentProductMessage(body)
     }
   })
+
+  auctionSubscription = client.subscribe(`/topic/lives/${liveId}/auctions`, (body) => {
+    if (isAuctionEventMessage(body) && body.auction.liveId === liveId) {
+      applyAuctionSnapshot(body.auction)
+    }
+  })
 }
 
 const clearRealtimeSubscriptions = () => {
   statusSubscription?.unsubscribe()
   currentProductSubscription?.unsubscribe()
+  auctionSubscription?.unsubscribe()
   statusSubscription = null
   currentProductSubscription = null
+  auctionSubscription = null
 }
 
 // ENDED·CANCELED면 status만 갱신해 기존 종료 상태 UI(헤더 배지·영상 안내)로 전환한다.
@@ -560,6 +628,14 @@ onBeforeUnmount(() => {
               :mock-scenario="tryOnMockScenario"
               @close="isTryOnOpen = false"
             />
+
+            <LiveAuctionResultOverlay
+              v-if="auctionWin"
+              :winner-nickname="auctionWin.winnerNickname"
+              :winning-bid="auctionWin.winningBid"
+              :product-title="auctionWin.productTitle"
+              @close="closeAuctionResult"
+            />
           </div>
 
           <div class="live-watch-page__details">
@@ -572,9 +648,11 @@ onBeforeUnmount(() => {
               @toggle-wish="toggleWish"
             />
             <LiveAuctionPanel
-              :product="selectedProduct"
-              :status="live.status"
-              :mock-state="auctionMockState"
+              :snapshot="auctionSnapshot"
+              :live-status="live.status"
+              :is-loading="isAuctionLoading"
+              :load-error="auctionLoadError"
+              @snapshot-change="applyAuctionSnapshot"
             />
           </div>
         </main>
