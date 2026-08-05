@@ -51,10 +51,10 @@ const label = computed(() => {
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    opacity 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base),
+    opacity var(--transition-base);
 }
 
 .follow-button:hover:not(:disabled) {

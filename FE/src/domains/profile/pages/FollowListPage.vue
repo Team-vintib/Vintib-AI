@@ -291,14 +291,14 @@ watch(
   border: 0;
   background: transparent;
   color: var(--color-text-primary);
-  font-size: 30px;
+  font-size: var(--font-size-3xl-plus);
   font-weight: 900;
-  line-height: 38px;
+  line-height: var(--line-height-3xl);
   text-align: left;
 }
 
 .follow-list-page__back span:first-child {
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   line-height: 1;
 }
 
@@ -316,9 +316,9 @@ watch(
 .follow-list-page__header p {
   color: var(--color-text-secondary);
   padding-left: var(--space-8);
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 24px;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
 }
 
 .follow-list-page__list {
@@ -347,7 +347,7 @@ watch(
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .follow-list-page__pagination {
@@ -363,7 +363,7 @@ watch(
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .follow-list-page__page--active {
@@ -378,8 +378,8 @@ watch(
   }
 
   .follow-list-page__back {
-    font-size: 28px;
-    line-height: 36px;
+    font-size: var(--font-size-3xl);
+    line-height: var(--line-height-2xl-plus);
   }
 
   .follow-list-page__header p {
