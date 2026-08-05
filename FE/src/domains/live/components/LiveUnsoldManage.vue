@@ -3,10 +3,10 @@ import { computed, ref } from 'vue'
 
 import LiveUnsoldProductItem from '@/domains/live/components/LiveUnsoldProductItem.vue'
 
-import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
+import type { LiveUnsoldProduct } from '@/domains/auction/types/liveAuction.types'
 
 const props = defineProps<{
-  products: LiveWatchProduct[]
+  products: LiveUnsoldProduct[]
 }>()
 
 const emit = defineEmits<{
@@ -21,7 +21,7 @@ const onHandled = (productId: number) => {
 }
 
 const handledCount = computed(
-  () => props.products.filter((product) => handledIds.value.has(product.id)).length,
+  () => props.products.filter((product) => handledIds.value.has(product.productId)).length,
 )
 
 const allHandled = computed(
@@ -35,13 +35,13 @@ const allHandled = computed(
       <button type="button" class="unsold-manage__back" @click="emit('back')">← 대시보드</button>
       <h1 id="unsold-manage-title" class="unsold-manage__title">남은 상품 관리</h1>
       <p class="unsold-manage__desc">
-        낙찰되지 않은 상품을 상시 판매로 전환하거나 경매 예정으로 되돌리세요.
+        유찰 상품을 상시 판매로 전환하거나 경매 예정 상태로 유지하세요.
       </p>
       <p class="unsold-manage__progress">{{ handledCount }} / {{ products.length }} 처리됨</p>
     </header>
 
     <ul class="unsold-manage__list">
-      <li v-for="product in products" :key="product.id">
+      <li v-for="product in products" :key="product.productId">
         <LiveUnsoldProductItem :product="product" @handled="onHandled" />
       </li>
     </ul>
