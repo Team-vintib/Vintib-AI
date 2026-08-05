@@ -289,6 +289,26 @@ python validation/CLASS/product-info-finetune/aihub_ground_truth_zero_shot_check
 정답셋에서 그 클래스만 골라 두 backbone의 zero-shot 예측을 나란히 찍는다 — 원본과 달라진
 이미지가 있으면 어느 방향(파인튜닝이 틀리게 만들었는지, 오히려 고쳤는지)인지도 표시한다.
 
+### 지연시간 실측 — 모델 두 개 배포 비용
+
+카테고리(last-N=4)·색상(LoRA-웜)을 모델 두 개로 따로 배포하기로 하면서, 실제 forward
+지연시간을 재야 브리핑 §11 기준(CPU p50 ≤200ms)을 지키는지 알 수 있다:
+
+```bash
+python validation/CLASS/product-info-finetune/aihub_finetune_latency.py \
+    --last-n-checkpoint .../artifacts_finetune/vit_last4_category_masked_lr1e-05/checkpoint.pt \
+    --unfreeze-layers 4 \
+    --lora-checkpoint .../artifacts_finetune/lora_r16_a32_d0.05_qv_color_masked_lr0.0001_warm/checkpoint.pt \
+    --r 16 --alpha 32
+```
+
+원본(zero-shot) backbone, last-N=4, LoRA 각각의 forward p50/p95를 재고, 두 모델을
+**순차 실행**했을 때 합산 시간과 **스레드로 동시 실행**했을 때(CPU가 코어 여유로 실제로
+병렬화되는지) 시간을 모두 찍는다. 기본은 CPU로 잰다(원래 123ms 기준선도 CPU 기준이라
+비교 가능해야 한다). `product-info-check/latency.py`의 방법론(idle, N회 반복 후 p50/p95)을
+그대로 따르되, 다른 스파이크 폴더의 모델 레지스트리는 안 건드리고 체크포인트를 곧바로
+불러와 쓴다.
+
 ## STEP 3.7 — (선택, 실험) LoRA 파인튜닝
 
 STEP 3.6(last-N 언프리즈)의 대안이다. last-N은 마지막 몇 개 블록을 **통째로** 학습하고,
