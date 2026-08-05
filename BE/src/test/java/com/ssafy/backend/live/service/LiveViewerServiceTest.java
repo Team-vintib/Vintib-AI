@@ -57,7 +57,7 @@ class LiveViewerServiceTest {
 
     @Test
     void 구독하면_시청자로_잡힌다() {
-        liveViewerService.enter("session-a", "sub-0", liveId);
+        liveViewerService.enter("session-a", "sub-0", liveId, null);
 
         assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(1);
     }
@@ -65,25 +65,25 @@ class LiveViewerServiceTest {
     @Test
     void 한_세션이_같은_방송의_여러_토픽을_구독해도_한_명이다() {
         // FE 는 채팅·시청자수·경매·상품 토픽을 함께 구독한다. 구독마다 세면 한 명이 네 명이 된다.
-        liveViewerService.enter("session-a", "sub-0", liveId);
-        liveViewerService.enter("session-a", "sub-1", liveId);
-        liveViewerService.enter("session-a", "sub-2", liveId);
+        liveViewerService.enter("session-a", "sub-0", liveId, null);
+        liveViewerService.enter("session-a", "sub-1", liveId, null);
+        liveViewerService.enter("session-a", "sub-2", liveId, null);
 
         assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(1);
     }
 
     @Test
     void 서로_다른_세션은_각각_센다() {
-        liveViewerService.enter("session-a", "sub-0", liveId);
-        liveViewerService.enter("session-b", "sub-0", liveId);
+        liveViewerService.enter("session-a", "sub-0", liveId, null);
+        liveViewerService.enter("session-b", "sub-0", liveId, null);
 
         assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(2);
     }
 
     @Test
     void 구독이_남아_있으면_해지해도_시청자에서_빠지지_않는다() {
-        liveViewerService.enter("session-a", "sub-0", liveId);
-        liveViewerService.enter("session-a", "sub-1", liveId);
+        liveViewerService.enter("session-a", "sub-0", liveId, null);
+        liveViewerService.enter("session-a", "sub-1", liveId, null);
 
         liveViewerService.leaveSubscription("session-a", "sub-0");
 
@@ -93,8 +93,8 @@ class LiveViewerServiceTest {
 
     @Test
     void 마지막_구독을_해지하면_시청자에서_빠진다() {
-        liveViewerService.enter("session-a", "sub-0", liveId);
-        liveViewerService.enter("session-a", "sub-1", liveId);
+        liveViewerService.enter("session-a", "sub-0", liveId, null);
+        liveViewerService.enter("session-a", "sub-1", liveId, null);
 
         liveViewerService.leaveSubscription("session-a", "sub-0");
         liveViewerService.leaveSubscription("session-a", "sub-1");
@@ -104,7 +104,7 @@ class LiveViewerServiceTest {
 
     @Test
     void 라이브_토픽이_아닌_구독_해지는_아무_영향이_없다() {
-        liveViewerService.enter("session-a", "sub-0", liveId);
+        liveViewerService.enter("session-a", "sub-0", liveId, null);
 
         // /user/queue/errors 처럼 방송과 무관한 구독의 해지다.
         liveViewerService.leaveSubscription("session-a", "sub-error");
@@ -118,8 +118,8 @@ class LiveViewerServiceTest {
                         Live.openNow(host, "다른 방송", null, null, LocalDateTime.now()))
                 .getId();
 
-        liveViewerService.enter("session-a", "sub-0", liveId);
-        liveViewerService.enter("session-a", "sub-1", otherLiveId);
+        liveViewerService.enter("session-a", "sub-0", liveId, null);
+        liveViewerService.enter("session-a", "sub-1", otherLiveId, null);
 
         liveViewerService.leaveSession("session-a");
 
@@ -129,8 +129,8 @@ class LiveViewerServiceTest {
 
     @Test
     void 여러_방송의_시청자_수를_한_번에_조회한다() {
-        liveViewerService.enter("session-a", "sub-0", liveId);
-        liveViewerService.enter("session-b", "sub-0", liveId);
+        liveViewerService.enter("session-a", "sub-0", liveId, null);
+        liveViewerService.enter("session-b", "sub-0", liveId, null);
 
         Map<Long, Integer> counts = liveViewerService.getViewerCounts(List.of(liveId, 999_999L));
 
@@ -141,13 +141,13 @@ class LiveViewerServiceTest {
 
     @Test
     void 최고_시청자_수는_넘어설_때만_갱신된다() {
-        liveViewerService.enter("session-a", "sub-0", liveId);
-        liveViewerService.enter("session-b", "sub-0", liveId);
+        liveViewerService.enter("session-a", "sub-0", liveId, null);
+        liveViewerService.enter("session-b", "sub-0", liveId, null);
         assertThat(peakOf(liveId)).isEqualTo(2);
 
         // 한 명이 나가고 다시 들어와도 최고치는 2 그대로다. 1 로 내려가면 기록이 아니다.
         liveViewerService.leaveSession("session-b");
-        liveViewerService.enter("session-c", "sub-0", liveId);
+        liveViewerService.enter("session-c", "sub-0", liveId, null);
 
         assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(2);
         assertThat(peakOf(liveId)).isEqualTo(2);
@@ -155,7 +155,7 @@ class LiveViewerServiceTest {
 
     @Test
     void 방송이_종료되면_시청자_집합이_비워진다() {
-        liveViewerService.enter("session-a", "sub-0", liveId);
+        liveViewerService.enter("session-a", "sub-0", liveId, null);
 
         Live live = liveRepository.findById(liveId).orElseThrow();
         live.transitionTo(LiveStatus.ENDED, LocalDateTime.now());
@@ -174,6 +174,110 @@ class LiveViewerServiceTest {
         // 프로세스가 죽으면 세션은 끊기는데 Redis 값만 남아 "아무도 없는 방송에 300명"이 된다.
         assertThat(liveViewerService.getViewerCount(liveId)).isZero();
         assertThat(redisTemplate.hasKey("live:session:죽은-세션")).isFalse();
+    }
+
+    @Test
+    void 호스트가_구독해도_시청자로_세지_않는다() {
+        // 판매자가 자기 방송 화면을 연 것은 시청이 아니다 — 혼자 있으면 0명이어야 한다.
+        liveViewerService.enter("session-host", "sub-0", liveId, host.getId());
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isZero();
+    }
+
+    @Test
+    void 호스트와_시청자가_함께_있으면_시청자만_센다() {
+        liveViewerService.enter("session-host", "sub-0", liveId, host.getId());
+        liveViewerService.enter("session-viewer", "sub-0", liveId, 다른_회원().getId());
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(1);
+    }
+
+    @Test
+    void 호스트는_최고_시청자_수에도_반영되지_않는다() {
+        liveViewerService.enter("session-host", "sub-0", liveId, host.getId());
+
+        assertThat(peakOf(liveId)).isZero();
+    }
+
+    @Test
+    void 다른_방송의_호스트는_시청자로_센다() {
+        // 판매자도 남의 방송에서는 그냥 시청자다.
+        Member 다른_호스트 = 다른_회원();
+        Long 다른_방송 = liveRepository.save(
+                Live.openNow(다른_호스트, "남의 라이브", null, null, LocalDateTime.now())).getId();
+
+        liveViewerService.enter("session-other-host", "sub-0", 다른_방송, host.getId());
+
+        assertThat(liveViewerService.getViewerCount(다른_방송)).isEqualTo(1);
+    }
+
+    @Test
+    void 같은_회원이_탭을_두_개_열어도_한_명이다() {
+        Long 시청자 = 다른_회원().getId();
+
+        liveViewerService.enter("session-tab1", "sub-0", liveId, 시청자);
+        liveViewerService.enter("session-tab2", "sub-0", liveId, 시청자);
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(1);
+    }
+
+    @Test
+    void 탭_하나를_닫아도_다른_탭이_남아_있으면_시청자로_남는다() {
+        Long 시청자 = 다른_회원().getId();
+        liveViewerService.enter("session-tab1", "sub-0", liveId, 시청자);
+        liveViewerService.enter("session-tab2", "sub-0", liveId, 시청자);
+
+        liveViewerService.leaveSession("session-tab1");
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(1);
+    }
+
+    @Test
+    void 마지막_탭까지_닫으면_시청자에서_빠진다() {
+        Long 시청자 = 다른_회원().getId();
+        liveViewerService.enter("session-tab1", "sub-0", liveId, 시청자);
+        liveViewerService.enter("session-tab2", "sub-0", liveId, 시청자);
+
+        liveViewerService.leaveSession("session-tab1");
+        liveViewerService.leaveSession("session-tab2");
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isZero();
+    }
+
+    @Test
+    void 재연결로_세션이_새로_생겨도_한_명이다() {
+        // FE 는 끊기면 다시 붙으면서 새 세션 ID 를 받는다. 옛 세션은 서버가 알아챌 때까지 남는다.
+        Long 시청자 = 다른_회원().getId();
+        liveViewerService.enter("session-old", "sub-0", liveId, 시청자);
+
+        liveViewerService.enter("session-new", "sub-0", liveId, 시청자);
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(1);
+    }
+
+    @Test
+    void 비회원은_세션마다_따로_센다() {
+        // 신원이 없어 세션 말고는 구분할 방법이 없다.
+        liveViewerService.enter("guest-a", "sub-0", liveId, null);
+        liveViewerService.enter("guest-b", "sub-0", liveId, null);
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(2);
+    }
+
+    @Test
+    void 서로_다른_회원은_각자_센다() {
+        liveViewerService.enter("session-a", "sub-0", liveId, 다른_회원().getId());
+        liveViewerService.enter("session-b", "sub-0", liveId, 다른_회원().getId());
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(2);
+    }
+
+    private Member 다른_회원() {
+        return memberRepository.save(Member.builder()
+                .email("viewer-" + UUID.randomUUID() + "@example.com")
+                .password("encoded")
+                .name("시청자")
+                .build());
     }
 
     private int peakOf(Long id) {

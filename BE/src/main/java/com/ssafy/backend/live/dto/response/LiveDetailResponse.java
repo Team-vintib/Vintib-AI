@@ -65,15 +65,22 @@ public record LiveDetailResponse(
         LocalDateTime endedAt,
 
         @Schema(
+                description = "방송을 만든 시각(FE 요청 024). 예약 방송은 만든 시점과 시작 예정 시각이 "
+                        + "다르므로, 생성 기준 경과 시간을 그릴 때는 `startedAt`이 아니라 이 값을 쓴다",
+                example = "2026-07-28T11:00:00")
+        LocalDateTime createdAt,
+
+        @Schema(
                 description = "최고 시청자 수. **누적 기록이며 방송이 끝나도 남는다.** "
-                        + "현재 값은 currentViewerCount를 봐야 한다",
+                        + "현재 값은 currentViewerCount를 봐야 한다. 호스트를 세지 않는 기준은 동일하다",
                 example = "152")
         int peakViewerCount,
 
         @Schema(
                 description = "현재 동시 시청자 수. **화면 진입 시 이 값으로 시작하고, 이후 변화는 "
                         + "`/topic/lives/{liveId}/viewers` 구독으로 받는다.** 구독 직후 브로드캐스트가 "
-                        + "오는 것은 보장되지 않으므로 초기값을 토픽에서 기다리면 안 된다",
+                        + "오는 것은 보장되지 않으므로 초기값을 토픽에서 기다리면 안 된다.\n\n"
+                        + "**호스트는 세지 않는다** — 판매자 혼자 방송 화면을 열어 둔 상태는 0명이다",
                 example = "128")
         int currentViewerCount,
 
@@ -117,6 +124,7 @@ public record LiveDetailResponse(
                 live.getScheduledAt(),
                 live.getStartedAt(),
                 live.getEndedAt(),
+                live.getCreatedAt(),
                 live.getPeakViewerCount(),
                 currentViewerCount,
                 live.getCurrentProductId(),

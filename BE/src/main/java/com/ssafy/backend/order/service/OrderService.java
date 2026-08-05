@@ -4,6 +4,8 @@ import com.ssafy.backend.global.client.DeliveryTrackingClient;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
+import com.ssafy.backend.live.entity.Live;
+import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.order.dto.request.OrderCreateRequest;
@@ -45,6 +47,7 @@ public class OrderService {
     private final OrderShipmentRepository orderShipmentRepository;
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
+    private final LiveRepository liveRepository;
     private final PointService pointService;
     private final DeliveryTrackingClient deliveryTrackingClient;
 
@@ -82,8 +85,13 @@ public class OrderService {
 
         Member buyer = memberRepository.findById(buyerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        // 라이브 시청 화면에서 산 주문만 방송이 붙는다 — 방송 종료 요약(LIVE-006)이 이 값으로
+        // 판매 실적을 집계한다. 없는 방송 ID를 보내면 404로 막는다(조용히 무시하면 요약에서
+        // 빠진 이유를 FE 가 알 방법이 없다).
+        Live live = request.liveId() == null ? null : liveRepository.findById(request.liveId())
+                .orElseThrow(() -> new CustomException(ErrorCode.LIVE_NOT_FOUND));
         Order order = orderRepository.save(
-                Order.createDirectSale(buyer, product.getSeller(), product, product.getPrice()));
+                Order.createDirectSale(buyer, product.getSeller(), product, live, product.getPrice()));
 
         pointService.pay(buyerId, product.getPrice(), order.getId());
         product.markSold();

@@ -28,9 +28,31 @@ import org.springframework.stereotype.Service;
  * 방송이 끝난 뒤에도 남아야 하므로 {@code live.peak_viewer_count} 에 저장한다 — 다만 최고치를
  * 넘어설 때만 DB 를 때린다.
  *
- * <p><b>왜 INCR 카운터가 아니라 세션 ID 집합인가.</b> FE 한 명이 같은 방송의 여러 토픽
+ * <p><b>왜 INCR 카운터가 아니라 집합인가.</b> FE 한 명이 같은 방송의 여러 토픽
  * (채팅·시청자수·경매·상품)을 구독한다. 구독마다 카운터를 올리면 한 사람이 네 명으로 잡힌다.
- * 세션 ID 를 {@code Set} 에 넣으면 몇 번 구독해도 {@code SCARD} 는 사람 수를 준다.
+ * {@code Set} 에 넣으면 몇 번 구독해도 {@code SCARD} 는 사람 수를 준다.
+ *
+ * <h2>무엇을 한 사람으로 볼 것인가 — 회원은 회원 ID, 비회원은 세션</h2>
+ *
+ * 한때 세션 ID 로만 셌는데, 그러면 <b>같은 사람이 여러 명으로 잡히는 경로가 두 개</b> 있었다.
+ *
+ * <ul>
+ *   <li><b>재연결</b> — FE 는 끊기면 몇 초 뒤 다시 붙는데 그때 세션 ID 가 새로 발급된다. 옛 세션은
+ *       서버가 하트비트로 알아챌 때까지 남아 있어, 그 사이 한 명이 두 명으로 보인다.</li>
+ *   <li><b>탭·기기 여러 개</b> — 같은 사람이 폰과 PC 로 보면 두 명이 된다.</li>
+ * </ul>
+ *
+ * <p>그래서 로그인 회원은 <b>회원 ID</b>를 집합에 넣는다. 재연결해도, 탭을 여러 개 열어도 한 명이다.
+ * 비회원은 신원이 없어 세션으로 셀 수밖에 없다 — 재연결 시 잠깐 겹치는 문제가 남지만, 하트비트가
+ * 옛 세션을 끊어 주고 무엇보다 <b>비회원에게는 이보다 나은 식별자가 없다.</b>
+ *
+ * <p><b>그래서 참조 카운트가 필요하다.</b> 회원이 탭 하나를 닫아도 다른 탭이 살아 있으면 시청자는
+ * 그대로다. 방송·시청자별로 붙들고 있는 세션을 따로 모아 두고, <b>마지막 세션이 사라질 때만</b>
+ * 시청자에서 뺀다.
+ *
+ * <p><b>호스트는 세지 않는다.</b> 판매자가 자기 방송 화면을 열어 둔 것은 시청이 아니다 —
+ * 넣으면 아무도 안 보는 방송이 늘 "1명"으로 보이고, 판매자가 "몇 명이 보고 있나"를 판단할 때
+ * 자기 자신을 빼서 읽어야 한다. 최고 시청자 수({@code peak_viewer_count})도 같은 기준을 따른다.
  *
  * <p><b>세션 → 방송 역방향 매핑이 필요한 이유.</b> UNSUBSCRIBE·DISCONNECT 프레임에는 destination 이
  * 없다. 어느 방송에서 빠져야 하는지 알 수 없으므로 구독 시점에 {@code sessionId + subscriptionId →
@@ -42,8 +64,17 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class LiveViewerService {
 
+    /** 방송별 시청자 집합. 원소는 sessionId 가 아니라 <b>시청자 키</b>다(클래스 주석 참고). */
     private static final String VIEWERS_KEY_PREFIX = "live:viewers:";
+    /** 세션 → 구독한 방송 매핑. UNSUBSCRIBE·DISCONNECT 에 destination 이 없어서 필요하다. */
     private static final String SESSION_KEY_PREFIX = "live:session:";
+    /** 방송·시청자별로 그 시청자가 붙들고 있는 세션들. 마지막 세션이 사라질 때만 시청자에서 뺀다. */
+    private static final String VIEWER_CONNS_KEY_PREFIX = "live:viewer-conns:";
+    /** 세션 → 그 세션의 시청자 키. 나갈 때는 memberId 를 알 수 없어 미리 적어 둔다. */
+    private static final String SESSION_KEY_OF_PREFIX = "live:session-key:";
+
+    private static final String MEMBER_KEY_PREFIX = "m:";
+    private static final String GUEST_KEY_PREFIX = "g:";
     private static final int SCAN_BATCH_SIZE = 500;
 
     private final StringRedisTemplate redisTemplate;
@@ -60,11 +91,25 @@ public class LiveViewerService {
      *
      * <p>이미 시청자로 잡혀 있는 세션이면 아무 일도 하지 않는다 — 같은 방송의 두 번째, 세 번째
      * 구독마다 같은 값을 브로드캐스트할 이유가 없다.
+     *
+     * @param memberId 구독한 회원 ID. <b>비회원이면 null</b>. 호스트를 시청자에서 빼기 위해 받는다
      */
-    public void enter(String sessionId, String subscriptionId, Long liveId) {
+    public void enter(String sessionId, String subscriptionId, Long liveId, Long memberId) {
+        // 호스트 세션도 매핑은 남긴다 — 정리 경로(UNSUBSCRIBE·DISCONNECT)를 한 갈래로 유지한다.
+        // 시청자 집합에 없으므로 나갈 때 아무 일도 일어나지 않는다.
         redisTemplate.opsForHash().put(sessionKey(sessionId), subscriptionId, String.valueOf(liveId));
 
-        Long added = redisTemplate.opsForSet().add(viewersKey(liveId), sessionId);
+        // 판매자는 자기 방송의 시청자가 아니다 — 혼자 있는 방송은 0명으로 보여야 한다.
+        if (isHost(liveId, memberId)) {
+            return;
+        }
+
+        String viewerKey = viewerKeyOf(sessionId, memberId);
+        redisTemplate.opsForValue().set(sessionKeyOfKey(sessionId), viewerKey);
+        redisTemplate.opsForSet().add(viewerConnsKey(liveId, viewerKey), sessionId);
+
+        // 같은 시청자가 이미 잡혀 있으면(탭 두 개, 재연결 직후 등) 수가 변하지 않는다.
+        Long added = redisTemplate.opsForSet().add(viewersKey(liveId), viewerKey);
         if (added == null || added == 0) {
             return;
         }
@@ -73,6 +118,16 @@ public class LiveViewerService {
         // 최고치를 넘어설 때만 UPDATE 가 실제로 행을 건드린다(조건이 SQL 안에 있다).
         liveRepository.raisePeakViewerCount(liveId, count);
         broadcast(liveId, count);
+    }
+
+    /**
+     * 이 세션을 무엇으로 셀 것인가.
+     *
+     * <p>로그인 회원은 <b>회원 ID</b>로 센다. 그래야 재연결로 세션이 새로 생기거나 탭을 여러 개
+     * 열어도 한 명이다. 비회원은 신원이 없어 세션으로 셀 수밖에 없다.
+     */
+    private String viewerKeyOf(String sessionId, Long memberId) {
+        return memberId == null ? GUEST_KEY_PREFIX + sessionId : MEMBER_KEY_PREFIX + memberId;
     }
 
     /**
@@ -106,7 +161,9 @@ public class LiveViewerService {
                 .collect(Collectors.toSet());
 
         redisTemplate.delete(sessionKey);
+        // 시청자 키는 마지막에 지운다 — removeViewer 가 그 값을 읽어야 한다.
         liveIds.forEach(liveId -> removeViewer(sessionId, liveId));
+        redisTemplate.delete(sessionKeyOfKey(sessionId));
     }
 
     /** 현재 동시 시청자 수. 아무도 없거나 키가 없으면 0. */
@@ -129,6 +186,7 @@ public class LiveViewerService {
     /** 방송이 끝나면 시청자 집합을 버린다 — 종료된 방송에 시청자 수가 남아 있을 이유가 없다. */
     public void clear(Long liveId) {
         redisTemplate.delete(viewersKey(liveId));
+        deleteByPattern(VIEWER_CONNS_KEY_PREFIX + liveId + ":*");
     }
 
     /**
@@ -143,18 +201,52 @@ public class LiveViewerService {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void clearStaleKeysOnStartup() {
-        int deleted = deleteByPattern(VIEWERS_KEY_PREFIX + "*") + deleteByPattern(SESSION_KEY_PREFIX + "*");
+        int deleted = deleteByPattern(VIEWERS_KEY_PREFIX + "*")
+                + deleteByPattern(SESSION_KEY_PREFIX + "*")
+                + deleteByPattern(VIEWER_CONNS_KEY_PREFIX + "*")
+                + deleteByPattern(SESSION_KEY_OF_PREFIX + "*");
         if (deleted > 0) {
             log.info("기동 시 잔여 시청자 키 정리 - {}개", deleted);
         }
     }
 
+    /**
+     * 이 세션을 방송에서 뺀다.
+     *
+     * <p><b>세션이 사라져도 시청자가 사라지는 것은 아니다.</b> 같은 회원이 다른 탭을 열어 두었거나
+     * 방금 재연결해 새 세션을 잡았을 수 있다. 그래서 그 시청자가 붙들고 있는 <b>마지막 세션</b>이
+     * 사라질 때만 시청자 수가 줄어든다.
+     */
     private void removeViewer(String sessionId, Long liveId) {
-        Long removed = redisTemplate.opsForSet().remove(viewersKey(liveId), sessionId);
+        String viewerKey = redisTemplate.opsForValue().get(sessionKeyOfKey(sessionId));
+        if (viewerKey == null) {
+            // 호스트였거나 애초에 시청자로 세지 않은 세션이다.
+            return;
+        }
+
+        String connsKey = viewerConnsKey(liveId, viewerKey);
+        redisTemplate.opsForSet().remove(connsKey, sessionId);
+        Long remaining = redisTemplate.opsForSet().size(connsKey);
+        if (remaining != null && remaining > 0) {
+            return;
+        }
+
+        redisTemplate.delete(connsKey);
+        Long removed = redisTemplate.opsForSet().remove(viewersKey(liveId), viewerKey);
         if (removed == null || removed == 0) {
             return;
         }
         broadcast(liveId, getViewerCount(liveId));
+    }
+
+    /**
+     * 이 회원이 그 방송의 호스트인지.
+     *
+     * <p><b>비회원은 조회 없이 바로 false다</b> — 토큰 없이 붙은 세션은 호스트일 수 없다.
+     * 회원이면 인덱스를 타는 {@code exists} 한 방으로 확인한다(방송을 통째로 읽어 올 이유가 없다).
+     */
+    private boolean isHost(Long liveId, Long memberId) {
+        return memberId != null && liveRepository.existsByIdAndHost_Id(liveId, memberId);
     }
 
     /** 이 세션이 해당 방송의 다른 구독을 아직 갖고 있는지. */
@@ -188,5 +280,13 @@ public class LiveViewerService {
 
     private String sessionKey(String sessionId) {
         return SESSION_KEY_PREFIX + sessionId;
+    }
+
+    private String viewerConnsKey(Long liveId, String viewerKey) {
+        return VIEWER_CONNS_KEY_PREFIX + liveId + ":" + viewerKey;
+    }
+
+    private String sessionKeyOfKey(String sessionId) {
+        return SESSION_KEY_OF_PREFIX + sessionId;
     }
 }

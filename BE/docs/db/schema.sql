@@ -456,6 +456,11 @@ CREATE TABLE orders (
     seller_id       BIGINT      NOT NULL REFERENCES member (id),
     product_id      BIGINT      NOT NULL REFERENCES product (id),
     auction_id      BIGINT      REFERENCES auction (id),  -- 상시 판매 주문은 NULL
+    -- 이 주문이 발생한 방송(LIVE-006 방송 종료 요약). 라이브 밖에서 산 주문은 NULL.
+    -- 낙찰이면 auction_id 로도 방송을 알 수 있지만, 방송 중 즉시구매는 경매를 거치지 않아
+    -- 이 컬럼 없이는 방송과 이을 근거가 없다. 두 경로를 한 컬럼으로 묶어 "이 방송에서
+    -- 발생한 주문"을 조건 하나로 뽑는다 — 낙찰 주문에도 채운다.
+    live_id         BIGINT      REFERENCES live (id),
     order_price     BIGINT      NOT NULL,
     status          VARCHAR(30) NOT NULL DEFAULT 'PAID',
     -- 배송 완료 후 3일 경과 시 자동 구매 확정. 스케줄러가 이 컬럼으로 대상을 찾는다.
@@ -484,6 +489,9 @@ CREATE INDEX ix_orders_seller ON orders (seller_id, created_at DESC);
 -- 자동 구매 확정 스케줄러 조회용 — DELIVERED 상태만 대상이라 부분 인덱스로 좁힌다.
 CREATE INDEX ix_orders_auto_confirm
     ON orders (auto_confirm_at) WHERE status = 'DELIVERED';
+
+-- 방송 종료 요약(LIVE-006) 조회용. 라이브 밖 주문이 대부분이라 부분 인덱스로 좁힌다.
+CREATE INDEX ix_orders_live ON orders (live_id) WHERE live_id IS NOT NULL;
 
 CREATE TABLE order_shipment (
     order_id        BIGINT PRIMARY KEY REFERENCES orders (id),
