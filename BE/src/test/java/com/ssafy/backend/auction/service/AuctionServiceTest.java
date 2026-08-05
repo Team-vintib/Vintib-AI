@@ -13,6 +13,7 @@ import com.ssafy.backend.auction.dto.request.AuctionConfigRequest;
 import com.ssafy.backend.auction.dto.response.AuctionResponse;
 import com.ssafy.backend.auction.entity.Auction;
 import com.ssafy.backend.auction.dto.response.AuctionSnapshotResponse;
+import com.ssafy.backend.auction.dto.response.AuctionWinnerResponse;
 import com.ssafy.backend.auction.entity.AuctionStatus;
 import com.ssafy.backend.auction.entity.Bid;
 import com.ssafy.backend.auction.entity.BidStatus;
@@ -539,6 +540,49 @@ class AuctionServiceTest {
         when(auctionRepository.existsById(AUCTION_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> auctionService.getBidHistory(AUCTION_ID, null, 20, null))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUCTION_NOT_FOUND);
+    }
+
+    @Test
+    void 낙찰된_경매는_낙찰자와_낙찰가를_돌려준다() {
+        Auction auction = 진행중인_경매();
+        auction.applyBid(OTHER_MEMBER_ID, 45_000L, LocalDateTime.now());
+        auction.closeAsSuccess(LocalDateTime.now());
+        when(auctionRepository.findWithLiveById(AUCTION_ID)).thenReturn(Optional.of(auction));
+        when(memberRepository.findById(OTHER_MEMBER_ID)).thenReturn(Optional.of(bidder));
+        when(bidder.getNickname()).thenReturn("빈티지러버");
+        when(bidRepository.countByAuction_Id(AUCTION_ID)).thenReturn(3L);
+
+        AuctionWinnerResponse response = auctionService.getWinner(AUCTION_ID);
+
+        assertThat(response.status()).isEqualTo(AuctionStatus.SUCCESS);
+        assertThat(response.winnerId()).isEqualTo(OTHER_MEMBER_ID);
+        assertThat(response.winnerNickname()).isEqualTo("빈티지러버");
+        assertThat(response.finalPrice()).isEqualTo(45_000L);
+        assertThat(response.bidCount()).isEqualTo(3L);
+    }
+
+    @Test
+    void 유찰된_경매도_404가_아니라_FAILED로_답한다() {
+        // "안 팔렸다"는 오류가 아니라 결과의 한 종류다 — 404 면 FE 가 "경매가 없다"와 구분하지 못한다.
+        Auction auction = 진행중인_경매();
+        auction.closeAsFailed(LocalDateTime.now());
+        when(auctionRepository.findWithLiveById(AUCTION_ID)).thenReturn(Optional.of(auction));
+        when(bidRepository.countByAuction_Id(AUCTION_ID)).thenReturn(0L);
+
+        AuctionWinnerResponse response = auctionService.getWinner(AUCTION_ID);
+
+        assertThat(response.status()).isEqualTo(AuctionStatus.FAILED);
+        assertThat(response.winnerId()).isNull();
+        assertThat(response.finalPrice()).isNull();
+    }
+
+    @Test
+    void 존재하지_않는_경매의_결과는_조회할_수_없다() {
+        when(auctionRepository.findWithLiveById(AUCTION_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> auctionService.getWinner(AUCTION_ID))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AUCTION_NOT_FOUND);
     }
