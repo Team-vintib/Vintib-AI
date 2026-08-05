@@ -387,21 +387,6 @@ const getMyHostLives = async (userId: number): Promise<MyLiveItem[]> => {
     .filter((item): item is MyLiveItem => item !== null)
 }
 
-export const getMyOrderDetail = async (
-  userId: number,
-  orderId: number,
-): Promise<MyOrderItem> => {
-  void userId
-  void orderId
-  throw new Error('구매 상세 API가 아직 연결되지 않았습니다.')
-}
-
-export const getMySaleDetail = async (userId: number, saleId: number): Promise<MySaleItem> => {
-  void userId
-  void saleId
-  throw new Error('판매 상세 API가 아직 연결되지 않았습니다.')
-}
-
 export const updateMyProfile = async (
   userId: number,
   request: MyProfileUpdateRequest,
