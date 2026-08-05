@@ -17,7 +17,7 @@ import type {
 
 export const MY_SECTION_OPTIONS: Array<{ id: MySectionId; label: string }> = [
   { id: 'dashboard', label: '마이페이지' },
-  { id: 'seller', label: '판매자 대시보드' },
+  { id: 'seller', label: '판매 대시보드' },
   { id: 'profile', label: '내 정보 변경' },
   { id: 'tryon', label: '시착 정보' },
   { id: 'products', label: '판매 상품 관리' },
@@ -326,7 +326,6 @@ export const mockMyPageViewData: MyPageViewData = {
     },
     todoCounts: {
       shippingPending: 3,
-      refundRequests: 1,
       scheduledLives: 2,
     },
     productStatusCounts: {

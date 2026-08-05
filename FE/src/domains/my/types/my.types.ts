@@ -84,7 +84,6 @@ export interface MySettlementSummary {
 
 export interface MyTodoCounts {
   shippingPending: number
-  refundRequests: number
   scheduledLives: number
 }
 

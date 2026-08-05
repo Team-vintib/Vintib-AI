@@ -417,7 +417,6 @@ const todoCards = computed(() => {
 
   return [
     { label: '배송 대기', value: todo?.shippingPending ?? 0, section: 'sales' },
-    { label: '환불 요청', value: todo?.refundRequests ?? 0, section: 'sales' },
     { label: '예약 라이브', value: todo?.scheduledLives ?? 0, section: 'lives' },
   ] satisfies Array<{ label: string; value: number; section: MySectionId }>
 })
@@ -1320,7 +1319,7 @@ onMounted(() => {
           </template>
 
           <template v-else-if="selectedSection === 'seller'">
-            <section class="my-dashboard" aria-label="판매자 대시보드 요약">
+            <section class="my-dashboard" aria-label="판매 대시보드 요약">
               <button
                 v-for="card in kpiCards"
                 :key="card.label"
@@ -1343,13 +1342,16 @@ onMounted(() => {
                   <strong>{{ formatPoint(viewData.summary.salesPerformance.grossRevenue) }}</strong>
                 </div>
                 <div class="my-revenue-chart">
-                  <div v-for="item in monthlyRevenue" :key="item.month" class="my-revenue-chart__item">
-                    <span>{{ formatPoint(item.revenue) }}</span>
+                  <div
+                    v-for="item in monthlyRevenue"
+                    :key="item.month"
+                    class="my-revenue-chart__item"
+                    :title="`${item.month} · ${formatPoint(item.revenue)} · ${item.soldCount}건`"
+                  >
                     <div>
                       <i :style="{ height: getRevenueBarHeight(item.revenue) }" />
                     </div>
                     <b>{{ item.month }}</b>
-                    <small>{{ item.soldCount }}건</small>
                   </div>
                 </div>
               </article>
@@ -2444,31 +2446,20 @@ onMounted(() => {
 
 .my-revenue-chart {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: end;
-  gap: 12px;
-  min-height: 216px;
+  gap: 6px;
+  min-height: 176px;
   padding-top: 8px;
 }
 
 .my-revenue-chart__item {
   display: grid;
-  grid-template-rows: 20px 128px 18px 16px;
+  grid-template-rows: 128px 18px;
   gap: 6px;
   align-items: end;
   min-width: 0;
   text-align: center;
-}
-
-.my-revenue-chart__item span,
-.my-revenue-chart__item small {
-  overflow: hidden;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-2xs);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .my-revenue-chart__item div {
