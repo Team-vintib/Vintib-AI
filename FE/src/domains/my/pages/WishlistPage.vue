@@ -250,14 +250,10 @@ onMounted(() => {
 
 <template>
   <DefaultLayout>
-    <section class="wishlist-page" aria-labelledby="wishlist-title">
-      <header class="wishlist-page__header">
-        <div>
-          <h1 id="wishlist-title">찜한 상품</h1>
-          <p>관심 상품을 검색하고 구매 방식별로 확인하세요.</p>
-        </div>
+    <section class="wishlist-page" aria-label="찜한 상품">
+      <div class="wishlist-page__summary" aria-live="polite">
         <strong>{{ wishes.length.toLocaleString('ko-KR') }}개</strong>
-      </header>
+      </div>
 
       <p v-if="actionMessage" class="wishlist-page__message" role="status">
         {{ actionMessage }}
@@ -412,22 +408,12 @@ onMounted(() => {
   gap: var(--space-8);
 }
 
-.wishlist-page__header {
+.wishlist-page__summary {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-6);
+  justify-content: flex-end;
 }
 
-.wishlist-page__header h1 {
-  color: var(--color-text-primary);
-  font-size: 36px;
-  font-weight: var(--font-weight-bold);
-  line-height: 48px;
-}
-
-.wishlist-page__header p,
-.wishlist-page__header strong {
+.wishlist-page__summary strong {
   color: var(--color-text-secondary);
   font-size: var(--font-size-md);
   line-height: var(--line-height-lg);
@@ -769,16 +755,6 @@ onMounted(() => {
 }
 
 @media (max-width: 640px) {
-  .wishlist-page__header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .wishlist-page__header h1 {
-    font-size: var(--font-size-3xl-plus);
-    line-height: 40px;
-  }
-
   .wishlist-filter__actions,
   .wishlist-grid {
     grid-template-columns: 1fr;

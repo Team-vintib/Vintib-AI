@@ -188,12 +188,7 @@ onBeforeUnmount(() => {
 
 <template>
   <DefaultLayout>
-    <section class="live-list-page" aria-labelledby="live-list-title">
-      <header class="live-list-page__header">
-        <h1 id="live-list-title">라이브</h1>
-        <p>지금 진행 중인 방송과 곧 시작할 라이브를 만나보세요.</p>
-      </header>
-
+    <section class="live-list-page" aria-label="라이브 목록">
       <AppSearchBar
         v-model="searchKeyword"
         search-label="라이브 검색"
@@ -279,27 +274,6 @@ onBeforeUnmount(() => {
 .live-list-page {
   display: grid;
   gap: var(--space-8);
-}
-
-.live-list-page__header {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.live-list-page__header h1 {
-  color: var(--color-text-primary);
-  font-family: var(--font-display);
-  font-size: 44px;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.04em;
-  line-height: 1;
-}
-
-.live-list-page__header p {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-light);
-  line-height: var(--line-height-body);
 }
 
 .live-list-page__content {

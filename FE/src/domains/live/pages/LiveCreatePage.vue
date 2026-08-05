@@ -527,12 +527,7 @@ onMounted(() => {
 
 <template>
   <DefaultLayout content-max-width="1120px">
-    <section class="live-create" aria-labelledby="live-create-title">
-      <header class="live-create__header">
-        <h1 id="live-create-title">라이브 시작</h1>
-        <p>방송 방식과 기본 정보를 정리한 뒤 라이브를 개설합니다.</p>
-      </header>
-
+    <section class="live-create" aria-label="라이브 시작">
       <nav class="live-create__steps" aria-label="라이브 개설 단계">
         <ol>
           <li
@@ -544,7 +539,7 @@ onMounted(() => {
             }"
             :aria-current="index === currentStepIndex ? 'step' : undefined"
           >
-            <span>{{ index + 1 }}</span>
+            <span>{{ index < currentStepIndex ? '✓' : index + 1 }}</span>
             <strong>{{ step.label }}</strong>
           </li>
         </ol>
@@ -1046,12 +1041,6 @@ onMounted(() => {
   padding-bottom: var(--space-16);
 }
 
-.live-create__header {
-  display: grid;
-  gap: var(--space-2);
-  padding-top: var(--space-6);
-}
-
 .live-create__eyebrow,
 .live-create__section-label {
   color: var(--color-accent);
@@ -1063,16 +1052,6 @@ onMounted(() => {
   text-transform: uppercase;
 }
 
-.live-create__header h1 {
-  color: var(--color-text-primary);
-  font-family: var(--font-display);
-  font-size: 40px;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.035em;
-  line-height: 1.08;
-}
-
-.live-create__header p:last-child,
 .live-create__panel > p:last-child {
   color: var(--color-text-secondary);
 }
@@ -1090,46 +1069,47 @@ onMounted(() => {
   flex-direction: column;
   min-width: 0;
   gap: var(--space-2);
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   text-align: center;
 }
 
 .live-create__steps li:not(:last-child)::after {
   position: absolute;
-  top: 15px;
-  left: calc(50% + 22px);
-  width: calc(100% - 44px);
-  height: var(--underline-thickness);
-  background: var(--color-border-strong);
+  top: 17px;
+  left: calc(50% + 24px);
+  width: calc(100% - 48px);
+  height: 2px;
+  background: var(--color-border);
   content: '';
 }
 
 .live-create__step--complete:not(:last-child)::after {
-  background: var(--color-live);
+  background: var(--color-primary);
 }
 
 .live-create__steps span {
   position: relative;
   z-index: var(--z-layer-1);
   display: grid;
-  width: var(--space-8);
-  height: var(--space-8);
-  border: 1px solid var(--color-border-strong);
-  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-badge);
   background: var(--color-surface);
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   flex: 0 0 auto;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
   place-items: center;
 }
 
 .live-create__steps strong {
-  overflow: hidden;
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: var(--line-height-snug);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .live-create__step--current {
@@ -1138,14 +1118,13 @@ onMounted(() => {
 
 .live-create__step--current span,
 .live-create__step--complete span {
-  border-color: var(--color-live);
-  background: var(--color-live);
+  border-color: var(--color-primary);
+  background: var(--color-primary);
   color: var(--color-text-inverse);
 }
 
-.live-create__step--current strong,
-.live-create__step--complete strong {
-  color: var(--color-text-primary);
+.live-create__step--current strong {
+  color: var(--color-primary);
 }
 
 .live-create__body {
@@ -1888,7 +1867,6 @@ onMounted(() => {
 }
 
 @media (max-width: 960px) {
-  .live-create__steps ol,
   .live-create__body,
   .live-create__method-grid {
     grid-template-columns: 1fr;
