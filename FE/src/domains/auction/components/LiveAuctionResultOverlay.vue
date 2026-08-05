@@ -91,7 +91,7 @@ const fireworks = FIREWORK_BURSTS.flatMap((burst, burstIndex) =>
 .auction-result__card {
   display: flex;
   position: relative;
-  z-index: 1;
+  z-index: var(--z-layer-1);
   max-width: min(360px, 84%);
   padding: var(--space-6) var(--space-5);
   border: 1px solid var(--color-live-border);
@@ -110,8 +110,8 @@ const fireworks = FIREWORK_BURSTS.flatMap((burst, burstIndex) =>
   border-radius: var(--radius-badge);
   color: var(--color-accent);
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
@@ -119,8 +119,8 @@ const fireworks = FIREWORK_BURSTS.flatMap((burst, burstIndex) =>
 .auction-result__label {
   margin-top: var(--space-4);
   color: var(--color-live-text-secondary);
-  font-size: 11px;
-  line-height: 16px;
+  font-size: var(--font-size-2xs);
+  line-height: var(--line-height-xs);
 }
 
 .auction-result__label--price {
@@ -134,8 +134,8 @@ const fireworks = FIREWORK_BURSTS.flatMap((burst, burstIndex) =>
   margin-top: 4px;
   color: var(--color-live-text-primary);
   font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 600;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: -0.03em;
   line-height: 1.15;
   word-break: break-all;
@@ -147,7 +147,7 @@ const fireworks = FIREWORK_BURSTS.flatMap((burst, burstIndex) =>
   font-family: var(--font-mono);
   font-size: 38px;
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   letter-spacing: -0.03em;
   line-height: 1.1;
 }
@@ -156,21 +156,21 @@ const fireworks = FIREWORK_BURSTS.flatMap((burst, burstIndex) =>
   max-width: 280px;
   margin-top: var(--space-3);
   color: var(--color-live-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
 }
 
 .auction-result__close {
-  height: 42px;
+  height: var(--button-height-tight);
   margin-top: var(--space-5);
   padding: 0 var(--space-6);
   border: 1px solid var(--color-accent);
   border-radius: var(--radius-control);
   background: var(--color-accent);
   color: var(--color-primary-strong);
-  font-size: 13px;
-  font-weight: 500;
-  transition: background-color 160ms ease;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  transition: background-color var(--transition-base);
 }
 
 .auction-result__close:hover {
@@ -179,7 +179,7 @@ const fireworks = FIREWORK_BURSTS.flatMap((burst, burstIndex) =>
 }
 
 .auction-result__close:focus-visible {
-  outline: 1px solid #fff;
+  outline: 1px solid var(--color-primary-strong);
   outline-offset: 2px;
 }
 
@@ -200,7 +200,7 @@ const fireworks = FIREWORK_BURSTS.flatMap((burst, burstIndex) =>
   background: hsl(var(--hue) 92% 64%);
   box-shadow: none;
   opacity: 0;
-  animation: auction-firework 1.7s ease-out infinite;
+  animation: auction-firework var(--duration-pulse) ease-out infinite;
 }
 
 @keyframes auction-firework {

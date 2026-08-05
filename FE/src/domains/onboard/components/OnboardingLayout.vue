@@ -120,10 +120,10 @@ const onboardingSteps = [
   margin-bottom: var(--space-3);
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 400;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-regular);
   letter-spacing: 0.2em;
-  line-height: 16px;
+  line-height: var(--line-height-xs);
   text-transform: uppercase;
 }
 
@@ -131,7 +131,7 @@ const onboardingSteps = [
   color: var(--color-text-primary);
   font-family: var(--font-display);
   font-size: 40px;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   letter-spacing: -0.035em;
   line-height: 1.08;
 }
@@ -139,12 +139,12 @@ const onboardingSteps = [
 .onboarding-layout__description {
   margin-top: var(--space-3);
   color: var(--color-text-secondary);
-  font-weight: 300;
-  line-height: 24px;
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-body);
 }
 
 .onboarding-layout__content {
-  min-height: 320px;
+  min-height: var(--surface-min-height-lg);
   padding: var(--space-8);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);

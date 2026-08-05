@@ -109,7 +109,7 @@ const emit = defineEmits<{
 
 .notification-state--message {
   display: grid;
-  min-height: 320px;
+  min-height: var(--surface-min-height-lg);
   padding: var(--space-10) var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
@@ -146,7 +146,7 @@ const emit = defineEmits<{
 
 .notification-state h2 {
   color: var(--color-text-primary);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-bold);
   line-height: 30px;
 }
@@ -155,8 +155,8 @@ const emit = defineEmits<{
   max-width: 460px;
   margin-top: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
 }
 
 .notification-state button {
@@ -167,7 +167,7 @@ const emit = defineEmits<{
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 

@@ -210,23 +210,23 @@ const goHome = async () => {
 .verification-pending__eyebrow {
   margin-top: var(--space-4);
   color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-snug);
 }
 
 .verification-pending__header h1 {
   margin-top: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 32px;
-  line-height: 44px;
+  font-size: var(--font-size-4xl);
+  line-height: var(--line-height-4xl);
 }
 
 .verification-pending__header > p:last-child {
   max-width: 560px;
   margin-top: var(--space-2);
   color: var(--color-text-secondary);
-  line-height: 24px;
+  line-height: var(--line-height-body);
 }
 
 .verification-summary {
@@ -245,14 +245,14 @@ const goHome = async () => {
 }
 
 .verification-summary__header h2 {
-  font-size: 20px;
-  line-height: 28px;
+  font-size: var(--font-size-lg-plus);
+  line-height: var(--line-height-lg-plus);
 }
 
 .verification-summary__header p {
   margin-top: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
 }
 
 .verification-summary__header > span {
@@ -261,8 +261,8 @@ const goHome = async () => {
   background: var(--color-primary-soft);
   color: var(--color-primary);
   flex: 0 0 auto;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .verification-summary__details {
@@ -281,14 +281,14 @@ const goHome = async () => {
 
 .verification-summary__details dt {
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
 }
 
 .verification-summary__details dd {
   min-width: 0;
   color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
   overflow-wrap: anywhere;
 }
 
@@ -318,14 +318,14 @@ const goHome = async () => {
 }
 
 .verification-certificate strong {
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
 }
 
 .verification-certificate span {
   overflow: hidden;
   margin-top: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -345,14 +345,14 @@ const goHome = async () => {
 
 .verification-pending__notice strong {
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
 }
 
 .verification-pending__notice p {
   margin-top: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .verification-pending__home-button {
@@ -365,8 +365,8 @@ const goHome = async () => {
   color: var(--color-text-inverse);
   cursor: pointer;
   font: inherit;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
 }
 
 .verification-pending__home-button:hover {
@@ -387,8 +387,8 @@ const goHome = async () => {
 .verification-pending__home-description {
   margin-top: var(--space-2);
   color: var(--color-text-muted);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
   text-align: center;
 }
 
@@ -398,8 +398,8 @@ const goHome = async () => {
   }
 
   .verification-pending__header h1 {
-    font-size: 28px;
-    line-height: 38px;
+    font-size: var(--font-size-3xl);
+    line-height: var(--line-height-3xl);
   }
 
   .verification-summary {

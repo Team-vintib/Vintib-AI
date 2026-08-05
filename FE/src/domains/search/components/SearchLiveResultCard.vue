@@ -92,8 +92,8 @@ const displayTime = computed(() => {
   border-radius: var(--radius-card);
   background: var(--color-surface);
   transition:
-    border-color 160ms ease,
-    transform 160ms ease;
+    border-color var(--transition-base),
+    transform var(--transition-base);
 }
 
 .search-live-card:hover {
@@ -128,9 +128,9 @@ const displayTime = computed(() => {
   padding: 4px 10px;
   border-radius: var(--radius-badge);
   color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-snug);
 }
 
 .search-live-card__badge--live {
@@ -155,7 +155,7 @@ const displayTime = computed(() => {
   display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 17px;
+  font-size: var(--font-size-md-plus);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-body);
   -webkit-box-orient: vertical;
@@ -165,6 +165,6 @@ const displayTime = computed(() => {
 .search-live-card__meta {
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 </style>

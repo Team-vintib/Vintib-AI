@@ -85,15 +85,15 @@ const formatPrice = (price: number | null) =>
 .live-product-queue__header {
   display: flex;
   align-items: center;
-  min-height: 30px;
+  min-height: var(--badge-height-lg);
   padding: 0 var(--space-3);
 }
 
 .live-product-queue__header h2 {
   color: var(--color-live-text-secondary);
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 400;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-regular);
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
@@ -118,8 +118,8 @@ const formatPrice = (price: number | null) =>
   color: var(--color-live-text-primary);
   text-align: left;
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease;
+    background-color var(--transition-base),
+    border-color var(--transition-base);
 }
 
 .live-product-queue__item + .live-product-queue__item {
@@ -148,7 +148,7 @@ const formatPrice = (price: number | null) =>
   border-radius: var(--radius-badge);
   background: var(--color-image-frame);
   color: var(--color-live-text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-badge);
   place-items: center;
 }
 
@@ -168,8 +168,8 @@ const formatPrice = (price: number | null) =>
   background: var(--color-accent);
   color: var(--color-primary-strong);
   font-family: var(--font-mono);
-  font-size: 8px;
-  font-weight: 500;
+  font-size: var(--font-size-4xs);
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.12em;
 }
 
@@ -183,8 +183,8 @@ const formatPrice = (price: number | null) =>
   display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-strong);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
   line-height: 1.35;
   letter-spacing: -0.01em;
   -webkit-box-orient: vertical;
@@ -194,8 +194,8 @@ const formatPrice = (price: number | null) =>
 .live-product-queue__content > span {
   overflow: hidden;
   color: var(--color-live-text-secondary);
-  font-size: 10px;
-  line-height: 15px;
+  font-size: var(--font-size-badge);
+  line-height: var(--line-height-tight);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -204,7 +204,7 @@ const formatPrice = (price: number | null) =>
   margin-top: 4px;
   color: var(--color-text-caption);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-badge);
   letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
 }
@@ -220,8 +220,8 @@ const formatPrice = (price: number | null) =>
   gap: 3px;
   color: var(--color-accent);
   font-family: var(--font-mono);
-  font-size: 8px;
-  font-weight: 500;
+  font-size: var(--font-size-4xs);
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.1em;
   line-height: 13px;
 }
@@ -249,7 +249,7 @@ const formatPrice = (price: number | null) =>
 .live-product-queue__empty > span {
   display: grid;
   width: 42px;
-  height: 42px;
+  height: var(--button-height-tight);
   margin-bottom: var(--space-3);
   border-radius: 50%;
   background: var(--color-live-surface-raised);
@@ -257,8 +257,8 @@ const formatPrice = (price: number | null) =>
 }
 
 .live-product-queue__empty svg {
-  width: 20px;
-  height: 20px;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -268,14 +268,14 @@ const formatPrice = (price: number | null) =>
 
 .live-product-queue__empty strong {
   color: var(--color-live-text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .live-product-queue__empty p {
   max-width: 170px;
   margin-top: 5px;
-  font-size: 10px;
-  line-height: 16px;
+  font-size: var(--font-size-badge);
+  line-height: var(--line-height-xs);
 }
 
 .live-product-queue__item:focus-visible {

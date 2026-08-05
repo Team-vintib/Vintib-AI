@@ -113,8 +113,8 @@ const getStateText = (stepId: number) => {
   background: var(--color-surface);
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
 }
 
 .step-indicator__item--completed .step-indicator__marker,
@@ -126,12 +126,12 @@ const getStateText = (stepId: number) => {
 
 .step-indicator__item--current .step-indicator__label {
   color: var(--color-primary);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .step-indicator__label {
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
 }
 
 .step-indicator__state {

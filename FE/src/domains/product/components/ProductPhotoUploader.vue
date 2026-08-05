@@ -134,9 +134,9 @@ const handleFileChange = (event: Event) => {
   min-width: 0;
   gap: 4px;
   color: var(--color-text-primary);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  line-height: 26px;
+  line-height: var(--line-height-lg);
 }
 
 .product-photo-uploader__title-text {
@@ -147,10 +147,10 @@ const handleFileChange = (event: Event) => {
 .product-photo-uploader__header h3 em {
   flex: 0 0 auto;
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-style: normal;
   font-weight: var(--font-weight-bold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
   white-space: nowrap;
 }
 
@@ -158,7 +158,7 @@ const handleFileChange = (event: Event) => {
   flex: 0 0 auto;
   margin-left: 2px;
   color: var(--color-error);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .product-photo-uploader__required-text {
@@ -179,8 +179,8 @@ const handleFileChange = (event: Event) => {
 
 .product-photo-uploader__header p {
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
   white-space: pre-line;
 }
 
@@ -197,7 +197,7 @@ const handleFileChange = (event: Event) => {
   background: var(--color-surface);
   color: var(--color-text-primary);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
 }
 
@@ -211,8 +211,8 @@ const handleFileChange = (event: Event) => {
 
 .product-photo-uploader__error {
   color: var(--color-error);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .product-photo-uploader__grid {
@@ -255,9 +255,9 @@ const handleFileChange = (event: Event) => {
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
   white-space: nowrap;
 }
 
@@ -270,7 +270,7 @@ const handleFileChange = (event: Event) => {
 .product-photo-uploader__empty {
   display: grid;
   gap: var(--space-1);
-  min-height: 132px;
+  min-height: var(--surface-min-height-2xs);
   place-content: center;
   padding: var(--space-5);
   border: 1px dashed var(--color-border);

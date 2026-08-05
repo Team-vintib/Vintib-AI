@@ -59,9 +59,9 @@ const totalPoint = () =>
 }
 
 .point-summary__hero span {
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
-  line-height: 24px;
+  line-height: var(--line-height-body);
   opacity: 0.82;
 }
 
@@ -90,23 +90,23 @@ const totalPoint = () =>
 
 .point-summary__cards dt {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .point-summary__cards dd {
   margin: 0;
   color: var(--color-text-primary);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-extrabold);
-  line-height: 28px;
+  line-height: var(--line-height-lg-plus);
 }
 
 @media (max-width: 860px) {
   .point-summary__hero strong {
     font-size: 36px;
-    line-height: 44px;
+    line-height: var(--line-height-4xl);
   }
 
   .point-summary__cards {

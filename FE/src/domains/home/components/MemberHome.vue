@@ -207,7 +207,7 @@ const handleAvatarError = (event: Event) => {
   border-radius: var(--radius-card);
   color: inherit;
   text-align: center;
-  transition: border-color 220ms ease;
+  transition: border-color var(--transition-standard);
 }
 
 .seller-card:hover {
@@ -219,8 +219,8 @@ const handleAvatarError = (event: Event) => {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 64px;
-  height: 64px;
+  width: var(--space-16);
+  height: var(--space-16);
   border: 1px solid var(--color-border);
   border-radius: 50%;
   background: var(--color-image-frame);
@@ -238,16 +238,16 @@ const handleAvatarError = (event: Event) => {
   justify-items: center;
   min-width: 0;
   width: 100%;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .seller-card__name {
   color: var(--color-text-primary);
   overflow: hidden;
   max-width: 100%;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 21px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-comfortable);
   letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -257,10 +257,10 @@ const handleAvatarError = (event: Event) => {
   justify-content: center;
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-regular);
   letter-spacing: -0.01em;
-  line-height: 18px;
+  line-height: var(--line-height-snug);
   font-variant-numeric: tabular-nums;
 }
 

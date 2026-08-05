@@ -352,25 +352,25 @@ watch(
 
 .seller-auction__header h2 {
   color: var(--color-live-text-primary);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
 }
 
 .seller-auction__phase {
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
+  min-height: var(--badge-height-xs);
   padding: 0 8px;
   border-radius: var(--radius-badge);
   background: var(--color-live-surface-raised);
   color: var(--color-live-text-secondary);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-bold);
 }
 
 .seller-auction__phase--running {
-  background: #c43d46;
-  color: #fff;
+  background: var(--color-auction);
+  color: var(--color-primary-strong);
 }
 
 .seller-auction__phase--ended_won {
@@ -380,8 +380,8 @@ watch(
 
 .seller-auction__empty {
   color: var(--color-live-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
 }
 
 .seller-auction__target {
@@ -394,14 +394,14 @@ watch(
 
 .seller-auction__target span {
   color: var(--color-live-text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-badge);
 }
 
 .seller-auction__target strong {
   overflow: hidden;
   color: var(--color-live-text-primary);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -415,8 +415,8 @@ watch(
 .seller-auction__field > label,
 .seller-auction__label {
   color: var(--color-live-text-secondary);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
 }
 
 .seller-auction__presets {
@@ -426,13 +426,13 @@ watch(
 
 .seller-auction__presets button {
   flex: 1;
-  min-height: 30px;
+  min-height: var(--badge-height-lg);
   border: 1px solid var(--color-live-border);
   border-radius: var(--radius-control);
   background: var(--color-live-background);
   color: var(--color-live-text-secondary);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
 }
 
 .seller-auction__presets button:hover {
@@ -440,9 +440,9 @@ watch(
 }
 
 .seller-auction__preset--active {
-  border-color: #c43d46 !important;
-  background: color-mix(in srgb, #c43d46 18%, transparent) !important;
-  color: #fff !important;
+  border-color: var(--color-auction) !important;
+  background: color-mix(in srgb, var(--color-auction) 18%, transparent) !important;
+  color: var(--color-primary-strong) !important;
 }
 
 .seller-auction__input {
@@ -457,12 +457,12 @@ watch(
 
 .seller-auction__input input {
   width: 100%;
-  height: 34px;
+  height: var(--button-height-2xs);
   border: 0;
   background: transparent;
   color: var(--color-live-text-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
 }
 
@@ -472,13 +472,13 @@ watch(
 
 .seller-auction__input span {
   color: var(--color-live-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .seller-auction__hint {
   color: var(--color-live-text-secondary);
-  font-size: 10px;
-  line-height: 15px;
+  font-size: var(--font-size-badge);
+  line-height: var(--line-height-tight);
 }
 
 .seller-auction__hint--error {
@@ -486,15 +486,15 @@ watch(
 }
 
 .seller-auction__start {
-  min-height: 44px;
+  min-height: var(--button-height-compact);
   margin-top: var(--space-1);
   border: 0;
   border-radius: 9px;
-  background: #c43d46;
+  background: var(--color-auction);
   box-shadow: none;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
+  color: var(--color-primary-strong);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .seller-auction__start:hover:not(:disabled) {
@@ -520,7 +520,7 @@ watch(
 .seller-auction__metric span {
   display: block;
   color: var(--color-live-text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-badge);
 }
 
 .seller-auction__metric strong {
@@ -529,16 +529,16 @@ watch(
   overflow: hidden;
   color: var(--color-live-text-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .seller-auction__metric--current strong {
-  color: #c43d46;
+  color: var(--color-auction);
   font-size: 20px;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .seller-auction__timer--urgent {
@@ -550,8 +550,8 @@ watch(
   border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--color-timer) 18%, transparent);
   color: var(--color-timer);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
   text-align: center;
 }
 
@@ -573,14 +573,14 @@ watch(
 
 .seller-auction__result strong {
   color: var(--color-live-text-primary);
-  font-size: 15px;
-  font-weight: 800;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-extrabold);
 }
 
 .seller-auction__result p {
   color: var(--color-live-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
 }
 
 .seller-auction__result dl {
@@ -596,13 +596,13 @@ watch(
 
 .seller-auction__result dt {
   color: var(--color-live-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 .seller-auction__result dd {
   color: var(--color-live-text-primary);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
 }
 
@@ -610,14 +610,14 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
+  min-height: var(--button-height-sm);
   gap: 6px;
   border: 1px solid var(--color-live-border);
   border-radius: var(--radius-control);
   background: var(--color-live-background);
   color: var(--color-live-text-primary);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
 }
 
 .seller-auction__soon {
@@ -625,8 +625,8 @@ watch(
   border-radius: var(--radius-badge);
   background: var(--color-live-surface-raised);
   color: var(--color-live-text-secondary);
-  font-size: 9px;
-  font-weight: 700;
+  font-size: var(--font-size-3xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .seller-auction__start:focus-visible,

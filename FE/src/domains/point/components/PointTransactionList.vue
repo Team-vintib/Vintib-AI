@@ -76,9 +76,9 @@ const formatDateTime = (dateTime: string) =>
 
 .point-transactions h2 {
   color: var(--color-text-primary);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-extrabold);
-  line-height: 28px;
+  line-height: var(--line-height-lg-plus);
 }
 
 .point-transactions header button {
@@ -88,7 +88,7 @@ const formatDateTime = (dateTime: string) =>
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
@@ -123,23 +123,23 @@ const formatDateTime = (dateTime: string) =>
 
 .point-transactions__main span {
   color: var(--color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .point-transactions__main strong {
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
 }
 
 .point-transactions__main small,
 .point-transactions__amount span {
   color: var(--color-text-muted);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .point-transactions__amount {
@@ -149,9 +149,9 @@ const formatDateTime = (dateTime: string) =>
 
 .point-transactions__amount strong {
   color: var(--color-primary);
-  font-size: 16px;
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-extrabold);
-  line-height: 24px;
+  line-height: var(--line-height-body);
 }
 
 .point-transactions__amount--minus {
@@ -161,8 +161,8 @@ const formatDateTime = (dateTime: string) =>
 .point-transactions__empty {
   padding: var(--space-6);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
   text-align: center;
 }
 

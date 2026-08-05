@@ -96,7 +96,7 @@ const emit = defineEmits<{
 }
 
 .live-list-state__skeleton-line--title {
-  height: 22px;
+  height: var(--badge-height-xs);
 }
 
 .live-list-state__skeleton-line--short {
@@ -105,7 +105,7 @@ const emit = defineEmits<{
 
 .live-list-state--message {
   display: grid;
-  min-height: 360px;
+  min-height: var(--surface-min-height-xl);
   padding: var(--space-10) var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
@@ -118,7 +118,7 @@ const emit = defineEmits<{
 .live-list-state__icon {
   display: grid;
   width: 56px;
-  height: 56px;
+  height: var(--button-height-tall);
   margin-bottom: var(--space-4);
   border-radius: 50%;
   background: var(--color-surface-secondary);
@@ -143,8 +143,8 @@ const emit = defineEmits<{
 .live-list-state h2 {
   color: var(--color-text-primary);
   font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 600;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: -0.03em;
   line-height: 1.1;
 }
@@ -153,9 +153,9 @@ const emit = defineEmits<{
   max-width: 460px;
   margin-top: var(--space-3);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  font-weight: 300;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-relaxed);
 }
 
 .live-list-state button {
@@ -166,11 +166,11 @@ const emit = defineEmits<{
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-medium);
   transition:
-    background-color 160ms ease,
-    color 160ms ease;
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .live-list-state button:hover {
@@ -209,7 +209,7 @@ const emit = defineEmits<{
   }
 
   .live-list-state--message {
-    min-height: 320px;
+    min-height: var(--surface-min-height-lg);
     padding: var(--space-8) var(--space-5);
   }
 }

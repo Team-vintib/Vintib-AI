@@ -110,7 +110,7 @@ const formatSchedule = (value?: string) => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-media);
   background: var(--color-image-frame);
-  transition: border-color 220ms ease;
+  transition: border-color var(--transition-standard);
 }
 
 .live-card__media {
@@ -130,7 +130,7 @@ const formatSchedule = (value?: string) => {
 .live-card__media::after {
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, rgba(10, 10, 10, 0.55), transparent 42%);
+  background: linear-gradient(0deg, var(--overlay-scrim-medium), transparent 42%);
   content: '';
 }
 
@@ -140,7 +140,7 @@ const formatSchedule = (value?: string) => {
   height: 100%;
   object-fit: cover;
   filter: saturate(0.88) contrast(1.04) brightness(0.95);
-  transition: filter 220ms ease;
+  transition: filter var(--transition-standard);
 }
 
 .live-card:hover .live-card__image,
@@ -152,18 +152,18 @@ const formatSchedule = (value?: string) => {
 .live-card__viewers,
 .schedule-card__time {
   position: absolute;
-  z-index: 1;
+  z-index: var(--z-layer-1);
   top: 0;
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
-  padding: 0 8px;
+  min-height: var(--line-height-relaxed);
+  padding: 0 var(--space-2);
   color: var(--color-text-primary);
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.12em;
-  line-height: 16px;
+  line-height: var(--line-height-xs);
 }
 
 .live-card__badge {
@@ -180,7 +180,7 @@ const formatSchedule = (value?: string) => {
   border-radius: 50%;
   background: currentColor;
   content: '';
-  animation: live-pulse 1.7s ease-in-out infinite;
+  animation: live-pulse var(--duration-pulse) ease-in-out infinite;
 }
 
 @keyframes live-pulse {
@@ -197,7 +197,7 @@ const formatSchedule = (value?: string) => {
 
 .live-card__viewers {
   right: 0;
-  background: rgba(10, 10, 10, 0.82);
+  background: var(--overlay-scrim-strong);
   border-radius: 0 0 0 var(--radius-badge);
   color: var(--color-text-secondary);
   letter-spacing: -0.01em;
@@ -206,7 +206,7 @@ const formatSchedule = (value?: string) => {
 
 .schedule-card__time {
   left: 0;
-  background: rgba(10, 10, 10, 0.82);
+  background: var(--overlay-scrim-strong);
   border-radius: 0 0 var(--radius-badge) 0;
 }
 
@@ -226,9 +226,9 @@ const formatSchedule = (value?: string) => {
   display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 21px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-comfortable);
   letter-spacing: -0.01em;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -244,10 +244,10 @@ const formatSchedule = (value?: string) => {
   overflow: hidden;
   min-width: 0;
   color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-medium);
   letter-spacing: -0.01em;
-  line-height: 20px;
+  line-height: var(--line-height-control);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -256,7 +256,7 @@ const formatSchedule = (value?: string) => {
   flex: 0 0 auto;
   color: var(--color-text-secondary);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   letter-spacing: -0.01em;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -265,9 +265,9 @@ const formatSchedule = (value?: string) => {
 .live-card__meta,
 .schedule-card__meta {
   color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 300;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-snug);
 }
 
 .schedule-card__action {
@@ -276,18 +276,18 @@ const formatSchedule = (value?: string) => {
   justify-content: center;
   align-self: flex-start;
   width: fit-content;
-  height: 32px;
+  height: var(--space-8);
   padding: 0 var(--space-3);
   margin-top: var(--space-1);
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-snug);
   transition:
-    background-color 220ms ease,
-    color 220ms ease;
+    background-color var(--transition-standard),
+    color var(--transition-standard);
 }
 
 .schedule-card__action:hover {
@@ -297,8 +297,8 @@ const formatSchedule = (value?: string) => {
 
 @media (max-width: 520px) {
   .live-card__title {
-    font-size: 15px;
-    line-height: 22px;
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-relaxed);
   }
 
   .schedule-card__media {
