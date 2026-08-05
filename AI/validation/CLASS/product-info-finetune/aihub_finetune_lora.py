@@ -61,6 +61,7 @@ def run_name(
     dropout: float = DEFAULT_DROPOUT,
     target_modules: tuple[str, ...] = DEFAULT_TARGET_MODULES,
     warm_start: bool = False,
+    frozen_backbone: bool = False,
 ) -> str:
     """`lora_`로 시작 — 노트북의 `method_of()`가 이 접두어로 LoRA를 분류한다.
 
@@ -69,9 +70,12 @@ def run_name(
 
     `warm_start=True`면 `_warm` 접미사를 붙인다 — `aihub_finetune_vit.run_name()`과 같은
     이유(다른 태스크 체크포인트에서 이어받은 run을 독립학습 run과 구분).
+
+    `frozen_backbone=True`면 `_probe` 접미사를 붙인다 — `--freeze-backbone`으로 어댑터를
+    더 학습시키지 않고 헤드만 학습한 진단 run이다.
     """
     modules_tag = "".join(sorted(m.split("_")[0] for m in target_modules))
-    suffix = "_warm" if warm_start else ""
+    suffix = ("_warm" if warm_start else "") + ("_probe" if frozen_backbone else "")
     return (
         f"lora_r{r}_a{alpha}_d{dropout:g}_{modules_tag}_{task}_{variant}_lr{lr_adapter:g}{suffix}"
     )
@@ -152,6 +156,13 @@ def main(argv: list[str] | None = None) -> int:
         help="다른 태스크에서 저장한 checkpoint.pt 경로. 주면 그 backbone(헤드 제외)에서 "
         "이어서 학습한다 — 예: 카테고리로 파인튜닝한 체크포인트에서 이어받아 색상을 학습",
     )
+    parser.add_argument(
+        "--freeze-backbone",
+        action="store_true",
+        help="--init-checkpoint로 불러온 backbone(LoRA 어댑터 포함)을 더 학습시키지 않고 "
+        "완전히 얼린 채 헤드만 학습한다 — '이 backbone이 다른 태스크에서도 여전히 쓸만한가'를 "
+        "재는 진단용",
+    )
     args = parser.parse_args(argv)
 
     import torch
@@ -213,6 +224,11 @@ def main(argv: list[str] | None = None) -> int:
         model.load_state_dict(checkpoint["backbone_state_dict"], strict=False)
         print(f"backbone 웜스타트: {args.init_checkpoint} (task={checkpoint.get('task')})")
 
+    if args.freeze_backbone:
+        for parameter in model.parameters():
+            parameter.requires_grad_(False)
+        print("backbone 동결(진단 모드) — 헤드만 학습한다")
+
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total = sum(p.numel() for p in model.parameters())
     print(f"학습 대상 파라미터: {trainable:,} / {total:,} ({trainable / total:.2%})")
@@ -252,6 +268,7 @@ def main(argv: list[str] | None = None) -> int:
         dropout=args.dropout,
         target_modules=tuple(args.target_modules),
         warm_start=args.init_checkpoint is not None,
+        frozen_backbone=args.freeze_backbone,
     )
     out_dir = args.out_dir or (args.pixel_cache_dir.parent / "artifacts_finetune")
     run_dir = out_dir / name
@@ -286,6 +303,7 @@ def main(argv: list[str] | None = None) -> int:
         "lr_head": args.lr_head,
         "batch_size": args.batch_size,
         "init_checkpoint": str(args.init_checkpoint) if args.init_checkpoint else None,
+        "frozen_backbone": args.freeze_backbone,
         "classes": classes,
         "history": result["history"],
         "best_epoch": best_state["epoch"],

@@ -44,6 +44,16 @@ def test_run_name_warm_start_still_classified_correctly() -> None:
     assert fp.method_of(warm) == "last-N 언프리즈"
 
 
+def test_run_name_frozen_backbone_gets_distinct_suffix() -> None:
+    """색상으로 이어서 학습한 backbone이 카테고리도 여전히 잘하는지 재는 진단 run(헤드만
+    학습, backbone 동결)은 실제로 backbone을 더 학습시킨 run과 다른 폴더에 저장돼야 한다."""
+    warm = fv.run_name("category", "masked", 4, 1e-5, warm_start=True)
+    probe = fv.run_name("category", "masked", 4, 1e-5, warm_start=True, frozen_backbone=True)
+    assert probe != warm
+    assert probe == warm + "_probe"
+    assert fp.method_of(probe) == "last-N 언프리즈"
+
+
 def test_encode_labels_sorts_classes_and_matches_indices() -> None:
     indices, classes = fv.encode_labels(["SHIRT", "TSHIRT", "SHIRT", "JACKET"])
     assert classes == ["JACKET", "SHIRT", "TSHIRT"]

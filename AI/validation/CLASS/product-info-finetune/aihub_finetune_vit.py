@@ -51,6 +51,7 @@ def run_name(
     lr_backbone: float,
     *,
     warm_start: bool = False,
+    frozen_backbone: bool = False,
 ) -> str:
     """run마다 다른 폴더 이름 — 하이퍼파라미터 조합이 다르면 이전 run과 안 겹친다.
 
@@ -60,9 +61,14 @@ def run_name(
     `warm_start=True`면 `_warm` 접미사를 붙인다 — `--init-checkpoint`로 다른 태스크의
     체크포인트에서 이어서 학습한 run은, 처음부터 학습한(독립학습) run과 같은 폴더에
     저장되면 안 된다(둘을 비교하는 게 목적이라 하나가 다른 하나를 덮어쓰면 안 됨).
-    `method_of()`는 접두어만 보므로 이 접미사가 붙어도 방법 분류는 그대로 된다.
+
+    `frozen_backbone=True`면 `_probe` 접미사를 붙인다 — `--freeze-backbone`으로 백본을
+    안 건드리고 헤드만 학습한 run이다("이 백본이 다른 태스크에서도 여전히 쓸만한가"를
+    재는 진단 실행). 실제로 백본을 더 적응시킨 run과 구분해야 한다.
+
+    `method_of()`는 접두어만 보므로 이 접미사들이 붙어도 방법 분류는 그대로 된다.
     """
-    suffix = "_warm" if warm_start else ""
+    suffix = ("_warm" if warm_start else "") + ("_probe" if frozen_backbone else "")
     return f"vit_last{unfreeze_layers}_{task}_{variant}_lr{lr_backbone:g}{suffix}"
 
 
@@ -301,6 +307,13 @@ def main(argv: list[str] | None = None) -> int:
         help="다른 태스크에서 저장한 checkpoint.pt 경로. 주면 그 backbone(헤드 제외)에서 "
         "이어서 학습한다 — 예: 카테고리로 파인튜닝한 체크포인트에서 이어받아 색상을 학습",
     )
+    parser.add_argument(
+        "--freeze-backbone",
+        action="store_true",
+        help="--init-checkpoint로 불러온 backbone을 더 학습시키지 않고 완전히 얼린 채 "
+        "헤드만 학습한다 — '이 backbone이 다른 태스크에서도 여전히 쓸만한가'를 재는 진단용 "
+        "(예: 색상으로 이어서 학습한 backbone이 카테고리도 여전히 잘하는지 확인)",
+    )
     args = parser.parse_args(argv)
 
     import torch
@@ -360,6 +373,11 @@ def main(argv: list[str] | None = None) -> int:
         model.load_state_dict(checkpoint["backbone_state_dict"], strict=False)
         print(f"backbone 웜스타트: {args.init_checkpoint} (task={checkpoint.get('task')})")
 
+    if args.freeze_backbone:
+        for parameter in model.parameters():
+            parameter.requires_grad_(False)
+        print("backbone 동결(진단 모드) — 헤드만 학습한다")
+
     feature_dim = model.config.projection_dim
     head = torch.nn.Linear(feature_dim, len(classes)).to(device)
 
@@ -393,6 +411,7 @@ def main(argv: list[str] | None = None) -> int:
         args.unfreeze_layers,
         args.lr_backbone,
         warm_start=args.init_checkpoint is not None,
+        frozen_backbone=args.freeze_backbone,
     )
     out_dir = args.out_dir or (args.pixel_cache_dir.parent / "artifacts_finetune")
     run_dir = out_dir / name
@@ -422,6 +441,7 @@ def main(argv: list[str] | None = None) -> int:
         "lr_head": args.lr_head,
         "batch_size": args.batch_size,
         "init_checkpoint": str(args.init_checkpoint) if args.init_checkpoint else None,
+        "frozen_backbone": args.freeze_backbone,
         "classes": classes,
         "history": result["history"],
         "best_epoch": best_state["epoch"],

@@ -239,6 +239,25 @@ python validation/CLASS/product-info-finetune/aihub_finetune_vit.py \
 독립학습 run과 안 겹친다 — 둘 다 남겨서 `aihub_finetune_summary.py --best-per-group
 method,task`로 어느 쪽이 더 나은지 비교하는 걸 권장한다(하나가 다른 하나를 대체하지 않는다).
 
+### 이 백본이 원래 태스크도 여전히 잘하는지 진단(`--freeze-backbone`)
+
+배포될 기능은 사진 한 장에 카테고리·색상을 **동시에** 내야 한다 — 그러니 색상으로 이어서
+학습한 backbone이 카테고리도 여전히 잘하는지(혹은 그 반대) 확인이 필요하다. `--init-checkpoint`
+와 `--freeze-backbone`을 같이 주면, 그 backbone을 **더 학습시키지 않고** 새 헤드만 학습해
+순수하게 "이 backbone이 다른 태스크에 얼마나 쓸만한가"를 잰다:
+
+```bash
+python validation/CLASS/product-info-finetune/aihub_finetune_vit.py \
+    --pixel-cache-dir .../artifacts \
+    --task category --variant masked \
+    --unfreeze-layers 4 --epochs 5 --batch-size 32 \
+    --init-checkpoint .../artifacts_finetune/vit_last4_color_masked_lr1e-05_warm/checkpoint.pt \
+    --freeze-backbone
+```
+
+이 test accuracy를 카테고리 전용으로 학습한 원래 결과와 비교하면, 색상 학습이 카테고리
+성능을 얼마나 깎았는지(또는 안 깎았는지) 알 수 있다. run 폴더 이름엔 `_probe`가 붙는다.
+
 ## STEP 3.7 — (선택, 실험) LoRA 파인튜닝
 
 STEP 3.6(last-N 언프리즈)의 대안이다. last-N은 마지막 몇 개 블록을 **통째로** 학습하고,
@@ -260,7 +279,8 @@ python validation/CLASS/product-info-finetune/aihub_finetune_lora.py \
 
 STEP 3.6과 같은 이유로 `--init-checkpoint`도 지원한다(다른 태스크의 LoRA 체크포인트에서
 이어서 학습). `--r`/`--target-modules`가 체크포인트 학습 때와 다르면 경고만 찍고 겹치는
-어댑터 파라미터만 로드한다.
+어댑터 파라미터만 로드한다. `--freeze-backbone`도 동일하게 지원한다 — "이 어댑터가 다른
+태스크에서도 여전히 쓸만한가" 진단은 STEP 3.6 쪽 설명을 그대로 참고.
 
 ## STEP 4 — 헤드 학습 (CPU, 수 초)
 

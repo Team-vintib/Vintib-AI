@@ -70,3 +70,15 @@ def test_run_name_warm_start_still_classified_correctly() -> None:
     그대로 동작해야 한다 — 안 그러면 순차학습 run이 플랏/리더보드에서 "기타"로 빠진다."""
     warm = lora.run_name("color", "masked", 16, 1e-4, alpha=32, warm_start=True)
     assert fp.method_of(warm) == "LoRA"
+
+
+def test_run_name_frozen_backbone_gets_distinct_suffix() -> None:
+    """색상으로 이어서 학습한 backbone이 카테고리도 여전히 잘하는지 재는 진단 run(헤드만
+    학습, 어댑터 동결)은 실제로 어댑터를 더 학습시킨 run과 다른 폴더에 저장돼야 한다."""
+    warm = lora.run_name("category", "masked", 16, 1e-4, alpha=32, warm_start=True)
+    probe = lora.run_name(
+        "category", "masked", 16, 1e-4, alpha=32, warm_start=True, frozen_backbone=True
+    )
+    assert probe != warm
+    assert probe == warm + "_probe"
+    assert fp.method_of(probe) == "LoRA"
