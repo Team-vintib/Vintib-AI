@@ -39,6 +39,7 @@ def test_load_runs_reads_run_name_from_folder_and_drops_huge_lists(tmp_path: Pat
 def test_best_per_group_keeps_top_run_per_method_and_task(tmp_path: Path) -> None:
     """color 파인튜닝을 시작하면서 실제로 필요해진 사용례 — last-N·LoRA 각각 category·color
     베스트만 뽑아 4행짜리 리더보드를 만든다. 같은 (method, task) 안에서 진 run은 빠져야 한다."""
+
     def _row(run: str, method: str, task: str, test_accuracy: float) -> dict:
         return {"run": run, "method": method, "task": task, "test_accuracy": test_accuracy}
 
