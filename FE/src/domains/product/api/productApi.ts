@@ -1,6 +1,7 @@
 import axios from 'axios'
 
 import type {
+  ProductCategoryOption,
   ProductConditionGrade,
   ProductListItem,
   ProductSaleStatus,
@@ -287,6 +288,51 @@ export const getCategories = async () => {
   const response = await http.get<ApiResponse<CategoryDto[]>>('/categories', { skipAuth: true })
 
   return unwrapApiData(response.data)
+}
+
+// 소분류(depth 3)를 부모 대분류(depth 2)로 묶어 필터/탭 옵션을 만든다. 같은 이름의 대분류가
+// 성별(남성/여성/공용)마다 따로 있어 이름으로 병합한다(예: "아우터"는 성별 3개를 합쳐 하나).
+export const buildProductCategoryOptions = (categories: CategoryDto[]): ProductCategoryOption[] => {
+  const childrenByParentId = new Map<number, number[]>()
+
+  categories
+    .filter((category) => category.depth === 3)
+    .forEach((category) => {
+      const parentId = category.parentId
+      if (parentId === null) return
+
+      const siblingIds = childrenByParentId.get(parentId) ?? []
+      siblingIds.push(category.id)
+      childrenByParentId.set(parentId, siblingIds)
+    })
+
+  const groupedOptions = new Map<string, ProductCategoryOption>()
+
+  categories
+    .filter((category) => category.depth === 2)
+    .forEach((category) => {
+      const label = category.name.trim()
+      if (!label) return
+
+      const categoryIds = [category.id, ...(childrenByParentId.get(category.id) ?? [])]
+      const existingOption = groupedOptions.get(label)
+
+      if (existingOption) {
+        existingOption.categoryIds.push(...categoryIds)
+        return
+      }
+
+      groupedOptions.set(label, {
+        id: category.id,
+        label,
+        categoryIds,
+      })
+    })
+
+  return [...groupedOptions.values()].map((option) => ({
+    ...option,
+    categoryIds: [...new Set(option.categoryIds)],
+  }))
 }
 
 export const addWish = async (userId: number, productId: number) => {

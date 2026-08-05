@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import {
   addWish,
-  type CategoryDto,
+  buildProductCategoryOptions,
   getCategories,
   getProductList,
   getWishProductIds,
@@ -30,6 +30,7 @@ import { ROUTE_NAMES } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const wishStore = useWishStore()
 const categoryOptions = ref<ProductCategoryOption[]>([])
@@ -37,7 +38,11 @@ const isLoadingCategories = ref(true)
 const categoryLoadError = ref('')
 const selectedCategoryIds = ref<number[]>([])
 const selectedConditionIds = ref<string[]>([])
-const selectedSaleType = ref<ProductSaleTypeTab['id']>('ALL')
+
+const initialSaleType = PRODUCT_SALE_TYPE_TABS.find(
+  (tab) => tab.id === route.query.saleType,
+)?.id
+const selectedSaleType = ref<ProductSaleTypeTab['id']>(initialSaleType ?? 'ALL')
 const selectedSortOption = ref<ProductSortOption>('LATEST')
 const selectedPage = ref(1)
 const searchKeyword = ref('')
@@ -250,49 +255,6 @@ const moveToPage = (page: number) => {
   void loadProducts()
 }
 
-const buildCategoryOptions = (categories: CategoryDto[]): ProductCategoryOption[] => {
-  const childrenByParentId = new Map<number, number[]>()
-
-  categories
-    .filter((category) => category.depth === 3)
-    .forEach((category) => {
-      const parentId = category.parentId
-      if (parentId === null) return
-
-      const siblingIds = childrenByParentId.get(parentId) ?? []
-      siblingIds.push(category.id)
-      childrenByParentId.set(parentId, siblingIds)
-    })
-
-  const groupedOptions = new Map<string, ProductCategoryOption>()
-
-  categories
-    .filter((category) => category.depth === 2)
-    .forEach((category) => {
-      const label = category.name.trim()
-      if (!label) return
-
-      const categoryIds = [category.id, ...(childrenByParentId.get(category.id) ?? [])]
-      const existingOption = groupedOptions.get(label)
-
-      if (existingOption) {
-        existingOption.categoryIds.push(...categoryIds)
-        return
-      }
-
-      groupedOptions.set(label, {
-        id: category.id,
-        label,
-        categoryIds,
-      })
-    })
-
-  return [...groupedOptions.values()].map((option) => ({
-    ...option,
-    categoryIds: [...new Set(option.categoryIds)],
-  }))
-}
-
 const loadCategoryOptions = async () => {
   isLoadingCategories.value = true
   categoryLoadError.value = ''
@@ -300,7 +262,7 @@ const loadCategoryOptions = async () => {
   try {
     const categories = await getCategories()
 
-    categoryOptions.value = buildCategoryOptions(categories)
+    categoryOptions.value = buildProductCategoryOptions(categories)
   } catch {
     categoryOptions.value = []
     categoryLoadError.value = '카테고리를 불러오지 못했습니다.'

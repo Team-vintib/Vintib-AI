@@ -5,12 +5,16 @@ import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
 import LiveCard from '@/domains/home/components/LiveCard.vue'
 import ProductCard from '@/domains/home/components/ProductCard.vue'
-import type { HomeViewData } from '@/domains/home/types/homeView.types'
+import type { HomePopularHostLive, HomeViewData } from '@/domains/home/types/homeView.types'
+import type { ProductCategoryTabSection } from '@/domains/product/types/productList.types'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
 defineProps<{
   homeData: HomeViewData
   wishedProductIds: Set<number>
+  productGradeLabels: Map<number, string>
+  popularHostLive: HomePopularHostLive | null
+  categoryProductTabs: ProductCategoryTabSection[]
 }>()
 
 const emit = defineEmits<{
@@ -25,7 +29,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
   <div class="guest-home">
     <HomeSearchPanel />
 
-    <HomeHeroCarousel :home-data="homeData" />
+    <HomeHeroCarousel :home-data="homeData" :popular-host-live="popularHostLive" />
 
     <HomeSection
       title-id="live-now-title"
@@ -79,6 +83,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
+          :grade-label="productGradeLabels.get(product.id)"
           :is-wished="wishedProductIds.has(product.id)"
           @toggle-wish="emit('toggleWish', $event)"
         />
@@ -86,7 +91,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
     </HomeSection>
 
     <CategoryProductTabs
-      :sections="homeData.categoryProductSections"
+      :sections="categoryProductTabs"
       :wished-product-ids="wishedProductIds"
       @toggle-wish="emit('toggleWish', $event)"
     />
@@ -95,7 +100,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
       title-id="auction-title"
       eyebrow="Auction"
       title="경매 예정 상품"
-      :link-to="ROUTE_PATHS.PRODUCT_LIST"
+      :link-to="{ path: ROUTE_PATHS.PRODUCT_LIST, query: { saleType: 'AUCTION' } }"
       :is-empty="homeData.upcomingAuctionProducts.length === 0"
       empty-message="경매 예정 상품이 없습니다."
     >
@@ -105,8 +110,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
-          badge-label="경매 예정"
-          badge-variant="auction"
+          :grade-label="productGradeLabels.get(product.id)"
           price-prefix="가격 "
           :action-to="ROUTE_PATHS.AUTH_LOGIN"
           action-label="경매 알림 받기"

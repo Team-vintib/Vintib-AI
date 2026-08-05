@@ -7,12 +7,16 @@ import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
 import LiveCard from '@/domains/home/components/LiveCard.vue'
 import ProductCard from '@/domains/home/components/ProductCard.vue'
-import type { HomeViewData } from '@/domains/home/types/homeView.types'
+import type { HomePopularHostLive, HomeViewData } from '@/domains/home/types/homeView.types'
+import type { ProductCategoryTabSection } from '@/domains/product/types/productList.types'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
 
 defineProps<{
   homeData: HomeViewData
   wishedProductIds: Set<number>
+  productGradeLabels: Map<number, string>
+  popularHostLive: HomePopularHostLive | null
+  categoryProductTabs: ProductCategoryTabSection[]
 }>()
 
 const emit = defineEmits<{
@@ -42,12 +46,12 @@ const handleAvatarError = (event: Event) => {
   <div class="member-home">
     <HomeSearchPanel />
 
-    <HomeHeroCarousel :home-data="homeData" />
+    <HomeHeroCarousel :home-data="homeData" :popular-host-live="popularHostLive" />
 
     <HomeSection
       title-id="followed-seller-title"
       eyebrow="Following"
-      title="내가 팔로우한 판매자"
+      title="팔로우 중인 판매자"
       :link-to="ROUTE_PATHS.FOLLOWING_HOME"
       :is-empty="homeData.followedSellers.length === 0"
       empty-message="팔로우한 판매자가 없습니다."
@@ -133,8 +137,7 @@ const handleAvatarError = (event: Event) => {
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
-          :badge-label="product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'"
-          :badge-variant="product.saleType === 'AUCTION' ? 'auction' : 'direct'"
+          :grade-label="productGradeLabels.get(product.id)"
           :is-wished="wishedProductIds.has(product.id)"
           @toggle-wish="emit('toggleWish', $event)"
         />
@@ -142,7 +145,7 @@ const handleAvatarError = (event: Event) => {
     </HomeSection>
 
     <CategoryProductTabs
-      :sections="homeData.categoryProductSections"
+      :sections="categoryProductTabs"
       :wished-product-ids="wishedProductIds"
       @toggle-wish="emit('toggleWish', $event)"
     />
@@ -151,7 +154,7 @@ const handleAvatarError = (event: Event) => {
       title-id="auction-title"
       eyebrow="Auction"
       title="경매 예정 상품"
-      :link-to="ROUTE_PATHS.PRODUCT_LIST"
+      :link-to="{ path: ROUTE_PATHS.PRODUCT_LIST, query: { saleType: 'AUCTION' } }"
       :is-empty="homeData.upcomingAuctionProducts.length === 0"
       empty-message="경매 예정 상품이 없습니다."
     >
@@ -161,8 +164,7 @@ const handleAvatarError = (event: Event) => {
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
-          badge-label="경매 예정"
-          badge-variant="auction"
+          :grade-label="productGradeLabels.get(product.id)"
           price-prefix="가격 "
           :is-wished="wishedProductIds.has(product.id)"
           @toggle-wish="emit('toggleWish', $event)"
@@ -195,18 +197,16 @@ const handleAvatarError = (event: Event) => {
 }
 
 // 낮고 컴팩트한 카드: 얇은 border만, 채워진 배경 박스는 두지 않는다.
-// hover도 뜨지 않고 보더 대비만 미세하게 바뀐다. 정사각형에 가깝게 세로(아바타 위·텍스트 아래) 배치한다.
+// hover도 뜨지 않고 보더 대비만 미세하게 바뀐다. 아바타는 왼쪽, 닉네임·통계는 오른쪽에 배치한다.
 .seller-card {
   position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-4) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   color: inherit;
-  text-align: center;
   transition: border-color var(--transition-standard);
 }
 
@@ -235,7 +235,7 @@ const handleAvatarError = (event: Event) => {
 
 .seller-card__body {
   display: grid;
-  justify-items: center;
+  justify-items: start;
   min-width: 0;
   width: 100%;
   gap: var(--space-1);
@@ -254,7 +254,10 @@ const handleAvatarError = (event: Event) => {
 }
 
 .seller-card__stats {
-  justify-content: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: var(--space-1) var(--space-3);
   color: var(--color-text-muted);
   font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
@@ -262,12 +265,6 @@ const handleAvatarError = (event: Event) => {
   letter-spacing: -0.01em;
   line-height: var(--line-height-snug);
   font-variant-numeric: tabular-nums;
-}
-
-.seller-card__stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-3);
 }
 
 @media (max-width: 768px) {
