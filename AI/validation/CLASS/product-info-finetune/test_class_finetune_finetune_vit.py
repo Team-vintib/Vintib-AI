@@ -56,3 +56,20 @@ def test_filter_known_classes_keeps_everything_when_all_known() -> None:
     assert dropped == 0
     assert y == [0, 1]
     assert np.array_equal(x_kept, x)
+
+
+def test_next_versioned_dir_returns_bare_name_when_absent(tmp_path) -> None:
+    target = tmp_path / "vit_last4_category_masked_lr1e-05"
+    assert fv.next_versioned_dir(target) == target
+
+
+def test_next_versioned_dir_bumps_version_when_taken(tmp_path) -> None:
+    """torch 시드를 고정해도 라이브러리/CUDA 버전 차이로 재실행 결과가 달라질 수 있어,
+    같은 이름으로 다시 돌리면 이전 run 폴더를 덮어쓰는 대신 버전을 올려야 한다
+    (2026-08-05: 시드 없이 재실행해 last-N=4 결과가 조용히 덮인 사고의 재발 방지)."""
+    base_dir = tmp_path / "vit_last4_category_masked_lr1e-05"
+    base_dir.mkdir()
+    assert fv.next_versioned_dir(base_dir) == tmp_path / "vit_last4_category_masked_lr1e-05_v2"
+
+    (tmp_path / "vit_last4_category_masked_lr1e-05_v2").mkdir()
+    assert fv.next_versioned_dir(base_dir) == tmp_path / "vit_last4_category_masked_lr1e-05_v3"

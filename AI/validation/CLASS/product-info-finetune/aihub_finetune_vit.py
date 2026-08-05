@@ -45,8 +45,29 @@ SEED = 42
 
 
 def run_name(task: str, variant: str, unfreeze_layers: int, lr_backbone: float) -> str:
-    """run마다 다른 폴더 이름 — 조건을 바꿔 여러 번 돌려도 이전 run을 안 덮어쓴다."""
+    """run마다 다른 폴더 이름 — 하이퍼파라미터 조합이 다르면 이전 run과 안 겹친다.
+
+    **같은 조합으로 다시 돌리면 이름이 같다** — `next_versioned_dir()`가 그 경우를
+    처리한다(기본은 버전을 올려 저장, `--overwrite`로 강제 덮어쓰기).
+    """
     return f"vit_last{unfreeze_layers}_{task}_{variant}_lr{lr_backbone:g}"
+
+
+def next_versioned_dir(path: Path) -> Path:
+    """`path`가 이미 있으면 안 겹치는 `_v2`, `_v3`, … 폴더명을 찾아 반환한다.
+
+    `aihub_train_head.next_versioned_path()`와 같은 이유다 — torch 시드를 고정해도
+    같은 명령을 재실행하면 결과가 미세하게 달라질 수 있는데(다른 라이브러리 버전,
+    비결정적 CUDA 커널 등), 그때 이전 run의 체크포인트를 조용히 덮어쓰면 안 된다.
+    """
+    if not path.exists():
+        return path
+    version = 2
+    while True:
+        candidate = path.with_name(f"{path.name}_v{version}")
+        if not candidate.exists():
+            return candidate
+        version += 1
 
 
 def pixel_split_tag(split: str, variant: str) -> str:
@@ -255,11 +276,22 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="기본값: <pixel-cache-dir>/../artifacts_finetune (선형 헤드 산출물과 분리)",
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="같은 이름의 기존 run 폴더를 덮어쓴다. 기본은 버전을 올려 저장한다(_v2, _v3, …)",
+    )
     args = parser.parse_args(argv)
 
     import torch
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
+    # 헤드(nn.Linear) 초기화·미니배치 셔플 순서를 고정한다 — 이게 없으면 같은 인자로
+    # 다시 돌려도 매번 결과가 미세하게 달라져서(2026-08-05 실측: test 0.8435→0.8424),
+    # "재현 안 되는 게 정상"인지 "뭔가 바뀐 건지" 구분이 안 된다.
+    torch.manual_seed(SEED)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(SEED)
 
     x_train_pixels, train_rows = load_pixel_split(args.pixel_cache_dir, "train", args.variant)
     x_val_pixels, val_rows = load_pixel_split(args.pixel_cache_dir, "val", args.variant)
@@ -324,6 +356,8 @@ def main(argv: list[str] | None = None) -> int:
     name = run_name(args.task, args.variant, args.unfreeze_layers, args.lr_backbone)
     out_dir = args.out_dir or (args.pixel_cache_dir.parent / "artifacts_finetune")
     run_dir = out_dir / name
+    if not args.overwrite:
+        run_dir = next_versioned_dir(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
 
     torch.save(

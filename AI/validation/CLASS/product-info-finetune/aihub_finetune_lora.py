@@ -133,11 +133,21 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="기본값: <pixel-cache-dir>/../artifacts_finetune (last-N과 같은 폴더, run_name으로 구분)",
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="같은 이름의 기존 run 폴더를 덮어쓴다. 기본은 버전을 올려 저장한다(_v2, _v3, …)",
+    )
     args = parser.parse_args(argv)
 
     import torch
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
+    # aihub_finetune_vit.py와 같은 이유 — 헤드 초기화·셔플 순서를 고정해야 같은 인자로
+    # 다시 돌렸을 때 재현이 된다(2026-08-05 실측: 시드 없이 재실행하니 결과가 바뀌었다).
+    torch.manual_seed(base.SEED)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(base.SEED)
 
     x_train_pixels, train_rows = base.load_pixel_split(args.pixel_cache_dir, "train", args.variant)
     x_val_pixels, val_rows = base.load_pixel_split(args.pixel_cache_dir, "val", args.variant)
@@ -215,6 +225,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     out_dir = args.out_dir or (args.pixel_cache_dir.parent / "artifacts_finetune")
     run_dir = out_dir / name
+    if not args.overwrite:
+        run_dir = base.next_versioned_dir(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
 
     torch.save(
