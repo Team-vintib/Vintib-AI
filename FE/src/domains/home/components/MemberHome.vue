@@ -117,8 +117,6 @@ const handleAvatarError = (event: Event) => {
           :key="live.id"
           :live="live"
           variant="scheduled"
-          :action-to="getLivePath(live.id)"
-          action-label="예약하기"
         />
       </div>
     </HomeSection>

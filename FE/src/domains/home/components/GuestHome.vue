@@ -63,8 +63,6 @@ const getProductPath = (productId: number) => `/products/${productId}`
           :key="live.id"
           :live="live"
           variant="scheduled"
-          :action-to="ROUTE_PATHS.AUTH_LOGIN"
-          action-label="예약하기"
         />
       </div>
     </HomeSection>
