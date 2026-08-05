@@ -158,11 +158,11 @@ BE/
 │   │   ├── repository/
 │   │   └── dto/
 │   ├── auction/                 # 경매 조건 설정/진행/입찰 (AUCT) — 정윤
-│   │   ├── controller/          # AuctionController(조건 설정·현황), AuctionActionController(시작·입찰·내역)
-│   │   ├── service/             # AuctionService
+│   │   ├── controller/          # AuctionController(조건 설정·현황), AuctionActionController(시작·입찰·내역·결과), LiveBroadcastResultController(방송 종료 요약·유찰 목록 — 경로는 /api/lives 지만 편성 상품+경매 결과를 함께 봐야 해 여기 둔다. live→auction 역방향 의존을 만들지 않기 위함)
+│   │   ├── service/             # AuctionService(설정·시작·입찰), AuctionCloseService(마감·낙찰·유찰), AuctionCloseScheduler(1초 주기), AuctionLiveCleanupHook(방송 종료 시 강제 마감), LiveBroadcastResultService
 │   │   ├── entity/              # Auction, AuctionStatus, Bid, BidStatus
 │   │   ├── repository/          # AuctionRepository(findByIdForUpdate 비관적 락), BidRepository
-│   │   ├── port/                # ProductCommandPort·PointCommandPort — 상품/포인트 도메인 참조를 격리
+│   │   ├── port/                # ProductCommandPort·PointCommandPort·OrderCommandPort — 상품/포인트/주문 도메인 참조를 격리
 │   │   └── dto/
 │   ├── tryon/                    # AI 가상 시착 결과·프로필 저장/조회/삭제 (TRYON) — 서윤
 │   │   ├── controller/           # TryOnController(결과), TryOnProfileController(프로필)
@@ -191,7 +191,7 @@ BE/
 │   ├── order/                    # 주문 생성(SALE-002)·배송지/송장(ORDER-001, SHIP-001/002)·구매확정/정산(ORDER-002/003)·세금계산서(BIZ-002)·구매/판매 내역(MY-003/004) — 서윤
 │   │   ├── controller/           # InvoiceController, OrderController(생성/조회/배송지/송장/확정), MyOrderController(구매/판매 내역)
 │   │   ├── service/              # InvoiceService, OrderService
-│   │   ├── entity/               # Order, OrderStatus, OrderShipment(배송지+송장, 공유 PK 1:1), Invoice
+│   │   ├── entity/               # Order(낙찰 주문은 auction, 라이브 발생 주문은 live 를 가리킨다 — 방송 종료 요약이 이 값으로 집계), OrderStatus, OrderShipment(배송지+송장, 공유 PK 1:1), Invoice
 │   │   ├── repository/           # OrderRepository, OrderShipmentRepository, InvoiceRepository
 │   │   ├── scheduler/            # OrderAutoConfirmScheduler(ORDER-003, 배송완료 3일 후 자동 구매확정)
 │   │   └── dto/

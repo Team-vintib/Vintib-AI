@@ -86,16 +86,32 @@
 }
 ```
 
-2026-08-04 확인: `Notification.type`/`refType`은 DB enum이 아니라 자유 문자열이고, 실제로 생성되는
-값은 현재 `type=LIVE_REMINDER`/`refType=LIVE` 하나뿐이다(§3.2 참고). 나머지 요청 사항은 이벤트가
-더 생겨야 의미가 있어 아직 그대로 남겨둔다.
+### 2026-08-05 확정 — 라이브·경매 알림 4종 (정윤)
 
-확정 요청:
+`Notification.type`/`refType`은 **DB enum이 아니라 자유 문자열**이다. 아래 4종은 실제로 생성되는
+값이 확정됐다. 문자열 포함 검사 같은 임시 분류를 걷어내고 이 값으로 정확히 분기해도 된다.
 
-- `type` enum 전체 목록과 각 값의 발생 이벤트를 문서화해 주세요.
-- `refType` enum 전체 목록과 `refId`가 가리키는 테이블/리소스를 문서화해 주세요.
-- `refType/refId`가 없는 알림이 존재할 수 있는지, 존재한다면 FE가 이동 없이 읽음 처리만 하면 되는지 확정해 주세요.
-- 같은 알림 `type`에서 `refType`이 여러 개 나올 수 있는지 확정해 주세요.
+| `type` | `refType` | `refId` | 발생 시점 | 받는 사람 |
+| --- | --- | --- | --- | --- |
+| `LIVE_REMINDER` | `LIVE` | `live.id` | 예약 방송 시작 전(스케줄러) | 알림 신청자 |
+| `LIVE_STARTED` | `LIVE` | `live.id` | 방송이 실제로 시작될 때(즉시 개설·예약→시작·자동 시작 전부) | 그 판매자를 팔로우한 회원 |
+| `AUCTION_OUTBID` | `AUCTION` | `auction.id` | 내가 최고 입찰자였는데 상위 입찰이 들어왔을 때 | 밀린 직전 최고 입찰자 1명 |
+| `AUCTION_WON` | `AUCTION` | `auction.id` | 경매가 낙찰로 마감될 때 | 낙찰자 |
+
+- **한 `type`은 항상 같은 `refType`을 쓴다.** 위 4종에서 `refType`이 여러 개로 갈리는 경우는 없다.
+- **위 4종은 `refType`/`refId`가 반드시 채워진다.** 따라서 `AUCTION` → 경매 결과 화면,
+  `LIVE` → `/lives/{refId}`로 안전하게 이동할 수 있다.
+- `AUCTION`으로 이동할 때 경매 결과가 필요하면 `GET /api/auctions/{refId}/winner`를 쓰면 된다
+  (`docs/requests/FE/030-auction-close-contract.md` §2).
+
+**나머지 4종(주문·배송·포인트)은 아직 미정이다** — 그 도메인 서비스에서 생성해야 해서 서윤 확인이
+필요하다(§3.2 표 참고). `refType/refId`가 비는 알림이 생길지도 그때 함께 확정된다.
+
+확정이 남은 것(서윤):
+
+- 주문·배송·포인트 알림의 `type`/`refType` 값
+- 배송 알림의 `refId`가 order id인지 shipment id인지
+- `refType/refId`가 없는 알림이 존재할 수 있는지
 
 FE 현재 임시 분류:
 
@@ -130,7 +146,7 @@ FE 현재 임시 이동:
 | 팔로우한 판매자 라이브 시작 | `LIVE_STARTED` | `LIVE` / live id | **반영 완료** — 즉시 개설·예약→시작 전이 양쪽 모두 팔로워 전원에게 |
 | 예약 라이브 시작 전 알림 | `LIVE_REMINDER` | `LIVE` / live id | **반영 완료**(§3.2.1) |
 | 상위 입찰 발생 | `AUCTION_OUTBID` | `AUCTION` / auction id | **반영 완료** — 밀린 최고 입찰자에게 |
-| 낙찰 | `AUCTION_WON` | `AUCTION` / auction id | 미반영(경매 종료 자체가 아직 없음 — Phase 8, `-467`에서 함께) |
+| 낙찰 | `AUCTION_WON` | `AUCTION` / auction id | **반영 완료**(2026-08-05, Phase 8) — 경매가 자동 마감되며 낙찰자에게 |
 | 결제 완료 | `ORDER_PAID` | `ORDER` / order id | 미반영 — 서윤 확인 필요 |
 | 송장 등록/배송 시작 | `SHIPMENT_STARTED` | `SHIPMENT` / order or shipment id | 미반영 — 서윤 확인 필요 |
 | 배송 완료 | `SHIPMENT_COMPLETED` | `SHIPMENT` / order or shipment id | 미반영 — 서윤 확인 필요 |

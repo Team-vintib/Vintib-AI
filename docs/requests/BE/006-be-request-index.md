@@ -36,11 +36,20 @@
 | 001 | `001-auth-contract.md` | Auth | 이메일 auth API 연결 완료 | `GET /api/me`, auth 응답 `user/nextStep`, SSAFY SSO |
 | 002 | `002-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
 | 003 | `003-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 필드(필수+선택 전부: brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId/hostProfileImageUrl/description/material/measurements/defectSummary) 연결 완료 | AI 시착 생성만 남음(서윤/AI 파트) |
-| 004 | `004-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API, 예약 라이브 알림 신청/스케줄러, `LIVE_STARTED`/`AUCTION_OUTBID` 알림 생성 연동 완료 | 알림 생성 이벤트 5종(낙찰/주문/배송/포인트)은 아직 — 낙찰은 Phase 8, 나머지는 서윤 확인 필요. unread count API, 탭별 bulk read API |
-| 005 | `005-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수, 경매 조건 설정, 경매 snapshot/시작/입찰/입찰내역, STOMP(`AUCTION_STARTED`/`BID_PLACED`) 연동 완료 | 경매 종료(`close`)·낙찰자 조회(`winner`)·`AUCTION_CLOSED` 이벤트·자동 종료 스케줄러 |
-| 010 | `010-product-category-optional.md` | Product | 미반영 | `categoryId`가 여전히 `@NotNull`(`ProductCreateRequest`) — 선택 입력 전환 검토 |
+| 004 | `004-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API, 예약 라이브 알림 신청/스케줄러, `LIVE_STARTED`/`AUCTION_OUTBID`/`AUCTION_WON` 알림 생성 연동 완료 | 알림 생성 이벤트 4종(주문/배송/포인트)은 서윤 확인 필요. unread count API, 탭별 bulk read API |
+| 008 | `008-user-tryon-image-contract.md` | TryOn | — | 서윤/AI 파트 |
+| 009 | `009-product-list-primary-image.md` | Product | 미반영 | `GET /api/products` 응답에 대표 이미지 URL 없음 — FE가 상세를 추가 호출 중 |
 | 011 | `011-product-similar-price-distribution.md` | Product | 미반영 | 상품 상세에 유사 상품 목록(`id`/`title`/`price`) 없음 |
 | 012 | `012-product-ai-tryon-registration-fields.md` | Product | 미반영 | `aiModelEnabled`/`aiModelGender` 필드가 `ProductCreateRequest`에 없음 |
+| 019 | `019-product-quality-multi-image.md` | Product | 미반영 | 서윤 파트 |
+| 020 | `020-tryon-result-category.md` | TryOn | 미반영 | 서윤/AI 파트 |
+| 021 | `021-live-thumbnail-upload.md` | Live | **반영 완료** | 없음 — `POST /api/users/{id}/lives/thumbnail/upload-url`. 계약은 `FE/029`. 다음 정리 때 삭제 |
+| 022 | `022-product-list-sold-exclusion.md` | Product | 미확인 | 서윤 파트 |
+| 023 | `023-product-similar-list.md` | Product | 미확인 | 서윤 파트 |
+| 024 | `024-live-created-at.md` | Live | **미확인 — 정윤 확인 필요** | 다음 배치에서 코드 대조 |
+| 025 | `025-product-same-price-chart.md` | Product | 미확인 | 서윤 파트 |
+| 026 | `026-live-list-latest-sort.md` | Live | **미확인 — 정윤 확인 필요** | 다음 배치에서 코드 대조 |
+| 026 | `026-toss-client-key-widget-type.md` | Point | 미확인 | 서윤 파트. ⚠️ **번호가 위와 중복이다** — 다음에 손대는 사람이 하나를 027로 옮길 것 |
 
 ## 4. 기존 API 변경 요청
 
@@ -121,6 +130,29 @@
 - 2026-08-04: 이 폴더 및 `FE`/`AI` 요청 문서 전체를 001부터 빈틈없이 재넘버링했다(팀원별로 독립적으로
   번호를 매겨 BE 014·016, FE 001·002·003·005·006·007·016·018, AI 002가 중복돼 있었음). 이 문서 자체도
   012 → 006으로 바뀌었다.
+
+## 2026-08-05 Phase 8-b 정리
+
+**표가 실제 폴더와 어긋나 있었다.** `008`·`009`·`018`·`019`·`020` 다섯 건이 표에서 통째로 빠져
+있어 인덱스가 절반만 추적하고 있었다 — 전부 채워 넣었다. 앞으로 문서를 추가하면 이 표에도 넣는다.
+
+이번 배치로 삭제한 문서:
+
+- `005-auction-chat-contract.md` — 남아 있던 경매 종료·낙찰자 조회·`AUCTION_CLOSED`·자동 마감
+  스케줄러가 Phase 8에서 전부 반영됐다. 계약은 `docs/requests/FE/030-auction-close-contract.md`.
+- `018-live-broadcast-end-summary.md` — `GET /api/lives/{liveId}/summary` 구현 완료.
+  집계는 경매 낙찰 기준이며 그 이유와 확장 계획은 `docs/requests/FE/031` 참고.
+- `007-unsold-product-disposition.md` — 확인 요청 2건은 Phase 8에서 답했고, 남아 있던 "유찰 상품
+  내용 수정 불가"는 `Product.isEditable()`에 `AUCTION_SCHEDULED`를 허용해 해소했다.
+- `010-product-category-optional.md` — **카테고리 지정은 필수 유지로 확정**됐다(기획 결정).
+  요청과 반대 방향으로 정해져 더 이상 대기 항목이 아니다.
+
+`004`의 `AUCTION_WON`은 Phase 8에서 반영됐고, §3.1이 요청한 알림 `type`/`refType` 목록은 정윤
+도메인 4종을 확정해 채웠다(주문·배송·포인트 4종은 서윤 미정으로 표시).
+
+**`021`~`026`은 Phase 8 머지 때 함께 들어온 것을 뒤늦게 표에 채웠다.** 그중 `024`(라이브 생성
+시각)·`026`(라이브 목록 최신순)은 정윤 도메인인데 아직 코드와 대조하지 못했다 — 다음 배치에서
+확인한다. `026` 번호가 둘 있으니 손대는 김에 하나를 `027`로 옮기는 편이 좋다.
 
 ## 2026-08-04 라이브 이슈 4건 정리
 

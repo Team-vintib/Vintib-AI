@@ -64,7 +64,7 @@ class RefundServiceTest {
     }
 
     private Order orderWith(OrderStatus status) {
-        Order order = Order.createDirectSale(buyer, seller, product, 50_000L);
+        Order order = Order.createDirectSale(buyer, seller, product, null, 50_000L);
         if (status == OrderStatus.SHIPPING || status == OrderStatus.DELIVERED) {
             order.markShipping();
         }

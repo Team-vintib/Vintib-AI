@@ -12,6 +12,7 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
+import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.order.dto.request.OrderCreateRequest;
 import com.ssafy.backend.order.dto.request.OrderRole;
@@ -61,6 +62,9 @@ class OrderServiceTest {
     private MemberRepository memberRepository;
 
     @Mock
+    private LiveRepository liveRepository;
+
+    @Mock
     private PointService pointService;
 
     @Mock
@@ -83,8 +87,8 @@ class OrderServiceTest {
     @BeforeEach
     void setUp() {
         orderService = new OrderService(
-                orderRepository, orderShipmentRepository, productRepository, memberRepository, pointService,
-                deliveryTrackingClient);
+                orderRepository, orderShipmentRepository, productRepository, memberRepository, liveRepository,
+                pointService, deliveryTrackingClient);
     }
 
     private Product realDirectSaleProduct() {
@@ -188,7 +192,7 @@ class OrderServiceTest {
         when(memberRepository.findById(BUYER_ID)).thenReturn(Optional.of(buyer));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        OrderListItemResponse response = orderService.createOrder(BUYER_ID, new OrderCreateRequest(PRODUCT_ID));
+        OrderListItemResponse response = orderService.createOrder(BUYER_ID, new OrderCreateRequest(PRODUCT_ID, null));
 
         assertThat(response.orderPrice()).isEqualTo(50_000L);
         assertThat(response.status()).isEqualTo("PAID");
@@ -202,14 +206,14 @@ class OrderServiceTest {
         Product realProduct = realDirectSaleProduct();
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(realProduct));
 
-        assertThatThrownBy(() -> orderService.createOrder(BUYER_ID, new OrderCreateRequest(PRODUCT_ID)))
+        assertThatThrownBy(() -> orderService.createOrder(BUYER_ID, new OrderCreateRequest(PRODUCT_ID, null)))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SELF_PURCHASE_NOT_ALLOWED);
     }
 
     @Test
     void 배송지를_처음_등록하면_새로_생성된다() {
-        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
         when(buyer.getId()).thenReturn(BUYER_ID);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
         when(orderShipmentRepository.findById(ORDER_ID)).thenReturn(Optional.empty());
@@ -229,7 +233,7 @@ class OrderServiceTest {
 
     @Test
     void 웹훅_구독에_성공하면_송장만_등록하고_아직_배송완료로_바뀌지_않는다() {
-        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
         when(buyer.getId()).thenReturn(BUYER_ID);
         when(seller.getId()).thenReturn(SELLER_ID);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
@@ -248,7 +252,7 @@ class OrderServiceTest {
 
     @Test
     void 웹훅_구독에_실패하면_즉시_배송완료로_폴백한다() {
-        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
         when(buyer.getId()).thenReturn(BUYER_ID);
         when(seller.getId()).thenReturn(SELLER_ID);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
@@ -264,7 +268,7 @@ class OrderServiceTest {
 
     @Test
     void 환불_요청_중인_주문은_송장을_등록할_수_없다() {
-        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
         realOrder.markRefundRequested();
         when(buyer.getId()).thenReturn(BUYER_ID);
         when(seller.getId()).thenReturn(SELLER_ID);
@@ -278,7 +282,7 @@ class OrderServiceTest {
 
     @Test
     void 배송지_미등록시_송장등록하면_예외를_던진다() {
-        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
         when(buyer.getId()).thenReturn(BUYER_ID);
         when(seller.getId()).thenReturn(SELLER_ID);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
@@ -292,7 +296,7 @@ class OrderServiceTest {
 
     @Test
     void 배송완료_웹훅을_받으면_SHIPPING_주문이_배송완료로_바뀐다() {
-        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
         realOrder.markShipping();
         OrderShipment shipment = newShipmentFor(realOrder);
         when(orderShipmentRepository.findByCourierAndTrackingNumber(CourierCode.CJ, "123456789012"))
@@ -306,7 +310,7 @@ class OrderServiceTest {
 
     @Test
     void 이미_배송완료된_주문에_중복_웹훅이_와도_조용히_무시한다() {
-        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
         realOrder.markShipping();
         realOrder.markDelivered(LocalDateTime.now());
         OrderShipment shipment = newShipmentFor(realOrder);
@@ -320,7 +324,7 @@ class OrderServiceTest {
 
     @Test
     void 배송완료_상태에서_구매확정하면_정산되고_SETTLED로_바뀐다() {
-        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
         realOrder.markShipping();
         realOrder.markDelivered(LocalDateTime.now());
         when(buyer.getId()).thenReturn(BUYER_ID);
@@ -335,7 +339,7 @@ class OrderServiceTest {
 
     @Test
     void 환불_요청_중인_주문은_구매확정할_수_없다() {
-        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
         realOrder.markShipping();
         realOrder.markDelivered(LocalDateTime.now());
         realOrder.markRefundRequested();
@@ -349,7 +353,7 @@ class OrderServiceTest {
 
     @Test
     void 배송완료_전에는_구매확정할_수_없다() {
-        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
         when(buyer.getId()).thenReturn(BUYER_ID);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(realOrder));
 
@@ -360,7 +364,7 @@ class OrderServiceTest {
 
     @Test
     void 배송완료_경과일이_지난_주문은_자동으로_구매확정된다() {
-        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), 50_000L);
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
         realOrder.markShipping();
         realOrder.markDelivered(LocalDateTime.now().minusDays(8));
         when(buyer.getId()).thenReturn(BUYER_ID);

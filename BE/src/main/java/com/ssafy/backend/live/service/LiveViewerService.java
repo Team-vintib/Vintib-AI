@@ -32,6 +32,10 @@ import org.springframework.stereotype.Service;
  * (채팅·시청자수·경매·상품)을 구독한다. 구독마다 카운터를 올리면 한 사람이 네 명으로 잡힌다.
  * 세션 ID 를 {@code Set} 에 넣으면 몇 번 구독해도 {@code SCARD} 는 사람 수를 준다.
  *
+ * <p><b>호스트는 세지 않는다.</b> 판매자가 자기 방송 화면을 열어 둔 것은 시청이 아니다 —
+ * 넣으면 아무도 안 보는 방송이 늘 "1명"으로 보이고, 판매자가 "몇 명이 보고 있나"를 판단할 때
+ * 자기 자신을 빼서 읽어야 한다. 최고 시청자 수({@code peak_viewer_count})도 같은 기준을 따른다.
+ *
  * <p><b>세션 → 방송 역방향 매핑이 필요한 이유.</b> UNSUBSCRIBE·DISCONNECT 프레임에는 destination 이
  * 없다. 어느 방송에서 빠져야 하는지 알 수 없으므로 구독 시점에 {@code sessionId + subscriptionId →
  * liveId} 를 남겨 둔다. 한 세션이 같은 방송을 여러 번 구독했다면 <b>마지막 구독이 사라질 때만</b>
@@ -60,9 +64,18 @@ public class LiveViewerService {
      *
      * <p>이미 시청자로 잡혀 있는 세션이면 아무 일도 하지 않는다 — 같은 방송의 두 번째, 세 번째
      * 구독마다 같은 값을 브로드캐스트할 이유가 없다.
+     *
+     * @param memberId 구독한 회원 ID. <b>비회원이면 null</b>. 호스트를 시청자에서 빼기 위해 받는다
      */
-    public void enter(String sessionId, String subscriptionId, Long liveId) {
+    public void enter(String sessionId, String subscriptionId, Long liveId, Long memberId) {
+        // 호스트 세션도 매핑은 남긴다 — 정리 경로(UNSUBSCRIBE·DISCONNECT)를 한 갈래로 유지한다.
+        // 시청자 집합에 없으므로 나갈 때 SREM 이 0을 돌려주고 브로드캐스트도 일어나지 않는다.
         redisTemplate.opsForHash().put(sessionKey(sessionId), subscriptionId, String.valueOf(liveId));
+
+        // 판매자는 자기 방송의 시청자가 아니다 — 혼자 있는 방송은 0명으로 보여야 한다.
+        if (isHost(liveId, memberId)) {
+            return;
+        }
 
         Long added = redisTemplate.opsForSet().add(viewersKey(liveId), sessionId);
         if (added == null || added == 0) {
@@ -155,6 +168,16 @@ public class LiveViewerService {
             return;
         }
         broadcast(liveId, getViewerCount(liveId));
+    }
+
+    /**
+     * 이 회원이 그 방송의 호스트인지.
+     *
+     * <p><b>비회원은 조회 없이 바로 false다</b> — 토큰 없이 붙은 세션은 호스트일 수 없다.
+     * 회원이면 인덱스를 타는 {@code exists} 한 방으로 확인한다(방송을 통째로 읽어 올 이유가 없다).
+     */
+    private boolean isHost(Long liveId, Long memberId) {
+        return memberId != null && liveRepository.existsByIdAndHost_Id(liveId, memberId);
     }
 
     /** 이 세션이 해당 방송의 다른 구독을 아직 갖고 있는지. */
