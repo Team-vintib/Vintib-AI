@@ -4,6 +4,8 @@ import com.ssafy.backend.member.entity.Gender;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.entity.MemberType;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.point.entity.PointAccount;
+import com.ssafy.backend.point.repository.PointAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -45,8 +47,12 @@ public class DemoMemberSeeder implements ApplicationRunner {
          "제주 제주시 첨단로 242", "202호", "63309"},
     };
 
+    // 데모 계정 기본 지급 포인트. 입찰/결제를 바로 테스트할 수 있게 시드 시점에 충전해 둔다.
+    private static final long DEFAULT_SEED_POINTS = 1_000_000L;
+
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PointAccountRepository pointAccountRepository;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -69,7 +75,9 @@ public class DemoMemberSeeder implements ApplicationRunner {
     }
 
     /**
-     * 이메일이 없으면 회원을 생성하고 온보딩 완료 처리한다. 이미 존재하면 건너뛴다(멱등).
+     * 이메일이 없으면 회원을 생성하고 온보딩 완료 처리한다. 이미 존재하면 회원 생성은 건너뛴다(멱등).
+     * 포인트 지급은 회원 존재 여부와 별개로 계정마다 확인한다 — 이 시드 로직이 나중에 추가돼도
+     * 기존에 이미 만들어진 데모 계정에 포인트 계좌를 backfill 할 수 있도록.
      *
      * @param genderStr "MALE" 또는 "FEMALE"
      */
@@ -77,18 +85,42 @@ public class DemoMemberSeeder implements ApplicationRunner {
             String email, String password, String name, String nickname,
             String genderStr, String phone, String address, String detailAddress,
             String postalCode, MemberType memberType) {
-        if (memberRepository.existsByEmail(email)) {
+        Member member = memberRepository.findByEmail(email).orElse(null);
+        if (member == null) {
+            log.info("시드 계정 생성: {} ({})", email, memberType);
+            Gender gender = "FEMALE".equals(genderStr) ? Gender.FEMALE : Gender.MALE;
+            member = Member.builder()
+                    .email(email)
+                    .password(passwordEncoder.encode(password))
+                    .name(name)
+                    .build();
+            member.updateBasicInfo(nickname, phone, address, detailAddress, postalCode, gender);
+            member.completeOnboarding(memberType);
+            member = memberRepository.save(member);
+        }
+        seedPoints(member);
+    }
+
+    /**
+     * 포인트 계좌를 최소 {@link #DEFAULT_SEED_POINTS}까지 채운다(멱등). 계좌가 없으면 새로
+     * 만들고, 이미 있는데 기본 지급액보다 적으면(과거 기본값으로 만들어졌거나 테스트로 깎인
+     * 경우) 그 차액만큼만 충전한다 — 기본 지급액보다 많이 갖고 있으면(구매·정산 등으로 늘어난
+     * 경우) 건드리지 않는다.
+     */
+    private void seedPoints(Member member) {
+        PointAccount account = pointAccountRepository.findById(member.getId()).orElse(null);
+        if (account == null) {
+            log.info("시드 계정 포인트 지급: {} ({}P)", member.getEmail(), DEFAULT_SEED_POINTS);
+            account = PointAccount.builder().member(member).build();
+            account.charge(DEFAULT_SEED_POINTS);
+            pointAccountRepository.save(account);
             return;
         }
-        log.info("시드 계정 생성: {} ({})", email, memberType);
-        Gender gender = "FEMALE".equals(genderStr) ? Gender.FEMALE : Gender.MALE;
-        Member member = Member.builder()
-                .email(email)
-                .password(passwordEncoder.encode(password))
-                .name(name)
-                .build();
-        member.updateBasicInfo(nickname, phone, address, detailAddress, postalCode, gender);
-        member.completeOnboarding(memberType);
-        memberRepository.save(member);
+        long shortfall = DEFAULT_SEED_POINTS - account.getAvailable();
+        if (shortfall > 0) {
+            log.info("시드 계정 포인트 충전: {} (+{}P)", member.getEmail(), shortfall);
+            account.charge(shortfall);
+            pointAccountRepository.save(account);
+        }
     }
 }
