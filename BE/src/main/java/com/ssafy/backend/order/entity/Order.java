@@ -24,8 +24,9 @@ import lombok.NoArgsConstructor;
 /**
  * 주문. 스키마는 {@code docs/db/schema.sql}의 {@code orders} 테이블이 단일 기준이다.
  *
- * <p>생성은 {@link #createDirectSale}(SALE-002, 상시 판매 즉시구매)로만 한다 — 경매 낙찰(AUCT)
- * 주문은 입찰 자체가 아직 없어 이번 범위에서 다루지 않는다({@code auction}은 항상 NULL).
+ * <p>생성 경로는 둘이다 — {@link #createDirectSale}(SALE-002, 상시 판매 즉시구매, {@code auction}이
+ * NULL)과 {@link #createAuctionWin}(AUCT-012, 경매 낙찰). 후자는 경매 마감 스케줄러가 부르며
+ * 구매자의 결제 동작 없이 만들어진다 — 이유는 그 메서드 주석 참고.
  * 상태 전이 메서드는 전제조건을 검증하지 않는다 — 검증은 {@code OrderService}가 한다
  * (다른 엔티티의 상태 전이와 같은 패턴).
  */
@@ -81,6 +82,20 @@ public class Order extends BaseTimeEntity {
     /** 상시 판매 즉시구매 주문 생성(SALE-002). 결제(포인트 보관)는 서비스가 처리하고, 이 주문은 항상 PAID로 시작한다. */
     public static Order createDirectSale(Member buyer, Member seller, Product product, Long orderPrice) {
         return new Order(buyer, seller, product, null, orderPrice, OrderStatus.PAID);
+    }
+
+    /**
+     * 경매 낙찰 주문 생성(AUCT-012, 정윤 추가 — JY008 설계 판단 12).
+     *
+     * <p>즉시구매와 달리 <b>구매자가 결제 버튼을 누르는 시점이 없다.</b> 입찰한 순간 낙찰 시
+     * 구매 의무가 확정되고 그 금액이 이미 보류돼 있어서, 마감과 동시에 주문이 만들어지고
+     * 보류가 거래 대금으로 전환된다({@code PointCommandPort.convertHoldToPayment}).
+     * 그래서 여기서도 {@code PAID}로 시작하며, 이후 배송·구매확정은 즉시구매와 완전히 같은
+     * 흐름을 탄다.
+     */
+    public static Order createAuctionWin(
+            Member buyer, Member seller, Product product, Auction auction, Long finalPrice) {
+        return new Order(buyer, seller, product, auction, finalPrice, OrderStatus.PAID);
     }
 
     /** 송장 등록(SHIP-001). 전제조건(PAID 상태)은 서비스가 검증한다. */
