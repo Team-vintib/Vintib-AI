@@ -189,8 +189,8 @@ onBeforeUnmount(() => {
   font: inherit;
   text-align: center;
   transition:
-    border-color 160ms ease,
-    background 160ms ease;
+    border-color var(--transition-base),
+    background var(--transition-base);
 }
 
 .certificate-upload-empty:hover {
@@ -237,15 +237,15 @@ onBeforeUnmount(() => {
 
 .certificate-upload-empty strong {
   margin-top: var(--space-4);
-  font-size: 15px;
-  line-height: 20px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-control);
 }
 
 .certificate-upload-empty > span:last-child {
   margin-top: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
 }
 
 .certificate-preview {
@@ -279,8 +279,8 @@ onBeforeUnmount(() => {
 }
 
 .certificate-preview__file strong {
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
 }
 
 .certificate-preview__file span {
@@ -288,8 +288,8 @@ onBeforeUnmount(() => {
   overflow: hidden;
   margin-top: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -308,8 +308,8 @@ onBeforeUnmount(() => {
   background: var(--color-surface);
   color: var(--color-text-primary);
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .certificate-uploader__button:hover {
@@ -329,8 +329,8 @@ onBeforeUnmount(() => {
 .certificate-uploader__error {
   margin-top: var(--space-2);
   color: var(--color-error);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
 }
 
 @media (max-width: 640px) {

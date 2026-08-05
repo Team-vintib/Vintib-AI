@@ -228,23 +228,23 @@ onMounted(() => {
 .point-page__eyebrow {
   margin-bottom: var(--space-1);
   color: var(--color-primary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .point-page__header h1 {
   color: var(--color-text-primary);
   font-size: 36px;
   font-weight: var(--font-weight-extrabold);
-  line-height: 44px;
+  line-height: var(--line-height-4xl);
 }
 
 .point-page__header p:not(.point-page__eyebrow) {
   margin-top: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: 15px;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 .point-page__section-tabs {
@@ -259,7 +259,7 @@ onMounted(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
 }
 
@@ -278,16 +278,16 @@ onMounted(() => {
   border-radius: var(--radius-card);
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 15px;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
   text-align: center;
 }
 
 .point-page__state strong {
   color: var(--color-text-primary);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-extrabold);
-  line-height: 26px;
+  line-height: var(--line-height-lg);
 }
 
 .point-page__state button {
@@ -297,7 +297,7 @@ onMounted(() => {
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
@@ -305,9 +305,9 @@ onMounted(() => {
 .point-page__error {
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-control);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-semibold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
 }
 
 .point-page__message {

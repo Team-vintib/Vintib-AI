@@ -174,23 +174,23 @@ onMounted(() => {
 .point-history__eyebrow {
   margin-bottom: var(--space-1);
   color: var(--color-primary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .point-history__header h1 {
   color: var(--color-text-primary);
   font-size: 36px;
   font-weight: var(--font-weight-extrabold);
-  line-height: 44px;
+  line-height: var(--line-height-4xl);
 }
 
 .point-history__header p {
   margin-top: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: 15px;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 .point-history__header button,
@@ -199,7 +199,7 @@ onMounted(() => {
   min-height: var(--button-height-small);
   padding: 0 var(--space-4);
   border-radius: var(--radius-control);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
@@ -237,7 +237,7 @@ onMounted(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
@@ -261,9 +261,9 @@ onMounted(() => {
 
 .point-history__period span {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .point-history__period input {
@@ -273,7 +273,7 @@ onMounted(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
 }
 
 .point-history__state {
@@ -290,7 +290,7 @@ onMounted(() => {
 
 .point-history__state strong {
   color: var(--color-text-primary);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-extrabold);
 }
 

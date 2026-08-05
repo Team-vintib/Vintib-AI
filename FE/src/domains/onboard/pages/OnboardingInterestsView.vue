@@ -307,9 +307,9 @@ onMounted(() => {
 }
 
 .interest-selection__title {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 34px;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-2xl-loose);
 }
 
 .interest-selection__description {
@@ -323,9 +323,9 @@ onMounted(() => {
   border-radius: 999px;
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .interest-group {
@@ -347,23 +347,23 @@ onMounted(() => {
   width: 100%;
   gap: var(--space-4);
   color: var(--color-text-primary);
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .interest-group__count {
   color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .interest-group__hint {
   margin-top: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .brand-search {
@@ -388,8 +388,8 @@ onMounted(() => {
   margin-top: var(--space-5);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
   text-align: center;
 }
 
@@ -406,12 +406,12 @@ onMounted(() => {
   background: var(--color-surface);
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .brand-option:hover {
@@ -436,8 +436,8 @@ onMounted(() => {
   overflow: hidden;
   opacity: 0;
   transition:
-    width 160ms ease,
-    opacity 160ms ease;
+    width var(--transition-base),
+    opacity var(--transition-base);
 }
 
 .brand-option__check--visible {
@@ -463,10 +463,10 @@ onMounted(() => {
   color: var(--color-text-secondary);
   cursor: pointer;
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .category-option:hover {
@@ -492,7 +492,7 @@ onMounted(() => {
 }
 
 .category-option__label {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .category-option__check {
@@ -506,8 +506,8 @@ onMounted(() => {
   margin-left: auto;
   background: var(--color-surface);
   color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .category-option--selected .category-option__check {
@@ -522,7 +522,7 @@ onMounted(() => {
   margin-top: var(--space-10);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
 }
 
 .interest-selection__notice strong {
@@ -537,8 +537,8 @@ onMounted(() => {
   margin-top: var(--space-6);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
 }
 
 @media (max-width: 820px) {

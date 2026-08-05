@@ -140,23 +140,23 @@ const submitWithdrawal = () => {
 
 .point-withdrawal h2 {
   color: var(--color-text-primary);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-extrabold);
-  line-height: 28px;
+  line-height: var(--line-height-lg-plus);
 }
 
 .point-withdrawal h3 {
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
 }
 
 .point-withdrawal p,
 .point-withdrawal span {
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .point-withdrawal label {
@@ -174,7 +174,7 @@ const submitWithdrawal = () => {
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
 }
 
 .point-withdrawal button {
@@ -183,7 +183,7 @@ const submitWithdrawal = () => {
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
