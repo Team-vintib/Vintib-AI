@@ -51,6 +51,12 @@ public record LiveListItemResponse(
         LocalDateTime startedAt,
 
         @Schema(
+                description = "방송을 만든 시각(FE 요청 024). **`sort=LATEST`의 정렬 기준이 이 값이다.** "
+                        + "예약 방송은 만든 시점과 시작 예정 시각이 다르므로 둘을 섞어 쓰면 안 된다",
+                example = "2026-07-28T11:00:00")
+        LocalDateTime createdAt,
+
+        @Schema(
                 description = "현재 동시 시청자 수. **실시간 집계 값이다.** 예약 방송은 아직 아무도 "
                         + "보고 있지 않으므로 0이며, 진행 중인데 0이면 실제로 시청자가 없는 것이다. "
                         + "**호스트는 세지 않는다** — 판매자만 들어와 있으면 0이다",
@@ -80,6 +86,7 @@ public record LiveListItemResponse(
                 categories,
                 live.getScheduledAt(),
                 live.getStartedAt(),
+                live.getCreatedAt(),
                 viewerCount,
                 live.getCurrentProductId());
     }

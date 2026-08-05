@@ -11,16 +11,17 @@ import org.springframework.data.domain.Sort;
 public enum LiveListSort {
 
     /**
-     * 최신순. 진행 중인 방송이 먼저 오고(시작이 최근인 순), 그다음 예약 방송이 온다.
+     * 최신순 — <b>생성 시각 기준</b>이다(FE 요청 026).
      *
-     * <p>두 상태가 시각 컬럼을 따로 쓰기 때문에({@code startedAt} / {@code scheduledAt}) 한 컬럼으로는
-     * 정렬되지 않는다. {@code NULLS LAST}를 명시하지 않으면 DB가 NULL을 어디에 둘지 정해버려서
-     * 예약 방송이 진행 중 방송보다 위로 올라온다.
+     * <p><b>시작 시각으로 정렬하면 안 되는 이유.</b> 즉시 개설은 시작 시각과 생성 시각이 거의
+     * 같지만, 예약 개설은 <b>만든 시점과 시작 예정 시각이 완전히 다르다.</b> 그래서 시작 시각을
+     * 기준으로 삼으면 "최근에 만든 순"으로 볼 때 예약 방송이 생성 순서와 어긋나게 섞인다.
+     *
+     * <p>이전에는 {@code startedAt} → {@code scheduledAt} 순으로 정렬했는데, 두 상태가 시각
+     * 컬럼을 따로 쓰는 탓에 {@code NULLS LAST}까지 얹어야 했다. {@code createdAt}은 모든 방송이
+     * 반드시 갖는 값이라 그 복잡함이 통째로 사라진다.
      */
-    LATEST(Sort.by(
-            new Sort.Order(Sort.Direction.DESC, "startedAt", Sort.NullHandling.NULLS_LAST),
-            new Sort.Order(Sort.Direction.DESC, "scheduledAt", Sort.NullHandling.NULLS_LAST),
-            Sort.Order.desc("id"))),
+    LATEST(Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))),
 
     /** 제목 오름차순. */
     TITLE_ASC(Sort.by(Sort.Order.asc("title"), Sort.Order.desc("id"))),

@@ -211,6 +211,67 @@ class LiveViewerServiceTest {
         assertThat(liveViewerService.getViewerCount(다른_방송)).isEqualTo(1);
     }
 
+    @Test
+    void 같은_회원이_탭을_두_개_열어도_한_명이다() {
+        Long 시청자 = 다른_회원().getId();
+
+        liveViewerService.enter("session-tab1", "sub-0", liveId, 시청자);
+        liveViewerService.enter("session-tab2", "sub-0", liveId, 시청자);
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(1);
+    }
+
+    @Test
+    void 탭_하나를_닫아도_다른_탭이_남아_있으면_시청자로_남는다() {
+        Long 시청자 = 다른_회원().getId();
+        liveViewerService.enter("session-tab1", "sub-0", liveId, 시청자);
+        liveViewerService.enter("session-tab2", "sub-0", liveId, 시청자);
+
+        liveViewerService.leaveSession("session-tab1");
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(1);
+    }
+
+    @Test
+    void 마지막_탭까지_닫으면_시청자에서_빠진다() {
+        Long 시청자 = 다른_회원().getId();
+        liveViewerService.enter("session-tab1", "sub-0", liveId, 시청자);
+        liveViewerService.enter("session-tab2", "sub-0", liveId, 시청자);
+
+        liveViewerService.leaveSession("session-tab1");
+        liveViewerService.leaveSession("session-tab2");
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isZero();
+    }
+
+    @Test
+    void 재연결로_세션이_새로_생겨도_한_명이다() {
+        // FE 는 끊기면 다시 붙으면서 새 세션 ID 를 받는다. 옛 세션은 서버가 알아챌 때까지 남는다.
+        Long 시청자 = 다른_회원().getId();
+        liveViewerService.enter("session-old", "sub-0", liveId, 시청자);
+
+        liveViewerService.enter("session-new", "sub-0", liveId, 시청자);
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(1);
+    }
+
+    @Test
+    void 비회원은_세션마다_따로_센다() {
+        // 신원이 없어 세션 말고는 구분할 방법이 없다.
+        liveViewerService.enter("guest-a", "sub-0", liveId, null);
+        liveViewerService.enter("guest-b", "sub-0", liveId, null);
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(2);
+    }
+
+    @Test
+    void 서로_다른_회원은_각자_센다() {
+        liveViewerService.enter("session-a", "sub-0", liveId, 다른_회원().getId());
+        liveViewerService.enter("session-b", "sub-0", liveId, 다른_회원().getId());
+
+        assertThat(liveViewerService.getViewerCount(liveId)).isEqualTo(2);
+    }
+
     private Member 다른_회원() {
         return memberRepository.save(Member.builder()
                 .email("viewer-" + UUID.randomUUID() + "@example.com")
