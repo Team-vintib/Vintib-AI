@@ -13,9 +13,15 @@
 (validation은 원격 GPU 서버에서 단독 스크립트로 실행되고, 프로덕션 쪽도 `validation/`을
 import하지 않는 기존 규약과 대칭을 맞춘 것 — 두 곳 다 같은 판단 로직을 각자 복사해 둔다).
 
+**라벨 루트와 이미지 루트가 다르다** — AI-Hub 압축 해제본은 보통 라벨링데이터(JSON)와
+원천데이터(이미지)가 다른 디렉터리 트리다. `aihub_dataset.py scan/index`가 쓰는
+`--root`(라벨)와 `aihub_embed.py`가 쓰는 `--image-root`(이미지)가 서로 다른 경로였던
+것과 같은 이유로, 이 스크립트도 `--label-root`/`--image-root`를 따로 받는다.
+
 사용법:
     python aihub_seed_pricing_corpus.py \\
-        --image-root /path/to/aihub/data \\
+        --label-root /path/to/aihub/extracted/clothes \\
+        --image-root /path/to/aihub/extracted/images \\
         --checkpoint-path artifacts_finetune/vit_last4_category_masked_lr1e-05/checkpoint.pt \\
         --out-dir ../../../app/pricing/data \\
         --max-per-category 200
@@ -87,15 +93,17 @@ def build_meta_row(category: str, image_path: str) -> dict[str, Any]:
 
 
 def collect_rows(
-    image_root: Path, *, max_per_category: int, limit: int | None
+    label_root: Path, image_root: Path, *, max_per_category: int, limit: int | None
 ) -> list[tuple[Path, str]]:
     """AI-Hub 라벨을 순회해 (실제 이미지 경로, 카테고리) 쌍을 카테고리당 상한까지 모은다.
 
-    매핑이 없는(`subcategory is None`) 라벨과 실제 이미지 파일을 못 찾은 행은 건너뛴다.
+    `label_root`(라벨링데이터 JSON)와 `image_root`(원천데이터 이미지)가 다른 트리인
+    경우가 많다 — `aihub_embed.py`와 같은 구분. 매핑이 없는(`subcategory is None`)
+    라벨과 실제 이미지 파일을 못 찾은 행은 건너뛴다.
     """
     counts: dict[str, int] = {}
     rows: list[tuple[Path, str]] = []
-    for raw_label in aihub_dataset.load_labels(image_root, limit=limit):
+    for raw_label in aihub_dataset.load_labels(label_root, limit=limit):
         record, _reason = aihub_dataset.to_record(raw_label)
         category = record.subcategory
         if category is None:
@@ -144,7 +152,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="내부 CLIP 유사도 코퍼스 시딩(CH020) — AI-Hub 이미지 + 가상 가격(합성 데이터)"
     )
-    parser.add_argument("--image-root", type=Path, required=True, help="AI-Hub 데이터 루트")
+    parser.add_argument("--label-root", type=Path, required=True, help="라벨링데이터 JSON 루트")
+    parser.add_argument("--image-root", type=Path, required=True, help="원천데이터 이미지 루트")
     parser.add_argument("--checkpoint-path", type=Path, required=True)
     parser.add_argument("--model-id", default=DEFAULT_MODEL_ID)
     parser.add_argument("--unfreeze-layers", type=int, default=DEFAULT_UNFREEZE_LAYERS)
@@ -157,9 +166,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     print("AI-Hub 라벨 스캔 중...", flush=True)
-    rows = collect_rows(args.image_root, max_per_category=args.max_per_category, limit=args.limit)
+    rows = collect_rows(
+        args.label_root, args.image_root, max_per_category=args.max_per_category, limit=args.limit
+    )
     if not rows:
-        print("코퍼스로 쓸 이미지를 찾지 못했다 — --image-root를 확인할 것", file=sys.stderr)
+        print(
+            "코퍼스로 쓸 이미지를 찾지 못했다 — --label-root/--image-root를 확인할 것",
+            file=sys.stderr,
+        )
         return 1
     categories = sorted({category for _, category in rows})
     print(f"{len(rows):,}장 수집 완료 (카테고리 {len(categories)}종: {', '.join(categories)})")
