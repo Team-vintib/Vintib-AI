@@ -1,7 +1,7 @@
-package com.ssafy.backend.order.controller;
+package com.ssafy.backend.business.controller;
 
 import com.ssafy.backend.global.response.ApiResponse;
-import com.ssafy.backend.order.dto.response.InvoiceResponse;
+import com.ssafy.backend.business.dto.response.InvoiceResponse;
 import com.ssafy.backend.order.service.InvoiceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

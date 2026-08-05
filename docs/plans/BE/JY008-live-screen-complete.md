@@ -163,26 +163,26 @@ CONNECT 프레임에는 `liveId`가 없다. 어느 방송인지는 구독 시점
 
 각 Phase = 브랜치 1개, 커밋은 작업 단위. `develop-BE` 직접 커밋 금지.
 
-### Phase 1 — 실시간 토대 · `-447` · 브랜치 `feat/27-websocket-base`
+### Phase 1 — 실시간 토대 · `-447` · 브랜치 `feat/27-websocket-base` ✅ 완료
 
 **여기가 어긋나면 채팅·시청자수·경매·큐레이션을 같이 고쳐야 한다.**
 
-- [ ] `WebSocketConfig` — `@EnableWebSocketMessageBroker`, `/ws`, app prefix `/app`, SimpleBroker `/topic`
-- [ ] `setAllowedOriginPatterns` — HTTP CORS와 별개
-- [ ] `StompAuthChannelInterceptor` — CONNECT native header JWT 검증, principal에 `memberId`
-- [ ] 토큰 없으면 **익명 통과**(비회원 시청), 잘못된 토큰만 거부
-- [ ] `SecurityConfig`에 `/ws/**`
-- [ ] 테스트 — 회원 CONNECT / 익명 CONNECT / 잘못된 토큰 거부
+- [x] `WebSocketConfig` — `@EnableWebSocketMessageBroker`, `/ws`, app prefix `/app`, SimpleBroker `/topic`
+- [x] `setAllowedOriginPatterns` — HTTP CORS와 별개
+- [x] `StompAuthChannelInterceptor` — CONNECT native header JWT 검증, principal에 `memberId`
+- [x] 토큰 없으면 **익명 통과**(비회원 시청), 잘못된 토큰만 거부
+- [x] `SecurityConfig`에 `/ws/**`
+- [x] 테스트 — 회원 CONNECT / 익명 CONNECT / 잘못된 토큰 거부
 
-### Phase 2 — 채팅 · `-451` `-452` `-453` `-454` · 브랜치 `feat/208-live-chat`
+### Phase 2 — 채팅 · `-451` `-452` `-453` `-454` · 브랜치 `feat/208-live-chat` ✅ 완료
 
-- [ ] `-451` `chat` 패키지 + `ChatMessage` 엔티티. 정적 팩토리 `userMessage()`/`systemMessage()` — `@Builder`면 "USER인데 작성자 없음"이 만들어진다(DB `ck_chat_user_has_member`와 같은 규칙을 코드에서도)
-- [ ] `-452` `@MessageMapping` 송수신 → 저장 → 커밋 후 브로드캐스트
-- [ ] `-452` 비회원 발언 차단, 종료·취소 방송 발언 차단(`Live.isClosed()` 재사용), 길이 검증
-- [ ] `-453` `GET /api/lives/{liveId}/chat-messages` — **`id` 커서 페이징.** `created_at`은 같은 밀리초 동률에서 경계 메시지가 밀린다. 비회원 조회 허용
-- [ ] `-453` 실행계획 확인 후 필요하면 `(live_id, id DESC)` 인덱스
-- [ ] `-454` STOMP 통합 테스트 + 권한 분기 + 커서 경계
-- [ ] `BE/README.md` 디렉터리 구조에 `chat` 추가
+- [x] `-451` `chat` 패키지 + `ChatMessage` 엔티티. 정적 팩토리 `userMessage()`/`systemMessage()` — `@Builder`면 "USER인데 작성자 없음"이 만들어진다(DB `ck_chat_user_has_member`와 같은 규칙을 코드에서도)
+- [x] `-452` `@MessageMapping` 송수신 → 저장 → 커밋 후 브로드캐스트
+- [x] `-452` 비회원 발언 차단, 종료·취소 방송 발언 차단(`Live.isClosed()` 재사용), 길이 검증
+- [x] `-453` `GET /api/lives/{liveId}/chat-messages` — **`id` 커서 페이징.** `created_at`은 같은 밀리초 동률에서 경계 메시지가 밀린다. 비회원 조회 허용
+- [x] `-453` 실행계획 확인 후 필요하면 `(live_id, id DESC)` 인덱스
+- [x] `-454` STOMP 통합 테스트 + 권한 분기 + 커서 경계
+- [x] `BE/README.md` 디렉터리 구조에 `chat` 추가
 
 **FE가 확정을 요청한 채팅 schema** — 이 Phase에서 함께 확정한다.
 
@@ -516,7 +516,7 @@ FE 계약 회신 문서는 별도 티켓으로 빼지 않고 `-462`(경매)·`-4
 
 ## 공통 규율
 
-- [ ] 각 Phase마다 `BE:verify` 통과 후 커밋 — **빈 DB로도 한 번**
-- [ ] 새 엔드포인트는 Swagger 어노테이션 동반
-- [ ] 브로드캐스트는 전부 커밋 후(설계 판단 2)
-- [ ] push는 정윤이 직접
+- [x] 각 Phase마다 `BE:verify` 통과 후 커밋 — **빈 DB로도 한 번**
+- [x] 새 엔드포인트는 Swagger 어노테이션 동반
+- [x] 브로드캐스트는 전부 커밋 후(설계 판단 2)
+- [x] push는 정윤이 직접

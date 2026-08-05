@@ -8,12 +8,12 @@ import jakarta.validation.constraints.Size;
 
 public record SignUpRequest(
 
-        @Schema(example = "user@example.com")
+        @Schema(example = "vintib1@gmail.com")
         @NotBlank
         @Email
         String email,
 
-        @Schema(example = "password12!")
+        @Schema(example = "qwer1234")
         @NotBlank
         @Pattern(
                 regexp = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d!@#$%^&*()_+=-]{8,20}$",
@@ -21,7 +21,7 @@ public record SignUpRequest(
         )
         String password,
 
-        @Schema(example = "홍길동")
+        @Schema(example = "한서윤")
         @NotBlank
         @Size(max = 30)
         String name,

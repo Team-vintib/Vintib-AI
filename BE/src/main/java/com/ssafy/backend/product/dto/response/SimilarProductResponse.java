@@ -5,8 +5,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 public record SimilarProductResponse(
         @Schema(example = "12") Long id,
-        @Schema(example = "빈티지 데님 자켓") String title,
-        @Schema(example = "89000") Long price) {
+        @Schema(example = "Maison Kitsuné 더블 폭스 헤드 패치 폴로 반팔 셔츠 블랙") String title,
+        @Schema(example = "65000") Long price) {
 
     public static SimilarProductResponse from(Product product) {
         return new SimilarProductResponse(product.getId(), product.getTitle(), product.getPrice());

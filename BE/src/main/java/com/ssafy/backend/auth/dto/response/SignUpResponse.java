@@ -8,10 +8,10 @@ public record SignUpResponse(
         @Schema(example = "1")
         Long id,
 
-        @Schema(example = "user@example.com")
+        @Schema(example = "vintib1@gmail.com")
         String email,
 
-        @Schema(example = "홍길동")
+        @Schema(example = "한서윤")
         String name,
 
         @Schema(example = "false")

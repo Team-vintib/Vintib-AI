@@ -25,9 +25,9 @@ public class DeliveryWebhookController {
 
     private final DeliveryWebhookService deliveryWebhookService;
 
-    @Operation(summary = "배송 상태 변경 웹훅(SHIP-002)",
+    @Operation(summary = "배송 상태 변경 웹훅",
             description = "deliveryapi.co.kr이 배송 상태 변경 시 호출한다. JWT 인증이 아니라 "
-                    + "X-Webhook-Signature(HMAC-SHA256) 서명으로 검증한다. FE/앱에서 직접 호출하지 않는다.")
+                    + "X-Webhook-Signature(HMAC-SHA256) 서명으로 검증한다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "처리 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "서명 검증 실패 또는 잘못된 payload")

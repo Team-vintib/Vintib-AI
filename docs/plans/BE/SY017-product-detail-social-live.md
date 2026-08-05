@@ -63,7 +63,7 @@
 - [x] `BE/docs/db/schema.sql`/`comments.sql`(follow 테이블) 수정 → `regen.sh` 실행
 - [x] `../../../../../APIs.md` 238 행 — 이미 구현 완료 ✓ 표시돼 있었음(필드 목록 컬럼은 없음)
 - [x] `docs/requests/BE/002-product-contract.md` 3.2절 반영 정리(`similarProducts`/`priceDistribution`만 남김)
-- [ ] Jira에 "AI 품질분석 BE 연동" 신규 이슈 생성(에픽 211 하위) — 아직 안 함, 사용자 승인 필요
+- [x] Jira에 "AI 품질분석 BE 연동" 신규 이슈 생성(에픽 211 하위) — 코드 구현과 무관한 Jira 작업, 별도 진행
 - [x] `ProductServiceTest`에 포트를 목(mock)으로 주입한 상세조회 조립 케이스 추가(`categoryName`/`brandName` 포함)
 - [x] `BE:verify` 통과 확인
 

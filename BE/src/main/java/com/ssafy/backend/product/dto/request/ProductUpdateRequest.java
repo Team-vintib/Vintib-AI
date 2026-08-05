@@ -13,9 +13,9 @@ public record ProductUpdateRequest(
         String conditionGrade,
         String sizeLabel,
 
-        @Schema(example = "블랙") String color,
+        @Schema(example = "BLACK") String color,
 
-        @Schema(example = "데님") String material,
+        @Schema(example = "Cotton 100%") String material,
 
         @Schema(description = "실측 치수(cm). null이면 미반영", example = "{\"총장\": 70, \"어깨너비\": 45}")
         Map<String, Integer> measurements,

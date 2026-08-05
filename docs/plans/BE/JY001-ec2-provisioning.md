@@ -36,14 +36,14 @@
 
 ## 구현 목록
 
-- [ ] `infra/ec2/setup-swap.sh` — swap 4GB (멱등)
-- [ ] `infra/ec2/setup-ufw.sh` — 80/tcp 추가 (기존 규칙 보존, 멱등)
-- [ ] `docker-compose.prod.yml`에 Caddy 리버스 프록시 서비스 추가 + `infra/caddy/Caddyfile`
-- [ ] `backend`를 prod에서 호스트 포트 미바인딩으로 전환 (Caddy만 80/443 노출, backend는 vintib-net 내부로)
-- [ ] EC2에 레포 클론 + `.env` 작성 후 compose 기동
-- [ ] 검증: healthcheck 4/4, 포트 노출 검사, 외부 HTTPS 200, ufw active
-- [ ] GitLab 샘플 파이프라인 1회 성공 확인
-- [ ] `BE/docs/infra/ec2.md` 문서화
+- [x] `infra/ec2/setup-swap.sh` — swap 4GB (멱등)
+- [x] `infra/ec2/setup-ufw.sh` — 80/tcp 추가 (기존 규칙 보존, 멱등)
+- [x] `docker-compose.prod.yml`에 Caddy 리버스 프록시 서비스 추가 + `infra/caddy/Caddyfile`
+- [x] `backend`를 prod에서 호스트 포트 미바인딩으로 전환 (Caddy만 80/443 노출, backend는 vintib-net 내부로)
+- [x] EC2에 레포 클론 + `.env` 작성 후 compose 기동
+- [x] 검증: healthcheck 4/4, 포트 노출 검사, 외부 HTTPS 200, ufw active
+- [x] GitLab 샘플 파이프라인 1회 성공 확인
+- [x] `BE/docs/infra/ec2.md` 문서화
 
 ## 결정 사항 (2026-07-23 사용자 승인)
 
