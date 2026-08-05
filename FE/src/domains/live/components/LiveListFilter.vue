@@ -16,6 +16,7 @@ withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   'update:selectedCategory': [category: LiveCategoryFilter]
   reset: []
+  apply: []
 }>()
 
 const handleCategoryChange = (event: Event) => {
@@ -45,6 +46,17 @@ const handleCategoryChange = (event: Event) => {
         <span>{{ option.label }}</span>
       </label>
     </fieldset>
+
+    <div class="live-list-filter__actions">
+      <button
+        class="live-list-filter__apply"
+        type="button"
+        :disabled="disabled"
+        @click="emit('apply')"
+      >
+        적용
+      </button>
+    </div>
   </aside>
 </template>
 
@@ -113,8 +125,9 @@ const handleCategoryChange = (event: Event) => {
 .live-list-filter__group legend {
   margin-bottom: var(--space-4);
   color: var(--color-text-primary);
-  font-size: var(--font-size-button-small);
-  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: -0.01em;
 }
 
 .live-list-filter__group label {
@@ -123,7 +136,6 @@ const handleCategoryChange = (event: Event) => {
   min-height: var(--filter-option-min-height);
   gap: var(--space-3);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-button-small);
   cursor: pointer;
 }
 
@@ -133,9 +145,43 @@ const handleCategoryChange = (event: Event) => {
 }
 
 .live-list-filter__group input {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-size-xs-plus);
+  height: var(--icon-size-xs-plus);
   accent-color: var(--color-primary);
+}
+
+.live-list-filter__actions {
+  display: block;
+}
+
+.live-list-filter__apply {
+  width: 100%;
+  min-height: var(--button-height-small);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base);
+}
+
+.live-list-filter__apply:hover:not(:disabled) {
+  border-color: var(--color-primary-hover);
+  background: var(--color-primary-hover);
+}
+
+.live-list-filter__apply:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.live-list-filter__apply:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 @media (max-width: 1024px) {
@@ -151,6 +197,10 @@ const handleCategoryChange = (event: Event) => {
 
   .live-list-filter__group legend {
     grid-column: 1 / -1;
+  }
+
+  .live-list-filter__actions {
+    max-width: 240px;
   }
 }
 

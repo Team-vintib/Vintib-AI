@@ -183,9 +183,11 @@ const handleActionClick = () => {
 <style scoped lang="scss">
 .live-list-card {
   display: grid;
+  grid-template-rows: auto 1fr;
   overflow: hidden;
+  height: 100%;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
+  border-radius: 15px;
   background: var(--color-surface);
   transition:
     border-color var(--transition-standard),
@@ -215,7 +217,7 @@ const handleActionClick = () => {
   position: relative;
   display: block;
   overflow: hidden;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 4 / 5;
   background: var(--color-image-frame);
 }
 
@@ -233,18 +235,19 @@ const handleActionClick = () => {
 
 .live-list-card__badge {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: var(--space-2);
+  left: var(--space-2);
   display: inline-flex;
   align-items: center;
-  padding: 6px 9px;
-  border-radius: 0 0 var(--radius-badge) 0;
+  padding: 5px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
   color: var(--color-text-primary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-3xs);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.16em;
-  line-height: 1;
+  font-size: calc(var(--font-size-caption) - 1px);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.03em;
+  line-height: var(--line-height-xs);
+  backdrop-filter: blur(4px);
 }
 
 .live-list-card__badge--live {
@@ -272,19 +275,24 @@ const handleActionClick = () => {
 }
 
 .live-list-card__body {
-  display: grid;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-5);
+  padding: var(--space-4);
 }
 
 .live-list-card__title {
   display: -webkit-box;
   overflow: hidden;
+  min-height: 2.7em;
   color: var(--color-text-primary);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
   line-height: 1.35;
   letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -295,6 +303,8 @@ const handleActionClick = () => {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-light);
   line-height: var(--line-height-snug);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .live-list-card__viewer {
@@ -318,7 +328,7 @@ const handleActionClick = () => {
   justify-self: start;
   min-width: 104px;
   height: var(--button-height-sm);
-  margin-top: var(--space-2);
+  margin-top: auto;
   padding: 0 var(--space-4);
   border: 1px solid var(--color-primary);
   border-radius: var(--radius-control);

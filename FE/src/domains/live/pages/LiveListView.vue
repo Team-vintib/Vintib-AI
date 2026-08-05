@@ -34,14 +34,18 @@ const loadState = ref<LiveListLoadState>('loading')
 const errorMessage = ref('')
 const searchKeyword = ref('')
 const selectedCategory = ref<LiveCategoryFilter>('ALL')
+const appliedCategory = ref<LiveCategoryFilter>('ALL')
 const selectedStatus = ref<LiveStatusFilter>('ALL')
 const selectedSort = ref<LiveSortOption>('LATEST')
+const selectedPage = ref(1)
+const totalPageCount = ref(1)
 const apiEnabled = isLiveListApiEnabled()
 let loadRequestId = 0
 
 const canResetFilters = computed(
   () =>
     selectedCategory.value !== 'ALL' ||
+    appliedCategory.value !== 'ALL' ||
     selectedStatus.value !== 'ALL' ||
     selectedSort.value !== 'LATEST',
 )
@@ -64,7 +68,7 @@ const publicLiveList = computed(() => liveList.value.filter((live) => live.statu
 const sortedLiveList = computed(() => {
   const filteredLiveList = publicLiveList.value.filter((live) => {
     const matchesCategory =
-      selectedCategory.value === 'ALL' || live.category === selectedCategory.value
+      appliedCategory.value === 'ALL' || live.category === appliedCategory.value
     const matchesStatus = selectedStatus.value === 'ALL' || live.status === selectedStatus.value
 
     return matchesCategory && matchesStatus
@@ -86,6 +90,10 @@ const sortedLiveList = computed(() => {
   })
 })
 
+const visiblePageNumbers = computed(() =>
+  Array.from({ length: totalPageCount.value }, (_, index) => index + 1),
+)
+
 const isLoading = computed(() => loadState.value === 'loading')
 const hasLoadError = computed(() => loadState.value === 'error')
 const isEmpty = computed(() => loadState.value === 'success' && publicLiveList.value.length === 0)
@@ -106,7 +114,7 @@ const resultStatusMessage = computed(() => {
   }
 
   const condition = [
-    getOptionLabel(LIVE_CATEGORY_FILTER_OPTIONS, selectedCategory.value),
+    getOptionLabel(LIVE_CATEGORY_FILTER_OPTIONS, appliedCategory.value),
     getOptionLabel(LIVE_STATUS_FILTER_OPTIONS, selectedStatus.value),
     getOptionLabel(LIVE_SORT_OPTIONS, selectedSort.value),
   ].join(', ')
@@ -131,7 +139,7 @@ const loadLiveList = async () => {
       {
         status: selectedStatus.value === 'ALL' ? undefined : selectedStatus.value,
         sort: selectedSort.value,
-        page: 0,
+        page: selectedPage.value,
         size: 12,
       },
       scenario,
@@ -140,12 +148,14 @@ const loadLiveList = async () => {
     if (requestId !== loadRequestId) return
 
     liveList.value = response.items
+    totalPageCount.value = Math.max(response.totalPages, 1)
     loadState.value = 'success'
   } catch (error) {
     if (requestId !== loadRequestId) return
 
     const apiError = normalizeApiError(error)
 
+    totalPageCount.value = 1
     errorMessage.value =
       apiError.code === 'UNKNOWN_ERROR'
         ? '라이브 목록을 불러오지 못했습니다. 네트워크 상태를 확인해 주세요.'
@@ -156,8 +166,56 @@ const loadLiveList = async () => {
 
 const resetFilters = () => {
   selectedCategory.value = 'ALL'
+  appliedCategory.value = 'ALL'
   selectedStatus.value = 'ALL'
   selectedSort.value = 'LATEST'
+  selectedPage.value = 1
+
+  if (apiEnabled) {
+    void loadLiveList()
+  }
+}
+
+const applyCategoryFilter = () => {
+  appliedCategory.value = selectedCategory.value
+  selectedPage.value = 1
+
+  if (apiEnabled) {
+    void loadLiveList()
+  }
+}
+
+const handleStatusChange = (status: LiveStatusFilter) => {
+  if (selectedStatus.value === status || isLoading.value) return
+
+  selectedStatus.value = status
+  selectedPage.value = 1
+
+  if (apiEnabled) {
+    void loadLiveList()
+  }
+}
+
+const handleSortChange = () => {
+  selectedPage.value = 1
+
+  if (apiEnabled) {
+    void loadLiveList()
+  }
+}
+
+const moveToPage = (page: number) => {
+  if (
+    page < 1 ||
+    page > totalPageCount.value ||
+    page === selectedPage.value ||
+    isLoading.value
+  ) {
+    return
+  }
+
+  selectedPage.value = page
+  void loadLiveList()
 }
 
 const handleSearch = async (keyword: string) => {
@@ -174,12 +232,6 @@ watch(
   },
   { immediate: true },
 )
-
-watch([selectedStatus, selectedSort], () => {
-  if (apiEnabled) {
-    void loadLiveList()
-  }
-})
 
 onBeforeUnmount(() => {
   loadRequestId += 1
@@ -202,6 +254,7 @@ onBeforeUnmount(() => {
           :can-reset="canResetFilters"
           :disabled="isLoading"
           @reset="resetFilters"
+          @apply="applyCategoryFilter"
         />
 
         <div class="live-list-page__results">
@@ -215,7 +268,7 @@ onBeforeUnmount(() => {
                 :class="{ 'live-list-page__tab--active': selectedStatus === option.id }"
                 :aria-selected="selectedStatus === option.id"
                 :disabled="isLoading"
-                @click="selectedStatus = option.id"
+                @click="handleStatusChange(option.id)"
               >
                 {{ option.label }}
               </button>
@@ -226,7 +279,12 @@ onBeforeUnmount(() => {
                 {{ isLoading ? '불러오는 중' : `총 ${sortedLiveList.length}개` }}
               </span>
               <label class="sr-only" for="live-list-sort">라이브 정렬</label>
-              <select id="live-list-sort" v-model="selectedSort" :disabled="isLoading">
+              <select
+                id="live-list-sort"
+                v-model="selectedSort"
+                :disabled="isLoading"
+                @change="handleSortChange"
+              >
                 <option v-for="option in LIVE_SORT_OPTIONS" :key="option.id" :value="option.id">
                   {{ option.label }}
                 </option>
@@ -264,6 +322,44 @@ onBeforeUnmount(() => {
           <div v-else class="live-list-page__grid" aria-label="필터링된 라이브 방송 목록">
             <LiveListCard v-for="live in sortedLiveList" :key="live.id" :live="live" />
           </div>
+
+          <nav
+            v-if="publicLiveList.length && totalPageCount > 1"
+            class="live-list-page__pagination"
+            aria-label="라이브 목록 페이지"
+          >
+            <button
+              type="button"
+              aria-label="이전 페이지"
+              :disabled="selectedPage <= 1 || isLoading"
+              @click="moveToPage(selectedPage - 1)"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </button>
+            <button
+              v-for="page in visiblePageNumbers"
+              :key="page"
+              type="button"
+              :class="{ 'live-list-page__page--active': selectedPage === page }"
+              :aria-current="selectedPage === page ? 'page' : undefined"
+              :disabled="isLoading"
+              @click="moveToPage(page)"
+            >
+              {{ page }}
+            </button>
+            <button
+              type="button"
+              aria-label="다음 페이지"
+              :disabled="selectedPage >= totalPageCount || isLoading"
+              @click="moveToPage(selectedPage + 1)"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </button>
+          </nav>
         </div>
       </div>
     </section>
@@ -378,8 +474,61 @@ onBeforeUnmount(() => {
 
 .live-list-page__grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-6);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+.live-list-page__pagination {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+
+.live-list-page__pagination button {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  height: var(--button-height-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.live-list-page__pagination button:hover:not(:disabled),
+.live-list-page__pagination button:focus-visible,
+.live-list-page__page--active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.live-list-page__pagination button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.live-list-page__pagination button:disabled {
+  color: var(--color-text-muted);
+  opacity: 0.45;
+}
+
+.live-list-page__pagination svg {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+@media (max-width: 1120px) {
+  .live-list-page__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 1024px) {
@@ -388,13 +537,7 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-width: 840px) {
-  .live-list-page__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .live-list-page__result-header {
     align-items: stretch;
     flex-direction: column;
@@ -411,8 +554,13 @@ onBeforeUnmount(() => {
   }
 
   .live-list-page__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .live-list-page__grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-5);
   }
 }
 </style>
