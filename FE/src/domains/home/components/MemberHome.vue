@@ -83,9 +83,11 @@ const handleAvatarError = (event: Event) => {
           </span>
           <span class="seller-card__body">
             <strong class="seller-card__name">{{ seller.name }}</strong>
-            <span class="seller-card__stats">
+            <span class="seller-card__stats-row">
               <span>팔로워 {{ formatCompactNumber(seller.followerCount) }}</span>
               <span>팔로잉 {{ formatCompactNumber(seller.followingCount) }}</span>
+            </span>
+            <span class="seller-card__stats-row">
               <span>판매 상품 {{ formatCompactNumber(seller.newProductCount) }}</span>
               <span>라이브 {{ formatCompactNumber(seller.liveCount) }}</span>
             </span>
@@ -260,18 +262,32 @@ const handleAvatarError = (event: Event) => {
   white-space: nowrap;
 }
 
-.seller-card__stats {
+.seller-card__stats-row {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-start;
-  gap: var(--space-1) var(--space-3);
+  gap: var(--space-1) 0;
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-regular);
   letter-spacing: -0.01em;
   line-height: var(--line-height-snug);
   font-variant-numeric: tabular-nums;
+}
+
+.seller-card__stats-row > span:not(:last-child) {
+  position: relative;
+  padding-right: var(--space-3);
+}
+
+.seller-card__stats-row > span:not(:last-child)::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  color: var(--color-border-strong);
+  content: '·';
+  transform: translateY(-50%);
 }
 
 @media (max-width: 768px) {

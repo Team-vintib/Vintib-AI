@@ -112,7 +112,7 @@ const handleAvatarError = (event: Event) => {
   gap: var(--space-1) var(--space-3);
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-regular);
   letter-spacing: -0.01em;
   line-height: var(--line-height-snug);
