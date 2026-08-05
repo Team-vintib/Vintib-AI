@@ -3,9 +3,15 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import { getMyOrderDetail } from '@/domains/my/api/myApi'
 import { MY_ORDER_STATUS_LABELS } from '@/domains/my/constants/myMockData'
-import type { MyOrderItem } from '@/domains/my/types/my.types'
+import { confirmOrder, getOrderDetail, updateOrderAddress } from '@/domains/order/api/orderApi'
+import type { OrderAddressInput, OrderSummary } from '@/domains/order/types/order.types'
+import { getProductPrimaryImageUrl } from '@/domains/product/api/productApi'
+import { createRefund, getRefunds } from '@/domains/refund/api/refundApi'
+import { REFUND_REASON_OPTIONS, REFUND_STATUS_LABELS } from '@/domains/refund/constants/refundOptions'
+import type { RefundReason, RefundRequestInfo } from '@/domains/refund/types/refund.types'
+import { getShipment } from '@/domains/shipping/api/shipmentApi'
+import type { OrderShipmentInfo } from '@/domains/shipping/types/shipping.types'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
@@ -14,7 +20,10 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
-const order = ref<MyOrderItem | null>(null)
+const order = ref<OrderSummary | null>(null)
+const shipment = ref<OrderShipmentInfo | null>(null)
+const refunds = ref<RefundRequestInfo[]>([])
+const productThumbnailUrl = ref('')
 const loadState = ref<'idle' | 'loading' | 'success' | 'error' | 'guest'>('idle')
 const errorMessage = ref('')
 
@@ -23,21 +32,36 @@ const isGuest = computed(() => loadState.value === 'guest')
 const hasLoadError = computed(() => loadState.value === 'error')
 const orderId = computed(() => Number(route.params.orderId))
 
-const orderTypeLabel = computed(() => {
-  if (!order.value) {
-    return ''
-  }
+const canEditAddress = computed(() => order.value?.status === 'PAID')
+const canConfirm = computed(() => order.value?.status === 'DELIVERED')
+const activeRefund = computed(() => refunds.value.find((refund) => refund.status === 'REQUESTED') ?? null)
+const canRequestRefund = computed(
+  () =>
+    !!order.value &&
+    ['PAID', 'SHIPPING', 'DELIVERED'].includes(order.value.status) &&
+    !activeRefund.value,
+)
+const latestRefund = computed(() => refunds.value[0] ?? null)
 
-  return order.value.type === 'AUCTION' ? '경매 낙찰' : '즉시 구매'
+const isAddressFormOpen = ref(false)
+const addressForm = ref<OrderAddressInput>({
+  recipientName: '',
+  recipientPhone: '',
+  zipcode: '',
+  address1: '',
+  address2: '',
 })
+const isAddressSubmitting = ref(false)
+const addressErrorMessage = ref('')
 
-const orderAddress = computed(() => {
-  if (!order.value) {
-    return ''
-  }
+const isConfirmSubmitting = ref(false)
+const confirmErrorMessage = ref('')
 
-  return `(${order.value.postalCode}) ${order.value.address} ${order.value.detailAddress}`.trim()
-})
+const isRefundFormOpen = ref(false)
+const refundReason = ref<RefundReason>('NOT_AS_DESCRIBED')
+const refundDetailReason = ref('')
+const isRefundSubmitting = ref(false)
+const refundErrorMessage = ref('')
 
 const formatOrderDate = (value: string) =>
   new Intl.DateTimeFormat('ko-KR', {
@@ -64,11 +88,102 @@ const loadOrder = async () => {
   errorMessage.value = ''
 
   try {
-    order.value = await getMyOrderDetail(authStore.user.id, orderId.value)
+    const orderDetail = await getOrderDetail(orderId.value)
+    order.value = orderDetail
+
+    const [shipmentResult, refundsResult, thumbnailUrl] = await Promise.all([
+      getShipment(orderId.value).catch(() => null),
+      getRefunds(orderId.value).catch(() => []),
+      getProductPrimaryImageUrl(orderDetail.product.id).catch(() => ''),
+    ])
+
+    shipment.value = shipmentResult
+    refunds.value = refundsResult
+    productThumbnailUrl.value = thumbnailUrl
+    prefillAddressForm()
     loadState.value = 'success'
   } catch (error) {
     errorMessage.value = normalizeApiError(error).message
     loadState.value = 'error'
+  }
+}
+
+const prefillAddressForm = () => {
+  if (!shipment.value) return
+
+  addressForm.value = {
+    recipientName: shipment.value.recipientName,
+    recipientPhone: shipment.value.recipientPhone,
+    zipcode: shipment.value.zipcode,
+    address1: shipment.value.address1,
+    address2: shipment.value.address2 ?? '',
+  }
+}
+
+const openAddressForm = () => {
+  prefillAddressForm()
+  addressErrorMessage.value = ''
+  isAddressFormOpen.value = true
+}
+
+const submitAddress = async () => {
+  if (!order.value) return
+
+  isAddressSubmitting.value = true
+  addressErrorMessage.value = ''
+
+  try {
+    shipment.value = await updateOrderAddress(order.value.orderId, {
+      ...addressForm.value,
+      address2: addressForm.value.address2 || undefined,
+    })
+    isAddressFormOpen.value = false
+  } catch (error) {
+    addressErrorMessage.value = normalizeApiError(error).message
+  } finally {
+    isAddressSubmitting.value = false
+  }
+}
+
+const submitConfirm = async () => {
+  if (!order.value) return
+
+  isConfirmSubmitting.value = true
+  confirmErrorMessage.value = ''
+
+  try {
+    order.value = await confirmOrder(order.value.orderId)
+  } catch (error) {
+    confirmErrorMessage.value = normalizeApiError(error).message
+  } finally {
+    isConfirmSubmitting.value = false
+  }
+}
+
+const openRefundForm = () => {
+  refundReason.value = 'NOT_AS_DESCRIBED'
+  refundDetailReason.value = ''
+  refundErrorMessage.value = ''
+  isRefundFormOpen.value = true
+}
+
+const submitRefund = async () => {
+  if (!order.value || !refundDetailReason.value.trim()) return
+
+  isRefundSubmitting.value = true
+  refundErrorMessage.value = ''
+
+  try {
+    const created = await createRefund(order.value.orderId, {
+      reason: refundReason.value,
+      detailReason: refundDetailReason.value.trim(),
+    })
+    refunds.value = [created, ...refunds.value]
+    isRefundFormOpen.value = false
+  } catch (error) {
+    refundErrorMessage.value = normalizeApiError(error).message
+  } finally {
+    isRefundSubmitting.value = false
   }
 }
 
@@ -113,18 +228,34 @@ onMounted(() => {
         </header>
 
         <article class="my-order-detail-card">
-          <img :src="order.productThumbnailUrl" :alt="order.productName" />
+          <img :src="productThumbnailUrl" :alt="order.product.title" />
           <div class="my-order-detail-card__body">
-            <span>{{ orderTypeLabel }}</span>
-            <h2>{{ order.productName }}</h2>
+            <span>{{ MY_ORDER_STATUS_LABELS[order.status] }}</span>
+            <h2>{{ order.product.title }}</h2>
             <p>{{ order.sellerNickname }}</p>
-            <strong>{{ order.paidAmount.toLocaleString('ko-KR') }}P</strong>
+            <strong>{{ order.orderPrice.toLocaleString('ko-KR') }}P</strong>
           </div>
         </article>
 
+        <section class="my-order-detail-section" aria-labelledby="product-title">
+          <div class="my-order-detail-section__title">
+            <h2 id="product-title">상품 정보</h2>
+          </div>
+          <dl class="my-order-detail-grid">
+            <div>
+              <dt>상품 상태</dt>
+              <dd>{{ order.product.conditionGrade ?? '-' }}</dd>
+            </div>
+            <div>
+              <dt>사이즈</dt>
+              <dd>{{ order.product.sizeLabel ?? '-' }}</dd>
+            </div>
+          </dl>
+        </section>
+
         <section class="my-order-detail-section" aria-labelledby="payment-title">
           <div class="my-order-detail-section__title">
-            <h2 id="payment-title">결제 정보</h2>
+            <h2 id="payment-title">구매 정보</h2>
           </div>
           <dl class="my-order-detail-grid">
             <div>
@@ -133,11 +264,11 @@ onMounted(() => {
             </div>
             <div>
               <dt>결제 금액</dt>
-              <dd>{{ order.paidAmount.toLocaleString('ko-KR') }}P</dd>
+              <dd>{{ order.orderPrice.toLocaleString('ko-KR') }}P</dd>
             </div>
             <div>
               <dt>구매 방식</dt>
-              <dd>{{ orderTypeLabel }}</dd>
+              <dd>즉시 구매</dd>
             </div>
             <div>
               <dt>주문 상태</dt>
@@ -148,22 +279,155 @@ onMounted(() => {
 
         <section class="my-order-detail-section" aria-labelledby="shipping-title">
           <div class="my-order-detail-section__title">
-            <h2 id="shipping-title">배송 정보</h2>
+            <h2 id="shipping-title">배송지</h2>
+            <button v-if="canEditAddress" type="button" @click="openAddressForm">
+              {{ shipment ? '배송지 수정' : '배송지 등록' }}
+            </button>
           </div>
-          <dl class="my-order-detail-grid">
+
+          <form v-if="isAddressFormOpen" class="my-order-detail-form" @submit.prevent="submitAddress">
+            <div class="my-order-detail-form__field">
+              <label for="order-recipient-name">받는 사람</label>
+              <input id="order-recipient-name" v-model="addressForm.recipientName" type="text" required />
+            </div>
+            <div class="my-order-detail-form__field">
+              <label for="order-recipient-phone">연락처</label>
+              <input id="order-recipient-phone" v-model="addressForm.recipientPhone" type="tel" required />
+            </div>
+            <div class="my-order-detail-form__field">
+              <label for="order-zipcode">우편번호</label>
+              <input id="order-zipcode" v-model="addressForm.zipcode" type="text" required />
+            </div>
+            <div class="my-order-detail-form__field">
+              <label for="order-address1">주소</label>
+              <input id="order-address1" v-model="addressForm.address1" type="text" required />
+            </div>
+            <div class="my-order-detail-form__field">
+              <label for="order-address2">상세 주소</label>
+              <input id="order-address2" v-model="addressForm.address2" type="text" />
+            </div>
+            <p v-if="addressErrorMessage" class="my-order-detail-form__error" role="alert">
+              {{ addressErrorMessage }}
+            </p>
+            <div class="my-order-detail-form__actions">
+              <button type="button" @click="isAddressFormOpen = false">취소</button>
+              <button type="submit" :disabled="isAddressSubmitting">
+                {{ isAddressSubmitting ? '저장 중…' : '저장' }}
+              </button>
+            </div>
+          </form>
+
+          <dl v-else-if="shipment" class="my-order-detail-grid">
             <div>
               <dt>받는 사람</dt>
-              <dd>{{ order.recipientName }}</dd>
+              <dd>{{ shipment.recipientName }}</dd>
             </div>
             <div>
               <dt>연락처</dt>
-              <dd>{{ order.recipientPhoneNumber }}</dd>
+              <dd>{{ shipment.recipientPhone }}</dd>
             </div>
             <div class="my-order-detail-grid__wide">
               <dt>배송지</dt>
-              <dd>{{ orderAddress }}</dd>
+              <dd>({{ shipment.zipcode }}) {{ shipment.address1 }} {{ shipment.address2 }}</dd>
             </div>
           </dl>
+
+          <p v-else class="my-order-detail-empty">등록된 배송지가 없습니다.</p>
+        </section>
+
+        <section class="my-order-detail-section" aria-labelledby="delivery-title">
+          <div class="my-order-detail-section__title">
+            <h2 id="delivery-title">배송 정보</h2>
+          </div>
+          <dl v-if="shipment?.trackingNumber" class="my-order-detail-grid">
+            <div>
+              <dt>택배사</dt>
+              <dd>{{ shipment.courierName }}</dd>
+            </div>
+            <div>
+              <dt>송장 번호</dt>
+              <dd>{{ shipment.trackingNumber }}</dd>
+            </div>
+            <div>
+              <dt>배송 상태</dt>
+              <dd>{{ MY_ORDER_STATUS_LABELS[order.status] }}</dd>
+            </div>
+            <div>
+              <dt>발송/도착 일시</dt>
+              <dd>
+                {{ shipment.shippedAt ? formatOrderDate(shipment.shippedAt) : '-' }} /
+                {{ shipment.deliveredAt ? formatOrderDate(shipment.deliveredAt) : '-' }}
+              </dd>
+            </div>
+          </dl>
+          <p v-else class="my-order-detail-empty">아직 송장이 등록되지 않았습니다.</p>
+        </section>
+
+        <section v-if="canConfirm" class="my-order-detail-section" aria-labelledby="confirm-title">
+          <div class="my-order-detail-section__title">
+            <h2 id="confirm-title">구매 확정</h2>
+          </div>
+          <p class="my-order-detail-help">
+            상품을 확인하셨다면 구매를 확정해 주세요. 확정 후에는 판매자에게 대금이 정산됩니다.
+          </p>
+          <p v-if="confirmErrorMessage" class="my-order-detail-form__error" role="alert">
+            {{ confirmErrorMessage }}
+          </p>
+          <button type="button" class="my-order-detail-primary-action" :disabled="isConfirmSubmitting" @click="submitConfirm">
+            {{ isConfirmSubmitting ? '처리 중…' : '구매 확정하기' }}
+          </button>
+        </section>
+
+        <section class="my-order-detail-section" aria-labelledby="refund-title">
+          <div class="my-order-detail-section__title">
+            <h2 id="refund-title">환불</h2>
+            <button v-if="canRequestRefund" type="button" @click="openRefundForm">환불 요청</button>
+          </div>
+
+          <form v-if="isRefundFormOpen" class="my-order-detail-form" @submit.prevent="submitRefund">
+            <div class="my-order-detail-form__field">
+              <label for="refund-reason">환불 사유</label>
+              <select id="refund-reason" v-model="refundReason">
+                <option v-for="option in REFUND_REASON_OPTIONS" :key="option.reason" :value="option.reason">
+                  {{ option.label }}
+                </option>
+              </select>
+            </div>
+            <div class="my-order-detail-form__field">
+              <label for="refund-detail">상세 사유</label>
+              <textarea id="refund-detail" v-model="refundDetailReason" rows="3" required></textarea>
+            </div>
+            <p v-if="refundErrorMessage" class="my-order-detail-form__error" role="alert">
+              {{ refundErrorMessage }}
+            </p>
+            <div class="my-order-detail-form__actions">
+              <button type="button" @click="isRefundFormOpen = false">취소</button>
+              <button type="submit" :disabled="isRefundSubmitting || !refundDetailReason.trim()">
+                {{ isRefundSubmitting ? '요청 중…' : '환불 요청하기' }}
+              </button>
+            </div>
+          </form>
+
+          <dl v-else-if="latestRefund" class="my-order-detail-grid">
+            <div>
+              <dt>상태</dt>
+              <dd>{{ REFUND_STATUS_LABELS[latestRefund.status] }}</dd>
+            </div>
+            <div>
+              <dt>요청 일시</dt>
+              <dd>{{ formatOrderDate(latestRefund.requestedAt) }}</dd>
+            </div>
+            <div class="my-order-detail-grid__wide">
+              <dt>상세 사유</dt>
+              <dd>{{ latestRefund.detailReason }}</dd>
+            </div>
+            <div v-if="latestRefund.rejectionReason" class="my-order-detail-grid__wide">
+              <dt>거절 사유</dt>
+              <dd>{{ latestRefund.rejectionReason }}</dd>
+            </div>
+          </dl>
+
+          <p v-else class="my-order-detail-empty">환불 요청 내역이 없습니다.</p>
         </section>
       </template>
     </section>
@@ -199,7 +463,9 @@ onMounted(() => {
 }
 
 .my-order-detail-page__header button,
-.my-order-detail-state button {
+.my-order-detail-state button,
+.my-order-detail-section__title button,
+.my-order-detail-form__actions button {
   min-height: var(--button-height-sm);
   padding: 0 16px;
   border: 1px solid var(--color-border);
@@ -210,6 +476,23 @@ onMounted(() => {
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-relaxed);
   cursor: pointer;
+}
+
+.my-order-detail-primary-action {
+  min-height: var(--button-height-sm);
+  padding: 0 20px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+.my-order-detail-primary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .my-order-detail-card,
@@ -272,11 +555,29 @@ onMounted(() => {
   padding: var(--space-5);
 }
 
+.my-order-detail-section__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .my-order-detail-section__title h2 {
   color: var(--color-text-primary);
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-extrabold);
   line-height: var(--line-height-lg);
+}
+
+.my-order-detail-help {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-relaxed);
+}
+
+.my-order-detail-empty {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
 }
 
 .my-order-detail-grid {
@@ -313,6 +614,43 @@ onMounted(() => {
   overflow-wrap: anywhere;
 }
 
+.my-order-detail-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.my-order-detail-form__field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.my-order-detail-form__field label {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.my-order-detail-form__field input,
+.my-order-detail-form__field select,
+.my-order-detail-form__field textarea {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+}
+
+.my-order-detail-form__error {
+  color: var(--color-danger, #d64545);
+  font-size: var(--font-size-caption);
+}
+
+.my-order-detail-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
 .my-order-detail-state {
   display: grid;
   justify-items: center;
@@ -343,7 +681,8 @@ onMounted(() => {
 }
 
 .my-order-detail-page__header button:hover,
-.my-order-detail-state button:hover {
+.my-order-detail-state button:hover,
+.my-order-detail-section__title button:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
 }

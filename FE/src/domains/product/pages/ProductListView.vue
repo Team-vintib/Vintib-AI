@@ -236,12 +236,7 @@ onMounted(() => {
 
 <template>
   <DefaultLayout>
-    <section class="product-list-page" aria-labelledby="product-list-title">
-      <header class="product-list-page__header">
-        <h1 id="product-list-title">상품</h1>
-        <p>지금 구매 가능한 상품과 라이브 경매 예정 상품을 둘러보세요.</p>
-      </header>
-
+    <section class="product-list-page" aria-label="상품 목록">
       <AppSearchBar
         v-model="searchKeyword"
         search-label="상품 검색"
@@ -386,27 +381,6 @@ onMounted(() => {
   display: grid;
   gap: var(--space-8);
   width: 100%;
-}
-
-.product-list-page__header {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.product-list-page__header h1 {
-  color: var(--color-text-primary);
-  font-family: var(--font-display);
-  font-size: 44px;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.04em;
-  line-height: 1;
-}
-
-.product-list-page__header p {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-light);
-  line-height: var(--line-height-body);
 }
 
 .product-list-page__content {
@@ -620,11 +594,6 @@ onMounted(() => {
 }
 
 @media (max-width: 720px) {
-  .product-list-page__header h1 {
-    font-size: var(--font-size-3xl-plus);
-    line-height: 40px;
-  }
-
   .product-list-page__result-header {
     align-items: stretch;
     flex-direction: column;
