@@ -94,17 +94,14 @@ const selectKeyword = (keyword: string) => {
   height: 46px;
   padding: 3px 3px 3px var(--space-4);
   border: 1px solid var(--color-search-border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--color-surface);
   box-shadow: none;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+  transition: border-color 160ms ease;
 }
 
 .app-search:focus-within {
-  border-color: var(--color-search-button);
-  box-shadow: 0 0 0 4px rgba(47, 75, 58, 0.08);
+  border-color: var(--color-border-underline);
 }
 
 .app-search__icon {
@@ -148,7 +145,7 @@ const selectKeyword = (keyword: string) => {
   flex: 0 0 38px;
   padding: 0;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--color-search-button);
   color: var(--color-text-inverse);
   font-weight: 700;
@@ -185,12 +182,15 @@ const selectKeyword = (keyword: string) => {
   align-items: center;
   min-height: 28px;
   padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-chip);
-  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
   color: var(--color-text-secondary);
   font-size: 13px;
   line-height: 20px;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .app-search-tags__item:hover {

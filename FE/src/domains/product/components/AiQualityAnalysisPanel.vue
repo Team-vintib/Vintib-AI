@@ -341,7 +341,7 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 }
 
 .ai-analysis__nav-button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -367,7 +367,10 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 .ai-analysis__comparison {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-6);
+  gap: var(--space-4);
+  // 원본/검수 이미지가 패널 폭을 꽉 채워 과하게 커지지 않도록 폭을 제한하고 가운데 정렬한다.
+  max-width: 680px;
+  margin: 0 auto;
   padding: var(--space-5) var(--space-6) var(--space-4);
 }
 
@@ -442,7 +445,7 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 }
 
 .ai-analysis__dot:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -467,7 +470,7 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 
 .ai-analysis__description ul {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-3);
   margin-top: var(--space-5);
   list-style: none;

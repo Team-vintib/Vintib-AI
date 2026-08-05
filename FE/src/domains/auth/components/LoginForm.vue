@@ -355,19 +355,21 @@ function getQueryValue(value: unknown) {
   width: 100%;
   height: var(--button-height-standard);
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border-input);
   border-radius: var(--radius-control);
-  background: var(--color-surface);
+  background: transparent;
   color: var(--color-text-primary);
+  font-weight: 300;
   outline: none;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+  transition: border-color 160ms ease;
+}
+
+.login-form__input:hover {
+  border-color: var(--color-border-strong);
 }
 
 .login-form__input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px var(--color-primary-soft);
 }
 
 .login-form__input--error {
@@ -375,7 +377,8 @@ function getQueryValue(value: unknown) {
 }
 
 .login-form__input:disabled {
-  background: var(--color-surface-secondary);
+  border-color: var(--color-border-grid);
+  background: var(--color-surface);
   color: var(--color-text-muted);
 }
 
@@ -458,14 +461,13 @@ function getQueryValue(value: unknown) {
   height: var(--button-height-major);
   padding: 0 var(--space-5);
   border-radius: var(--radius-control);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   line-height: 20px;
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
+    color 160ms ease;
 }
 
 .login-form__submit {
@@ -476,26 +478,27 @@ function getQueryValue(value: unknown) {
 
 .login-form__submit:hover:not(:disabled) {
   background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 .login-form__submit:disabled {
-  background: var(--color-surface-secondary);
-  color: var(--color-text-muted);
+  background: var(--color-border-grid);
+  color: var(--color-text-disabled);
 }
 
 .login-form__secondary {
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-input);
+  background: transparent;
+  color: var(--color-text-muted);
 }
 
 .login-form__secondary:hover {
-  background: var(--color-surface-secondary);
+  border-color: var(--color-text-primary);
+  color: var(--color-text-primary);
 }
 
 .login-form__secondary:disabled {
-  background: var(--color-surface-secondary);
-  color: var(--color-text-muted);
+  color: var(--color-text-disabled);
 }
 
 .login-form__submit:focus-visible,
@@ -503,8 +506,8 @@ function getQueryValue(value: unknown) {
 .login-form__password-toggle:focus-visible,
 .login-form__text-button:focus-visible,
 .login-form__link:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 3px;
+  outline: 1px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .login-form__submit:active:not(:disabled),
@@ -521,8 +524,13 @@ function getQueryValue(value: unknown) {
 }
 
 .login-form__link {
-  color: var(--color-primary);
-  font-weight: 700;
+  color: var(--color-text-primary);
+  font-weight: 500;
+  transition: color 160ms ease;
+}
+
+.login-form__link:hover {
+  color: var(--color-accent);
 }
 
 @media (max-width: 400px) {

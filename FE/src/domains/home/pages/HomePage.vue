@@ -92,7 +92,7 @@ watch(
 </script>
 
 <template>
-  <DefaultLayout content-max-width="1200px">
+  <DefaultLayout>
     <section v-if="isLoading" class="home-state" aria-live="polite">
       <p class="home-state__title">홈 페이지 연결 중입니다.</p>
     </section>

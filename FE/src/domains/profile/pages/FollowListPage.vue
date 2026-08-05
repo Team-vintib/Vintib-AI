@@ -134,6 +134,11 @@ const toggleFollow = async (targetUserId: number) => {
     followerCount: targetUser?.followerCount ?? 0,
     isFollowing: targetUser?.isFollowing ?? false,
   })
+
+  if (previousState.isFollowing && !window.confirm('팔로우를 취소하시겠습니까?')) {
+    return
+  }
+
   const nextIsFollowing = !previousState.isFollowing
   const nextFollowerCount = Math.max(
     previousState.followerCount + (nextIsFollowing ? 1 : -1),
@@ -304,7 +309,7 @@ watch(
 }
 
 .follow-list-page__back:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 3px;
 }
 

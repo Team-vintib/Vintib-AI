@@ -62,7 +62,7 @@ const getProfileRoute = () => ({ name: ROUTE_NAMES.PROFILE, params: { userId: pr
 
 .follow-user-item:hover {
   border-color: var(--color-border-strong);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+  box-shadow: none;
 }
 
 .follow-user-item:focus-within {
@@ -70,7 +70,7 @@ const getProfileRoute = () => ({ name: ROUTE_NAMES.PROFILE, params: { userId: pr
 }
 
 .follow-user-item__link:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 3px;
 }
 

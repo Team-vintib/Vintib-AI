@@ -29,6 +29,13 @@ const formatCompactNumber = (value: number) => {
 const getLivePath = (liveId: number) => `/lives/${liveId}`
 const getProductPath = (productId: number) => `/products/${productId}`
 const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
+
+// 아바타 로드에 실패하면 대체 이미지를 새로 추가하는 대신 빈 원형 프레임만 남긴다.
+const handleAvatarError = (event: Event) => {
+  if (event.target instanceof HTMLImageElement) {
+    event.target.style.visibility = 'hidden'
+  }
+}
 </script>
 
 <template>
@@ -53,12 +60,16 @@ const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
           :to="getSellerProfilePath(seller.id)"
           :aria-label="`${seller.name} 프로필 보기`"
         >
+          <span class="seller-card__avatar">
+            <img
+              v-if="seller.profileImageUrl"
+              :src="seller.profileImageUrl"
+              :alt="seller.name"
+              @error="handleAvatarError"
+            />
+          </span>
           <span class="seller-card__body">
-            <span class="seller-card__profile">
-              <span class="seller-card__identity">
-                <strong class="seller-card__name">{{ seller.name }}</strong>
-              </span>
-            </span>
+            <strong class="seller-card__name">{{ seller.name }}</strong>
             <span class="seller-card__stats">
               <span>팔로워 {{ formatCompactNumber(seller.followerCount) }}</span>
               <span>팔로잉 {{ formatCompactNumber(seller.followingCount) }}</span>
@@ -165,76 +176,92 @@ const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
 .member-home {
   display: grid;
   justify-items: stretch;
-  gap: var(--space-12);
+  gap: var(--space-16);
   padding-bottom: var(--space-16);
 }
 
-.seller-grid,
+.seller-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
 .live-grid,
 .schedule-grid,
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-5);
 }
 
+// 낮고 컴팩트한 카드: 얇은 border만, 채워진 배경 박스는 두지 않는다.
+// hover도 뜨지 않고 보더 대비만 미세하게 바뀐다. 정사각형에 가깝게 세로(아바타 위·텍스트 아래) 배치한다.
 .seller-card {
   position: relative;
-  overflow: hidden;
-  display: grid;
-  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: 20px;
-  background: var(--color-surface);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+  border-radius: var(--radius-card);
   color: inherit;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+  text-align: center;
+  transition: border-color 220ms ease;
 }
 
 .seller-card:hover {
   border-color: var(--color-border-strong);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--color-text-primary) 7%, transparent);
-  transform: translateY(-2px);
+}
+
+.seller-card__avatar {
+  overflow: hidden;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-image-frame);
+}
+
+.seller-card__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
 }
 
 .seller-card__body {
   display: grid;
-  align-content: center;
-  gap: var(--space-4);
-  padding: var(--space-5);
-}
-
-.seller-card__profile {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.seller-card__identity {
-  display: grid;
+  justify-items: center;
   min-width: 0;
-  gap: 2px;
+  width: 100%;
+  gap: 4px;
 }
 
 .seller-card__name {
   color: var(--color-text-primary);
-  display: -webkit-box;
   overflow: hidden;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 26px;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  max-width: 100%;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 21px;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .seller-card__stats {
+  justify-content: center;
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 400;
-  line-height: 20px;
+  letter-spacing: -0.01em;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
 }
 
 .seller-card__stats {

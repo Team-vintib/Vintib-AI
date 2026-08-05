@@ -88,7 +88,7 @@ const audienceLabel = computed(() => {
       :aria-pressed="isFollowing"
       @click="$emit('toggleFollow')"
     >
-      {{ isFollowing ? '팔로잉' : '팔로우' }}
+      {{ isFollowing ? '언팔로우' : '팔로우' }}
     </button>
   </header>
 </template>
@@ -99,11 +99,11 @@ const audienceLabel = computed(() => {
   position: relative;
   z-index: 10;
   align-items: center;
-  min-height: 52px;
-  padding: 0 var(--space-4);
+  min-height: 56px;
+  padding: 0 var(--space-6);
   border-bottom: 1px solid var(--color-live-border);
   background: var(--color-live-background);
-  gap: var(--space-3);
+  gap: var(--space-5);
 }
 
 .live-watch-header__back {
@@ -137,27 +137,28 @@ const audienceLabel = computed(() => {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  min-height: 26px;
+  min-height: 24px;
   padding: 0 9px;
   border-radius: var(--radius-badge);
   background: var(--color-live-surface-raised);
   color: var(--color-live-text-secondary);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
 }
 
 .live-watch-header__status--live {
-  background: var(--color-live);
-  color: var(--color-text-inverse);
+  background: var(--color-accent);
+  color: var(--color-primary-strong);
   gap: 5px;
 }
 
 .live-watch-header__status--live span {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
+  width: 4px;
+  height: 4px;
   background: currentColor;
+  animation: vtPulse 1.7s ease-in-out infinite;
 }
 
 .live-watch-header__identity {
@@ -192,9 +193,10 @@ const audienceLabel = computed(() => {
 .live-watch-header__identity strong,
 .live-watch-header__identity h1 {
   overflow: hidden;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 22px;
+  letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -224,7 +226,10 @@ const audienceLabel = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  color: var(--color-live-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -244,23 +249,29 @@ const audienceLabel = computed(() => {
   min-width: 70px;
   min-height: 34px;
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-live-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-live-text-primary);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
-.live-watch-header__follow:hover,
+.live-watch-header__follow:hover {
+  border-color: var(--color-live-text-primary);
+}
+
 .live-watch-header__follow--active {
-  border-color: var(--color-primary-soft);
-  background: var(--color-primary);
+  border-color: var(--color-border-input);
+  color: var(--color-live-text-secondary);
 }
 
 .live-watch-header__back:focus-visible,
 .live-watch-header__follow:focus-visible {
-  outline: 3px solid var(--color-ai);
+  outline: 1px solid var(--color-live-text-primary);
   outline-offset: 2px;
 }
 

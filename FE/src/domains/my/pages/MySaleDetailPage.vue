@@ -217,7 +217,7 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgb(23 26 31 / 8%);
+  box-shadow: none;
 }
 
 .my-sale-detail-card {

@@ -1,52 +1,76 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  /* Light UI */
-  --color-page: #F7F6F2;
-  --color-surface: #FFFFFF;
-  --color-surface-secondary: #F0F0EB;
-  --color-text-primary: #171815;
-  --color-text-secondary: #686A64;
-  --color-text-muted: #92948E;
-  --color-text-inverse: #FFFFFF;
-  --color-border: #E1E0DA;
-  --color-border-strong: #C9C8C1;
+  /* ── VinTib 다크 에디토리얼 ──────────────────────────────
+     기존 토큰 이름은 그대로 두고 값만 VinTib 다크로 교체한다.
+     (100개 .vue 파일이 var(--...)로 자동 상속) */
 
-  /* Brand */
-  --color-primary: #294335;
-  --color-primary-hover: #1F352A;
-  --color-primary-soft: #E7EEE9;
-  --color-search-border: #DDD8CF;
-  --color-search-icon: #8A867F;
-  --color-search-button: #2F4B3A;
-  --color-search-button-hover: #243B2D;
+  /* Canvas / Surfaces */
+  --color-page: #0a0a0a; /* canvas */
+  --color-chrome: #050505; /* 최상단 크롬 바 */
+  --color-surface: #141312; /* 서페이스 / 호버 */
+  --color-surface-secondary: #101010; /* 서페이스 강조 */
+  --color-surface-raised: #100f0e; /* 경매 패널 등 강조 패널 */
+  --color-image-frame: #131211; /* 이미지 프레임 바탕 */
+
+  /* Text */
+  --color-text-primary: #f2f0ed; /* 1차 */
+  --color-text-strong: #e4e1dd; /* 2차(강) */
+  --color-text-secondary: #b8b3af; /* 본문 */
+  --color-text-muted: #9a9591; /* 메타 / 라벨 */
+  --color-text-caption: #6b6663; /* 가장 약한 캡션 */
+  --color-text-disabled: #4f4b49; /* 비활성 */
+  --color-text-inverse: #0a0a0a; /* 흰 블록 위 텍스트 */
+
+  /* Borders */
+  --color-border: #232120; /* 기본 */
+  --color-border-strong: #3a3735; /* 강조 */
+  --color-border-grid: #1b1918; /* 헤어라인 그리드 갭 */
+  --color-border-input: #2a2827; /* 입력 / 칩 */
+  --color-border-underline: #4a4644; /* 밑줄 */
+
+  /* Primary = 흰 잉크 (1차 CTA 흰 블록 · 활성 상태). 호버 시 포인트 레드. */
+  --color-primary: #f2f0ed;
+  --color-primary-strong: #ffffff;
+  --color-primary-hover: #c43d46;
+  --color-primary-soft: #141312; /* soft 배경 → 다크 서페이스 */
+
+  /* Accent (포인트) — LIVE · 경매 · 실시간성에만 */
+  --color-accent: #c43d46;
+  --color-accent-hover: #d45a62;
+
+  /* Search */
+  --color-search-border: #2a2827;
+  --color-search-icon: #9a9591;
+  --color-search-button: #f2f0ed;
+  --color-search-button-hover: #c43d46;
 
   /* Feedback */
-  --color-error: #B42318;
-  --color-error-soft: #FEE4E2;
+  --color-error: #c43d46;
+  --color-error-soft: #201314;
 
-  /* Live & Auction */
-  --color-live: #C43D46;
-  --color-auction: #A92F38;
-  --color-auction-soft: #F7E8EA;
-  --color-timer: #CF7A36;
+  /* Live & Auction (포인트로 통일) */
+  --color-live: #c43d46;
+  --color-auction: #c43d46;
+  --color-auction-soft: #100f0e;
+  --color-timer: #c43d46;
 
-  /* Sale */
-  --color-direct-sale: #2563EB;
+  /* Sale — VinTib 팔레트엔 파랑 없음 → 중립. 배지는 스크림(rgba) 사용 */
+  --color-direct-sale: #b8b3af;
 
-  /* AI */
-  --color-ai: #6F5BD3;
-  --color-ai-soft: #F0EDFC;
+  /* AI — VinTib 팔레트엔 보라 없음 → 중립 */
+  --color-ai: #b8b3af;
+  --color-ai-soft: #141312;
 
-  /* Dark Live UI */
-  --color-live-background: #0E1110;
-  --color-live-surface: #171B19;
-  --color-live-surface-raised: #202522;
-  --color-live-border: #343A36;
-  --color-live-text-primary: #F7F7F4;
-  --color-live-text-secondary: #A9ADA7;
+  /* Dark Live UI (VinTib 중립 다크로 정렬) */
+  --color-live-background: #0a0a0a;
+  --color-live-surface: #141312;
+  --color-live-surface-raised: #100f0e;
+  --color-live-border: #232120;
+  --color-live-text-primary: #f2f0ed;
+  --color-live-text-secondary: #9a9591;
 
-  /* Spacing */
+  /* Spacing (범용 스케일 — 값 유지) */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -58,36 +82,50 @@
   --space-12: 48px;
   --space-16: 64px;
 
-  /* Radius */
-  --radius-control: 8px;
-  --radius-card: 12px;
-  --radius-media: 16px;
-  --radius-modal: 16px;
-  --radius-badge: 4px;
-  --radius-chip: 999px;
+  /* Radius — VinTib은 전부 5px, pill 폐지 */
+  --radius-control: 5px;
+  --radius-card: 5px;
+  --radius-media: 5px;
+  --radius-modal: 5px;
+  --radius-badge: 5px;
+  --radius-chip: 5px;
 
-  /* Controls */
+  /* Controls (버튼 높이 — 값 유지) */
   --button-height-small: 36px;
   --button-height-standard: 48px;
   --button-height-major: 52px;
   --button-height-bid: 60px;
 
-  /* Typography */
+  /* Typography — 3개 서체 */
+  --font-display: 'Archivo', 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  --font-body: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'Noto Sans KR', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
+
   --font-size-body: 15px;
   --font-size-caption: 13px;
   --font-size-button-small: 14px;
   --line-height-body: 24px;
+
+  --font-weight-light: 300;
   --font-weight-regular: 400;
+  --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
   --font-weight-extrabold: 800;
 
+  /* 라벨 자간 (모노 대문자 라벨) */
+  --letter-spacing-label: 0.18em;
+
   /* Filter */
-  --filter-panel-width: 224px;
+  --filter-panel-width: 232px;
   --filter-option-min-height: 24px;
 
-  /* Layout */
-  --layout-content-max-width: 1320px;
+  /* Layout — VinTib 풀블리드(좌우 40px). 폭 제한 없음(P1에서 레이아웃 반영). */
+  --layout-content-max-width: none;
+  --layout-gutter: 40px;
 }
 
 *,
@@ -107,15 +145,9 @@ body {
   min-height: 100vh;
   background: var(--color-page);
   color: var(--color-text-primary);
-  font-family:
-    'Pretendard',
-    'Noto Sans KR',
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  font-family: var(--font-body);
   font-size: var(--font-size-body);
+  font-weight: var(--font-weight-light);
   line-height: var(--line-height-body);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -153,4 +185,110 @@ svg {
 
 #app {
   min-height: 100vh;
+}
+
+/* ── VinTib 유틸리티 ──────────────────────────────────────
+   사진 톤 통일: 로고/아이콘이 아닌 콘텐츠 이미지에만 붙인다. */
+.vt-media-tone {
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
+}
+
+.vt-media-tone--hero {
+  filter: saturate(0.82) contrast(1.04) brightness(0.9);
+}
+
+/* 모노 대문자 라벨 (LOTS 08 · VIEWERS 1,245 …) */
+.vt-label {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-regular);
+  font-size: 11px;
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* 모노 숫자 (가격 · 시간 · 카운트) */
+.vt-num {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 대형 헤드라인 (Latin/숫자 혼용) */
+.vt-display {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.04em;
+}
+
+/* 텍스트 선택 · 스크롤바 (VinTib) */
+::selection {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-page);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-input);
+}
+
+/* 키보드 포커스 (스펙: 1px #F2F0ED, offset 2px) */
+:focus-visible {
+  outline: 1px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* VinTib 모션 키프레임 */
+@keyframes vtReveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes vtPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+@keyframes vtBar {
+  from {
+    transform: scaleY(0.04);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* 접근성: 모션 최소화. 콘텐츠는 절대 숨기지 않는다(리빌 실패 시에도 보여야 함). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -1,6 +1,8 @@
 import type {
   PointAccount,
   PointBalance,
+  PointChargeConfirmRequest,
+  PointChargeReady,
   PointTransaction,
   PointTransactionType,
   PointTransactionQuery,
@@ -114,11 +116,31 @@ export const getPointTransactions = async (
   }
 }
 
-export const chargePoints = async (userId: number, amount: number): Promise<PointBalance> => {
+/** 충전 준비(POINT-001) — 토스페이먼츠 결제위젯에 넘길 orderId/clientKey를 발급받는다. */
+export const readyPointCharge = async (userId: number, amount: number): Promise<PointChargeReady> => {
+  if (POINT_API_ENABLED) {
+    const { data } = await http.post<ApiResponse<PointChargeReady>>(
+      `/users/${userId}/points/charges/ready`,
+      { amount },
+    )
+
+    if (data.data) {
+      return data.data
+    }
+  }
+
+  return { orderId: `mock-${Date.now()}`, amount, clientKey: '' }
+}
+
+/** 충전 승인(POINT-001) — 결제위젯이 돌려준 paymentKey로 토스 결제를 승인하고 잔액에 반영한다. */
+export const confirmPointCharge = async (
+  userId: number,
+  request: PointChargeConfirmRequest,
+): Promise<PointBalance> => {
   if (POINT_API_ENABLED) {
     const { data } = await http.post<ApiResponse<BackendPointBalanceResponse>>(
-      `/users/${userId}/points/charges`,
-      { amount },
+      `/users/${userId}/points/charges/confirm`,
+      request,
     )
 
     if (data.data) {

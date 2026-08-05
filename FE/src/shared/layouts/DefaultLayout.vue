@@ -38,7 +38,7 @@ withDefaults(
   flex: 1 0 auto;
   width: 100%;
   max-width: var(--default-layout-content-max-width);
-  padding: var(--space-6) var(--space-12);
+  padding: var(--space-8) var(--layout-gutter);
   margin-inline: auto;
 }
 

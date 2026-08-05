@@ -1,13 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import {
-  chargePoints,
-  getPointWallet,
-  requestWithdrawal,
-} from '@/domains/point/api/pointApi'
+import { getPointWallet, requestWithdrawal } from '@/domains/point/api/pointApi'
 import PointChargePanel from '@/domains/point/components/PointChargePanel.vue'
 import PointSummaryPanel from '@/domains/point/components/PointSummaryPanel.vue'
 import PointTransactionList from '@/domains/point/components/PointTransactionList.vue'
@@ -17,7 +13,6 @@ import type {
   PointBalance,
   PointTransaction,
 } from '@/domains/point/types/point.types'
-import { dispatchPointBalanceUpdated } from '@/domains/point/utils/pointBalanceEvents'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
@@ -25,19 +20,22 @@ import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 type PointMainSection = 'history' | 'charge' | 'withdraw'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 const balance = ref<PointBalance | null>(null)
 const account = ref<PointAccount | null>(null)
 const transactions = ref<PointTransaction[]>([])
-const selectedSection = ref<PointMainSection>('history')
+const selectedSection = ref<PointMainSection>(route.query.section === 'charge' ? 'charge' : 'history')
 const loadState = ref<'idle' | 'loading' | 'success' | 'error' | 'guest'>('idle')
 const errorMessage = ref('')
 const actionMessage = ref('')
 const actionErrorMessage = ref('')
-const isCharging = ref(false)
 const isWithdrawing = ref(false)
 
+// PointChargePanel/PointWithdrawalPanel은 loadState가 'success'일 때만 렌더링되고,
+// 그 상태는 authStore.user.id가 있어야만 도달하므로 0 폴백은 실제로 쓰이지 않는다.
+const userId = computed(() => authStore.user?.id ?? 0)
 const isLoading = computed(() => loadState.value === 'loading')
 const hasLoadError = computed(() => loadState.value === 'error')
 const isGuest = computed(() => loadState.value === 'guest')
@@ -88,28 +86,11 @@ const goToHistory = () => {
   void router.push({ name: ROUTE_NAMES.POINT_HISTORY })
 }
 
-const handleCharge = async (amount: number) => {
-  if (!authStore.user?.id) {
-    await router.push({ name: ROUTE_NAMES.AUTH_LOGIN, query: { redirect: ROUTE_PATHS.POINT } })
-    return
-  }
-
-  isCharging.value = true
-  actionMessage.value = ''
-  actionErrorMessage.value = ''
-
-  try {
-    const nextBalance = await chargePoints(authStore.user.id, amount)
-    balance.value = nextBalance
-    dispatchPointBalanceUpdated({ userId: authStore.user.id, balance: nextBalance })
-    actionMessage.value = `${amount.toLocaleString('ko-KR')}P 충전 요청이 처리되었습니다.`
-    await loadWallet()
-    selectedSection.value = 'history'
-  } catch (error) {
-    actionErrorMessage.value = normalizeApiError(error).message
-  } finally {
-    isCharging.value = false
-  }
+// 실제 충전 처리는 PointChargePanel이 토스 결제위젯으로 리다이렉트해 진행하고,
+// 최종 승인은 /points/charge/success 콜백 페이지가 맡는다. 여기서는 위젯 준비/요청
+// 단계에서 난 오류만 화면에 보여준다.
+const handleChargeError = (message: string) => {
+  actionErrorMessage.value = message
 }
 
 const handleWithdrawal = async (amount: number, nextAccount: PointAccount) => {
@@ -214,9 +195,9 @@ onMounted(() => {
 
         <PointChargePanel
           v-else-if="selectedSection === 'charge'"
+          :user-id="userId"
           :current-balance="balance.available"
-          :is-submitting="isCharging"
-          @charge="handleCharge"
+          @error="handleChargeError"
         />
 
         <PointWithdrawalPanel

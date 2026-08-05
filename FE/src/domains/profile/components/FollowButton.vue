@@ -21,7 +21,7 @@ const label = computed(() => {
     return '처리 중'
   }
 
-  return props.isFollowing ? '팔로잉' : '팔로우'
+  return props.isFollowing ? '언팔로우' : '팔로우'
 })
 </script>
 
@@ -80,7 +80,7 @@ const label = computed(() => {
 }
 
 .follow-button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 </style>

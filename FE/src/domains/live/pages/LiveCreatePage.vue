@@ -5,6 +5,7 @@ import {
   createLiveNow,
   getLiveCreateProducts,
   scheduleLive,
+  uploadLiveThumbnail,
 } from '@/domains/live/api/liveCreateApi'
 import {
   LIVE_CREATE_BASE_STEPS,
@@ -22,8 +23,10 @@ import type {
   LiveCreateProduct,
   LiveCreateStep,
 } from '@/domains/live/types/liveCreate.types'
+import { readImageFileAsDataUrl } from '@/shared/api/mockProfileMediaStorage'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
+import fallbackProductThumbnail from '@/assets/images/products/product-denim-jacket.webp'
 
 type LiveCreateField = 'mode' | 'title' | 'description' | 'mainBrand' | 'products' | 'scheduledDate' | 'scheduledTime'
 
@@ -45,6 +48,11 @@ const isSubmittingLive = ref(false)
 const isLoadingProducts = ref(false)
 const submitError = ref('')
 const productLoadError = ref('')
+const thumbnailInput = ref<HTMLInputElement | null>(null)
+const thumbnailFile = ref<File | null>(null)
+const thumbnailPreviewUrl = ref('')
+const thumbnailFileName = ref('')
+const thumbnailError = ref('')
 const liveCreateProducts = ref<LiveCreateProduct[]>([])
 const cameraPreviewElement = ref<HTMLVideoElement | null>(null)
 const cameraPreviewStream = ref<MediaStream | null>(null)
@@ -375,6 +383,76 @@ const getScheduledAt = () => {
 const getLiveThumbnailUrl = () =>
   selectedProducts.value.find((product) => product.thumbnailUrl)?.thumbnailUrl || null
 
+const getProductThumbnail = (thumbnailUrl: string) => thumbnailUrl || fallbackProductThumbnail
+
+const handleProductImageError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackProductThumbnail
+  }
+}
+
+const openThumbnailPicker = () => {
+  thumbnailInput.value?.click()
+}
+
+const handleThumbnailChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+
+  if (!file) {
+    return
+  }
+
+  if (!file.type.startsWith('image/')) {
+    thumbnailError.value = '이미지 파일만 업로드할 수 있습니다.'
+    input.value = ''
+    return
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    thumbnailError.value = '썸네일 사진은 5MB 이하로 선택해 주세요.'
+    input.value = ''
+    return
+  }
+
+  try {
+    thumbnailPreviewUrl.value = await readImageFileAsDataUrl(file, '썸네일 사진을 읽지 못했습니다.')
+    thumbnailFile.value = file
+    thumbnailFileName.value = file.name
+    thumbnailError.value = ''
+  } catch (error) {
+    thumbnailError.value = error instanceof Error ? error.message : '썸네일 사진을 읽지 못했습니다.'
+  }
+}
+
+const removeThumbnail = () => {
+  thumbnailFile.value = null
+  thumbnailPreviewUrl.value = ''
+  thumbnailFileName.value = ''
+  thumbnailError.value = ''
+
+  if (thumbnailInput.value) {
+    thumbnailInput.value.value = ''
+  }
+}
+
+const resolveThumbnailUrl = async () => {
+  if (!thumbnailFile.value || !authStore.user?.id) {
+    return getLiveThumbnailUrl()
+  }
+
+  try {
+    return await uploadLiveThumbnail(authStore.user.id, thumbnailFile.value)
+  } catch (error) {
+    thumbnailError.value =
+      error instanceof Error ? error.message : '썸네일 사진을 업로드하지 못했습니다.'
+    return getLiveThumbnailUrl()
+  }
+}
+
 const submitLiveCreate = async () => {
   if (createdLiveId.value) {
     return true
@@ -386,7 +464,7 @@ const submitLiveCreate = async () => {
   try {
     const baseRequest = {
       title: form.title.trim(),
-      thumbnailUrl: getLiveThumbnailUrl(),
+      thumbnailUrl: await resolveThumbnailUrl(),
       productIds: form.selectedProductIds,
     }
     const response =
@@ -505,6 +583,41 @@ onMounted(() => {
             class="live-create__info-form"
             aria-label="방송 정보 입력"
           >
+            <div class="live-create__thumbnail">
+              <div class="live-create__thumbnail-preview" aria-hidden="true">
+                <img
+                  v-if="thumbnailPreviewUrl"
+                  :src="thumbnailPreviewUrl"
+                  alt="방송 썸네일 미리보기"
+                />
+                <span v-else>썸네일</span>
+              </div>
+              <div class="live-create__thumbnail-body">
+                <strong>썸네일 사진</strong>
+                <p>등록하지 않으면 선택한 상품 사진이 자동으로 쓰입니다.</p>
+                <p v-if="thumbnailFileName" class="live-create__thumbnail-file">
+                  {{ thumbnailFileName }}
+                </p>
+                <div class="live-create__thumbnail-actions">
+                  <button type="button" @click="openThumbnailPicker">사진 선택</button>
+                  <button v-if="thumbnailPreviewUrl" type="button" @click="removeThumbnail">
+                    사진 삭제
+                  </button>
+                </div>
+                <span v-if="thumbnailError" class="live-create__field-error" role="alert">
+                  {{ thumbnailError }}
+                </span>
+              </div>
+              <input
+                ref="thumbnailInput"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                class="live-create__thumbnail-input"
+                aria-label="방송 썸네일 사진 선택"
+                @change="handleThumbnailChange"
+              />
+            </div>
+
             <label class="live-create__field" for="live-create-title-input">
               <span>방송 제목</span>
               <input
@@ -606,7 +719,11 @@ onMounted(() => {
                 class="live-create__product"
                 :class="{ 'live-create__product--selected': isProductSelected(product.id) }"
               >
-                <img :src="product.thumbnailUrl" :alt="product.name" />
+                <img
+                  :src="getProductThumbnail(product.thumbnailUrl)"
+                  :alt="product.name"
+                  @error="handleProductImageError"
+                />
                 <div class="live-create__product-info">
                   <strong>{{ product.name }}</strong>
                   <dl class="live-create__product-meta">
@@ -804,7 +921,11 @@ onMounted(() => {
               <h4>판매 상품</h4>
               <div class="live-create__complete-product-list">
                 <article v-for="product in selectedProducts" :key="product.id">
-                  <img :src="product.thumbnailUrl" :alt="product.name" />
+                  <img
+                    :src="getProductThumbnail(product.thumbnailUrl)"
+                    :alt="product.name"
+                    @error="handleProductImageError"
+                  />
                   <div>
                     <strong>{{ product.name }}</strong>
                     <dl class="live-create__summary-product-meta">
@@ -868,7 +989,11 @@ onMounted(() => {
             <div v-if="selectedProducts.length" class="live-create__products">
               <h3>상품 선택 미리보기</h3>
               <article v-for="product in selectedProducts" :key="product.id">
-                <img :src="product.thumbnailUrl" :alt="product.name" />
+                <img
+                  :src="getProductThumbnail(product.thumbnailUrl)"
+                  :alt="product.name"
+                  @error="handleProductImageError"
+                />
                 <div>
                   <strong>{{ product.name }}</strong>
                   <dl class="live-create__summary-product-meta">
@@ -929,17 +1054,22 @@ onMounted(() => {
 
 .live-create__eyebrow,
 .live-create__section-label {
-  color: var(--color-live);
-  font-size: 13px;
-  font-weight: var(--font-weight-bold);
-  line-height: 18px;
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  line-height: 16px;
+  text-transform: uppercase;
 }
 
 .live-create__header h1 {
   color: var(--color-text-primary);
-  font-size: 36px;
-  font-weight: var(--font-weight-extrabold);
-  line-height: 48px;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
 }
 
 .live-create__header p:last-child,
@@ -1080,13 +1210,91 @@ onMounted(() => {
 
 .live-create__method--selected {
   border-color: var(--color-live);
-  box-shadow: 0 0 0 3px var(--color-auction-soft);
+  box-shadow: none;
 }
 
 .live-create__info-form {
   display: grid;
   gap: var(--space-5);
   margin-top: var(--space-8);
+}
+
+.live-create__thumbnail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.live-create__thumbnail-preview {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-media);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+}
+
+.live-create__thumbnail-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.live-create__thumbnail-body {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.live-create__thumbnail-body strong {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  line-height: 20px;
+}
+
+.live-create__thumbnail-body p {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.live-create__thumbnail-file {
+  color: var(--color-primary) !important;
+  font-weight: var(--font-weight-semibold);
+}
+
+.live-create__thumbnail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.live-create__thumbnail-actions button {
+  height: var(--button-height-small);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+}
+
+.live-create__thumbnail-actions button:first-child {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.live-create__thumbnail-input {
+  display: none;
 }
 
 .live-create__field {
@@ -1137,7 +1345,7 @@ onMounted(() => {
 .live-create__field input:focus,
 .live-create__field textarea:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
   outline: none;
 }
 
@@ -1453,7 +1661,7 @@ onMounted(() => {
 
 .live-create__product--selected {
   border-color: var(--color-live);
-  box-shadow: 0 0 0 3px var(--color-auction-soft);
+  box-shadow: none;
 }
 
 .live-create__product img {

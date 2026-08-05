@@ -17,6 +17,7 @@ import ProductImageGallery from '@/domains/product/components/ProductImageGaller
 import ProductPriceDistribution from '@/domains/product/components/ProductPriceDistribution.vue'
 import ProductPurchaseSummary from '@/domains/product/components/ProductPurchaseSummary.vue'
 import ProductSellerLivePanel from '@/domains/product/components/ProductSellerLivePanel.vue'
+import ProductSimilarRecommendation from '@/domains/product/components/ProductSimilarRecommendation.vue'
 import LiveTryOnPanel from '@/domains/tryon/components/LiveTryOnPanel.vue'
 import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
 import type { ProductDetailViewData } from '@/domains/product/types/productDetail.types'
@@ -307,6 +308,7 @@ onBeforeUnmount(() => {
       />
       <ProductDetailInformation :product="product" />
       <AiQualityAnalysisPanel :analysis="product.aiQualityAnalysis" />
+      <ProductSimilarRecommendation :product-id="product.id" />
     </article>
 
     <div
@@ -372,7 +374,7 @@ onBeforeUnmount(() => {
 }
 
 .product-detail__back:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -461,7 +463,6 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.38);
 }
 
 .product-try-on-popup--expanded {
@@ -497,8 +498,8 @@ onBeforeUnmount(() => {
 }
 
 .product-try-on-popup__expand:hover {
-  border-color: #b69ad7;
-  color: #d3b9ef;
+  border-color: var(--color-border-underline);
+  color: var(--color-text-primary);
 }
 
 .product-try-on-popup__expand svg {

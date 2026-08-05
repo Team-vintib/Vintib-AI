@@ -219,12 +219,15 @@ watch(
 .price-distribution__current-price {
   flex: 0 0 auto;
   padding: 5px var(--space-3);
-  border-radius: 999px;
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  font-size: 12px;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-badge);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 400;
+  letter-spacing: -0.01em;
   line-height: 18px;
   white-space: nowrap;
 }
@@ -249,9 +252,10 @@ watch(
 .price-distribution__count {
   display: block;
   margin-bottom: var(--space-2);
+  font-family: var(--font-mono);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 16px;
 }
 
@@ -264,10 +268,10 @@ watch(
 
 .price-distribution__bar {
   display: block;
-  width: min(100%, 50px);
-  min-height: 8px;
-  border-radius: var(--radius-control) var(--radius-control) 3px 3px;
-  background: var(--color-surface-secondary);
+  width: min(100%, 44px);
+  min-height: 3px;
+  border-radius: 0;
+  background: var(--color-border-strong);
   transition:
     height 180ms ease,
     background-color 160ms ease;
@@ -284,7 +288,7 @@ watch(
 }
 
 .price-distribution__column:not(:disabled):hover .price-distribution__bar {
-  background: var(--color-primary-soft);
+  background: var(--color-text-muted);
 }
 
 .price-distribution__column--selected {
@@ -306,7 +310,7 @@ watch(
 
 .price-distribution__column:focus-visible {
   border-radius: var(--radius-control);
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 3px;
 }
 
@@ -388,9 +392,11 @@ watch(
 }
 
 .price-distribution__product > strong {
+  font-family: var(--font-mono);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 500;
+  letter-spacing: -0.02em;
   line-height: 18px;
   white-space: nowrap;
 }
@@ -411,7 +417,7 @@ watch(
 }
 
 .price-distribution__product:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 

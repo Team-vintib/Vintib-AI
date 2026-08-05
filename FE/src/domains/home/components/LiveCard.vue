@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import fallbackImageUrl from '@/assets/images/products/product-denim-jacket.webp'
 import type { HomeLiveCardItem } from '@/domains/home/types/homeView.types'
 import type { RouteLocationRaw } from 'vue-router'
 
@@ -25,8 +26,7 @@ const rootComponent = computed(() => (props.to ? RouterLink : 'article'))
 const isScheduled = computed(() => props.variant === 'scheduled')
 const rootClass = computed(() => (isScheduled.value ? 'schedule-card' : 'live-card'))
 const rootProps = computed(() => (props.to ? { to: props.to } : {}))
-const fallbackImageUrl =
-  'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=80'
+const displayImageUrl = computed(() => props.live.thumbnailUrl || fallbackImageUrl)
 
 const handleImageError = (event: Event) => {
   if (event.target instanceof HTMLImageElement) {
@@ -55,72 +55,83 @@ const formatSchedule = (value?: string) => {
     <span :class="isScheduled ? 'schedule-card__media' : 'live-card__media'">
       <img
         :class="isScheduled ? 'schedule-card__image' : 'live-card__image'"
-        :src="live.thumbnailUrl"
+        :src="displayImageUrl"
         :alt="live.title"
         @error="handleImageError"
       />
       <span v-if="isScheduled" class="schedule-card__time">
         {{ formatSchedule(live.scheduledAt) }}
       </span>
-      <span v-else class="live-card__badge">LIVE</span>
+      <template v-else>
+        <span class="live-card__badge">LIVE</span>
+        <span v-if="live.viewerCount !== undefined" class="live-card__viewers">
+          {{ live.viewerCount.toLocaleString('ko-KR') }}명
+        </span>
+      </template>
     </span>
-    <span :class="isScheduled ? 'schedule-card__body' : 'live-card__body'">
-      <strong :class="isScheduled ? 'schedule-card__title' : 'live-card__title'">
-        {{ live.title }}
-      </strong>
-      <span :class="isScheduled ? 'schedule-card__meta' : 'live-card__meta'">
-        판매자 {{ live.hostName }}
+    <span v-if="isScheduled" class="schedule-card__body">
+      <span class="schedule-card__row">
+        <strong class="schedule-card__title">{{ live.title }}</strong>
+        <span class="schedule-card__time-text">{{ formatSchedule(live.scheduledAt) }}</span>
       </span>
-      <span
-        :class="
-          isScheduled
-            ? 'schedule-card__meta schedule-card__meta--time'
-            : 'live-card__meta live-card__meta--time'
-        "
-      >
-        {{ isScheduled ? '예정 일자' : '시작 시간' }}
-        {{ formatSchedule(isScheduled ? live.scheduledAt : live.startedAt) }}
-      </span>
-      <span v-if="isScheduled" class="schedule-card__meta">
-        예정 상품 {{ live.scheduledProductCount ?? 0 }}개
+      <span class="schedule-card__meta">
+        판매자 {{ live.hostName }} · 예정 상품 {{ live.scheduledProductCount ?? 0 }}개
       </span>
       <RouterLink v-if="actionTo && actionLabel" class="schedule-card__action" :to="actionTo">
         {{ actionLabel }}
       </RouterLink>
     </span>
+    <span v-else class="live-card__body">
+      <strong class="live-card__title">{{ live.title }}</strong>
+      <span class="live-card__meta">판매자 {{ live.hostName }}</span>
+    </span>
   </component>
 </template>
 
 <style scoped lang="scss">
-.live-card,
-.schedule-card {
-  position: relative;
+// 카드 자체는 박스(테두리/배경)를 두르지 않는다 — 페이지 배경과 자연스럽게 연결하고,
+// 얇은 border는 이미지 프레임에만 준다. hover도 뜨는 대신 이미지/보더 대비만 미세하게 바뀐다.
+.live-card {
   display: grid;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: 20px;
-  background: var(--color-surface);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text-primary) 5%, transparent);
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+  gap: var(--space-3);
 }
 
-.live-card:hover,
-.schedule-card:hover {
-  border-color: var(--color-border-strong);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--color-text-primary) 7%, transparent);
-  transform: translateY(-2px);
+.schedule-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .live-card__media,
 .schedule-card__media {
   position: relative;
-  display: block;
   overflow: hidden;
-  aspect-ratio: 16 / 9;
-  background: var(--color-surface-secondary);
+  display: block;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-media);
+  background: var(--color-image-frame);
+  transition: border-color 220ms ease;
+}
+
+.live-card__media {
+  aspect-ratio: 4 / 3;
+}
+
+.schedule-card__media {
+  flex: 0 0 96px;
+  aspect-ratio: 1 / 1;
+}
+
+.live-card:hover .live-card__media,
+.schedule-card:hover .schedule-card__media {
+  border-color: var(--color-border-strong);
+}
+
+.live-card__media::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(10, 10, 10, 0.55), transparent 42%);
+  content: '';
 }
 
 .live-card__image,
@@ -128,28 +139,39 @@ const formatSchedule = (value?: string) => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
+  transition: filter 220ms ease;
+}
+
+.live-card:hover .live-card__image,
+.schedule-card:hover .schedule-card__image {
+  filter: saturate(0.88) contrast(1.04) brightness(1.03);
 }
 
 .live-card__badge,
+.live-card__viewers,
 .schedule-card__time {
   position: absolute;
   z-index: 1;
-  top: var(--space-3);
-  left: var(--space-3);
+  top: 0;
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: var(--space-2);
-  color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 18px;
+  min-height: 22px;
+  padding: 0 8px;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  line-height: 16px;
 }
 
 .live-card__badge {
+  left: 0;
   gap: 6px;
-  background: #b83f42;
+  background: var(--color-accent);
+  border-radius: 0 0 var(--radius-badge) 0;
+  letter-spacing: 0.18em;
 }
 
 .live-card__badge::before {
@@ -158,68 +180,129 @@ const formatSchedule = (value?: string) => {
   border-radius: 50%;
   background: currentColor;
   content: '';
+  animation: live-pulse 1.7s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+.live-card__viewers {
+  right: 0;
+  background: rgba(10, 10, 10, 0.82);
+  border-radius: 0 0 0 var(--radius-badge);
+  color: var(--color-text-secondary);
+  letter-spacing: -0.01em;
+  text-transform: none;
 }
 
 .schedule-card__time {
-  background: rgba(14, 17, 16, 0.66);
+  left: 0;
+  background: rgba(10, 10, 10, 0.82);
+  border-radius: 0 0 var(--radius-badge) 0;
 }
 
-.live-card__body,
+.live-card__body {
+  display: grid;
+  gap: var(--space-1);
+}
+
 .schedule-card__body {
   display: grid;
-  gap: var(--space-2);
-  padding: var(--space-5);
-  background: var(--color-surface);
+  flex: 1 1 auto;
+  gap: var(--space-1);
+  min-width: 0;
 }
 
-.live-card__title,
-.schedule-card__title {
+.live-card__title {
   display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 26px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 21px;
+  letter-spacing: -0.01em;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.schedule-card__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.schedule-card__title {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-card__time-text {
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .live-card__meta,
 .schedule-card__meta {
   color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 20px;
-}
-
-.live-card__meta--time,
-.schedule-card__meta--time {
-  color: var(--color-text-secondary);
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 300;
+  line-height: 18px;
 }
 
 .schedule-card__action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  align-self: flex-start;
   width: fit-content;
-  height: 40px;
-  padding: 0 var(--space-4);
-  justify-self: end;
-  margin-top: var(--space-2);
-  border-radius: 12px;
+  height: 32px;
+  padding: 0 var(--space-3);
+  margin-top: var(--space-1);
+  border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  transition:
+    background-color 220ms ease,
+    color 220ms ease;
+}
+
+.schedule-card__action:hover {
+  background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 @media (max-width: 520px) {
-  .live-card__title,
-  .schedule-card__title {
+  .live-card__title {
     font-size: 15px;
     line-height: 22px;
+  }
+
+  .schedule-card__media {
+    flex-basis: 76px;
   }
 }
 </style>

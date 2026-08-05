@@ -105,24 +105,12 @@ const formatPrice = (value?: number) => {
 </template>
 
 <style scoped lang="scss">
+// 카드 자체는 박스(테두리/배경)를 두르지 않는다 — 페이지 배경과 자연스럽게 연결하고,
+// 얇은 border는 이미지 프레임에만 준다. hover도 뜨는 대신 이미지/보더 대비만 미세하게 바뀐다.
 .product-card {
   position: relative;
   display: grid;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: 20px;
-  background: var(--color-surface);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text-primary) 5%, transparent);
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
-}
-
-.product-card:hover {
-  border-color: var(--color-border-strong);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--color-text-primary) 7%, transparent);
-  transform: translateY(-2px);
+  gap: var(--space-2);
 }
 
 .product-card__overlay-link {
@@ -146,14 +134,21 @@ const formatPrice = (value?: number) => {
   position: relative;
   display: block;
   overflow: hidden;
-  aspect-ratio: 16 / 9;
-  background: var(--color-surface-secondary);
+  aspect-ratio: 4 / 5;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-media);
+  background: var(--color-image-frame);
+  transition: border-color 220ms ease;
+}
+
+.product-card:hover .product-card__media {
+  border-color: var(--color-border-strong);
 }
 
 .product-card__media::after {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(14, 17, 16, 0.04), rgba(14, 17, 16, 0.5));
+  background: linear-gradient(0deg, rgba(10, 10, 10, 0.55), transparent 42%);
   content: '';
 }
 
@@ -161,31 +156,39 @@ const formatPrice = (value?: number) => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
+  transition: filter 220ms ease;
+}
+
+.product-card:hover .product-card__image {
+  filter: saturate(0.88) contrast(1.04) brightness(1.03);
 }
 
 .product-card__tag {
   position: absolute;
   z-index: 1;
-  top: var(--space-2);
-  left: var(--space-2);
+  top: 0;
+  left: 0;
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
+  min-height: 24px;
   padding: 0 10px;
-  border-radius: var(--space-2);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: 700;
+  border-radius: 0 0 var(--radius-badge) 0;
+  background: rgba(10, 10, 10, 0.82);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   line-height: 18px;
 }
 
 .product-card__tag--auction {
-  background: var(--color-auction);
+  background: var(--color-accent);
 }
 
 .product-card__tag--direct {
-  background: var(--color-direct-sale);
+  background: rgba(10, 10, 10, 0.82);
 }
 
 .product-card__wish {
@@ -195,12 +198,13 @@ const formatPrice = (value?: number) => {
   right: var(--space-2);
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(225, 224, 218, 0.84);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.94);
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-badge);
+  background: rgba(10, 10, 10, 0.55);
   color: var(--color-text-secondary);
+  backdrop-filter: blur(2px);
 }
 
 .product-card__wish svg {
@@ -223,52 +227,65 @@ const formatPrice = (value?: number) => {
 }
 
 .product-card__wish:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
 .product-card__body {
   display: grid;
   gap: var(--space-1);
-  padding: var(--space-5);
+  padding: var(--space-2) 0 0;
 }
 
 .product-card__brand {
-  color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 20px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  line-height: 18px;
+  text-transform: uppercase;
 }
 
 .product-card__seller,
 .product-card__meta {
   color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 20px;
+  font-size: 12px;
+  font-weight: 300;
+  line-height: 18px;
 }
 
 .product-card__title {
   display: -webkit-box;
   overflow: hidden;
+  margin-top: 2px;
   color: var(--color-text-primary);
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 26px;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+  letter-spacing: -0.01em;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.product-card__price,
-.product-card__bid {
+.product-card__price {
+  margin-top: 2px;
   color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 21px;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 24px;
+  font-variant-numeric: tabular-nums;
 }
 
 .product-card__bid {
-  color: var(--color-auction);
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
 }
 
 .product-card__action {
@@ -278,16 +295,24 @@ const formatPrice = (value?: number) => {
   align-items: center;
   justify-content: center;
   width: fit-content;
-  height: 40px;
+  height: 36px;
   padding: 0 var(--space-4);
   justify-self: end;
   margin-top: var(--space-2);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   line-height: 20px;
+  transition:
+    background-color 220ms ease,
+    color 220ms ease;
+}
+
+.product-card__action:hover {
+  background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 @media (max-width: 520px) {

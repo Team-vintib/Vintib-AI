@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import {
@@ -88,7 +88,37 @@ const duplicateEmail = ref('')
 const duplicateCheckedEmail = ref('')
 const verificationToken = ref('')
 const verifiedEmail = ref('')
+const verificationCodeRemainingSeconds = ref(0)
 const router = useRouter()
+
+const VERIFICATION_CODE_TTL_SECONDS = 300
+let verificationCodeTimerId: number | undefined
+
+const stopVerificationCodeTimer = () => {
+  window.clearInterval(verificationCodeTimerId)
+  verificationCodeTimerId = undefined
+}
+
+const startVerificationCodeTimer = () => {
+  stopVerificationCodeTimer()
+  verificationCodeRemainingSeconds.value = VERIFICATION_CODE_TTL_SECONDS
+
+  verificationCodeTimerId = window.setInterval(() => {
+    verificationCodeRemainingSeconds.value -= 1
+
+    if (verificationCodeRemainingSeconds.value <= 0) {
+      stopVerificationCodeTimer()
+      verificationCodeRemainingSeconds.value = 0
+      isEmailVerificationCodeSent.value = false
+      emailVerificationMessage.value = ''
+      errors.verificationCode = '인증코드가 만료되었습니다. 인증코드를 다시 받아주세요.'
+    }
+  }, 1000)
+}
+
+onBeforeUnmount(() => {
+  stopVerificationCodeTimer()
+})
 
 const agreementItems: {
   key: AgreementField
@@ -132,11 +162,26 @@ const normalizedEmail = computed(() => form.email.trim())
 const isCurrentEmailDuplicateChecked = computed(
   () => isEmailDuplicateChecked.value && duplicateCheckedEmail.value === normalizedEmail.value,
 )
-const canCheckEmailDuplicate = computed(() => isEmail(form.email))
 const canRequestVerificationCode = computed(
-  () => isEmail(form.email) && isCurrentEmailDuplicateChecked.value,
+  () =>
+    isEmail(form.email) &&
+    !(isEmailVerificationCodeSent.value && verificationCodeRemainingSeconds.value > 0),
 )
 const canConfirmVerificationCode = computed(() => isVerificationCode(form.verificationCode))
+const codeExpiresInLabel = computed(() => {
+  if (
+    !isEmailVerificationCodeSent.value ||
+    isEmailVerified.value ||
+    verificationCodeRemainingSeconds.value <= 0
+  ) {
+    return ''
+  }
+
+  const minutes = Math.floor(verificationCodeRemainingSeconds.value / 60)
+  const seconds = verificationCodeRemainingSeconds.value % 60
+
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+})
 const serverFieldMap: Partial<Record<string, ServerSignupField | 'verificationCode'>> = {
   name: 'name',
   email: 'email',
@@ -260,6 +305,8 @@ const handleVerificationCodeUpdate = (verificationCode: string) => {
 }
 
 const resetEmailVerification = () => {
+  stopVerificationCodeTimer()
+  verificationCodeRemainingSeconds.value = 0
   form.verificationCode = ''
   isEmailDuplicateChecked.value = false
   isEmailVerificationCodeSent.value = false
@@ -274,14 +321,15 @@ const resetEmailVerification = () => {
   }
 }
 
-const handleCheckEmailDuplicate = async () => {
+const handleRequestVerificationCode = async () => {
   touched.email = true
 
   if (
     !validateField('email') ||
     isCheckingEmailDuplicate.value ||
     isSendingVerificationCode.value ||
-    isVerifyingEmailCode.value
+    isVerifyingEmailCode.value ||
+    !canRequestVerificationCode.value
   ) {
     return
   }
@@ -293,47 +341,26 @@ const handleCheckEmailDuplicate = async () => {
   errors.verificationCode = ''
 
   try {
-    const response = await checkEmailDuplicate({ email: normalizedEmail.value })
+    const duplicateResponse = await checkEmailDuplicate({ email: normalizedEmail.value })
 
-    if (!response.success) {
-      applyEmailDuplicateCheckError(response.error?.code, response.error?.message)
+    if (!duplicateResponse.success) {
+      applyEmailDuplicateCheckError(duplicateResponse.error?.code, duplicateResponse.error?.message)
       return
     }
 
     isEmailDuplicateChecked.value = true
     duplicateCheckedEmail.value = normalizedEmail.value
-    emailVerificationMessage.value = '사용 가능한 이메일입니다. 인증코드를 발송해 주세요.'
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
     applyEmailDuplicateCheckError(apiError.code, apiError.message)
+    return
   } finally {
     isCheckingEmailDuplicate.value = false
   }
-}
-
-const handleSendVerificationCode = async () => {
-  touched.email = true
-
-  if (!isCurrentEmailDuplicateChecked.value) {
-    errors.email = '이메일 중복 확인을 먼저 완료해 주세요.'
-    return
-  }
-
-  if (
-    !validateField('email') ||
-    isCheckingEmailDuplicate.value ||
-    isSendingVerificationCode.value ||
-    isVerifyingEmailCode.value
-  ) {
-    return
-  }
 
   isSendingVerificationCode.value = true
-  emailVerificationMessage.value = ''
   form.verificationCode = ''
-  errors.email = ''
-  errors.verificationCode = ''
   verificationToken.value = ''
   verifiedEmail.value = ''
   isEmailVerified.value = false
@@ -351,6 +378,7 @@ const handleSendVerificationCode = async () => {
     verificationToken.value = ''
     verifiedEmail.value = ''
     emailVerificationMessage.value = '인증코드를 발송했습니다. 이메일을 확인해 주세요.'
+    startVerificationCodeTimer()
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -400,6 +428,7 @@ const handleVerifyEmailCode = async () => {
     verificationToken.value = response.data.verificationToken
     verifiedEmail.value = normalizedEmail.value
     emailVerificationMessage.value = '이메일 인증이 완료되었습니다.'
+    stopVerificationCodeTimer()
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -624,7 +653,7 @@ const applyDuplicateEmailError = (message?: string) => {
 
     <button
       v-if="duplicateEmail"
-      class="h-11 w-full rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+      class="h-11 w-full rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
       type="button"
       :disabled="isSubmitting"
       @click="handleMoveToLogin"
@@ -643,9 +672,9 @@ const applyDuplicateEmailError = (message?: string) => {
         <input
           id="signup-name"
           v-model="form.name"
-          class="h-12 w-full rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+          class="h-12 w-full rounded-[var(--radius-control)] border bg-transparent px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)]"
           :class="
-            errors.name ? 'border-[var(--color-error)]' : 'border-[var(--color-border-strong)]'
+            errors.name ? 'border-[var(--color-error)]' : 'border-[var(--color-border-input)]'
           "
           type="text"
           autocomplete="name"
@@ -670,21 +699,19 @@ const applyDuplicateEmailError = (message?: string) => {
         :email-error="errors.email"
         :verification-code-error="errors.verificationCode"
         :status-message="emailVerificationMessage"
-        :is-checking-duplicate="isCheckingEmailDuplicate"
-        :is-sending-code="isSendingVerificationCode"
+        :is-sending-code="isCheckingEmailDuplicate || isSendingVerificationCode"
         :is-verifying-code="isVerifyingEmailCode"
-        :can-check-duplicate="canCheckEmailDuplicate"
         :can-send-code="canRequestVerificationCode"
         :can-verify-code="canConfirmVerificationCode"
-        :is-duplicate-checked="isCurrentEmailDuplicateChecked"
+        :is-code-sent="isEmailVerificationCodeSent"
         :is-verified="isEmailVerified"
         :disabled="isSubmitting"
+        :code-expires-in-label="codeExpiresInLabel"
         @update:email="handleFieldInput('email')"
         @update:verification-code="handleVerificationCodeUpdate"
         @email-blur="handleFieldBlur('email')"
         @verification-code-blur="handleFieldBlur('verificationCode')"
-        @check-duplicate="handleCheckEmailDuplicate"
-        @send-code="handleSendVerificationCode"
+        @send-code="handleRequestVerificationCode"
         @verify-code="handleVerifyEmailCode"
       />
 
@@ -699,11 +726,11 @@ const applyDuplicateEmailError = (message?: string) => {
           <input
             id="signup-password"
             v-model="form.password"
-            class="h-12 w-full rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 pr-20 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+            class="h-12 w-full rounded-[var(--radius-control)] border bg-transparent px-4 pr-20 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)]"
             :class="
               errors.password
                 ? 'border-[var(--color-error)]'
-                : 'border-[var(--color-border-strong)]'
+                : 'border-[var(--color-border-input)]'
             "
             :type="isPasswordVisible ? 'text' : 'password'"
             autocomplete="new-password"
@@ -714,7 +741,7 @@ const applyDuplicateEmailError = (message?: string) => {
             @blur="handleFieldBlur('password')"
           />
           <button
-            class="absolute right-2 top-1/2 h-9 -translate-y-1/2 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+            class="absolute right-2 top-1/2 h-9 -translate-y-1/2 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
             type="button"
             :aria-pressed="isPasswordVisible"
             @click="togglePasswordVisibility"
@@ -741,11 +768,11 @@ const applyDuplicateEmailError = (message?: string) => {
         <input
           id="signup-password-confirm"
           v-model="form.passwordConfirm"
-          class="h-12 w-full rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+          class="h-12 w-full rounded-[var(--radius-control)] border bg-transparent px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)]"
           :class="
             errors.passwordConfirm
               ? 'border-[var(--color-error)]'
-              : 'border-[var(--color-border-strong)]'
+              : 'border-[var(--color-border-input)]'
           "
           :type="isPasswordVisible ? 'text' : 'password'"
           autocomplete="new-password"
@@ -823,7 +850,7 @@ const applyDuplicateEmailError = (message?: string) => {
 
     <section class="space-y-3" aria-label="회원가입 실행">
       <button
-        class="h-[var(--button-height-major)] w-full rounded-[var(--radius-control)] px-5 text-[15px] font-semibold transition focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+        class="h-[var(--button-height-major)] w-full rounded-[var(--radius-control)] px-5 text-[15px] font-semibold transition focus:outline-none"
         :class="
           !isSubmitting
             ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)] hover:bg-[var(--color-primary-hover)]'
@@ -836,7 +863,7 @@ const applyDuplicateEmailError = (message?: string) => {
       </button>
 
       <button
-        class="h-12 w-full rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+        class="h-12 w-full rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
         type="button"
         :disabled="isSubmitting"
         @click="handleSsafySignUp"

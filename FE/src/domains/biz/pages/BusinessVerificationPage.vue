@@ -529,7 +529,7 @@ const handleSubmit = async () => {
 
 .business-field input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
   outline: none;
 }
 

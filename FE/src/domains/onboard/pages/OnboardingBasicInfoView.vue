@@ -531,7 +531,7 @@ const handleSubmit = async () => {
 
 .gender-field:focus-visible .gender-field__options {
   border-radius: var(--radius-control);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .gender-field__legend {
@@ -590,7 +590,7 @@ const handleSubmit = async () => {
 
 .gender-field__option:has(.gender-field__input:focus-visible) {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .gender-field__option--selected {

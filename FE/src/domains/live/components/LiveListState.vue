@@ -67,7 +67,7 @@ const emit = defineEmits<{
   gap: var(--space-3);
   padding-bottom: var(--space-5);
   border: 1px solid var(--color-border);
-  border-radius: 20px;
+  border-radius: var(--radius-card);
   background: var(--color-surface);
 }
 
@@ -85,7 +85,7 @@ const emit = defineEmits<{
 
 .live-list-state__skeleton-media {
   display: block;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 4 / 3;
 }
 
 .live-list-state__skeleton-line {
@@ -142,16 +142,19 @@ const emit = defineEmits<{
 
 .live-list-state h2 {
   color: var(--color-text-primary);
-  font-size: 20px;
-  font-weight: var(--font-weight-bold);
-  line-height: 30px;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 .live-list-state p {
   max-width: 460px;
-  margin-top: var(--space-2);
+  margin-top: var(--space-3);
   color: var(--color-text-secondary);
   font-size: 14px;
+  font-weight: 300;
   line-height: 22px;
 }
 
@@ -164,12 +167,20 @@ const emit = defineEmits<{
   background: var(--color-primary);
   color: var(--color-text-inverse);
   font-size: 14px;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.live-list-state button:hover {
+  background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 .live-list-state button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
-  outline-offset: 3px;
+  outline: 1px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 @keyframes live-list-skeleton {

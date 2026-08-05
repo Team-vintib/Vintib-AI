@@ -63,9 +63,11 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
 
 .detail-information > h2 {
   color: var(--color-text-primary);
+  font-family: var(--font-display);
   font-size: 26px;
-  font-weight: 700;
-  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
 }
 
 .detail-information__description {
@@ -83,10 +85,11 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
 .detail-information__specs {
   display: grid;
   grid-template-columns: 1fr;
+  gap: 1px;
   margin-top: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-bottom: 0;
+  border: 1px solid var(--color-border-grid);
   border-radius: var(--radius-card);
+  background: var(--color-border-grid);
   overflow: hidden;
 }
 
@@ -94,21 +97,22 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
   display: grid;
   grid-template-columns: 180px 1fr;
   padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
 }
 
 .detail-information__specs dt {
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 400;
-  line-height: 18px;
+  letter-spacing: 0.04em;
+  line-height: 20px;
 }
 
 .detail-information__specs dd {
   color: var(--color-text-primary);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 500;
   line-height: 24px;
 }
 
@@ -125,34 +129,39 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
 .detail-information__sizes dl {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
   margin-top: var(--space-3);
-  border-top: 1px solid var(--color-border);
-  border-left: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-grid);
   border-radius: var(--radius-card);
+  background: var(--color-border-grid);
   overflow: hidden;
 }
 
 .detail-information__sizes div {
   padding: var(--space-4);
-  border-right: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
   text-align: center;
 }
 
 .detail-information__sizes dt {
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 400;
-  line-height: 18px;
+  letter-spacing: 0.08em;
+  line-height: 16px;
+  text-transform: uppercase;
 }
 
 .detail-information__sizes dd {
   margin-top: var(--space-1);
   color: var(--color-text-primary);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 24px;
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
 }
 
 .detail-information__seller-note {

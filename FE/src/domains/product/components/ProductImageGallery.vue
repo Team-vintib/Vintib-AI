@@ -1,12 +1,22 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import fallbackProductImage from '@/assets/images/products/product-denim-jacket.webp'
 import type { ProductDetailImage } from '@/domains/product/types/productDetail.types'
 
 const props = defineProps<{
   images: ProductDetailImage[]
   selectedImageId: string
 }>()
+
+const handleImageError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackProductImage
+  }
+}
 
 const emit = defineEmits<{
   selectImage: [imageId: string]
@@ -54,7 +64,7 @@ const closeZoom = () => {
         :aria-pressed="image.id === representativeImage?.id"
         @click="emit('selectImage', image.id)"
       >
-        <img :src="image.url" alt="" />
+        <img :src="image.url" alt="" @error="handleImageError" />
       </button>
     </div>
 
@@ -65,6 +75,7 @@ const closeZoom = () => {
         :src="representativeImage.url"
         :alt="representativeImage.alt"
         :style="representativeImageStyle"
+        @error="handleImageError"
       />
       <div v-else class="product-gallery__empty">등록된 상품 이미지가 없습니다.</div>
 
@@ -94,6 +105,7 @@ const closeZoom = () => {
           :src="representativeImage.url"
           :alt="`${representativeImage.alt} 확대 이미지`"
           :style="representativeImageStyle"
+          @error="handleImageError"
         />
       </div>
     </dialog>
@@ -116,7 +128,7 @@ const closeZoom = () => {
   aspect-ratio: 4 / 5;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-media);
-  background: var(--color-surface-secondary);
+  background: var(--color-image-frame);
   place-items: center;
 }
 
@@ -124,6 +136,7 @@ const closeZoom = () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
   transition: transform 180ms ease;
 }
 
@@ -182,12 +195,13 @@ const closeZoom = () => {
   top: var(--space-4);
   right: var(--space-4);
   display: grid;
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(225, 224, 218, 0.8);
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(10, 10, 10, 0.55);
   color: var(--color-text-secondary);
+  backdrop-filter: blur(2px);
   place-items: center;
   transition:
     background-color 160ms ease,
@@ -213,8 +227,13 @@ const closeZoom = () => {
 
 .product-gallery__thumbnail:focus-visible,
 .product-gallery__zoom:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+.product-gallery__thumbnail img,
+.product-gallery__dialog-image img {
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
 }
 
 .product-gallery__dialog {
