@@ -1,6 +1,6 @@
 # ERD 및 상태 설계 (S15P11A108-296)
 
-> 대상 DB: PostgreSQL 18 · 테이블 23개
+> 대상 DB: PostgreSQL 18 · 테이블 25개
 > DDL: [`schema.sql`](./schema.sql) — 실제 PostgreSQL 18에 적용 검증 완료
 > 데이터 사전: [`data-dictionary.md`](./data-dictionary.md) — 이 스키마에서 자동 생성
 >
@@ -16,7 +16,7 @@
 
 | 담당 | 테이블 |
 | --- | --- |
-| **서윤** | `member*`, `business_info`, `brand`, `category`, `product*`, `wish`, `follow`, `point_*`, `orders`, `order_shipment`, `notification` |
+| **서윤** | `member*`, `business_info`, `brand`, `category`, `product*`, `tryon_result`, `wish`, `follow`, `point_*`, `orders`, `order_shipment`, `notification` |
 | **정윤** | `live`, `live_product`, `auction`, `bid`, `chat_message` |
 
 ---
@@ -39,11 +39,16 @@ erDiagram
     category ||--o{ product : classifies
     brand ||--o{ product : brands
     product ||--o{ product_image : has
+    product ||--o{ product_defect : has
     product ||--o{ wish : wished
+
+    member ||--o{ tryon_result : owns
+    product ||--o{ tryon_result : "used in"
 
     member ||--o{ live : hosts
     live ||--o{ live_product : lists
     product ||--o{ live_product : listed
+    product |o--o{ live : "now showing"
 
     live ||--o{ auction : holds
     product ||--o{ auction : "sold via"
@@ -125,13 +130,11 @@ stateDiagram-v2
     DRAFT --> ON_SALE : 상시 판매 등록
     DRAFT --> AUCTION_SCHEDULED : 경매 예정 설정
     ON_SALE --> AUCTION_SCHEDULED : 경매 전환 (PROD-004)
+    AUCTION_SCHEDULED --> ON_SALE : 상시 판매 전환 (PROD-004/PROD-005)
     AUCTION_SCHEDULED --> AUCTION_IN_PROGRESS : 경매 시작 (AUCT-002)
+    AUCTION_IN_PROGRESS --> AUCTION_SCHEDULED : 입찰자 없이 종료 (AUCT-014)
     ON_SALE --> SOLD : 상시 구매
     AUCTION_IN_PROGRESS --> SOLD : 낙찰 (AUCT-012)
-    AUCTION_IN_PROGRESS --> AUCTION_FAILED : 입찰자 없이 종료
-    AUCTION_FAILED --> ON_SALE : 판매자가 상시 판매 선택
-    AUCTION_FAILED --> AUCTION_SCHEDULED : 경매 예정 유지
-    AUCTION_FAILED --> PRIVATE : 비공개 선택
     SOLD --> [*]
 ```
 
@@ -139,13 +142,20 @@ stateDiagram-v2
 | --- | --- |
 | `DRAFT` | 등록 중(미공개) |
 | `ON_SALE` | 상시 판매 중 |
-| `AUCTION_SCHEDULED` | 경매 예정 — 가격 없음, 홈에서 '경매 예정'으로 표시 |
+| `AUCTION_SCHEDULED` | 경매 예정 — 가격 없음, 홈에서 '경매 예정'으로 표시. 입찰자 없이 경매가 끝나도 다시 이 상태로 남는다 |
 | `AUCTION_IN_PROGRESS` | 경매 진행 중 — 상시 구매 즉시 중단 (LIVE-006) |
-| `AUCTION_FAILED` | 미낙찰 — **판매자 재설정 대기** |
 | `SOLD` | 판매 완료(낙찰 포함) |
-| `PRIVATE` | 비공개 |
 
-> **`AUCTION_FAILED`를 별도 상태로 둔 이유.** `AUCT-014`는 "자동 상시 판매 전환 금지"이고 `PROD-005`는 판매자가 상시 판매 / 경매 예정 유지 / 비공개 중 고르게 되어 있다. 자동 전이가 금지된 이상 **선택을 기다리는 중간 상태가 반드시 필요**하다. 이 상태가 없으면 미낙찰 상품이 갈 곳이 없다.
+> **`AUCTION_FAILED`라는 별도 상태를 두지 않는 이유.** 입찰자 없이 경매가 끝나도 상품은 그냥
+> `AUCTION_SCHEDULED`로 돌아간다(경매 도메인이 실패 시 `product`를 건드릴 필요가 없어짐). 판매자는
+> 이 상태의 상품을 아무 때나 골라 가격을 넣고 `ON_SALE`로 전환하거나(PROD-005), 그냥 둬서 다음
+> 라이브에서 다시 경매되게 할 수 있다 — "그대로 둔다"는 선택은 아무 것도 안 하면 되므로 API도
+> 필요 없다. 이 상품이 예전에 실패한 적이 있다는 이력은 `product.sale_status`에는 안 남지만
+> `auction` 테이블에 그 시도가 `status='FAILED'`인 row로 남아 있어 사라지지 않는다.
+>
+> **`PRIVATE`는 없앴다.** 처음엔 미낙찰 후속 선택지에 "비공개"도 있었지만 기획에서 빠졌다. 이
+> 상태로 들어오는 화살표가 이거 하나뿐이었어서, 선택지가 없어지면 `PRIVATE`는 영원히 도달 불가능한
+> 죽은 상태가 된다. 그래서 enum·CHECK 제약에서 완전히 제거했다.
 
 ### 3-2. 방송 상태 `live.status`
 
@@ -187,7 +197,7 @@ stateDiagram-v2
 
 로드맵 부록의 판매 흐름(낙찰 → 대금 보관 → 송장 등록 → 배송 완료 → 구매 확정 → 정산)을 그대로 옮긴 것이다.
 
-> **`auto_confirm_at` 컬럼을 둔 이유.** "구매 확정 또는 **자동 구매 확정(7일)**"이 정책이다. 스케줄러가 매번 `delivered_at + 7일`을 계산하며 전체를 스캔하면 주문이 쌓일수록 느려진다. 배송 완료 시점에 확정 예정 시각을 미리 박아두고 `WHERE status='DELIVERED'` 부분 인덱스로 좁힌다.
+> **`auto_confirm_at` 컬럼을 둔 이유.** "구매 확정 또는 **자동 구매 확정(3일)**"이 정책이다. 스케줄러가 매번 `delivered_at + 3일`을 계산하며 전체를 스캔하면 주문이 쌓일수록 느려진다. 배송 완료 시점에 확정 예정 시각을 미리 박아두고 `WHERE status='DELIVERED'` 부분 인덱스로 좁힌다.
 
 ---
 
@@ -209,7 +219,10 @@ stateDiagram-v2
 | 회원 발언은 작성자 필수 (CHAT-001) | `ck_chat_user_has_member` | ✅ 거부됨 |
 | 자기 자신 팔로우 방지 | `ck_follow_not_self` | ✅ 거부됨 |
 
-> `ux_bid_auction_price`는 Redis 분산락의 **대체재가 아니라 안전망이다.** 1차 방어는 락이고, 이 제약은 락이 실패했을 때 데이터 정합성이 깨지는 것을 막는다.
+> `ux_bid_auction_price`는 DB 비관적 락의 **대체재가 아니라 안전망이다.** 1차 방어는
+> `AuctionRepository.findByIdForUpdate`가 거는 행 잠금이다(Redis 분산락·MQ는 검토 후
+> 채택하지 않았다 — Phase 7 계획 문서 설계 판단 1 참고). 이 제약은 그 잠금이 실패했을 때
+> 데이터 정합성이 깨지는 것을 막는다.
 
 ### ⚠️ AUCT-006과 AUCT-009가 같은 제약으로 처리되는 것에 대해
 
@@ -252,6 +265,7 @@ stateDiagram-v2
 | 금액은 `BIGINT`(원 단위 정수) | KRW는 소수점이 없다. `NUMERIC`은 불필요한 비용 |
 | 시각은 전부 `TIMESTAMPTZ` | 경매 종료 판정이 서버 시각 기준이라 타임존 모호성을 남기면 안 된다 |
 | `live_product` 제외를 `removed_at` soft delete | 방송 중 제외해도 "그 시점에 연결돼 있었다"는 사실이 남아야 다시보기 타임라인(LIVE-008)을 만들 수 있다 |
+| `live.current_product_id` 컬럼 보유 (LIVE-004) | 라이브 카테고리는 편성 상품에서 **유도**하지만 "지금 소개 중"은 **호스트의 현재 의도라 파생할 근거가 없다.** 전환 이력은 남기지 않는다 — `shown_at` 한 컬럼으로 현재와 이력을 겸하려 하면 상품을 되돌아갈 때 둘 다 깨진다. 이력이 필요해지면(LIVE-008) 별도 테이블을 만든다 |
 | `auction.current_price` / `top_bidder_id` 비정규화 | AUCT-011 최고 입찰자 실시간 표시가 초당 수십 회 조회된다. 매번 `bid` 집계는 부담 |
 | `auction.extension_count` 보유 | 5초 연장은 횟수 제한이 없지만, 이상 동작 검증과 발표용 통계에 필요 |
 | `orders` 테이블명 | `order`는 SQL 예약어 |

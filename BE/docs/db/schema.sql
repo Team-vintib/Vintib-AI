@@ -21,19 +21,28 @@
 CREATE TABLE member (
     id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email             VARCHAR(255) NOT NULL UNIQUE,
-    password_hash     VARCHAR(255),                    -- SSO 전용 계정은 NULL
-    nickname          VARCHAR(30)  NOT NULL UNIQUE,    -- 경매 최고 입찰자 표시에 사용(AUCT-011)
+    password          VARCHAR(255),                    -- SSO 전용 계정은 NULL
+    -- 온보딩 완료 전에는 NULL이고, 온보딩 완료 시 애플리케이션에서 필수로 검증한다(UNIQUE만 DB가 보장).
+    nickname          VARCHAR(30)  UNIQUE,              -- 경매 최고 입찰자 표시에 사용(AUCT-011)
     name              VARCHAR(50),
-    phone             VARCHAR(20),
+    phone_number      VARCHAR(20),
+    -- 온보딩(ONBOARD-001)에서 채워지는 정보. 가입 시점에는 전부 NULL이다.
+    address           VARCHAR(200),
+    detail_address    VARCHAR(100),
+    postal_code       VARCHAR(10),                     -- 주소 검색을 안 쓰고 직접 입력하면 NULL 허용
+    gender            VARCHAR(10),
     member_type       VARCHAR(20)  NOT NULL DEFAULT 'GENERAL',
     status            VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
     profile_image_url VARCHAR(500),
+    description       VARCHAR(500),                    -- 소개글
+    cover_image_url   VARCHAR(500),                     -- 커버 이미지 URL
     onboarding_done   BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     deleted_at        TIMESTAMPTZ,
     CONSTRAINT ck_member_type   CHECK (member_type IN ('GENERAL', 'BUSINESS')),
-    CONSTRAINT ck_member_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'WITHDRAWN'))
+    CONSTRAINT ck_member_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'WITHDRAWN')),
+    CONSTRAINT ck_member_gender CHECK (gender IN ('MALE', 'FEMALE'))
 );
 
 -- 싸피어스 SSO 등 외부 계정 연결 (AUTH-003, AUTH-004)
@@ -48,19 +57,27 @@ CREATE TABLE member_social_account (
 );
 
 -- 전신 사진·신체 정보 (ONBOARD-003, TRYON-001~002)
+-- body_photo_key: 비공개(private) 버킷에 저장되는 S3 key. presigned GET으로만 열 수 있어
+-- 고정 URL이 아니라 key를 저장한다 — tryon_result.image_key와 동일한 이유.
 CREATE TABLE member_body_profile (
     member_id      BIGINT PRIMARY KEY REFERENCES member (id),
-    body_photo_url VARCHAR(500),
+    body_photo_key VARCHAR(500),
     height_cm      SMALLINT,
     weight_kg      SMALLINT,
+    chest_cm       SMALLINT,
+    waist_cm       SMALLINT,
+    hip_cm         SMALLINT,
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- 사업자 정보 (BIZ-001)
+-- certificate_key: 비공개(private) 버킷 S3 key. presigned GET으로만 열림 — member_body_profile.body_photo_key와 동일한 이유.
 CREATE TABLE business_info (
     member_id            BIGINT PRIMARY KEY REFERENCES member (id),
     business_number      VARCHAR(20)  NOT NULL,
-    certificate_url      VARCHAR(500) NOT NULL,
+    business_name        VARCHAR(100) NOT NULL,
+    representative_name  VARCHAR(50)  NOT NULL,
+    certificate_key      VARCHAR(500) NOT NULL,
     verification_status  VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
     submitted_at         TIMESTAMPTZ  NOT NULL DEFAULT now(),
     verified_at          TIMESTAMPTZ,
@@ -74,14 +91,16 @@ CREATE TABLE business_info (
 -- =============================================================================
 
 CREATE TABLE brand (
-    id   BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE
+    id      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name    VARCHAR(100) NOT NULL UNIQUE,
+    name_en VARCHAR(100)                     -- 영문명. 없는 브랜드 대비 nullable
 );
 
 CREATE TABLE category (
     id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     parent_id BIGINT REFERENCES category (id),   -- 상위 카테고리, 최상위는 NULL
     name      VARCHAR(100) NOT NULL,
+    name_en   VARCHAR(100) NOT NULL,              -- 영문 코드(예: JACKET) — AI/FE 연동용
     depth     SMALLINT     NOT NULL DEFAULT 1
 );
 
@@ -106,12 +125,17 @@ CREATE TABLE member_interest_category (
 CREATE TABLE product (
     id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     seller_id       BIGINT       NOT NULL REFERENCES member (id),
-    category_id     BIGINT       REFERENCES category (id),
+    -- 카테고리는 필수다. 상품이 어느 카테고리에도 속하지 않으면 검색·필터는 물론
+    -- 라이브 카테고리(편성 상품에서 유도)에서도 통째로 누락된다.
+    category_id     BIGINT       NOT NULL REFERENCES category (id),
     brand_id        BIGINT       REFERENCES brand (id),
     title           VARCHAR(200) NOT NULL,
     description     TEXT,
     condition_grade VARCHAR(20),                     -- 중고 상태 등급 (체계 미확정)
     size_label      VARCHAR(50),
+    color           VARCHAR(50),
+    material        VARCHAR(50),
+    measurements    JSONB,                           -- 실측 치수(cm). 항목이 상품마다 달라 고정 컬럼 대신 JSONB
     sale_type       VARCHAR(20),                     -- 상시 판매 / 경매. 기본 정보 저장 시점에는 NULL,
                                                        -- 판매 채널을 정하는 API(판매 가격 설정/경매 조건 설정)
                                                        -- 호출 시 확정된다
@@ -127,13 +151,11 @@ CREATE TABLE product (
         'ON_SALE',            -- 상시 판매 중
         'AUCTION_SCHEDULED',  -- 경매 예정
         'AUCTION_IN_PROGRESS',-- 경매 진행 중 (상시 구매 즉시 중단, LIVE-006)
-        'AUCTION_FAILED',     -- 미낙찰 — 판매자 재설정 대기 (AUCT-014 / PROD-005)
-        'SOLD',               -- 판매 완료(낙찰 포함)
-        'PRIVATE'             -- 비공개
+        'SOLD'                -- 판매 완료(낙찰 포함)
     )),
     -- 상시 판매 상품은 가격이 반드시 있어야 한다.
-    -- 경매 상품의 가격은 강제하지 않는다 — 미낙찰 후 상시 판매로 전환(PROD-005)하는
-    -- 과도기에 sale_type 과 price 갱신 순서를 애플리케이션이 자유롭게 잡을 수 있어야 한다.
+    -- 경매 상품의 가격은 강제하지 않는다 — 미낙찰 후 상시 판매로 전환(PROD-005)할 때
+    -- sale_type 과 price 갱신 순서를 애플리케이션이 자유롭게 잡을 수 있어야 한다.
     CONSTRAINT ck_product_price_by_type CHECK (
         sale_type <> 'DIRECT_SALE' OR price IS NOT NULL
     )
@@ -142,9 +164,17 @@ CREATE TABLE product (
 CREATE TABLE product_image (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     product_id BIGINT       NOT NULL REFERENCES product (id),
-    image_url  VARCHAR(500) NOT NULL,
+    image_key  VARCHAR(500) NOT NULL,
     sort_order SMALLINT     NOT NULL DEFAULT 0,
     is_primary BOOLEAN      NOT NULL DEFAULT FALSE
+);
+
+-- 판매자가 직접 입력한 하자 목록 (PROD-001)
+CREATE TABLE product_defect (
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    product_id BIGINT      NOT NULL REFERENCES product (id),
+    content    TEXT        NOT NULL,
+    sort_order SMALLINT    NOT NULL DEFAULT 0
 );
 
 -- 찜 (MY-009)
@@ -155,14 +185,18 @@ CREATE TABLE wish (
     PRIMARY KEY (member_id, product_id)
 );
 
--- 팔로우 (FOLLOW-001) — HOME-002 팔로잉 콘텐츠 조회의 기준
-CREATE TABLE follow (
-    follower_id  BIGINT      NOT NULL REFERENCES member (id),
-    following_id BIGINT      NOT NULL REFERENCES member (id),
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (follower_id, following_id),
-    CONSTRAINT ck_follow_not_self CHECK (follower_id <> following_id)
+-- AI 가상 시착 결과물. product_id 를 참조하므로 product 다음에 둔다.
+-- 다중 아이템 합성("빈티지 코디" 등)은 이번 범위 밖 — 상품 1개 기준 단일 합성 결과만 다룬다.
+CREATE TABLE tryon_result (
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    member_id  BIGINT       NOT NULL REFERENCES member (id),
+    product_id BIGINT       NOT NULL REFERENCES product (id),
+    image_key  VARCHAR(500) NOT NULL,
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    deleted_at TIMESTAMPTZ
 );
+
+CREATE INDEX ix_tryon_result_member ON tryon_result (member_id, created_at DESC) WHERE deleted_at IS NULL;
 
 
 -- =============================================================================
@@ -174,12 +208,17 @@ CREATE TABLE live (
     host_id           BIGINT       NOT NULL REFERENCES member (id),
     title             VARCHAR(200) NOT NULL,
     thumbnail_url     VARCHAR(500),
+    description       VARCHAR(1000),                  -- 방송 설명(선택). 시청 화면 헤더 표시용
     status            VARCHAR(20)  NOT NULL DEFAULT 'SCHEDULED',
     scheduled_at      TIMESTAMPTZ,                    -- 예약 라이브만. 즉시 라이브는 NULL
     started_at        TIMESTAMPTZ,
     ended_at          TIMESTAMPTZ,
     openvidu_room     VARCHAR(100),                   -- OpenVidu v3 room name
     peak_viewer_count INTEGER      NOT NULL DEFAULT 0,
+    -- 지금 소개 중인 상품(LIVE-004). FE NOW 배지의 원천.
+    -- 카테고리는 편성 상품에서 유도하지만 "지금 소개 중"은 호스트의 현재 의도라 파생할 근거가
+    -- 없어 컬럼으로 둔다. 편성된 상품인지는 애플리케이션이 live_product 로 검증한다.
+    current_product_id BIGINT      REFERENCES product (id),
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT ck_live_status CHECK (status IN (
@@ -190,7 +229,10 @@ CREATE TABLE live (
     ))
 );
 
--- 라이브 ↔ 상품 연결 (LIVE-003). 방송 전·중 모두 추가·제외 가능, 개수 제한 없음.
+-- 라이브 ↔ 상품 연결 (LIVE-003). 개수 제한은 없으나 최소 1개는 있어야 한다.
+-- 편성은 라이브 개설 시점에 정하고, 방송이 시작되면(status='LIVE') 더 이상 바꿀 수 없다 —
+-- 시청자가 보고 있는 판매 목록이 도중에 바뀌면 안 되고, 라이브 카테고리를 이 편성에서
+-- 유도하므로 함께 흔들린다. 예약(SCHEDULED) 상태에서는 방송 시작 전까지 변경 가능.
 -- 제외는 물리 삭제 대신 removed_at 으로 남긴다 — 다시보기 타임라인(LIVE-008)의 근거가 된다.
 CREATE TABLE live_product (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -204,6 +246,23 @@ CREATE TABLE live_product (
 -- 같은 상품을 같은 라이브에 중복 연결하지 못하게 한다(제외된 건은 재연결 허용).
 CREATE UNIQUE INDEX ux_live_product_active
     ON live_product (live_id, product_id) WHERE removed_at IS NULL;
+
+
+-- 예약 라이브 시작 알림 신청 (FE 요청 008 §3.2.1).
+-- notified_at 이 중복 발송을 막는 유일한 근거다 — 스케줄러는 이 값이 비어 있는 신청만 집고,
+-- 알림 생성과 같은 트랜잭션에서 채운다. 서버가 재기동돼도 이미 보낸 건은 다시 잡히지 않는다.
+CREATE TABLE live_reminder (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    live_id     BIGINT      NOT NULL REFERENCES live (id),
+    member_id   BIGINT      NOT NULL REFERENCES member (id),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    notified_at TIMESTAMPTZ,                        -- NULL 이면 아직 안 보냄
+    CONSTRAINT ux_live_reminder UNIQUE (live_id, member_id)
+);
+
+-- 스케줄러가 "아직 안 보낸 것"만 훑는다. 보낸 건이 쌓여도 스캔 대상이 늘지 않게 부분 인덱스로 둔다.
+CREATE INDEX ix_live_reminder_pending
+    ON live_reminder (live_id) WHERE notified_at IS NULL;
 
 
 -- =============================================================================
@@ -271,7 +330,8 @@ CREATE TABLE bid (
 
 -- 같은 경매에서 동일 가격 단계는 단 한 번만 성립한다.
 -- 중복 클릭(AUCT-004)과 동시 입찰 경합(AUCT-005)을 DB 레벨에서 차단하는 최후 방어선.
--- Redis 분산락이 1차 방어이고, 이 제약은 락이 실패했을 때의 안전망이다.
+-- 1차 방어는 Redis 분산락이 아니라 DB 비관적 락(AuctionRepository.findByIdForUpdate)이다 —
+-- 같은 경매의 입찰은 이 행 잠금으로 직렬화된다. 이 제약은 그 잠금이 실패했을 때의 안전망이다.
 CREATE UNIQUE INDEX ux_bid_auction_price ON bid (auction_id, bid_price);
 
 CREATE INDEX ix_bid_auction_created ON bid (auction_id, created_at DESC);
@@ -323,6 +383,33 @@ CREATE TABLE point_transaction (
 
 CREATE INDEX ix_point_tx_member ON point_transaction (member_id, created_at DESC);
 
+-- 포인트 충전 결제 준비/승인 상태(POINT-001). order_id 는 토스에 넘기는 주문번호(BE 발급, orders 테이블과 무관).
+CREATE TABLE point_charge (
+    id           BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    member_id    BIGINT      NOT NULL REFERENCES member (id),
+    order_id     VARCHAR(64) NOT NULL,
+    amount       BIGINT      NOT NULL,
+    status       VARCHAR(20) NOT NULL DEFAULT 'READY',
+    payment_key  VARCHAR(200),
+    approved_at  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_point_charge_order_id UNIQUE (order_id),
+    CONSTRAINT ck_point_charge_status CHECK (status IN ('READY', 'DONE', 'FAILED')),
+    CONSTRAINT ck_point_charge_amount_positive CHECK (amount > 0)
+);
+
+CREATE INDEX ix_point_charge_member ON point_charge (member_id, created_at DESC);
+
+-- 출금(현금화) 계좌 정보(POINT-003). point_account 와 같은 공유 PK 1:1 — 회원당 한 행만 존재한다.
+-- 실제 은행 송금 연동은 범위 밖이라 계좌 정보만 평문으로 남긴다(business_info 와 동일한 전제).
+CREATE TABLE withdrawal_account (
+    member_id           BIGINT      PRIMARY KEY REFERENCES member (id),
+    bank_name           VARCHAR(50) NOT NULL,
+    account_number      VARCHAR(30) NOT NULL,
+    account_holder_name VARCHAR(50) NOT NULL,
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- 입찰 보류 상태. 입찰 내역 ↔ 포인트 보류를 잇는 테이블.
 CREATE TABLE point_hold (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -364,18 +451,26 @@ CREATE TABLE orders (
     seller_id       BIGINT      NOT NULL REFERENCES member (id),
     product_id      BIGINT      NOT NULL REFERENCES product (id),
     auction_id      BIGINT      REFERENCES auction (id),  -- 상시 판매 주문은 NULL
+    -- 이 주문이 발생한 방송(LIVE-006 방송 종료 요약). 라이브 밖에서 산 주문은 NULL.
+    -- 낙찰이면 auction_id 로도 방송을 알 수 있지만, 방송 중 즉시구매는 경매를 거치지 않아
+    -- 이 컬럼 없이는 방송과 이을 근거가 없다. 두 경로를 한 컬럼으로 묶어 "이 방송에서
+    -- 발생한 주문"을 조건 하나로 뽑는다 — 낙찰 주문에도 채운다.
+    live_id         BIGINT      REFERENCES live (id),
     order_price     BIGINT      NOT NULL,
     status          VARCHAR(30) NOT NULL DEFAULT 'PAID',
-    -- 배송 완료 후 7일 경과 시 자동 구매 확정. 스케줄러가 이 컬럼으로 대상을 찾는다.
+    -- 배송 완료 후 3일 경과 시 자동 구매 확정. 스케줄러가 이 컬럼으로 대상을 찾는다.
     -- 배송 완료 시점(delivered_at)에 계산해 채운다.
-    auto_confirm_at TIMESTAMPTZ,
+    auto_confirm_at   TIMESTAMPTZ,
+    -- 진행 중인(REQUESTED) 환불 요청이 있는 동안 true. 송장 등록·구매 확정(수동/자동)을 막는 용도로만
+    -- 쓴다 — 요청 중에도 status는 바꾸지 않는다(REFUND-001/002).
+    refund_requested  BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT ck_order_status CHECK (status IN (
         'PAID',        -- 결제 완료, 거래 대금 보관 중
         'SHIPPING',    -- 송장 등록·배송 중 (SHIP-*)
         'DELIVERED',   -- 배송 완료
-        'CONFIRMED',   -- 구매 확정 (수동 또는 7일 자동)
+        'CONFIRMED',   -- 구매 확정 (수동 또는 3일 자동)
         'SETTLED',     -- 판매자 정산 완료
         'REFUNDED',
         'CANCELED'
@@ -390,6 +485,9 @@ CREATE INDEX ix_orders_seller ON orders (seller_id, created_at DESC);
 CREATE INDEX ix_orders_auto_confirm
     ON orders (auto_confirm_at) WHERE status = 'DELIVERED';
 
+-- 방송 종료 요약(LIVE-006) 조회용. 라이브 밖 주문이 대부분이라 부분 인덱스로 좁힌다.
+CREATE INDEX ix_orders_live ON orders (live_id) WHERE live_id IS NOT NULL;
+
 CREATE TABLE order_shipment (
     order_id        BIGINT PRIMARY KEY REFERENCES orders (id),
     recipient_name  VARCHAR(50)  NOT NULL,
@@ -397,10 +495,54 @@ CREATE TABLE order_shipment (
     zipcode         VARCHAR(10)  NOT NULL,
     address1        VARCHAR(255) NOT NULL,
     address2        VARCHAR(255),
+    -- deliveryapi.co.kr이 지원하는 국내 택배사 10개로 한정한다(SY034) — 자유 문자열 금지.
     courier         VARCHAR(50),
     tracking_number VARCHAR(50),
     shipped_at      TIMESTAMPTZ,
-    delivered_at    TIMESTAMPTZ
+    -- 더 이상 송장 등록 시점에 즉시 채우지 않는다 — deliveryapi.co.kr 웹훅으로 실제 배송완료
+    -- 신호를 받았을 때만 채운다(웹훅 구독 실패 시에는 예외적으로 즉시 채우는 폴백을 쓴다).
+    delivered_at    TIMESTAMPTZ,
+    CONSTRAINT ck_order_shipment_courier CHECK (courier IN (
+        'LOTTE', 'CJ', 'HANJIN', 'POST', 'KYUNGDONG',
+        'DAESIN', 'LOGEN', 'HAPDONG', 'COUPANG', 'WOORI'
+    ))
+);
+
+-- 환불 요청·승인/거절 (REFUND-001/002). 구매자가 요청하고 판매자가 승인/거절한다(운영자 승인 아님 —
+-- 이 프로젝트엔 관리자 역할이 없다). 승인되면 보관 중이던 대금을 판매자 정산 없이 구매자 포인트로
+-- 돌려준다(point_transaction의 REFUND 타입). 같은 주문에 여러 건 있을 수 있다(거절 후 재요청 허용).
+CREATE TABLE refund_request (
+    id               BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    order_id         BIGINT      NOT NULL REFERENCES orders (id),
+    reason           VARCHAR(30) NOT NULL,
+    detail_reason    TEXT        NOT NULL,
+    status           VARCHAR(20) NOT NULL DEFAULT 'REQUESTED',
+    rejection_reason TEXT,
+    reviewed_at      TIMESTAMPTZ,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_refund_request_reason CHECK (reason IN (
+        'NOT_AS_DESCRIBED', 'UNDISCLOSED_DEFECT', 'NOT_SHIPPED', 'DUPLICATE_PAYMENT', 'SYSTEM_ERROR'
+    )),
+    CONSTRAINT ck_refund_request_status CHECK (status IN ('REQUESTED', 'APPROVED', 'REJECTED'))
+);
+
+CREATE INDEX ix_refund_request_order ON refund_request (order_id, created_at DESC);
+
+-- 세금계산서 (BIZ-002). 법적 문서라 발행 시점 사업자 정보를 스냅샷으로 저장한다 —
+-- 이후 판매자가 business_info를 바꿔도 이미 발행된 계산서는 바뀌지 않는다.
+-- 주문당 1건만 허용(uq_invoice_order) — 취소/재발행은 범위 밖.
+CREATE TABLE invoice (
+    id                   BIGINT      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    order_id             BIGINT      NOT NULL REFERENCES orders (id),
+    business_number      VARCHAR(20)  NOT NULL,
+    business_name        VARCHAR(100) NOT NULL,
+    representative_name  VARCHAR(50)  NOT NULL,
+    supply_amount        BIGINT      NOT NULL,  -- 공급가액
+    tax_amount           BIGINT      NOT NULL,  -- 부가세
+    total_amount         BIGINT      NOT NULL,  -- 합계금액 (= order.order_price)
+    issued_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_invoice_order UNIQUE (order_id)
 );
 
 
@@ -478,3 +620,16 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX ix_product_title_trgm   ON product USING gin (title gin_trgm_ops);
 CREATE INDEX ix_member_nickname_trgm ON member  USING gin (nickname gin_trgm_ops);
 CREATE INDEX ix_live_title_trgm      ON live    USING gin (title gin_trgm_ops);
+
+-- =============================================================================
+-- 11. 소셜 (찜/팔로우)
+-- =============================================================================
+
+CREATE TABLE follow (
+    id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    follower_id  BIGINT      NOT NULL REFERENCES member (id),
+    following_id BIGINT      NOT NULL REFERENCES member (id),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ux_follow UNIQUE (follower_id, following_id),
+    CONSTRAINT ck_follow_not_self CHECK (follower_id <> following_id)
+);

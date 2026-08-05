@@ -2,15 +2,6 @@
 .env.*
 !.env.example
 
-# 파이썬 캐시·가상환경. AI/.gitignore 에도 있지만 그건 AI/ 아래에만 적용된다 —
-# worker/ 처럼 리포 루트에 있는 파이썬 코드는 여기서 걸러야 한다.
-# (워커는 의존성이 AI와 달라 별도 venv를 쓰게 된다.)
-__pycache__/
-*.py[cod]
-.venv/
-.venv-*/
-venv/
-
 .DS_Store
 Thumbs.db
 

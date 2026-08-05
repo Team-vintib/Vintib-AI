@@ -25,7 +25,25 @@ services:
       - "${SERVER_PORT:-8080}:8080"
     environment:
       SPRING_PROFILES_ACTIVE: local
+      # presigned URL은 브라우저/FE가 여는 것이라 호스트에 발행된 포트를 가리켜야 한다.
+      # (컨테이너 네트워크 주소인 base 의 AWS_S3_ENDPOINT 로는 브라우저가 열지 못한다)
+      AWS_S3_PUBLIC_ENDPOINT: http://localhost:${MINIO_API_PORT:-9000}
 
   ai:
     ports:
       - "${AI_PORT:-8000}:8000"
+
+  # 로컬에서는 Caddy 가 없으므로 시그널링(7880)도 호스트에 연다.
+  # 브라우저가 ws://localhost:7880 으로 직접 붙는다.
+  livekit:
+    ports:
+      - "${LIVEKIT_PORT:-7880}:7880"
+      - "7885:7885/udp"
+      - "7881:7881"
+
+  # minio 서비스 자체는 base 에 있다 (운영도 MinIO 를 쓴다 — 계획 JY006).
+  # 여기서는 IDE에서 직접 붙거나 콘솔을 열 수 있게 호스트 포트만 추가로 발행한다.
+  minio:
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"

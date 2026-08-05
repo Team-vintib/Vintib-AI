@@ -108,6 +108,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `name` | `varchar(100)` | NOT NULL |  | UQ | 브랜드명. 중복 불가. |
+| `name_en` | `varchar(100)` |  |  |  | 브랜드 영문명. 없는 브랜드는 NULL. |
 
 **인덱스**
 
@@ -123,7 +124,9 @@
 | --- | --- | --- | --- | --- | --- |
 | `member_id` | `bigint` | NOT NULL |  | FK→member, PK | 대상 회원. |
 | `business_number` | `varchar(20)` | NOT NULL |  |  | 사업자등록번호. |
-| `certificate_url` | `varchar(500)` | NOT NULL |  |  | 사업자등록증 사본 URL. |
+| `business_name` | `varchar(100)` | NOT NULL |  |  | 상호명. |
+| `representative_name` | `varchar(50)` | NOT NULL |  |  | 대표자명. |
+| `certificate_key` | `varchar(500)` | NOT NULL |  |  | 사업자등록증 사본 S3 key(비공개 버킷). |
 | `verification_status` | `varchar(20)` | NOT NULL | `'PENDING'` |  | PENDING \| APPROVED \| REJECTED |
 | `submitted_at` | `timestamptz` | NOT NULL | `now()` |  | 인증 서류 제출 시각. |
 | `verified_at` | `timestamptz` |  |  |  | 인증 승인·거절 처리 시각. |
@@ -143,6 +146,7 @@
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `parent_id` | `bigint` |  |  | FK→category | 상위 카테고리. 최상위는 NULL. |
 | `name` | `varchar(100)` | NOT NULL |  |  | 카테고리명. |
+| `name_en` | `varchar(100)` | NOT NULL |  |  | 카테고리 영문 코드(예: JACKET). AI/FE 연동용. |
 | `depth` | `smallint` | NOT NULL | `1` |  | 계층 깊이. 최상위가 1. |
 
 ---
@@ -174,17 +178,44 @@
 
 ### `follow`
 
-회원 팔로우 (FOLLOW-001). 팔로잉 콘텐츠 조회(HOME-002)의 기준.
+회원 간 팔로우 (FOLLOW-001).
 
 | 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
 | --- | --- | --- | --- | --- | --- |
-| `follower_id` | `bigint` | NOT NULL |  | FK→member, PK | 팔로우를 건 회원. |
-| `following_id` | `bigint` | NOT NULL |  | FK→member, PK | 팔로우 당한 회원. |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `follower_id` | `bigint` | NOT NULL |  | FK→member, UQ | 팔로우를 하는 회원 (구독자). |
+| `following_id` | `bigint` | NOT NULL |  | FK→member, UQ | 팔로우 대상 회원 (판매자/크리에이터). |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
 
 **CHECK 제약**
 
 - `ck_follow_not_self` — `CHECK ((follower_id <> following_id))`
+
+**인덱스**
+
+- `ux_follow` — `CREATE UNIQUE INDEX ux_follow ON public.follow USING btree (follower_id, following_id)`
+
+---
+
+### `invoice`
+
+세금계산서 (BIZ-002). 주문당 1건, 발행 시점 사업자 정보를 스냅샷으로 저장.
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `order_id` | `bigint` | NOT NULL |  | FK→orders, UQ | 대상 주문. |
+| `business_number` | `varchar(20)` | NOT NULL |  |  | 발행 시점 판매자 사업자등록번호(스냅샷). |
+| `business_name` | `varchar(100)` | NOT NULL |  |  | 발행 시점 판매자 상호명(스냅샷). |
+| `representative_name` | `varchar(50)` | NOT NULL |  |  | 발행 시점 판매자 대표자명(스냅샷). |
+| `supply_amount` | `bigint` | NOT NULL |  |  | 공급가액. round(orders.order_price / 1.1). |
+| `tax_amount` | `bigint` | NOT NULL |  |  | 부가세. orders.order_price - supply_amount. |
+| `total_amount` | `bigint` | NOT NULL |  |  | 합계금액. orders.order_price와 동일. |
+| `issued_at` | `timestamptz` | NOT NULL | `now()` |  |  |
+
+**인덱스**
+
+- `uq_invoice_order` — `CREATE UNIQUE INDEX uq_invoice_order ON public.invoice USING btree (order_id)`
 
 ---
 
@@ -204,6 +235,7 @@
 | `ended_at` | `timestamptz` |  |  |  | 방송 종료 시각. |
 | `openvidu_room` | `varchar(100)` |  |  |  | OpenVidu v3 room name. WebRTC 세션·토큰 발급 시 사용. |
 | `peak_viewer_count` | `integer` | NOT NULL | `0` |  | 최고 동시 시청자 수. 통계·발표용. |
+| `current_product_id` | `bigint` |  |  | FK→product | 지금 소개 중인 상품 (LIVE-004, FE NOW 배지). 편성 상품(live_product) 중 하나여야 하며 애플리케이션이 검증한다. 방송 종료 시 NULL. 전환 이력은 남기지 않는다. |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
 
@@ -246,13 +278,19 @@
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `email` | `varchar(255)` | NOT NULL |  | UQ | 로그인 ID 겸 연락 수단. 경매 화면에는 노출하지 않는다. |
-| `password_hash` | `varchar(255)` |  |  |  | 자체 로그인용 해시. SSO 전용 계정은 NULL. |
-| `nickname` | `varchar(30)` | NOT NULL |  | UQ | 공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011). |
+| `password` | `varchar(255)` |  |  |  | 자체 로그인용 해시. SSO 전용 계정은 NULL. |
+| `nickname` | `varchar(30)` |  |  | UQ | 공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011). |
 | `name` | `varchar(50)` |  |  |  | 실명. 배송·정산용이며 외부 노출 금지. |
-| `phone` | `varchar(20)` |  |  |  | 연락처. 배송·정산 확인용이며 외부 노출 금지. |
+| `phone_number` | `varchar(20)` |  |  |  | 연락처. 배송·정산 확인용이며 외부 노출 금지. |
+| `address` | `varchar(200)` |  |  |  | 기본 주소(도로명/지번). 온보딩(ONBOARD-001)에서 입력. |
+| `detail_address` | `varchar(100)` |  |  |  | 상세 주소(동/호수 등). |
+| `postal_code` | `varchar(10)` |  |  |  | 우편번호. 주소 검색을 안 쓰고 직접 입력하면 NULL 허용. |
+| `gender` | `varchar(10)` |  |  |  | MALE \| FEMALE |
 | `member_type` | `varchar(20)` | NOT NULL | `'GENERAL'` |  | GENERAL(일반) \| BUSINESS(사업자) |
 | `status` | `varchar(20)` | NOT NULL | `'ACTIVE'` |  | ACTIVE \| SUSPENDED(정지) \| WITHDRAWN(탈퇴) |
 | `profile_image_url` | `varchar(500)` |  |  |  | 프로필 이미지 URL. |
+| `description` | `varchar(500)` |  |  |  | 소개글. 공개 프로필에 노출된다. |
+| `cover_image_url` | `varchar(500)` |  |  |  | 커버 이미지 URL. 공개 프로필에 노출된다. |
 | `onboarding_done` | `boolean` | NOT NULL | `false` |  | 온보딩(관심 브랜드·카테고리·신체 정보) 완료 여부. |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
@@ -260,6 +298,7 @@
 
 **CHECK 제약**
 
+- `ck_member_gender` — `CHECK (((gender)::text = ANY ((ARRAY['MALE'::character varying, 'FEMALE'::character varying])::text[])))`
 - `ck_member_status` — `CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'SUSPENDED'::character varying, 'WITHDRAWN'::character varying])::text[])))`
 - `ck_member_type` — `CHECK (((member_type)::text = ANY ((ARRAY['GENERAL'::character varying, 'BUSINESS'::character varying])::text[])))`
 
@@ -278,9 +317,12 @@
 | 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
 | --- | --- | --- | --- | --- | --- |
 | `member_id` | `bigint` | NOT NULL |  | FK→member, PK | 대상 회원. |
-| `body_photo_url` | `varchar(500)` |  |  |  | 전신 사진 URL. 미등록이면 시착 불가. |
+| `body_photo_key` | `varchar(500)` |  |  |  | 전신 사진 S3 key(비공개 버킷). 미등록이면 시착 불가. |
 | `height_cm` | `smallint` |  |  |  | 키(cm). |
 | `weight_kg` | `smallint` |  |  |  | 몸무게(kg). |
+| `chest_cm` | `smallint` |  |  |  | 가슴둘레(cm). |
+| `waist_cm` | `smallint` |  |  |  | 허리둘레(cm). |
+| `hip_cm` | `smallint` |  |  |  | 엉덩이둘레(cm). |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
 
 ---
@@ -368,6 +410,10 @@
 | `shipped_at` | `timestamptz` |  |  |  | 발송 시각. 송장 등록 시점. |
 | `delivered_at` | `timestamptz` |  |  |  | 배송 완료 시각. orders.auto_confirm_at 계산 기준. |
 
+**CHECK 제약**
+
+- `ck_order_shipment_courier` — `CHECK (((courier)::text = ANY ((ARRAY['LOTTE'::character varying, 'CJ'::character varying, 'HANJIN'::character varying, 'POST'::character varying, 'KYUNGDONG'::character varying, 'DAESIN'::character varying, 'LOGEN'::character varying, 'HAPDONG'::character varying, 'COUPANG'::character varying, 'WOORI'::character varying])::text[])))`
+
 ---
 
 ### `orders`
@@ -383,7 +429,8 @@
 | `auction_id` | `bigint` |  |  | FK→auction | 낙찰로 생성된 주문의 경매. 상시 판매 주문은 NULL. |
 | `order_price` | `bigint` | NOT NULL |  |  | 결제 금액(원). |
 | `status` | `varchar(30)` | NOT NULL | `'PAID'` |  | PAID → SHIPPING → DELIVERED → CONFIRMED → SETTLED (+ REFUNDED / CANCELED) |
-| `auto_confirm_at` | `timestamptz` |  |  |  | 자동 구매 확정 예정 시각(배송 완료 + 7일). 배송 완료 시점에 채워 넣고 스케줄러가 이 컬럼으로 대상을 찾는다. |
+| `auto_confirm_at` | `timestamptz` |  |  |  | 자동 구매 확정 예정 시각(배송 완료 + 3일). 배송 완료 시점에 채워 넣고 스케줄러가 이 컬럼으로 대상을 찾는다. |
+| `refund_requested` | `boolean` | NOT NULL | `false` |  | 진행 중인(REQUESTED) 환불 요청이 있으면 true. 송장 등록·구매 확정(수동/자동)을 막는 용도. |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
 
@@ -417,6 +464,31 @@
 **CHECK 제약**
 
 - `ck_point_non_negative` — `CHECK (((available >= 0) AND (bid_held >= 0) AND (trade_escrow >= 0) AND (settling >= 0) AND (withdrawing >= 0)))`
+
+---
+
+### `point_charge`
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `member_id` | `bigint` | NOT NULL |  | FK→member | 대상 회원. |
+| `order_id` | `varchar(64)` | NOT NULL |  | UQ | 대상 주문. |
+| `amount` | `bigint` | NOT NULL |  |  |  |
+| `status` | `varchar(20)` | NOT NULL | `'READY'` |  |  |
+| `payment_key` | `varchar(200)` |  |  |  |  |
+| `approved_at` | `timestamptz` |  |  |  |  |
+| `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
+
+**CHECK 제약**
+
+- `ck_point_charge_amount_positive` — `CHECK ((amount > 0))`
+- `ck_point_charge_status` — `CHECK (((status)::text = ANY ((ARRAY['READY'::character varying, 'DONE'::character varying, 'FAILED'::character varying])::text[])))`
+
+**인덱스**
+
+- `ix_point_charge_member` — `CREATE INDEX ix_point_charge_member ON public.point_charge USING btree (member_id, created_at DESC)`
+- `uq_point_charge_order_id` — `CREATE UNIQUE INDEX uq_point_charge_order_id ON public.point_charge USING btree (order_id)`
 
 ---
 
@@ -479,14 +551,17 @@
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `seller_id` | `bigint` | NOT NULL |  | FK→member | 판매자. |
-| `category_id` | `bigint` |  |  | FK→category | 카테고리. |
+| `category_id` | `bigint` | NOT NULL |  | FK→category | 카테고리. |
 | `brand_id` | `bigint` |  |  | FK→brand | 브랜드. |
 | `title` | `varchar(200)` | NOT NULL |  |  | 상품명. 통합 검색 대상이며 pg_trgm GIN 인덱스가 걸려 있다 (SEARCH-001). |
 | `description` | `text` |  |  |  | 상품 상세 설명. |
 | `condition_grade` | `varchar(20)` |  |  |  | 중고 상태 등급. ⚠️ 등급 체계 미확정이라 자유 문자열. |
 | `size_label` | `varchar(50)` |  |  |  | 사이즈 표기(S/M/L, 95/100 등). 브랜드마다 달라 문자열로 둔다. |
-| `sale_type` | `varchar(20)` | NOT NULL |  |  | DIRECT_SALE(상시 판매) \| AUCTION(경매) |
-| `sale_status` | `varchar(30)` | NOT NULL | `'DRAFT'` |  | DRAFT \| ON_SALE \| AUCTION_SCHEDULED \| AUCTION_IN_PROGRESS \| AUCTION_FAILED \| SOLD \| PRIVATE |
+| `color` | `varchar(50)` |  |  |  | 색상(자유 문자열). |
+| `material` | `varchar(50)` |  |  |  | 소재(자유 문자열). |
+| `measurements` | `jsonb` |  |  |  | 실측 치수(cm). 항목(총장/어깨너비 등)이 상품마다 달라 JSONB로 저장. |
+| `sale_type` | `varchar(20)` |  |  |  | DIRECT_SALE(상시 판매) \| AUCTION(경매) |
+| `sale_status` | `varchar(30)` | NOT NULL | `'DRAFT'` |  | DRAFT \| ON_SALE \| AUCTION_SCHEDULED \| AUCTION_IN_PROGRESS \| SOLD |
 | `price` | `bigint` |  |  |  | 상시 판매가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002). |
 | `view_count` | `integer` | NOT NULL | `0` |  | 누적 조회수(집계값). ⚠️ 회원별 조회 이력은 남지 않는다 — REC-001 착수 시 재검토 필요. |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
@@ -496,7 +571,7 @@
 **CHECK 제약**
 
 - `ck_product_price_by_type` — `CHECK ((((sale_type)::text <> 'DIRECT_SALE'::text) OR (price IS NOT NULL)))`
-- `ck_product_sale_status` — `CHECK (((sale_status)::text = ANY ((ARRAY['DRAFT'::character varying, 'ON_SALE'::character varying, 'AUCTION_SCHEDULED'::character varying, 'AUCTION_IN_PROGRESS'::character varying, 'AUCTION_FAILED'::character varying, 'SOLD'::character varying, 'PRIVATE'::character varying])::text[])))`
+- `ck_product_sale_status` — `CHECK (((sale_status)::text = ANY ((ARRAY['DRAFT'::character varying, 'ON_SALE'::character varying, 'AUCTION_SCHEDULED'::character varying, 'AUCTION_IN_PROGRESS'::character varying, 'SOLD'::character varying])::text[])))`
 - `ck_product_sale_type` — `CHECK (((sale_type)::text = ANY ((ARRAY['DIRECT_SALE'::character varying, 'AUCTION'::character varying])::text[])))`
 
 **인덱스**
@@ -510,6 +585,19 @@
 
 ---
 
+### `product_defect`
+
+판매자가 직접 입력한 하자 목록 (PROD-001).
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `product_id` | `bigint` | NOT NULL |  | FK→product | 대상 상품. |
+| `content` | `text` | NOT NULL |  |  | 하자 내용(자유 문자열). |
+| `sort_order` | `smallint` | NOT NULL | `0` |  | 노출 순서. |
+
+---
+
 ### `product_image`
 
 상품 이미지. 시착(TRYON-003) 입력으로도 쓰인다.
@@ -518,9 +606,55 @@
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `product_id` | `bigint` | NOT NULL |  | FK→product | 대상 상품. |
-| `image_url` | `varchar(500)` | NOT NULL |  |  | 이미지 URL. S3 미제공이라 EC2 로컬 볼륨 기준 (저장 방식 미확정). |
+| `image_key` | `varchar(500)` | NOT NULL |  |  | S3 오브젝트 key(전체 URL 아님). public 버킷에 저장하며 응답 시점에 고정 URL로 조립한다. |
 | `sort_order` | `smallint` | NOT NULL | `0` |  | 노출 순서. |
 | `is_primary` | `boolean` | NOT NULL | `false` |  | 대표 이미지 여부. 목록·썸네일에 쓴다. |
+
+---
+
+### `refund_request`
+
+환불 요청·승인/거절 (REFUND-001/002). 구매자가 요청하고 판매자가 승인/거절한다(운영자 아님). 같은 주문에 여러 건 있을 수 있다(거절 후 재요청 허용).
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `order_id` | `bigint` | NOT NULL |  | FK→orders | 대상 주문. |
+| `reason` | `varchar(30)` | NOT NULL |  |  | 환불 사유. 단순 변심은 없음(NOT_AS_DESCRIBED/UNDISCLOSED_DEFECT/NOT_SHIPPED/DUPLICATE_PAYMENT/SYSTEM_ERROR). |
+| `detail_reason` | `text` | NOT NULL |  |  |  |
+| `status` | `varchar(20)` | NOT NULL | `'REQUESTED'` |  | REQUESTED → APPROVED 또는 REJECTED. |
+| `rejection_reason` | `text` |  |  |  | 거절 사유. REJECTED일 때만 값이 있다. |
+| `reviewed_at` | `timestamptz` |  |  |  | 판매자가 승인/거절 처리한 시각. REQUESTED 상태면 NULL. |
+| `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
+| `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
+
+**CHECK 제약**
+
+- `ck_refund_request_reason` — `CHECK (((reason)::text = ANY ((ARRAY['NOT_AS_DESCRIBED'::character varying, 'UNDISCLOSED_DEFECT'::character varying, 'NOT_SHIPPED'::character varying, 'DUPLICATE_PAYMENT'::character varying, 'SYSTEM_ERROR'::character varying])::text[])))`
+- `ck_refund_request_status` — `CHECK (((status)::text = ANY ((ARRAY['REQUESTED'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying])::text[])))`
+
+**인덱스**
+
+- `ix_refund_request_order` — `CREATE INDEX ix_refund_request_order ON public.refund_request USING btree (order_id, created_at DESC)`
+
+---
+
+### `tryon_result`
+
+AI 가상 시착 합성 결과물. 생성(POST) 자체는 AI 계약 확정 전이라 저장/조회/삭제만 다룬다.
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `member_id` | `bigint` | NOT NULL |  | FK→member | 결과물 소유자. 본인만 조회 가능 (presigned GET URL). |
+| `product_id` | `bigint` | NOT NULL |  | FK→product | 합성에 사용된 상품. |
+| `image_key` | `varchar(500)` | NOT NULL |  |  | S3 오브젝트 key(전체 URL 아님). private 버킷에 저장하며 조회 시 presigned GET URL을 매번 새로 발급한다. |
+| `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
+| `deleted_at` | `timestamptz` |  |  |  | 사용자가 수동 삭제한 시각. 자동 만료 정책은 없다. |
+
+**인덱스**
+
+- `ix_tryon_result_member` — `CREATE INDEX ix_tryon_result_member ON public.tryon_result USING btree (member_id, created_at DESC) WHERE (deleted_at IS NULL)`
 
 ---
 
@@ -533,4 +667,16 @@
 | `member_id` | `bigint` | NOT NULL |  | FK→member, PK | 대상 회원. |
 | `product_id` | `bigint` | NOT NULL |  | FK→product, PK | 대상 상품. |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
+
+---
+
+### `withdrawal_account`
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `member_id` | `bigint` | NOT NULL |  | FK→member, PK | 대상 회원. |
+| `bank_name` | `varchar(50)` | NOT NULL |  |  |  |
+| `account_number` | `varchar(30)` | NOT NULL |  |  |  |
+| `account_holder_name` | `varchar(50)` | NOT NULL |  |  |  |
+| `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
 

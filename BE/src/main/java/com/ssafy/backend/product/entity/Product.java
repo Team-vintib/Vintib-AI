@@ -14,10 +14,15 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import java.util.Map;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.SQLRestriction;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -29,12 +34,12 @@ import lombok.NoArgsConstructor;
                 @CheckConstraint(
                         name = "ck_product_sale_status",
                         constraint = "sale_status IN ("
-                                + "'DRAFT', 'ON_SALE', 'AUCTION_SCHEDULED', 'AUCTION_IN_PROGRESS', "
-                                + "'AUCTION_FAILED', 'SOLD', 'PRIVATE')"),
+                                + "'DRAFT', 'ON_SALE', 'AUCTION_SCHEDULED', 'AUCTION_IN_PROGRESS', 'SOLD')"),
                 @CheckConstraint(
                         name = "ck_product_price_by_type",
                         constraint = "sale_type <> 'DIRECT_SALE' OR price IS NOT NULL")
         })
+@SQLRestriction("deleted_at IS NULL")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Product extends BaseTimeEntity {
@@ -47,7 +52,9 @@ public class Product extends BaseTimeEntity {
     @JoinColumn(name = "seller_id", nullable = false)
     private Member seller;
 
-    @Column(name = "category_id")
+    // 카테고리는 필수다. 미분류 상품은 검색·필터에서 누락되고, 라이브 카테고리(편성 상품에서
+    // 유도)도 만들 수 없다.
+    @Column(name = "category_id", nullable = false)
     private Long categoryId;
 
     @Column(name = "brand_id")
@@ -66,6 +73,17 @@ public class Product extends BaseTimeEntity {
     @Column(name = "size_label", length = 50)
     private String sizeLabel;
 
+    @Column(length = 50)
+    private String color;
+
+    @Column(length = 50)
+    private String material;
+
+    // 치수 항목(총장/어깨너비/가슴단면/소매길이 등)이 상품마다 달라 고정 컬럼 대신 JSONB로 담는다.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Integer> measurements;
+
     // 판매 채널(상시 판매/경매)은 이번 단계에서 정하지 않는다 — 판매 가격 설정 또는
     // 경매 조건 설정 API를 호출하는 시점에 비로소 결정된다.
     @Enumerated(EnumType.STRING)
@@ -78,6 +96,9 @@ public class Product extends BaseTimeEntity {
 
     private Long price;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @Builder
     private Product(
             Member seller,
@@ -86,7 +107,10 @@ public class Product extends BaseTimeEntity {
             String title,
             String description,
             String conditionGrade,
-            String sizeLabel) {
+            String sizeLabel,
+            String color,
+            String material,
+            Map<String, Integer> measurements) {
         this.seller = seller;
         this.categoryId = categoryId;
         this.brandId = brandId;
@@ -94,6 +118,9 @@ public class Product extends BaseTimeEntity {
         this.description = description;
         this.conditionGrade = conditionGrade;
         this.sizeLabel = sizeLabel;
+        this.color = color;
+        this.material = material;
+        this.measurements = measurements;
         this.saleStatus = SaleStatus.DRAFT;
     }
 
@@ -101,5 +128,92 @@ public class Product extends BaseTimeEntity {
         this.saleType = SaleType.DIRECT_SALE;
         this.price = price;
         this.saleStatus = SaleStatus.ON_SALE;
+    }
+
+    public void scheduleAuction() {
+        this.saleType = SaleType.AUCTION;
+        this.price = null;
+        this.saleStatus = SaleStatus.AUCTION_SCHEDULED;
+    }
+
+    public void update(
+            String title,
+            String description,
+            Long categoryId,
+            Long brandId,
+            String conditionGrade,
+            String sizeLabel,
+            String color,
+            String material,
+            Map<String, Integer> measurements) {
+        if (title != null) {
+            this.title = title;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+        if (categoryId != null) {
+            this.categoryId = categoryId;
+        }
+        if (brandId != null) {
+            this.brandId = brandId;
+        }
+        if (conditionGrade != null) {
+            this.conditionGrade = conditionGrade;
+        }
+        if (sizeLabel != null) {
+            this.sizeLabel = sizeLabel;
+        }
+        if (color != null) {
+            this.color = color;
+        }
+        if (material != null) {
+            this.material = material;
+        }
+        if (measurements != null) {
+            this.measurements = measurements;
+        }
+    }
+
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    /** 상시 판매 즉시구매 대상인지 확인한다(SALE-002). 경매 상품이나 품절 상품은 구매할 수 없다. */
+    public boolean isAvailableForDirectPurchase() {
+        return saleType == SaleType.DIRECT_SALE && saleStatus == SaleStatus.ON_SALE;
+    }
+
+    /** 즉시구매 완료 처리(SALE-002). 재고가 1개뿐인 중고 상품이라 판매 완료로 바로 넘어간다. */
+    public void markSold() {
+        this.saleStatus = SaleStatus.SOLD;
+    }
+
+    public boolean isOwnedBy(Long memberId) {
+        return memberId != null && seller.getId().equals(memberId);
+    }
+
+    public boolean isDraft() {
+        return saleStatus == SaleStatus.DRAFT;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    /**
+     * 상품 내용(제목·설명·사진 등)을 고칠 수 있는 상태인지.
+     *
+     * <p><b>{@code AUCTION_SCHEDULED}를 허용한다</b>(FE 요청 007) — 유찰된 상품은 이 상태로
+     * 돌아오는데, 판매자 입장에서 "안 팔렸으니 설명을 고쳐 다시 걸자"가 자연스러운 흐름이다.
+     * 막아 두면 상시 판매로 전환했다가 되돌리는 우회로를 강요하게 된다.
+     *
+     * <p><b>{@code AUCTION_IN_PROGRESS}는 계속 막는다.</b> 입찰이 붙는 도중에 상품 정보가 바뀌면
+     * 입찰자가 보고 판단한 것과 실제로 받는 물건이 달라진다. {@code SOLD}도 마찬가지로 막힌다.
+     */
+    public boolean isEditable() {
+        return saleStatus == SaleStatus.DRAFT
+                || saleStatus == SaleStatus.ON_SALE
+                || saleStatus == SaleStatus.AUCTION_SCHEDULED;
     }
 }

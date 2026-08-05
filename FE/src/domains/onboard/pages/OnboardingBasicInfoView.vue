@@ -3,6 +3,7 @@ import axios from 'axios'
 import { nextTick, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { openPostcodeSearch } from '@/domains/onboard/api/postcode'
 import { saveOnboardingBasicInfo } from '@/domains/onboard/api/onboarding'
 import BaseButton from '@/domains/onboard/components/BaseButton.vue'
@@ -58,6 +59,7 @@ const isSubmitting = ref(false)
 const submitError = ref('')
 const detailAddressInput = ref<InstanceType<typeof BaseInput> | null>(null)
 const router = useRouter()
+const authStore = useAuthStore()
 
 const genderOptions: { value: Exclude<Gender, ''>; label: string }[] = [
   { value: 'MALE', label: '남성' },
@@ -111,7 +113,7 @@ const getValidationMessage = (field: FormField) => {
     }
 
     if (!phonePattern.test(phoneNumber)) {
-      return '전화번호 형식을 확인해 주세요. 예: 010-1234-5678'
+      return '전화번호 형식을 확인해 주세요. 예: 01012345678'
     }
   }
 
@@ -142,7 +144,7 @@ const handleFieldBlur = (field: FormField) => {
 }
 
 const handleTextUpdate = (field: TextFormField, input: string) => {
-  form[field] = field === 'phoneNumber' ? input.replace(/[^\d-]/g, '').slice(0, 13) : input
+  form[field] = field === 'phoneNumber' ? input.replace(/\D/g, '').slice(0, 11) : input
   submitError.value = ''
 
   if (touched[field]) {
@@ -268,12 +270,16 @@ const handleSubmit = async () => {
       postalCode: form.zonecode || null,
       address: form.address,
       detailAddress: form.detailAddress,
+    }, {
+      userId: authStore.user?.id,
     })
 
     if (!response.success) {
       await applyApiError(response.error ?? null)
       return
     }
+
+    authStore.updateUser({ nickname: form.nickname })
 
     await router.push({ name: ROUTE_NAMES.ONBOARD_INTERESTS })
   } catch (error: unknown) {
@@ -344,7 +350,7 @@ const handleSubmit = async () => {
           id="phone-number"
           label="전화번호"
           required
-          hint="숫자와 하이픈(-)만 입력해 주세요."
+          hint="숫자만 입력해 주세요."
           :error="errors.phoneNumber"
           v-slot="{ descriptionId, isInvalid }"
         >
@@ -353,9 +359,9 @@ const handleSubmit = async () => {
             :model-value="form.phoneNumber"
             type="tel"
             inputmode="tel"
-            placeholder="010-1234-5678"
+            placeholder="01012345678"
             autocomplete="tel"
-            :maxlength="13"
+            :maxlength="11"
             required
             :invalid="isInvalid"
             :described-by="descriptionId"
@@ -493,9 +499,9 @@ const handleSubmit = async () => {
 }
 
 .basic-info-form__title {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 34px;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-2xl-loose);
 }
 
 .basic-info-form__description {
@@ -525,15 +531,15 @@ const handleSubmit = async () => {
 
 .gender-field:focus-visible .gender-field__options {
   border-radius: var(--radius-control);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .gender-field__legend {
   margin-bottom: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .gender-field__required {
@@ -570,12 +576,12 @@ const handleSubmit = async () => {
   background: var(--color-surface);
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .gender-field__option:hover {
@@ -584,7 +590,7 @@ const handleSubmit = async () => {
 
 .gender-field__option:has(.gender-field__input:focus-visible) {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .gender-field__option--selected {
@@ -609,8 +615,8 @@ const handleSubmit = async () => {
   min-height: 20px;
   margin-top: var(--space-2);
   color: var(--color-error);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .address-field__control {
@@ -635,7 +641,7 @@ const handleSubmit = async () => {
   margin-top: var(--space-8);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
 }
 
 .basic-info-form__notice-title {
@@ -650,7 +656,7 @@ const handleSubmit = async () => {
   margin-top: var(--space-6);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
 }
 </style>

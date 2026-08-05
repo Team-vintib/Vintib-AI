@@ -13,9 +13,11 @@ SET client_min_messages TO NOTICE;
 INSERT INTO member (email, nickname) VALUES
     ('seller@t.com', '판매자'), ('bidder1@t.com', '입찰자1'), ('bidder2@t.com', '입찰자2');
 
-INSERT INTO product (seller_id, title, sale_type, sale_status, price)
-VALUES (1, '빈티지 데님 자켓', 'AUCTION', 'AUCTION_SCHEDULED', NULL),
-       (1, '울 코트',        'AUCTION', 'AUCTION_SCHEDULED', NULL);
+INSERT INTO category (name, name_en) VALUES ('아우터', 'OUTER');
+
+INSERT INTO product (seller_id, category_id, title, sale_type, sale_status, price)
+VALUES (1, 1, '빈티지 데님 자켓', 'AUCTION', 'AUCTION_SCHEDULED', NULL),
+       (1, 1, '울 코트',        'AUCTION', 'AUCTION_SCHEDULED', NULL);
 
 INSERT INTO live (host_id, title, status) VALUES (1, '주말 빈티지 마켓', 'LIVE');
 
@@ -115,8 +117,8 @@ BEGIN
 
     -- 8. 상시 판매인데 가격 없음
     BEGIN
-        INSERT INTO product (seller_id, title, sale_type, sale_status, price)
-        VALUES (1, '가격없는 상시판매', 'DIRECT_SALE', 'ON_SALE', NULL);
+        INSERT INTO product (seller_id, category_id, title, sale_type, sale_status, price)
+        VALUES (1, 1, '가격없는 상시판매', 'DIRECT_SALE', 'ON_SALE', NULL);
         RAISE NOTICE '[FAIL] PROD     가격 없는 상시 판매가 허용됨';
         failed := failed + 1;
     EXCEPTION WHEN check_violation THEN

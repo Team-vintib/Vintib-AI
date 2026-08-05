@@ -155,7 +155,13 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
       aria-labelledby="link-title"
     >
       <header class="link-header">
-        <img class="link-header__logo" :src="logoImage" alt="VinTib" />
+        <RouterLink
+          class="link-header__logo-link"
+          :to="{ name: ROUTE_NAMES.HOME }"
+          aria-label="VinTib 홈"
+        >
+          <img class="link-header__logo" :src="logoImage" alt="VinTib" />
+        </RouterLink>
         <p class="link-header__eyebrow">SSAFYERS SSO</p>
         <h1 id="link-title" class="link-header__title">기존 계정 연결 안내</h1>
         <p class="link-header__description">
@@ -269,36 +275,43 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
   text-align: center;
 }
 
-.link-header__logo {
+.link-header__logo-link {
+  display: block;
   width: min(180px, 52vw);
-  height: auto;
   margin-right: auto;
   margin-bottom: var(--space-2);
   margin-left: auto;
+  border-radius: var(--radius-control);
+}
+
+.link-header__logo {
+  display: block;
+  width: 100%;
+  height: auto;
   object-fit: contain;
 }
 
 .link-header__eyebrow {
   margin-top: var(--space-4);
   color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 16px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-xs);
 }
 
 .link-header__title {
   margin-top: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 38px;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-3xl);
 }
 
 .link-header__description {
   margin-top: var(--space-3);
   color: var(--color-text-secondary);
-  font-size: 15px;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 .link-account {
@@ -306,7 +319,7 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  min-height: 52px;
+  min-height: var(--button-height-major);
   margin-top: var(--space-8);
   padding: 0 var(--space-4);
   border: 1px solid var(--color-border);
@@ -317,18 +330,18 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
 .link-account__label {
   flex: 0 0 auto;
   color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .link-account__value {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--color-text-primary);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
   text-align: right;
 }
 
@@ -345,8 +358,8 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
 
 .link-guide__text {
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
 }
 
 .link-consent {
@@ -358,15 +371,15 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
   align-items: flex-start;
   gap: var(--space-3);
   color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-relaxed);
 }
 
 .link-consent__checkbox {
   flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
   margin-top: 2px;
   accent-color: var(--color-primary);
 }
@@ -379,9 +392,9 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
   border-radius: var(--radius-control);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .link-actions {
@@ -401,9 +414,9 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
   height: var(--button-height-major);
   padding: 0 var(--space-5);
   border-radius: var(--radius-control);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .link-primary {
@@ -451,9 +464,10 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
 
 .link-primary:focus-visible,
 .link-secondary:focus-visible,
+.link-header__logo-link:focus-visible,
 .link-text-button:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 3px;
+  outline: var(--focus-ring-width) solid var(--color-primary);
+  outline-offset: var(--focus-ring-offset);
 }
 
 @media (max-width: 560px) {

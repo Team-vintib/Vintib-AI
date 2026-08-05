@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import {
   completeOnboarding,
   type OnboardingMemberType,
@@ -38,6 +39,7 @@ const memberTypeOptions: MemberTypeOption[] = [
 ]
 
 const router = useRouter()
+const authStore = useAuthStore()
 const selectedMemberType = ref<OnboardingMemberType | null>(null)
 const isSubmitting = ref(false)
 const submitError = ref('')
@@ -91,7 +93,12 @@ const handleComplete = async () => {
   submitError.value = ''
 
   try {
-    const response = await completeOnboarding({ memberType })
+    const response = await completeOnboarding(
+      { memberType },
+      {
+        userId: authStore.user?.id,
+      },
+    )
 
     if (!response.success) {
       applyApiError(response.error ?? null)
@@ -100,6 +107,8 @@ const handleComplete = async () => {
 
     const destination =
       memberType === 'GENERAL' ? ROUTE_PATHS.HOME : ROUTE_PATHS.BIZ_VERIFY
+
+    authStore.updateUser({ onboardingCompleted: response.data?.onboardingCompleted ?? true })
 
     await router.push(destination)
   } catch (error: unknown) {
@@ -213,9 +222,9 @@ const handleComplete = async () => {
 }
 
 .member-type-selection__title {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 34px;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-2xl-loose);
 }
 
 .member-type-selection__description {
@@ -230,9 +239,9 @@ const handleComplete = async () => {
   border-radius: var(--radius-chip);
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .member-type-group {
@@ -269,11 +278,11 @@ const handleComplete = async () => {
   color: var(--color-text-secondary);
   cursor: pointer;
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-base);
 }
 
 .member-type-option:hover {
@@ -284,7 +293,7 @@ const handleComplete = async () => {
 .member-type-option:has(.member-type-option__input:focus-visible) {
   border-color: var(--color-primary);
   outline: none;
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .member-type-option--selected {
@@ -320,9 +329,9 @@ const handleComplete = async () => {
   border-radius: var(--radius-chip);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 20px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-control);
 }
 
 .member-type-option--selected .member-type-option__badge {
@@ -340,8 +349,8 @@ const handleComplete = async () => {
   border-radius: 50%;
   background: var(--color-surface);
   color: var(--color-text-inverse);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
 }
 
 .member-type-option--selected .member-type-option__check {
@@ -352,14 +361,14 @@ const handleComplete = async () => {
 .member-type-option__title {
   margin-top: var(--space-8);
   color: var(--color-text-primary);
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 34px;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-2xl-loose);
 }
 
 .member-type-option__description {
   margin-top: var(--space-2);
-  line-height: 24px;
+  line-height: var(--line-height-body);
 }
 
 .member-type-option__benefits {
@@ -375,12 +384,12 @@ const handleComplete = async () => {
   align-items: center;
   gap: var(--space-2);
   color: var(--color-text-primary);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .member-type-option__benefit > span {
   color: var(--color-primary);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .member-type-selection__status {
@@ -389,7 +398,7 @@ const handleComplete = async () => {
   margin-top: var(--space-6);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   text-align: center;
 }
 
@@ -399,13 +408,13 @@ const handleComplete = async () => {
   margin-top: var(--space-4);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
 }
 
 @media (max-width: 820px) {
   .member-type-option {
-    min-height: 320px;
+    min-height: var(--surface-min-height-lg);
     padding: var(--space-6);
   }
 }

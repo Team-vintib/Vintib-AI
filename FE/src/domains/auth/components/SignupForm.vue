@@ -1,11 +1,20 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { sendEmailVerificationCode, signUp, verifyEmailCode } from '@/domains/auth/api/authApi'
+import {
+  checkEmailDuplicate,
+  login,
+  sendEmailVerificationCode,
+  signUp,
+  verifyEmailCode,
+} from '@/domains/auth/api/authApi'
 import EmailVerificationField from '@/domains/auth/components/EmailVerificationField.vue'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
+import type { LoginResponse, SignUpResponse } from '@/domains/auth/types/auth.types'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
+import type { ApiErrorBody } from '@/shared/types/api.types'
 import {
   isEmail,
   isRequired,
@@ -16,6 +25,7 @@ import {
 
 type SignupField = 'name' | 'email' | 'verificationCode' | 'password' | 'passwordConfirm'
 type AgreementField = 'serviceTerms' | 'privacyPolicy' | 'marketing'
+type ServerSignupField = Extract<SignupField, 'name' | 'email' | 'password'>
 
 interface SignupFormState {
   name: string
@@ -38,6 +48,8 @@ const form = reactive<SignupFormState>({
   password: '',
   passwordConfirm: '',
 })
+
+const authStore = useAuthStore()
 
 const agreements = reactive<SignupAgreements>({
   serviceTerms: false,
@@ -63,6 +75,8 @@ const errors = reactive<Record<SignupField, string>>({
 
 const isPasswordVisible = ref(false)
 const isAgreementTouched = ref(false)
+const isCheckingEmailDuplicate = ref(false)
+const isEmailDuplicateChecked = ref(false)
 const isSendingVerificationCode = ref(false)
 const isVerifyingEmailCode = ref(false)
 const isEmailVerificationCodeSent = ref(false)
@@ -71,9 +85,40 @@ const isSubmitting = ref(false)
 const emailVerificationMessage = ref('')
 const submitError = ref('')
 const duplicateEmail = ref('')
+const duplicateCheckedEmail = ref('')
 const verificationToken = ref('')
 const verifiedEmail = ref('')
+const verificationCodeRemainingSeconds = ref(0)
 const router = useRouter()
+
+const VERIFICATION_CODE_TTL_SECONDS = 300
+let verificationCodeTimerId: number | undefined
+
+const stopVerificationCodeTimer = () => {
+  window.clearInterval(verificationCodeTimerId)
+  verificationCodeTimerId = undefined
+}
+
+const startVerificationCodeTimer = () => {
+  stopVerificationCodeTimer()
+  verificationCodeRemainingSeconds.value = VERIFICATION_CODE_TTL_SECONDS
+
+  verificationCodeTimerId = window.setInterval(() => {
+    verificationCodeRemainingSeconds.value -= 1
+
+    if (verificationCodeRemainingSeconds.value <= 0) {
+      stopVerificationCodeTimer()
+      verificationCodeRemainingSeconds.value = 0
+      isEmailVerificationCodeSent.value = false
+      emailVerificationMessage.value = ''
+      errors.verificationCode = '인증코드가 만료되었습니다. 인증코드를 다시 받아주세요.'
+    }
+  }, 1000)
+}
+
+onBeforeUnmount(() => {
+  stopVerificationCodeTimer()
+})
 
 const agreementItems: {
   key: AgreementField
@@ -113,8 +158,36 @@ const agreementError = computed(() => {
   return '필수 약관에 모두 동의해 주세요.'
 })
 
-const canRequestVerificationCode = computed(() => isEmail(form.email))
+const normalizedEmail = computed(() => form.email.trim())
+const isCurrentEmailDuplicateChecked = computed(
+  () => isEmailDuplicateChecked.value && duplicateCheckedEmail.value === normalizedEmail.value,
+)
+const canRequestVerificationCode = computed(
+  () =>
+    isEmail(form.email) &&
+    !(isEmailVerificationCodeSent.value && verificationCodeRemainingSeconds.value > 0),
+)
 const canConfirmVerificationCode = computed(() => isVerificationCode(form.verificationCode))
+const codeExpiresInLabel = computed(() => {
+  if (
+    !isEmailVerificationCodeSent.value ||
+    isEmailVerified.value ||
+    verificationCodeRemainingSeconds.value <= 0
+  ) {
+    return ''
+  }
+
+  const minutes = Math.floor(verificationCodeRemainingSeconds.value / 60)
+  const seconds = verificationCodeRemainingSeconds.value % 60
+
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+})
+const serverFieldMap: Partial<Record<string, ServerSignupField | 'verificationCode'>> = {
+  name: 'name',
+  email: 'email',
+  password: 'password',
+  verificationToken: 'verificationCode',
+}
 
 const getFieldError = (field: SignupField) => {
   if (field === 'name') {
@@ -232,10 +305,14 @@ const handleVerificationCodeUpdate = (verificationCode: string) => {
 }
 
 const resetEmailVerification = () => {
+  stopVerificationCodeTimer()
+  verificationCodeRemainingSeconds.value = 0
   form.verificationCode = ''
+  isEmailDuplicateChecked.value = false
   isEmailVerificationCodeSent.value = false
   isEmailVerified.value = false
   emailVerificationMessage.value = ''
+  duplicateCheckedEmail.value = ''
   verificationToken.value = ''
   verifiedEmail.value = ''
 
@@ -244,20 +321,52 @@ const resetEmailVerification = () => {
   }
 }
 
-const handleSendVerificationCode = async () => {
+const handleRequestVerificationCode = async () => {
   touched.email = true
 
-  if (!validateField('email') || isSendingVerificationCode.value || isVerifyingEmailCode.value) {
+  if (
+    !validateField('email') ||
+    isCheckingEmailDuplicate.value ||
+    isSendingVerificationCode.value ||
+    isVerifyingEmailCode.value ||
+    !canRequestVerificationCode.value
+  ) {
     return
   }
 
-  isSendingVerificationCode.value = true
+  isCheckingEmailDuplicate.value = true
+  submitError.value = ''
   emailVerificationMessage.value = ''
   errors.email = ''
   errors.verificationCode = ''
 
   try {
-    const response = await sendEmailVerificationCode({ email: form.email.trim() })
+    const duplicateResponse = await checkEmailDuplicate({ email: normalizedEmail.value })
+
+    if (!duplicateResponse.success) {
+      applyEmailDuplicateCheckError(duplicateResponse.error?.code, duplicateResponse.error?.message)
+      return
+    }
+
+    isEmailDuplicateChecked.value = true
+    duplicateCheckedEmail.value = normalizedEmail.value
+  } catch (error: unknown) {
+    const apiError = normalizeApiError(error)
+
+    applyEmailDuplicateCheckError(apiError.code, apiError.message)
+    return
+  } finally {
+    isCheckingEmailDuplicate.value = false
+  }
+
+  isSendingVerificationCode.value = true
+  form.verificationCode = ''
+  verificationToken.value = ''
+  verifiedEmail.value = ''
+  isEmailVerified.value = false
+
+  try {
+    const response = await sendEmailVerificationCode({ email: normalizedEmail.value })
 
     if (!response.success) {
       applyEmailVerificationError(response.error?.code, response.error?.message)
@@ -269,6 +378,7 @@ const handleSendVerificationCode = async () => {
     verificationToken.value = ''
     verifiedEmail.value = ''
     emailVerificationMessage.value = '인증코드를 발송했습니다. 이메일을 확인해 주세요.'
+    startVerificationCodeTimer()
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -280,6 +390,11 @@ const handleSendVerificationCode = async () => {
 
 const handleVerifyEmailCode = async () => {
   touched.verificationCode = true
+
+  if (!isCurrentEmailDuplicateChecked.value) {
+    errors.email = '이메일 중복 확인을 먼저 완료해 주세요.'
+    return
+  }
 
   if (!isEmailVerificationCodeSent.value) {
     errors.verificationCode = '먼저 인증코드를 발송해 주세요.'
@@ -300,7 +415,7 @@ const handleVerifyEmailCode = async () => {
 
   try {
     const response = await verifyEmailCode({
-      email: form.email.trim(),
+      email: normalizedEmail.value,
       code: form.verificationCode,
     })
 
@@ -311,8 +426,9 @@ const handleVerifyEmailCode = async () => {
 
     isEmailVerified.value = true
     verificationToken.value = response.data.verificationToken
-    verifiedEmail.value = form.email.trim()
+    verifiedEmail.value = normalizedEmail.value
     emailVerificationMessage.value = '이메일 인증이 완료되었습니다.'
+    stopVerificationCodeTimer()
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -320,6 +436,17 @@ const handleVerifyEmailCode = async () => {
   } finally {
     isVerifyingEmailCode.value = false
   }
+}
+
+const applyEmailDuplicateCheckError = (code?: string, message?: string) => {
+  emailVerificationMessage.value = ''
+
+  if (code === 'U003') {
+    applyDuplicateEmailError(message)
+    return
+  }
+
+  errors.email = message || '이메일 중복 확인을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
 }
 
 const applyEmailVerificationError = (code?: string, message?: string) => {
@@ -362,7 +489,7 @@ const validateForm = () => {
 
   if (
     !isEmailVerified.value ||
-    verifiedEmail.value !== form.email.trim() ||
+    verifiedEmail.value !== normalizedEmail.value ||
     !verificationToken.value
   ) {
     errors.verificationCode = '이메일 인증을 완료해 주세요.'
@@ -388,13 +515,13 @@ const handleSubmit = async () => {
   try {
     const response = await signUp({
       name: form.name.trim(),
-      email: form.email.trim(),
+      email: normalizedEmail.value,
       password: form.password,
       verificationToken: verificationToken.value,
     })
 
     if (!response.success) {
-      applySignUpError(response.error?.code, response.error?.message)
+      applySignUpError(response.error)
       return
     }
 
@@ -403,15 +530,48 @@ const handleSubmit = async () => {
       return
     }
 
-    await router.push({ name: ROUTE_NAMES.ONBOARD_PROFILE })
+    const loginResponse = await login({
+      email: normalizedEmail.value,
+      password: form.password,
+    })
+
+    if (!loginResponse.success) {
+      submitError.value =
+        loginResponse.error?.message ||
+        '회원가입은 완료됐지만 로그인 세션을 만들지 못했습니다. 로그인 후 온보딩을 이어가 주세요.'
+      return
+    }
+
+    if (!loginResponse.data?.accessToken) {
+      submitError.value =
+        '회원가입은 완료됐지만 로그인 토큰을 받지 못했습니다. 로그인 후 온보딩을 이어가 주세요.'
+      return
+    }
+
+    authStore.setSession(buildSignupSession(loginResponse.data, response.data), true)
+    await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
-    applySignUpError(apiError.code, apiError.message)
+    applySignUpError(apiError)
   } finally {
     isSubmitting.value = false
   }
 }
+
+const buildSignupSession = (
+  loginResult: LoginResponse,
+  signupResult: SignUpResponse,
+): LoginResponse => ({
+  ...loginResult,
+  user: {
+    id: loginResult.user?.id ?? signupResult.id,
+    email: loginResult.user?.email ?? signupResult.email,
+    name: loginResult.user?.name ?? signupResult.name,
+    onboardingCompleted:
+      loginResult.user?.onboardingCompleted ?? signupResult.onboardingCompleted ?? false,
+  },
+})
 
 const handleSsafySignUp = async () => {
   if (isSubmitting.value) {
@@ -425,7 +585,10 @@ const handleMoveToLogin = async () => {
   await router.push({ name: ROUTE_NAMES.AUTH_LOGIN })
 }
 
-const applySignUpError = (code?: string, message?: string) => {
+const applySignUpError = (apiError?: ApiErrorBody | null) => {
+  const code = apiError?.code
+  const message = apiError?.message
+
   if (code === 'U003') {
     applyDuplicateEmailError(message)
     return
@@ -438,15 +601,40 @@ const applySignUpError = (code?: string, message?: string) => {
   }
 
   if (code === 'C001') {
-    submitError.value = message || '입력값을 다시 확인해 주세요.'
+    applySignUpFieldErrors(apiError)
     return
   }
 
   submitError.value = message || '회원가입을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
 }
 
+const applySignUpFieldErrors = (apiError?: ApiErrorBody | null) => {
+  const mappedFields: SignupField[] = []
+  const unmappedReasons: string[] = []
+
+  apiError?.errors?.forEach((fieldError) => {
+    const field = serverFieldMap[fieldError.field]
+
+    if (!field) {
+      unmappedReasons.push(fieldError.reason)
+      return
+    }
+
+    touched[field] = true
+    errors[field] = fieldError.reason
+    mappedFields.push(field)
+  })
+
+  if (mappedFields.length === 0) {
+    submitError.value = unmappedReasons[0] || apiError?.message || '입력값을 다시 확인해 주세요.'
+    return
+  }
+
+  submitError.value = unmappedReasons[0] || apiError?.message || ''
+}
+
 const applyDuplicateEmailError = (message?: string) => {
-  duplicateEmail.value = form.email.trim()
+  duplicateEmail.value = normalizedEmail.value
   errors.email = message || '이미 가입된 이메일입니다.'
   submitError.value = '이미 가입된 이메일입니다. 기존 계정으로 로그인해 주세요.'
   resetEmailVerification()
@@ -465,7 +653,7 @@ const applyDuplicateEmailError = (message?: string) => {
 
     <button
       v-if="duplicateEmail"
-      class="h-11 w-full rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+      class="h-11 w-full rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-5 text-[var(--font-size-body)] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
       type="button"
       :disabled="isSubmitting"
       @click="handleMoveToLogin"
@@ -484,9 +672,9 @@ const applyDuplicateEmailError = (message?: string) => {
         <input
           id="signup-name"
           v-model="form.name"
-          class="h-12 w-full rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+          class="h-12 w-full rounded-[var(--radius-control)] border bg-transparent px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)]"
           :class="
-            errors.name ? 'border-[var(--color-error)]' : 'border-[var(--color-border-strong)]'
+            errors.name ? 'border-[var(--color-error)]' : 'border-[var(--color-border-input)]'
           "
           type="text"
           autocomplete="name"
@@ -499,7 +687,7 @@ const applyDuplicateEmailError = (message?: string) => {
         <p
           v-if="errors.name"
           id="signup-name-error"
-          class="text-[13px] leading-5 text-[var(--color-error)]"
+          class="text-[var(--font-size-caption)] leading-5 text-[var(--color-error)]"
         >
           {{ errors.name }}
         </p>
@@ -511,17 +699,19 @@ const applyDuplicateEmailError = (message?: string) => {
         :email-error="errors.email"
         :verification-code-error="errors.verificationCode"
         :status-message="emailVerificationMessage"
-        :is-sending-code="isSendingVerificationCode"
+        :is-sending-code="isCheckingEmailDuplicate || isSendingVerificationCode"
         :is-verifying-code="isVerifyingEmailCode"
         :can-send-code="canRequestVerificationCode"
         :can-verify-code="canConfirmVerificationCode"
+        :is-code-sent="isEmailVerificationCodeSent"
         :is-verified="isEmailVerified"
         :disabled="isSubmitting"
+        :code-expires-in-label="codeExpiresInLabel"
         @update:email="handleFieldInput('email')"
         @update:verification-code="handleVerificationCodeUpdate"
         @email-blur="handleFieldBlur('email')"
         @verification-code-blur="handleFieldBlur('verificationCode')"
-        @send-code="handleSendVerificationCode"
+        @send-code="handleRequestVerificationCode"
         @verify-code="handleVerifyEmailCode"
       />
 
@@ -536,11 +726,11 @@ const applyDuplicateEmailError = (message?: string) => {
           <input
             id="signup-password"
             v-model="form.password"
-            class="h-12 w-full rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 pr-20 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+            class="h-12 w-full rounded-[var(--radius-control)] border bg-transparent px-4 pr-20 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)]"
             :class="
               errors.password
                 ? 'border-[var(--color-error)]'
-                : 'border-[var(--color-border-strong)]'
+                : 'border-[var(--color-border-input)]'
             "
             :type="isPasswordVisible ? 'text' : 'password'"
             autocomplete="new-password"
@@ -551,7 +741,7 @@ const applyDuplicateEmailError = (message?: string) => {
             @blur="handleFieldBlur('password')"
           />
           <button
-            class="absolute right-2 top-1/2 h-9 -translate-y-1/2 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+            class="absolute right-2 top-1/2 h-9 -translate-y-1/2 rounded-[var(--radius-control)] px-3 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
             type="button"
             :aria-pressed="isPasswordVisible"
             @click="togglePasswordVisibility"
@@ -561,7 +751,7 @@ const applyDuplicateEmailError = (message?: string) => {
         </div>
         <p
           id="signup-password-message"
-          class="text-[13px] leading-5"
+          class="text-[var(--font-size-caption)] leading-5"
           :class="errors.password ? 'text-[var(--color-error)]' : 'text-[var(--color-text-muted)]'"
         >
           {{ errors.password || '8~20자, 영문과 숫자를 포함해 입력해주세요.' }}
@@ -578,11 +768,11 @@ const applyDuplicateEmailError = (message?: string) => {
         <input
           id="signup-password-confirm"
           v-model="form.passwordConfirm"
-          class="h-12 w-full rounded-[var(--radius-control)] border bg-[var(--color-surface)] px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+          class="h-12 w-full rounded-[var(--radius-control)] border bg-transparent px-4 text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)]"
           :class="
             errors.passwordConfirm
               ? 'border-[var(--color-error)]'
-              : 'border-[var(--color-border-strong)]'
+              : 'border-[var(--color-border-input)]'
           "
           :type="isPasswordVisible ? 'text' : 'password'"
           autocomplete="new-password"
@@ -595,7 +785,7 @@ const applyDuplicateEmailError = (message?: string) => {
         <p
           v-if="errors.passwordConfirm"
           id="signup-password-confirm-error"
-          class="text-[13px] leading-5 text-[var(--color-error)]"
+          class="text-[var(--font-size-caption)] leading-5 text-[var(--color-error)]"
         >
           {{ errors.passwordConfirm }}
         </p>
@@ -652,7 +842,7 @@ const applyDuplicateEmailError = (message?: string) => {
       <p
         v-if="agreementError"
         id="agreement-error"
-        class="mt-3 text-[13px] leading-5 text-[var(--color-error)]"
+        class="mt-3 text-[var(--font-size-caption)] leading-5 text-[var(--color-error)]"
       >
         {{ agreementError }}
       </p>
@@ -660,7 +850,7 @@ const applyDuplicateEmailError = (message?: string) => {
 
     <section class="space-y-3" aria-label="회원가입 실행">
       <button
-        class="h-[var(--button-height-major)] w-full rounded-[var(--radius-control)] px-5 text-[15px] font-semibold transition focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+        class="h-[var(--button-height-major)] w-full rounded-[var(--radius-control)] px-5 text-[var(--font-size-body)] font-semibold transition focus:outline-none"
         :class="
           !isSubmitting
             ? 'bg-[var(--color-primary)] text-[var(--color-text-inverse)] hover:bg-[var(--color-primary-hover)]'
@@ -673,7 +863,7 @@ const applyDuplicateEmailError = (message?: string) => {
       </button>
 
       <button
-        class="h-12 w-full rounded-[var(--radius-control)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-5 text-[15px] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]"
+        class="h-12 w-full rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-5 text-[var(--font-size-body)] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
         type="button"
         :disabled="isSubmitting"
         @click="handleSsafySignUp"
@@ -730,7 +920,7 @@ input:not([type='checkbox']) {
 }
 
 #signup-password {
-  padding-right: 80px;
+  padding-right: var(--space-20);
 }
 
 section[aria-labelledby='agreement-title'] {

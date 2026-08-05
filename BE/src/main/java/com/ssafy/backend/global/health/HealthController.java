@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 개발 환경 배선 확인용 엔드포인트.
  * PostgreSQL·Redis 상태는 actuator 가 자동으로 잡아주므로 여기서는 FastAPI 도달 여부만 본다.
  */
-@Tag(name = "시스템", description = "서버 상태 확인 API")
+@Tag(name = "시스템(System)", description = "서버 상태 확인 API")
 @RestController
 @RequestMapping("/api/health")
 public class HealthController {

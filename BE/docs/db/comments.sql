@@ -12,26 +12,35 @@
 -- ---------- 회원 ----------
 COMMENT ON TABLE member IS '서비스 회원. 판매자·구매자 구분 없이 한 테이블을 쓴다.';
 COMMENT ON COLUMN member.email             IS '로그인 ID 겸 연락 수단. 경매 화면에는 노출하지 않는다.';
-COMMENT ON COLUMN member.password_hash     IS '자체 로그인용 해시. SSO 전용 계정은 NULL.';
+COMMENT ON COLUMN member.password          IS '자체 로그인용 해시. SSO 전용 계정은 NULL.';
 COMMENT ON COLUMN member.nickname          IS '공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011).';
 COMMENT ON COLUMN member.name              IS '실명. 배송·정산용이며 외부 노출 금지.';
 COMMENT ON COLUMN member.member_type       IS 'GENERAL(일반) | BUSINESS(사업자)';
 COMMENT ON COLUMN member.status            IS 'ACTIVE | SUSPENDED(정지) | WITHDRAWN(탈퇴)';
 COMMENT ON COLUMN member.onboarding_done   IS '온보딩(관심 브랜드·카테고리·신체 정보) 완료 여부.';
 COMMENT ON COLUMN member.deleted_at        IS '탈퇴 시각. 입찰·주문 이력이 FK 로 남아 물리 삭제하지 않는다.';
+COMMENT ON COLUMN member.address           IS '기본 주소(도로명/지번). 온보딩(ONBOARD-001)에서 입력.';
+COMMENT ON COLUMN member.detail_address    IS '상세 주소(동/호수 등).';
+COMMENT ON COLUMN member.postal_code       IS '우편번호. 주소 검색을 안 쓰고 직접 입력하면 NULL 허용.';
+COMMENT ON COLUMN member.gender            IS 'MALE | FEMALE';
 
 COMMENT ON TABLE member_social_account IS '외부 계정 연결 (AUTH-003, AUTH-004). 한 회원이 여러 provider 를 가질 수 있다.';
 COMMENT ON COLUMN member_social_account.provider         IS 'SSO 공급자. 현재 SSAFY 만 허용.';
 COMMENT ON COLUMN member_social_account.provider_user_id IS '공급자 측 고유 ID. provider 와 묶어 유일하다.';
 
 COMMENT ON TABLE member_body_profile IS '전신 사진·신체 정보 (ONBOARD-003, TRYON-001~002). 가상 시착 입력값.';
-COMMENT ON COLUMN member_body_profile.body_photo_url IS '전신 사진 URL. 미등록이면 시착 불가.';
+COMMENT ON COLUMN member_body_profile.body_photo_key IS '전신 사진 S3 key(비공개 버킷). 미등록이면 시착 불가.';
 COMMENT ON COLUMN member_body_profile.height_cm      IS '키(cm).';
 COMMENT ON COLUMN member_body_profile.weight_kg      IS '몸무게(kg).';
+COMMENT ON COLUMN member_body_profile.chest_cm       IS '가슴둘레(cm).';
+COMMENT ON COLUMN member_body_profile.waist_cm       IS '허리둘레(cm).';
+COMMENT ON COLUMN member_body_profile.hip_cm         IS '엉덩이둘레(cm).';
 
 COMMENT ON TABLE business_info IS '사업자 인증 정보 (BIZ-001).';
 COMMENT ON COLUMN business_info.business_number     IS '사업자등록번호.';
-COMMENT ON COLUMN business_info.certificate_url     IS '사업자등록증 사본 URL.';
+COMMENT ON COLUMN business_info.business_name       IS '상호명.';
+COMMENT ON COLUMN business_info.representative_name IS '대표자명.';
+COMMENT ON COLUMN business_info.certificate_key     IS '사업자등록증 사본 S3 key(비공개 버킷).';
 COMMENT ON COLUMN business_info.verification_status IS 'PENDING | APPROVED | REJECTED';
 
 
@@ -50,8 +59,11 @@ COMMENT ON TABLE product IS '판매 상품. 라이브·경매·주문이 모두 
 COMMENT ON COLUMN product.seller_id       IS '판매자.';
 COMMENT ON COLUMN product.condition_grade IS '중고 상태 등급. ⚠️ 등급 체계 미확정이라 자유 문자열.';
 COMMENT ON COLUMN product.size_label      IS '사이즈 표기(S/M/L, 95/100 등). 브랜드마다 달라 문자열로 둔다.';
+COMMENT ON COLUMN product.color           IS '색상(자유 문자열).';
+COMMENT ON COLUMN product.material        IS '소재(자유 문자열).';
+COMMENT ON COLUMN product.measurements    IS '실측 치수(cm). 항목(총장/어깨너비 등)이 상품마다 달라 JSONB로 저장.';
 COMMENT ON COLUMN product.sale_type       IS 'DIRECT_SALE(상시 판매) | AUCTION(경매)';
-COMMENT ON COLUMN product.sale_status     IS 'DRAFT | ON_SALE | AUCTION_SCHEDULED | AUCTION_IN_PROGRESS | AUCTION_FAILED | SOLD | PRIVATE';
+COMMENT ON COLUMN product.sale_status     IS 'DRAFT | ON_SALE | AUCTION_SCHEDULED | AUCTION_IN_PROGRESS | SOLD';
 COMMENT ON COLUMN product.price           IS '상시 판매가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002).';
 COMMENT ON COLUMN product.view_count      IS '누적 조회수(집계값). ⚠️ 회원별 조회 이력은 남지 않는다 — REC-001 착수 시 재검토 필요.';
 COMMENT ON COLUMN product.deleted_at      IS '삭제 시각. 주문 이력 보존을 위해 물리 삭제하지 않는다.';
@@ -60,10 +72,11 @@ COMMENT ON TABLE product_image IS '상품 이미지. 시착(TRYON-003) 입력으
 COMMENT ON COLUMN product_image.sort_order IS '노출 순서.';
 COMMENT ON COLUMN product_image.is_primary IS '대표 이미지 여부. 목록·썸네일에 쓴다.';
 
+COMMENT ON TABLE product_defect IS '판매자가 직접 입력한 하자 목록 (PROD-001).';
+COMMENT ON COLUMN product_defect.content    IS '하자 내용(자유 문자열).';
+COMMENT ON COLUMN product_defect.sort_order IS '노출 순서.';
+
 COMMENT ON TABLE wish   IS '찜 (MY-009). 추천(REC-001) 입력.';
-COMMENT ON TABLE follow IS '회원 팔로우 (FOLLOW-001). 팔로잉 콘텐츠 조회(HOME-002)의 기준.';
-COMMENT ON COLUMN follow.follower_id  IS '팔로우를 건 회원.';
-COMMENT ON COLUMN follow.following_id IS '팔로우 당한 회원.';
 
 
 -- ---------- 라이브 ----------
@@ -73,6 +86,7 @@ COMMENT ON COLUMN live.status            IS 'SCHEDULED(예정) | LIVE(진행 중
 COMMENT ON COLUMN live.scheduled_at      IS '예약 방송 시작 예정 시각 (LIVE-001). 즉시 개설(LIVE-002)은 NULL.';
 COMMENT ON COLUMN live.openvidu_room     IS 'OpenVidu v3 room name. WebRTC 세션·토큰 발급 시 사용.';
 COMMENT ON COLUMN live.peak_viewer_count IS '최고 동시 시청자 수. 통계·발표용.';
+COMMENT ON COLUMN live.current_product_id IS '지금 소개 중인 상품 (LIVE-004, FE NOW 배지). 편성 상품(live_product) 중 하나여야 하며 애플리케이션이 검증한다. 방송 종료 시 NULL. 전환 이력은 남기지 않는다.';
 
 COMMENT ON TABLE live_product IS '라이브 ↔ 상품 연결 (LIVE-003). 방송 전·중 모두 추가·제외 가능하며 개수 제한이 없다.';
 COMMENT ON COLUMN live_product.sort_order IS '방송 중 소개 순서.';
@@ -124,11 +138,26 @@ COMMENT ON TABLE orders IS '주문. 낙찰(AUCT-012) 또는 상시 구매로 생
 COMMENT ON COLUMN orders.auction_id      IS '낙찰로 생성된 주문의 경매. 상시 판매 주문은 NULL.';
 COMMENT ON COLUMN orders.order_price     IS '결제 금액(원).';
 COMMENT ON COLUMN orders.status          IS 'PAID → SHIPPING → DELIVERED → CONFIRMED → SETTLED (+ REFUNDED / CANCELED)';
-COMMENT ON COLUMN orders.auto_confirm_at IS '자동 구매 확정 예정 시각(배송 완료 + 7일). 배송 완료 시점에 채워 넣고 스케줄러가 이 컬럼으로 대상을 찾는다.';
+COMMENT ON COLUMN orders.auto_confirm_at IS '자동 구매 확정 예정 시각(배송 완료 + 3일). 배송 완료 시점에 채워 넣고 스케줄러가 이 컬럼으로 대상을 찾는다.';
+COMMENT ON COLUMN orders.refund_requested IS '진행 중인(REQUESTED) 환불 요청이 있으면 true. 송장 등록·구매 확정(수동/자동)을 막는 용도.';
 
 COMMENT ON TABLE order_shipment IS '배송지·송장 정보 (SHIP-*). 주문 1건당 1행.';
 COMMENT ON COLUMN order_shipment.courier         IS '택배사. 송장 등록 전에는 NULL.';
 COMMENT ON COLUMN order_shipment.tracking_number IS '운송장 번호. 판매자가 등록한다.';
+
+COMMENT ON TABLE refund_request IS '환불 요청·승인/거절 (REFUND-001/002). 구매자가 요청하고 판매자가 승인/거절한다(운영자 아님). 같은 주문에 여러 건 있을 수 있다(거절 후 재요청 허용).';
+COMMENT ON COLUMN refund_request.reason           IS '환불 사유. 단순 변심은 없음(NOT_AS_DESCRIBED/UNDISCLOSED_DEFECT/NOT_SHIPPED/DUPLICATE_PAYMENT/SYSTEM_ERROR).';
+COMMENT ON COLUMN refund_request.status           IS 'REQUESTED → APPROVED 또는 REJECTED.';
+COMMENT ON COLUMN refund_request.rejection_reason IS '거절 사유. REJECTED일 때만 값이 있다.';
+COMMENT ON COLUMN refund_request.reviewed_at      IS '판매자가 승인/거절 처리한 시각. REQUESTED 상태면 NULL.';
+
+COMMENT ON TABLE invoice IS '세금계산서 (BIZ-002). 주문당 1건, 발행 시점 사업자 정보를 스냅샷으로 저장.';
+COMMENT ON COLUMN invoice.business_number      IS '발행 시점 판매자 사업자등록번호(스냅샷).';
+COMMENT ON COLUMN invoice.business_name        IS '발행 시점 판매자 상호명(스냅샷).';
+COMMENT ON COLUMN invoice.representative_name  IS '발행 시점 판매자 대표자명(스냅샷).';
+COMMENT ON COLUMN invoice.supply_amount        IS '공급가액. round(orders.order_price / 1.1).';
+COMMENT ON COLUMN invoice.tax_amount           IS '부가세. orders.order_price - supply_amount.';
+COMMENT ON COLUMN invoice.total_amount         IS '합계금액. orders.order_price와 동일.';
 COMMENT ON COLUMN order_shipment.delivered_at    IS '배송 완료 시각. orders.auto_confirm_at 계산 기준.';
 
 
@@ -148,18 +177,28 @@ COMMENT ON COLUMN notification.is_read  IS '읽음 여부. 알림함 기본 조�
 
 
 -- ---------- 나머지 컬럼 ----------
-COMMENT ON COLUMN member.phone             IS '연락처. 배송·정산 확인용이며 외부 노출 금지.';
+COMMENT ON COLUMN member.phone_number      IS '연락처. 배송·정산 확인용이며 외부 노출 금지.';
 COMMENT ON COLUMN member.profile_image_url IS '프로필 이미지 URL.';
+COMMENT ON COLUMN member.description       IS '소개글. 공개 프로필에 노출된다.';
+COMMENT ON COLUMN member.cover_image_url   IS '커버 이미지 URL. 공개 프로필에 노출된다.';
 
 COMMENT ON COLUMN brand.name    IS '브랜드명. 중복 불가.';
+COMMENT ON COLUMN brand.name_en IS '브랜드 영문명. 없는 브랜드는 NULL.';
 COMMENT ON COLUMN category.name IS '카테고리명.';
+COMMENT ON COLUMN category.name_en IS '카테고리 영문 코드(예: JACKET). AI/FE 연동용.';
 
 COMMENT ON COLUMN business_info.submitted_at IS '인증 서류 제출 시각.';
 COMMENT ON COLUMN business_info.verified_at  IS '인증 승인·거절 처리 시각.';
 
 COMMENT ON COLUMN product.title       IS '상품명. 통합 검색 대상이며 pg_trgm GIN 인덱스가 걸려 있다 (SEARCH-001).';
 COMMENT ON COLUMN product.description IS '상품 상세 설명.';
-COMMENT ON COLUMN product_image.image_url IS '이미지 URL. S3 미제공이라 EC2 로컬 볼륨 기준 (저장 방식 미확정).';
+COMMENT ON COLUMN product_image.image_key IS 'S3 오브젝트 key(전체 URL 아님). public 버킷에 저장하며 응답 시점에 고정 URL로 조립한다.';
+
+COMMENT ON TABLE tryon_result IS 'AI 가상 시착 합성 결과물. 생성(POST) 자체는 AI 계약 확정 전이라 저장/조회/삭제만 다룬다.';
+COMMENT ON COLUMN tryon_result.member_id  IS '결과물 소유자. 본인만 조회 가능 (presigned GET URL).';
+COMMENT ON COLUMN tryon_result.product_id IS '합성에 사용된 상품.';
+COMMENT ON COLUMN tryon_result.image_key  IS 'S3 오브젝트 key(전체 URL 아님). private 버킷에 저장하며 조회 시 presigned GET URL을 매번 새로 발급한다.';
+COMMENT ON COLUMN tryon_result.deleted_at IS '사용자가 수동 삭제한 시각. 자동 만료 정책은 없다.';
 
 COMMENT ON COLUMN live.title         IS '방송명. 통합 검색 대상 (SEARCH-001).';
 COMMENT ON COLUMN live.thumbnail_url IS '방송 썸네일 URL. 홈 목록에 노출된다.';
@@ -185,6 +224,9 @@ COMMENT ON COLUMN chat_message.content IS '메시지 본문. 차단되어도 내
 COMMENT ON COLUMN notification.title   IS '알림 제목.';
 COMMENT ON COLUMN notification.body    IS '알림 본문.';
 
+COMMENT ON TABLE  follow              IS '회원 간 팔로우 (FOLLOW-001).';
+COMMENT ON COLUMN follow.follower_id  IS '팔로우를 하는 회원 (구독자).';
+COMMENT ON COLUMN follow.following_id IS '팔로우 대상 회원 (판매자/크리에이터).';
 
 -- ---------- 공통 컬럼 ----------
 -- id·created_at 같은 상용구를 테이블마다 반복해 적으면 정작 중요한 설명이 묻힌다.

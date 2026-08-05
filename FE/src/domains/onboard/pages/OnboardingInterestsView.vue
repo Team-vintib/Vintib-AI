@@ -1,59 +1,53 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { saveOnboardingInterests } from '@/domains/onboard/api/onboarding'
 import BaseField from '@/domains/onboard/components/BaseField.vue'
 import BaseInput from '@/domains/onboard/components/BaseInput.vue'
 import OnboardingLayout from '@/domains/onboard/components/OnboardingLayout.vue'
+import { getBrands, getCategories } from '@/domains/product/api/productApi'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 
 import type { ApiErrorBody as ApiError, ApiResponse } from '@/shared/types/api.types'
 
 interface InterestOption {
-  id: string
+  id: number
   label: string
 }
 
-const brands: InterestOption[] = [
-  { id: 'brand-a', label: '브랜드 A' },
-  { id: 'brand-b', label: '브랜드 B' },
-  { id: 'brand-c', label: '브랜드 C' },
-  { id: 'brand-d', label: '브랜드 D' },
-  { id: 'brand-e', label: '브랜드 E' },
-  { id: 'brand-f', label: '브랜드 F' },
-]
-
-const categories: InterestOption[] = [
-  { id: 'outer', label: '아우터' },
-  { id: 'top', label: '상의' },
-  { id: 'bottom', label: '하의' },
-  { id: 'dress', label: '원피스' },
-  { id: 'shoes', label: '신발' },
-  { id: 'accessories', label: '액세서리' },
-]
+// 관심 카테고리는 성별(depth 1)을 빼고 대분류(depth 2)만 보여준다.
+// 성별마다 중복되는 대분류(예: 남/여/공용 상의)를 이름으로 묶고, 선택 시 그 이름의 모든 성별 id를 함께 담는다.
+interface CategoryGroup {
+  label: string
+  ids: number[]
+}
 
 const brandSearchQuery = ref('')
-const selectedBrandIds = ref<string[]>([])
-const selectedCategoryIds = ref<string[]>([])
+const brands = ref<InterestOption[]>([])
+const categories = ref<CategoryGroup[]>([])
+const selectedBrandIds = ref<number[]>([])
+const selectedCategoryIds = ref<number[]>([])
 const isSubmitting = ref(false)
 const submitError = ref('')
 const router = useRouter()
+const authStore = useAuthStore()
 
 const filteredBrands = computed(() => {
   const normalizedSearchQuery = brandSearchQuery.value.trim().toLocaleLowerCase()
 
   if (!normalizedSearchQuery) {
-    return brands
+    return brands.value
   }
 
-  return brands.filter((brand) => brand.label.toLocaleLowerCase().includes(normalizedSearchQuery))
+  return brands.value.filter((brand) => brand.label.toLocaleLowerCase().includes(normalizedSearchQuery))
 })
 
-const isBrandSelected = (brandId: string) => selectedBrandIds.value.includes(brandId)
+const isBrandSelected = (brandId: number) => selectedBrandIds.value.includes(brandId)
 
-const toggleBrand = (brandId: string) => {
+const toggleBrand = (brandId: number) => {
   submitError.value = ''
 
   if (isBrandSelected(brandId)) {
@@ -71,6 +65,18 @@ const handlePrevious = async () => {
 }
 
 const applyApiError = (apiError: ApiError | null) => {
+  if (apiError?.code === 'P008') {
+    submitError.value =
+      '선택한 브랜드 중 더 이상 존재하지 않는 항목이 있습니다. 목록을 새로고침한 뒤 다시 선택해 주세요.'
+    return
+  }
+
+  if (apiError?.code === 'P009') {
+    submitError.value =
+      '선택한 카테고리 중 더 이상 존재하지 않는 항목이 있습니다. 목록을 새로고침한 뒤 다시 선택해 주세요.'
+    return
+  }
+
   submitError.value =
     apiError?.message || '관심 정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.'
 }
@@ -87,6 +93,8 @@ const handleSave = async (skip = false) => {
     const response = await saveOnboardingInterests({
       brandIds: skip ? [] : [...selectedBrandIds.value],
       categoryIds: skip ? [] : [...selectedCategoryIds.value],
+    }, {
+      userId: authStore.user?.id,
     })
 
     if (!response.success) {
@@ -111,9 +119,51 @@ const handleSave = async (skip = false) => {
   }
 }
 
-const handleCategoryChange = () => {
+const isCategorySelected = (ids: number[]) =>
+  ids.length > 0 && ids.every((id) => selectedCategoryIds.value.includes(id))
+
+// 대분류 그룹을 토글한다 — 성별 구분 없이 그 이름의 모든 성별 id를 함께 넣거나 뺀다.
+const toggleCategory = (ids: number[]) => {
   submitError.value = ''
+
+  if (isCategorySelected(ids)) {
+    selectedCategoryIds.value = selectedCategoryIds.value.filter((id) => !ids.includes(id))
+    return
+  }
+
+  selectedCategoryIds.value = [...new Set([...selectedCategoryIds.value, ...ids])]
 }
+
+const selectedCategoryCount = computed(
+  () => categories.value.filter((category) => isCategorySelected(category.ids)).length,
+)
+
+const loadInterestOptions = async () => {
+  try {
+    const [brandResponse, categoryResponse] = await Promise.all([getBrands(), getCategories()])
+
+    brands.value = brandResponse.map((brand) => ({
+      id: brand.id,
+      label: brand.nameEn ? `${brand.name} (${brand.nameEn})` : brand.name,
+    }))
+    const categoryGroups = new Map<string, number[]>()
+    categoryResponse
+      .filter((category) => category.depth === 2)
+      .forEach((category) => {
+        const ids = categoryGroups.get(category.name) ?? []
+        ids.push(category.id)
+        categoryGroups.set(category.name, ids)
+      })
+    categories.value = [...categoryGroups.entries()].map(([label, ids]) => ({ label, ids }))
+  } catch {
+    brands.value = []
+    categories.value = []
+  }
+}
+
+onMounted(() => {
+  void loadInterestOptions()
+})
 </script>
 
 <template>
@@ -199,7 +249,7 @@ const handleCategoryChange = () => {
         <legend class="interest-group__legend">
           <span>관심 카테고리</span>
           <span class="interest-group__count" aria-live="polite">
-            {{ selectedCategoryIds.length }}개 선택
+            {{ selectedCategoryCount }}개 선택
           </span>
         </legend>
 
@@ -208,29 +258,21 @@ const handleCategoryChange = () => {
         </p>
 
         <div class="category-options">
-          <label
+          <button
             v-for="category in categories"
-            :key="category.id"
+            :key="category.label"
+            type="button"
             class="category-option"
-            :class="{
-              'category-option--selected': selectedCategoryIds.includes(category.id),
-            }"
+            :class="{ 'category-option--selected': isCategorySelected(category.ids) }"
+            :aria-pressed="isCategorySelected(category.ids)"
+            @click="toggleCategory(category.ids)"
           >
-            <input
-              v-model="selectedCategoryIds"
-              class="category-option__input"
-              type="checkbox"
-              name="interest-category"
-              :value="category.id"
-              @change="handleCategoryChange"
-            />
-
             <span class="category-option__label">{{ category.label }}</span>
 
             <span class="category-option__check" aria-hidden="true">
-              {{ selectedCategoryIds.includes(category.id) ? '✓' : '' }}
+              {{ isCategorySelected(category.ids) ? '✓' : '' }}
             </span>
-          </label>
+          </button>
         </div>
       </fieldset>
 
@@ -265,9 +307,9 @@ const handleCategoryChange = () => {
 }
 
 .interest-selection__title {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 34px;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-2xl-loose);
 }
 
 .interest-selection__description {
@@ -281,9 +323,9 @@ const handleCategoryChange = () => {
   border-radius: 999px;
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .interest-group {
@@ -305,23 +347,23 @@ const handleCategoryChange = () => {
   width: 100%;
   gap: var(--space-4);
   color: var(--color-text-primary);
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .interest-group__count {
   color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .interest-group__hint {
   margin-top: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .brand-search {
@@ -346,8 +388,8 @@ const handleCategoryChange = () => {
   margin-top: var(--space-5);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
   text-align: center;
 }
 
@@ -364,12 +406,12 @@ const handleCategoryChange = () => {
   background: var(--color-surface);
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .brand-option:hover {
@@ -380,7 +422,7 @@ const handleCategoryChange = () => {
 .brand-option:focus-visible {
   border-color: var(--color-primary);
   outline: none;
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .brand-option--selected {
@@ -394,8 +436,8 @@ const handleCategoryChange = () => {
   overflow: hidden;
   opacity: 0;
   transition:
-    width 160ms ease,
-    opacity 160ms ease;
+    width var(--transition-base),
+    opacity var(--transition-base);
 }
 
 .brand-option__check--visible {
@@ -421,10 +463,10 @@ const handleCategoryChange = () => {
   color: var(--color-text-secondary);
   cursor: pointer;
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .category-option:hover {
@@ -433,7 +475,7 @@ const handleCategoryChange = () => {
 
 .category-option:has(.category-option__input:focus-visible) {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .category-option--selected {
@@ -450,7 +492,7 @@ const handleCategoryChange = () => {
 }
 
 .category-option__label {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .category-option__check {
@@ -464,8 +506,8 @@ const handleCategoryChange = () => {
   margin-left: auto;
   background: var(--color-surface);
   color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .category-option--selected .category-option__check {
@@ -480,7 +522,7 @@ const handleCategoryChange = () => {
   margin-top: var(--space-10);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
 }
 
 .interest-selection__notice strong {
@@ -495,8 +537,8 @@ const handleCategoryChange = () => {
   margin-top: var(--space-6);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
 }
 
 @media (max-width: 820px) {

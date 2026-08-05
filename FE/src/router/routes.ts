@@ -4,6 +4,23 @@ import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 
 export const routes: RouteRecordRaw[] = [
   {
+    path: ROUTE_PATHS.HOME,
+    name: ROUTE_NAMES.HOME,
+    component: () => import('@/domains/home/pages/HomePage.vue'),
+  },
+  {
+    path: ROUTE_PATHS.SEARCH,
+    name: ROUTE_NAMES.SEARCH,
+    component: () => import('@/domains/search/pages/SearchResultsPage.vue'),
+    meta: { title: '검색' },
+  },
+  {
+    path: ROUTE_PATHS.FOLLOWING_HOME,
+    name: ROUTE_NAMES.FOLLOWING_HOME,
+    component: () => import('@/shared/components/RoutePlaceholder.vue'),
+    meta: { requiresAuth: true, title: '팔로잉 홈' },
+  },
+  {
     path: ROUTE_PATHS.AUTH_LOGIN,
     name: ROUTE_NAMES.AUTH_LOGIN,
     component: () => import('@/domains/auth/pages/LoginPage.vue'),
@@ -57,20 +74,169 @@ export const routes: RouteRecordRaw[] = [
     path: ROUTE_PATHS.ONBOARD_PROFILE,
     name: ROUTE_NAMES.ONBOARD_PROFILE,
     component: () => import('@/domains/onboard/pages/OnboardingBasicInfoView.vue'),
+    meta: { requiresAuth: true },
   },
   {
     path: ROUTE_PATHS.ONBOARD_INTERESTS,
     name: ROUTE_NAMES.ONBOARD_INTERESTS,
     component: () => import('@/domains/onboard/pages/OnboardingInterestsView.vue'),
+    meta: { requiresAuth: true },
   },
   {
     path: ROUTE_PATHS.ONBOARD_TRYON,
     name: ROUTE_NAMES.ONBOARD_TRYON,
     component: () => import('@/domains/onboard/pages/OnboardingTryOnView.vue'),
+    meta: { requiresAuth: true },
   },
   {
     path: ROUTE_PATHS.ONBOARD_MEMBER_TYPE,
     name: ROUTE_NAMES.ONBOARD_MEMBER_TYPE,
     component: () => import('@/domains/onboard/pages/OnboardingMemberTypeView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: ROUTE_PATHS.BIZ_VERIFY,
+    name: ROUTE_NAMES.BIZ_VERIFY,
+    component: () => import('@/domains/biz/pages/BusinessVerificationPage.vue'),
+    meta: { requiresAuth: true, title: '사업자 인증' },
+  },
+  {
+    path: ROUTE_PATHS.BIZ_VERIFY_PENDING,
+    name: ROUTE_NAMES.BIZ_VERIFY_PENDING,
+    component: () => import('@/domains/biz/pages/BusinessVerificationPendingPage.vue'),
+    meta: { requiresAuth: true, title: '사업자 인증 대기' },
+  },
+  {
+    path: ROUTE_PATHS.LIVE_LIST,
+    name: ROUTE_NAMES.LIVE_LIST,
+    component: () => import('@/domains/live/pages/LiveListView.vue'),
+    meta: { title: '라이브 목록' },
+  },
+  {
+    path: ROUTE_PATHS.PRODUCT_LIST,
+    name: ROUTE_NAMES.PRODUCT_LIST,
+    component: () => import('@/domains/product/pages/ProductListView.vue'),
+    meta: { title: '상품 목록' },
+  },
+  {
+    path: ROUTE_PATHS.PRODUCT_DETAIL,
+    name: ROUTE_NAMES.PRODUCT_DETAIL,
+    component: () => import('@/domains/product/pages/ProductDetailView.vue'),
+    meta: { title: '상품 상세' },
+  },
+  {
+    path: ROUTE_PATHS.PRODUCT_CREATE,
+    name: ROUTE_NAMES.PRODUCT_CREATE,
+    component: () => import('@/domains/product/pages/ProductRegistrationPage.vue'),
+    meta: { requiresAuth: true, title: '상품 등록' },
+  },
+  {
+    path: ROUTE_PATHS.PROFILE_ME,
+    name: ROUTE_NAMES.PROFILE_ME,
+    component: () => import('@/domains/profile/pages/ProfilePage.vue'),
+    meta: { requiresAuth: true, title: '프로필' },
+  },
+  {
+    path: ROUTE_PATHS.PROFILE_FOLLOWERS,
+    name: ROUTE_NAMES.PROFILE_FOLLOWERS,
+    component: () => import('@/domains/profile/pages/FollowListPage.vue'),
+    meta: { title: '팔로워' },
+  },
+  {
+    path: ROUTE_PATHS.PROFILE_FOLLOWING,
+    name: ROUTE_NAMES.PROFILE_FOLLOWING,
+    component: () => import('@/domains/profile/pages/FollowListPage.vue'),
+    meta: { title: '팔로잉' },
+  },
+  {
+    path: ROUTE_PATHS.PROFILE,
+    name: ROUTE_NAMES.PROFILE,
+    component: () => import('@/domains/profile/pages/ProfilePage.vue'),
+    meta: { title: '프로필' },
+  },
+  {
+    path: ROUTE_PATHS.WISHLIST,
+    name: ROUTE_NAMES.WISHLIST,
+    component: () => import('@/domains/my/pages/WishlistPage.vue'),
+    meta: { requiresAuth: true, title: '찜한 상품' },
+  },
+  {
+    path: ROUTE_PATHS.LIVE_CREATE,
+    name: ROUTE_NAMES.LIVE_CREATE,
+    component: () => import('@/domains/live/pages/LiveCreatePage.vue'),
+    meta: { requiresAuth: true, title: '라이브 시작' },
+  },
+  {
+    path: ROUTE_PATHS.LIVE_BROADCAST,
+    name: ROUTE_NAMES.LIVE_BROADCAST,
+    component: () => import('@/domains/live/pages/LiveBroadcastPage.vue'),
+    meta: { requiresAuth: true, title: '라이브 송출' },
+  },
+  {
+    path: ROUTE_PATHS.LIVE_WATCH,
+    name: ROUTE_NAMES.LIVE_WATCH,
+    component: () => import('@/domains/live/pages/LiveWatchPage.vue'),
+    meta: { title: '라이브 시청' },
+  },
+  {
+    path: ROUTE_PATHS.NOTIFICATIONS,
+    name: ROUTE_NAMES.NOTIFICATIONS,
+    component: () => import('@/domains/notification/pages/NotificationCenterPage.vue'),
+    meta: { requiresAuth: true, title: '알림센터' },
+  },
+  {
+    path: ROUTE_PATHS.TRYON,
+    name: ROUTE_NAMES.TRYON,
+    component: () => import('@/domains/tryon/pages/TryOnPage.vue'),
+    meta: { requiresAuth: true, title: 'AI 시착' },
+  },
+  {
+    path: ROUTE_PATHS.MY,
+    name: ROUTE_NAMES.MY,
+    component: () => import('@/domains/my/pages/MyPage.vue'),
+    beforeEnter: (to) => {
+      if (!to.query.section) {
+        return { name: ROUTE_NAMES.PROFILE_ME }
+      }
+
+      return true
+    },
+    meta: { requiresAuth: true, title: '프로필 관리' },
+  },
+  {
+    path: ROUTE_PATHS.MY_ORDER_DETAIL,
+    name: ROUTE_NAMES.MY_ORDER_DETAIL,
+    component: () => import('@/domains/my/pages/MyOrderDetailPage.vue'),
+    meta: { requiresAuth: true, title: '구매 상세' },
+  },
+  {
+    path: ROUTE_PATHS.MY_SALE_DETAIL,
+    name: ROUTE_NAMES.MY_SALE_DETAIL,
+    component: () => import('@/domains/my/pages/MySaleDetailPage.vue'),
+    meta: { requiresAuth: true, title: '판매 상세' },
+  },
+  {
+    path: ROUTE_PATHS.POINT_HISTORY,
+    name: ROUTE_NAMES.POINT_HISTORY,
+    component: () => import('@/domains/point/pages/PointHistoryPage.vue'),
+    meta: { requiresAuth: true, title: '포인트 내역' },
+  },
+  {
+    path: ROUTE_PATHS.POINT,
+    name: ROUTE_NAMES.POINT,
+    component: () => import('@/domains/point/pages/PointWalletPage.vue'),
+    meta: { requiresAuth: true, title: '포인트' },
+  },
+  {
+    path: ROUTE_PATHS.POINT_CHARGE_SUCCESS,
+    name: ROUTE_NAMES.POINT_CHARGE_SUCCESS,
+    component: () => import('@/domains/point/pages/PointChargeSuccessPage.vue'),
+    meta: { requiresAuth: true, title: '포인트 충전 완료' },
+  },
+  {
+    path: ROUTE_PATHS.POINT_CHARGE_FAIL,
+    name: ROUTE_NAMES.POINT_CHARGE_FAIL,
+    component: () => import('@/domains/point/pages/PointChargeFailPage.vue'),
+    meta: { requiresAuth: true, title: '포인트 충전 실패' },
   },
 ]

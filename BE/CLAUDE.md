@@ -12,13 +12,13 @@
 
 ## 새 기능 계획
 
-신규 API/도메인 로직 등 새 기능은 바로 구현하지 않는다. 먼저 계획을 세워 `.claude/plans/be/`(루트 기준)에 md로 기록하고, 사용자 승인 후 그 계획대로 구현한다. 형식은 루트 `.claude/plans/README.md` 참고. 버그 수정 등에는 적용하지 않는다.
+신규 API/도메인 로직 등 새 기능은 바로 구현하지 않는다. 먼저 계획을 세워 `docs/plans/BE/`(루트 기준)에 md로 기록하고, 사용자 승인 후 그 계획대로 구현한다. 형식은 루트 `docs/plans/README.md` 참고. 버그 수정 등에는 적용하지 않는다.
 
 계획이 승인되면 `.claude/skills/scaffold`(이 폴더 범위 스킬)로 패키지/파일 뼈대를 만든다. 새 엔드포인트에는 `.claude/skills/swagger` 컨벤션에 맞춰 문서화 어노테이션(`@Tag`/`@Operation`/`@ApiResponses`/`@Schema`)을 함께 채운다.
 
 ## 다른 파트 코드 수정 금지
 
-FE/AI 코드는 직접 수정하지 않는다. FE나 AI 쪽 변경이 필요하면 `.claude/requests/fe/` 또는 `.claude/requests/ai/`(루트 기준)에 md로 요청 문서를 남긴다. 형식은 루트 `.claude/requests/README.md` 참고.
+FE/AI 코드는 직접 수정하지 않는다. FE나 AI 쪽 변경이 필요하면 `docs/requests/FE/` 또는 `docs/requests/AI/`(루트 기준)에 md로 요청 문서를 남긴다. 형식은 루트 `docs/requests/README.md` 참고.
 
 ## 코드 컨벤션
 
@@ -26,7 +26,7 @@ FE/AI 코드는 직접 수정하지 않는다. FE나 AI 쪽 변경이 필요하�
 - Lombok 사용 가능(`@Getter`, `@Builder` 등). 단 엔티티에 `@Setter`를 습관적으로 붙이지 않는다 — 상태 변경은 의도가 드러나는 메서드로 한다.
 - 요청 DTO는 Bean Validation(`@Valid` + `jakarta.validation` 애너테이션)으로 검증한다.
 - 새 도메인 로직을 추가하면 최소 하나 이상의 테스트를 함께 작성한다(서비스 단위 테스트 또는 `@WebMvcTest`/`@SpringBootTest`). 테스트 메서드명은 한글로 작성해 검증 의도를 그대로 드러낸다 (예: `인증코드가_일치하면_토큰을_발급한다()`). 자바 식별자는 유니코드를 허용하므로 컴파일·테스트 리포트 모두 문제없다.
-- 경매(AUCT) 등 동시성이 걸리는 로직은 Redis 분산 락/Pub-Sub 설계가 아직 미확정이므로, 구현 전 접근 방식을 사용자와 먼저 확인한다.
+- 경매(AUCT) 동시성은 **DB 비관적 락**(`AuctionRepository.findByIdForUpdate`, `PESSIMISTIC_WRITE`)으로 처리한다 — Redis 분산락·MQ는 검토 후 채택하지 않았다(이유는 `docs/plans/BE/JY008-live-screen-complete.md` 설계 판단 1). 같은 경매에 대한 입찰은 이 행 잠금으로 직렬화되고, `ux_bid_auction_price`·`ux_point_hold_member_active` 부분 UNIQUE 인덱스는 잠금이 실패했을 때의 최후 방어선이다.
 
 ## 팀 간 계약
 

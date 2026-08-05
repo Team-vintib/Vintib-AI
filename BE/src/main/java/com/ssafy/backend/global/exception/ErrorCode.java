@@ -23,30 +23,105 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "U009", "이메일 또는 비밀번호가 일치하지 않습니다."),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "U010", "유효하지 않은 토큰입니다."),
     EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "U011", "만료된 토큰입니다."),
+    NICKNAME_ALREADY_TAKEN(HttpStatus.CONFLICT, "U012", "이미 사용 중인 닉네임입니다."),
+    MEMBER_FORBIDDEN(HttpStatus.FORBIDDEN, "U013", "본인의 정보만 수정할 수 있습니다."),
+    ONBOARDING_BASIC_INFO_REQUIRED(HttpStatus.BAD_REQUEST, "U014", "기본 정보를 먼저 등록해주세요."),
+    MEMBER_IMAGE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "U015", "업로드가 확인되지 않았습니다. 먼저 이미지를 업로드해주세요."),
 
     // [라이브/채팅]
     LIVE_NOT_FOUND(HttpStatus.NOT_FOUND, "L001", "진행 중이거나 예약된 라이브가 없습니다."),
     MESSAGE_BLOCKED(HttpStatus.FORBIDDEN, "L002", "숨김 또는 차단 처리된 메시지입니다."),
     STT_PROCESSING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "L003", "STT 변환 처리에 실패했습니다."),
+    NOT_LIVE_HOST(HttpStatus.FORBIDDEN, "L004", "본인이 개설한 라이브만 처리할 수 있습니다."),
+    PRODUCT_ALREADY_LINKED(HttpStatus.CONFLICT, "L005", "이미 라이브에 연결된 상품입니다."),
+    LIVE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "L006", "라이브에 연결되지 않은 상품입니다."),
+    INVALID_LIVE_STATE(HttpStatus.BAD_REQUEST, "L007", "현재 방송 상태에서는 해당 처리를 할 수 없습니다."),
+    CHAT_GUEST_NOT_ALLOWED(HttpStatus.UNAUTHORIZED, "L008", "채팅은 로그인 후 이용할 수 있습니다."),
+    CHAT_CONTENT_INVALID(HttpStatus.BAD_REQUEST, "L009", "메시지는 1자 이상 500자 이하여야 합니다."),
+    REACTION_GUEST_NOT_ALLOWED(HttpStatus.UNAUTHORIZED, "L010", "반응 보내기는 로그인 후 이용할 수 있습니다."),
+    REACTION_TOO_FREQUENT(HttpStatus.TOO_MANY_REQUESTS, "L011", "반응을 너무 빠르게 보내고 있습니다. 잠시 후 다시 시도해주세요."),
+    VIDEO_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "L012", "영상 서버가 준비되지 않았습니다."),
+    VIDEO_ROOM_NOT_READY(HttpStatus.BAD_REQUEST, "L013", "아직 방송이 시작되지 않아 영상에 접속할 수 없습니다."),
 
     // [경매/입찰]
     AUCTION_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "A001", "현재 진행 중인 경매가 아닙니다."),
     BID_LOWER_THAN_CURRENT(HttpStatus.BAD_REQUEST, "A002", "입찰 금액이 현재 최고가보다 낮습니다."),
     AUCTION_ALREADY_CLOSED(HttpStatus.BAD_REQUEST, "A003", "이미 종료된 경매입니다."),
+    AUCTION_ALREADY_CONFIGURED(HttpStatus.CONFLICT, "A004", "해당 상품에 이미 설정된 경매가 있습니다."),
+    AUCTION_NOT_FOUND(HttpStatus.NOT_FOUND, "A005", "존재하지 않는 경매입니다."),
+    AUCTION_NOT_STARTABLE(HttpStatus.BAD_REQUEST, "A006", "시작할 수 있는 상태의 경매가 아닙니다."),
+    // 한 라이브에서 동시에 진행 중인 경매는 1개다 (LIVE-004).
+    AUCTION_ALREADY_RUNNING(HttpStatus.CONFLICT, "A007", "이 방송에 이미 진행 중인 경매가 있습니다."),
+    BID_PRICE_MISMATCH(HttpStatus.BAD_REQUEST, "A008", "입찰 금액이 현재 필요한 금액과 다릅니다. 최신 금액으로 다시 시도해 주세요."),
+    // 직전 최고 입찰자 본인은 연속으로 입찰할 수 없다 (AUCT-006).
+    CONSECUTIVE_BID_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "A009", "직전 최고 입찰자는 연속으로 입찰할 수 없습니다."),
+    // 같은 경매·같은 금액 입찰의 중복 클릭·경합을 막는다 (AUCT-004/005).
+    DUPLICATE_BID_PRICE(HttpStatus.CONFLICT, "A010", "이미 같은 금액으로 입찰이 접수됐습니다."),
+    // 최고 입찰자인 동안 다른 경매에 입찰할 수 없다 (AUCT-009).
+    ACTIVE_HOLD_ELSEWHERE(HttpStatus.CONFLICT, "A011", "이미 다른 경매에 최고 입찰자로 참여 중입니다."),
 
     // [지갑/주문]
     INSUFFICIENT_POINTS(HttpStatus.BAD_REQUEST, "W001", "포인트 잔액이 부족합니다."),
     WITHDRAWAL_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "W002", "출금 가능 금액을 초과했습니다."),
+    PAYMENT_CHARGE_NOT_FOUND(HttpStatus.NOT_FOUND, "W003", "존재하지 않는 결제 준비 정보입니다."),
+    PAYMENT_ALREADY_PROCESSED(HttpStatus.BAD_REQUEST, "W004", "이미 처리된 결제입니다."),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "W005", "결제 금액이 준비된 금액과 일치하지 않습니다."),
+    PAYMENT_CONFIRM_FAILED(HttpStatus.BAD_REQUEST, "W006", "결제 승인에 실패했습니다."),
+    WITHDRAWAL_ACCOUNT_REQUIRED(HttpStatus.BAD_REQUEST, "W007", "등록된 출금 계좌가 없습니다. 먼저 계좌를 등록해주세요."),
+    WITHDRAWAL_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "W008", "등록된 출금 계좌가 없습니다."),
     INVALID_ORDER_STATE(HttpStatus.BAD_REQUEST, "O001", "현재 상태에서는 해당 처리를 할 수 없습니다."),
+    ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "O002", "존재하지 않는 주문입니다."),
+    SELF_PURCHASE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "O003", "본인이 등록한 상품은 구매할 수 없습니다."),
+    PRODUCT_NOT_AVAILABLE_FOR_PURCHASE(HttpStatus.BAD_REQUEST, "O004", "구매할 수 없는 상품입니다."),
+    ORDER_BUYER_ONLY(HttpStatus.FORBIDDEN, "O005", "구매자만 처리할 수 있습니다."),
+    ORDER_SELLER_ONLY(HttpStatus.FORBIDDEN, "O006", "판매자만 처리할 수 있습니다."),
+    ORDER_SHIPMENT_ADDRESS_REQUIRED(HttpStatus.BAD_REQUEST, "O007", "배송지가 아직 등록되지 않았습니다."),
+    ORDER_SHIPMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "O008", "등록된 배송지/송장 정보가 없습니다."),
+
+    // [환불]
+    REFUND_NOT_FOUND(HttpStatus.NOT_FOUND, "R001", "존재하지 않는 환불 요청입니다."),
+    REFUND_ALREADY_REQUESTED(HttpStatus.CONFLICT, "R002", "이미 진행 중인 환불 요청이 있습니다."),
+    REFUND_ALREADY_REVIEWED(HttpStatus.BAD_REQUEST, "R003", "이미 처리된 환불 요청입니다."),
+
+    // [사업자]
+    BUSINESS_CERTIFICATE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "B001", "업로드가 확인되지 않았습니다. 먼저 사업자등록증을 업로드해주세요."),
+    BUSINESS_INFO_FORBIDDEN(HttpStatus.FORBIDDEN, "B002", "본인의 사업자 정보만 처리할 수 있습니다."),
+    BUSINESS_INFO_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "B003", "이미 제출했거나 승인된 사업자 정보입니다."),
+
+    // [세금계산서]
+    INVOICE_ALREADY_ISSUED(HttpStatus.CONFLICT, "I001", "이미 발행된 세금계산서입니다."),
+    INVOICE_NOT_FOUND(HttpStatus.NOT_FOUND, "I002", "발행된 세금계산서가 없습니다."),
+    INVOICE_ISSUER_NOT_APPROVED_BUSINESS(HttpStatus.BAD_REQUEST, "I003", "판매자가 사업자 인증을 완료해야 세금계산서를 발행할 수 있습니다."),
+    INVOICE_FORBIDDEN(HttpStatus.FORBIDDEN, "I004", "본인이 거래 당사자인 주문만 처리할 수 있습니다."),
 
     // [AI 가상 시착]
     TRYON_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "T001", "가상 시착 프로필이 등록되지 않았습니다."),
     TRYON_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "T002", "가상 시착 이미지 생성 중 오류가 발생했습니다."),
+    TRYON_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "T003", "존재하지 않는 시착 결과입니다."),
+    TRYON_RESULT_NOT_OWNER(HttpStatus.FORBIDDEN, "T004", "본인의 시착 결과만 처리할 수 있습니다."),
+    TRYON_PROFILE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "T005", "업로드가 확인되지 않았습니다. 먼저 사진을 업로드해주세요."),
+    TRYON_PROFILE_NOT_OWNER(HttpStatus.FORBIDDEN, "T006", "본인의 시착 프로필만 처리할 수 있습니다."),
 
     // [상품]
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "존재하지 않는 상품입니다."),
     NOT_PRODUCT_OWNER(HttpStatus.FORBIDDEN, "P002", "본인이 등록한 상품만 처리할 수 있습니다."),
-    INVALID_PRODUCT_STATE(HttpStatus.BAD_REQUEST, "P003", "현재 상태에서는 해당 처리를 할 수 없습니다.");
+    INVALID_PRODUCT_STATE(HttpStatus.BAD_REQUEST, "P003", "현재 상태에서는 해당 처리를 할 수 없습니다."),
+    PRODUCT_IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "P004", "존재하지 않는 상품 이미지입니다."),
+    PRODUCT_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "P005", "상품 이미지는 최대 10장까지 등록할 수 있습니다."),
+    INVALID_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "P006", "지원하지 않는 이미지 형식입니다."),
+    PRODUCT_IMAGE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "P007", "업로드가 확인되지 않았습니다. 먼저 파일을 업로드해주세요."),
+    CATEGORY_NOT_FOUND(HttpStatus.BAD_REQUEST, "P008", "존재하지 않는 카테고리입니다."),
+    BRAND_NOT_FOUND(HttpStatus.BAD_REQUEST, "P009", "존재하지 않는 브랜드입니다."),
+
+    // [소셜(팔로우/찜)]
+    WISH_ALREADY_EXISTS(HttpStatus.CONFLICT, "S001", "이미 찜한 상품입니다."),
+    WISH_NOT_FOUND(HttpStatus.NOT_FOUND, "S002", "찜하지 않은 상품입니다."),
+    WISH_FORBIDDEN(HttpStatus.FORBIDDEN, "S003", "본인의 찜만 처리할 수 있습니다."),
+    SELF_FOLLOW_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "S004", "자기 자신은 팔로우할 수 없습니다."),
+
+    // [알림]
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "존재하지 않는 알림입니다."),
+    NOTIFICATION_FORBIDDEN(HttpStatus.FORBIDDEN, "N002", "본인의 알림만 처리할 수 있습니다.");
 
     private final HttpStatus status;
     private final String code;

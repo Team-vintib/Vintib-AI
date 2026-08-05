@@ -1,4 +1,4 @@
-# BE
+﻿# BE
 
 빈티지·세컨핸드 의류 라이브 경매 플랫폼 백엔드.
 
@@ -83,7 +83,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 ## DB 설계
 
-테이블 23개 기준. 상세는 [`docs/db/`](./docs/db)에 있다.
+테이블 25개 기준. 상세는 [`docs/db/`](./docs/db)에 있다.
 
 | 문서 | 내용 |
 | --- | --- |
@@ -95,71 +95,21 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 > `data-dictionary.md`와 `docs/db/img/`는 **자동 생성물이다.** 직접 고치지 말고 `bash docs/db/regen.sh` / `bash docs/db/export-erd.sh`로 다시 뽑는다.
 
 경매 동시성 정책(`LIVE-004`, `AUCT-004/006/008/009`)은 애플리케이션 검증뿐 아니라 **DB 제약으로도 막혀 있다.** 입찰 로직을 손볼 때는 [`erd.md` §4](./docs/db/erd.md)를 먼저 읽을 것 — 특히 포인트 보류 해제 순서를 잘못 잡으면 제약이 무력화된다.
-### 1) 전부 컨테이너로 (권장 — EC2와 동일 구성)
 
-레포 루트에서:
-
-```bash
-cp .env.example .env && docker compose up -d
-```
-
-`docker-compose.override.yml`이 자동 병합되어 로컬 개발용 포트가 열린다.
-
-| 서비스 | 로컬 주소 |
-| --- | --- |
-| Spring Boot | http://localhost:8080 |
-| FastAPI | http://localhost:8000 |
-| PostgreSQL | localhost:5432 |
-| Redis | localhost:6379 |
-
-배선 확인:
-
-```bash
-curl -s http://localhost:8080/actuator/health && curl -s http://localhost:8080/api/health
-```
-
-`/actuator/health`는 PostgreSQL·Redis를, `/api/health`는 FastAPI 도달 여부를 보여준다.
-
-### 2) 인프라만 컨테이너 + Spring은 IDE에서
-
-```bash
-docker compose up -d postgres redis ai
-```
-
-이후 `BE/`에서 `./gradlew bootRun` (기본 프로파일 `local`).
-
-### 3) EC2 운영 기동
-
-override를 타지 않도록 `-f`를 반드시 명시한다.
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-```
-
-> [!WARNING]
-> 베이스 `docker-compose.yml`에는 호스트 포트를 절대 추가하지 않는다. Docker는 포트 publish 시 iptables를 직접 조작해 UFW를 우회하므로, PostgreSQL·Redis·FastAPI가 그대로 외부에 노출된다. 로컬용 포트는 `docker-compose.override.yml`에만 둔다.
-
-## 프로파일
-
-| 프로파일 | ddl-auto | actuator 노출 | 용도 |
-| --- | --- | --- | --- |
-| `local` | `update` | health, info, metrics, env, beans | 개발 |
-| `prod` | `validate` | health (상세 숨김) | EC2 |
-
-## DB 설계
-
-테이블 23개 기준. 상세는 [`docs/db/`](./docs/db)에 있다.
-
-| 문서 | 내용 |
-| --- | --- |
-| [ERD·상태 설계](./docs/db/erd.md) | ERD, 상태 전이, 정책을 DB 제약으로 옮긴 근거, 미확인 가정 |
-| [데이터 사전](./docs/db/data-dictionary.md) | 테이블별 컬럼·타입·제약·기본값·설명 (자동 생성) |
-| [`schema.sql`](./docs/db/schema.sql) | 스키마 원본 — 단일 기준 |
+### 시각 표현 규약 (KST 벽시계)
 
 > [!IMPORTANT]
-> `data-dictionary.md`와 `docs/db/img/`는 **자동 생성물이다.** 직접 고치지 말고 `bash docs/db/regen.sh` / `bash docs/db/export-erd.sh`로 다시 뽑는다.
+> **API의 모든 시각 필드는 오프셋 없는 KST 벽시계다.** (`2026-08-03T21:30:00` — `Z`도 `+09:00`도 붙지 않는다.)
 
-경매 동시성 정책(`LIVE-004`, `AUCT-004/006/008/009`)은 애플리케이션 검증뿐 아니라 **DB 제약으로도 막혀 있다.** 입찰 로직을 손볼 때는 [`erd.md` §4](./docs/db/erd.md)를 먼저 읽을 것 — 특히 포인트 보류 해제 순서를 잘못 잡으면 제약이 무력화된다.
+엔티티가 `LocalDateTime`(존 없음), DB 컬럼이 `TIMESTAMPTZ`라 **서버 타임존이 곧 API 계약**이다. 그래서 백엔드 컨테이너의 타임존을 `Asia/Seoul`로 못박아 뒀다 — `docker-compose.yml`의 `TZ`와 `BE/Dockerfile`의 `-Duser.timezone` 두 곳이다.
+
+여기가 UTC로 돌아가면 **모든 시각이 9시간 어긋난다.** 브라우저가 오프셋 없는 문자열을 자기 로컬(KST)로 읽기 때문이다. 실제로 방송 시작 시각이 9시간 전으로 표시되고 경과 방송 시간이 9시간부터 시작하는 버그가 있었다. `@Future` 같은 검증도 같은 축이라, 서버가 UTC면 "KST 기준 과거 9시간 이내" 예약이 통과한다.
+
+- 로컬 개발(Windows/macOS)은 JVM 기본 타임존이 이미 KST라 재현되지 않는다 — **컨테이너에서만 드러난다.**
+- 배포 후 확인: `docker exec vintib-backend date`가 KST인지, 즉시 개설한 라이브의 `startedAt`이 현재 시각과 맞는지.
+- 오프셋을 실어 보내는 방식(`OffsetDateTime`)으로 바꾸려면 BE 전 도메인 DTO와 FE 파싱을 함께 바꿔야 한다. 지금은 위 규약을 지키는 쪽으로 통일한다.
+
+**`live` 테이블에는 카테고리 컬럼이 없다.** 라이브의 카테고리는 편성 상품(`live_product` → `product.category_id`)에서 유도해 대분류로 롤업한다. 같은 사실을 두 군데 저장하면 반드시 어긋나기 때문이다. 그 결과 **라이브 하나가 카테고리를 여러 개 가질 수 있고**(응답이 `categories[]`, 필터가 `categoryIds` 복수인 이유), 편성이 확정되는 시점 = 카테고리가 확정되는 시점이다. 그래서 개설 요청에 `productIds`가 필수이고 방송 시작 후에는 편성을 바꿀 수 없다.
 
 ## 디렉터리 구조
 
@@ -185,15 +135,87 @@ BE/
 │   │   └── dto/
 │   ├── home/                    # 홈/팔로잉 콘텐츠 조회 (HOME) — 정윤
 │   │   ├── controller/
+│   │   ├── service/             # HomeService·FollowingService(전 섹션 실데이터), LiveCardAssembler·ProductCardAssembler(카드 조립 공유)
+│   │   ├── repository/          # HomeProductQueryRepository — 홈 전용 읽기 전용 상품 질의
+│   │   └── dto/response/        # 카드 DTO(HOME-001 소유. HOME-002·SEARCH가 재사용)
+│   ├── search/                  # 상품·라이브·회원 통합 검색 (SEARCH) — 정윤
+│   │   ├── controller/
+│   │   ├── service/             # 카드 조립은 home의 Assembler를 재사용한다
+│   │   ├── repository/          # SearchQueryRepository — 세 도메인 읽기 전용 질의
+│   │   └── dto/
+│   ├── live/                    # 라이브 방 개설/조회/상태 전이, 시청자 수, 반응, 시작 알림 (LIVE) — 정윤
+│   │   ├── controller/          # LiveController, LiveProductController, LiveReminderController, LiveReactionStompController(STOMP)
+│   │   ├── service/             # LiveService, LiveProductService, LiveViewerService, LiveReactionService, LiveReminderService/Scheduler
+│   │   ├── entity/              # Live, LiveStatus, LiveProduct, LiveReminder, ReactionType(저장 안 함)
+│   │   ├── repository/
+│   │   ├── port/                # ProductQueryPort·NotificationCommandPort — 타 도메인 참조를 한 곳으로 격리
+│   │   ├── websocket/           # LiveSessionEventListener — SUBSCRIBE/DISCONNECT를 시청자 수로
+│   │   └── dto/
+│   ├── chat/                    # 라이브 실시간 채팅 (CHAT) — 정윤
+│   │   ├── controller/          # ChatStompController(STOMP), ChatMessageController(이력 REST)
+│   │   ├── service/             # ChatMessageService
+│   │   ├── entity/              # ChatMessage, SenderType
+│   │   ├── repository/
+│   │   └── dto/
+│   ├── auction/                 # 경매 조건 설정/진행/입찰 (AUCT) — 정윤
+│   │   ├── controller/          # AuctionController(조건 설정·현황), AuctionActionController(시작·입찰·내역·결과), LiveBroadcastResultController(방송 종료 요약·유찰 목록 — 경로는 /api/lives 지만 편성 상품+경매 결과를 함께 봐야 해 여기 둔다. live→auction 역방향 의존을 만들지 않기 위함)
+│   │   ├── service/             # AuctionService(설정·시작·입찰), AuctionCloseService(마감·낙찰·유찰), AuctionCloseScheduler(1초 주기), AuctionLiveCleanupHook(방송 종료 시 강제 마감), LiveBroadcastResultService
+│   │   ├── entity/              # Auction, AuctionStatus, Bid, BidStatus
+│   │   ├── repository/          # AuctionRepository(findByIdForUpdate 비관적 락), BidRepository
+│   │   ├── port/                # ProductCommandPort·PointCommandPort·OrderCommandPort — 상품/포인트/주문 도메인 참조를 격리
+│   │   └── dto/
+│   ├── tryon/                    # AI 가상 시착 결과·프로필 저장/조회/삭제 (TRYON) — 서윤
+│   │   ├── controller/           # TryOnController(결과), TryOnProfileController(프로필)
 │   │   ├── service/
-│   │   └── dto/response/        # 카드 DTO는 현재 Mock 응답용 (2주차 실데이터 연결)
+│   │   ├── entity/               # TryOnResult, MemberBodyProfile
+│   │   ├── repository/
+│   │   └── dto/
+│   ├── social/                   # 상품 찜/해제, 팔로우 (WISH/FOLLOW, APIs.md "팔로우 / 찜" 섹션 기준) — 서윤
+│   │   ├── controller/           # WishController, FollowController
+│   │   ├── service/               # WishService, FollowService
+│   │   ├── entity/               # Wish, WishId(복합키), Follow
+│   │   ├── repository/
+│   │   └── dto/
+│   ├── notification/             # 알림함 읽음 처리 (NOTI, APIs.md "알림" 섹션 기준) — 서윤
+│   │   ├── controller/
+│   │   ├── service/
+│   │   ├── entity/               # Notification
+│   │   ├── repository/
+│   │   └── dto/response/
+│   ├── business/                 # 사업자 인증 정보 제출/조회/재제출 (BIZ-001) — 서윤
+│   │   ├── controller/
+│   │   ├── service/
+│   │   ├── entity/               # BusinessInfo, BusinessVerificationStatus
+│   │   ├── repository/
+│   │   └── dto/
+│   ├── order/                    # 주문 생성(SALE-002)·배송지/송장(ORDER-001, SHIP-001/002)·구매확정/정산(ORDER-002/003)·세금계산서(BIZ-002)·구매/판매 내역(MY-003/004) — 서윤
+│   │   ├── controller/           # InvoiceController, OrderController(생성/조회/배송지/송장/확정), MyOrderController(구매/판매 내역)
+│   │   ├── service/              # InvoiceService, OrderService
+│   │   ├── entity/               # Order(낙찰 주문은 auction, 라이브 발생 주문은 live 를 가리킨다 — 방송 종료 요약이 이 값으로 집계), OrderStatus, OrderShipment(배송지+송장, 공유 PK 1:1), Invoice
+│   │   ├── repository/           # OrderRepository, OrderShipmentRepository, InvoiceRepository
+│   │   ├── scheduler/            # OrderAutoConfirmScheduler(ORDER-003, 배송완료 3일 후 자동 구매확정)
+│   │   └── dto/
+│   ├── point/                    # 포인트 잔액/충전/출금(MY-007), 주문 결제·정산(SALE-002/ORDER-002·003), 환불 환급(REFUND-002) — 서윤 / 입찰 보류·해제(AUCT-007~009) — 정윤
+│   │   ├── controller/
+│   │   ├── service/              # PointService — pay(결제)/settleOrder(정산)/refundOrder(환불 환급)/readyCharge·confirmCharge(토스 결제위젯 충전, POINT-001). 입찰 보류/해제는 auction/port/PointCommandAdapter가 이 패키지 엔티티를 직접 조립
+│   │   ├── entity/               # PointAccount(공유 PK 1:1, holdForBid/releaseHold/pay/releaseEscrow/settle/refund), PointTransaction(원장), PointTransactionType, PointHold(AUCT-007~009), PointHoldStatus, PointCharge(충전 준비/승인 상태), PointChargeStatus, WithdrawalAccount(출금 계좌, 공유 PK 1:1, POINT-003)
+│   │   ├── repository/
+│   │   └── dto/
+│   ├── refund/                   # 환불 요청/승인/거절(REFUND-001/002, 판매자 승인) — 서윤
+│   │   ├── controller/           # RefundController
+│   │   ├── service/              # RefundService
+│   │   ├── entity/               # RefundRequest, RefundReason, RefundStatus
+│   │   ├── repository/           # RefundRequestRepository
+│   │   └── dto/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
-│       ├── client/              # AiClient — Spring → FastAPI
-│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig
+│       ├── client/              # AiClient(Spring → FastAPI), DeliveryTrackingClient(deliveryapi.co.kr 배송 조회 웹훅), TossPaymentsClient(결제위젯 승인)
+│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig, SchedulingConfig, DeliveryApiConfig, TossPaymentsConfig
 │       ├── entity/              # BaseTimeEntity 등 공통 베이스 엔티티
 │       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
 │       ├── health/              # HealthController
-│       └── response/            # ApiResponse, ErrorResponse
+│       ├── response/            # ApiResponse, ErrorResponse, PageResponse, CursorPageResponse
+│       ├── storage/             # S3StorageService, S3BucketInitializer
+│       └── websocket/           # STOMP 인증(StompAuthChannelInterceptor)·공통 예외(StompExceptionAdvice)
 ├── src/main/resources/application.yml
 └── src/test/java/com/ssafy/backend/
 ```
@@ -203,7 +225,7 @@ BE/
 담당 분배:
 
 ```
-{auth,member,product,point,order}/   ← 서윤
+{auth,member,product,tryon,social,notification,point,order}/   ← 서윤
 {live,auction,chat,home,search}/     ← 정윤
 ```
 
@@ -217,6 +239,7 @@ BE/
 - 토큰 재발급: `POST /api/auth/reissue` (바디에 refreshToken)
 - 로그아웃: `POST /api/auth/logout` — Redis에 저장된 Refresh Token만 삭제(Access Token은 자연 만료까지 유효)
 - `/api/auth/signup`, `/api/auth/signin`, `/api/auth/reissue`, `/api/auth/email/**`, `/api/health`, `/api/home`, `/actuator/**`, swagger 경로는 인증 없이 접근 가능. 그 외 모든 API는 인증 필요. (`/api/home/following`은 정확 일치가 아니라 인증 필요)
+- `GET /api/users/{userId}/followers`, `GET /api/users/{userId}/followings`(팔로워/팔로잉 목록, 공개 프로필)도 인증 없이 접근 가능하다. 같은 경로의 `POST`/`DELETE`(팔로우/해제)는 인증 필요.
 
 ## 공통 응답 규격
 

@@ -47,9 +47,11 @@
 
 ## 연동 데이터
 
-- 임시 후보: `POST /api/auth/login`
-- 요청 후보: `email`, `password`, `rememberMe`
-- 응답 후보: `accessToken`, `refreshToken`, `user`
+- 현재 BE 계약: `POST /api/auth/signin`
+- 요청: `email`, `password`
+- `rememberMe`는 BE로 보내지 않고 FE 저장소 선택에만 사용
+- 현재 BE 응답: `accessToken`, `refreshToken`
+- `user`, `nextStep`은 BE 응답 확장 또는 내 정보 조회 API 확정 후 온보딩 분기에 사용
 
 ## 상태 및 예외
 
@@ -61,6 +63,6 @@
 
 ## 미확정
 
-- 로그인 후 기본 홈
-- refresh token 정책
+- 로그인 응답에 `user`, `nextStep` 포함 여부 또는 내 정보 조회 API
+- 자동 refresh interceptor 적용 시점
 - 비밀번호 찾기 화면/정책

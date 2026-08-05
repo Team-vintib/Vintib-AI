@@ -3,6 +3,7 @@ import axios from 'axios'
 import { computed, nextTick, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { saveOnboardingTryOnProfile } from '@/domains/onboard/api/onboarding'
 import BaseField from '@/domains/onboard/components/BaseField.vue'
 import BaseInput from '@/domains/onboard/components/BaseInput.vue'
@@ -60,6 +61,7 @@ const selectedFullBodyPhoto = ref<File | null>(null)
 const isSubmitting = ref(false)
 const submitError = ref('')
 const router = useRouter()
+const authStore = useAuthStore()
 
 const completedMeasurementCount = computed(
   () => bodyFields.filter((field) => bodyForm[field.id].trim()).length,
@@ -210,7 +212,9 @@ const handleSave = async () => {
   isSubmitting.value = true
 
   try {
-    const response = await saveOnboardingTryOnProfile(createSaveRequest())
+    const response = await saveOnboardingTryOnProfile(createSaveRequest(), {
+      userId: authStore.user?.id,
+    })
 
     if (!response.success) {
       await applyApiError(response.error ?? null)
@@ -399,9 +403,9 @@ const handleSave = async () => {
 }
 
 .try-on-registration__title {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 34px;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-2xl-loose);
 }
 
 .try-on-registration__description,
@@ -415,9 +419,9 @@ const handleSave = async () => {
   flex: 0 0 auto;
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-chip);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .try-on-registration__optional {
@@ -442,14 +446,14 @@ const handleSave = async () => {
 }
 
 .registration-section__title {
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .registration-section__description {
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .photo-registration {
@@ -470,8 +474,8 @@ const handleSave = async () => {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
 }
 
 .photo-guide__icon {
@@ -483,8 +487,8 @@ const handleSave = async () => {
   border-radius: 50%;
   background: var(--color-ai-soft);
   color: var(--color-ai);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
 }
 
 .photo-guide__list {
@@ -492,8 +496,8 @@ const handleSave = async () => {
   gap: var(--space-3);
   margin-top: var(--space-5);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
   list-style: none;
 }
 
@@ -519,9 +523,9 @@ const handleSave = async () => {
   border-radius: var(--radius-control);
   background: var(--color-ai-soft);
   color: var(--color-ai);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .photo-guide__notice {
@@ -555,7 +559,7 @@ const handleSave = async () => {
   top: 50%;
   right: var(--space-4);
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   transform: translateY(-50%);
   pointer-events: none;
 }
@@ -570,9 +574,9 @@ const handleSave = async () => {
   margin-top: var(--space-5);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .visually-hidden {

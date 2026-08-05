@@ -13,6 +13,9 @@ set -eu
 DEPLOY_DIR=/home/ubuntu/vintib
 COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml -p vintib"
 HEALTH_TIMEOUT=180
+# 브라우저가 실제로 여는 주소. presigned·공개 이미지 URL 이 이 값으로 서명된다.
+# infra/caddy/Caddyfile 의 사이트 주소와 반드시 같아야 한다 (서명에 Host 가 포함됨).
+PUBLIC_ORIGIN=https://i15a108.p.ssafy.io
 
 log() { echo "[deploy] $*"; }
 
@@ -46,9 +49,49 @@ fi
 #    값을 바꾸면 볼륨을 지우거나 ALTER USER 를 해야 백엔드가 붙는다.
 # 운영 비밀번호는 PROD_DB_PASSWORD 로 받는다. DB_PASSWORD 라는 이름을 쓰면
 # 프로젝트 변수가 be-test 의 테스트용 DB_PASSWORD 까지 덮어써 테스트가 깨진다.
+#
+# ⚠️ MINIO_ROOT_USER/PASSWORD 도 DB 와 똑같은 함정이 있다. MinIO 는 이 값을 minio-data
+#    볼륨을 처음 만들 때의 값으로 굳히므로, 나중에 바꾸면 백엔드의 서명 검증이 전부
+#    실패한다(고치려면 볼륨을 지워야 하고 = 업로드된 이미지가 전부 사라진다).
+#    이름에 PROD_ 접두사를 쓰는 이유도 DB 와 같다 — be-test 잡의 MinIO 서비스
+#    컨테이너가 MINIO_ROOT_USER 를 job 변수로 쓰는데, 프로젝트 변수가 그걸 이긴다.
+
+# heredoc 확장 전에 필수 변수를 먼저 전부 검사한다.
+# 이유 두 가지:
+#   1) set -u 만 믿으면 위에서부터 하나씩 터져, CI/CD Variables 를 한 번에 못 채운다.
+#   2) `cat > .env` 는 리다이렉션이 먼저 처리되므로 확장이 실패하면 운영 .env 가
+#      빈 파일로 남는다 → 다음 배포의 롤백 기준 태그(PREVIOUS_TAG)까지 사라진다.
+#
+# ⚠️ PROD_LIVEKIT_NODE_IP 는 EC2 공인 IP 다. 비어 있으면 미디어 서버가 컨테이너 사설
+#    IP(172.x)를 ICE 후보로 뿌려서 브라우저가 영상에 붙지 못한다 — **에러 없이 화면만
+#    검게 나오는** 형태라 원인을 찾기 어렵다. 그래서 필수 변수로 둔다.
+REQUIRED_VARS="DB_NAME DB_USERNAME PROD_DB_PASSWORD IMAGE_TAG CORS_ALLOWED_ORIGINS
+PROD_MINIO_ROOT_USER PROD_MINIO_ROOT_PASSWORD PROD_MAIL_USERNAME PROD_MAIL_PASSWORD
+PROD_OPENVIDU_API_KEY PROD_OPENVIDU_API_SECRET PROD_OPENVIDU_SERVER_URL PROD_LIVEKIT_NODE_IP
+PROD_TOSS_SECRET_KEY PROD_TOSS_CLIENT_KEY"
+
+# 택배 배송 조회(deliveryapi.co.kr, SY034)는 필수가 아니다 — 비어 있으면 DeliveryTrackingClient가
+# 즉시-확정 폴백으로 동작하므로, REQUIRED_VARS 에는 넣지 않는다(등록 전에도 배포가 막히면 안 된다).
+#
+# 포인트 충전 토스페이먼츠(SY035)는 폴백이 없어 REQUIRED_VARS 에 넣는다 — 비어 있으면 결제
+# 승인 자체가 항상 실패하므로, 조용히 배포되기보다 배포 단계에서 막히는 게 낫다.
+
+missing=""
+for name in $REQUIRED_VARS; do
+    eval "value=\${$name:-}"
+    [ -n "$value" ] || missing="$missing $name"
+done
+if [ -n "$missing" ]; then
+    log "!! 필수 CI/CD Variable 이 비어 있다:$missing"
+    log "   GitLab → Settings → CI/CD → Variables 에서 등록한다."
+    log "   (Protected 로 등록하려면 develop-BE 도 protected 브랜치여야 한다)"
+    exit 1
+fi
+
 log ".env 생성"
 umask 077
-cat > "$DEPLOY_DIR/.env" <<ENV
+# 임시 파일에 쓴 뒤 교체한다. 중간에 실패해도 기존 .env 가 살아남는다.
+cat > "$DEPLOY_DIR/.env.tmp" <<ENV
 DB_NAME=${DB_NAME}
 DB_USERNAME=${DB_USERNAME}
 DB_PASSWORD=${PROD_DB_PASSWORD}
@@ -56,7 +99,25 @@ SPRING_PROFILES_ACTIVE=prod
 SERVER_PORT=8080
 IMAGE_TAG=${IMAGE_TAG}
 WORKER_API_KEY=${WORKER_API_KEY}
+CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+MINIO_ROOT_USER=${PROD_MINIO_ROOT_USER}
+MINIO_ROOT_PASSWORD=${PROD_MINIO_ROOT_PASSWORD}
+MAIL_USERNAME=${PROD_MAIL_USERNAME}
+MAIL_PASSWORD=${PROD_MAIL_PASSWORD}
+AWS_S3_PUBLIC_ENDPOINT=${PUBLIC_ORIGIN}
+OPENVIDU_API_KEY=${PROD_OPENVIDU_API_KEY}
+OPENVIDU_API_SECRET=${PROD_OPENVIDU_API_SECRET}
+OPENVIDU_SERVER_URL=${PROD_OPENVIDU_SERVER_URL}
+OPENVIDU_API_URL=http://livekit:7880
+LIVEKIT_NODE_IP=${PROD_LIVEKIT_NODE_IP}
+DELIVERY_API_KEY=${PROD_DELIVERY_API_KEY:-}
+DELIVERY_API_SECRET_KEY=${PROD_DELIVERY_API_SECRET_KEY:-}
+DELIVERY_API_ENDPOINT_ID=${PROD_DELIVERY_API_ENDPOINT_ID:-}
+DELIVERY_API_WEBHOOK_SECRET=${PROD_DELIVERY_API_WEBHOOK_SECRET:-}
+TOSS_SECRET_KEY=${PROD_TOSS_SECRET_KEY}
+TOSS_CLIENT_KEY=${PROD_TOSS_CLIENT_KEY}
 ENV
+mv "$DEPLOY_DIR/.env.tmp" "$DEPLOY_DIR/.env"
 
 cd "$DEPLOY_DIR"
 
@@ -66,6 +127,35 @@ $COMPOSE build
 
 log "서비스 교체"
 $COMPOSE up -d
+
+# Caddyfile 은 bind mount 라 **내용이 바뀌어도 compose 가 컨테이너를 다시 만들지 않는다.**
+# Caddy 는 기동 시 한 번만 설정을 읽으므로, 그대로 두면 새 라우팅이 반영되지 않은 채
+# 배포가 "성공"으로 끝난다 — 실제로 -448 에서 /rtc 라우팅이 이 이유로 누락됐다.
+# reload 는 무중단이고, 설정이 잘못되면 기존 설정을 유지한 채 실패한다.
+# ⚠️ reload 가 "성공"해도 옛 설정일 수 있다 — 이게 -514 의 핵심이다.
+#    리눅스에서 파일 단위 bind mount 는 inode 에 묶이는데, rsync 가 rename 으로 파일을
+#    갈아치우면 컨테이너는 옛 inode 를 계속 본다. reload 는 그 옛 파일을 성실히 다시 읽고
+#    성공을 보고한다. 그래서 종료 코드만으로는 반영 여부를 알 수 없다.
+#
+#    마운트를 디렉터리로 바꿔(-514) 원인은 없앴지만, 확인 없이 믿지 않는다.
+#    **호스트 파일과 컨테이너가 보는 파일을 직접 대조**하고, 어긋나면 재시작한다.
+log "Caddy 설정 반영"
+HOST_SUM=$(md5sum "$DEPLOY_DIR/infra/caddy/Caddyfile" 2>/dev/null | cut -d' ' -f1)
+CTR_SUM=$(docker exec vintib-caddy md5sum /etc/caddy/Caddyfile 2>/dev/null | cut -d' ' -f1)
+
+if [ -n "$HOST_SUM" ] && [ "$HOST_SUM" != "$CTR_SUM" ]; then
+    # 컨테이너가 옛 파일을 보고 있다. reload 로는 못 고친다 — 재시작해야 다시 마운트된다.
+    log "  컨테이너가 옛 Caddyfile 을 보고 있다 (host=$HOST_SUM ctr=$CTR_SUM) — 재시작"
+    docker restart vintib-caddy >/dev/null && log "  Caddy 재시작 완료" \
+        || log "  !! Caddy 재시작 실패 — 라우팅이 옛 설정이다. 수동 확인 필요"
+elif docker exec vintib-caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
+    # 파일은 최신이다. reload 는 무중단이라 이쪽을 우선한다.
+    log "  Caddy reload 완료"
+else
+    # 문법 오류 등으로 reload 가 거부됐다. 재시작하면 Caddy 가 아예 못 뜰 수 있으므로
+    # 옛 설정으로 서비스를 계속하게 두고 경고만 남긴다.
+    log "  !! Caddy reload 실패 — 라우팅이 옛 설정일 수 있다. Caddyfile 문법을 확인할 것"
+fi
 
 # ---------- 4. 헬스체크 ----------
 # backend 가 healthy 가 되어야 배포 성공으로 본다.

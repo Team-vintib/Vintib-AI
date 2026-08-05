@@ -39,10 +39,6 @@
 - `test/` — **실제 테스트 코드.** `app/<도메인>/` 구조를 그대로 미러한다
   (`app/chat/` → `test/chat/`, `app/recommend/personalize/` → `test/recommend/personalize/`).
   프로덕션과 같은 lint 기준을 적용받는다.
-  - **예외: `test/worker/`** — 리포 루트 `worker/`(추론 워커) 코드를 대상으로 한다. `worker/`는
-    전용 CI 잡이 없어(`ai-test`는 `AI/**/*`만 감시) 그냥 두면 lint·test가 전혀 안 돈다. 그래서
-    **torch 없이 돌 수 있는 순수 로직만이라도** 여기서 커버한다. import 경로는
-    `test/conftest.py`가 `sys.path`에 넣어 준다(워커 실행 환경과 같은 방식).
 - `validation/` — **PoC·스파이크 코드 전용. 프로덕션 코드가 아니다.**
   `validation/requirements-test.txt`에 무거운 ML 의존성(torch, transformers,
   sentence-transformers, FlagEmbedding, datasets 등)이 모여 있는데, **CI에는 설치되지 않는다**
@@ -189,11 +185,11 @@ from my_module import Something  # noqa: E402 — importorskip 이후 import
 | `docs/chat-advancement-strategy.md` | 라이브 댓글 관리(`app/chat/`) 개선 작업을 할 때. 실측 기반 한계점과 기법 우선순위가 있다 |
 | `docs/recommendation-advancement-strategy.md` | 브랜드 유사도 그래프(`app/recommend/`) 개선 작업을 할 때. 크롤링 텍스트 임베딩·다면 유사도·FE 전달 설계가 있다 |
 
-구현 전 설계 계획은 여기가 아니라 루트 `.claude/plans/ai/`에 있다. 소스 파일 docstring의
-`설계: .claude/plans/ai/00N-*.md` 줄이 해당 모듈의 설계 근거를 가리킨다 — 모듈을 고치기 전에
+구현 전 설계 계획은 여기가 아니라 루트 `docs/plans/AI/`에 있다. 소스 파일 docstring의
+`설계: docs/plans/AI/00N-*.md` 줄이 해당 모듈의 설계 근거를 가리킨다 — 모듈을 고치기 전에
 그 문서를 먼저 읽는다.
 
 ## 커밋/브랜치 규칙
 
-루트 `.claude/commit-convention.md` 참고. `[JIRA-KEY] type: subject` 형식, push는 항상
+루트 `docs/commit-convention.md` 참고. `[JIRA-KEY] type: subject` 형식, push는 항상
 사용자가 직접 실행한다.

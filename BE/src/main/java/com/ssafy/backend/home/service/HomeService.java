@@ -1,64 +1,163 @@
 package com.ssafy.backend.home.service;
 
+import com.ssafy.backend.home.dto.response.CategoryProductSectionResponse;
 import com.ssafy.backend.home.dto.response.HomeContentResponse;
 import com.ssafy.backend.home.dto.response.LiveCardResponse;
 import com.ssafy.backend.home.dto.response.ProductCardResponse;
+import com.ssafy.backend.home.repository.HomeProductQueryRepository;
+import com.ssafy.backend.live.entity.Live;
+import com.ssafy.backend.live.entity.LiveStatus;
+import com.ssafy.backend.live.repository.LiveRepository;
+import com.ssafy.backend.product.entity.Category;
+import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.entity.SaleStatus;
+import com.ssafy.backend.product.repository.CategoryRepository;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 홈 콘텐츠 조회(HOME-001) 서비스.
  *
- * <p><b>현재는 Mock 응답을 반환한다.</b> 홈에 노출할 라이브는 내 도메인, 상품은 서윤 도메인에 의존하는데
- * 이번 주엔 해당 테이블이 없다. FE가 Mock 기준으로 홈 화면 개발에 착수할 수 있게 응답 스펙만 확정한다.
- * 2주차에 상품 도메인 + 라이브 CRUD가 준비되면 아래 {@code mock*} 조립부만 Repository 조회로 교체한다.
+ * <p><b>모든 섹션이 실데이터다.</b> 이전에는 전부 Mock이었는데, 그 탓에 홈 {@code liveNow}가
+ * 존재하지 않는 라이브(101·102)를 계속 "진행 중"으로 내려 카드를 누르면 시청 진입이 404가 됐다
+ * (FE 요청 004 §3.3). 실데이터 전환으로 그 정합성 문제가 사라진다.
+ *
+ * <h2>섹션별 노출 정책 (FE 요청 004 §3.2)</h2>
+ *
+ * <table>
+ *   <tr><th>섹션</th><th>대상</th><th>정렬</th><th>최대</th></tr>
+ *   <tr><td>liveNow</td><td>상태가 LIVE 인 방송만</td><td>최근 시작순</td><td>10</td></tr>
+ *   <tr><td>scheduledLives</td><td>SCHEDULED 이면서 예정 시각이 아직 안 지난 방송</td>
+ *       <td>임박순</td><td>10</td></tr>
+ *   <tr><td>onSaleProducts</td><td>ON_SALE 상품</td><td>최신 등록순</td><td>20</td></tr>
+ *   <tr><td>upcomingAuctionProducts</td><td>AUCTION_SCHEDULED 상품</td><td>최신 등록순</td><td>20</td></tr>
+ *   <tr><td>categorySections</td><td>대분류 6개, 각 탭의 ON_SALE 상품</td><td>최신 등록순</td><td>탭당 8</td></tr>
+ * </table>
+ *
+ * <p><b>빈 섹션도 키는 항상 내려간다</b>(빈 배열). 키가 사라지면 FE가 매번 존재 여부를 확인해야 한다.
  */
 @Service
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class HomeService {
 
-    public HomeContentResponse getHomeContent() {
-        // TODO(2주차): Repository 조회로 교체 — 진행 중/예약 라이브(정윤), 상시 판매/경매 예정 상품(서윤)
+    private static final int LIVE_LIMIT = 10;
+    private static final int PRODUCT_LIMIT = 20;
+    private static final int CATEGORY_SECTION_LIMIT = 6;
+    private static final int CATEGORY_SECTION_PRODUCT_LIMIT = 8;
+
+    private final LiveRepository liveRepository;
+    private final HomeProductQueryRepository productQueryRepository;
+    private final CategoryRepository categoryRepository;
+    private final LiveCardAssembler liveCardAssembler;
+    private final ProductCardAssembler productCardAssembler;
+
+    /**
+     * @param memberId 로그인 회원 ID. <b>비회원이면 null</b>이며 이때 상품 카드의 찜 여부는 null로 내린다.
+     */
+    public HomeContentResponse getHomeContent(Long memberId) {
         return new HomeContentResponse(
-                mockLiveNow(),
-                mockScheduledLives(),
-                mockOnSaleProducts(),
-                mockUpcomingAuctionProducts()
-        );
+                liveNow(),
+                scheduledLives(),
+                onSaleProducts(memberId),
+                upcomingAuctionProducts(memberId),
+                categoryProductSections(memberId));
     }
 
-    private List<LiveCardResponse> mockLiveNow() {
-        return List.of(
-                new LiveCardResponse(101L, "빈티지 데님 라이브", "빈티지장인",
-                        "https://cdn.example.com/live/101.jpg", "LIVE", null, 152, 5),
-                new LiveCardResponse(102L, "90s 스트릿 셀렉션", "구제셀러",
-                        "https://cdn.example.com/live/102.jpg", "LIVE", null, 87, 3)
-        );
+    /**
+     * 진행 중인 방송만. <b>종료된 방송이 섞이면 안 된다</b> — 리포지토리 질의가 상태를
+     * {@code LIVE}로 고정하고 있어 호출부 실수로 다시 새어 나올 수 없다.
+     */
+    private List<LiveCardResponse> liveNow() {
+        List<Live> lives = liveRepository.findByStatusOrderByStartedAtDesc(
+                LiveStatus.LIVE, PageRequest.of(0, LIVE_LIMIT));
+        return liveCardAssembler.toCards(lives);
     }
 
-    private List<LiveCardResponse> mockScheduledLives() {
-        return List.of(
-                new LiveCardResponse(201L, "주말 아메카지 특집", "빈티지장인",
-                        "https://cdn.example.com/live/201.jpg", "SCHEDULED",
-                        LocalDateTime.of(2026, 7, 27, 20, 0), null, 4)
-        );
+    /**
+     * 예정 방송. <b>예정 시각이 이미 지난 방송은 뺀다.</b> 호스트가 시작하지 않은 방송이
+     * 언제까지고 "곧 시작"으로 홈 상단에 남으면 안 된다.
+     */
+    private List<LiveCardResponse> scheduledLives() {
+        List<Live> lives = liveRepository.findByStatusAndScheduledAtAfterOrderByScheduledAtAsc(
+                LiveStatus.SCHEDULED, LocalDateTime.now(), PageRequest.of(0, LIVE_LIMIT));
+        return liveCardAssembler.toCards(lives);
     }
 
-    private List<ProductCardResponse> mockOnSaleProducts() {
-        return List.of(
-                new ProductCardResponse(2001L, "리바이스 501 빈티지", "Levi's",
-                        "https://cdn.example.com/product/2001.jpg", "NORMAL", "ON_SALE", 45000L, false),
-                new ProductCardResponse(2002L, "칼하트 더블니 워크팬츠", "Carhartt",
-                        "https://cdn.example.com/product/2002.jpg", "NORMAL", "ON_SALE", 68000L, false)
-        );
+    private List<ProductCardResponse> onSaleProducts(Long memberId) {
+        return productCardAssembler.toCards(findByStatus(SaleStatus.ON_SALE, PRODUCT_LIMIT), memberId);
     }
 
-    private List<ProductCardResponse> mockUpcomingAuctionProducts() {
-        return List.of(
-                new ProductCardResponse(3001L, "버버리 노바체크 트렌치", "Burberry",
-                        "https://cdn.example.com/product/3001.jpg", "AUCTION_SCHEDULED", "ON_SALE", null, true)
-        );
+    private List<ProductCardResponse> upcomingAuctionProducts(Long memberId) {
+        return productCardAssembler.toCards(
+                findByStatus(SaleStatus.AUCTION_SCHEDULED, PRODUCT_LIMIT), memberId);
+    }
+
+    private List<Product> findByStatus(SaleStatus status, int limit) {
+        return productQueryRepository.findBySaleStatusOrderByCreatedAtDesc(
+                status, PageRequest.of(0, limit));
+    }
+
+    /**
+     * 카테고리 탭 섹션. 탭은 카테고리 마스터의 <b>대분류(부모 없는 카테고리)</b> 앞 6개다.
+     *
+     * <p>상품은 소분류에 달리므로 탭마다 하위 카테고리 ID를 펼쳐서 묶는다. 탭별로 따로 질의하면
+     * 탭 수만큼 왕복하므로, <b>여섯 탭의 카테고리를 한 번에 묶어 조회한 뒤 메모리에서 나눈다.</b>
+     */
+    private List<CategoryProductSectionResponse> categoryProductSections(Long memberId) {
+        List<Category> all = categoryRepository.findAllByOrderByIdAsc();
+        List<Category> roots = all.stream()
+                .filter(category -> category.getParentId() == null)
+                .limit(CATEGORY_SECTION_LIMIT)
+                .toList();
+        if (roots.isEmpty()) {
+            return List.of();
+        }
+
+        // 대분류 ID → 그 대분류에 속하는 카테고리 ID들(자기 자신 + 소분류).
+        Map<Long, List<Long>> categoryIdsByRoot = new LinkedHashMap<>();
+        roots.forEach(root -> categoryIdsByRoot.put(root.getId(), new ArrayList<>(List.of(root.getId()))));
+        all.forEach(category -> {
+            List<Long> bucket = categoryIdsByRoot.get(category.getParentId());
+            if (bucket != null) {
+                bucket.add(category.getId());
+            }
+        });
+
+        List<Long> allCategoryIds = categoryIdsByRoot.values().stream().flatMap(List::stream).toList();
+        // 탭 수 × 탭당 개수보다 넉넉히 가져와야 특정 탭에 상품이 몰려도 다른 탭이 비지 않는다.
+        List<Product> products = productQueryRepository.findByCategoryIdInAndSaleStatusOrderByCreatedAtDesc(
+                allCategoryIds,
+                SaleStatus.ON_SALE,
+                PageRequest.of(0, CATEGORY_SECTION_LIMIT * CATEGORY_SECTION_PRODUCT_LIMIT * 4));
+
+        Map<Long, Long> rootByCategoryId = new LinkedHashMap<>();
+        categoryIdsByRoot.forEach((rootId, ids) -> ids.forEach(id -> rootByCategoryId.put(id, rootId)));
+
+        return roots.stream()
+                .map(root -> toSection(root, products, rootByCategoryId, memberId))
+                .toList();
+    }
+
+    private CategoryProductSectionResponse toSection(
+            Category root, List<Product> products, Map<Long, Long> rootByCategoryId, Long memberId) {
+        List<Product> sectionProducts = products.stream()
+                .filter(product -> Objects.equals(rootByCategoryId.get(product.getCategoryId()), root.getId()))
+                .limit(CATEGORY_SECTION_PRODUCT_LIMIT)
+                .toList();
+
+        return new CategoryProductSectionResponse(
+                String.valueOf(root.getId()),
+                root.getName(),
+                root.getName(),
+                productCardAssembler.toCards(sectionProducts, memberId));
     }
 }

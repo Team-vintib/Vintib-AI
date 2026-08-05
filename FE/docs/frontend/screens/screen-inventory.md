@@ -16,22 +16,22 @@
 | ONBOARD-001 | 기본 정보 입력            | 회원             | `/onboarding/basic-info`  | 2             | FE 완료, BE API 대기                                     |
 | ONBOARD-002 | 관심 브랜드/카테고리 설정 | 회원             | `/onboarding/interests`   | 2             | FE 완료, BE API 대기                                     |
 | ONBOARD-003 | 전신 사진/신체 정보 등록  | 회원             | `/onboarding/try-on`      | 2             | FE 완료, 저장 BE API 대기                                |
-| ONBOARD-004 | 일반/사업자 회원 선택     | 회원             | `/onboarding/member-type` | 2             | FE 완료, 저장 BE API 및 목적지 화면 대기                 |
-| BIZ-001     | 사업자 정보 제출          | 사업자 회원      | `/business/verification`  | 2             | 미구현                                                   |
+| ONBOARD-004 | 일반/사업자 회원 선택     | 회원             | `/onboarding/member-type` | 2             | FE 완료, 저장 BE API 대기. 일반은 HOME, 사업자는 BIZ-001로 이동 |
+| BIZ-001     | 사업자 정보 제출          | 사업자 회원      | `/business/verification`  | 2             | FE 입력 제약·더미 제출·BIZ-001-2 인증 대기 화면과 HOME 이동 완료, BE API 대기 |
 
 ## 이후 화면 묶음
 
 | 묶음                | 화면 ID                                                        | 상태   |
 | ------------------- | -------------------------------------------------------------- | ------ |
-| 홈/탐색             | HOME-001, HOME-002, SEARCH-001, SEARCH-002                     | 미구현 |
-| 상품                | PROD-001~008                                                   | 미구현 |
+| 홈/탐색             | HOME-001, HOME-002, SEARCH-001, SEARCH-002                     | HOME-001/002 홈 화면 구현, SEARCH-001/002 `/search` 결과 탭·필터·정렬·전체보기·페이지네이션·상태 화면 구현, 실제 검색 API 대기 |
+| 상품                | PROD-001~013                                                   | PROD-008 목록과 상세 route 연결, PROD-006 상품 상세 408 정적 UI·410 상호작용·412 상태 화면 구현, 실제 API 및 나머지 미구현 |
 | 라이브              | LIVE-001~007                                                   | 미구현 |
 | 경매                | AUCT-001~014                                                   | 미구현 |
 | 구매/주문/배송/환불 | SALE-001, ORDER-001~ORDER-003, SHIP-001~SHIP-002, REFUND-001 | 미구현 |
 | 포인트              | POINT-001~006                                                  | 미구현 |
-| AI 시착             | TRYON-001~004                                                  | 미구현 |
-| 마이페이지          | MY-001~009                                                     | 미구현 |
-| 알림                | NOTI-001~005                                                   | 미구현 |
+| AI 시착             | TRYON-001~004                                                  | TRYON-001/002 사용자 시착 프로필 API adapter와 마이페이지 관리 탭 구현. 상품 상세/라이브 AI 시착 패널은 사진 등록·변경·mock 생성 UI를 유지하며, TRYON-003/004 실제 시착 생성은 생성 API 대기 |
+| 마이페이지          | MY-001~009                                                     | `/my` route를 실제 마이페이지 1차 화면으로 연결. 요약 카드, 포인트 이동, 프로필/AI 시착/판매 상품/구매/판매/라이브/찜/사업자 섹션 전환 구현. 실제 API 계약 전까지 mock fallback 사용 |
+| 알림                | NOTI-001~005                                                   | S15P11A108-420·421 알림센터 목록·탭 필터·읽음 처리와 공통 헤더 팝업 구현, 알림 타입별 상세 route는 일부 미확정 |
 
 ## 라우트 제안 원칙
 
@@ -39,3 +39,21 @@
 - URL은 사용자가 이해하기 쉬운 영문 명사 중심으로 제안합니다.
 - 인증이 필요한 화면은 라우트 가드에서 `requiresAuth` 메타를 사용합니다.
 - 미확정 이동은 구현하지 않고 `docs/frontend/decisions/open-questions.md`에 기록합니다.
+
+## 2026-07-28 화면 목록 보강
+
+| 묶음 | 화면 ID | 상태 |
+| --- | --- | --- |
+| 홈/탐색 | SEARCH-001, SEARCH-002 | `/search` route, 검색 결과 탭, 전체 탭 섹션별 preview·전체보기, 개별 탭 페이지네이션, 상품/라이브/회원 mock 결과, 카테고리·상태·가격·판매 유형 필터, 상품 결과 정렬, 초기/loading/error/empty/filter-empty/price-error 상태 화면 구현. 실제 통합 검색 API 대기 |
+## 2026-08-01 포인트 화면 상태
+
+| 묶음 | 화면 ID | 상태 |
+| --- | --- | --- |
+| 포인트 | POINT-001~004 | `/points` route를 실제 포인트 지갑 화면으로 연결. 잔액 요약, 충전 입력, 거래 내역 필터, 출금 계좌/출금 신청 UI 구현. `VITE_POINT_API_ENABLED=false` 기본값에서는 mock fallback 사용. BE 포인트 API 계약 확정 전까지 실제 충전/출금/정산 처리는 대기 |
+| 포인트 | POINT-002 | `/points/history` 전체 내역 페이지 추가. 전체/출금/입금 필터와 시작일/종료일 기간 필터 제공 |
+
+## 2026-08-02 마이페이지 화면 상태
+
+| 묶음 | 화면 ID | 상태 |
+| --- | --- | --- |
+| 마이페이지 | MY-001~009 | `/my` route를 `MyPage`로 연결하고 사용자 요약, 포인트 카드, 카운터, 섹션 메뉴를 구현. `section` query로 프로필, AI 시착, 판매 상품, 구매/낙찰, 판매/정산, 라이브, 찜/팔로우, 사업자 섹션을 전환한다. AI 시착 탭은 전신 사진과 신체 정보를 `domains/tryon` adapter로 관리하며 `VITE_TRYON_API_ENABLED=false` 기본값에서는 mock fallback을 사용한다. 프로필 저장, 주문/배송/환불/포인트/팔로우/사업자 상세 API는 BE 계약 확정 대기 |

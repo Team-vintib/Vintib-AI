@@ -2,6 +2,10 @@ export interface SendEmailVerificationCodeRequest {
   email: string
 }
 
+export interface CheckEmailDuplicateRequest {
+  email: string
+}
+
 export interface VerifyEmailCodeRequest {
   email: string
   code: string
@@ -31,13 +35,17 @@ export interface AuthUser {
   id: number
   email: string
   name?: string
+  nickname?: string
   onboardingCompleted?: boolean
 }
 
 export interface LoginRequest {
   email: string
   password: string
-  rememberMe: boolean
+}
+
+export interface ReissueTokenRequest {
+  refreshToken: string
 }
 
 export interface LoginResponse {

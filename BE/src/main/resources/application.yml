@@ -21,6 +21,9 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+    web:
+      pageable:
+        max-page-size: 100
 
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
@@ -41,6 +44,12 @@ jwt:
 
 server:
   port: ${SERVER_PORT:8080}
+  # Caddy가 TLS를 종단하고 backend에는 평문 HTTP로 넘긴다. 이 설정이 없으면
+  # Spring이 요청을 그냥 http로 인식해 springdoc이 서버 URL을 http://로 잡고,
+  # 그 결과 https로 열린 Swagger UI에서 "Execute"가 스킴이 다른(=교차 출처) 요청이
+  # 되어 CORS/mixed-content로 막힌다. Caddy가 보내는 X-Forwarded-* 를 신뢰해
+  # 실제 스킴(https)을 인식하도록 한다.
+  forward-headers-strategy: framework
 
 management:
   health:
@@ -56,3 +65,60 @@ ai:
   base-url: ${AI_BASE_URL:http://localhost:8000}
   connect-timeout: 2s
   read-timeout: 5s
+
+cors:
+  # FE 로컬 개발 서버(vite, 기본 포트 5173) 기준. 배포 환경은 CORS_ALLOWED_ORIGINS 로 덮어쓴다.
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+# OpenVidu v3(LiveKit 기반) 미디어 서버. 서버 구축은 -448(정윤 직접) 영역이다.
+#
+# 기본값을 비워 둔다 — 서버가 없어도 애플리케이션은 떠야 한다. 로컬 개발과 CI에는 OpenVidu 가
+# 없고, 그때 기동이 실패하면 영상과 무관한 테스트까지 전부 깨진다. 값이 비어 있으면 영상 토큰
+# 발급만 503 으로 거부되고 나머지 기능은 그대로 동작한다.
+openvidu:
+  # 브라우저가 붙을 주소. 응답에 그대로 실려 나간다 (예: wss://i15a108.p.ssafy.io).
+  server-url: ${OPENVIDU_SERVER_URL:}
+  # 백엔드가 room 관리 API 를 호출할 주소. 운영에서는 도커 네트워크 안이라 위와 다르다
+  # (예: http://livekit:7880). 비우면 server-url 을 그대로 쓴다.
+  api-url: ${OPENVIDU_API_URL:}
+  api-key: ${OPENVIDU_API_KEY:}
+  api-secret: ${OPENVIDU_API_SECRET:}
+  # 토큰 수명. 방송이 이보다 길어지면 FE 가 재발급받는다.
+  token-ttl: ${OPENVIDU_TOKEN_TTL:2h}
+
+# 택배 배송 조회(deliveryapi.co.kr, SHIP-002). api-key 가 비어 있으면 DeliveryTrackingClient가
+# 구독을 시도하지 않고 false 를 반환 — 그 자리에서 OrderService가 즉시-확정 폴백으로 처리한다
+# (자격증명 없는 로컬/CI 환경에서도 주문 흐름이 끊기지 않게 하기 위함).
+delivery-api:
+  base-url: ${DELIVERY_API_BASE_URL:https://www.deliveryapi.co.kr}
+  api-key: ${DELIVERY_API_KEY:}
+  secret-key: ${DELIVERY_API_SECRET_KEY:}
+  # 웹훅 수신 엔드포인트 등록은 1회성 인프라 설정이라 앱이 대신 하지 않는다 — POST
+  # /v1/webhooks/endpoints 를 수동으로(API 테스트 콘솔/curl) 호출해 얻은 값을 넣는다.
+  endpoint-id: ${DELIVERY_API_ENDPOINT_ID:}
+  webhook-secret: ${DELIVERY_API_WEBHOOK_SECRET:}
+  connect-timeout: 3s
+  read-timeout: 5s
+
+# 토스페이먼츠 결제위젯(POINT-001). 결제 승인 실패는 조용히 넘기지 않는다 — DeliveryTrackingClient와
+# 달리 TossPaymentsClient는 실패를 CustomException으로 그대로 전파한다.
+toss-payments:
+  base-url: ${TOSS_BASE_URL:https://api.tosspayments.com}
+  secret-key: ${TOSS_SECRET_KEY:}
+  client-key: ${TOSS_CLIENT_KEY:}
+  connect-timeout: 3s
+  read-timeout: 5s
+
+aws:
+  region: ${AWS_REGION:us-east-1}
+  access-key: ${AWS_ACCESS_KEY_ID:}
+  secret-key: ${AWS_SECRET_ACCESS_KEY:}
+  s3:
+    # local(MinIO)만 채운다. prod는 비워서 AWS 기본 리졸버(virtual-hosted style)를 그대로 쓴다.
+    endpoint: ${AWS_S3_ENDPOINT:}
+    # 브라우저가 여는 presigned URL/공개 URL용. 비우면 endpoint를 그대로 쓴다 — docker-compose로
+    # 백엔드까지 컨테이너로 띄울 때만 endpoint(minio:9000, 컨테이너 네트워크)와
+    # public-endpoint(localhost:9000, 호스트 발행 포트)가 달라진다.
+    public-endpoint: ${AWS_S3_PUBLIC_ENDPOINT:}
+    public-bucket: ${AWS_S3_PUBLIC_BUCKET:vintib-public}
+    private-bucket: ${AWS_S3_PRIVATE_BUCKET:vintib-private}
