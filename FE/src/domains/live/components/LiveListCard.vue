@@ -9,9 +9,15 @@ import { ROUTE_NAMES } from '@/shared/constants/routes'
 
 import type { LiveListItem } from '@/domains/live/types/liveList.types'
 
-const props = defineProps<{
-  live: LiveListItem
-}>()
+const props = withDefaults(
+  defineProps<{
+    live: LiveListItem
+    variant?: 'default' | 'profile'
+  }>(),
+  {
+    variant: 'default',
+  },
+)
 
 const router = useRouter()
 const route = useRoute()
@@ -133,6 +139,7 @@ const handleActionClick = () => {
     :class="{
       'live-list-card--clickable': canEnterLive,
       'live-list-card--ended': isEndedLive,
+      'live-list-card--profile': variant === 'profile',
     }"
     :role="canEnterLive ? 'link' : undefined"
     :tabindex="canEnterLive ? 0 : undefined"
@@ -148,7 +155,7 @@ const handleActionClick = () => {
         :alt="`${live.title} 썸네일`"
         @error="handleThumbnailError"
       />
-      <span class="live-list-card__badge" :class="statusClass">
+      <span v-if="variant !== 'profile'" class="live-list-card__badge" :class="statusClass">
         {{ statusLabel }}
       </span>
     </span>
@@ -233,6 +240,44 @@ const handleActionClick = () => {
   transform: scale(1.045);
 }
 
+// 프로필 화면 전용 모양: 홈 라이브 카드(LiveCard.vue)와 같은 박스 없는 카드 — 이미지 프레임에만
+// 얇은 border를 두고, hover도 뜨는 대신 이미지 밝기만 미세하게 바뀐다. 글씨 크기/구성(뱃지 숨김,
+// 큰 폰트)은 위 --profile 규칙을 그대로 따른다.
+.live-list-card--profile {
+  gap: var(--space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.live-list-card--profile.live-list-card--clickable:hover {
+  border-color: transparent;
+  transform: none;
+}
+
+.live-list-card--profile .live-list-card__media {
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-media);
+  transition: border-color var(--transition-standard);
+}
+
+.live-list-card--profile.live-list-card--clickable:hover .live-list-card__media {
+  border-color: var(--color-border-strong);
+}
+
+.live-list-card--profile .live-list-card__media::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, var(--overlay-scrim-medium), transparent 42%);
+  content: '';
+}
+
+.live-list-card--profile.live-list-card--clickable:hover .live-list-card__image {
+  filter: saturate(0.86) contrast(1.05) brightness(1.02);
+  transform: none;
+}
+
 .live-list-card__badge {
   position: absolute;
   top: var(--space-2);
@@ -282,6 +327,10 @@ const handleActionClick = () => {
   padding: var(--space-4);
 }
 
+.live-list-card--profile .live-list-card__body {
+  padding: 0;
+}
+
 .live-list-card__title {
   display: -webkit-box;
   overflow: hidden;
@@ -322,6 +371,16 @@ const handleActionClick = () => {
 .live-list-card__viewer span {
   color: var(--color-accent);
   font-size: var(--font-size-4xs);
+}
+
+// 프로필 화면 전용: 예정/LIVE 뱃지를 숨기는 대신(variant prop) 판매자·예약일·시청자 수 글씨를 키운다.
+.live-list-card--profile .live-list-card__seller,
+.live-list-card--profile .live-list-card__meta {
+  font-size: var(--font-size-body);
+}
+
+.live-list-card--profile .live-list-card__viewer {
+  font-size: var(--font-size-caption);
 }
 
 .live-list-card__action {
