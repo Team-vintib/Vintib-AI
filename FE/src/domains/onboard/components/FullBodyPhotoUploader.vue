@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 import BaseButton from '@/domains/onboard/components/BaseButton.vue'
+import FullBodyCameraCapture from '@/shared/components/FullBodyCameraCapture.vue'
 
 interface Props {
   modelValue: File | null
@@ -20,6 +21,7 @@ const fileInputElement = ref<HTMLInputElement | null>(null)
 const captureInputElement = ref<HTMLInputElement | null>(null)
 const previewUrl = ref('')
 const fileError = ref('')
+const isCameraOpen = ref(false)
 
 const selectedFileName = computed(() => props.modelValue?.name ?? '')
 
@@ -57,7 +59,19 @@ const openCameraPicker = () => {
   }
 
   fileError.value = ''
-  captureInputElement.value?.click()
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    captureInputElement.value?.click()
+    return
+  }
+
+  isCameraOpen.value = true
+}
+
+const handleCameraSelect = (file: File) => {
+  isCameraOpen.value = false
+  fileError.value = ''
+  emit('update:modelValue', file)
 }
 
 const handleFileChange = (event: Event) => {
@@ -105,6 +119,15 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => props.disabled,
+  (disabled) => {
+    if (disabled) {
+      isCameraOpen.value = false
+    }
+  },
+)
+
 onBeforeUnmount(() => {
   releasePreviewUrl()
 })
@@ -127,7 +150,7 @@ onBeforeUnmount(() => {
       class="full-body-photo-uploader__input"
       type="file"
       accept="image/*"
-      capture="environment"
+      capture="user"
       :disabled="disabled"
       aria-label="전신 사진 촬영"
       @change="handleFileChange"
@@ -216,6 +239,12 @@ onBeforeUnmount(() => {
     <p v-if="fileError" class="full-body-photo-uploader__error" role="alert">
       {{ fileError }}
     </p>
+
+    <FullBodyCameraCapture
+      v-if="isCameraOpen"
+      @close="isCameraOpen = false"
+      @select="handleCameraSelect"
+    />
   </div>
 </template>
 

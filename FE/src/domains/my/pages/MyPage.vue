@@ -55,6 +55,7 @@ import type { FollowUser } from '@/domains/profile/types/profile.types'
 import { normalizeApiError } from '@/shared/api/http'
 import type { InterestBrand, InterestCategory } from '@/shared/api/mockInterestStorage'
 import { readImageFileAsDataUrl } from '@/shared/api/mockProfileMediaStorage'
+import FullBodyCameraCapture from '@/shared/components/FullBodyCameraCapture.vue'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
@@ -84,10 +85,12 @@ const profileForm = ref<MyProfileUpdateRequest>({
 const profileSaveState = ref<'idle' | 'saving' | 'success' | 'error'>('idle')
 const profileSaveMessage = ref('')
 const tryOnImageInput = ref<HTMLInputElement | null>(null)
+const tryOnCaptureInput = ref<HTMLInputElement | null>(null)
 const selectedTryOnImageFile = ref<File | null>(null)
 const tryOnImagePreviewUrl = ref('')
 const isTryOnImageRemoved = ref(false)
 const selectedTryOnImageName = ref('')
+const isTryOnCameraOpen = ref(false)
 const tryOnProfile = ref<TryOnProfile | null>(null)
 const tryOnProfileLoadState = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
 const tryOnProfileSaveState = ref<'idle' | 'saving' | 'success' | 'error'>('idle')
@@ -737,25 +740,16 @@ const openTryOnImagePicker = () => {
   tryOnImageInput.value?.click()
 }
 
-const handleTryOnImageChange = async (event: Event) => {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-
-  if (!file) {
-    return
-  }
-
+const applyTryOnImage = async (file: File) => {
   if (!file.type.startsWith('image/')) {
     tryOnProfileSaveState.value = 'error'
     tryOnProfileMessage.value = '이미지 파일만 업로드할 수 있습니다.'
-    input.value = ''
     return
   }
 
   if (file.size > 5 * 1024 * 1024) {
     tryOnProfileSaveState.value = 'error'
     tryOnProfileMessage.value = '시착용 사진은 5MB 이하로 선택해 주세요.'
-    input.value = ''
     return
   }
 
@@ -772,6 +766,31 @@ const handleTryOnImageChange = async (event: Event) => {
   }
 }
 
+const handleTryOnImageChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+
+  input.value = ''
+
+  if (file) {
+    await applyTryOnImage(file)
+  }
+}
+
+const openTryOnCamera = () => {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    tryOnCaptureInput.value?.click()
+    return
+  }
+
+  isTryOnCameraOpen.value = true
+}
+
+const handleTryOnCameraSelect = async (file: File) => {
+  isTryOnCameraOpen.value = false
+  await applyTryOnImage(file)
+}
+
 const removeTryOnImage = () => {
   selectedTryOnImageFile.value = null
   tryOnImagePreviewUrl.value = ''
@@ -780,6 +799,10 @@ const removeTryOnImage = () => {
 
   if (tryOnImageInput.value) {
     tryOnImageInput.value.value = ''
+  }
+
+  if (tryOnCaptureInput.value) {
+    tryOnCaptureInput.value.value = ''
   }
 }
 
@@ -1160,6 +1183,12 @@ watch(
   },
   { immediate: true },
 )
+
+watch(selectedSection, (section) => {
+  if (section !== 'tryon') {
+    isTryOnCameraOpen.value = false
+  }
+})
 
 onMounted(() => {
   void loadMyPage()
@@ -1562,6 +1591,9 @@ onMounted(() => {
                       <button type="button" :disabled="isTryOnProfileSaving" @click="openTryOnImagePicker">
                         사진 선택
                       </button>
+                      <button type="button" :disabled="isTryOnProfileSaving" @click="openTryOnCamera">
+                        즉시 촬영
+                      </button>
                       <button
                         v-if="tryOnImageDisplayUrl"
                         type="button"
@@ -1579,6 +1611,20 @@ onMounted(() => {
                     class="my-tryon-photo__input"
                     aria-label="시착용 전신 사진 선택"
                     @change="handleTryOnImageChange"
+                  />
+                  <input
+                    ref="tryOnCaptureInput"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    capture="user"
+                    class="my-tryon-photo__input"
+                    aria-label="시착용 전신 사진 촬영"
+                    @change="handleTryOnImageChange"
+                  />
+                  <FullBodyCameraCapture
+                    v-if="isTryOnCameraOpen"
+                    @close="isTryOnCameraOpen = false"
+                    @select="handleTryOnCameraSelect"
                   />
                 </div>
 
