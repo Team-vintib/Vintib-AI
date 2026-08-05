@@ -528,9 +528,12 @@ onUnmounted(() => {
   letter-spacing: var(--letter-spacing-num);
 }
 
-.global-nav__points:hover,
-.global-nav__points--active {
+.global-nav__points:hover {
   opacity: 0.8;
+}
+
+.global-nav__points--active {
+  border-bottom-color: var(--color-primary);
 }
 
 .global-nav__divider {
