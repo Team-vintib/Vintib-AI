@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import CategoryProductTabs from '@/domains/home/components/CategoryProductTabs.vue'
 import HomeHeroCarousel from '@/domains/home/components/HomeHeroCarousel.vue'
 import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
@@ -9,7 +11,9 @@ import LiveCard from '@/domains/home/components/LiveCard.vue'
 import ProductCard from '@/domains/home/components/ProductCard.vue'
 import type { HomePopularHostLive, HomeViewData } from '@/domains/home/types/homeView.types'
 import type { ProductCategoryTabSection } from '@/domains/product/types/productList.types'
-import { ROUTE_PATHS } from '@/shared/constants/routes'
+import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
+
+const authStore = useAuthStore()
 
 defineProps<{
   homeData: HomeViewData
@@ -33,6 +37,11 @@ const formatCompactNumber = (value: number) => {
 const getLivePath = (liveId: number) => `/lives/${liveId}`
 const getProductPath = (productId: number) => `/products/${productId}`
 const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
+const followingListRoute = computed(() =>
+  authStore.user?.id
+    ? { name: ROUTE_NAMES.PROFILE_FOLLOWING, params: { userId: authStore.user.id } }
+    : ROUTE_PATHS.AUTH_LOGIN,
+)
 
 // 아바타 로드에 실패하면 대체 이미지를 새로 추가하는 대신 빈 원형 프레임만 남긴다.
 const handleAvatarError = (event: Event) => {
@@ -52,7 +61,7 @@ const handleAvatarError = (event: Event) => {
       title-id="followed-seller-title"
       eyebrow="Following"
       title="팔로우 중인 판매자"
-      :link-to="ROUTE_PATHS.FOLLOWING_HOME"
+      :link-to="followingListRoute"
       :is-empty="homeData.followedSellers.length === 0"
       empty-message="팔로우한 판매자가 없습니다."
     >
