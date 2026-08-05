@@ -20,13 +20,15 @@ S15P11A108-27(인프라 세팅) / S15P11A108-210(CatVTON 모델 연결) 관련 �
 |---|---|
 | `base_worker.py` | 모든 워커가 상속하는 공통 골격. poll → 추론 → 결과 제출 → 실패 시 재시도를 처리한다. **이 파일은 기능이 늘어나도 수정할 필요가 거의 없다.** |
 | `storage_utils.py` | 게이트웨이와 파일을 주고받는 유틸(`download_image`/`upload_image`/`download_bytes`). S3 권한이 없어 EC2 로컬 디스크 저장 방식을 쓰기 때문에, 워커가 직접 디스크에 쓰지 않고 HTTP로 전송한다. `tryon_worker_example.py`가 import하므로 이 파일 없이는 워커가 기동하지 않는다. |
-| `tryon_worker_example.py` | 시착(CatVTON) 워커. 현재 `worker/models/catvton`의 검증 코드(`verify_fit_tryon.py`)를 기반으로 실제 모델이 연결되어 있다. |
+| `tryon_worker_example.py` | 시착 워커. VLM 캡션(`models/quality_vlm`) → 신체 치수 근사(`models/catvton/body_estimate.py`) + 핏 계산 → FLUX worn-reference 생성(`models/tryon_flux`) → CatVTON 합성(`models/catvton`)을 순서대로 처리한다(`S15P11A108-504`). |
 | `quality_check_worker_example.py` | 품질검수(SAM3) 워커. 판정 로직은 `models/sam3/`에 있고 이 파일은 오케스트레이션만 한다. **`QUALITY_BACKEND=mock`이면 GPU 없이도 전 경로가 돈다.** |
 | `stt_worker_example.py` | 라이브 발언 STT 워커. Whisper로 전사하고 같은 프로세스에서 KURE-v1 임베딩까지 계산해 게이트웨이엔 텍스트+벡터를 그대로 넘긴다(게이트웨이엔 torch가 없어서). **`STT_BACKEND=mock`(기본값)이면 GPU 없이도 전 경로가 돈다.** 실제 방송 오디오는 OpenVidu 설치 전이라 아직 없다. |
 | `chat_rag_worker_example.py` | 반복질문 답변 생성 워커. 게이트웨이가 `live_id`로 가져온 문서 후보 + 질문을 받아 KURE-v1로 임베딩·랭킹하고, 그라운딩 임계치를 넘으면 LangChain + `LiquidAI/LFM2.5-230M`으로 답변까지 생성해 돌려준다(검색·판단·생성을 왕복 1회로 처리). **`CHAT_RAG_BACKEND=mock`(기본값)이면 GPU 없이도 전 경로가 돈다.** |
 | `garment_measurement_worker_example.py` | 의류 실측(cm) 측정 워커. 기준 물체(A4) 검출 → 원단 분할 → 랜드마크 검출 → cm 환산을 순서대로 처리하고, 앞 단계가 실패하면 뒷 단계(특히 GPU가 필요한 랜드마크 검출)를 아예 건너뛴다. 세 단계 모두 독립적으로 스왑 가능해 환경변수도 3개다. **전부 `mock`(기본값)이면 GPU/opencv 없이도 전 경로가 돈다.** |
 | `models/sam3/` | 품질검수 판정 로직 — 세그멘테이션(목업/SAM3 PCS) · 하자 항목화 · 점수 · 히트맵 · 넘버링 bbox 이미지. **진짜 서브패키지**다(`__init__.py` 보유) — 이유는 아래 "왜 서브패키지인가" 참고. 순수 로직은 `AI/test/worker/sam3/`가 CI에서 검증한다. |
 | `models/garment_measurement/` | 실측 판정 로직 — 기준물체 검출(목업/OpenCV) · 원단 분할(목업/GrabCut) · 랜드마크 검출(목업/HRNet) · cm 환산. `models/sam3/`와 같은 이유로 **진짜 서브패키지**다(`__init__.py` 보유) — 이유는 아래 "왜 서브패키지인가" 참고. 순수 로직은 `AI/test/worker/garment_measurement/`가 CI에서 검증한다. |
+| `models/tryon_flux/` | FLUX.2-Klein worn-reference 생성(목업/`flux2_klein`). `models/sam3/`와 같은 이유로 **진짜 서브패키지**다. 원본(고객) 사진을 참조로 "이 사람에게 이 옷을 이 핏으로 입혀라" 프롬프트로 생성한다(`S15P11A108-504`, `AI/docs/tryon-advancement-strategy.md` §10.3). |
+| `models/catvton/body_estimate.py` | 키/몸무게 → 평균 체형 치수(허리/가슴/어깨 등) 근사. 실측이 아니라 근사치다 — BE에 실측 컬럼이 생기면 우선순위가 밀린다. |
 | `requirements.txt` | 워커 공통 의존성. `requests`, `Pillow`(storage_utils.py가 `PIL.Image`를 다룬다), `opencv-python-headless`(기준물체 검출·원단 분할, torch 불필요라 공용). CatVTON·HRNet 등 무거운 모델 자체의 의존성(torch, diffusers 등)은 각자 기존에 구성해둔 conda 환경을 그대로 쓴다 — 이 파일에 포함하지 않는다. |
 | `.env.example` | 워커 실행에 필요한 환경변수 예시. 필요한 값은 아래 "실행 방법" 참고. |
 
@@ -39,11 +41,25 @@ export GATEWAY_URL=https://i15a108.p.ssafy.io/ai
 export WORKER_API_KEY=<EC2 .env의 WORKER_API_KEY와 동일한 값>
 ```
 
-CatVTON 워커는 추가로 아래 환경변수도 쓸 수 있다 (생략 시 기본값 사용):
+시착(tryon) 워커는 추가로 아래 환경변수도 쓸 수 있다 (생략 시 기본값 사용):
 
 ```bash
 export CATVTON_CODE_PATH=/path/to/worker/models/catvton   # 기본값: worker/ 기준 models/catvton
+export TRYON_MODEL_CODE_PATH=/path/to/worker/models       # 기본값: worker/ 기준 models (tryon_flux/quality_vlm의 부모)
+
+export TRYON_VLM_BACKEND=mock       # 기본값. GPU 불필요 — 상품 캡션을 "garment" 고정 문구로 대체
+export TRYON_VLM_BACKEND=qwen3_vl   # 실제 Qwen3-VL-4B(4bit). worker/models/quality_vlm/requirements.txt 필요
+
+export TRYON_FLUX_BACKEND=mock         # 기본값. GPU/다운로드 불필요 — 참조(고객) 사진을 그대로 반환
+export TRYON_FLUX_BACKEND=flux2_klein  # 실제 FLUX.2-Klein-4B(GGUF Q4_0). worker/models/tryon_flux/requirements.txt 필요, ~5-6GB VRAM
 ```
+
+`TRYON_VLM_BACKEND=mock`/`TRYON_FLUX_BACKEND=mock`(둘 다 기본값)이면 CatVTON만 실제로
+돌고 VLM/FLUX 단계는 GPU 없이 통과한다 — CatVTON 자체는 이 워커의 원래 기능이라 여전히
+GPU가 필요하다(mock 백엔드 없음). 세 모델(VLM/FLUX/CatVTON) 전부 실제 백엔드로 돌릴 때는
+**동시에 상주하지 않고 단계별로 순차 로드/언로드**한다(프로덕션엔 GPU 서버가 없고 팀원
+노트북이 워커로 붙는 구조라 6GB급에서도 들어가게 하려는 설계, `AI/docs/
+tryon-advancement-strategy.md` §10 참고).
 
 품질검수 워커는 아래를 쓴다:
 
@@ -149,15 +165,19 @@ python tryon_worker_example.py
 [호스트명-tryon] CatVTON 파이프라인 로딩 완료
 ```
 
-## CatVTON 워커 동작 방식
+## 시착 워커 동작 방식 (`S15P11A108-504`)
 
-기존 `worker/models/catvton/verify_fit_tryon.py`(검증 스크립트)를 워커 구조에 맞게 옮긴 것이다. 로직 자체는 동일하고, 아래 세 가지만 다르다.
+VLM 캡션 → 신체 치수 근사/핏 계산 → FLUX worn-reference 생성 → CatVTON 합성, 4단계를
+순서대로 처리한다(`AI/docs/tryon-advancement-strategy.md` §9~§10에서 검증한 fit-aware
+worn-reference 기법의 프로덕션 버전). **최종 결과에는 실제 고객 사진(`user_image_url`)이
+나온다** — FLUX가 그 고객 사진을 참조로 worn-reference를 생성하므로, 재사용/캐싱 대상이
+아니라 매 요청마다 새로 생성한다.
 
-| 항목 | 검증 스크립트 | 워커 |
-|---|---|---|
-| 모델 초기화 시점 | 스크립트 실행 시 매번 | 워커 프로세스 시작 후 첫 job 처리 시 1회, 이후 재사용 |
-| fit_type 처리 | regular/oversized/cropped 3종 한 번에 반복 | job의 `payload["fit_type"]` 하나만 처리 |
-| 입출력 | 로컬 이미지 파일 읽기/저장 | URL로 다운로드, 결과는 게이트웨이로 업로드 후 URL 반환 |
+`fit_type`엔 `cropped`가 없다 — 옷을 짧게 만들어 마스크 하단을 제외하면 그 자리에
+diffusion이 맨살을 새로 생성해야 하는데, AI 가드레일상 정책적으로 피해서 뺐다
+(`AI/app/tryon/schemas.py`의 `MaskFitType` 참고). 실제로 핏(타이트/루즈 정도)은 이제
+`fit_type` 3단계가 아니라, 신체/상품 치수 비율을 FLUX 프롬프트에 반영하는 방식으로
+연속적으로 조절된다 — `fit_type`은 치수 데이터가 전혀 없을 때만 쓰이는 최후 폴백이다.
 
 ### job payload 형식
 
@@ -165,11 +185,22 @@ python tryon_worker_example.py
 {
   "user_image_url": "https://.../person.jpg",
   "product_image_url": "https://.../cloth.jpg",
-  "fit_type": "regular"
+  "mask_type": "upper",
+  "fit_type": "regular",
+  "num_inference_steps": 50,
+  "guidance_scale": 3.0,
+  "body_height_cm": 170.0,
+  "body_weight_kg": 65.0,
+  "body_waist_cm": null,
+  "garment_measurements": {"WAIST_WIDTH": 42.0}
 }
 ```
 
-`fit_type`은 `regular`, `oversized`, `cropped` 중 하나. 생략 시 `regular`.
+`mask_type`은 `upper`/`lower` 중 하나(생략 시 `upper`). `fit_type`은 `regular`/`oversized`
+중 하나(생략 시 `regular`). `body_waist_cm`(BE 컬럼 미확정, 항상 `null`일 수 있음)이 있으면
+그 실측값을, 없고 `body_height_cm`/`body_weight_kg`가 있으면 `body_estimate.py`의 근사치를
+쓴다. `garment_measurements["WAIST_WIDTH"]`까지 있어야 실제로 핏이 계산된다 — 그 전엔
+"regular fit" 고정으로 worn-reference를 생성한다.
 
 ### 결과 형식
 
@@ -177,9 +208,14 @@ python tryon_worker_example.py
 {
   "image_url": "https://i15a108.p.ssafy.io/results/tryon-results/xxx.png",
   "mask_preview_url": "https://i15a108.p.ssafy.io/results/tryon-masks/xxx.png",
-  "fit_type": "regular"
+  "worn_reference_url": "https://i15a108.p.ssafy.io/results/tryon-worn-references/xxx.png",
+  "fit_type": "regular",
+  "adaptive_masking_used": false
 }
 ```
+
+`worn_reference_url`은 FLUX가 생성한 중간 산출물(디버깅/고객 확인용)이다.
+`adaptive_masking_used`는 신체/상품 치수 비율로 실제 핏 계산이 이뤄졌는지를 나타낸다.
 
 `mask_preview_url`은 마스크가 어디에 적용됐는지 시각화한 참고용 이미지로, 디버깅에 유용해 같이 업로드하도록 추가했다. 필요 없으면 `tryon_worker_example.py`의 해당 부분만 제거하면 된다.
 
@@ -319,7 +355,21 @@ curl https://i15a108.p.ssafy.io/ai/jobs/{job_id}
 
 ## 모델 교체 시 손댈 곳
 
-`TryonWorker._ensure_loaded()`와 `run_inference()` 안, 딱 이 두 곳만 모델별로 갈아끼우면 된다. `base_worker.py`, 게이트웨이(`AI/app/gateway/`), job/result 스키마는 전혀 건드릴 필요가 없다 — 이게 처음부터 이 구조를 이렇게 짠 이유다.
+`TryonWorker`의 `_ensure_*_loaded()`류 메서드와 `run_inference()` 안, 딱 이 두 곳만
+모델별로 갈아끼우면 된다(CatVTON은 `_ensure_catvton_loaded()`, VLM/FLUX는 각각
+`_ensure_vlm_loaded()`/`_generate_worn_reference()` 안에서 지연 로드). `base_worker.py`,
+게이트웨이(`AI/app/gateway/`), job/result 스키마는 전혀 건드릴 필요가 없다 — 이게 처음부터
+이 구조를 이렇게 짠 이유다.
+
+## 남은 작업 (시착 워커, `S15P11A108-504`)
+
+- `TRYON_VLM_BACKEND=qwen3_vl TRYON_FLUX_BACKEND=flux2_klein`로 실제 GPU 노트북에서 4단계
+  전체(VLM 캡션 → FLUX worn-reference → CatVTON 합성) 엔드투엔드 스모크 테스트 — 지금까지는
+  단위 함수(신체 치수 근사, 핏 계산, 프롬프트 생성)와 CatVTON 파이프라인 자체만 개별
+  검증했고, 세 모델을 한 프로세스 안에서 순차로 로드/언로드하는 전체 흐름은 아직 실측
+  전이다. 피크 VRAM이 6GB 안에 들어오는지도 이때 같이 확인한다.
+- 카테고리(하의/상의/아우터/액세서리) 정보가 BE에서 아직 안 넘어와 `mask_type`을 요청값
+  그대로 신뢰한다 — BE 요청 문서(`.claude/requests/be/`) 회신 후 자동 판별 추가.
 
 ## 남은 작업
 
