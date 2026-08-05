@@ -44,7 +44,9 @@ public record LiveCardResponse(
         @Schema(description = "실제 방송 시작 시각. 예약(SCHEDULED)이면 null", example = "2026-07-29T11:02:10")
         LocalDateTime startedAt,
 
-        @Schema(description = "현재 시청자 수. 예약(SCHEDULED)이면 null", example = "152")
+        @Schema(
+                description = "현재 시청자 수. 예약(SCHEDULED)이면 null. **호스트는 세지 않는다**",
+                example = "152")
         Integer viewerCount,
 
         @Schema(description = "연결된 상품 수", example = "5")
