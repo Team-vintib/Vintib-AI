@@ -87,9 +87,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-_PRODUCT_INFO_CHECK_DIR = os.path.abspath(
-    os.path.join("..", "..", "CLASS", "product-info-check")
-)
+_PRODUCT_INFO_CHECK_DIR = os.path.abspath(os.path.join("..", "..", "CLASS", "product-info-check"))
 if _PRODUCT_INFO_CHECK_DIR not in sys.path:
     sys.path.insert(0, _PRODUCT_INFO_CHECK_DIR)
 
@@ -151,9 +149,7 @@ MAX_STILL_AREA_FRAC = 0.35  # 이보다 크면 물건 하나가 아니라 몸통
 CROP_PADDING_FRAC = 0.15  # 찾은 정지 영역 bbox에 이 비율만큼 여백을 더해 크롭
 
 
-_FACE_CASCADE = cv2.CascadeClassifier(
-    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-)
+_FACE_CASCADE = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 
 
 def detect_face_bbox(gray_frame: np.ndarray) -> tuple[int, int, int, int] | None:
@@ -194,11 +190,7 @@ def detect_torso_bbox(pose_model: YOLO, frame: np.ndarray) -> tuple[int, int, in
         idx = 0
 
     xy = r.keypoints.xy[idx].cpu().numpy()
-    conf = (
-        r.keypoints.conf[idx].cpu().numpy()
-        if r.keypoints.conf is not None
-        else np.ones(len(xy))
-    )
+    conf = r.keypoints.conf[idx].cpu().numpy() if r.keypoints.conf is not None else np.ones(len(xy))
     L_SHOULDER, R_SHOULDER = 5, 6
     shoulder_pts = [xy[i] for i in (L_SHOULDER, R_SHOULDER) if conf[i] >= POSE_CONF_THRESHOLD]
     if len(shoulder_pts) == 0:
@@ -232,7 +224,9 @@ def grid_motion_mask(prev_gray_small: np.ndarray, gray_small: np.ndarray) -> np.
     return diff > MOTION_DIFF_THRESHOLD
 
 
-def bbox_to_grid_mask(bbox_px: tuple[int, int, int, int] | None, frame_shape: tuple[int, int]) -> np.ndarray:
+def bbox_to_grid_mask(
+    bbox_px: tuple[int, int, int, int] | None, frame_shape: tuple[int, int]
+) -> np.ndarray:
     """픽셀 좌표 bbox를 그리드 좌표계의 bool 마스크로 변환한다(제외 영역 표시용)."""
     mask = np.zeros((GRID_ROWS, GRID_COLS), dtype=bool)
     if bbox_px is None:
@@ -242,11 +236,13 @@ def bbox_to_grid_mask(bbox_px: tuple[int, int, int, int] | None, frame_shape: tu
 
     gx0, gx1 = int(x0 / w * GRID_COLS), int(x1 / w * GRID_COLS)
     gy0, gy1 = int(y0 / h * GRID_ROWS), int(y1 / h * GRID_ROWS)
-    mask[max(0, gy0):min(GRID_ROWS, gy1), max(0, gx0):min(GRID_COLS, gx1)] = True
+    mask[max(0, gy0) : min(GRID_ROWS, gy1), max(0, gx0) : min(GRID_COLS, gx1)] = True
     return mask
 
 
-def largest_candidate_region(candidate_mask: np.ndarray, exclude: np.ndarray) -> tuple[int, int, int, int] | None:
+def largest_candidate_region(
+    candidate_mask: np.ndarray, exclude: np.ndarray
+) -> tuple[int, int, int, int] | None:
     """candidate_mask(그리드, bool: "막 멈춘" 블록) 중 exclude 아닌 영역에서 가장 큰 연결
     성분의 (gx0, gy0, gx1, gy1) 그리드 bbox. 최소 크기 미만이면 None."""
     candidate = (candidate_mask & ~exclude).astype(np.uint8)
@@ -259,7 +255,10 @@ def largest_candidate_region(candidate_mask: np.ndarray, exclude: np.ndarray) ->
     # 문제가 합성 테스트로 확인됐다 -- "이웃 투표" 방식은 고립 노이즈는 여전히 지우면서
     # 작은 소품 블록은 거의 그대로 살린다.)
     neighbor_count = cv2.filter2D(
-        candidate.astype(np.float32), -1, np.ones((3, 3), np.float32), borderType=cv2.BORDER_CONSTANT
+        candidate.astype(np.float32),
+        -1,
+        np.ones((3, 3), np.float32),
+        borderType=cv2.BORDER_CONSTANT,
     )
     # 자기 자신이 원래 후보가 아니었으면 이웃표가 많아도 후보로 승격시키지 않는다
     # (안 그러면 뭉친 블록 가장자리 바로 바깥 칸까지 "이웃이 많다"는 이유로 새로 후보가
@@ -280,8 +279,12 @@ def largest_candidate_region(candidate_mask: np.ndarray, exclude: np.ndarray) ->
     if area < MIN_STILL_AREA_FRAC * grid_area or area > MAX_STILL_AREA_FRAC * grid_area:
         return None
 
-    x, y, w, h = stats[best_label, cv2.CC_STAT_LEFT], stats[best_label, cv2.CC_STAT_TOP], \
-        stats[best_label, cv2.CC_STAT_WIDTH], stats[best_label, cv2.CC_STAT_HEIGHT]
+    x, y, w, h = (
+        stats[best_label, cv2.CC_STAT_LEFT],
+        stats[best_label, cv2.CC_STAT_TOP],
+        stats[best_label, cv2.CC_STAT_WIDTH],
+        stats[best_label, cv2.CC_STAT_HEIGHT],
+    )
     return x, y, x + w, y + h
 
 
@@ -331,7 +334,9 @@ def main():
     registered_categories: list[str] = []
 
     print("\n=== 실행 중 (창에 포커스한 뒤 'q'로 종료) ===")
-    print(f"상품을 카메라 앞에 갖다 대고 {STABLE_SECONDS_REQUIRED:.1f}초 이상 멈춰 있으면 자동으로 캡처됩니다.")
+    print(
+        f"상품을 카메라 앞에 갖다 대고 {STABLE_SECONDS_REQUIRED:.1f}초 이상 멈춰 있으면 자동으로 캡처됩니다."
+    )
 
     try:
         while True:
@@ -371,7 +376,9 @@ def main():
                 elif now - last_face_time <= FACE_STALE_SECONDS:
                     face_bbox = last_face_bbox  # 방금까지 있던 얼굴 위치를 잠깐 우려먹는다
                 torso_bbox = detect_torso_bbox(pose_model, frame)
-                exclude = bbox_to_grid_mask(face_bbox, (h, w)) | bbox_to_grid_mask(torso_bbox, (h, w))
+                exclude = bbox_to_grid_mask(face_bbox, (h, w)) | bbox_to_grid_mask(
+                    torso_bbox, (h, w)
+                )
 
                 region = largest_candidate_region(candidate_mask, exclude)
 
@@ -393,11 +400,21 @@ def main():
                 if region is not None:
                     gx0, gy0, gx1, gy1 = region
                     bbox_px = (
-                        int(gx0 / GRID_COLS * w), int(gy0 / GRID_ROWS * h),
-                        int(gx1 / GRID_COLS * w), int(gy1 / GRID_ROWS * h),
+                        int(gx0 / GRID_COLS * w),
+                        int(gy0 / GRID_ROWS * h),
+                        int(gx1 / GRID_COLS * w),
+                        int(gy1 / GRID_ROWS * h),
                     )
                     cv2.rectangle(display, bbox_px[:2], bbox_px[2:], (0, 255, 0), 2)
-                    cv2.putText(display, "captured!", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                    cv2.putText(
+                        display,
+                        "captured!",
+                        (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.8,
+                        (0, 255, 0),
+                        2,
+                    )
 
                     crop = crop_around_bbox(frame, bbox_px)
                     if crop.size > 0:
@@ -447,8 +464,15 @@ def main():
                         triggered = True
             elif in_cooldown:
                 remaining = COOLDOWN_SEC - (now - last_trigger_time)
-                cv2.putText(display, f"cooldown {remaining:.1f}s", (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (128, 128, 128), 2)
+                cv2.putText(
+                    display,
+                    f"cooldown {remaining:.1f}s",
+                    (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (128, 128, 128),
+                    2,
+                )
 
             if triggered:
                 # 방금 캡처한 영역이 쿨다운 뒤에도 여전히 "막 멈춘" 범위에 남아 곧바로
