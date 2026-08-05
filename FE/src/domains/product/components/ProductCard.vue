@@ -21,9 +21,6 @@ const formattedPrice = computed(() =>
     ? '경매 예정'
     : `${props.product.price.toLocaleString('ko-KR')}P`,
 )
-const saleTypeLabel = computed(() =>
-  props.product.saleType === 'AUCTION' ? '경매 예정' : '정찰제',
-)
 const displayImageUrl = computed(() => props.product.imageUrl || fallbackProductImage)
 const handleImageError = (event: Event) => {
   const target = event.target
@@ -82,10 +79,10 @@ const handleImageError = (event: Event) => {
           {{ formattedPrice }}
         </p>
         <span
+          v-if="product.saleType !== 'AUCTION'"
           class="product-card__sale-badge"
-          :class="{ 'product-card__sale-badge--auction': product.saleType === 'AUCTION' }"
         >
-          {{ saleTypeLabel }}
+          정찰제
         </span>
       </div>
     </RouterLink>
@@ -96,18 +93,11 @@ const handleImageError = (event: Event) => {
 .product-card {
   overflow: hidden;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
+  border-radius: calc(var(--radius-card) * 3);
   background: var(--color-surface);
   transition:
     border-color var(--transition-base),
     transform var(--transition-base);
-}
-
-.product-card {
-  transition:
-    border-color var(--transition-slow),
-    background-color var(--transition-slow),
-    transform var(--transition-emphasized);
 }
 
 .product-card:hover {
@@ -147,17 +137,18 @@ const handleImageError = (event: Event) => {
 
 .product-card__grade {
   position: absolute;
-  top: 0;
-  left: 0;
-  padding: 3px var(--space-2);
-  border-radius: 0 0 var(--radius-badge) 0;
+  top: var(--space-2);
+  left: var(--space-2);
+  padding: 5px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
   background: var(--overlay-scrim-strong);
   color: var(--color-text-primary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-badge);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.06em;
+  font-size: calc(var(--font-size-caption) - 1px);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.03em;
   line-height: var(--line-height-xs);
+  backdrop-filter: blur(4px);
 }
 
 .product-card__like-button {
@@ -166,13 +157,17 @@ const handleImageError = (event: Event) => {
   right: var(--space-2);
   display: grid;
   place-items: center;
-  width: var(--button-height-2xs);
-  height: var(--button-height-2xs);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-badge);
-  background: var(--overlay-scrim-medium);
-  color: var(--color-text-secondary);
-  backdrop-filter: blur(2px);
+  width: var(--button-height-small);
+  height: var(--button-height-small);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: var(--overlay-scrim-strong);
+  color: var(--color-text-primary);
+  backdrop-filter: blur(4px);
+  transition:
+    border-color var(--transition-base),
+    color var(--transition-base),
+    transform var(--transition-base);
 }
 
 .product-card__like-button svg {
@@ -187,7 +182,9 @@ const handleImageError = (event: Event) => {
 
 .product-card__like-button:hover,
 .product-card__like-button--active {
+  border-color: var(--color-auction);
   color: var(--color-auction);
+  transform: scale(1.05);
 }
 
 .product-card__like-button--active svg {
@@ -223,16 +220,19 @@ const handleImageError = (event: Event) => {
 }
 
 .product-card__name {
+  display: -webkit-box;
   overflow: hidden;
-  min-height: var(--badge-height-xs);
+  min-height: calc(var(--line-height-relaxed) + var(--line-height-relaxed));
   margin-top: var(--space-1);
   color: var(--color-text-primary);
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-relaxed);
   letter-spacing: -0.01em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .product-card__meta {
@@ -244,13 +244,15 @@ const handleImageError = (event: Event) => {
 }
 
 .product-card__price {
+  min-width: 0;
   color: var(--color-text-primary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-body);
+  font-family: inherit;
+  font-size: var(--font-size-md);
   font-variant-numeric: tabular-nums;
-  font-weight: var(--font-weight-medium);
-  letter-spacing: -0.02em;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.03em;
   line-height: var(--line-height-relaxed);
+  overflow-wrap: anywhere;
 }
 
 .product-card__price-prefix {
@@ -271,9 +273,4 @@ const handleImageError = (event: Event) => {
   line-height: var(--line-height-xs);
 }
 
-.product-card__sale-badge--auction {
-  border-color: var(--color-accent);
-  background: transparent;
-  color: var(--color-accent);
-}
 </style>

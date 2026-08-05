@@ -35,6 +35,7 @@ export interface ProductFilterOption {
 export interface ProductCategoryOption {
   id: number
   label: string
+  categoryIds: number[]
 }
 
 export interface ProductSaleTypeTab {
