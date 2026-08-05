@@ -73,7 +73,7 @@ public class DemoOrderSeeder implements ApplicationRunner {
     }
 
     private void seedOrder(Member buyer, Product product, boolean delivered) {
-        Order order = Order.createDirectSale(buyer, product.getSeller(), product, product.getPrice());
+        Order order = Order.createDirectSale(buyer, product.getSeller(), product, null, product.getPrice());
         LocalDateTime shippedAt = LocalDateTime.now().minusDays(2);
         LocalDateTime deliveredAt = LocalDateTime.now().minusDays(1);
         if (delivered) {

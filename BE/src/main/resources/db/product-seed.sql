@@ -1,4 +1,4 @@
--- 상품 데모 시드 40건 (DemoMemberSeeder @Order(1) 이후 실행).
+-- 상품 데모 시드 60건 (DemoMemberSeeder @Order(1) 이후 실행).
 -- seller는 시드 계정 4명에게 배분
 -- 브랜드 마스터에 없는 경우 brand_id = NULL, ai_model_enabled 기본값 false.
 
@@ -406,5 +406,205 @@ INSERT INTO product (
         '메종키츠네 골프 폭스헤드 pk XXL(105~110) 새상품', '선물 받은 후 입지 않아 판매합니다. 택만 제거된 새상품이며, 23 SS 시즌 이월 상품입니다.',
         'S', 'XXL', 'WHITE', 'Cotton 100%',
         'DIRECT_SALE', 'ON_SALE', 150000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 41. 메종키츠네 더블 모노크롬 폭스XL
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'TSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '메종키츠네 더블 모노크롬 폭스XL', '메종 키츠네 더블 모노크롬 폭스 헤드 패치 클래식 티셔츠 화이트 사이즈XL 판매합니다. 실사용 1번 착용했습니다. 별로 입지 않아서 싸게 급처합니다.',
+        'A', 'XL', 'WHITE', 'Cotton 100%',
+        'DIRECT_SALE', 'ON_SALE', 50000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 42. 메종키츠네 더블 폭스 반팔티 그레이
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'TSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '메종키츠네 더블 폭스 반팔티 그레이', '앙증맞은 폭스 자수가 포인트인 제품입니다. 오염이나 하자없고 상태 좋아요. 국내백화점 정품입니다.',
+        'A', 'FREE', 'GRAY', 'Cotton',
+        'DIRECT_SALE', 'ON_SALE', 59000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 43. 메종키츠네 더블폭스 반팔 티셔츠
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'TSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '메종키츠네 더블폭스 반팔 티셔츠', '측정 방법에 따라 오차 있을 수 있습니다. 중고제품 특성상 구매 후 교환,환불은 불가합니다. 제주,도서산간 +6500 (미리 말씀해주세요). 네고문의 답변 안합니다. 가슴단면 55cm, 총장 72cm.',
+        'B', 'L', 'WHITE', 'Cotton',
+        'DIRECT_SALE', 'ON_SALE', 45000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 44. 메종키츠네 반팔
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'TSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '메종키츠네 반팔', '메종키츠네 반팔티 판매합니다. 귀여운 폭스 자수가 포인트인 제품입니다. 특별한 하자 없이 상태 좋습니다.',
+        'A', 'FREE', 'BLACK', 'Cotton',
+        'DIRECT_SALE', 'ON_SALE', 50000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 45. 메종키츠네 폭스 반팔티 블랙 L
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'TSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '메종키츠네 폭스 반팔티 블랙 L', '메종키츠네 폭스 반팔티 블랙 L 사이즈 새 상품입니다. 택 달려있고 비닐 포장 그대로입니다. 귀여운 폭스 자수가 포인트인 제품입니다.',
+        'S', 'L', 'BLACK', 'Cotton',
+        'DIRECT_SALE', 'ON_SALE', 49000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 46. 메종키츠네 OW011CFKJ7026 ANTHRACITE 더블폭스헤드 반팔티셔츠 블랙
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'TSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '메종키츠네 OW011CFKJ7026 ANTHRACITE 더블폭스헤드 반팔티셔츠 블랙', '메종키츠네 OW011CFKJ7026 ANTHRACITE 더블폭스헤드 반팔티셔츠 블랙 판매합니다.',
+        'A', 'FREE', 'BLACK', 'Cotton',
+        'DIRECT_SALE', 'ON_SALE', 80000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 47. 리바이스 517
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DENIM' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '리바이스 517', '33사이즈 입니다. 옴니피플 구매.',
+        'B', '33', 'DARK_BLUE', 'Cotton 100%',
+        'DIRECT_SALE', 'ON_SALE', 85000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 48. 리바이스 517
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DENIM' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '리바이스 517', '레더탭 옆에 때운 자국 있습니다. 사진 참고하세요.',
+        'C', 'FREE', 'DARK_BLUE', 'Cotton 100%',
+        'DIRECT_SALE', 'ON_SALE', 83000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 49. 리바이스 517 현행 부츠컷 데님
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DENIM' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '리바이스 517 현행 부츠컷 데님', '리바이스 517 현행 부츠컷 데님. 리바이스 517 현행 새상품 컨디션. 34x32 허리 단면 43 허벅지 31.5 밑단 24 기장 109.',
+        'S', '34x32', 'BLUE', 'Cotton 100%',
+        'DIRECT_SALE', 'ON_SALE', 8500, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 50. [00's] Levi's 517 Boot cut
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DENIM' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '[00''s] Levi''s 517 Boot cut', '리바이스517 부츠컷. 표기 사이즈 33x30 실측 참고. 100% Cotton. 자연스러운 페이딩. 사이즈 미스로 매물합니다. 이체시 145,000원입니다. 편하게 문의 주세요! *측정 방법에 따라 1~2cm정도 오차가 있을 수 있습니다. *중고 상품 특성상 교환 및 환불이 어려운 점 양해 바랍니다.',
+        'B', '33x30', 'DARK_BLUE', 'Cotton 100%',
+        'DIRECT_SALE', 'ON_SALE', 145000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 51. 00's Levi's 517 부츠컷 데님
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DENIM' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '00''s Levi''s 517 부츠컷 데님', '00''s Levi''s 517 부츠컷 데님. [구매 전 유의사항] * 사이즈를 재는 사람, 방법, 제작 과정에 따라서 오차가 있을 수 있습니다. * 사용자의 모니터와 조명에 따라 색상의 차이가 있을 수 있습니다. * 빈티지 특성상 사용감 및 미세 오염이 존재할 수 있으며 교환/환불이 불가하오니 신중한 구매 부탁드립니다.',
+        'B', 'FREE', 'DARK_BLUE', 'Cotton 100%',
+        'DIRECT_SALE', 'ON_SALE', 120000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 52. 리바이스 517 데님 팬츠
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DENIM' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '리바이스 517 데님 팬츠', 'No.1-1527 #도떼기구매가능. Levis 517 denim pants. 리바이스 517 데님 팬츠 입니다. 사진에서 보시듯이상품 자체가 매우 양호하게 보존되어 있습니다. 사이즈 남성 33 추천드립니다. Color - denim, Size - 36, 총장104 허리43 밑위37 밑단22 허벅지32(cm). 측정위치에 따라 1-3cm 오차가 있을 수 있습니다. 모든 상품 세탁, 고온 스팀이 완료 된 상품입니다. 배송전에 한번 더 스팀 작업 진행합니다. 구매 전 공지사항과 사이즈를 다시 한번 확인 부탁드립니다.',
+        'A', '33', 'BLUE', 'Cotton 100%',
+        'DIRECT_SALE', 'ON_SALE', 92900, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 53. 00s 리바이스 517 (멕시코) w38
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DENIM' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '00s 리바이스 517 (멕시코) w38', '00년대 리바이스 517 부츠컷 청바지입니다. 멕시코 생산 제품이며, 허리 단면 38인치입니다. 빈티지한 워싱과 자연스러운 사용감이 매력적인 제품입니다. 구매 원하시면 바로 안전결제 해주시면 됩니다! 실측단면(cm) 허리단면48.5 엉덩이단면64 밑위32 허벅지단면33 밑단단면26 총장111. 빈티지 의류 특성상 미세한 얼룩이나 흔적이 있을수 있습니다! 구매 후 제품 특성상 교환/환불이 불가능하니 신중하게 구매 부탁드립니다. 배송은 2-3일 정도 소요되며, 주말/연휴 기간에는 더 소요될 수 있습니다. 사이즈 측정하는 방법에 따라 1-3cm 정도 오차가 발생할 수 있습니다.',
+        'B', 'w38', 'DARK_BLUE', 'Cotton 100%',
+        'DIRECT_SALE', 'ON_SALE', 141000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 54. 리바이스 517 부츠컷 데님 팬츠
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DENIM' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '리바이스 517 부츠컷 데님 팬츠', '표기사이즈:34 실측:허리:42 허벅지:32 총장:112.',
+        'B', '34', 'BLUE', 'Cotton 100%',
+        'DIRECT_SALE', 'ON_SALE', 99000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 55. 00s 리바이스 517-03 (재팬) w29
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DENIM' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '00s 리바이스 517-03 (재팬) w29', '00년대 리바이스 517-03 (재팬) 청바지 판매합니다. 사이즈는 W29이며, 빈티지한 워싱과 디테일이 매력적입니다. 밑단은 헤진 느낌으로 자연스럽게 연출되었으며, 편안하게 착용 가능합니다. 구매 원하시면 바로 안전결제 해주시면 됩니다! 실측단면(cm) 허리단면37 엉덩이단면49 밑위24 허벅지단면26 밑단단면23 총장99. 빈티지 의류 특성상 미세한 얼룩이나 흔적이 있을수 있습니다! 구매 후 제품 특성상 교환/환불이 불가능하니 신중하게 구매 부탁드립니다. 배송은 2-3일 정도 소요되며, 주말/연휴 기간에는 더 소요될 수 있습니다. 사이즈 측정하는 방법에 따라 1-3cm 정도 오차가 발생할 수 있습니다.',
+        'B', 'w29', 'DARK_BLUE', 'Cotton 100%',
+        'DIRECT_SALE', 'ON_SALE', 140000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 56. 미제 올드 리바이스 517 36(실34)
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DENIM' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '미제 올드 리바이스 517 36(실34)', '2000년 7월 미국 554 공장 생산 517. 사이즈 36/30(실 34). 부츠 컷, 기장 미수선, 왼쪽 다리 앞뒤 옅은 스팟 존재(사진 참고). 단면 실측(cm) 허리 44.5 밑위 31 허벅지 29 총장 103 밑단 21.5. ※ 치수를 재는 방식에 따라 ±1~2cm 차이가 있을 수 있습니다.',
+        'B', '34', 'DARK_BLUE', 'Cotton 100%',
+        'DIRECT_SALE', 'ON_SALE', 125000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 57. 리바이스 부츠컷 517 멕시코산
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DENIM' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '리바이스 부츠컷 517 멕시코산', '핏 이쁘게 떨어짐요. 32x34 특히 밑단이 예쁘게 빠짐.',
+        'A', '32x34', 'BLUE', 'Cotton 100%',
+        'DIRECT_SALE', 'ON_SALE', 145000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 58. 메종키츠네 더블폭스 s
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'TSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '메종키츠네 더블폭스 s', '매장구매 정품. 상태좋아요.',
+        'A', 'S', 'BLACK', 'Cotton',
+        'DIRECT_SALE', 'ON_SALE', 45000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 59. Maison Kitsune 더블폭스 반팔 블랙 M
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'TSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        'Maison Kitsune 더블폭스 반팔 블랙 M', '집에서 시도해보려고 좀 입어보고 나갈 때 딱 한번 입었습니다 그래서 싸게 내놔요 사진 가능합니다 신세계몰에서 구매 쿨거시 에눌 가능!',
+        'A', 'M', 'BLACK', 'Cotton',
+        'DIRECT_SALE', 'ON_SALE', 60000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 60. 메종키츠네 더블폭스헤드 xs
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'TSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '메종키츠네 더블폭스헤드 xs', '실착 3회 여성분들한테 잘 맞으실거같아요!! 편하게 연락주세용 반택합니다.',
+        'A', 'XS', 'WHITE', 'Cotton',
+        'DIRECT_SALE', 'ON_SALE', 60000, false, NULL,
         NOW(), NOW()
     );
