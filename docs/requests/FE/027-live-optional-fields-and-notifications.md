@@ -73,8 +73,7 @@ Phase 8(경매 종료) 들어가기 전에, 남아 있던 내 파트(라이브·
 
 ---
 
-## 4. 아직 안 된 것 (Phase 8에서 처리)
+## 4. ~~아직 안 된 것~~ → 전부 완료 (2026-08-05)
 
-- 경매 종료(`close`)/낙찰자 조회(`winner`)/`AUCTION_CLOSED` 이벤트
-- `AUCTION_WON` 알림
-- 007의 최종 검증(실제 유찰 케이스로 재확인)
+여기 적어 뒀던 3건(경매 종료·낙찰자 조회·`AUCTION_CLOSED`, `AUCTION_WON` 알림, 007 최종 검증)은
+**Phase 8에서 전부 반영됐다.** 계약은 `docs/requests/FE/030-auction-close-contract.md` 참고.

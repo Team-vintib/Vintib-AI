@@ -34,6 +34,8 @@ import org.springframework.stereotype.Component;
 public class PointCommandAdapter implements PointCommandPort {
 
     private static final String REF_TYPE_AUCTION = "AUCTION";
+    // PointService.pay 가 주문 결제에 쓰는 것과 같은 값 — 낙찰 결제도 같은 원장에서 읽힌다.
+    private static final String REF_TYPE_ORDER = "ORDER";
 
     private final PointAccountRepository pointAccountRepository;
     private final PointHoldRepository pointHoldRepository;
@@ -87,6 +89,41 @@ public class PointCommandAdapter implements PointCommandPort {
                             .balanceAfter(account.getAvailable())
                             .refType(REF_TYPE_AUCTION)
                             .refId(auctionId)
+                            .build());
+                });
+    }
+
+    @Override
+    public void convertHoldToPayment(Long auctionId, Long orderId) {
+        pointHoldRepository.findByAuctionIdAndStatus(auctionId, PointHoldStatus.HELD)
+                .ifPresent(hold -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    hold.convert(now);
+
+                    PointAccount account = getOrCreateAccountWithLock(hold.getMember().getId());
+                    long amount = hold.getAmount();
+
+                    // 보류를 먼저 잔액으로 되돌린 뒤 결제한다. 버킷을 건너뛰고 bidHeld → tradeEscrow
+                    // 로 바로 옮기는 메서드를 새로 만들 수도 있지만, 그러면 원장의 balanceAfter 가
+                    // 중간 상태를 건너뛰어 잔액 추적이 끊긴다.
+                    account.releaseHold(amount);
+                    pointTransactionRepository.save(PointTransaction.builder()
+                            .member(account.getMember())
+                            .type(PointTransactionType.BID_RELEASE)
+                            .amount(amount)
+                            .balanceAfter(account.getAvailable())
+                            .refType(REF_TYPE_AUCTION)
+                            .refId(auctionId)
+                            .build());
+
+                    account.pay(amount);
+                    pointTransactionRepository.save(PointTransaction.builder()
+                            .member(account.getMember())
+                            .type(PointTransactionType.PAYMENT)
+                            .amount(-amount)
+                            .balanceAfter(account.getAvailable())
+                            .refType(REF_TYPE_ORDER)
+                            .refId(orderId)
                             .build());
                 });
     }

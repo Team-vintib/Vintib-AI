@@ -83,4 +83,34 @@ public interface AuctionRepository extends JpaRepository<Auction, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Auction a WHERE a.id = :id")
     Optional<Auction> findByIdForUpdate(@Param("id") Long id);
+
+    /**
+     * 마감할 때가 된 경매(AUCT-012 마감 스캐너). {@code RUNNING}이면서 종료 예정 시각이 지난 것들.
+     *
+     * <p><b>여기서는 잠그지 않는다.</b> 스캐너는 후보만 고르고, 실제 마감은 경매 하나하나를
+     * {@link #findByIdForUpdate}로 다시 잡아 처리한다 — 목록 전체를 잠근 채로 마감·주문 생성·
+     * 포인트 전환까지 돌리면 그동안 그 방송들의 입찰이 전부 멈춘다.
+     *
+     * <p>그래서 후보를 고른 시점과 잠그는 시점 사이에 마감 직전 입찰이 들어와 종료 시각이
+     * 밀릴 수 있다(AUCT-010). 잠근 뒤 {@code isDue}를 한 번 더 확인해 걸러낸다.
+     */
+    List<Auction> findByStatusAndScheduledEndAtLessThanEqual(
+            AuctionStatus status, java.time.LocalDateTime at, Pageable pageable);
+
+    /** 방송 종료 시 강제 마감 대상(AUCT-014) — 이 방송에서 아직 진행 중인 경매. */
+    List<Auction> findByLiveIdAndStatus(Long liveId, AuctionStatus status);
+
+    /**
+     * 방송 종료 요약·유찰 목록(LIVE-006, Phase 8-b)용 — 이 방송에서 끝난 경매들.
+     *
+     * <p><b>상품 판매 상태가 아니라 이 테이블로 찾는 이유.</b> 유찰 상품은 판매 상태가
+     * {@code AUCTION_SCHEDULED}로 돌아가는데(설계 판단 10 정정), 그 상태만 보면 <b>다른 방송에서
+     * 유찰됐거나 아직 한 번도 경매에 안 걸린 상품까지</b> 섞인다. "이 방송의 결과"는
+     * {@code auction.live_id}에만 있다.
+     *
+     * <p>같은 상품에 재경매를 걸어 결과가 여러 건일 수 있으므로, 호출부가 상품별로 마지막
+     * 것을 고를 수 있게 <b>오래된 순</b>으로 준다.
+     */
+    List<Auction> findByLiveIdAndStatusInOrderByIdAsc(
+            Long liveId, Collection<AuctionStatus> statuses);
 }

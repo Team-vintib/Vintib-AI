@@ -218,4 +218,38 @@ public class Auction extends BaseTimeEntity {
             this.extensionCount = (short) (extensionCount + 1);
         }
     }
+
+    /**
+     * 종료 예정 시각이 지났는지(AUCT-012 마감 스캐너 판정).
+     *
+     * <p>{@link #isOpenForBidding}의 반대가 아니다 — 저쪽은 "지금 입찰을 받을 수 있는가", 이쪽은
+     * "이제 마감해야 하는가"다. {@code RUNNING}이 아닌 경매는 마감 대상이 아니다.
+     */
+    public boolean isDue(LocalDateTime at) {
+        return isRunning() && scheduledEndAt != null && !at.isBefore(scheduledEndAt);
+    }
+
+    /**
+     * 낙찰로 마감한다(AUCT-012). 낙찰자·낙찰가는 최고 입찰자·현재가를 그대로 확정한다.
+     *
+     * <p>입찰이 있는지({@link #hasBid()})는 서비스가 미리 확인해야 한다 — 입찰이 없는데 이걸
+     * 부르면 {@code ck_auction_success_fields} 제약에 걸린다.
+     */
+    public void closeAsSuccess(LocalDateTime at) {
+        this.status = AuctionStatus.SUCCESS;
+        this.winnerId = topBidderId;
+        this.finalPrice = currentPrice;
+        this.endedAt = at;
+    }
+
+    /**
+     * 유찰로 마감한다(AUCT-014) — 입찰이 하나도 없이 끝난 경우다.
+     *
+     * <p><b>{@code winnerId}·{@code finalPrice}는 비워 둔다.</b> 그래서 유찰 이력은 상품 상태가
+     * 아니라 이 행 하나로 남는다(설계 판단 10 정정).
+     */
+    public void closeAsFailed(LocalDateTime at) {
+        this.status = AuctionStatus.FAILED;
+        this.endedAt = at;
+    }
 }

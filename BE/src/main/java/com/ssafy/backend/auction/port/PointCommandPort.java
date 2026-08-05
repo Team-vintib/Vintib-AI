@@ -27,4 +27,18 @@ public interface PointCommandPort {
      * 하지 않는다</b> — 첫 입찰에는 풀어 줄 직전 최고 입찰자가 없다.
      */
     void releaseHoldForAuction(Long auctionId);
+
+    /**
+     * 낙찰자의 보류를 거래 대금으로 전환한다(AUCT-012). {@code bidHeld → available → tradeEscrow}로
+     * 옮기고 원장에 {@code BID_RELEASE}·{@code PAYMENT} 두 건을 남긴다.
+     *
+     * <p><b>보류를 그대로 두면 안 되는 이유.</b> 낙찰자의 포인트가 영구히 잠기는 것도 문제지만,
+     * 더 큰 것은 {@code ux_point_hold_member_active} 때문에 <b>그 회원이 이후 어떤 경매에도
+     * 입찰할 수 없게 된다</b>는 점이다.
+     *
+     * <p>보류가 없으면 아무 일도 하지 않는다 — 입찰이 하나도 없던 경매(유찰)에는 전환할 대상이 없다.
+     *
+     * @param orderId 이 낙찰로 만들어진 주문. 원장의 {@code PAYMENT} 기록이 가리킨다
+     */
+    void convertHoldToPayment(Long auctionId, Long orderId);
 }

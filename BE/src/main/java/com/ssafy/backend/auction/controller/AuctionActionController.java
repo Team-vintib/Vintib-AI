@@ -3,6 +3,7 @@ package com.ssafy.backend.auction.controller;
 import com.ssafy.backend.auction.dto.request.BidRequest;
 import com.ssafy.backend.auction.dto.response.AuctionEventResponse;
 import com.ssafy.backend.auction.dto.response.AuctionSnapshotResponse;
+import com.ssafy.backend.auction.dto.response.AuctionWinnerResponse;
 import com.ssafy.backend.auction.dto.response.BidResponse;
 import com.ssafy.backend.auction.service.AuctionService;
 import com.ssafy.backend.global.response.ApiResponse;
@@ -146,5 +147,23 @@ public class AuctionActionController {
         CursorPageResponse<BidResponse> response =
                 auctionService.getBidHistory(auctionId, cursor, size, viewerId);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "경매 결과 조회",
+            description = "낙찰자와 낙찰가를 조회한다. **비회원도 조회할 수 있다.**\n\n"
+                    + "**유찰도 200이다** — `status`가 `FAILED`이고 낙찰자 관련 필드가 전부 null이다. "
+                    + "아직 끝나지 않은 경매(`READY`/`RUNNING`)도 그대로 내려주므로, 종료 여부는 "
+                    + "`status`로 판단한다.\n\n"
+                    + "경매는 종료 시각이 지나면 서버 스케줄러가 자동으로 마감하며, 그 순간 "
+                    + "`/topic/lives/{liveId}/auctions`로 `AUCTION_CLOSED` 이벤트가 전파된다 — "
+                    + "이 API는 그 이벤트를 놓쳤거나 나중에 결과를 다시 확인할 때 쓴다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "경매 없음(A005)")
+    })
+    @GetMapping("/winner")
+    public ResponseEntity<ApiResponse<AuctionWinnerResponse>> getWinner(@PathVariable Long auctionId) {
+        return ResponseEntity.ok(ApiResponse.success(auctionService.getWinner(auctionId)));
     }
 }

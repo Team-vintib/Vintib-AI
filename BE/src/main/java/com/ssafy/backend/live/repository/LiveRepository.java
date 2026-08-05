@@ -50,6 +50,13 @@ public interface LiveRepository extends JpaRepository<Live, Long> {
     long countByHost_IdAndStatusIn(Long hostId, Collection<LiveStatus> statuses);
 
     /**
+     * 이 회원이 그 방송의 호스트인지(시청자 수 집계에서 호스트를 빼기 위해).
+     *
+     * <p>구독마다 불리므로 방송을 통째로 읽지 않고 존재 여부만 본다.
+     */
+    boolean existsByIdAndHost_Id(Long id, Long hostId);
+
+    /**
      * 홈 "지금 라이브" 섹션(HOME-001) — 진행 중인 방송을 최근 시작순으로.
      *
      * <p><b>상태를 인자로 받지 않고 조건을 이름에 박은 이유.</b> 홈은 종료된 방송을 절대 보이면
