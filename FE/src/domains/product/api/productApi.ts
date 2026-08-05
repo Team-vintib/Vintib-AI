@@ -19,7 +19,10 @@ import type {
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
 import { buildMockProductDetail } from '@/domains/product/constants/productDetailMockData'
-import { PRODUCT_LIST_MOCK_DATA } from '@/domains/product/constants/productListMockData'
+import {
+  PRODUCT_CATEGORY_MOCK_DATA,
+  PRODUCT_LIST_MOCK_DATA,
+} from '@/domains/product/constants/productListMockData'
 import { http } from '@/shared/api/http'
 import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.types'
 
@@ -169,13 +172,41 @@ export const getProductList = async ({
   sort = 'LATEST',
 }: ProductListParams = {}) => {
   if (!PRODUCT_API_ENABLED) {
+    const filteredItems = PRODUCT_LIST_MOCK_DATA.filter((product) => {
+      const matchesCategory =
+        !categoryIds.length ||
+        (product.categoryId !== null &&
+          product.categoryId !== undefined &&
+          categoryIds.includes(product.categoryId))
+      const matchesCondition =
+        !conditionGrades.length || conditionGrades.includes(product.conditionGrade)
+      const matchesPrice =
+        (minPrice === null || product.price >= minPrice) &&
+        (maxPrice === null || product.price <= maxPrice)
+      const matchesSaleType = saleType === 'ALL' || product.saleType === saleType
+
+      return matchesCategory && matchesCondition && matchesPrice && matchesSaleType
+    })
+    const sortedItems = [...filteredItems]
+
+    if (sort === 'PRICE_ASC') {
+      sortedItems.sort((left, right) => left.price - right.price)
+    } else if (sort === 'PRICE_DESC') {
+      sortedItems.sort((left, right) => right.price - left.price)
+    }
+
+    const safePage = Math.max(page, 1)
+    const safeSize = Math.max(size, 1)
+    const startIndex = (safePage - 1) * safeSize
+    const pagedItems = sortedItems.slice(startIndex, startIndex + safeSize)
+
     return {
-      items: PRODUCT_LIST_MOCK_DATA,
+      items: pagedItems,
       meta: {
-        page: 1,
-        size: PRODUCT_LIST_MOCK_DATA.length,
-        totalElements: PRODUCT_LIST_MOCK_DATA.length,
-        totalPages: 1,
+        page: safePage,
+        size: safeSize,
+        totalElements: sortedItems.length,
+        totalPages: Math.max(Math.ceil(sortedItems.length / safeSize), 1),
       } satisfies PageMeta,
     }
   }
@@ -249,6 +280,10 @@ export const getBrands = async () => {
 }
 
 export const getCategories = async () => {
+  if (!PRODUCT_API_ENABLED) {
+    return PRODUCT_CATEGORY_MOCK_DATA
+  }
+
   const response = await http.get<ApiResponse<CategoryDto[]>>('/categories', { skipAuth: true })
 
   return unwrapApiData(response.data)

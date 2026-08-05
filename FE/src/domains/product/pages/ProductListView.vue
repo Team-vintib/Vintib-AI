@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import {
   addWish,
+  type CategoryDto,
   getCategories,
   getProductList,
   getWishProductIds,
@@ -32,6 +33,8 @@ const router = useRouter()
 const authStore = useAuthStore()
 const wishStore = useWishStore()
 const categoryOptions = ref<ProductCategoryOption[]>([])
+const isLoadingCategories = ref(true)
+const categoryLoadError = ref('')
 const selectedCategoryIds = ref<number[]>([])
 const selectedConditionIds = ref<string[]>([])
 const selectedSaleType = ref<ProductSaleTypeTab['id']>('ALL')
@@ -57,6 +60,24 @@ const selectedFilterCount = computed(
     Number(Boolean(minimumPrice.value)) +
     Number(Boolean(maximumPrice.value)),
 )
+
+const categoryStatusMessage = computed(() => {
+  if (isLoadingCategories.value) return '카테고리를 불러오는 중입니다.'
+  if (categoryLoadError.value) return categoryLoadError.value
+  return '선택할 수 있는 카테고리가 없습니다.'
+})
+
+const expandedSelectedCategoryIds = computed(() => {
+  const selectedIds = new Set(selectedCategoryIds.value)
+
+  return [
+    ...new Set(
+      categoryOptions.value
+        .filter((option) => selectedIds.has(option.id))
+        .flatMap((option) => option.categoryIds),
+    ),
+  ]
+})
 
 const visiblePageNumbers = computed(() =>
   Array.from({ length: totalPageCount.value }, (_, index) => index + 1),
@@ -119,6 +140,19 @@ const handleSearch = async (keyword: string) => {
   })
 }
 
+const handleSaleTypeChange = (saleType: ProductSaleTypeTab['id']) => {
+  if (selectedSaleType.value === saleType || isLoadingProducts.value) return
+
+  selectedSaleType.value = saleType
+  selectedPage.value = 1
+  void loadProducts()
+}
+
+const handleSortChange = () => {
+  selectedPage.value = 1
+  void loadProducts()
+}
+
 const loadProducts = async () => {
   isLoadingProducts.value = true
   productLoadError.value = ''
@@ -127,7 +161,7 @@ const loadProducts = async () => {
     await authStore.validateStoredSession()
 
     const response = await getProductList({
-      categoryIds: selectedCategoryIds.value,
+      categoryIds: expandedSelectedCategoryIds.value,
       conditionGrades: selectedConditionIds.value,
       maxPrice: appliedMaximumPrice.value,
       minPrice: appliedMinimumPrice.value,
@@ -216,15 +250,62 @@ const moveToPage = (page: number) => {
   void loadProducts()
 }
 
+const buildCategoryOptions = (categories: CategoryDto[]): ProductCategoryOption[] => {
+  const childrenByParentId = new Map<number, number[]>()
+
+  categories
+    .filter((category) => category.depth === 3)
+    .forEach((category) => {
+      const parentId = category.parentId
+      if (parentId === null) return
+
+      const siblingIds = childrenByParentId.get(parentId) ?? []
+      siblingIds.push(category.id)
+      childrenByParentId.set(parentId, siblingIds)
+    })
+
+  const groupedOptions = new Map<string, ProductCategoryOption>()
+
+  categories
+    .filter((category) => category.depth === 2)
+    .forEach((category) => {
+      const label = category.name.trim()
+      if (!label) return
+
+      const categoryIds = [category.id, ...(childrenByParentId.get(category.id) ?? [])]
+      const existingOption = groupedOptions.get(label)
+
+      if (existingOption) {
+        existingOption.categoryIds.push(...categoryIds)
+        return
+      }
+
+      groupedOptions.set(label, {
+        id: category.id,
+        label,
+        categoryIds,
+      })
+    })
+
+  return [...groupedOptions.values()].map((option) => ({
+    ...option,
+    categoryIds: [...new Set(option.categoryIds)],
+  }))
+}
+
 const loadCategoryOptions = async () => {
+  isLoadingCategories.value = true
+  categoryLoadError.value = ''
+
   try {
     const categories = await getCategories()
 
-    categoryOptions.value = categories
-      .filter((category) => category.depth <= 2)
-      .map((category) => ({ id: category.id, label: category.name }))
+    categoryOptions.value = buildCategoryOptions(categories)
   } catch {
     categoryOptions.value = []
+    categoryLoadError.value = '카테고리를 불러오지 못했습니다.'
+  } finally {
+    isLoadingCategories.value = false
   }
 }
 
@@ -247,11 +328,14 @@ onMounted(() => {
       <div class="product-list-page__content">
         <ProductFilterPanel
           :category-options="categoryOptions"
+          :category-status-message="categoryStatusMessage"
           v-model:selected-category-ids="selectedCategoryIds"
           v-model:selected-condition-ids="selectedConditionIds"
           v-model:minimum-price="minimumPrice"
           v-model:maximum-price="maximumPrice"
           :price-error="priceError"
+          :can-reset="selectedFilterCount > 0"
+          :disabled="isLoadingProducts"
           @reset="handleFilterReset"
           @apply="handleFilterApply"
         />
@@ -267,7 +351,8 @@ onMounted(() => {
                 type="button"
                 role="tab"
                 :aria-selected="selectedSaleType === tab.id"
-                @click="selectedSaleType = tab.id; selectedPage = 1; loadProducts()"
+                :disabled="isLoadingProducts"
+                @click="handleSaleTypeChange(tab.id)"
               >
                 {{ tab.label }}
               </button>
@@ -276,7 +361,12 @@ onMounted(() => {
             <div class="product-list-page__toolbar">
               <p>총 {{ totalProductCount }}개</p>
               <label class="sr-only" for="product-sort">상품 정렬</label>
-              <select id="product-sort" v-model="selectedSortOption" @change="loadProducts">
+              <select
+                id="product-sort"
+                v-model="selectedSortOption"
+                :disabled="isLoadingProducts"
+                @change="handleSortChange"
+              >
                 <option
                   v-for="sortOption in PRODUCT_SORT_OPTIONS"
                   :key="sortOption.id"
@@ -475,8 +565,8 @@ onMounted(() => {
 
 .product-list-page__grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-6);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-5);
 }
 
 .product-list-page__empty {
@@ -581,9 +671,9 @@ onMounted(() => {
   stroke-width: 1.8;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1120px) {
   .product-list-page__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -615,6 +705,12 @@ onMounted(() => {
     justify-content: space-between;
   }
 
+  .product-list-page__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
   .product-list-page__grid {
     grid-template-columns: 1fr;
   }
