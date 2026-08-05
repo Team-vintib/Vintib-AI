@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import CategoryProductTabs from '@/domains/home/components/CategoryProductTabs.vue'
 import HomeHeroCarousel from '@/domains/home/components/HomeHeroCarousel.vue'
 import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
@@ -9,7 +11,9 @@ import LiveCard from '@/domains/home/components/LiveCard.vue'
 import ProductCard from '@/domains/home/components/ProductCard.vue'
 import type { HomePopularHostLive, HomeViewData } from '@/domains/home/types/homeView.types'
 import type { ProductCategoryTabSection } from '@/domains/product/types/productList.types'
-import { ROUTE_PATHS } from '@/shared/constants/routes'
+import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
+
+const authStore = useAuthStore()
 
 defineProps<{
   homeData: HomeViewData
@@ -33,6 +37,11 @@ const formatCompactNumber = (value: number) => {
 const getLivePath = (liveId: number) => `/lives/${liveId}`
 const getProductPath = (productId: number) => `/products/${productId}`
 const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
+const followingListRoute = computed(() =>
+  authStore.user?.id
+    ? { name: ROUTE_NAMES.PROFILE_FOLLOWING, params: { userId: authStore.user.id } }
+    : ROUTE_PATHS.AUTH_LOGIN,
+)
 
 // 아바타 로드에 실패하면 대체 이미지를 새로 추가하는 대신 빈 원형 프레임만 남긴다.
 const handleAvatarError = (event: Event) => {
@@ -52,13 +61,13 @@ const handleAvatarError = (event: Event) => {
       title-id="followed-seller-title"
       eyebrow="Following"
       title="팔로우 중인 판매자"
-      :link-to="ROUTE_PATHS.FOLLOWING_HOME"
+      :link-to="followingListRoute"
       :is-empty="homeData.followedSellers.length === 0"
       empty-message="팔로우한 판매자가 없습니다."
     >
       <div class="seller-grid">
         <RouterLink
-          v-for="seller in homeData.followedSellers"
+          v-for="seller in homeData.followedSellers.slice(0, 8)"
           :key="seller.id"
           class="seller-card"
           :to="getSellerProfilePath(seller.id)"
@@ -74,9 +83,11 @@ const handleAvatarError = (event: Event) => {
           </span>
           <span class="seller-card__body">
             <strong class="seller-card__name">{{ seller.name }}</strong>
-            <span class="seller-card__stats">
+            <span class="seller-card__stats-row">
               <span>팔로워 {{ formatCompactNumber(seller.followerCount) }}</span>
               <span>팔로잉 {{ formatCompactNumber(seller.followingCount) }}</span>
+            </span>
+            <span class="seller-card__stats-row">
               <span>판매 상품 {{ formatCompactNumber(seller.newProductCount) }}</span>
               <span>라이브 {{ formatCompactNumber(seller.liveCount) }}</span>
             </span>
@@ -95,7 +106,7 @@ const handleAvatarError = (event: Event) => {
     >
       <div class="live-grid">
         <LiveCard
-          v-for="live in homeData.liveNow"
+          v-for="live in homeData.liveNow.slice(0, 8)"
           :key="live.id"
           :live="live"
           :to="getLivePath(live.id)"
@@ -113,7 +124,7 @@ const handleAvatarError = (event: Event) => {
     >
       <div class="schedule-grid">
         <LiveCard
-          v-for="live in homeData.scheduledLives"
+          v-for="live in homeData.scheduledLives.slice(0, 8)"
           :key="live.id"
           :live="live"
           variant="scheduled"
@@ -131,7 +142,7 @@ const handleAvatarError = (event: Event) => {
     >
       <div class="product-grid">
         <ProductCard
-          v-for="product in homeData.recommendedProducts"
+          v-for="product in homeData.recommendedProducts.slice(0, 8)"
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
@@ -158,7 +169,7 @@ const handleAvatarError = (event: Event) => {
     >
       <div class="product-grid">
         <ProductCard
-          v-for="product in homeData.upcomingAuctionProducts"
+          v-for="product in homeData.upcomingAuctionProducts.slice(0, 8)"
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
@@ -251,18 +262,32 @@ const handleAvatarError = (event: Event) => {
   white-space: nowrap;
 }
 
-.seller-card__stats {
+.seller-card__stats-row {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-start;
-  gap: var(--space-1) var(--space-3);
+  gap: var(--space-1) 0;
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-regular);
   letter-spacing: -0.01em;
   line-height: var(--line-height-snug);
   font-variant-numeric: tabular-nums;
+}
+
+.seller-card__stats-row > span:not(:last-child) {
+  position: relative;
+  padding-right: var(--space-3);
+}
+
+.seller-card__stats-row > span:not(:last-child)::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  color: var(--color-border-strong);
+  content: '·';
+  transform: translateY(-50%);
 }
 
 @media (max-width: 768px) {

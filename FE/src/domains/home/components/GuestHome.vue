@@ -41,7 +41,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
     >
       <div class="live-grid">
         <LiveCard
-          v-for="live in homeData.liveNow"
+          v-for="live in homeData.liveNow.slice(0, 8)"
           :key="live.id"
           :live="live"
           :to="getLivePath(live.id)"
@@ -59,7 +59,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
     >
       <div class="schedule-grid">
         <LiveCard
-          v-for="live in homeData.scheduledLives"
+          v-for="live in homeData.scheduledLives.slice(0, 8)"
           :key="live.id"
           :live="live"
           variant="scheduled"
@@ -77,7 +77,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
     >
       <div class="product-grid">
         <ProductCard
-          v-for="product in homeData.directSaleProducts"
+          v-for="product in homeData.directSaleProducts.slice(0, 8)"
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
@@ -104,7 +104,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
     >
       <div class="product-grid product-grid--auction">
         <ProductCard
-          v-for="product in homeData.upcomingAuctionProducts"
+          v-for="product in homeData.upcomingAuctionProducts.slice(0, 8)"
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
