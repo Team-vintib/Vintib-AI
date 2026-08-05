@@ -126,20 +126,20 @@ const outcomeLabel: Record<string, string> = {
   border-radius: var(--radius-chip);
   background: var(--color-live-surface-raised);
   color: var(--color-live-text-secondary);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
   letter-spacing: 0.04em;
 }
 
 .broadcast-end__title {
   color: var(--color-live-text-primary);
-  font-size: 22px;
-  font-weight: 800;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-extrabold);
 }
 
 .broadcast-end__subtitle {
   color: var(--color-live-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
 }
 
 .broadcast-end__stats {
@@ -160,13 +160,13 @@ const outcomeLabel: Record<string, string> = {
 
 .broadcast-end__stat dt {
   color: var(--color-live-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 .broadcast-end__stat dd {
   color: var(--color-live-text-primary);
-  font-size: 16px;
-  font-weight: 800;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-extrabold);
 }
 
 .broadcast-end__stat--accent dd {
@@ -181,8 +181,8 @@ const outcomeLabel: Record<string, string> = {
 
 .broadcast-end__section-title {
   color: var(--color-live-text-primary);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .broadcast-end__list {
@@ -217,8 +217,8 @@ const outcomeLabel: Record<string, string> = {
   flex-shrink: 0;
   padding: 2px 8px;
   border-radius: var(--radius-badge);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-bold);
 }
 
 .broadcast-end__outcome--won {
@@ -239,8 +239,8 @@ const outcomeLabel: Record<string, string> = {
 .broadcast-end__item-title {
   overflow: hidden;
   color: var(--color-live-text-primary);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -254,18 +254,18 @@ const outcomeLabel: Record<string, string> = {
 
 .broadcast-end__winner {
   color: var(--color-live-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .broadcast-end__price {
   color: var(--color-live-text-primary);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-extrabold);
 }
 
 .broadcast-end__item-none {
   color: var(--color-live-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
 }
 
 .broadcast-end__unsold {
@@ -277,8 +277,8 @@ const outcomeLabel: Record<string, string> = {
 
 .broadcast-end__unsold-desc {
   color: var(--color-live-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
 }
 
 .broadcast-end__unsold-list {
@@ -293,19 +293,19 @@ const outcomeLabel: Record<string, string> = {
   border-radius: var(--radius-chip);
   background: var(--color-live-surface);
   color: var(--color-live-text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .broadcast-end__unsold-action {
-  min-height: 42px;
+  min-height: var(--button-height-tight);
   margin-top: var(--space-2);
   padding: 0 var(--space-5);
   border: 0;
   border-radius: var(--radius-control);
   background: var(--color-live);
   color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .broadcast-end__unsold-action:hover {
@@ -319,14 +319,14 @@ const outcomeLabel: Record<string, string> = {
 }
 
 .broadcast-end__to-list {
-  min-height: 44px;
+  min-height: var(--button-height-compact);
   flex: 1;
   border: 1px solid var(--color-live-border);
   border-radius: var(--radius-control);
   background: var(--color-live-surface);
   color: var(--color-live-text-primary);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .broadcast-end__to-list:hover {

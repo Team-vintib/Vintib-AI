@@ -222,8 +222,8 @@ function getQueryValue(value: unknown) {
 }
 
 .callback-state--error .callback-state__indicator {
-  width: 16px;
-  height: 16px;
+  width: var(--space-4);
+  height: var(--space-4);
   border: 0;
   border-radius: var(--radius-control);
   animation: none;
@@ -232,23 +232,23 @@ function getQueryValue(value: unknown) {
 
 .callback-title {
   color: var(--color-text-primary);
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 38px;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-3xl);
 }
 
 .callback-description {
   margin-top: var(--space-3);
   color: var(--color-text-secondary);
-  font-size: 15px;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 .callback-caption {
   margin-top: var(--space-8);
   color: var(--color-text-muted);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
 }
 
 .callback-actions {
@@ -266,9 +266,9 @@ function getQueryValue(value: unknown) {
   width: 100%;
   height: var(--button-height-major);
   border-radius: var(--radius-control);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .callback-primary-link {

@@ -4,13 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 import com.ssafy.backend.live.port.ProductQueryPort.CategorySummary;
+import com.ssafy.backend.live.port.ProductQueryPort.ProductCard;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.entity.ProductDefect;
 import com.ssafy.backend.product.repository.CategoryRepository;
+import com.ssafy.backend.product.repository.ProductDefectRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +41,9 @@ class ProductQueryAdapterTest {
 
     @Autowired
     private MemberRepository memberRepository;
+
+    @Autowired
+    private ProductDefectRepository productDefectRepository;
 
     private Member seller;
 
@@ -116,5 +123,52 @@ class ProductQueryAdapterTest {
         assertThat(categories)
                 .extracting(CategorySummary::id, CategorySummary::name)
                 .containsExactly(tuple(자켓.getParentId(), "아우터"));
+    }
+
+    // ---------- 카드 조회 — 소재/치수/하자 요약 (FE 요청 003 §3.5) ----------
+
+    @Test
+    void 소재와_실측_치수가_카드에_담긴다() {
+        Category 자켓 = 소분류("자켓");
+        Product product = productRepository.save(Product.builder()
+                .seller(seller)
+                .categoryId(자켓.getId())
+                .title("빈티지 자켓")
+                .material("코튼 100%")
+                .measurements(Map.of("어깨너비", 45, "총장", 70))
+                .build());
+
+        ProductCard card = productQueryPort.findCards(List.of(product.getId())).get(product.getId());
+
+        assertThat(card.material()).isEqualTo("코튼 100%");
+        assertThat(card.measurements()).containsEntry("어깨너비", 45).containsEntry("총장", 70);
+    }
+
+    @Test
+    void 하자_목록은_쉼표로_이어붙인_한_줄_요약으로_담긴다() {
+        Category 자켓 = 소분류("자켓");
+        Product product = productRepository.save(
+                Product.builder().seller(seller).categoryId(자켓.getId()).title("빈티지 자켓").build());
+        productDefectRepository.save(
+                ProductDefect.builder().product(product).content("밑단 오염").sortOrder((short) 0).build());
+        productDefectRepository.save(
+                ProductDefect.builder().product(product).content("우측 소매 실밥 풀림").sortOrder((short) 1).build());
+
+        ProductCard card = productQueryPort.findCards(List.of(product.getId())).get(product.getId());
+
+        assertThat(card.defectSummary()).isEqualTo("밑단 오염, 우측 소매 실밥 풀림");
+    }
+
+    @Test
+    void 소재와_하자가_없으면_null이다() {
+        Category 자켓 = 소분류("자켓");
+        Product product = productRepository.save(
+                Product.builder().seller(seller).categoryId(자켓.getId()).title("빈티지 자켓").build());
+
+        ProductCard card = productQueryPort.findCards(List.of(product.getId())).get(product.getId());
+
+        assertThat(card.material()).isNull();
+        assertThat(card.measurements()).isNull();
+        assertThat(card.defectSummary()).isNull();
     }
 }

@@ -2,17 +2,25 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import fallbackThumbnailImage from '@/assets/images/products/product-denim-jacket.webp'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useBusinessVerificationStore } from '@/domains/biz/stores/businessVerificationStore'
 import {
-  deleteMyProfileImage,
   getMyPageViewData,
   getMyInterestOptions,
   getMyInterests,
   updateMyInterests,
   updateMyProfile,
-  updateMyProfileImage,
 } from '@/domains/my/api/myApi'
+import { getPointBalance } from '@/domains/point/api/pointApi'
+import {
+  followUser,
+  getFollowers,
+  getFollowings,
+  getPublicProfile,
+  unfollowUser,
+} from '@/domains/profile/api/profileApi'
+import { useFollowStore } from '@/domains/profile/stores/followStore'
 import {
   MY_BUSINESS_STATUS_LABELS,
   MY_LIVE_STATUS_LABELS,
@@ -42,6 +50,8 @@ import type {
   TryOnBodyFieldId,
   TryOnProfile,
 } from '@/domains/tryon/types/tryOnProfile.types'
+import type { PointBalance } from '@/domains/point/types/point.types'
+import type { FollowUser } from '@/domains/profile/types/profile.types'
 import { normalizeApiError } from '@/shared/api/http'
 import type { InterestBrand, InterestCategory } from '@/shared/api/mockInterestStorage'
 import { readImageFileAsDataUrl } from '@/shared/api/mockProfileMediaStorage'
@@ -52,8 +62,14 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const businessVerificationStore = useBusinessVerificationStore()
+const followStore = useFollowStore()
 
 const viewData = ref<MyPageViewData | null>(null)
+const pointBalance = ref<PointBalance | null>(null)
+const followerCount = ref(0)
+const followingCount = ref(0)
+const followersList = ref<FollowUser[]>([])
+const followingsList = ref<FollowUser[]>([])
 const selectedSection = ref<MySectionId>('dashboard')
 const loadState = ref<'idle' | 'loading' | 'success' | 'error' | 'guest'>('idle')
 const errorMessage = ref('')
@@ -67,11 +83,6 @@ const profileForm = ref<MyProfileUpdateRequest>({
 })
 const profileSaveState = ref<'idle' | 'saving' | 'success' | 'error'>('idle')
 const profileSaveMessage = ref('')
-const profileImageInput = ref<HTMLInputElement | null>(null)
-const selectedProfileImageFile = ref<File | null>(null)
-const profileImagePreviewUrl = ref('')
-const isProfileImageRemoved = ref(false)
-const selectedProfileImageName = ref('')
 const tryOnImageInput = ref<HTMLInputElement | null>(null)
 const selectedTryOnImageFile = ref<File | null>(null)
 const tryOnImagePreviewUrl = ref('')
@@ -146,14 +157,11 @@ const isGuest = computed(() => loadState.value === 'guest')
 const hasLoadError = computed(() => loadState.value === 'error')
 const isProfileSaving = computed(() => profileSaveState.value === 'saving')
 const isTryOnProfileSaving = computed(() => tryOnProfileSaveState.value === 'saving')
-const profileInitial = computed(() => (profile.value?.nickname || profile.value?.name || '회').slice(0, 1))
-const profileImageDisplayUrl = computed(() => {
-  if (isProfileImageRemoved.value) {
-    return ''
-  }
-
-  return profileImagePreviewUrl.value || profile.value?.profileImageUrl || ''
-})
+const profileDisplayName = computed(
+  () => profile.value?.nickname?.trim() || profile.value?.name?.trim() || '회원',
+)
+const profileInitial = computed(() => profileDisplayName.value.slice(0, 1))
+const profileImageDisplayUrl = computed(() => profile.value?.profileImageUrl || '')
 const profileAvatarUrl = computed(() => profileImageDisplayUrl.value)
 const tryOnImageDisplayUrl = computed(() => {
   if (isTryOnImageRemoved.value) {
@@ -212,15 +220,12 @@ const filteredLives = computed(() => {
 
   return lives.filter((live) => live.status === selectedLiveFilter.value)
 })
-const visibleSocialUsers = computed(() => {
-  if (!viewData.value) {
-    return []
-  }
-
-  return selectedSocialTab.value === 'followers'
-    ? viewData.value.followers
-    : viewData.value.followings
-})
+const visibleSocialUsers = computed(() =>
+  selectedSocialTab.value === 'followers' ? followersList.value : followingsList.value,
+)
+const isSocialUserFollowing = (user: FollowUser) =>
+  followStore.getFollowState(user.id, { followerCount: user.followerCount, isFollowing: user.isFollowing })
+    .isFollowing
 const businessSubmission = computed(() => businessVerificationStore.submission)
 const businessStatusDescription = computed(() => {
   const status = profile.value?.businessVerificationStatus
@@ -309,7 +314,7 @@ const homeCards = computed(() => {
     },
     {
       label: '정산 예정',
-      value: summary?.settlementSummary.pendingAmount ?? summary?.pendingSettlementAmount ?? 0,
+      value: pointBalance.value?.pendingSettlement ?? 0,
       section: 'sales',
       suffix: 'P',
       tone: 'green',
@@ -334,39 +339,37 @@ const profileStats = computed(() => {
   const summary = viewData.value?.summary
 
   return [
-    { label: '팔로워', value: summary?.counts.followers ?? 0, suffix: '' },
-    { label: '팔로잉', value: 42, suffix: '' },
+    { label: '팔로워', value: followerCount.value, suffix: '' },
+    { label: '팔로잉', value: followingCount.value, suffix: '' },
     {
       label: '판매 완료',
       value: summary?.salesPerformance.soldCount ?? summary?.counts.sales ?? 0,
       suffix: '건',
     },
-    { label: '보유 포인트', value: summary?.pointBalance ?? 0, suffix: 'P' },
+    { label: '보유 포인트', value: pointBalance.value?.available ?? 0, suffix: 'P' },
   ]
 })
 
 const pointCards = computed(() => {
-  const summary = viewData.value?.summary
-
   return [
     {
       label: '사용 가능',
-      value: summary?.pointBalance ?? 0,
+      value: pointBalance.value?.available ?? 0,
       helper: '즉시 사용 가능',
     },
     {
       label: '입찰 보류',
-      value: 39000,
+      value: pointBalance.value?.held ?? 0,
       helper: '경매 종료 시 반환',
     },
     {
       label: '거래 보관',
-      value: summary?.settlementSummary.escrowAmount ?? 0,
+      value: pointBalance.value?.escrow ?? 0,
       helper: '구매 확정 후 정산',
     },
     {
       label: '판매 정산',
-      value: summary?.settlementSummary.pendingAmount ?? summary?.pendingSettlementAmount ?? 0,
+      value: pointBalance.value?.pendingSettlement ?? 0,
       helper: '출금 신청 가능',
     },
   ]
@@ -434,6 +437,16 @@ const maxMonthlyRevenue = computed(() =>
 const getRevenueBarHeight = (revenue: number) =>
   `${Math.max(10, Math.round((revenue / maxMonthlyRevenue.value) * 100))}%`
 
+const getThumbnail = (url: string) => url || fallbackThumbnailImage
+const handleThumbnailError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackThumbnailImage
+  }
+}
+
 const formatPoint = (value: number) => `${value.toLocaleString('ko-KR')}P`
 
 const formatShortDate = (value?: string) => {
@@ -462,10 +475,6 @@ const syncProfileForm = () => {
   }
   profileSaveState.value = 'idle'
   profileSaveMessage.value = ''
-  selectedProfileImageFile.value = null
-  profileImagePreviewUrl.value = ''
-  isProfileImageRemoved.value = false
-  selectedProfileImageName.value = ''
 }
 
 const syncTryOnProfileForm = () => {
@@ -549,15 +558,15 @@ const getProductFilterCount = (filterId: ProductFilterId) => {
 
 const isOrderInFilter = (status: MyOrderStatus, filterId: OrderFilterId) => {
   if (filterId === 'IN_PROGRESS') {
-    return status === 'CREATED' || status === 'PAID' || status === 'SHIPPING' || status === 'DELIVERED'
+    return status === 'PAID' || status === 'SHIPPING' || status === 'DELIVERED'
   }
 
   if (filterId === 'COMPLETED') {
-    return status === 'CONFIRMED'
+    return status === 'CONFIRMED' || status === 'SETTLED'
   }
 
   if (filterId === 'REFUND') {
-    return status === 'REFUND_REQUESTED' || status === 'REFUNDED'
+    return status === 'REFUNDED'
   }
 
   return true
@@ -565,15 +574,15 @@ const isOrderInFilter = (status: MyOrderStatus, filterId: OrderFilterId) => {
 
 const isSaleInFilter = (status: MyOrderStatus, filterId: SaleFilterId) => {
   if (filterId === 'IN_PROGRESS') {
-    return status === 'CREATED' || status === 'PAID' || status === 'SHIPPING' || status === 'DELIVERED'
+    return status === 'PAID' || status === 'SHIPPING' || status === 'DELIVERED'
   }
 
   if (filterId === 'COMPLETED') {
-    return status === 'CONFIRMED'
+    return status === 'CONFIRMED' || status === 'SETTLED'
   }
 
   if (filterId === 'REFUND') {
-    return status === 'REFUND_REQUESTED' || status === 'REFUNDED'
+    return status === 'REFUNDED'
   }
 
   return true
@@ -593,6 +602,45 @@ const selectLiveFilter = (filterId: LiveFilterId) => {
 
 const selectSocialTab = (tabId: SocialTabId) => {
   selectedSocialTab.value = tabId
+}
+
+const toggleSocialFollow = async (user: FollowUser) => {
+  if (followStore.isPending(user.id)) {
+    return
+  }
+
+  const previousState = followStore.getFollowState(user.id, {
+    followerCount: user.followerCount,
+    isFollowing: user.isFollowing,
+  })
+
+  if (previousState.isFollowing && !window.confirm('팔로우를 취소하시겠습니까?')) {
+    return
+  }
+
+  const nextIsFollowing = !previousState.isFollowing
+
+  followStore.setPending(user.id, true)
+  followStore.setFollowState(user.id, { isFollowing: nextIsFollowing })
+  followingCount.value = Math.max(followingCount.value + (nextIsFollowing ? 1 : -1), 0)
+
+  try {
+    if (previousState.isFollowing) {
+      await unfollowUser(user.id)
+      followingsList.value = followingsList.value.filter((item) => item.id !== user.id)
+    } else {
+      const response = await followUser(user.id)
+      followStore.setFollowState(user.id, {
+        followerCount: response.followerCount,
+        isFollowing: response.isFollowing,
+      })
+    }
+  } catch {
+    followStore.setFollowState(user.id, previousState)
+    followingCount.value = Math.max(followingCount.value + (nextIsFollowing ? -1 : 1), 0)
+  } finally {
+    followStore.setPending(user.id, false)
+  }
 }
 
 const goToOrderDetail = (orderId: number) => {
@@ -640,13 +688,8 @@ const getLiveFilterCount = (filterId: LiveFilterId) => {
   return lives.filter((live) => live.status === filterId).length
 }
 
-const getSocialTabCount = (tabId: SocialTabId) => {
-  if (!viewData.value) {
-    return 0
-  }
-
-  return tabId === 'followers' ? viewData.value.followers.length : viewData.value.followings.length
-}
+const getSocialTabCount = (tabId: SocialTabId) =>
+  tabId === 'followers' ? followerCount.value : followingCount.value
 
 const formatOrderDate = (value: string) =>
   new Intl.DateTimeFormat('ko-KR', {
@@ -690,47 +733,8 @@ const loadMyInterests = async (userId: number) => {
   }
 }
 
-const openProfileImagePicker = () => {
-  profileImageInput.value?.click()
-}
-
 const openTryOnImagePicker = () => {
   tryOnImageInput.value?.click()
-}
-
-const handleProfileImageChange = async (event: Event) => {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-
-  if (!file) {
-    return
-  }
-
-  if (!file.type.startsWith('image/')) {
-    profileSaveState.value = 'error'
-    profileSaveMessage.value = '이미지 파일만 업로드할 수 있습니다.'
-    input.value = ''
-    return
-  }
-
-  if (file.size > 5 * 1024 * 1024) {
-    profileSaveState.value = 'error'
-    profileSaveMessage.value = '프로필 사진은 5MB 이하로 선택해 주세요.'
-    input.value = ''
-    return
-  }
-
-  try {
-    profileImagePreviewUrl.value = await readImageFileAsDataUrl(file, '프로필 사진을 읽지 못했습니다.')
-    selectedProfileImageFile.value = file
-    isProfileImageRemoved.value = false
-    selectedProfileImageName.value = file.name
-    profileSaveState.value = 'idle'
-    profileSaveMessage.value = ''
-  } catch (error) {
-    profileSaveState.value = 'error'
-    profileSaveMessage.value = normalizeApiError(error).message
-  }
 }
 
 const handleTryOnImageChange = async (event: Event) => {
@@ -765,17 +769,6 @@ const handleTryOnImageChange = async (event: Event) => {
   } catch (error) {
     tryOnProfileSaveState.value = 'error'
     tryOnProfileMessage.value = normalizeApiError(error).message
-  }
-}
-
-const removeProfileImage = () => {
-  selectedProfileImageFile.value = null
-  profileImagePreviewUrl.value = ''
-  selectedProfileImageName.value = ''
-  isProfileImageRemoved.value = true
-
-  if (profileImageInput.value) {
-    profileImageInput.value.value = ''
   }
 }
 
@@ -945,15 +938,6 @@ const submitProfileForm = async () => {
       detailAddress: profileForm.value.detailAddress.trim(),
     }
     const nextProfile = await updateMyProfile(profile.value.id, request)
-    let nextProfileImageUrl = profile.value.profileImageUrl
-
-    if (isProfileImageRemoved.value) {
-      const response = await deleteMyProfileImage(profile.value.id)
-      nextProfileImageUrl = response.profileImageUrl
-    } else if (selectedProfileImageFile.value) {
-      const response = await updateMyProfileImage(profile.value.id, selectedProfileImageFile.value)
-      nextProfileImageUrl = response.profileImageUrl
-    }
 
     await updateMyInterests(profile.value.id, {
       brandIds: [...selectedInterestBrandIds.value],
@@ -966,18 +950,22 @@ const submitProfileForm = async () => {
         ...viewData.value.summary,
         profile: {
           ...nextProfile,
-          profileImageUrl: nextProfileImageUrl,
+          email: nextProfile.email || profile.value.email,
+          name: nextProfile.name || profile.value.name,
+          profileImageUrl: profile.value.profileImageUrl,
           defaultTryOnImageUrl: profile.value.defaultTryOnImageUrl,
+          memberType: nextProfile.memberType || profile.value.memberType,
+          businessVerificationStatus:
+            nextProfile.businessVerificationStatus || profile.value.businessVerificationStatus,
+          onboardingCompleted:
+            nextProfile.onboardingCompleted || profile.value.onboardingCompleted,
         },
       },
     }
     authStore.updateUser({ nickname: nextProfile.nickname })
-    selectedProfileImageFile.value = null
-    profileImagePreviewUrl.value = ''
-    selectedProfileImageName.value = ''
-    isProfileImageRemoved.value = false
     profileSaveState.value = 'success'
     profileSaveMessage.value = '내 정보가 저장되었습니다.'
+    await router.push({ name: ROUTE_NAMES.HOME })
   } catch (error) {
     profileSaveState.value = 'error'
     profileSaveMessage.value = normalizeApiError(error).message
@@ -1021,9 +1009,20 @@ const loadMyPage = async () => {
     const nextViewData = await getMyPageViewData(authStore.user.id)
     viewData.value = mergeSessionProfile(nextViewData)
     tryOnProfileLoadState.value = 'loading'
-    const [tryOnProfileResult] = await Promise.allSettled([
+    const [
+      tryOnProfileResult,
+      ,
+      publicProfileResult,
+      pointBalanceResult,
+      followersResult,
+      followingsResult,
+    ] = await Promise.allSettled([
       getMyTryOnProfile(authStore.user.id),
       loadMyInterests(authStore.user.id),
+      getPublicProfile(authStore.user.id),
+      getPointBalance(authStore.user.id),
+      getFollowers(authStore.user.id, { page: 1, size: 60 }),
+      getFollowings(authStore.user.id, { page: 1, size: 60 }),
     ])
 
     if (tryOnProfileResult.status === 'fulfilled') {
@@ -1045,6 +1044,45 @@ const loadMyPage = async () => {
       tryOnProfileMessage.value = normalizeApiError(tryOnProfileResult.reason).message
     }
 
+    if (publicProfileResult.status === 'fulfilled') {
+      viewData.value = {
+        ...viewData.value,
+        summary: {
+          ...viewData.value.summary,
+          profile: {
+            ...viewData.value.summary.profile,
+            profileImageUrl: publicProfileResult.value.profileImageUrl,
+          },
+        },
+      }
+      followerCount.value = publicProfileResult.value.followerCount
+      followingCount.value = publicProfileResult.value.followingCount
+    }
+
+    if (pointBalanceResult.status === 'fulfilled') {
+      pointBalance.value = pointBalanceResult.value
+    }
+
+    if (followersResult.status === 'fulfilled') {
+      followersList.value = followersResult.value.items
+      followersResult.value.items.forEach((user) => {
+        followStore.setFollowState(user.id, {
+          followerCount: user.followerCount,
+          isFollowing: user.isFollowing,
+        })
+      })
+    }
+
+    if (followingsResult.status === 'fulfilled') {
+      followingsList.value = followingsResult.value.items
+      followingsResult.value.items.forEach((user) => {
+        followStore.setFollowState(user.id, {
+          followerCount: user.followerCount,
+          isFollowing: user.isFollowing,
+        })
+      })
+    }
+
     loadState.value = 'success'
   } catch (error) {
     errorMessage.value = normalizeApiError(error).message
@@ -1061,6 +1099,7 @@ const mergeSessionProfile = (data: MyPageViewData): MyPageViewData => {
 
   const profile = data.summary.profile
   const sessionName = sessionUser.name?.trim() || sessionUser.email || ''
+  const sessionNickname = sessionUser.nickname?.trim() || ''
 
   return {
     ...data,
@@ -1071,7 +1110,7 @@ const mergeSessionProfile = (data: MyPageViewData): MyPageViewData => {
         id: sessionUser.id,
         email: profile.email || sessionUser.email,
         name: profile.name || sessionName,
-        nickname: profile.nickname || sessionUser.name?.trim() || '',
+        nickname: profile.nickname || sessionNickname || '',
         onboardingCompleted:
           profile.onboardingCompleted || sessionUser.onboardingCompleted === true,
       },
@@ -1151,7 +1190,7 @@ onMounted(() => {
               <span v-else>{{ profileInitial }}</span>
             </div>
             <div>
-              <strong>{{ profile.name }} 님</strong>
+              <strong>{{ profileDisplayName }} 님</strong>
               <span>{{ profile.memberType === 'BUSINESS' ? '사업자 회원' : '일반 회원' }}</span>
             </div>
           </div>
@@ -1193,7 +1232,7 @@ onMounted(() => {
               </div>
               <div class="my-profile-hero__body">
                 <div class="my-profile-hero__title">
-                  <h2>{{ profile.name }} 님</h2>
+                  <h2>{{ profileDisplayName }} 님</h2>
                   <span>{{ MY_BUSINESS_STATUS_LABELS[profile.businessVerificationStatus] }}</span>
                 </div>
                 <p>
@@ -1362,25 +1401,11 @@ onMounted(() => {
                   </div>
                   <div class="my-profile-photo__body">
                     <strong>프로필 사진</strong>
-                    <p>마이페이지와 판매자 정보에 표시되는 사진입니다. 시착용 사진과 별도로 관리됩니다.</p>
-                    <p v-if="selectedProfileImageName" class="my-profile-photo__file">
-                      {{ selectedProfileImageName }}
+                    <p>
+                      프로필 페이지와 동일한 사진이 표시됩니다.
+                      <router-link :to="{ name: ROUTE_NAMES.PROFILE_ME }">프로필 편집</router-link>에서 변경할 수 있습니다.
                     </p>
-                    <div class="my-profile-photo__actions">
-                      <button type="button" @click="openProfileImagePicker">사진 선택</button>
-                      <button v-if="profileImageDisplayUrl" type="button" @click="removeProfileImage">
-                        사진 삭제
-                      </button>
-                    </div>
                   </div>
-                  <input
-                    ref="profileImageInput"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    class="my-profile-photo__input"
-                    aria-label="프로필 사진 선택"
-                    @change="handleProfileImageChange"
-                  />
                 </div>
 
                 <div class="my-profile-form__grid">
@@ -1610,7 +1635,11 @@ onMounted(() => {
                     class="my-product-card__main"
                     @click="goToProductDetail(item.product.id)"
                   >
-                    <img :src="item.product.imageUrl" :alt="item.product.imageAlt" />
+                    <img
+                      :src="getThumbnail(item.product.imageUrl)"
+                      :alt="item.product.imageAlt"
+                      @error="handleThumbnailError"
+                    />
                     <span>{{ MY_PRODUCT_STATUS_LABELS[item.status] }}</span>
                     <strong>{{ item.product.name }}</strong>
                     <p>{{ item.product.price.toLocaleString('ko-KR') }}P</p>
@@ -1649,7 +1678,11 @@ onMounted(() => {
                     class="my-order-card__main"
                     @click="goToOrderDetail(order.id)"
                   >
-                    <img :src="order.productThumbnailUrl" :alt="order.productName" />
+                    <img
+                      :src="getThumbnail(order.productThumbnailUrl)"
+                      :alt="order.productName"
+                      @error="handleThumbnailError"
+                    />
                     <div class="my-order-card__body">
                       <div class="my-order-card__top">
                         <span>{{ getOrderTypeLabel(order.type) }}</span>
@@ -1701,7 +1734,11 @@ onMounted(() => {
                     class="my-order-card__main"
                     @click="goToSaleDetail(sale.id)"
                   >
-                    <img :src="sale.productThumbnailUrl" :alt="sale.productName" />
+                    <img
+                      :src="getThumbnail(sale.productThumbnailUrl)"
+                      :alt="sale.productName"
+                      @error="handleThumbnailError"
+                    />
                     <div class="my-order-card__body">
                       <div class="my-order-card__top">
                         <span>{{ MY_ORDER_STATUS_LABELS[sale.status] }}</span>
@@ -1753,7 +1790,11 @@ onMounted(() => {
                     class="my-order-card__main"
                     @click="goToLiveDetail(live.id, live.status)"
                   >
-                    <img :src="live.thumbnailUrl" :alt="live.title" />
+                    <img
+                      :src="getThumbnail(live.thumbnailUrl)"
+                      :alt="live.title"
+                      @error="handleThumbnailError"
+                    />
                     <div class="my-order-card__body">
                       <div class="my-order-card__top">
                         <span>{{ MY_LIVE_STATUS_LABELS[live.status] }}</span>
@@ -1806,21 +1847,30 @@ onMounted(() => {
                   </div>
                   <div class="my-social-card__body">
                     <strong>{{ user.nickname }}</strong>
-                    <p>{{ user.introduction }}</p>
                     <dl>
                       <div>
                         <dt>팔로워</dt>
                         <dd>{{ user.followerCount.toLocaleString('ko-KR') }}</dd>
                       </div>
                       <div>
-                        <dt>팔로잉</dt>
-                        <dd>{{ user.followingCount.toLocaleString('ko-KR') }}</dd>
+                        <dt>상품</dt>
+                        <dd>{{ user.productCount.toLocaleString('ko-KR') }}</dd>
                       </div>
                     </dl>
-                    <span>{{ formatOrderDate(user.followedAt) }}</span>
                   </div>
-                  <button type="button" disabled>
-                    {{ selectedSocialTab === 'followers' && !user.isFollowing ? '팔로우' : '프로필 보기' }}
+                  <button
+                    type="button"
+                    :class="{ 'my-social-card__follow--active': isSocialUserFollowing(user) }"
+                    :disabled="followStore.isPending(user.id)"
+                    @click="toggleSocialFollow(user)"
+                  >
+                    {{
+                      followStore.isPending(user.id)
+                        ? '처리 중'
+                        : isSocialUserFollowing(user)
+                          ? '언팔로우'
+                          : '팔로우'
+                    }}
                   </button>
                 </article>
               </div>
@@ -1894,13 +1944,13 @@ onMounted(() => {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: var(--search-input-height);
+  height: var(--search-input-height);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-extrabold);
   overflow: hidden;
 }
@@ -1917,16 +1967,16 @@ onMounted(() => {
 .my-empty strong {
   display: block;
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
-  line-height: 21px;
+  line-height: var(--line-height-comfortable);
 }
 
 .my-sidebar__profile span {
   display: block;
   color: var(--color-text-secondary);
-  font-size: 11px;
-  line-height: 17px;
+  font-size: var(--font-size-2xs);
+  line-height: var(--line-height-2xs);
 }
 
 .my-sidebar__nav {
@@ -1948,7 +1998,7 @@ onMounted(() => {
   color: var(--color-text-secondary);
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-semibold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
   text-align: left;
 }
 
@@ -1979,9 +2029,9 @@ onMounted(() => {
 
 .my-content__header h1 {
   color: var(--color-text-primary);
-  font-size: 28px;
+  font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-extrabold);
-  line-height: 36px;
+  line-height: var(--line-height-2xl-plus);
 }
 
 .my-content__header p,
@@ -1990,8 +2040,8 @@ onMounted(() => {
 .my-empty p {
   margin-top: 2px;
   color: var(--color-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
 }
 
 .my-content__actions {
@@ -2011,10 +2061,10 @@ onMounted(() => {
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .my-content__actions button:first-child,
@@ -2047,11 +2097,10 @@ onMounted(() => {
 .my-product-card__main:focus-visible,
 .my-order-card__main:focus-visible,
 .my-business-status button:focus-visible,
-.my-profile-photo__actions button:focus-visible,
 .my-tryon-photo__actions button:focus-visible,
 .my-interest-editor__chips button:focus-visible,
 .my-point-panel__actions button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -2066,18 +2115,18 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgb(23 26 31 / 10%);
+  box-shadow: none;
 }
 
 .my-profile-hero__avatar {
   display: grid;
   place-items: center;
-  width: 88px;
-  height: 88px;
+  width: var(--avatar-size-lg);
+  height: var(--avatar-size-lg);
   border-radius: 50%;
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 32px;
+  font-size: var(--font-size-4xl);
   font-weight: var(--font-weight-extrabold);
   overflow: hidden;
 }
@@ -2101,26 +2150,26 @@ onMounted(() => {
 
 .my-profile-hero__title h2 {
   color: var(--color-text-primary);
-  font-size: 28px;
+  font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-extrabold);
-  line-height: 36px;
+  line-height: var(--line-height-2xl-plus);
 }
 
 .my-profile-hero__title span {
-  min-height: 28px;
+  min-height: var(--badge-height-md);
   padding: 5px 12px;
   border-radius: var(--radius-badge);
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
 }
 
 .my-profile-hero__body > p {
   margin-top: 4px;
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
 }
 
 .my-profile-hero__stats {
@@ -2142,7 +2191,7 @@ onMounted(() => {
 
 .my-profile-hero__stats strong {
   color: var(--color-text-primary);
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-extrabold);
   line-height: 30px;
@@ -2150,7 +2199,7 @@ onMounted(() => {
 
 .my-profile-hero__stats span {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -2182,54 +2231,54 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgb(23 26 31 / 10%);
+  box-shadow: none;
 }
 
 .my-dashboard__card {
   display: grid;
   gap: 8px;
-  min-height: 128px;
+  min-height: var(--surface-min-height-3xs);
   padding: 20px;
   border-radius: var(--radius-card);
   text-align: left;
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-base);
 }
 
 .my-dashboard__card:hover {
   border-color: var(--color-border-strong);
-  box-shadow: 0 6px 18px rgb(23 26 31 / 10%);
+  box-shadow: none;
   transform: translateY(-1px);
 }
 
 .my-dashboard--home .my-dashboard__card {
   align-content: center;
-  min-height: 128px;
+  min-height: var(--surface-min-height-3xs);
   padding: 22px;
 }
 
 .my-dashboard__card span {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .my-dashboard__card strong {
   color: var(--color-text-primary);
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-extrabold);
-  line-height: 32px;
+  line-height: var(--line-height-2xl);
 }
 
 .my-dashboard__card small {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .my-point-panel {
@@ -2262,22 +2311,22 @@ onMounted(() => {
 
 .my-point-panel__grid span {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
 }
 
 .my-point-panel__grid strong {
   color: var(--color-text-primary);
-  font-size: 22px;
+  font-size: var(--font-size-xl);
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-extrabold);
 }
 
 .my-point-panel__grid p {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .my-point-panel__actions {
@@ -2295,9 +2344,9 @@ onMounted(() => {
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .my-point-panel__actions button:first-child {
@@ -2342,7 +2391,7 @@ onMounted(() => {
 
 .my-card--revenue .my-card__title > strong {
   color: var(--color-text-primary);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-extrabold);
 }
@@ -2369,9 +2418,9 @@ onMounted(() => {
 .my-revenue-chart__item small {
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   font-weight: var(--font-weight-medium);
-  line-height: 16px;
+  line-height: var(--line-height-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2380,7 +2429,7 @@ onMounted(() => {
   display: flex;
   align-items: end;
   justify-content: center;
-  height: 128px;
+  height: var(--surface-min-height-3xs);
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   overflow: hidden;
@@ -2396,9 +2445,9 @@ onMounted(() => {
 
 .my-revenue-chart__item b {
   color: var(--color-text-primary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .my-card--todo {
@@ -2410,7 +2459,7 @@ onMounted(() => {
   align-items: center;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
-  min-height: 48px;
+  min-height: var(--space-12);
   padding: 0;
   border: 0;
   border-bottom: 1px solid var(--color-border);
@@ -2425,13 +2474,13 @@ onMounted(() => {
 
 .my-todo-row span {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
 }
 
 .my-todo-row strong {
   color: var(--color-text-primary);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-extrabold);
 }
@@ -2454,13 +2503,13 @@ onMounted(() => {
 
 .my-status-grid span {
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
 
 .my-status-grid strong {
   color: var(--color-text-primary);
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-extrabold);
 }
@@ -2468,9 +2517,9 @@ onMounted(() => {
 .my-card h2,
 .my-card__title h2 {
   color: var(--color-text-primary);
-  font-size: 16px;
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-extrabold);
-  line-height: 24px;
+  line-height: var(--line-height-body);
 }
 
 .my-card__title {
@@ -2529,8 +2578,8 @@ onMounted(() => {
 .my-product-tabs button span,
 .my-order-tabs button span {
   color: inherit;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
 }
 
 .my-order-tabs {
@@ -2553,7 +2602,7 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgb(23 26 31 / 8%);
+  box-shadow: none;
 }
 
 .my-product-card__main {
@@ -2587,25 +2636,25 @@ onMounted(() => {
 
 .my-product-card__main span {
   justify-self: start;
-  min-height: 24px;
+  min-height: var(--badge-height-compact);
   padding: 2px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-badge);
   margin-top: var(--space-4);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .my-product-card__main strong {
   overflow: hidden;
   margin-top: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-extrabold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2613,9 +2662,9 @@ onMounted(() => {
 .my-product-card__main p {
   margin-top: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-extrabold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
 }
 
 .my-product-empty {
@@ -2624,8 +2673,8 @@ onMounted(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
   text-align: center;
 }
 
@@ -2644,19 +2693,19 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgb(23 26 31 / 8%);
+  box-shadow: none;
 }
 
 .my-social-card__avatar {
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  width: var(--button-height-tall);
+  height: var(--button-height-tall);
   overflow: hidden;
   border-radius: 50%;
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-extrabold);
 }
 
@@ -2675,9 +2724,9 @@ onMounted(() => {
 .my-social-card__body strong {
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-extrabold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2686,8 +2735,8 @@ onMounted(() => {
   display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -2721,14 +2770,24 @@ onMounted(() => {
 .my-social-card > button {
   min-height: 36px;
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-primary);
   border-radius: var(--radius-control);
-  background: var(--color-surface-secondary);
-  color: var(--color-text-secondary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
   font-size: 13px;
   font-weight: var(--font-weight-bold);
   grid-column: 2;
   justify-self: start;
+}
+
+.my-social-card > button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.my-social-card__follow--active {
+  background: var(--color-surface);
+  color: var(--color-primary);
 }
 
 .my-business-status {
@@ -2856,7 +2915,7 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgb(23 26 31 / 8%);
+  box-shadow: none;
 }
 
 .my-order-card__main {
@@ -3098,45 +3157,9 @@ onMounted(() => {
   line-height: 20px;
 }
 
-.my-profile-photo__file {
-  color: var(--color-primary) !important;
+.my-profile-photo p a {
+  color: var(--color-primary);
   font-weight: var(--font-weight-semibold);
-}
-
-.my-profile-photo__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-
-.my-profile-photo__actions button {
-  min-height: var(--button-height-small);
-  padding: 0 var(--space-4);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: var(--font-size-button-small);
-  font-weight: var(--font-weight-bold);
-}
-
-.my-profile-photo__actions button:first-child {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.my-profile-photo__actions button:hover {
-  background: var(--color-surface);
-}
-
-.my-profile-photo__actions button:first-child:hover {
-  background: var(--color-primary-hover);
-}
-
-.my-profile-photo__input {
-  display: none;
 }
 
 .my-tryon-photo {
@@ -3266,7 +3289,7 @@ onMounted(() => {
 
 .my-tryon-fields input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
   outline: none;
 }
 
@@ -3338,7 +3361,7 @@ onMounted(() => {
 .my-profile-form__grid input:focus,
 .my-profile-form__grid select:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
   outline: none;
 }
 
@@ -3436,7 +3459,7 @@ onMounted(() => {
 
 .my-interest-editor__search input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
   outline: none;
 }
 

@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import logoImage from '@/assets/images/logo.png'
+import logoImage from '@/assets/images/logo-white.png'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { getMyProfile } from '@/domains/my/api/myApi'
 import NotificationPopup from '@/domains/notification/components/NotificationPopup.vue'
@@ -452,9 +452,9 @@ onUnmounted(() => {
 .global-nav {
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: var(--z-top);
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-chrome);
 }
 
 .global-nav__inner {
@@ -462,9 +462,9 @@ onUnmounted(() => {
   align-items: center;
   width: 100%;
   max-width: var(--layout-content-max-width);
-  height: 64px;
+  height: var(--space-16);
   margin: 0 auto;
-  padding: 0 var(--space-12);
+  padding: 0 var(--layout-gutter);
   gap: 0;
 }
 
@@ -473,7 +473,7 @@ onUnmounted(() => {
   flex: 0 0 auto;
   align-items: center;
   margin-right: var(--space-6);
-  transition: opacity 160ms ease;
+  transition: opacity var(--transition-base);
 }
 
 .global-nav__brand:hover {
@@ -481,8 +481,8 @@ onUnmounted(() => {
 }
 
 .global-nav__brand-logo {
-  width: 116px;
-  height: 40px;
+  width: auto;
+  height: var(--brand-logo-height);
   object-fit: contain;
 }
 
@@ -505,14 +505,14 @@ onUnmounted(() => {
   border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
   white-space: nowrap;
   transition:
-    border-color 160ms ease,
-    color 160ms ease,
-    opacity 160ms ease;
+    border-color var(--transition-base),
+    color var(--transition-base),
+    opacity var(--transition-base);
 }
 
 .global-nav__menu-item:hover,
@@ -523,7 +523,9 @@ onUnmounted(() => {
 
 .global-nav__points {
   color: var(--color-primary);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-spacing-num);
 }
 
 .global-nav__points:hover,
@@ -534,7 +536,7 @@ onUnmounted(() => {
 .global-nav__divider {
   flex: 0 0 auto;
   width: 1px;
-  height: 16px;
+  height: var(--space-4);
   margin: 0 var(--space-2);
   background: var(--color-border);
 }
@@ -555,18 +557,18 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
+  min-height: var(--button-height-small);
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-control);
   white-space: nowrap;
   transition:
-    background-color 160ms ease,
-    color 160ms ease;
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .global-nav__action {
@@ -591,14 +593,14 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 16px;
-  height: 16px;
+  min-width: var(--space-4);
+  height: var(--space-4);
   padding: 0 2px;
   border-radius: var(--radius-chip);
   background: var(--color-live);
   color: var(--color-text-inverse);
-  font-size: 9px;
-  font-weight: 700;
+  font-size: var(--font-size-3xs);
+  font-weight: var(--font-weight-bold);
   line-height: 1;
 }
 
@@ -606,10 +608,10 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: var(--space-4);
+  height: var(--space-4);
   color: currentColor;
-  font-size: 15px;
+  font-size: var(--font-size-body);
   line-height: 1;
 }
 
@@ -623,8 +625,8 @@ onUnmounted(() => {
   margin-left: var(--space-1);
   padding: 0 10px;
   color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
 }
 
 .global-nav__profile-menu {
@@ -651,7 +653,7 @@ onUnmounted(() => {
 
 .global-nav__profile-panel {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + var(--space-2));
   right: 0;
   display: grid;
   width: 184px;
@@ -659,13 +661,12 @@ onUnmounted(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
-  box-shadow: 0 18px 48px rgb(23 24 21 / 14%);
   opacity: 0;
   pointer-events: none;
   transform: translateY(-4px);
   transition:
-    opacity 140ms ease,
-    transform 140ms ease;
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .global-nav__profile-menu:hover .global-nav__profile-panel,
@@ -685,19 +686,19 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 36px;
+  min-height: var(--button-height-small);
   padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
   text-align: left;
   transition:
-    background-color 140ms ease,
-    color 140ms ease;
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .global-nav__profile-menu-item:hover,
@@ -729,43 +730,46 @@ onUnmounted(() => {
   justify-content: center;
   width: 28px;
   height: 28px;
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-chip);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  font-size: 11px;
-  font-weight: 700;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
 }
 
 .global-nav__chevron {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: var(--space-4);
+  height: var(--space-4);
   color: var(--color-text-muted);
 }
 
 .global-nav__chevron-svg {
-  width: 16px;
-  height: 16px;
-  transition: transform 140ms ease;
+  width: var(--space-4);
+  height: var(--space-4);
+  transition: transform var(--transition-fast);
 }
 
 .global-nav__guest-link {
   padding: 0 var(--space-4);
   color: var(--color-text-primary);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .global-nav__guest-primary {
   padding: 0 var(--space-5);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .global-nav__guest-primary:hover {
   background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 .global-nav__brand:focus-visible,
@@ -775,8 +779,8 @@ onUnmounted(() => {
 .global-nav__profile:focus-visible,
 .global-nav__guest-link:focus-visible,
 .global-nav__guest-primary:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 3px;
+  outline: var(--focus-ring-width) solid var(--color-primary);
+  outline-offset: var(--focus-ring-offset);
 }
 
 @media (max-width: 1120px) {
@@ -812,8 +816,8 @@ onUnmounted(() => {
   }
 
   .global-nav__brand-logo {
-    width: 96px;
-    height: 34px;
+    width: auto;
+    height: 26px;
   }
 
   .global-nav__menu {

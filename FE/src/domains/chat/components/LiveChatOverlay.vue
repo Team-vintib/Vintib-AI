@@ -30,6 +30,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   viewerCount: [count: number]
+  realtimeReady: [client: LiveRealtimeClient]
 }>()
 
 interface LiveReactionParticle {
@@ -111,6 +112,12 @@ const connectRealtime = () => {
       isConnected.value = true
       errorMessage.value = ''
       subscribeRealtime()
+
+      // 시청 화면(LiveWatchPage)이 이 연결에 방송 상태·현재 상품 구독을 얹을 수 있도록
+      // 연결된 클라이언트를 부모에 넘긴다(연결을 하나로 합쳐 시청자수 중복 집계 방지).
+      if (realtimeClient) {
+        emit('realtimeReady', realtimeClient)
+      }
     },
     onDisconnect: () => {
       isConnected.value = false
@@ -413,7 +420,7 @@ function getRealtimeErrorMessage(body: unknown) {
 <style scoped lang="scss">
 .live-chat-overlay {
   position: absolute;
-  z-index: 1;
+  z-index: var(--z-layer-1);
   inset: 0;
   pointer-events: none;
 }
@@ -421,8 +428,8 @@ function getRealtimeErrorMessage(body: unknown) {
 .live-chat-overlay__reactions {
   display: flex;
   position: absolute;
-  bottom: calc(15px + 204px + var(--space-3));
-  left: 12px;
+  bottom: calc(20px + 250px);
+  left: 20px;
   flex-direction: column;
   gap: var(--space-2);
   pointer-events: auto;
@@ -430,16 +437,15 @@ function getRealtimeErrorMessage(body: unknown) {
 
 .live-chat-overlay__reactions button {
   width: 24px;
-  height: 26px;
+  height: var(--badge-height-sm);
   padding: 0;
   border: 0;
   background: transparent;
-  color: #fff;
-  font-size: 18px;
-  line-height: 26px;
+  color: var(--color-live-text-primary);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-lg);
   transition:
     background-color 150ms ease,
-    box-shadow 150ms ease,
     opacity 150ms ease,
     transform 150ms ease;
 }
@@ -449,11 +455,8 @@ function getRealtimeErrorMessage(body: unknown) {
 }
 
 .live-chat-overlay__reaction--active {
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2) !important;
-  box-shadow:
-    0 0 0 3px rgba(255, 255, 255, 0.1),
-    0 5px 14px rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius-badge);
+  background: rgba(242, 240, 237, 0.14) !important;
   transform: scale(0.84) !important;
 }
 
@@ -465,14 +468,14 @@ function getRealtimeErrorMessage(body: unknown) {
 .live-chat-overlay__reactions button:focus-visible,
 .live-chat-overlay__composer button:focus-visible,
 .live-chat-overlay__composer input:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--color-primary-strong);
   outline-offset: 2px;
 }
 
 .live-chat-overlay__reaction-burst {
   position: absolute;
-  bottom: calc(15px + 204px + var(--space-3));
-  left: 46px;
+  bottom: calc(20px + 250px);
+  left: 54px;
   width: 76px;
   height: 156px;
   pointer-events: none;
@@ -481,7 +484,7 @@ function getRealtimeErrorMessage(body: unknown) {
 .live-chat-overlay__reaction-burst span {
   position: absolute;
   bottom: 0;
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   line-height: 28px;
   opacity: 0;
   filter: drop-shadow(0 5px 7px rgba(0, 0, 0, 0.45));
@@ -491,19 +494,24 @@ function getRealtimeErrorMessage(body: unknown) {
 
 .live-chat-overlay__panel {
   position: absolute;
-  bottom: 15px;
-  left: 15px;
-  width: 288px;
+  bottom: 20px;
+  left: 20px;
+  width: 340px;
+  padding: 14px;
+  border: 1px solid var(--overlay-hairline);
+  border-radius: var(--radius-control);
+  background: rgba(8, 8, 8, 0.68);
+  backdrop-filter: blur(12px);
   pointer-events: auto;
 }
 
 .live-chat-overlay__messages {
-  height: 160px;
+  height: 168px;
   margin: 0 0 var(--space-2);
   overflow-y: auto;
   padding: 0 6px 0 0;
   list-style: none;
-  scrollbar-color: rgba(255, 255, 255, 0.38) transparent;
+  scrollbar-color: var(--overlay-scrollbar) transparent;
   scrollbar-width: thin;
 }
 
@@ -512,76 +520,69 @@ function getRealtimeErrorMessage(body: unknown) {
 }
 
 .live-chat-overlay__messages::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.38);
+  background: var(--overlay-scrollbar);
 }
 
 .live-chat-overlay__messages li {
   display: flex;
-  align-items: flex-end;
-  gap: 6px;
+  align-items: baseline;
+  gap: 9px;
 }
 
 .live-chat-overlay__messages li + li {
-  margin-top: 6px;
+  margin-top: 9px;
 }
 
 .live-chat-overlay__author {
   flex: 0 0 auto;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(32, 37, 34, 0.8);
   color: var(--color-live-text-secondary);
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 14px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  text-transform: uppercase;
 }
 
 .live-chat-overlay__author--host {
-  background: rgba(31, 89, 62, 0.82);
-  color: #a9d4b8;
+  color: var(--color-live-text-primary);
 }
 
 .live-chat-overlay__message {
-  padding: 6px 10px;
-  border-radius: 13px;
-  background: rgba(32, 37, 34, 0.75);
-  color: var(--color-live-text-primary);
-  font-size: 11px;
-  line-height: 15px;
+  color: #d8d4d0;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-light);
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
 .live-chat-overlay__error {
   margin: 0 0 6px;
-  color: #ffb0b6;
-  font-size: 11px;
-  line-height: 15px;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+  color: var(--color-accent);
+  font-size: var(--font-size-2xs);
+  line-height: var(--line-height-tight);
 }
 
 .live-chat-overlay__composer {
   display: flex;
-  width: 288px;
-  height: 36px;
+  width: 100%;
   box-sizing: border-box;
   align-items: center;
-  padding: 4px 5px 4px var(--space-2);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-control);
-  background: rgba(14, 17, 16, 0.78);
+  padding: 4px 0 0;
+  border-top: 1px solid var(--overlay-hairline);
   gap: 6px;
-  backdrop-filter: blur(8px);
 }
 
 .live-chat-overlay__composer input {
   min-width: 0;
+  padding: 9px 0;
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--color-live-text-primary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-snug);
   flex: 1;
 }
 
@@ -593,12 +594,11 @@ function getRealtimeErrorMessage(body: unknown) {
   display: grid;
   flex: 0 0 auto;
   width: 26px;
-  height: 26px;
+  height: var(--badge-height-sm);
   padding: 0;
   border: 0;
-  border-radius: var(--radius-control);
   background: transparent;
-  color: #7db892;
+  color: var(--color-live-text-primary);
   place-items: center;
 }
 
@@ -609,8 +609,8 @@ function getRealtimeErrorMessage(body: unknown) {
 }
 
 .live-chat-overlay__composer svg {
-  width: 15px;
-  height: 15px;
+  width: var(--icon-size-xs);
+  height: var(--icon-size-xs);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -635,7 +635,7 @@ function getRealtimeErrorMessage(body: unknown) {
     bottom: auto;
     left: 15px;
     width: 180px;
-    height: 42px;
+    height: var(--button-height-tight);
   }
 
   .live-chat-overlay__reaction-burst span {

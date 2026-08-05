@@ -17,6 +17,7 @@ import ProductImageGallery from '@/domains/product/components/ProductImageGaller
 import ProductPriceDistribution from '@/domains/product/components/ProductPriceDistribution.vue'
 import ProductPurchaseSummary from '@/domains/product/components/ProductPurchaseSummary.vue'
 import ProductSellerLivePanel from '@/domains/product/components/ProductSellerLivePanel.vue'
+import ProductSimilarRecommendation from '@/domains/product/components/ProductSimilarRecommendation.vue'
 import LiveTryOnPanel from '@/domains/tryon/components/LiveTryOnPanel.vue'
 import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
 import type { ProductDetailViewData } from '@/domains/product/types/productDetail.types'
@@ -307,6 +308,7 @@ onBeforeUnmount(() => {
       />
       <ProductDetailInformation :product="product" />
       <AiQualityAnalysisPanel :analysis="product.aiQualityAnalysis" />
+      <ProductSimilarRecommendation :product-id="product.id" />
     </article>
 
     <div
@@ -341,19 +343,19 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 36px;
+  height: var(--button-height-small);
   margin-bottom: var(--space-4);
   padding: 0 var(--space-3) 0 var(--space-2);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
   transition:
-    border-color 160ms ease,
-    color 160ms ease;
+    border-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .product-detail__back:hover {
@@ -362,8 +364,8 @@ onBeforeUnmount(() => {
 }
 
 .product-detail__back svg {
-  width: 18px;
-  height: 18px;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -372,7 +374,7 @@ onBeforeUnmount(() => {
 }
 
 .product-detail__back:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -390,9 +392,9 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .product-detail__sold-banner {
@@ -409,8 +411,8 @@ onBeforeUnmount(() => {
 .product-detail__sold-banner > div:first-child {
   display: grid;
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
+  width: var(--button-height-sm);
+  height: var(--button-height-sm);
   border-radius: 50%;
   background: var(--color-surface);
   color: var(--color-text-secondary);
@@ -427,16 +429,16 @@ onBeforeUnmount(() => {
 }
 
 .product-detail__sold-banner strong {
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
 }
 
 .product-detail__sold-banner p {
   margin-top: 2px;
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
 }
 
 @media (max-width: 940px) {
@@ -461,7 +463,6 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.38);
 }
 
 .product-try-on-popup--expanded {
@@ -483,11 +484,11 @@ onBeforeUnmount(() => {
 .product-try-on-popup__expand {
   display: grid;
   position: absolute;
-  z-index: 2;
+  z-index: var(--z-layer-2);
   top: 14px;
   right: 52px;
-  width: 30px;
-  height: 30px;
+  width: var(--badge-height-lg);
+  height: var(--badge-height-lg);
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-control);
@@ -497,13 +498,13 @@ onBeforeUnmount(() => {
 }
 
 .product-try-on-popup__expand:hover {
-  border-color: #b69ad7;
-  color: #d3b9ef;
+  border-color: var(--color-border-underline);
+  color: var(--color-text-primary);
 }
 
 .product-try-on-popup__expand svg {
-  width: 15px;
-  height: 15px;
+  width: var(--icon-size-xs);
+  height: var(--icon-size-xs);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;

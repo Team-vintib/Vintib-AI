@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
+import fallbackProductImage from '@/assets/images/products/product-denim-jacket.webp'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { addWish, removeWish } from '@/domains/product/api/productApi'
 import { useWishStore } from '@/domains/product/stores/wishStore'
@@ -34,6 +35,15 @@ const wishStore = useWishStore()
 const validTabIds: SearchResultTabId[] = ['all', 'product', 'live', 'member']
 const validSortOptionIds: SearchSortOptionId[] = ['LATEST', 'PRICE_ASC', 'PRICE_DESC']
 const validMockStatuses = ['loading', 'error', 'empty'] as const
+const getProductThumbnail = (imageUrl: string) => imageUrl || fallbackProductImage
+const handleProductImageError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackProductImage
+  }
+}
 const SEARCH_RESULT_PREVIEW_LIMIT = 3
 const SEARCH_PRODUCT_PAGE_SIZE = 3
 const SEARCH_LIVE_PAGE_SIZE = 2
@@ -1011,8 +1021,9 @@ watch(
                     >
                       <img
                         class="search-product-card__image"
-                        :src="product.imageUrl"
+                        :src="getProductThumbnail(product.imageUrl)"
                         :alt="product.imageAlt"
+                        @error="handleProductImageError"
                       />
                       <span class="search-product-card__grade">{{ product.conditionGrade }}급</span>
                     </RouterLink>
@@ -1194,7 +1205,7 @@ watch(
 
 .search-page__search:focus-within {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .search-page__search-icon {
@@ -1236,7 +1247,7 @@ watch(
 }
 
 .search-page__search button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -1252,14 +1263,14 @@ watch(
   color: var(--color-primary);
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-extrabold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .search-page__title {
   margin-top: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 32px;
-  font-weight: 800;
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-extrabold);
   line-height: 42px;
 }
 
@@ -1404,7 +1415,7 @@ watch(
 
 .search-page__product-filter input:focus-visible {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .search-page__field-error {
@@ -1412,8 +1423,8 @@ watch(
   border-radius: var(--radius-control);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .search-page__filter-actions {
@@ -1435,7 +1446,7 @@ watch(
 }
 
 .search-page__filter-actions button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -1476,7 +1487,7 @@ watch(
 
 .search-page__sort-toolbar select:focus-visible {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .search-page__selected-filters {
@@ -1487,7 +1498,7 @@ watch(
   margin-top: var(--space-4);
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
 }
 
 .search-page__selected-filters > span {
@@ -1499,7 +1510,7 @@ watch(
   min-height: 28px;
   padding: 0 var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
@@ -1535,15 +1546,15 @@ watch(
 }
 
 .search-page__section-header h2 {
-  font-size: 22px;
-  font-weight: 800;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-extrabold);
   line-height: 30px;
 }
 
 .search-page__section-header span {
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .search-page__section-summary {
@@ -1610,7 +1621,7 @@ watch(
 }
 
 .search-page__pagination button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -1633,7 +1644,7 @@ watch(
   position: relative;
   display: grid;
   gap: var(--space-3);
-  transition: transform 180ms ease;
+  transition: transform var(--transition-moderate);
 }
 
 .search-product-card:hover {
@@ -1652,7 +1663,7 @@ watch(
 .search-product-card__media:focus-visible,
 .search-product-card__name:focus-visible,
 .search-product-card__like:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -1660,7 +1671,7 @@ watch(
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 220ms ease;
+  transition: transform var(--transition-standard);
 }
 
 .search-product-card:hover .search-product-card__image {
@@ -1673,11 +1684,11 @@ watch(
   left: var(--space-3);
   padding: 2px var(--space-2);
   border-radius: var(--radius-badge);
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--overlay-scrim-strong);
   color: var(--color-text-primary);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-snug);
 }
 
 .search-product-card__like {
@@ -1688,9 +1699,9 @@ watch(
   place-items: center;
   width: 40px;
   height: 40px;
-  border: 1px solid rgba(225, 224, 218, 0.8);
+  border: 1px solid var(--color-border);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--overlay-scrim-medium);
   color: var(--color-text-secondary);
 }
 
@@ -1724,7 +1735,7 @@ watch(
   overflow: hidden;
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
-  line-height: 20px;
+  line-height: var(--line-height-control);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1738,7 +1749,7 @@ watch(
   display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 17px;
+  font-size: var(--font-size-md-plus);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-body);
   -webkit-box-orient: vertical;
@@ -1766,9 +1777,9 @@ watch(
   border-radius: var(--radius-badge);
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  line-height: 16px;
+  line-height: var(--line-height-xs);
 }
 
 .search-product-card__badge--auction {
@@ -1806,8 +1817,8 @@ watch(
 
 @media (max-width: 720px) {
   .search-page__title {
-    font-size: 26px;
-    line-height: 36px;
+    font-size: var(--font-size-2xl-plus);
+    line-height: var(--line-height-2xl-plus);
   }
 
   .search-page__result-header {

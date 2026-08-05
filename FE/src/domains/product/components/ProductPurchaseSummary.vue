@@ -153,25 +153,30 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 
 .purchase-summary__breadcrumb {
   color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-snug);
 }
 
 .purchase-summary__title {
   margin-top: var(--space-3);
   color: var(--color-text-primary);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 36px;
+  font-family: var(--font-display);
+  font-size: var(--font-size-3xl-plus);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.03em;
+  line-height: 1.08;
 }
 
 .purchase-summary__price {
-  margin-top: var(--space-2);
-  font-size: 32px;
+  margin-top: var(--space-3);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-hero-display);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  line-height: 40px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 .purchase-summary__seller {
@@ -187,75 +192,80 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 
 .purchase-summary__avatar {
   display: grid;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
+  width: var(--button-height-compact);
+  height: var(--button-height-compact);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-badge);
   background: var(--color-surface-secondary);
-  color: var(--color-primary);
-  font-size: 15px;
-  font-weight: 800;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
   place-items: center;
 }
 
 .purchase-summary__seller strong {
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .purchase-summary__seller p {
   margin-top: 2px;
   color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-snug);
 }
 
 .purchase-summary__seller button {
-  height: 34px;
+  height: var(--button-height-2xs);
   padding: 0 var(--space-3);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
   transition:
-    border-color 160ms ease,
-    color 160ms ease;
+    border-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .purchase-summary__quick-info {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
   margin-top: var(--space-6);
-  border-top: 1px solid var(--color-border);
-  border-left: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-grid);
   border-radius: var(--radius-control);
+  background: var(--color-border-grid);
   overflow: hidden;
 }
 
 .purchase-summary__quick-info div {
   min-width: 0;
   padding: var(--space-4);
-  border-right: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
 
 .purchase-summary__quick-info dt {
   color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0.06em;
+  line-height: var(--line-height-xs);
+  text-transform: uppercase;
 }
 
 .purchase-summary__quick-info dd {
   overflow: hidden;
   margin-top: var(--space-1);
   color: var(--color-text-primary);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -269,25 +279,25 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 
 .purchase-summary__secondary {
   display: flex;
-  height: 44px;
+  height: var(--button-height-compact);
   align-items: center;
   justify-content: center;
   gap: 6px;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .purchase-summary__secondary svg {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-size-xs-plus);
+  height: var(--icon-size-xs-plus);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -297,16 +307,16 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 
 .purchase-summary__purchase {
   width: 100%;
-  height: 52px;
+  height: var(--button-height-major);
   margin-top: var(--space-3);
   border: 1px solid var(--color-primary);
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 20px;
-  transition: background-color 160ms ease;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
+  transition: background-color var(--transition-base);
 }
 
 .purchase-summary__seller button:hover,
@@ -347,7 +357,9 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 }
 
 .purchase-summary__purchase:hover {
+  border-color: var(--color-primary-hover);
   background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 .purchase-summary__purchase:disabled {
@@ -365,7 +377,7 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 }
 
 .purchase-summary button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 

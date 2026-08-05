@@ -187,7 +187,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <DefaultLayout content-max-width="1200px">
+  <DefaultLayout>
     <section class="live-list-page" aria-labelledby="live-list-title">
       <header class="live-list-page__header">
         <h1 id="live-list-title">라이브</h1>
@@ -288,15 +288,18 @@ onBeforeUnmount(() => {
 
 .live-list-page__header h1 {
   color: var(--color-text-primary);
-  font-size: clamp(30px, 4vw, 40px);
-  font-weight: 800;
-  line-height: 1.2;
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.04em;
+  line-height: 1;
 }
 
 .live-list-page__header p {
   color: var(--color-text-secondary);
-  font-size: 16px;
-  line-height: 26px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-body);
 }
 
 .live-list-page__content {
@@ -316,7 +319,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: end;
   justify-content: space-between;
-  min-height: 48px;
+  min-height: var(--button-height-standard);
   gap: var(--space-5);
   border-bottom: 1px solid var(--color-border);
 }
@@ -329,12 +332,12 @@ onBeforeUnmount(() => {
 
 .live-list-page__tabs button {
   position: relative;
-  min-height: 48px;
+  min-height: var(--button-height-standard);
   padding: 0 2px;
   border: 0;
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -343,7 +346,7 @@ onBeforeUnmount(() => {
   right: 0;
   bottom: -1px;
   left: 0;
-  height: 2px;
+  height: var(--underline-thickness);
   background: transparent;
   content: '';
 }
@@ -356,7 +359,7 @@ onBeforeUnmount(() => {
 
 .live-list-page__tabs button:focus-visible,
 .live-list-page__toolbar select:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -378,19 +381,25 @@ onBeforeUnmount(() => {
 }
 
 .live-list-page__toolbar span {
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .live-list-page__toolbar select {
   min-height: var(--button-height-small);
   padding: 0 34px 0 var(--space-3);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-input);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
+}
+
+.live-list-page__toolbar select:focus-visible {
+  border-color: var(--color-border-underline);
 }
 
 .live-list-page__grid {

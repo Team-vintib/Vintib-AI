@@ -1,52 +1,76 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  /* Light UI */
-  --color-page: #F7F6F2;
-  --color-surface: #FFFFFF;
-  --color-surface-secondary: #F0F0EB;
-  --color-text-primary: #171815;
-  --color-text-secondary: #686A64;
-  --color-text-muted: #92948E;
-  --color-text-inverse: #FFFFFF;
-  --color-border: #E1E0DA;
-  --color-border-strong: #C9C8C1;
+  /* ── VinTib 다크 에디토리얼 ──────────────────────────────
+     기존 토큰 이름은 그대로 두고 값만 VinTib 다크로 교체한다.
+     (100개 .vue 파일이 var(--...)로 자동 상속) */
 
-  /* Brand */
-  --color-primary: #294335;
-  --color-primary-hover: #1F352A;
-  --color-primary-soft: #E7EEE9;
-  --color-search-border: #DDD8CF;
-  --color-search-icon: #8A867F;
-  --color-search-button: #2F4B3A;
-  --color-search-button-hover: #243B2D;
+  /* Canvas / Surfaces */
+  --color-page: #0a0a0a; /* canvas */
+  --color-chrome: #050505; /* 최상단 크롬 바 */
+  --color-surface: #141312; /* 서페이스 / 호버 */
+  --color-surface-secondary: #101010; /* 서페이스 강조 */
+  --color-surface-raised: #100f0e; /* 경매 패널 등 강조 패널 */
+  --color-image-frame: #131211; /* 이미지 프레임 바탕 */
+
+  /* Text */
+  --color-text-primary: #f2f0ed; /* 1차 */
+  --color-text-strong: #e4e1dd; /* 2차(강) */
+  --color-text-secondary: #b8b3af; /* 본문 */
+  --color-text-muted: #9a9591; /* 메타 / 라벨 */
+  --color-text-caption: #6b6663; /* 가장 약한 캡션 */
+  --color-text-disabled: #4f4b49; /* 비활성 */
+  --color-text-inverse: #0a0a0a; /* 흰 블록 위 텍스트 */
+
+  /* Borders */
+  --color-border: #232120; /* 기본 */
+  --color-border-strong: #3a3735; /* 강조 */
+  --color-border-grid: #1b1918; /* 헤어라인 그리드 갭 */
+  --color-border-input: #2a2827; /* 입력 / 칩 */
+  --color-border-underline: #4a4644; /* 밑줄 */
+
+  /* Primary = 흰 잉크 (1차 CTA 흰 블록 · 활성 상태). 호버 시 포인트 레드. */
+  --color-primary: #f2f0ed;
+  --color-primary-strong: #ffffff;
+  --color-primary-hover: #c43d46;
+  --color-primary-soft: #141312; /* soft 배경 → 다크 서페이스 */
+
+  /* Accent (포인트) — LIVE · 경매 · 실시간성에만 */
+  --color-accent: #c43d46;
+  --color-accent-hover: #d45a62;
+
+  /* Search */
+  --color-search-border: #2a2827;
+  --color-search-icon: #9a9591;
+  --color-search-button: #f2f0ed;
+  --color-search-button-hover: #c43d46;
 
   /* Feedback */
-  --color-error: #B42318;
-  --color-error-soft: #FEE4E2;
+  --color-error: #c43d46;
+  --color-error-soft: #201314;
 
-  /* Live & Auction */
-  --color-live: #C43D46;
-  --color-auction: #A92F38;
-  --color-auction-soft: #F7E8EA;
-  --color-timer: #CF7A36;
+  /* Live & Auction (포인트로 통일) */
+  --color-live: #c43d46;
+  --color-auction: #c43d46;
+  --color-auction-soft: #100f0e;
+  --color-timer: #c43d46;
 
-  /* Sale */
-  --color-direct-sale: #2563EB;
+  /* Sale — VinTib 팔레트엔 파랑 없음 → 중립. 배지는 스크림(rgba) 사용 */
+  --color-direct-sale: #b8b3af;
 
-  /* AI */
-  --color-ai: #6F5BD3;
-  --color-ai-soft: #F0EDFC;
+  /* AI — VinTib 팔레트엔 보라 없음 → 중립 */
+  --color-ai: #b8b3af;
+  --color-ai-soft: #141312;
 
-  /* Dark Live UI */
-  --color-live-background: #0E1110;
-  --color-live-surface: #171B19;
-  --color-live-surface-raised: #202522;
-  --color-live-border: #343A36;
-  --color-live-text-primary: #F7F7F4;
-  --color-live-text-secondary: #A9ADA7;
+  /* Dark Live UI (VinTib 중립 다크로 정렬) */
+  --color-live-background: #0a0a0a;
+  --color-live-surface: #141312;
+  --color-live-surface-raised: #100f0e;
+  --color-live-border: #232120;
+  --color-live-text-primary: #f2f0ed;
+  --color-live-text-secondary: #9a9591;
 
-  /* Spacing */
+  /* Spacing (범용 스케일 — 값 유지) */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -57,37 +81,173 @@
   --space-10: 40px;
   --space-12: 48px;
   --space-16: 64px;
+  --space-20: 80px; /* 비밀번호 입력 필드 토글 버튼 여백 등 반복 사용 */
 
-  /* Radius */
-  --radius-control: 8px;
-  --radius-card: 12px;
-  --radius-media: 16px;
-  --radius-modal: 16px;
-  --radius-badge: 4px;
-  --radius-chip: 999px;
+  /* Radius — VinTib은 전부 5px, pill 폐지 */
+  --radius-control: 5px;
+  --radius-card: 5px;
+  --radius-media: 5px;
+  --radius-modal: 5px;
+  --radius-badge: 5px;
+  --radius-chip: 5px;
 
-  /* Controls */
+  /* Controls (버튼 높이 — 값 유지) */
   --button-height-small: 36px;
+  --button-height-compact: 44px;
   --button-height-standard: 48px;
   --button-height-major: 52px;
   --button-height-bid: 60px;
+  --button-height-2xs: 34px; /* SY032 live/auction 배치 */
+  --button-height-sm: 40px; /* SY032 live/auction 배치 */
+  --button-height-tight: 42px; /* SY032 live/auction/chat 배치 */
+  --button-height-loose: 46px; /* SY032 live 배치 */
+  --button-height-tall: 56px; /* SY032 live 배치 */
 
-  /* Typography */
+  /* Surface min-heights — 빈 상태/스테이지/텍스트영역류 큰 컨테이너 최소 높이 (SY032 live 배치) */
+  --surface-min-height-md: 300px;
+  --surface-min-height-lg: 320px;
+  --surface-min-height-xl: 360px;
+
+  /* Typography — 3개 서체 */
+  --font-display: 'Archivo', 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  --font-body: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'Noto Sans KR', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
+
   --font-size-body: 15px;
   --font-size-caption: 13px;
   --font-size-button-small: 14px;
   --line-height-body: 24px;
+
+  --font-weight-light: 300;
   --font-weight-regular: 400;
+  --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
   --font-weight-extrabold: 800;
 
+  /* 라벨 자간 (모노 대문자 라벨) */
+  --letter-spacing-label: 0.18em;
+
   /* Filter */
-  --filter-panel-width: 224px;
+  --filter-panel-width: 232px;
   --filter-option-min-height: 24px;
 
-  /* Layout */
-  --layout-content-max-width: 1320px;
+  /* Layout — VinTib 풀블리드(좌우 40px). 폭 제한 없음(P1에서 레이아웃 반영). */
+  --layout-content-max-width: none;
+  --layout-gutter: 40px;
+
+  /* ── 신규 토큰 카테고리 (SY032 리팩토링) ──────────────────
+     각 도메인 배치를 진행하며 실제 하드코딩 값을 발견하는 대로 이 아래에 추가한다.
+     원칙: 값은 발견된 값 그대로(반올림/근사 금지), 2회 이상 반복되거나
+     기존 스케일에 맞는 "체계적 값"만 토큰화한다. */
+
+  /* Typography scale — 기존 --font-size-caption(13px)/-button-small(14px)/-body(15px)와 별개로,
+     그 외 반복 사용되는 폰트 크기를 발견하는 대로 추가한다. */
+  --font-size-3xs: 9px;
+  --font-size-badge: 10px; /* 카드 배지/eyebrow 라벨 */
+  --font-size-2xs: 11px;
+  --font-size-xs: 12px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 28px;
+  --font-size-4xl: 32px;
+  --font-size-hero-display: 34px; /* 홈 히어로류 대형 타이틀 */
+  --font-size-4xs: 8px; /* live 배지/카운트 라벨 (SY032 live 배치) */
+  --font-size-xl: 22px; /* 방송 종료 대시보드류 통계 타이틀 (SY032 live 배치) */
+  --line-height-tight: 15px; /* 라이브 소형 메타 텍스트 (SY032 live 배치) */
+  --line-height-xs: 16px; /* font-size-xs(12px)와 쌍 */
+  --line-height-snug: 18px; /* font-size-caption(13px) 강조 텍스트와 쌍 */
+  --line-height-control: 20px; /* 버튼/메뉴 아이템류 공통 line-height */
+  --line-height-comfortable: 21px;
+  --line-height-relaxed: 22px; /* font-size-button-small(14px) 문단과 쌍 */
+  --line-height-lg: 26px; /* SY032 live/chat 배치: 헤더 타이틀류 */
+  --line-height-2xl: 32px; /* font-size-2xl(24px)와 쌍 */
+  --line-height-3xl: 38px; /* font-size-3xl(28px)와 쌍 */
+  --line-height-4xl: 44px; /* font-size-4xl(32px)와 쌍 */
+  --letter-spacing-num: -0.02em; /* 모노 숫자(.vt-num)와 동일한 자간 */
+  --font-weight-demibold: 650; /* SY032 live 배치: LiveSelectedProduct 배지 숫자 */
+  --font-size-md-plus: 17px; /* SY032 product 배치: md(16)~lg(18) 사이, 소제목류 10회 반복 */
+  --font-size-lg-plus: 20px; /* SY032 product 배치: lg(18)~xl(22) 사이, 3회 반복 */
+  --font-size-2xl-plus: 26px; /* SY032 product 배치: 2xl(24)~3xl(28) 사이, 통계 숫자류 5회 반복 */
+  --font-size-3xl-plus: 30px; /* SY032 product 배치: 3xl(28)~4xl(32) 사이, 2회 반복 */
+  --line-height-lg-plus: 28px; /* SY032 product 배치: font-size-lg-plus(20px)와 쌍, 2회 반복 */
+  --line-height-2xl-plus: 36px; /* SY032 product 배치: font-size-2xl-plus(26px)와 쌍, 3회 반복 */
+  --line-height-2xs: 17px; /* SY032 my/tryon 배치: font-size-2xs(11px)와 쌍, 4회 반복 */
+  --line-height-2xl-loose: 34px; /* SY032 my 배치: 주문/판매 상세 가격 타이틀, font-size-2xl(24px)과 쌍, 2회 반복 */
+
+  /* Icon sizes — 아이콘 SVG 크기 (여러 파일에서 반복) */
+  --icon-size-xs: 15px; /* SY032 live/chat 배치: 헤더 메타 아이콘 */
+  --icon-size-sm: 18px;
+  --icon-size-md: 20px; /* SY032 live 배치: 헤더 뒤로가기 아이콘 등 */
+  --icon-size-xs-plus: 16px; /* SY032 product 배치: 체크박스/닫기류 아이콘, 2회 반복 */
+  --icon-size-lg: 64px; /* SY032 product 배치: AI 패널/상세 상태 패널 대형 아이콘, 2회 반복 */
+
+  /* Badge / control heights — 배지·칩류 최소 높이 (SY032 live/auction 배치) */
+  --badge-height-xs: 22px;
+  --badge-height-sm: 26px;
+  --badge-height-md: 28px;
+  --badge-height-lg: 30px;
+  --badge-height-compact: 24px; /* SY032 my 배치: 주문/찜/프로필 배지·상태 태그 min-height, 6회 반복 */
+
+  /* Search control */
+  --search-input-height: 38px;
+
+  /* Product 도메인 전용 레이아웃 값 (SY032 product 배치) */
+  --thumbnail-size-sm: 72px; /* 갤러리/스켈레톤 썸네일 폭, 5회 반복 */
+  --surface-min-height-2xs: 132px; /* 사진 업로더 빈 상태 그리드 최소 높이, 2회 반복 */
+  --prose-max-width: 520px; /* 설명/완료 문구 본문 폭 제한, 2회 반복 */
+
+  /* My 도메인 전용 사이징 값 (SY032 my 배치) */
+  --avatar-size-lg: 88px; /* 프로필 히어로/사진 편집 아바타, 2회 반복 */
+  --surface-min-height-3xs: 128px; /* 대시보드 카드·수익 차트 막대 min-height, 3회 반복 */
+  --surface-min-height-sm: 240px; /* 주문/판매 상세 카드 이미지 min-height, 2회 반복 */
+
+  /* Brand */
+  --brand-logo-height: 30px;
+
+  /* Focus ring (강조용, 기본 :focus-visible 스펙과 별개로 nav/footer 링크에서 반복) */
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 3px;
+  --underline-thickness: 2px; /* SY032 live 배치: 탭/스텝 밑줄 두께 */
+
+  /* Transition / duration — 이미 코드베이스 전반에서 값이 통일되어 있어 선제 등록 */
+  --transition-fast: 140ms ease;
+  --transition-base: 160ms ease;
+  --transition-moderate: 180ms ease;
+  --transition-slow: 200ms ease;
+  --transition-standard: 220ms ease;
+  --transition-emphasized: 620ms cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-pulse: 1.7s;
+
+  /* Z-index scale — 실사용 문맥(레이어 목적)을 확인하며 이름을 붙여 추가한다. */
+  --z-top: 50; /* 고정 헤더 등 최상단 레이어 */
+  --z-layer-header: 10; /* 라이브 방송/시청 헤더의 sticky 스태킹 (SY032 live 배치) */
+  --z-layer-1: 1; /* 카드/히어로 내부 로컬 스태킹: 이미지 위 그라디언트 */
+  --z-layer-2: 2; /* 로컬 스태킹: 그 위 배지/컨트롤 */
+  --z-layer-3: 3; /* 로컬 스태킹: 최상단 콘텐츠 */
+
+  /* Shadow */
+  --shadow-ring: 0 0 0 1px rgba(255, 255, 255, 0.55);
+
+  /* Overlay / scrim — 배경 위 그라디언트·스크림에 쓰이는 반투명 색을 발견하는 대로 추가한다. */
+  --overlay-scrim-strong: rgba(10, 10, 10, 0.82); /* 카드 배지 배경 등 */
+  --overlay-scrim-medium: rgba(10, 10, 10, 0.55); /* 이미지 하단 그라디언트 스크림 */
+  --overlay-hairline: rgba(242, 240, 237, 0.1); /* SY032 chat 배치: 채팅 오버레이 헤어라인 */
+  --overlay-scrollbar: rgba(242, 240, 237, 0.28); /* SY032 chat 배치: 채팅 오버레이 스크롤바 */
+  --overlay-focus-ring: rgb(47 111 237 / 22%); /* SY032 my 배치: 주문/판매 상세 페이지 버튼 focus 아웃라인, 2회 반복 */
+
+  /* Status colors — 팔레트에 없는 시착 상태 표시 색 (SY032 tryon 배치) */
+  --color-status-error-bg: rgba(196, 61, 70, 0.14);
+  --color-status-error-text: #f0a2a8;
+  --color-status-success-bg: rgba(77, 139, 98, 0.17);
+  --color-status-success-text: #9bd0ac;
+  --gradient-hero-scrim:
+    linear-gradient(90deg, rgba(10, 10, 10, 0.9) 0%, rgba(10, 10, 10, 0.72) 38%, rgba(10, 10, 10, 0.2) 68%, rgba(10, 10, 10, 0.04) 100%),
+    linear-gradient(0deg, rgba(10, 10, 10, 0.3), transparent 56%);
 }
 
 *,
@@ -107,15 +267,9 @@ body {
   min-height: 100vh;
   background: var(--color-page);
   color: var(--color-text-primary);
-  font-family:
-    'Pretendard',
-    'Noto Sans KR',
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  font-family: var(--font-body);
   font-size: var(--font-size-body);
+  font-weight: var(--font-weight-light);
   line-height: var(--line-height-body);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -153,4 +307,110 @@ svg {
 
 #app {
   min-height: 100vh;
+}
+
+/* ── VinTib 유틸리티 ──────────────────────────────────────
+   사진 톤 통일: 로고/아이콘이 아닌 콘텐츠 이미지에만 붙인다. */
+.vt-media-tone {
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
+}
+
+.vt-media-tone--hero {
+  filter: saturate(0.82) contrast(1.04) brightness(0.9);
+}
+
+/* 모노 대문자 라벨 (LOTS 08 · VIEWERS 1,245 …) */
+.vt-label {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-regular);
+  font-size: 11px;
+  letter-spacing: var(--letter-spacing-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* 모노 숫자 (가격 · 시간 · 카운트) */
+.vt-num {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 대형 헤드라인 (Latin/숫자 혼용) */
+.vt-display {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.04em;
+}
+
+/* 텍스트 선택 · 스크롤바 (VinTib) */
+::selection {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-page);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-input);
+}
+
+/* 키보드 포커스 (스펙: 1px #F2F0ED, offset 2px) */
+:focus-visible {
+  outline: 1px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* VinTib 모션 키프레임 */
+@keyframes vtReveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes vtPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+@keyframes vtBar {
+  from {
+    transform: scaleY(0.04);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* 접근성: 모션 최소화. 콘텐츠는 절대 숨기지 않는다(리빌 실패 시에도 보여야 함). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
 }

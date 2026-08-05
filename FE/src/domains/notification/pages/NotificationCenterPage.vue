@@ -241,23 +241,23 @@ onMounted(() => {
 .notification-page__eyebrow {
   margin-bottom: var(--space-1);
   color: var(--color-primary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .notification-page__header h1 {
   color: var(--color-text-primary);
   font-size: 36px;
   font-weight: var(--font-weight-extrabold);
-  line-height: 44px;
+  line-height: var(--line-height-4xl);
 }
 
 .notification-page__header p:not(.notification-page__eyebrow) {
   margin-top: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: 15px;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 .notification-page__read-all {
@@ -267,7 +267,7 @@ onMounted(() => {
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
   white-space: nowrap;
 }
@@ -294,10 +294,10 @@ onMounted(() => {
   border: 0;
   background: transparent;
   color: var(--color-text-muted);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-semibold);
   transition:
-    color 160ms ease;
+    color var(--transition-base);
 }
 
 .notification-page__tabs button::after {
@@ -306,14 +306,14 @@ onMounted(() => {
   right: 0;
   left: 0;
   height: 3px;
-  border-radius: 999px 999px 0 0;
+  border-radius: 0;
   background: transparent;
   content: '';
   transform: scaleX(0);
   transform-origin: center;
   transition:
-    background-color 160ms ease,
-    transform 160ms ease;
+    background-color var(--transition-base),
+    transform var(--transition-base);
 }
 
 .notification-page__tabs button:hover:not(:disabled),
@@ -333,7 +333,7 @@ button.notification-page__tab--active::after {
 
 .notification-page__tabs button:focus-visible,
 .notification-page__read-all:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -342,9 +342,9 @@ button.notification-page__tab--active::after {
   border-radius: var(--radius-control);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-semibold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
 }
 
 .notification-page__list {
@@ -366,7 +366,7 @@ button.notification-page__tab--active::after {
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
@@ -377,14 +377,14 @@ button.notification-page__tab--active::after {
 }
 
 .notification-page__pagination button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
 .notification-page__pagination p {
   color: var(--color-text-muted);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 @media (max-width: 640px) {
@@ -395,8 +395,8 @@ button.notification-page__tab--active::after {
   }
 
   .notification-page__header h1 {
-    font-size: 30px;
-    line-height: 38px;
+    font-size: var(--font-size-3xl-plus);
+    line-height: var(--line-height-3xl);
   }
 
   .notification-page__read-all {
@@ -411,7 +411,7 @@ button.notification-page__tab--active::after {
   .notification-page__tabs button {
     flex: 0 0 auto;
     min-height: 40px;
-    font-size: 14px;
+    font-size: var(--font-size-button-small);
   }
 }
 </style>

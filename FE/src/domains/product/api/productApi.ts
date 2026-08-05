@@ -15,8 +15,13 @@ import type {
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
 import { buildMockAiQualityAnalysis } from '@/domains/product/constants/aiQualityAnalysisMockData'
+import { buildMockProductDetail } from '@/domains/product/constants/productDetailMockData'
+import { PRODUCT_LIST_MOCK_DATA } from '@/domains/product/constants/productListMockData'
 import { http } from '@/shared/api/http'
 import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.types'
+
+// VITE_PRODUCT_API_ENABLED=false 일 때만 mock 목록을 사용합니다(기본값은 실 API).
+const PRODUCT_API_ENABLED = import.meta.env.VITE_PRODUCT_API_ENABLED !== 'false'
 
 type ProductSaleTypeDto = 'DIRECT_SALE' | 'AUCTION'
 type ProductSaleStatusDto =
@@ -26,7 +31,6 @@ type ProductSaleStatusDto =
   | 'AUCTION_IN_PROGRESS'
   | 'AUCTION_FAILED'
   | 'SOLD'
-  | 'PRIVATE'
 
 export interface BrandDto {
   id: number
@@ -159,6 +163,18 @@ export const getProductList = async ({
   size = 20,
   sort = 'LATEST',
 }: ProductListParams = {}) => {
+  if (!PRODUCT_API_ENABLED) {
+    return {
+      items: PRODUCT_LIST_MOCK_DATA,
+      meta: {
+        page: 1,
+        size: PRODUCT_LIST_MOCK_DATA.length,
+        totalElements: PRODUCT_LIST_MOCK_DATA.length,
+        totalPages: 1,
+      } satisfies PageMeta,
+    }
+  }
+
   const response = await http.get<ApiResponse<PageResponse<ProductListDto> | BackendPageResponse<ProductListDto>>>('/products', {
     params: {
       page: Math.max(page - 1, 0),
@@ -182,7 +198,17 @@ export const getProductList = async ({
   }
 }
 
+// 유사 상품 추천 목록. 실제 유사 판정·목록 API는 미구현(유사 기준도 BE 소관, docs/requests/BE 참고) →
+// 현재는 mock(목록 mock에서 현재 상품 제외). BE 엔드포인트가 확정되면 이 자리를 실제 호출로 교체한다.
+export const getSimilarProducts = async (productId: number): Promise<ProductListItem[]> => {
+  return PRODUCT_LIST_MOCK_DATA.filter((product) => product.id !== productId).slice(0, 8)
+}
+
 export const getProductDetail = async (productId: number): Promise<ProductDetailViewData> => {
+  if (!PRODUCT_API_ENABLED) {
+    return buildMockProductDetail(productId)
+  }
+
   const response = await http.get<ApiResponse<ProductDetailDto>>(`/products/${productId}`)
 
   return toProductDetailViewData(unwrapApiData(response.data))

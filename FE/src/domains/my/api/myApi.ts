@@ -10,12 +10,14 @@ import { PRODUCT_LIST_MOCK_DATA } from '@/domains/product/constants/productListM
 import type {
   MyLiveItem,
   MyOrderItem,
+  MyOrderStatus,
   MyPageViewData,
   MyProductItem,
   MyProductStatus,
   MyProfile,
   MyProfileUpdateRequest,
   MySaleItem,
+  MySettlementStatus,
   MyWishItem,
 } from '@/domains/my/types/my.types'
 import type {
@@ -29,14 +31,13 @@ import type {
   InterestCategory,
   UserInterests,
 } from '@/shared/api/mockInterestStorage'
+import { readMockProfileMedia } from '@/shared/api/mockProfileMediaStorage'
 import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.types'
 
 const MY_API_ENABLED = import.meta.env.VITE_MY_API_ENABLED === 'true'
 const MY_LIVE_API_ENABLED = import.meta.env.VITE_LIVE_LIST_API_ENABLED !== 'false'
-
-interface MyProfileImageResponse {
-  profileImageUrl: string | null
-}
+const WISH_API_ENABLED = import.meta.env.VITE_WISH_API_ENABLED !== 'false'
+const MOCK_MY_PROFILE_STORAGE_KEY = 'vidtib:mock-my-profile'
 
 interface MyDefaultTryOnImageResponse {
   defaultTryOnImageUrl: string | null
@@ -59,7 +60,6 @@ type ProductSaleStatusDto =
   | 'AUCTION_IN_PROGRESS'
   | 'AUCTION_FAILED'
   | 'SOLD'
-  | 'PRIVATE'
 
 interface MyProductApiDto {
   id: number
@@ -96,6 +96,33 @@ interface MyLiveApiDto {
   viewerCount: number
 }
 
+interface OrderProductDto {
+  id: number
+  sellerId: number
+  categoryId: number | null
+  brandId: number | null
+  title: string
+  description?: string | null
+  conditionGrade?: string | null
+  sizeLabel?: string | null
+  saleType: ProductSaleTypeDto
+  saleStatus?: ProductSaleStatusDto
+  price: number | null
+  createdAt: string
+}
+
+interface OrderListItemDto {
+  orderId: number
+  product: OrderProductDto
+  buyerId: number
+  buyerNickname: string
+  sellerId: number
+  sellerNickname: string
+  orderPrice: number
+  status: string
+  createdAt: string
+}
+
 interface BackendPageResponse<T> {
   content: T[]
   page: number
@@ -104,6 +131,8 @@ interface BackendPageResponse<T> {
   totalPages: number
   hasNext: boolean
 }
+
+type MockMyProfileMap = Record<string, Partial<MyProfile>>
 
 const EMPTY_PAGE_META: PageMeta = {
   page: 1,
@@ -181,26 +210,39 @@ const createEmptyMyPageViewData = (userId: number): MyPageViewData => ({
 export const getMyPageViewData = async (userId: number): Promise<MyPageViewData> => {
   const baseViewData = createEmptyMyPageViewData(userId)
 
-  const [profileResult, wishesResult, productsResult, livesResult, notificationCountResult] =
-    await Promise.allSettled([
-      MY_API_ENABLED ? getMyProfile(userId) : Promise.resolve(null),
-      MY_API_ENABLED ? getMyWishList(userId) : Promise.resolve(null),
-      MY_API_ENABLED ? getMySellerProducts(userId) : Promise.resolve(null),
-      MY_LIVE_API_ENABLED ? getMyHostLives(userId) : Promise.resolve(null),
-      MY_API_ENABLED ? getUnreadNotificationCount(userId) : Promise.resolve(null),
-    ])
+  const [
+    profileResult,
+    wishesResult,
+    productsResult,
+    livesResult,
+    notificationCountResult,
+    ordersResult,
+    salesResult,
+  ] = await Promise.allSettled([
+    getMyProfile(userId),
+    getMyWishList(userId),
+    MY_API_ENABLED ? getMySellerProducts(userId) : Promise.resolve(null),
+    MY_LIVE_API_ENABLED ? getMyHostLives(userId) : Promise.resolve(null),
+    MY_API_ENABLED ? getUnreadNotificationCount(userId) : Promise.resolve(null),
+    MY_API_ENABLED ? getMyOrders(userId, 'BUYER') : Promise.resolve(null),
+    MY_API_ENABLED ? getMyOrders(userId, 'SELLER') : Promise.resolve(null),
+  ])
 
   const profile = getSettledValue(profileResult)
   const wishes = getSettledValue(wishesResult)
   const products = getSettledValue(productsResult)
   const lives = getSettledValue(livesResult)
   const unreadNotifications = getSettledValue(notificationCountResult)
+  const orders = getSettledValue(ordersResult)?.map(toMyOrderItem) ?? null
+  const sales = getSettledValue(salesResult)?.map(toMySaleItem) ?? null
 
   return {
     ...baseViewData,
     products: products ?? [],
     lives: lives ?? [],
     wishes: wishes?.items ?? [],
+    orders: orders ?? [],
+    sales: sales ?? [],
     wishMeta: wishes?.meta ?? EMPTY_PAGE_META,
     summary: {
       ...baseViewData.summary,
@@ -209,6 +251,8 @@ export const getMyPageViewData = async (userId: number): Promise<MyPageViewData>
         ...baseViewData.summary.counts,
         wishes: wishes?.items.length ?? 0,
         unreadNotifications: unreadNotifications ?? 0,
+        orders: orders?.length ?? 0,
+        sales: sales?.length ?? 0,
       },
       productStatusCounts: products ? getProductStatusCounts(products) : baseViewData.summary.productStatusCounts,
       todoCounts: {
@@ -221,7 +265,11 @@ export const getMyPageViewData = async (userId: number): Promise<MyPageViewData>
 
 export const getMyProfile = async (userId: number): Promise<MyProfile> => {
   if (!MY_API_ENABLED) {
-    return createEmptyProfile(userId)
+    return {
+      ...createEmptyProfile(userId),
+      ...readMockMyProfile(userId),
+      ...readMockProfileMedia(userId),
+    }
   }
 
   const response = await http.get<ApiResponse<MyProfileApiDto>>(`/users/${userId}`)
@@ -234,7 +282,7 @@ export const getMyProfile = async (userId: number): Promise<MyProfile> => {
 }
 
 export const getMyWishList = async (userId: number) => {
-  if (!MY_API_ENABLED) {
+  if (!WISH_API_ENABLED) {
     void userId
     const items = PRODUCT_LIST_MOCK_DATA
       .filter((product) => product.isLiked)
@@ -296,23 +344,45 @@ const getMySellerProducts = async (userId: number): Promise<MyProductItem[]> => 
   return products.filter((item): item is MyProductItem => item !== null)
 }
 
+const getMyOrders = async (
+  userId: number,
+  role: 'BUYER' | 'SELLER',
+): Promise<OrderListItemDto[]> => {
+  const response = await http.get<
+    ApiResponse<PageResponse<OrderListItemDto> | BackendPageResponse<OrderListItemDto>>
+  >(`/users/${userId}/orders`, {
+    params: {
+      role,
+      page: 0,
+      size: 100,
+    },
+  })
+  const pageResponse = normalizePageResponse(
+    unwrapApiData(response.data, '주문 목록을 불러오지 못했습니다.'),
+  )
+
+  return pageResponse.items
+}
+
 const getMyHostLives = async (userId: number): Promise<MyLiveItem[]> => {
   const response = await http.get<
     ApiResponse<PageResponse<MyLiveApiDto> | BackendPageResponse<MyLiveApiDto>>
   >('/lives', {
+    // hostId 필터 + 인증 토큰으로 호출해야 종료·취소된 내 라이브까지 서버가 돌려준다.
+    // skipAuth로 비회원 취급되면 공개 상태(SCHEDULED/LIVE)만 내려온다(req 028 §2).
     params: {
+      hostId: userId,
       page: 0,
       size: 100,
       sort: 'LATEST',
     },
-    skipAuth: true,
   })
   const pageResponse = normalizePageResponse(
     unwrapApiData(response.data, '라이브 목록을 불러오지 못했습니다.'),
   )
 
+  // 서버가 hostId로 이미 좁혀 주므로 클라이언트 재필터는 하지 않는다.
   return pageResponse.items
-    .filter((live) => live.hostId === userId)
     .map(toMyLiveItem)
     .filter((item): item is MyLiveItem => item !== null)
 }
@@ -337,25 +407,18 @@ export const updateMyProfile = async (
   request: MyProfileUpdateRequest,
 ): Promise<MyProfile> => {
   if (!MY_API_ENABLED) {
-    return {
+    const nextProfile = {
       ...createEmptyProfile(userId),
+      ...readMockMyProfile(userId),
       ...request,
     }
+
+    writeMockMyProfile(userId, nextProfile)
+    return nextProfile
   }
 
   const response = await http.patch<ApiResponse<MyProfile>>(`/users/${userId}`, request)
   return unwrapApiData(response.data, '회원 정보를 저장하지 못했습니다.')
-}
-
-export const updateMyProfileImage = async (userId: number, file: File) => {
-  void userId
-  void file
-  return { profileImageUrl: null } satisfies MyProfileImageResponse
-}
-
-export const deleteMyProfileImage = async (userId: number) => {
-  void userId
-  return { profileImageUrl: null } satisfies MyProfileImageResponse
 }
 
 export const updateMyDefaultTryOnImage = async (userId: number, file: File) => {
@@ -412,7 +475,7 @@ export const updateMyInterests = async (userId: number, request: UpdateMyInteres
 }
 
 export const removeMyWish = async (userId: number, productId: number) => {
-  if (!MY_API_ENABLED) {
+  if (!WISH_API_ENABLED) {
     return
   }
 
@@ -423,6 +486,40 @@ export const isMyApiEnabled = () => MY_API_ENABLED
 
 const getSettledValue = <T>(result: PromiseSettledResult<T>) =>
   result.status === 'fulfilled' ? result.value : null
+
+const getMockMyProfileKey = (userId: number) => String(userId)
+
+const readMockMyProfileMap = (): MockMyProfileMap => {
+  if (typeof window === 'undefined') {
+    return {}
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(MOCK_MY_PROFILE_STORAGE_KEY)
+
+    if (!storedValue) {
+      return {}
+    }
+
+    return JSON.parse(storedValue) as MockMyProfileMap
+  } catch {
+    return {}
+  }
+}
+
+const readMockMyProfile = (userId: number): Partial<MyProfile> =>
+  readMockMyProfileMap()[getMockMyProfileKey(userId)] ?? {}
+
+const writeMockMyProfile = (userId: number, profile: MyProfile) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const profileMap = readMockMyProfileMap()
+
+  profileMap[getMockMyProfileKey(userId)] = profile
+  window.localStorage.setItem(MOCK_MY_PROFILE_STORAGE_KEY, JSON.stringify(profileMap))
+}
 
 const normalizePageResponse = <T>(
   response: PageResponse<T> | BackendPageResponse<T>,
@@ -476,6 +573,54 @@ const toMyLiveItem = (live: MyLiveApiDto): MyLiveItem | null => {
     viewerCount: live.viewerCount,
     broadcastAt: live.startedAt ?? live.scheduledAt ?? '',
   }
+}
+
+const toMyOrderItem = (order: OrderListItemDto): MyOrderItem => ({
+  id: order.orderId,
+  type: order.product.saleType === 'AUCTION' ? 'AUCTION' : 'DIRECT',
+  status: order.status as MyOrderStatus,
+  productName: order.product.title,
+  productThumbnailUrl: '',
+  sellerNickname: order.sellerNickname,
+  paidAmount: order.orderPrice,
+  createdAt: order.createdAt,
+  recipientName: '',
+  recipientPhoneNumber: '',
+  postalCode: '',
+  address: '',
+  detailAddress: '',
+})
+
+const toMySaleItem = (order: OrderListItemDto): MySaleItem => ({
+  id: order.orderId,
+  status: order.status as MyOrderStatus,
+  settlementStatus: toMySettlementStatus(order.status),
+  productName: order.product.title,
+  productThumbnailUrl: '',
+  buyerNickname: order.buyerNickname,
+  paidAmount: order.orderPrice,
+  createdAt: order.createdAt,
+  recipientName: '',
+  recipientPhoneNumber: '',
+  postalCode: '',
+  address: '',
+  detailAddress: '',
+})
+
+const toMySettlementStatus = (status: string): MySettlementStatus => {
+  if (status === 'SETTLED') {
+    return 'SETTLED'
+  }
+
+  if (status === 'CONFIRMED') {
+    return 'PENDING'
+  }
+
+  if (status === 'REFUNDED') {
+    return 'REFUND_REQUESTED'
+  }
+
+  return 'ESCROW'
 }
 
 const toProductListItem = async (product: MyProductApiDto): Promise<ProductListItem> => {

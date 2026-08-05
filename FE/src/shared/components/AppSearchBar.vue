@@ -94,44 +94,41 @@ const selectKeyword = (keyword: string) => {
   height: 46px;
   padding: 3px 3px 3px var(--space-4);
   border: 1px solid var(--color-search-border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--color-surface);
   box-shadow: none;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+  transition: border-color var(--transition-base);
 }
 
 .app-search:focus-within {
-  border-color: var(--color-search-button);
-  box-shadow: 0 0 0 4px rgba(47, 75, 58, 0.08);
+  border-color: var(--color-border-underline);
 }
 
 .app-search__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
   flex: 0 0 auto;
   color: var(--color-search-icon);
 }
 
 .app-search__icon svg {
-  width: 18px;
-  height: 18px;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
 }
 
 .app-search__input {
-  height: 38px;
+  height: var(--search-input-height);
   min-width: 0;
   border: 0;
   flex: 1;
   padding: 0 var(--space-3);
   background: transparent;
   color: var(--color-text-primary);
-  font-size: 15px;
-  line-height: 38px;
+  font-size: var(--font-size-body);
+  line-height: var(--search-input-height);
   outline: none;
 }
 
@@ -143,22 +140,22 @@ const selectKeyword = (keyword: string) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
+  width: var(--search-input-height);
+  height: var(--search-input-height);
+  flex: 0 0 var(--search-input-height);
   padding: 0;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--color-search-button);
   color: var(--color-text-inverse);
-  font-weight: 700;
-  line-height: 20px;
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-control);
   white-space: nowrap;
 }
 
 .app-search__button svg {
-  width: 18px;
-  height: 18px;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
 }
 
 .app-search__button:hover {
@@ -176,8 +173,8 @@ const selectKeyword = (keyword: string) => {
 
 .app-search-tags__label {
   color: var(--color-text-muted);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .app-search-tags__item {
@@ -185,12 +182,15 @@ const selectKeyword = (keyword: string) => {
   align-items: center;
   min-height: 28px;
   padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-chip);
-  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
+  transition:
+    border-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .app-search-tags__item:hover {
@@ -211,14 +211,14 @@ const selectKeyword = (keyword: string) => {
   }
 
   .app-search__input {
-    height: 36px;
-    line-height: 36px;
+    height: var(--button-height-small);
+    line-height: var(--button-height-small);
   }
 
   .app-search__button {
-    width: 36px;
-    height: 36px;
-    flex-basis: 36px;
+    width: var(--button-height-small);
+    height: var(--button-height-small);
+    flex-basis: var(--button-height-small);
   }
 
   .app-search-tags {

@@ -2487,13 +2487,16 @@ onBeforeUnmount(() => {
 
 .product-registration__header h1 {
   color: var(--color-text-primary);
-  font-size: 36px;
-  font-weight: var(--font-weight-extrabold);
-  line-height: 48px;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.035em;
+  line-height: 1.08;
 }
 
 .product-registration__header p {
   color: var(--color-text-secondary);
+  font-weight: var(--font-weight-light);
 }
 
 .product-registration__steps ol {
@@ -2529,7 +2532,7 @@ onBeforeUnmount(() => {
 
 .product-registration__steps span {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-layer-1);
   display: grid;
   width: 32px;
   height: 32px;
@@ -2538,14 +2541,14 @@ onBeforeUnmount(() => {
   background: var(--color-surface);
   color: var(--color-text-secondary);
   flex: 0 0 auto;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   place-items: center;
 }
 
 .product-registration__steps strong {
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2588,16 +2591,16 @@ onBeforeUnmount(() => {
 .product-registration__panel {
   display: grid;
   align-content: start;
-  min-height: 320px;
+  min-height: var(--surface-min-height-lg);
   gap: var(--space-4);
   padding: var(--space-8);
 }
 
 .product-registration__panel h2 {
   color: var(--color-text-primary);
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-extrabold);
-  line-height: 32px;
+  line-height: var(--line-height-2xl);
 }
 
 .product-registration__completeness {
@@ -2612,7 +2615,7 @@ onBeforeUnmount(() => {
 
 .product-registration__completeness--desktop {
   position: sticky;
-  top: calc(72px + var(--space-6));
+  top: calc(var(--thumbnail-size-sm) + var(--space-6));
 }
 
 .product-registration__completeness--mobile {
@@ -2628,14 +2631,14 @@ onBeforeUnmount(() => {
 
 .product-registration__completeness-header h3 {
   color: var(--color-text-primary);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  line-height: 26px;
+  line-height: var(--line-height-lg);
 }
 
 .product-registration__completeness-header strong {
   color: var(--color-primary);
-  font-size: 28px;
+  font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-extrabold);
   line-height: 34px;
 }
@@ -2643,7 +2646,7 @@ onBeforeUnmount(() => {
 .product-registration__progress {
   overflow: hidden;
   height: 8px;
-  border-radius: 999px;
+  border-radius: 2px;
   background: var(--color-surface-secondary);
 }
 
@@ -2652,13 +2655,13 @@ onBeforeUnmount(() => {
   height: 100%;
   border-radius: inherit;
   background: var(--color-primary);
-  transition: width 180ms ease;
+  transition: width var(--transition-moderate);
 }
 
 .product-registration__completeness > p {
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
 }
 
 .product-registration__completeness-list {
@@ -2668,8 +2671,8 @@ onBeforeUnmount(() => {
 
 .product-registration__completeness-list > strong {
   color: var(--color-text-primary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
 }
 
 .product-registration__completeness-list ul {
@@ -2685,8 +2688,8 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
 }
 
 .product-registration__completeness-list li span {
@@ -2741,8 +2744,8 @@ onBeforeUnmount(() => {
 
 .product-registration__field-error {
   color: var(--color-error);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .product-registration__form {
@@ -2764,9 +2767,9 @@ onBeforeUnmount(() => {
 
 .product-registration__field span:first-child {
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .product-registration__field .product-registration__required,
@@ -2789,9 +2792,9 @@ onBeforeUnmount(() => {
 
 .product-registration__field-hint {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-style: normal;
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .product-registration__field-hint--spacer {
@@ -2810,8 +2813,8 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
 }
 
 .product-registration__field input,
@@ -2824,8 +2827,8 @@ onBeforeUnmount(() => {
   color: var(--color-text-primary);
   font: inherit;
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .product-registration__field input,
@@ -2863,9 +2866,9 @@ onBeforeUnmount(() => {
   top: 50%;
   right: var(--space-4);
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-semibold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
   transform: translateY(-50%);
 }
 
@@ -2878,7 +2881,7 @@ onBeforeUnmount(() => {
 .product-registration__field select:focus,
 .product-registration__field textarea:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
   outline: none;
 }
 
@@ -2904,15 +2907,15 @@ onBeforeUnmount(() => {
 .product-registration__fieldset legend {
   padding: 0 var(--space-1);
   color: var(--color-text-primary);
-  font-size: 16px;
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-bold);
-  line-height: 24px;
+  line-height: var(--line-height-body);
 }
 
 .product-registration__fieldset > p {
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
 }
 
 .product-registration__field-empty {
@@ -2935,9 +2938,9 @@ onBeforeUnmount(() => {
 
 .product-registration__section h3 {
   color: var(--color-text-primary);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  line-height: 26px;
+  line-height: var(--line-height-lg);
 }
 
 .product-registration__section-header {
@@ -2954,8 +2957,8 @@ onBeforeUnmount(() => {
 
 .product-registration__section-header p {
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
 }
 
 .product-registration__ai-model {
@@ -2971,8 +2974,8 @@ onBeforeUnmount(() => {
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-control);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
 }
 
 .product-registration__segmented {
@@ -2988,9 +2991,9 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-model-choice > span:first-child {
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .product-registration__option-grid {
@@ -3040,7 +3043,7 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-photo--selected {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .product-registration__ai-photo img {
@@ -3071,7 +3074,7 @@ onBeforeUnmount(() => {
 
 .product-registration__add-ai-photo-button span {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -3105,7 +3108,7 @@ onBeforeUnmount(() => {
 
 .product-registration__additional-ai-photo--selected {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .product-registration__additional-ai-photo img {
@@ -3116,7 +3119,7 @@ onBeforeUnmount(() => {
 
 .product-registration__additional-ai-photo span {
   padding: var(--space-2);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
 }
 
@@ -3140,8 +3143,8 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: var(--button-height-small);
+  height: var(--button-height-small);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
@@ -3155,8 +3158,8 @@ onBeforeUnmount(() => {
 }
 
 .product-registration__ai-result-toolbar svg {
-  width: 20px;
-  height: 20px;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
 }
 
 .product-registration__ai-result-toolbar strong {
@@ -3184,7 +3187,7 @@ onBeforeUnmount(() => {
   border: 2px solid #2563eb;
   background: rgb(37 99 235 / 12%);
   color: #2563eb;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   line-height: 1;
   place-items: start;
@@ -3227,8 +3230,8 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-card p {
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
 }
 
 .product-registration__ai-card button {
@@ -3239,7 +3242,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
   white-space: nowrap;
 }
@@ -3266,14 +3269,14 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-result-actions > span {
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
 .product-registration__ai-empty {
   display: grid;
   gap: var(--space-1);
-  min-height: 132px;
+  min-height: var(--surface-min-height-2xs);
   place-content: center;
   padding: var(--space-5);
   border: 1px dashed var(--color-border);
@@ -3303,7 +3306,7 @@ onBeforeUnmount(() => {
 
 .product-registration__price-axis {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -3332,7 +3335,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   height: 220px;
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   text-align: right;
 }
@@ -3371,8 +3374,8 @@ onBeforeUnmount(() => {
   width: 100%;
   margin-bottom: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 12px;
-  line-height: 16px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
   text-align: center;
 }
 
@@ -3392,7 +3395,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-sm);
   background: var(--color-error);
   color: var(--color-text-inverse);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   font-weight: var(--font-weight-bold);
   white-space: nowrap;
   transform: translateX(-50%);
@@ -3415,7 +3418,7 @@ onBeforeUnmount(() => {
 
 .product-registration__price-recommendations dt {
   color: var(--color-error);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
 }
 
@@ -3448,16 +3451,16 @@ onBeforeUnmount(() => {
 
 .product-registration__review-card-header h4 {
   color: var(--color-text-primary);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  line-height: 26px;
+  line-height: var(--line-height-lg);
 }
 
 .product-registration__review-card-header .product-registration__button {
   min-width: 120px;
   height: var(--button-height-small);
   padding: 0 var(--space-3);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
 }
 
 .product-registration__review-list {
@@ -3473,16 +3476,16 @@ onBeforeUnmount(() => {
 
 .product-registration__review-list dt {
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
 }
 
 .product-registration__review-list dd {
   min-width: 0;
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-semibold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
   overflow-wrap: anywhere;
 }
 
@@ -3500,25 +3503,25 @@ onBeforeUnmount(() => {
 
 .product-registration__complete-icon {
   display: grid;
-  width: 52px;
-  height: 52px;
+  width: var(--button-height-major);
+  height: var(--button-height-major);
   border-radius: 50%;
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   place-items: center;
 }
 
 .product-registration__complete h3 {
   color: var(--color-text-primary);
-  font-size: 22px;
+  font-size: var(--font-size-xl);
   font-weight: var(--font-weight-extrabold);
   line-height: 30px;
 }
 
 .product-registration__complete p {
-  max-width: 520px;
+  max-width: var(--prose-max-width);
   color: var(--color-text-secondary);
   line-height: var(--line-height-body);
 }
@@ -3552,20 +3555,20 @@ onBeforeUnmount(() => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: 0 24px 60px rgb(0 0 0 / 16%);
+  box-shadow: none;
 }
 
 .product-registration__prompt h3 {
   color: var(--color-text-primary);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-bold);
-  line-height: 28px;
+  line-height: var(--line-height-lg-plus);
 }
 
 .product-registration__prompt p {
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
 }
 
 .product-registration__prompt-actions {

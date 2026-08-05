@@ -62,6 +62,13 @@ public interface LiveRepository extends JpaRepository<Live, Long> {
     List<Live> findByStatusAndScheduledAtAfterOrderByScheduledAtAsc(
             LiveStatus status, LocalDateTime from, Pageable pageable);
 
+    /**
+     * 예정 시각이 지난 예약 라이브(JY010 자동 시작). 오래 기다린 것부터 처리하도록 임박순으로
+     * 정렬한다. 상한은 호출부(스케줄러)가 {@code pageable}로 건다.
+     */
+    List<Live> findByStatusAndScheduledAtLessThanEqualOrderByScheduledAtAsc(
+            LiveStatus status, LocalDateTime now, Pageable pageable);
+
     /** 팔로잉 홈(HOME-002) — 팔로우한 판매자들의 진행 중·예정 방송. */
     List<Live> findByHost_IdInAndStatusInOrderByCreatedAtDesc(
             Collection<Long> hostIds, Collection<LiveStatus> statuses, Pageable pageable);

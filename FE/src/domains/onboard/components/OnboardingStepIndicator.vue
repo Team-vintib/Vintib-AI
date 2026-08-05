@@ -106,12 +106,15 @@ const getStateText = (stepId: number) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-badge);
   background: var(--color-surface);
-  font-weight: 600;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
 }
 
 .step-indicator__item--completed .step-indicator__marker,
@@ -123,12 +126,12 @@ const getStateText = (stepId: number) => {
 
 .step-indicator__item--current .step-indicator__label {
   color: var(--color-primary);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .step-indicator__label {
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
 }
 
 .step-indicator__state {

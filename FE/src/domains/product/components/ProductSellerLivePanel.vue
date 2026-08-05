@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
+import fallbackLiveThumbnail from '@/assets/images/products/product-denim-jacket.webp'
 import type { ProductLinkedLive } from '@/domains/product/types/productDetail.types'
 
 const props = defineProps<{
@@ -11,6 +14,16 @@ const emit = defineEmits<{
   toggleReminder: []
   viewLive: [liveId: number]
 }>()
+
+const displayThumbnailUrl = computed(() => props.linkedLive?.thumbnailUrl || fallbackLiveThumbnail)
+const handleThumbnailError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackLiveThumbnail
+  }
+}
 
 const formatLiveDate = (date: string) =>
   new Intl.DateTimeFormat('ko-KR', {
@@ -26,7 +39,11 @@ const formatLiveDate = (date: string) =>
     <h2 id="linked-live-title">연결 라이브</h2>
 
     <article class="seller-live__live">
-      <img :src="linkedLive.thumbnailUrl" :alt="`${linkedLive.title} 대표 이미지`" />
+      <img
+        :src="displayThumbnailUrl"
+        :alt="`${linkedLive.title} 대표 이미지`"
+        @error="handleThumbnailError"
+      />
       <div class="seller-live__live-copy">
         <span class="seller-live__status">
           {{ linkedLive.status === 'LIVE' ? '방송 중' : '방송 예정' }}
@@ -65,9 +82,9 @@ const formatLiveDate = (date: string) =>
 .seller-live > h2 {
   margin-bottom: var(--space-4);
   color: var(--color-text-primary);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 36px;
+  font-size: var(--font-size-2xl-plus);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-2xl-plus);
 }
 
 .seller-live__live {
@@ -97,9 +114,9 @@ const formatLiveDate = (date: string) =>
   overflow: hidden;
   margin-top: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -107,9 +124,9 @@ const formatLiveDate = (date: string) =>
 .seller-live__live-copy p {
   margin-top: 2px;
   color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-snug);
 }
 
 .seller-live__status {
@@ -117,9 +134,9 @@ const formatLiveDate = (date: string) =>
   padding: 2px 7px;
   background: var(--color-auction-soft);
   color: var(--color-auction);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 16px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-xs);
 }
 
 .seller-live__actions {
@@ -131,24 +148,24 @@ const formatLiveDate = (date: string) =>
 
 .seller-live__secondary {
   flex: 0 0 auto;
-  height: 40px;
+  height: var(--button-height-sm);
   padding: 0 var(--space-4);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .seller-live__link {
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .seller-live__secondary:hover,
@@ -163,7 +180,7 @@ const formatLiveDate = (date: string) =>
 }
 
 .seller-live button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 

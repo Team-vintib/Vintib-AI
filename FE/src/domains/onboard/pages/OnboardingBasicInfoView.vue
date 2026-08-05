@@ -499,9 +499,9 @@ const handleSubmit = async () => {
 }
 
 .basic-info-form__title {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 34px;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-2xl-loose);
 }
 
 .basic-info-form__description {
@@ -531,15 +531,15 @@ const handleSubmit = async () => {
 
 .gender-field:focus-visible .gender-field__options {
   border-radius: var(--radius-control);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .gender-field__legend {
   margin-bottom: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .gender-field__required {
@@ -576,12 +576,12 @@ const handleSubmit = async () => {
   background: var(--color-surface);
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .gender-field__option:hover {
@@ -590,7 +590,7 @@ const handleSubmit = async () => {
 
 .gender-field__option:has(.gender-field__input:focus-visible) {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .gender-field__option--selected {
@@ -615,8 +615,8 @@ const handleSubmit = async () => {
   min-height: 20px;
   margin-top: var(--space-2);
   color: var(--color-error);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .address-field__control {
@@ -641,7 +641,7 @@ const handleSubmit = async () => {
   margin-top: var(--space-8);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
 }
 
 .basic-info-form__notice-title {
@@ -656,7 +656,7 @@ const handleSubmit = async () => {
   margin-top: var(--space-6);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
 }
 </style>

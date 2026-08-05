@@ -104,20 +104,27 @@ const getProductPath = (productId: number) => `/products/${productId}`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
+  min-height: var(--button-height-small);
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-chip);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-control);
   white-space: nowrap;
+  transition:
+    border-color var(--transition-slow),
+    background-color var(--transition-slow),
+    color var(--transition-slow);
 }
 
-.category-products__tab:hover,
-.category-products__tab:focus-visible,
+.category-products__tab:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
 .category-products__tab--active {
   border-color: var(--color-primary);
   background: var(--color-primary);
@@ -125,13 +132,13 @@ const getProductPath = (productId: number) => `/products/${productId}`
 }
 
 .category-products__tab:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
 .category-products__panel {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-5);
 }
 
@@ -144,8 +151,8 @@ const getProductPath = (productId: number) => `/products/${productId}`
   border-radius: var(--radius-card);
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
 }
 
 @media (max-width: 768px) {
@@ -158,7 +165,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
   .category-products__tab {
     min-height: 34px;
     padding: 0 var(--space-3);
-    font-size: 13px;
+    font-size: var(--font-size-caption);
   }
 
   .category-products__panel {

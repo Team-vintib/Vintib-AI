@@ -35,8 +35,8 @@
 | --- | --- | --- | --- | --- |
 | 001 | `001-auth-contract.md` | Auth | 이메일 auth API 연결 완료 | `GET /api/me`, auth 응답 `user/nextStep`, SSAFY SSO |
 | 002 | `002-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
-| 003 | `003-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 상품/헤더 필수 필드(brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId) 연결 완료 | 생성용 상품 조회, AI 시착 생성, 선택 필드(hostProfileImageUrl/description/material/measurements/defectSummary) |
-| 004 | `004-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API, 예약 라이브 알림 신청/스케줄러 연동 완료 | 알림 생성 이벤트는 `LIVE_REMINDER` 하나뿐 — 나머지 7종(라이브 시작/입찰/낙찰/주문/배송/포인트) 미반영, unread count API, 탭별 bulk read API |
+| 003 | `003-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 필드(필수+선택 전부: brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId/hostProfileImageUrl/description/material/measurements/defectSummary) 연결 완료 | AI 시착 생성만 남음(서윤/AI 파트) |
+| 004 | `004-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API, 예약 라이브 알림 신청/스케줄러, `LIVE_STARTED`/`AUCTION_OUTBID` 알림 생성 연동 완료 | 알림 생성 이벤트 5종(낙찰/주문/배송/포인트)은 아직 — 낙찰은 Phase 8, 나머지는 서윤 확인 필요. unread count API, 탭별 bulk read API |
 | 005 | `005-auction-chat-contract.md` | Auction/Chat | 채팅/반응/시청자 수, 경매 조건 설정, 경매 snapshot/시작/입찰/입찰내역, STOMP(`AUCTION_STARTED`/`BID_PLACED`) 연동 완료 | 경매 종료(`close`)·낙찰자 조회(`winner`)·`AUCTION_CLOSED` 이벤트·자동 종료 스케줄러 |
 
 ## 4. 기존 API 변경 요청
@@ -91,6 +91,19 @@
   (`hostProfileImageUrl`/`description`/`material`/`measurements`/`defectSummary`)와 §3.1(생성용 상품
   조회)·§3.3/3.6(AI 시착 생성)은 아직 남아 있어 문서는 삭제하지 않고 갱신만 했다.
 
+## 2026-08-04 Phase 8 진입 전 정리
+
+- `003-live-tryon-contract.md` §3.5 선택 필드(hostProfileImageUrl/description/material/
+  measurements/defectSummary) 전부 반영 완료. 남은 것은 AI 시착 생성뿐이라 표 상태를 "AI 시착
+  생성만 남음"으로 정리했다.
+- `004-social-notification-contract.md`에 `LIVE_STARTED`(팔로우한 판매자 방송 시작)·
+  `AUCTION_OUTBID`(상위 입찰 발생) 알림 생성을 추가했다 — 둘 다 정윤 도메인 트리거라 서윤을
+  기다리지 않고 반영했다. 계약은 `docs/requests/FE/027-live-optional-fields-and-notifications.md`.
+- `007-unsold-product-disposition.md` 질문 1(미낙찰 상품 처리)에 DB 설계 기준 예비 답변을 남겼다
+  — 최종 검증은 Phase 8 코드가 들어간 뒤.
+- `018-live-broadcast-end-summary.md`(방송 종료 요약 API)는 Phase 8 작업(경매 종료·낙찰/유찰
+  집계)과 데이터가 겹쳐 Phase 8에서 함께 처리한다 — 별도 반영하지 않았다.
+
 ## 2026-08-04 머지 정리 (경매/라이브 알림/검색/홈 대규모 반영)
 
 - `004-home-contract.md`, `005-search-contract.md`는 팀원(정윤) 쪽에서 홈 `hostId`·통합 검색을
@@ -114,3 +127,19 @@
 - `010-product-category-optional.md`(categoryId 선택 입력 전환)는 **반영하지 않기로 결정**하고
   삭제했다 — AI가 카테고리를 자동 판별해 채워주고 사용자가 필요시 수정하는 흐름이라 실질적으로
   미분류 상태가 생기지 않는다. `categoryId` `@NotNull`은 그대로 유지한다.
+
+## 2026-08-04 라이브 이슈 4건 정리
+
+- 사용자 리포트(예약 라이브 자동 시작 안 됨 / 목록에서 내 라이브 구분 안 됨 / 홈 라이브 목록
+  비어 있음 / 시청자 수 중복 집계) 4건을 조사해 반영했다. 상세는
+  `docs/requests/FE/028-live-auto-start-isHost-viewercount.md`.
+- 예약 라이브 자동 시작 스케줄러(JY010, `LiveAutoStartScheduler`) 신규 구현 — 예정 시각이
+  지난 `SCHEDULED` 라이브를 30초 주기로 `LIVE` 전이시킨다. 설계는
+  `docs/plans/BE/JY010-live-auto-start.md`.
+- `GET /api/lives`(목록) 응답에 `isHost` 필드 추가 — 상세 조회와 같은 규칙. FE의 `myApi.ts`가
+  이 필드 대신 `hostId` 직접 비교 + `skipAuth`로 호출하고 있어 "내 라이브가 남 라이브처럼
+  보인다" 증상의 원인이었다.
+- 홈 화면 라이브 미노출은 자동 시작 스케줄러 부재와 겹친 증상으로 확인 — 홈 쿼리 자체에는
+  버그가 없었다.
+- 시청자 수 중복 집계는 FE 원인으로 확인(시청 화면이 STOMP 연결을 2개 열어 세션이 2개로
+  잡힘) — BE 집계 로직(세션 단위)은 의도된 설계라 그대로 두고 FE 조치를 요청했다.

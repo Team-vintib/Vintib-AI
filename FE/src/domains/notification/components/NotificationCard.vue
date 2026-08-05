@@ -116,20 +116,20 @@ const getCategoryIcon = (notification: NotificationItem) =>
   color: var(--color-text-primary);
   text-align: left;
   transition:
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    transform 140ms ease;
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .notification-card:hover:not(:disabled),
 .notification-card:focus-visible {
   border-color: var(--color-border-strong);
-  box-shadow: 0 12px 32px rgb(23 24 21 / 10%);
+  box-shadow: none;
   transform: translateY(-1px);
 }
 
 .notification-card:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -139,7 +139,7 @@ const getCategoryIcon = (notification: NotificationItem) =>
 }
 
 .notification-card--read {
-  background: rgb(255 255 255 / 64%);
+  background: transparent;
 }
 
 .notification-card__icon {
@@ -189,9 +189,9 @@ const getCategoryIcon = (notification: NotificationItem) =>
   min-width: 0;
   gap: var(--space-3);
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .notification-card__category {
@@ -204,9 +204,9 @@ const getCategoryIcon = (notification: NotificationItem) =>
   min-width: 0;
   gap: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
 }
 
 .notification-card__unread {
@@ -220,8 +220,8 @@ const getCategoryIcon = (notification: NotificationItem) =>
 .notification-card__body {
   overflow: hidden;
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

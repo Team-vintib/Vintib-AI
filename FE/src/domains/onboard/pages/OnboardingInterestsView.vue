@@ -18,9 +18,16 @@ interface InterestOption {
   label: string
 }
 
+// 관심 카테고리는 성별(depth 1)을 빼고 대분류(depth 2)만 보여준다.
+// 성별마다 중복되는 대분류(예: 남/여/공용 상의)를 이름으로 묶고, 선택 시 그 이름의 모든 성별 id를 함께 담는다.
+interface CategoryGroup {
+  label: string
+  ids: number[]
+}
+
 const brandSearchQuery = ref('')
 const brands = ref<InterestOption[]>([])
-const categories = ref<InterestOption[]>([])
+const categories = ref<CategoryGroup[]>([])
 const selectedBrandIds = ref<number[]>([])
 const selectedCategoryIds = ref<number[]>([])
 const isSubmitting = ref(false)
@@ -112,9 +119,24 @@ const handleSave = async (skip = false) => {
   }
 }
 
-const handleCategoryChange = () => {
+const isCategorySelected = (ids: number[]) =>
+  ids.length > 0 && ids.every((id) => selectedCategoryIds.value.includes(id))
+
+// 대분류 그룹을 토글한다 — 성별 구분 없이 그 이름의 모든 성별 id를 함께 넣거나 뺀다.
+const toggleCategory = (ids: number[]) => {
   submitError.value = ''
+
+  if (isCategorySelected(ids)) {
+    selectedCategoryIds.value = selectedCategoryIds.value.filter((id) => !ids.includes(id))
+    return
+  }
+
+  selectedCategoryIds.value = [...new Set([...selectedCategoryIds.value, ...ids])]
 }
+
+const selectedCategoryCount = computed(
+  () => categories.value.filter((category) => isCategorySelected(category.ids)).length,
+)
 
 const loadInterestOptions = async () => {
   try {
@@ -124,12 +146,15 @@ const loadInterestOptions = async () => {
       id: brand.id,
       label: brand.nameEn ? `${brand.name} (${brand.nameEn})` : brand.name,
     }))
-    categories.value = categoryResponse
-      .filter((category) => category.depth <= 2)
-      .map((category) => ({
-        id: category.id,
-        label: category.name,
-      }))
+    const categoryGroups = new Map<string, number[]>()
+    categoryResponse
+      .filter((category) => category.depth === 2)
+      .forEach((category) => {
+        const ids = categoryGroups.get(category.name) ?? []
+        ids.push(category.id)
+        categoryGroups.set(category.name, ids)
+      })
+    categories.value = [...categoryGroups.entries()].map(([label, ids]) => ({ label, ids }))
   } catch {
     brands.value = []
     categories.value = []
@@ -224,7 +249,7 @@ onMounted(() => {
         <legend class="interest-group__legend">
           <span>관심 카테고리</span>
           <span class="interest-group__count" aria-live="polite">
-            {{ selectedCategoryIds.length }}개 선택
+            {{ selectedCategoryCount }}개 선택
           </span>
         </legend>
 
@@ -233,29 +258,21 @@ onMounted(() => {
         </p>
 
         <div class="category-options">
-          <label
+          <button
             v-for="category in categories"
-            :key="category.id"
+            :key="category.label"
+            type="button"
             class="category-option"
-            :class="{
-              'category-option--selected': selectedCategoryIds.includes(category.id),
-            }"
+            :class="{ 'category-option--selected': isCategorySelected(category.ids) }"
+            :aria-pressed="isCategorySelected(category.ids)"
+            @click="toggleCategory(category.ids)"
           >
-            <input
-              v-model="selectedCategoryIds"
-              class="category-option__input"
-              type="checkbox"
-              name="interest-category"
-              :value="category.id"
-              @change="handleCategoryChange"
-            />
-
             <span class="category-option__label">{{ category.label }}</span>
 
             <span class="category-option__check" aria-hidden="true">
-              {{ selectedCategoryIds.includes(category.id) ? '✓' : '' }}
+              {{ isCategorySelected(category.ids) ? '✓' : '' }}
             </span>
-          </label>
+          </button>
         </div>
       </fieldset>
 
@@ -290,9 +307,9 @@ onMounted(() => {
 }
 
 .interest-selection__title {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 34px;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-2xl-loose);
 }
 
 .interest-selection__description {
@@ -306,9 +323,9 @@ onMounted(() => {
   border-radius: 999px;
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .interest-group {
@@ -330,23 +347,23 @@ onMounted(() => {
   width: 100%;
   gap: var(--space-4);
   color: var(--color-text-primary);
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .interest-group__count {
   color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .interest-group__hint {
   margin-top: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .brand-search {
@@ -371,8 +388,8 @@ onMounted(() => {
   margin-top: var(--space-5);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
   text-align: center;
 }
 
@@ -389,12 +406,12 @@ onMounted(() => {
   background: var(--color-surface);
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .brand-option:hover {
@@ -405,7 +422,7 @@ onMounted(() => {
 .brand-option:focus-visible {
   border-color: var(--color-primary);
   outline: none;
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .brand-option--selected {
@@ -419,8 +436,8 @@ onMounted(() => {
   overflow: hidden;
   opacity: 0;
   transition:
-    width 160ms ease,
-    opacity 160ms ease;
+    width var(--transition-base),
+    opacity var(--transition-base);
 }
 
 .brand-option__check--visible {
@@ -446,10 +463,10 @@ onMounted(() => {
   color: var(--color-text-secondary);
   cursor: pointer;
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .category-option:hover {
@@ -458,7 +475,7 @@ onMounted(() => {
 
 .category-option:has(.category-option__input:focus-visible) {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
 }
 
 .category-option--selected {
@@ -475,7 +492,7 @@ onMounted(() => {
 }
 
 .category-option__label {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .category-option__check {
@@ -489,8 +506,8 @@ onMounted(() => {
   margin-left: auto;
   background: var(--color-surface);
   color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .category-option--selected .category-option__check {
@@ -505,7 +522,7 @@ onMounted(() => {
   margin-top: var(--space-10);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
 }
 
 .interest-selection__notice strong {
@@ -520,8 +537,8 @@ onMounted(() => {
   margin-top: var(--space-6);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
 }
 
 @media (max-width: 820px) {

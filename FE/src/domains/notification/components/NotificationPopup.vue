@@ -88,7 +88,7 @@ const handleMarkAllAsRead = async () => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
-  box-shadow: 0 18px 48px rgb(23 24 21 / 14%);
+  box-shadow: none;
 }
 
 .notification-popup__header {
@@ -102,16 +102,16 @@ const handleMarkAllAsRead = async () => {
 
 .notification-popup__header h2 {
   color: var(--color-text-primary);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  line-height: 26px;
+  line-height: var(--line-height-lg);
 }
 
 .notification-popup__header p {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .notification-popup__header button,
@@ -123,7 +123,7 @@ const handleMarkAllAsRead = async () => {
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
   white-space: nowrap;
 }
@@ -156,7 +156,7 @@ const handleMarkAllAsRead = async () => {
   min-height: 156px;
   padding: var(--space-6);
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-semibold);
   text-align: center;
   place-items: center;

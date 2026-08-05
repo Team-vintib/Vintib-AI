@@ -23,7 +23,10 @@ import LiveProductQueue from '@/domains/live/components/LiveProductQueue.vue'
 import LiveUnsoldManage from '@/domains/live/components/LiveUnsoldManage.vue'
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchState from '@/domains/live/components/LiveWatchState.vue'
-import type { BroadcastEndSummary } from '@/domains/live/constants/liveBroadcastEndMock'
+import {
+  buildBroadcastEndSummary,
+  type BroadcastEndSummary,
+} from '@/domains/live/constants/liveBroadcastEndMock'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import LiveLayout from '@/shared/layouts/LiveLayout.vue'
@@ -337,15 +340,12 @@ const closeAuctionWin = () => {
   auctionWin.value = null
 }
 
-// 438 방송 종료 대시보드 — 종료 시 방송 요약(mock). 실제 경매 결과/방송 요약 API 없음(docs/requests/BE/009, 013).
-// ?result=sold 이면 전부 낙찰(미낙찰 처리 섹션 숨김 확인용).
-const broadcastSummary = computed<BroadcastEndSummary>(() => ({
-  productCount: live.value?.products.length ?? 0,
-  soldCount: 0,
-  unsoldCount: 0,
-  totalSales: 0,
-  results: [],
-}))
+// 438 방송 종료 대시보드 — 종료 시 방송 요약(mock). 실제 경매 결과/방송 요약 API 없음(docs/requests/BE/018).
+// 기본은 절반 미낙찰로 미판매 처리 흐름을 보여주고, ?result=sold 이면 전부 낙찰(미낙찰 섹션 숨김 확인용).
+const broadcastSummary = computed<BroadcastEndSummary>(() => {
+  const resultQuery = Array.isArray(route.query.result) ? route.query.result[0] : route.query.result
+  return buildBroadcastEndSummary(live.value?.products ?? [], resultQuery === 'sold')
+})
 
 const unsoldProducts = computed(() => {
   const unsoldIds = new Set(
@@ -551,8 +551,8 @@ onBeforeUnmount(() => {
 
 .live-broadcast-page__body {
   display: grid;
-  min-height: calc(100vh - 52px);
-  height: calc(100vh - 52px);
+  min-height: calc(100vh - var(--button-height-major));
+  height: calc(100vh - var(--button-height-major));
   grid-template-columns: 240px minmax(0, 1fr) 360px;
 }
 
@@ -578,13 +578,13 @@ onBeforeUnmount(() => {
 }
 
 .live-broadcast-page__transition {
-  min-height: 40px;
+  min-height: var(--button-height-sm);
   border: 1px solid var(--color-live);
   border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--color-live) 18%, transparent);
   color: var(--color-live-text-primary);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
 }
 
 .live-broadcast-page__transition:hover:not(:disabled) {
@@ -620,14 +620,14 @@ onBeforeUnmount(() => {
 
 .live-broadcast-page__slot-note {
   color: var(--color-live-text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-badge);
   letter-spacing: 0.02em;
   opacity: 0.75;
 }
 
 .live-broadcast-page__notice {
   position: absolute;
-  z-index: 3;
+  z-index: var(--z-layer-3);
   top: var(--space-4);
   left: 50%;
   max-width: calc(100% - var(--space-8));
@@ -635,9 +635,9 @@ onBeforeUnmount(() => {
   border: 1px solid var(--color-live-border);
   border-radius: var(--radius-chip);
   background: rgba(10, 12, 11, 0.86);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
+  color: var(--color-primary-strong);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
   text-align: center;
   backdrop-filter: blur(8px);
   transform: translateX(-50%);
@@ -654,7 +654,7 @@ onBeforeUnmount(() => {
 .live-broadcast-page__modal-backdrop {
   display: grid;
   position: fixed;
-  z-index: 50;
+  z-index: var(--z-top);
   inset: 0;
   place-items: center;
   padding: var(--space-4);
@@ -676,13 +676,13 @@ onBeforeUnmount(() => {
 .live-broadcast-page__modal h2 {
   color: var(--color-live-text-primary);
   font-size: 17px;
-  font-weight: 800;
+  font-weight: var(--font-weight-extrabold);
 }
 
 .live-broadcast-page__modal p {
   color: var(--color-live-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .live-broadcast-page__modal-actions {
@@ -693,10 +693,10 @@ onBeforeUnmount(() => {
 
 .live-broadcast-page__modal-actions button {
   flex: 1;
-  min-height: 42px;
+  min-height: var(--button-height-tight);
   border-radius: var(--radius-control);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .live-broadcast-page__modal-cancel {
@@ -708,7 +708,7 @@ onBeforeUnmount(() => {
 .live-broadcast-page__modal-confirm {
   border: 1px solid color-mix(in srgb, var(--color-error) 55%, transparent);
   background: var(--color-error);
-  color: #fff;
+  color: var(--color-primary-strong);
 }
 
 .live-broadcast-page__modal-cancel:hover {
@@ -725,14 +725,14 @@ onBeforeUnmount(() => {
 }
 
 .live-broadcast-loading__header {
-  height: 52px;
+  height: var(--button-height-major);
   border-bottom: 1px solid var(--color-live-border);
   background: var(--color-live-surface);
 }
 
 .live-broadcast-loading__body {
   display: grid;
-  min-height: calc(100vh - 52px);
+  min-height: calc(100vh - var(--button-height-major));
   grid-template-columns: 240px minmax(0, 1fr) 360px;
 }
 
@@ -781,7 +781,7 @@ onBeforeUnmount(() => {
   }
 
   .live-broadcast-page__stage {
-    min-height: 360px;
+    min-height: var(--surface-min-height-xl);
   }
 
   .live-broadcast-page__control {

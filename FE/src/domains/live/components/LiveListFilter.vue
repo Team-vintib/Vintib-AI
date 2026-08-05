@@ -71,15 +71,18 @@ const handleCategoryChange = (event: Event) => {
 
 .live-list-filter__heading h2 {
   color: var(--color-text-primary);
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-bold);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
 }
 
 .live-list-filter__heading button {
   border: 0;
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -91,7 +94,7 @@ const handleCategoryChange = (event: Event) => {
 
 .live-list-filter__heading button:focus-visible,
 .live-list-filter__group input:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -110,7 +113,7 @@ const handleCategoryChange = (event: Event) => {
 .live-list-filter__group legend {
   margin-bottom: var(--space-4);
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
@@ -120,7 +123,7 @@ const handleCategoryChange = (event: Event) => {
   min-height: var(--filter-option-min-height);
   gap: var(--space-3);
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   cursor: pointer;
 }
 

@@ -49,9 +49,9 @@ defineProps<{
 .search-member-card__name {
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 24px;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -59,12 +59,12 @@ defineProps<{
 .search-member-card__stats {
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .search-member-card__arrow {
   color: var(--color-text-muted);
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   line-height: 1;
 }
 
@@ -75,7 +75,7 @@ defineProps<{
 }
 
 .search-member-card:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 3px;
 }
 </style>

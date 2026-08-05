@@ -63,9 +63,11 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
 
 .detail-information > h2 {
   color: var(--color-text-primary);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 36px;
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl-plus);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
 }
 
 .detail-information__description {
@@ -75,18 +77,19 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
   border-radius: var(--radius-card);
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-body);
 }
 
 .detail-information__specs {
   display: grid;
   grid-template-columns: 1fr;
+  gap: 1px;
   margin-top: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-bottom: 0;
+  border: 1px solid var(--color-border-grid);
   border-radius: var(--radius-card);
+  background: var(--color-border-grid);
   overflow: hidden;
 }
 
@@ -94,22 +97,23 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
   display: grid;
   grid-template-columns: 180px 1fr;
   padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
 }
 
 .detail-information__specs dt {
   color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0.04em;
+  line-height: var(--line-height-control);
 }
 
 .detail-information__specs dd {
   color: var(--color-text-primary);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-body);
 }
 
 .detail-information__sizes {
@@ -117,42 +121,47 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
 }
 
 .detail-information__sizes h3 {
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .detail-information__sizes dl {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
   margin-top: var(--space-3);
-  border-top: 1px solid var(--color-border);
-  border-left: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-grid);
   border-radius: var(--radius-card);
+  background: var(--color-border-grid);
   overflow: hidden;
 }
 
 .detail-information__sizes div {
   padding: var(--space-4);
-  border-right: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
   text-align: center;
 }
 
 .detail-information__sizes dt {
   color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0.08em;
+  line-height: var(--line-height-xs);
+  text-transform: uppercase;
 }
 
 .detail-information__sizes dd {
   margin-top: var(--space-1);
   color: var(--color-text-primary);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 24px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: -0.02em;
+  line-height: var(--line-height-relaxed);
+  font-variant-numeric: tabular-nums;
 }
 
 .detail-information__seller-note {
@@ -167,16 +176,16 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
 
 .detail-information__seller-note strong {
   flex: 0 0 auto;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .detail-information__seller-note p {
   color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-snug);
 }
 
 @media (max-width: 720px) {

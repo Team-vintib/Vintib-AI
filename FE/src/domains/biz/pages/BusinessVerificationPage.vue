@@ -417,22 +417,22 @@ const handleSubmit = async () => {
 .business-verification__eyebrow {
   margin-top: var(--space-4);
   color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .business-verification__header h1 {
   margin-top: var(--space-2);
   font-size: 36px;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   line-height: 48px;
 }
 
 .business-verification__header > p:last-child {
   margin-top: var(--space-2);
   color: var(--color-text-secondary);
-  line-height: 24px;
+  line-height: var(--line-height-body);
 }
 
 .business-form {
@@ -458,16 +458,16 @@ const handleSubmit = async () => {
 }
 
 .business-form__section-header h2 {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 28px;
+  font-size: var(--font-size-lg-plus);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-lg-plus);
 }
 
 .business-form__section-header p {
   margin-top: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
 }
 
 .business-form__section-header > span {
@@ -476,9 +476,9 @@ const handleSubmit = async () => {
   border-radius: var(--radius-badge);
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 16px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-xs);
 }
 
 .business-form__fields {
@@ -499,9 +499,9 @@ const handleSubmit = async () => {
 
 .business-field__label {
   margin-bottom: var(--space-2);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .business-field__label > span {
@@ -517,10 +517,10 @@ const handleSubmit = async () => {
   background: var(--color-surface);
   color: var(--color-text-primary);
   font: inherit;
-  font-size: 15px;
+  font-size: var(--font-size-body);
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .business-field input::placeholder {
@@ -529,7 +529,7 @@ const handleSubmit = async () => {
 
 .business-field input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  box-shadow: none;
   outline: none;
 }
 
@@ -546,8 +546,8 @@ const handleSubmit = async () => {
 .business-field__help,
 .business-field__error {
   margin-top: var(--space-2);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
 }
 
 .business-field__help {
@@ -579,14 +579,14 @@ const handleSubmit = async () => {
   border-radius: 50%;
   color: var(--color-text-secondary);
   flex: 0 0 auto;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .business-privacy-notice p {
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .business-form__actions {
@@ -607,9 +607,9 @@ const handleSubmit = async () => {
   margin-top: var(--space-6);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .business-form__submit-error + .business-form__actions {
@@ -619,8 +619,8 @@ const handleSubmit = async () => {
 .business-form__submit-description {
   margin-top: var(--space-2);
   color: var(--color-text-muted);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
   text-align: center;
 }
 

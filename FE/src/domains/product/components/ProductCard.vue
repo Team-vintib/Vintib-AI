@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import fallbackProductImage from '@/assets/images/products/product-denim-jacket.webp'
 import type { ProductListItem } from '@/domains/product/types/productList.types'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 
@@ -23,6 +24,15 @@ const formattedPrice = computed(() =>
 const saleTypeLabel = computed(() =>
   props.product.saleType === 'AUCTION' ? '경매 예정' : '정찰제',
 )
+const displayImageUrl = computed(() => props.product.imageUrl || fallbackProductImage)
+const handleImageError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackProductImage
+  }
+}
 </script>
 
 <template>
@@ -34,10 +44,10 @@ const saleTypeLabel = computed(() =>
         :aria-label="`${product.name} 상세 보기`"
       >
         <img
-          v-if="product.imageUrl"
           class="product-card__image"
-          :src="product.imageUrl"
+          :src="displayImageUrl"
           :alt="product.imageAlt"
+          @error="handleImageError"
         />
         <span class="product-card__grade">{{ product.conditionGrade }}급</span>
       </RouterLink>
@@ -87,20 +97,31 @@ const saleTypeLabel = computed(() =>
   border-radius: var(--radius-card);
   background: var(--color-surface);
   transition:
-    border-color 160ms ease,
-    transform 160ms ease;
+    border-color var(--transition-base),
+    transform var(--transition-base);
+}
+
+.product-card {
+  transition:
+    border-color var(--transition-slow),
+    background-color var(--transition-slow),
+    transform var(--transition-emphasized);
 }
 
 .product-card:hover {
   border-color: var(--color-border-strong);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+}
+
+.product-card:hover .product-card__image {
+  transform: scale(1.045);
 }
 
 .product-card__media {
   position: relative;
   overflow: hidden;
   aspect-ratio: 4 / 5;
-  background: var(--color-surface-secondary);
+  background: var(--color-image-frame);
 }
 
 .product-card__detail-link {
@@ -118,38 +139,43 @@ const saleTypeLabel = computed(() =>
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
+  transition: transform var(--transition-emphasized);
 }
 
 .product-card__grade {
   position: absolute;
-  top: var(--space-3);
-  left: var(--space-3);
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-badge);
-  background: rgba(255, 255, 255, 0.9);
+  top: 0;
+  left: 0;
+  padding: 3px var(--space-2);
+  border-radius: 0 0 var(--radius-badge) 0;
+  background: var(--overlay-scrim-strong);
   color: var(--color-text-primary);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 18px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.06em;
+  line-height: var(--line-height-xs);
 }
 
 .product-card__like-button {
   position: absolute;
-  top: var(--space-3);
-  right: var(--space-3);
+  top: var(--space-2);
+  right: var(--space-2);
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(225, 224, 218, 0.8);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
+  width: var(--button-height-2xs);
+  height: var(--button-height-2xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-badge);
+  background: var(--overlay-scrim-medium);
   color: var(--color-text-secondary);
+  backdrop-filter: blur(2px);
 }
 
 .product-card__like-button svg {
-  width: 20px;
-  height: 20px;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
   fill: transparent;
   stroke: currentColor;
   stroke-linecap: round;
@@ -167,7 +193,7 @@ const saleTypeLabel = computed(() =>
 }
 
 .product-card__like-button:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -177,27 +203,32 @@ const saleTypeLabel = computed(() =>
 }
 
 .product-card__detail-link:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
-  outline-offset: -3px;
+  outline: 2px solid var(--color-primary);
+  outline-offset: calc(var(--focus-ring-offset) * -1);
 }
 
 .product-card__brand {
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 13px;
-  line-height: 18px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.16em;
+  line-height: var(--line-height-snug);
   text-overflow: ellipsis;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
 .product-card__name {
   overflow: hidden;
-  min-height: 24px;
+  min-height: var(--badge-height-xs);
   margin-top: var(--space-1);
   color: var(--color-text-primary);
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-relaxed);
+  letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -212,31 +243,35 @@ const saleTypeLabel = computed(() =>
 
 .product-card__price {
   color: var(--color-text-primary);
-  font-size: 16px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  line-height: 24px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: -0.02em;
+  line-height: var(--line-height-relaxed);
 }
 
 .product-card__price-prefix {
   color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
 }
 
 .product-card__sale-badge {
   flex: 0 0 auto;
   padding: 3px var(--space-2);
+  border: 1px solid var(--color-border-input);
   border-radius: var(--radius-badge);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 16px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-xs);
 }
 
 .product-card__sale-badge--auction {
-  background: var(--color-auction-soft);
-  color: var(--color-auction);
+  border-color: var(--color-accent);
+  background: transparent;
+  color: var(--color-accent);
 }
 </style>

@@ -99,9 +99,9 @@ const isLive = computed(() => props.live.status === 'LIVE')
 .live-broadcast-header {
   display: flex;
   position: relative;
-  z-index: 10;
+  z-index: var(--z-layer-header);
   align-items: center;
-  min-height: 52px;
+  min-height: var(--button-height-major);
   padding: 0 var(--space-4);
   border-bottom: 1px solid var(--color-live-border);
   background: var(--color-live-background);
@@ -112,7 +112,7 @@ const isLive = computed(() => props.live.status === 'LIVE')
   display: grid;
   flex: 0 0 auto;
   width: 36px;
-  height: 36px;
+  height: var(--button-height-small);
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
@@ -126,8 +126,8 @@ const isLive = computed(() => props.live.status === 'LIVE')
 }
 
 .live-broadcast-header__back svg {
-  width: 20px;
-  height: 20px;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -139,13 +139,13 @@ const isLive = computed(() => props.live.status === 'LIVE')
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  min-height: 26px;
+  min-height: var(--badge-height-sm);
   padding: 0 9px;
   border-radius: var(--radius-badge);
   background: var(--color-live-surface-raised);
   color: var(--color-live-text-secondary);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-extrabold);
   letter-spacing: 0.04em;
 }
 
@@ -166,13 +166,13 @@ const isLive = computed(() => props.live.status === 'LIVE')
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  min-height: 22px;
+  min-height: var(--badge-height-xs);
   padding: 0 8px;
   border: 1px solid var(--color-live-border);
   border-radius: var(--radius-badge);
   color: var(--color-live-text-secondary);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-bold);
   letter-spacing: 0.04em;
 }
 
@@ -186,9 +186,9 @@ const isLive = computed(() => props.live.status === 'LIVE')
 .live-broadcast-header__identity h1 {
   overflow: hidden;
   color: var(--color-live-text-primary);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-control);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -206,14 +206,14 @@ const isLive = computed(() => props.live.status === 'LIVE')
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .live-broadcast-header__meta-item svg {
-  width: 15px;
-  height: 15px;
+  width: var(--icon-size-xs);
+  height: var(--icon-size-xs);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -225,15 +225,15 @@ const isLive = computed(() => props.live.status === 'LIVE')
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  min-height: 34px;
+  min-height: var(--button-height-2xs);
   padding: 0 var(--space-4);
   border: 1px solid color-mix(in srgb, var(--color-error) 55%, transparent);
   border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--color-error) 16%, transparent);
   gap: 6px;
   color: var(--color-error);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .live-broadcast-header__end span {
@@ -256,7 +256,7 @@ const isLive = computed(() => props.live.status === 'LIVE')
 
 .live-broadcast-header__back:focus-visible,
 .live-broadcast-header__end:focus-visible {
-  outline: 3px solid var(--color-ai);
+  outline: var(--focus-ring-width) solid var(--color-ai);
   outline-offset: 2px;
 }
 

@@ -123,7 +123,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
 .guest-home {
   display: grid;
   justify-items: stretch;
-  gap: var(--space-12);
+  gap: var(--space-16);
   padding-bottom: var(--space-16);
 }
 
@@ -131,7 +131,7 @@ const getProductPath = (productId: number) => `/products/${productId}`
 .schedule-grid,
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-5);
 }
 

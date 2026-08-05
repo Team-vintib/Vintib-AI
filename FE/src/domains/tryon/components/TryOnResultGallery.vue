@@ -170,15 +170,19 @@ const goToProductList = () => {
 }
 
 .tryon-results__header h2 {
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 30px;
+  color: var(--color-text-primary);
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 .tryon-results__header p {
   margin-top: var(--space-2);
   color: var(--color-text-secondary);
   font-size: 14px;
+  font-weight: 300;
   line-height: 20px;
 }
 
@@ -213,12 +217,12 @@ const goToProductList = () => {
 
 .tryon-results__tab {
   padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-chip);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text-muted);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 20px;
   transition:
     border-color 160ms ease,
@@ -254,31 +258,37 @@ const goToProductList = () => {
   background: var(--color-surface);
   overflow: hidden;
   transition:
-    border-color 160ms ease,
-    transform 160ms ease;
+    border-color 220ms ease,
+    transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .tryon-results__card:hover {
-  border-color: var(--color-primary);
-  transform: translateY(-2px);
+  border-color: var(--color-border-strong);
+  transform: translateY(-3px);
+}
+
+.tryon-results__card:hover .tryon-results__thumb img {
+  transform: scale(1.045);
 }
 
 .tryon-results__card:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 1px solid var(--color-primary);
   outline-offset: 2px;
 }
 
 .tryon-results__thumb {
   display: block;
   overflow: hidden;
-  aspect-ratio: 3 / 4;
-  background: var(--color-surface-secondary);
+  aspect-ratio: 4 / 5;
+  background: var(--color-image-frame);
 }
 
 .tryon-results__thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
+  transition: transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .tryon-results__meta {
@@ -290,19 +300,22 @@ const goToProductList = () => {
 }
 
 .tryon-results__badge {
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-chip);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  font-size: 11px;
-  font-weight: 700;
+  padding: 3px var(--space-2);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-badge);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 400;
   line-height: 16px;
 }
 
 .tryon-results__date {
   color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 500;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .tryon-results__empty {
@@ -333,7 +346,15 @@ const goToProductList = () => {
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-weight: 600;
+  font-weight: 500;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.tryon-results__empty-cta:hover {
+  background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 .tryon-results__overlay {
@@ -343,13 +364,15 @@ const goToProductList = () => {
   display: grid;
   place-items: center;
   padding: var(--space-6);
-  background: rgb(24 24 22 / 72%);
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(2px);
 }
 
 .tryon-results__detail {
   position: relative;
   width: min(420px, 100%);
   padding: var(--space-5);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
 }

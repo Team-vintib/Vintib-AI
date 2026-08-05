@@ -63,9 +63,9 @@ const descriptionId = computed(() => {
 
 .base-field__label {
   color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .base-field__required {
@@ -88,8 +88,8 @@ const descriptionId = computed(() => {
 .base-field__message {
   min-height: 20px;
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .base-field__message--error {

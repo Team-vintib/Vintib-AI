@@ -1,12 +1,22 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import fallbackProductImage from '@/assets/images/products/product-denim-jacket.webp'
 import type { ProductDetailImage } from '@/domains/product/types/productDetail.types'
 
 const props = defineProps<{
   images: ProductDetailImage[]
   selectedImageId: string
 }>()
+
+const handleImageError = (event: Event) => {
+  const target = event.target
+
+  if (target instanceof HTMLImageElement) {
+    target.onerror = null
+    target.src = fallbackProductImage
+  }
+}
 
 const emit = defineEmits<{
   selectImage: [imageId: string]
@@ -54,7 +64,7 @@ const closeZoom = () => {
         :aria-pressed="image.id === representativeImage?.id"
         @click="emit('selectImage', image.id)"
       >
-        <img :src="image.url" alt="" />
+        <img :src="image.url" alt="" @error="handleImageError" />
       </button>
     </div>
 
@@ -65,6 +75,7 @@ const closeZoom = () => {
         :src="representativeImage.url"
         :alt="representativeImage.alt"
         :style="representativeImageStyle"
+        @error="handleImageError"
       />
       <div v-else class="product-gallery__empty">등록된 상품 이미지가 없습니다.</div>
 
@@ -94,6 +105,7 @@ const closeZoom = () => {
           :src="representativeImage.url"
           :alt="`${representativeImage.alt} 확대 이미지`"
           :style="representativeImageStyle"
+          @error="handleImageError"
         />
       </div>
     </dialog>
@@ -103,7 +115,7 @@ const closeZoom = () => {
 <style scoped lang="scss">
 .product-gallery {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: var(--thumbnail-size-sm) minmax(0, 1fr);
   align-items: start;
   gap: var(--space-4);
   min-width: 0;
@@ -116,7 +128,7 @@ const closeZoom = () => {
   aspect-ratio: 4 / 5;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-media);
-  background: var(--color-surface-secondary);
+  background: var(--color-image-frame);
   place-items: center;
 }
 
@@ -124,15 +136,16 @@ const closeZoom = () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 180ms ease;
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
+  transition: transform var(--transition-moderate);
 }
 
 .product-gallery__empty {
   padding: var(--space-6);
   color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-snug);
   text-align: center;
 }
 
@@ -143,13 +156,13 @@ const closeZoom = () => {
 
 .product-gallery__thumbnail {
   overflow: hidden;
-  width: 72px;
+  width: var(--thumbnail-size-sm);
   aspect-ratio: 4 / 5;
   padding: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
-  transition: border-color 160ms ease;
+  transition: border-color var(--transition-base);
 }
 
 .product-gallery__thumbnail--selected {
@@ -182,20 +195,21 @@ const closeZoom = () => {
   top: var(--space-4);
   right: var(--space-4);
   display: grid;
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(225, 224, 218, 0.8);
+  width: var(--button-height-small);
+  height: var(--button-height-small);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--overlay-scrim-medium);
   color: var(--color-text-secondary);
+  backdrop-filter: blur(2px);
   place-items: center;
   transition:
-    background-color 160ms ease,
-    color 160ms ease;
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .product-gallery__zoom svg {
-  width: 18px;
+  width: var(--icon-size-sm);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -213,8 +227,13 @@ const closeZoom = () => {
 
 .product-gallery__thumbnail:focus-visible,
 .product-gallery__zoom:focus-visible {
-  outline: 3px solid var(--color-primary-soft);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+.product-gallery__thumbnail img,
+.product-gallery__dialog-image img {
+  filter: saturate(0.88) contrast(1.04) brightness(0.95);
 }
 
 .product-gallery__dialog {
@@ -232,17 +251,17 @@ const closeZoom = () => {
 
 .product-gallery__dialog > button {
   position: absolute;
-  z-index: 1;
+  z-index: var(--z-layer-1);
   top: var(--space-3);
   right: var(--space-3);
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: var(--button-height-sm);
+  height: var(--button-height-sm);
   border: 1px solid var(--color-border);
   border-radius: 50%;
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 26px;
+  font-size: var(--font-size-2xl-plus);
   line-height: 1;
   place-items: center;
 }

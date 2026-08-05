@@ -4,6 +4,7 @@ import com.ssafy.backend.auction.dto.request.AuctionConfigRequest;
 import com.ssafy.backend.auction.dto.request.BidRequest;
 import com.ssafy.backend.auction.dto.response.AuctionResponse;
 import com.ssafy.backend.auction.dto.response.AuctionSnapshotResponse;
+import com.ssafy.backend.auction.dto.response.AuctionWinnerResponse;
 import com.ssafy.backend.auction.dto.response.BidResponse;
 import com.ssafy.backend.auction.entity.Auction;
 import com.ssafy.backend.auction.entity.AuctionStatus;
@@ -17,6 +18,7 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.CursorPageResponse;
 import com.ssafy.backend.live.entity.Live;
+import com.ssafy.backend.live.port.NotificationCommandPort;
 import com.ssafy.backend.live.port.ProductQueryPort;
 import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
@@ -40,6 +42,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>라이브 조회는 포트를 거치지 않고 리포지토리를 직접 쓴다. 상품 도메인과 달리 라이브는
  * 같은 담당자의 안정된 도메인이라 격리 이득이 없다. 반대로 <b>상품·포인트는 서윤 영역이라</b>
  * {@link ProductQueryPort}/{@link ProductCommandPort}/{@link PointCommandPort}로만 건드린다.
+ * {@link NotificationCommandPort}는 {@code live} 패키지 소유를 그대로 재사용한다 — 둘 다 정윤
+ * 담당 도메인이라 새로 만들 이유가 없다.
  */
 @Service
 @RequiredArgsConstructor
@@ -58,6 +62,7 @@ public class AuctionService {
     private final ProductQueryPort productQueryPort;
     private final ProductCommandPort productCommandPort;
     private final PointCommandPort pointCommandPort;
+    private final NotificationCommandPort notificationCommandPort;
 
     /**
      * 경매 조건을 설정한다. 결과는 {@code READY} 상태이며 시작은 별도 API(AUCT-002)가 한다.
@@ -187,12 +192,21 @@ public class AuctionService {
         Member bidder = memberRepository.findById(bidderId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        // 상위 입찰이 들어왔다 — 직전 최고 입찰자의 보류를 풀고, 그의 입찰을 OUTBID로 내린다.
-        // 첫 입찰(hasBid() == false)에는 풀어 줄 대상이 없다.
+        // 상위 입찰이 들어왔다 — 직전 최고 입찰자의 보류를 풀고, 그의 입찰을 OUTBID로 내리고, 밀렸다는
+        // 사실을 알린다. 첫 입찰(hasBid() == false)에는 풀어 줄 대상도 알릴 대상도 없다.
         if (auction.hasBid()) {
             pointCommandPort.releaseHoldForAuction(auction.getId());
             bidRepository.findByAuction_IdAndStatus(auction.getId(), BidStatus.ACTIVE)
-                    .ifPresent(Bid::outbid);
+                    .ifPresent(previousBid -> {
+                        previousBid.outbid();
+                        notificationCommandPort.notify(
+                                previousBid.getBidder(),
+                                "AUCTION_OUTBID",
+                                "상위 입찰이 발생했어요",
+                                "다른 사용자가 더 높은 금액으로 입찰했습니다.",
+                                "AUCTION",
+                                auction.getId());
+                    });
         }
 
         Bid bid;
@@ -227,6 +241,26 @@ public class AuctionService {
         List<Bid> found =
                 bidRepository.findPageByAuctionId(auctionId, cursor, PageRequest.of(0, size + 1));
         return CursorPageResponse.of(found, size, bid -> BidResponse.of(bid, viewerId), Bid::getId);
+    }
+
+    /**
+     * 경매 결과 조회(AUCT-012). <b>비회원도 조회할 수 있다</b> — 입찰 내역과 같은 이유로
+     * 누가 얼마에 가져갔는지는 관전 정보다.
+     *
+     * <p>아직 끝나지 않은 경매도 그대로 돌려준다 — 종료 여부 판단은 {@code status}로 한다.
+     */
+    public AuctionWinnerResponse getWinner(Long auctionId) {
+        Auction auction = auctionRepository.findWithLiveById(auctionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.AUCTION_NOT_FOUND));
+
+        String winnerNickname = auction.getWinnerId() == null
+                ? null
+                : memberRepository.findById(auction.getWinnerId())
+                        .map(Member::getNickname)
+                        .orElse(null);
+
+        return AuctionWinnerResponse.of(
+                auction, winnerNickname, bidRepository.countByAuction_Id(auctionId));
     }
 
     /** 상품명·입찰자 닉네임·입찰 수를 붙여 현황 한 장으로 만든다. */

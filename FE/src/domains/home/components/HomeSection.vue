@@ -55,28 +55,47 @@ withDefaults(
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-4);
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .home-section__eyebrow {
-  color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 20px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0.2em;
+  line-height: var(--line-height-xs);
+  text-transform: uppercase;
 }
 
 .home-section__title {
-  margin-top: var(--space-1);
+  margin-top: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 34px;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
 }
 
 .home-section__link {
-  color: var(--color-primary);
-  font-size: 14px;
-  font-weight: 800;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   white-space: nowrap;
+  transition: color var(--transition-base);
+}
+
+.home-section__link::after {
+  content: ' →';
+}
+
+.home-section__link:hover {
+  color: var(--color-text-primary);
 }
 
 .home-section__empty {
@@ -86,11 +105,11 @@ withDefaults(
   padding: var(--space-8);
   border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-card);
-  background: rgba(255, 255, 255, 0.54);
+  background: var(--color-surface);
   color: var(--color-text-muted);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-relaxed);
   text-align: center;
 }
 

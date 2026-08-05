@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import logoImage from '@/assets/images/logo.png'
+import logoImage from '@/assets/images/logo-white.png'
 import { ROUTE_PATHS, type RoutePath } from '@/shared/constants/routes'
 
 interface FooterLink {
@@ -88,7 +88,7 @@ const footerGroups: FooterGroup[] = [
 <style scoped lang="scss">
 .app-footer {
   border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-chrome);
 }
 
 .app-footer__inner {
@@ -97,7 +97,7 @@ const footerGroups: FooterGroup[] = [
   width: 100%;
   max-width: var(--layout-content-max-width);
   min-height: 220px;
-  padding: var(--space-12);
+  padding: var(--space-12) var(--layout-gutter);
   margin-inline: auto;
   gap: var(--space-16);
 }
@@ -109,8 +109,8 @@ const footerGroups: FooterGroup[] = [
 }
 
 .app-footer__logo {
-  width: 116px;
-  height: 40px;
+  width: auto;
+  height: var(--brand-logo-height);
   object-fit: contain;
 }
 
@@ -122,7 +122,7 @@ const footerGroups: FooterGroup[] = [
 
 .app-footer__description,
 .app-footer__copyright {
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   line-height: 22px;
 }
 
@@ -130,8 +130,8 @@ const footerGroups: FooterGroup[] = [
   display: grid;
   gap: var(--space-1);
   margin-top: var(--space-1);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .app-footer__contact div {
@@ -140,9 +140,9 @@ const footerGroups: FooterGroup[] = [
 }
 
 .app-footer__contact dt {
-  min-width: 32px;
+  min-width: var(--space-8);
   color: var(--color-text-secondary);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .app-footer__contact dd {
@@ -168,9 +168,9 @@ const footerGroups: FooterGroup[] = [
 
 .app-footer__group-title {
   color: var(--color-text-primary);
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 24px;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-body);
 }
 
 .app-footer__links {
@@ -181,10 +181,10 @@ const footerGroups: FooterGroup[] = [
 
 .app-footer__link {
   color: var(--color-text-muted);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 24px;
-  transition: color 160ms ease;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
+  transition: color var(--transition-base);
 }
 
 .app-footer__link--static {
@@ -192,8 +192,8 @@ const footerGroups: FooterGroup[] = [
 }
 
 .app-footer__link:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 3px;
+  outline: var(--focus-ring-width) solid var(--color-primary);
+  outline-offset: var(--focus-ring-offset);
 }
 
 @media (max-width: 860px) {
