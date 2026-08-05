@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import logoImage from '@/assets/images/logo.png'
+import logoImage from '@/assets/images/logo-white.png'
 import LoginForm from '@/domains/auth/components/LoginForm.vue'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
