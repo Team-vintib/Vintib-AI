@@ -248,9 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--alpha", type=int, default=32)
     parser.add_argument("--dropout", type=float, default=0.05)
     parser.add_argument("--target-modules", nargs="*", default=["q_proj", "v_proj"])
-    parser.add_argument(
-        "--device", default="cpu", help="기본 CPU — 원래 123ms 기준선도 CPU였다"
-    )
+    parser.add_argument("--device", default="cpu", help="기본 CPU — 원래 123ms 기준선도 CPU였다")
     parser.add_argument("--warmup", type=int, default=DEFAULT_WARMUP)
     parser.add_argument("--iterations", type=int, default=DEFAULT_ITERATIONS)
     parser.add_argument(
