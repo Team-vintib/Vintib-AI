@@ -219,6 +219,26 @@ STEP 3.5의 `pixel_values` 캐시가 미리 있어야 한다. 첫 실행은 `--u
 헤드와 구조가 다르다** — `aihub_evaluate.py`로는 못 읽는다. 비교는 이 스크립트가 찍는
 test accuracy 숫자를 STEP 5 리포트의 헤드/zero-shot 숫자와 나란히 놓고 보는 식이다.
 
+### 다른 태스크 체크포인트에서 이어서 학습(웜스타트, 선택)
+
+기본은 매번 원본 `fashion_clip`에서 새로 시작한다(카테고리 run과 색상 run은 독립). 다른
+태스크의 체크포인트에서 이어받고 싶으면(예: 카테고리로 파인튜닝한 backbone에서 색상을
+이어서 학습) `--init-checkpoint`에 그 `checkpoint.pt` 경로를 준다:
+
+```bash
+python validation/CLASS/product-info-finetune/aihub_finetune_vit.py \
+    --pixel-cache-dir .../artifacts \
+    --task color --variant masked \
+    --unfreeze-layers 4 --epochs 5 --batch-size 32 \
+    --init-checkpoint .../artifacts_finetune/vit_last4_category_masked_lr1e-05/checkpoint.pt
+```
+
+헤드(`nn.Linear`)는 절대 안 가져온다(태스크마다 클래스 수가 달라 shape가 안 맞는다) —
+백본(언프리즈된 파라미터)만 이어받고 헤드는 새로 초기화한다. `--unfreeze-layers`가 체크포인트
+학습 때와 다르면 경고만 찍고 겹치는 파라미터만 로드한다. run 폴더 이름에 `_warm`이 붙어
+독립학습 run과 안 겹친다 — 둘 다 남겨서 `aihub_finetune_summary.py --best-per-group
+method,task`로 어느 쪽이 더 나은지 비교하는 걸 권장한다(하나가 다른 하나를 대체하지 않는다).
+
 ## STEP 3.7 — (선택, 실험) LoRA 파인튜닝
 
 STEP 3.6(last-N 언프리즈)의 대안이다. last-N은 마지막 몇 개 블록을 **통째로** 학습하고,
@@ -237,6 +257,10 @@ python validation/CLASS/product-info-finetune/aihub_finetune_lora.py \
 `--r`(rank)이 핵심 손잡이다 — 크면 last-N에 가까워지고 작으면 원본 보존이 강해진다.
 산출물은 STEP 3.6과 같은 `artifacts_finetune/`에 쌓이되 폴더 이름이 `lora_r{r}_...`로
 시작해 `vit_last{N}_...`(STEP 3.6)와 안 겹친다.
+
+STEP 3.6과 같은 이유로 `--init-checkpoint`도 지원한다(다른 태스크의 LoRA 체크포인트에서
+이어서 학습). `--r`/`--target-modules`가 체크포인트 학습 때와 다르면 경고만 찍고 겹치는
+어댑터 파라미터만 로드한다.
 
 ## STEP 4 — 헤드 학습 (CPU, 수 초)
 

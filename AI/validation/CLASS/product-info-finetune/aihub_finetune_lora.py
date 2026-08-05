@@ -60,14 +60,21 @@ def run_name(
     alpha: int = DEFAULT_ALPHA,
     dropout: float = DEFAULT_DROPOUT,
     target_modules: tuple[str, ...] = DEFAULT_TARGET_MODULES,
+    warm_start: bool = False,
 ) -> str:
     """`lora_`로 시작 — 노트북의 `method_of()`가 이 접두어로 LoRA를 분류한다.
 
     `alpha`/`dropout`/`target_modules`도 이름에 반영한다 — `r`·`lr_adapter`만 반영하던
     이전 버전은 이 셋만 바꿔 스윕하면 폴더명이 겹쳐 이전 run을 덮어썼다.
+
+    `warm_start=True`면 `_warm` 접미사를 붙인다 — `aihub_finetune_vit.run_name()`과 같은
+    이유(다른 태스크 체크포인트에서 이어받은 run을 독립학습 run과 구분).
     """
     modules_tag = "".join(sorted(m.split("_")[0] for m in target_modules))
-    return f"lora_r{r}_a{alpha}_d{dropout:g}_{modules_tag}_{task}_{variant}_lr{lr_adapter:g}"
+    suffix = "_warm" if warm_start else ""
+    return (
+        f"lora_r{r}_a{alpha}_d{dropout:g}_{modules_tag}_{task}_{variant}_lr{lr_adapter:g}{suffix}"
+    )
 
 
 def load_model(
@@ -138,6 +145,13 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="같은 이름의 기존 run 폴더를 덮어쓴다. 기본은 버전을 올려 저장한다(_v2, _v3, …)",
     )
+    parser.add_argument(
+        "--init-checkpoint",
+        type=Path,
+        default=None,
+        help="다른 태스크에서 저장한 checkpoint.pt 경로. 주면 그 backbone(헤드 제외)에서 "
+        "이어서 학습한다 — 예: 카테고리로 파인튜닝한 체크포인트에서 이어받아 색상을 학습",
+    )
     args = parser.parse_args(argv)
 
     import torch
@@ -184,6 +198,21 @@ def main(argv: list[str] | None = None) -> int:
     model = load_model(
         args.model_id, args.r, args.alpha, args.dropout, tuple(args.target_modules), device
     )
+
+    if args.init_checkpoint is not None:
+        checkpoint = torch.load(args.init_checkpoint, map_location=device)
+        source_r = checkpoint.get("lora_r")
+        source_modules = checkpoint.get("target_modules")
+        if source_r != args.r or source_modules != list(args.target_modules):
+            print(
+                f"⚠ --init-checkpoint의 LoRA 설정(r={source_r}, target_modules={source_modules})이 "
+                f"지금 설정(r={args.r}, target_modules={list(args.target_modules)})과 다르다 — "
+                "겹치는 파라미터만 로드되고 나머지는 새로 초기화된 채로 남는다",
+                file=sys.stderr,
+            )
+        model.load_state_dict(checkpoint["backbone_state_dict"], strict=False)
+        print(f"backbone 웜스타트: {args.init_checkpoint} (task={checkpoint.get('task')})")
+
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total = sum(p.numel() for p in model.parameters())
     print(f"학습 대상 파라미터: {trainable:,} / {total:,} ({trainable / total:.2%})")
@@ -222,6 +251,7 @@ def main(argv: list[str] | None = None) -> int:
         alpha=args.alpha,
         dropout=args.dropout,
         target_modules=tuple(args.target_modules),
+        warm_start=args.init_checkpoint is not None,
     )
     out_dir = args.out_dir or (args.pixel_cache_dir.parent / "artifacts_finetune")
     run_dir = out_dir / name
@@ -255,6 +285,7 @@ def main(argv: list[str] | None = None) -> int:
         "lr_adapter": args.lr_adapter,
         "lr_head": args.lr_head,
         "batch_size": args.batch_size,
+        "init_checkpoint": str(args.init_checkpoint) if args.init_checkpoint else None,
         "classes": classes,
         "history": result["history"],
         "best_epoch": best_state["epoch"],

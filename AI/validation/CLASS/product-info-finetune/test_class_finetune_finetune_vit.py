@@ -12,6 +12,7 @@ from __future__ import annotations
 import numpy as np
 
 import aihub_cache_pixels as cp
+import aihub_finetune_plots as fp
 import aihub_finetune_vit as fv
 
 
@@ -25,6 +26,22 @@ def test_run_name_varies_by_hyperparameter() -> None:
     assert base != fv.run_name("category", "masked", 4, 1e-5)  # layer 수
     assert base != fv.run_name("category", "masked", 2, 1e-4)  # lr
     assert base != fv.run_name("color", "masked", 2, 1e-5)  # task
+
+
+def test_run_name_warm_start_gets_distinct_suffix() -> None:
+    """색상 독립학습과 순차학습(카테고리 체크포인트에서 이어받음)은 같은 하이퍼파라미터를
+    써도 서로 다른 폴더에 저장돼야 한다 — 하나가 다른 하나를 덮어쓰면 비교가 불가능하다."""
+    scratch = fv.run_name("color", "masked", 4, 1e-5)
+    warm = fv.run_name("color", "masked", 4, 1e-5, warm_start=True)
+    assert warm != scratch
+    assert warm == scratch + "_warm"
+
+
+def test_run_name_warm_start_still_classified_correctly() -> None:
+    """`_warm` 접미사가 붙어도 `aihub_finetune_plots.method_of()`의 접두어 분류는
+    그대로 동작해야 한다 — 안 그러면 순차학습 run이 플랏/리더보드에서 "기타"로 빠진다."""
+    warm = fv.run_name("color", "masked", 4, 1e-5, warm_start=True)
+    assert fp.method_of(warm) == "last-N 언프리즈"
 
 
 def test_encode_labels_sorts_classes_and_matches_indices() -> None:

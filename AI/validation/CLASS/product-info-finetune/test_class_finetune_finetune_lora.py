@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import aihub_finetune_lora as lora
+import aihub_finetune_plots as fp
 
 
 def test_run_name_starts_with_lora_prefix() -> None:
@@ -53,3 +54,19 @@ def test_run_name_target_modules_tag_is_order_independent() -> None:
         "category", "masked", 8, 1e-4, target_modules=("k_proj", "v_proj", "q_proj")
     )
     assert name_a == name_b
+
+
+def test_run_name_warm_start_gets_distinct_suffix() -> None:
+    """색상 독립학습과 순차학습(카테고리 체크포인트에서 이어받음)은 같은 하이퍼파라미터를
+    써도 서로 다른 폴더에 저장돼야 한다 — 하나가 다른 하나를 덮어쓰면 비교가 불가능하다."""
+    scratch = lora.run_name("color", "masked", 16, 1e-4, alpha=32)
+    warm = lora.run_name("color", "masked", 16, 1e-4, alpha=32, warm_start=True)
+    assert warm != scratch
+    assert warm == scratch + "_warm"
+
+
+def test_run_name_warm_start_still_classified_correctly() -> None:
+    """`_warm` 접미사가 붙어도 `aihub_finetune_plots.method_of()`의 접두어 분류는
+    그대로 동작해야 한다 — 안 그러면 순차학습 run이 플랏/리더보드에서 "기타"로 빠진다."""
+    warm = lora.run_name("color", "masked", 16, 1e-4, alpha=32, warm_start=True)
+    assert fp.method_of(warm) == "LoRA"
