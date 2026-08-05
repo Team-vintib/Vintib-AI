@@ -1,4 +1,4 @@
-"""슬롯 B — 비교 매물(comps) 수집.
+﻿"""슬롯 B — 비교 매물(comps) 수집.
 
 `validation/PRICE/pricing-model-check/comps_sources.py`의 프로덕션판. 백엔드가 달라도 결과가 같은
 `CompItem` 목록으로 정규화되므로, 가격 산정기는 출처를 몰라도 된다.
@@ -27,6 +27,7 @@ __all__ = [
     "CompsFetch",
     "CompsSource",
     "CompsUnavailable",
+    "InternalClipCompsSource",
     "LlmWebSearchCompsSource",
     "MockCompsSource",
     "build_comps_source",
@@ -85,13 +86,18 @@ def build_query(
 
 
 class CompsSource(ABC):
-    """comps 수집기 인터페이스. **모델 교체는 이 구현체를 갈아끼우는 것으로 끝난다.**"""
+    """comps 수집기 인터페이스. **모델 교체는 이 구현체를 갈아끼우는 것으로 끝난다.**
+
+    `image_url`은 `internal_clip`(CH020, CLIP 이미지 유사도 검색)만 쓴다 — 텍스트 쿼리
+    기반 백엔드(mock/llm_web_search)는 키워드를 받아도 무시한다. 백엔드마다 필요한 입력이
+    다르다고 호출부(`service.py`)가 분기하게 만들지 않으려고 시그니처에 얹었다.
+    """
 
     key: str
 
     @abstractmethod
-    def fetch(self, query: str) -> CompsFetch:
-        """쿼리로 비교 매물을 모은다. 인프라 오류면 `CompsUnavailable`."""
+    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
+        """쿼리(+선택적 이미지)로 비교 매물을 모은다. 인프라 오류면 `CompsUnavailable`."""
         raise NotImplementedError
 
 
@@ -104,7 +110,7 @@ class MockCompsSource(CompsSource):
 
     key = "mock"
 
-    def fetch(self, query: str) -> CompsFetch:
+    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
         digest = hashlib.sha256(query.encode("utf-8")).digest()
         base = 40_000 + int.from_bytes(digest[:4], "big") % 60_000
         items = [
@@ -135,7 +141,7 @@ class LlmWebSearchCompsSource(CompsSource):
     def __init__(self, config: registry.CompsSourceConfig | None = None) -> None:
         self._config = config or registry.comps_config(self.key)
 
-    def fetch(self, query: str) -> CompsFetch:
+    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
         # 키 확인을 build가 아니라 fetch에서 하는 이유: 서비스 조립은 @lru_cache라
         # build 시점에 던지면 잘못 설정된 컨테이너가 모든 요청에 500을 뱉는다.
         # 여기서 던지면 job result의 error로 내려가 BE가 원인을 본다.
@@ -206,6 +212,71 @@ class LlmWebSearchCompsSource(CompsSource):
         )
 
 
+class InternalClipCompsSource(CompsSource):
+    """내부 데이터 CLIP 이미지 유사도 검색(CH020). 텍스트 쿼리는 안 쓰고 `image_url`만 본다.
+
+    ⚠️ 이번 라운드의 코퍼스는 **전부 합성 데이터**다(AI-Hub 학습 이미지 + 가상 가격) —
+    실제 시세가 아니다. `internal_corpus.CorpusItem.data_source`에 그 표식이 남는다.
+    """
+
+    key = "internal_clip"
+
+    def __init__(self, config: registry.CompsSourceConfig | None = None) -> None:
+        self._config = config or registry.comps_config(self.key)
+        self._clip_config = registry.INTERNAL_CLIP_CONFIG
+
+    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
+        if not image_url:
+            return CompsFetch(
+                items=[],
+                notes=["이미지가 없어 내부 CLIP 유사도 검색을 할 수 없습니다."],
+                reason=ReasonCode.no_image_provided,
+            )
+
+        from app.pricing import clip_embed, internal_corpus
+
+        try:
+            embedding = clip_embed.embed_image_from_url(
+                image_url,
+                checkpoint_path=self._clip_config["checkpoint_path"],
+                model_id=self._config["model_id"] or "",
+            )
+        except clip_embed.ClipEmbedNotReady as exc:
+            raise CompsUnavailable(str(exc)) from exc
+
+        try:
+            corpus = internal_corpus.get_corpus(self._clip_config["corpus_dir"])
+        except internal_corpus.CorpusNotReady as exc:
+            raise CompsUnavailable(str(exc)) from exc
+
+        matches = internal_corpus.query_similar(
+            embedding,
+            corpus,
+            top_k=self._config["max_comps"],
+            min_similarity=self._clip_config["similarity_floor"],
+        )
+        if not matches:
+            return CompsFetch(
+                items=[],
+                notes=["유사도 기준을 넘는 내부 매물이 없습니다."],
+                reason=ReasonCode.insufficient_comps,
+            )
+
+        items = [
+            CompItem(
+                title=f"{item.aihub_category} 유사 상품(내부 CLIP 유사도 검색)",
+                price=item.synthetic_price,
+                source=self.key,
+                is_used=None,  # AI-Hub 학습 이미지 출처라 중고 여부를 판별할 수 없다
+            )
+            for item, _score in matches
+        ]
+        return CompsFetch(
+            items=items,
+            notes=["⚠️ 합성 코퍼스(AI-Hub 학습 이미지 기반) 결과입니다 — 실거래 시세가 아닙니다."],
+        )
+
+
 def build_comps_source(key: str | None = None) -> CompsSource:
     """활성 comps 백엔드 구현체를 만든다."""
     resolved = key or registry.ACTIVE_COMPS_SOURCE
@@ -213,6 +284,8 @@ def build_comps_source(key: str | None = None) -> CompsSource:
         return MockCompsSource()
     if resolved == "llm_web_search":
         return LlmWebSearchCompsSource()
+    if resolved == "internal_clip":
+        return InternalClipCompsSource()
     raise ValueError(f"등록되지 않은 comps 백엔드입니다: {resolved!r}")
 
 
