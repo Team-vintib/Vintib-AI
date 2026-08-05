@@ -1,4 +1,4 @@
-"""가격 책정 백엔드 레지스트리 — 구현 교체의 유일한 스왑 지점.
+﻿"""가격 책정 백엔드 레지스트리 — 구현 교체의 유일한 스왑 지점.
 
 `ACTIVE_*` 키 하나만 바꾸면 comps 수집기와 가격 산정기가 교체된다. `validation/` 코드를
 프로덕션에서 import하지 않는 규약에 따라 모델 ID는 여기서 재선언한다(`app/chat/registry.py` 선례).
@@ -15,6 +15,7 @@ LLM 백엔드가 **항상** `INSUFFICIENT_COMPS`가 된다. 그래서 `min_comps
 설계: .claude/plans/ai/CH003-pricing-service-prototype.md
 """
 
+from pathlib import Path
 from typing import TypedDict
 
 from app.pricing.schemas import ConditionGrade, ConfidenceLevel
@@ -63,9 +64,20 @@ COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
         # 것이라 근거 있는 값은 아니다 — 실측으로 조정 대상.
         "max_output_tokens": 4096,
     },
+    # CH020: 내부 데이터 CLIP 이미지 유사도 검색. 네트워크 호출이 없으니 timeout/tool_types/
+    # max_output_tokens은 다른 백엔드와 형태만 맞춘 미사용 값이다. 코퍼스를 직접 통제하므로
+    # (`--max-per-category`) llm_web_search의 응급 최저치(1)보다 mock 수준 기준을 쓴다.
+    "internal_clip": {
+        "model_id": "patrickjohncyh/fashion-clip",
+        "tool_types": (),
+        "timeout_seconds": 5.0,
+        "max_comps": 8,
+        "min_comps_for_pricing": 3,
+        "max_output_tokens": 0,
+    },
 }
-ACTIVE_COMPS_SOURCE = "mock"  # <- 여기 키만 바꾸면 스왑. llm_web_search 전환은 사용자만(하드 룰)
-# llm_web_search / mock
+ACTIVE_COMPS_SOURCE = "mock"  # <- 여기 키만 바꾸면 스왑. llm_web_search/internal_clip 전환은
+# 사용자만(하드 룰). llm_web_search / mock / internal_clip
 
 
 class RetailSourceConfig(TypedDict):
@@ -152,6 +164,27 @@ COMPS_FILTER_MAD_THRESHOLD = 3.5  # 이 값보다 큰 표준화 편차는 이상
 MAX_CONCURRENT_JOBS = 2
 
 WORKER_ID = "ai-inprocess"  # 노트북 워커가 아니라 컨테이너가 처리했음을 결과에 남긴다
+
+
+# --- internal_clip 전용 설정 (CH020) ----------------------------------------
+# `CompsSourceConfig`에 없는 필드(체크포인트 경로·코퍼스 경로·유사도 하한)라 별도 TypedDict로
+# 뺐다 — 이 백엔드만 쓰는 필드로 공유 TypedDict를 어지럽히지 않는다.
+
+
+class InternalClipConfig(TypedDict):
+    checkpoint_path: str
+    corpus_dir: str
+    similarity_floor: float
+
+
+INTERNAL_CLIP_CONFIG: InternalClipConfig = {
+    # 커밋된 기본값은 빈 문자열(미구성 상태) — 로컬/개발 환경에서 실제 체크포인트 경로로
+    # 채운다. `ClipEmbedNotReady`가 이 상태를 감지해 `CompsUnavailable`로 승격한다.
+    "checkpoint_path": "",
+    "corpus_dir": str(Path(__file__).resolve().parent / "data"),
+    # 임의값 — MAD/키워드 필터(CH017)처럼 실측 전까지 근거 없는 계수다.
+    "similarity_floor": 0.55,
+}
 
 
 def comps_config(key: str | None = None) -> CompsSourceConfig:
