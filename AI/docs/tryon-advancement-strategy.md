@@ -454,3 +454,77 @@ CatVTON은 상의/하의 의류 try-on 전용으로 학습된 모델이라 액�
   FLUX 경로로 방향이 정해졌으므로, 해당 함수를 되살릴 필요는 없어 보인다.
 - 프로덕션(`worker/models/catvton/`) 반영 여부 결정 — 지금까지 전부 `AI/validation/`
   안의 검증 코드다.
+
+## 11. 프로덕션 승격 — VLM + FLUX + CatVTON (`S15P11A108-504`)
+
+§9~§10에서 검증한 fit-aware worn-reference 기법을 프로덕션 `worker/tryon_worker_example.py`로
+승격했다. 검증 때와 결정적으로 다른 점 하나: **타겟이 실제 고객 사진이다.** §9~§10은 전부
+고정된 AI 모델 4명(희동이/도우너/둘리/마이콜)에게 입혀보는 검증이었지만, 프로덕션
+`tryon_worker_example.py`는 원래 실제 고객 사진(`user_image_url`) + 상품 사진을 받아
+합성하는 계약이었다 — 이 계약을 유지한 채 VLM+FLUX 단계를 앞에 붙였다.
+
+### 11.1 캐싱 포기
+
+처음엔 "worn-reference는 상품+사이즈당 한 번만 만들면 되는 자산"이라는 생각으로 생성
+결과를 캐싱해서 고객마다 재사용하는 구조를 검토했다. 하지만 타겟이 실제 고객 사진으로
+확정되면서 이 전제가 깨졌다 — worn-reference는 "그 고객 사진"을 참조로 생성해야 결과에
+그 고객 본인이 나오므로, 고객마다 다시 생성해야 한다. 재사용 이점 없이 매 요청마다
+FLUX를 다시 돌리는 쪽으로 결정했다(사용자 확정).
+
+### 11.2 신체 치수 — 실측 대신 키/몸무게 근사
+
+§9~§10의 핏 계산(`ratio = garment_measurement_cm / body_measurement_cm`)은 실제 신체
+치수가 있어야 하는데, BE `member_body_profile`엔 아직 `height_cm`/`weight_kg`만 확정
+컬럼이고 가슴/허리/엉덩이 실측 컬럼은 없다(`.codex/requests/be/
+003-onboarding-tryon-profile-api.md`, 아직 열려있음). 새 BE 스캔 기능을 기다리는 대신,
+**키/몸무게 기반 근사 공식**(`worker/models/catvton/body_estimate.py`)으로 대체했다 —
+키 대비 부위별 평균 비율에 BMI 편차 보정을 곱하는 방식. 정밀한 회귀식이 아니라 v1
+근사치라는 걸 코드에 명시했고, 실측 컬럼이 생기면 그 값이 우선한다(`body_waist_cm`이
+payload에 있으면 근사를 건너뜀).
+
+### 11.3 세 모델 순차 로드 (동시 상주 아님)
+
+VLM(Qwen3-VL-4B) + FLUX.2-Klein-4B + CatVTON을 한 워커 프로세스 안에서 순차로 로드/
+언로드한다 — `worker/garment_measurement_worker_example.py`가 이미 "한 프로세스 안에서
+여러 무거운 모델을 순차 체이닝"하는 전례였다. 프로덕션엔 GPU 서버가 없고 팀원 노트북
+(6GB급)이 워커로 붙는 구조라(`AI/docs/infra-architecture.md`), 세 모델 동시 상주는 안
+되지만 순차 로드라면 피크 VRAM이 가장 큰 단일 스테이지(FLUX, ~5-6GB) 수준으로 억제된다.
+FLUX 사용 종료 직후 `del`+`torch.cuda.empty_cache()`(`worker/models/tryon_flux/
+generator.py`의 `Flux2KleinGenerator.unload()`).
+
+새 VLM/FLUX 단계는 `quality_check_worker_example.py`/`stt_worker_example.py`가 이미 쓰는
+"`FEATURE_BACKEND=mock` 기본값, GPU 없이 전 경로 검증" 컨벤션을 그대로 따른다
+(`TRYON_VLM_BACKEND`/`TRYON_FLUX_BACKEND`, `worker/README.md` 참고). CatVTON 자체는
+원래부터 mock이 없었고 이번에도 추가하지 않았다.
+
+### 11.4 파이프라인 구조 — 하의 전용 어텐션 부스팅(§8)은 안 가져옴
+
+§10.2에서 검증한 worn-reference-as-person 방식으로 통일했다 — `image=worn-reference`
+(FLUX가 방금 생성), `condition_image=실제 상품 사진`, 마스크는 `AutoMasker`로
+worn-reference에서 새로 계산한다. §8의 어텐션 부스팅(하의 길이 렌더링 보정)은 이번엔
+안 가져왔다 — worn-reference-as-person 방식은 마스크를 worn-reference에서 새로 계산하므로
+애초에 올바른 길이가 마스크에 반영될 걸로 기대한다. 하의 길이 문제가 재현되면 그때
+되살린다(코드는 `AI/validation/TRYON/AI_tryon/CatVTON/model/attn_processor.py`에 남아있다).
+
+### 11.5 `fit_type`에서 `cropped` 제거
+
+§7.5에서 "기장(길이) 축은 AI 가드레일상 맨살 노출 우려로 뺐다"고 이미 결정했는데,
+프로덕션 `MaskFitType`엔 `cropped`(옷을 짧게 만들어 마스크 하단을 제외하는 옵션)가 그
+결정과 충돌한 채 남아 있었다 — enum 값만 안 지워진 것. `AI/app/tryon/schemas.py`/
+`worker/tryon_worker_example.py` 둘 다에서 제거했다. `cloth_masker.py`의 `cropped` 분기
+자체(벤더 코드)는 안 건드리고, 우리 쪽 API/워커 레벨에서 그 값을 절대 못 넘기게만 막았다.
+
+### 11.6 아직 못 푸는 것 — 카테고리 자동 판별
+
+상품 카테고리(하의/상의/아우터/액세서리)가 AI로 전혀 안 넘어온다 — `Product.categoryId`는
+raw `Long` FK뿐이고 AI의 35종 taxonomy와 연결할 방법이 없다. `mask_type`을 AI가 스스로
+판단 못 해서, 지금은 요청 payload의 `mask_type` 값을 그대로 신뢰한다. BE 요청 문서
+(`.claude/requests/be/007-tryon-product-category.md`)를 남겼다.
+
+### 11.7 다음 단계
+
+- 실제 GPU 노트북에서 VLM→FLUX→CatVTON 전체 파이프라인 엔드투엔드 스모크 테스트(단위
+  함수/CatVTON 자체는 검증했지만 세 모델 순차 로드 전체 흐름과 피크 VRAM은 아직 실측
+  전 — `worker/README.md` "남은 작업" 참고).
+- `.claude/requests/be/007-tryon-product-category.md` 회신 후 카테고리 자동 판별 추가.
+- `body_estimate.py`의 근사 공식은 실측 데이터가 쌓이면 정확도 검증/보정이 필요하다.

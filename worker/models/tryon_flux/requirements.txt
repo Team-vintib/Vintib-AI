@@ -1,0 +1,12 @@
+# tryon_flux(FLUX.2-Klein worn-reference 생성) 전용 추가 의존성.
+#
+# CatVTON 워커가 쓰는 conda 환경에 아래를 추가로 설치한다. torch/transformers는 CatVTON이
+# 이미 요구하는 버전을 그대로 쓴다(diffusers만 FLUX.2 클래스를 지원하는 버전으로 맞출 것 --
+# AI/validation/TRYON/AI_tryon/CatVTON에서 실측한 버전 확인).
+#
+#   pip install -r worker/models/tryon_flux/requirements.txt
+#
+# mock 백엔드(TRYON_FLUX_BACKEND=mock, 기본값)는 이 파일이 전혀 필요 없다.
+diffusers>=0.35
+bitsandbytes>=0.50
+gguf

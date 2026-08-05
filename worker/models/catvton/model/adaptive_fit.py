@@ -23,9 +23,9 @@ diffusion이 새로 생성해야 한다 — AI 가드레일상 맨살 생성은 
 지금 실제로 쓰는 축:
 - **너비(바지 허리)**: body_waist_cm ↔ WAIST_WIDTH. 평평하게 편 원단 폭은 몸에 딱 맞았을 때
   둘레의 절반과 같다는 물리적 관계를 쓴다. 다만 BE `member_body_profile`에 waist 컬럼이
-  아직 없어(`.claude/requests/be/005-tryon-adaptive-fit-data.md`) 실제로는
-  `body_circumference_cm=None`이 들어와 항상 스킵된다 — 데이터가 생기면 바로 켜지는 구조로만
-  미리 준비해둔다.
+  아직 없어(`.codex/requests/be/003-onboarding-tryon-profile-api.md`, 아직 열려있음)
+  실제로는 `body_circumference_cm=None`이 들어올 수 있다 — 이때는 `worker/models/catvton/
+  body_estimate.py`의 키/몸무게 기반 근사치로 대체한다(`S15P11A108-504`).
 - **상의/원피스는 아직 축이 없다** — 가슴(bust) 너비 축에 대응하는 의류 치수가 없다(겨드랑이
   랜드마크 미지원, `AI/app/measurement/schemas.py`의 `MeasurementType` 참고). 데이터가 없는
   동안은 `fit_type` 고정 로직으로 폴백한다.
