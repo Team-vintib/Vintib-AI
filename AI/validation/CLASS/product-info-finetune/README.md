@@ -366,8 +366,12 @@ black --check .
 pytest -q
 ```
 
-테스트 8종(`test_class_finetune_{dataset,accessory,preprocess,head,evaluate,cache_pixels,
-finetune_vit,finetune_lora}.py`)은 무거운 의존성이 없어 CI에서 그대로 돈다 — 파싱 함정,
-매핑 우선순위, 그룹 분할 누수, 폴리곤 좌표 처리, 태스크별 행 선택, zero-shot 채점 수학,
-캐시 파일명 분리, 라벨 인코딩/미지 클래스 필터링, run_name 접두어(방법 분류/충돌 방지)를
+테스트는 전부 `tests/` 밑에 있다(스크립트 12종에 대응하는 `test_class_finetune_*.py`) —
+무거운 의존성이 없어 CI에서 그대로 돈다: 파싱 함정, 매핑 우선순위, 그룹 분할 누수, 폴리곤
+좌표 처리, 태스크별 행 선택, zero-shot 채점 수학, 캐시/체크포인트 파일명 규칙, 라벨 인코딩/
+미지 클래스 필터링, run_name 접두어(방법 분류/충돌 방지), (방법,태스크)별 리더보드 그룹핑을
 고정한다. 각 스크립트의 무거운 본체(모델 로드·학습·추론)는 CI 밖(서버)에서만 검증한다.
+
+`tests/`가 `aihub_*.py`와 다른 폴더라 `import aihub_finetune_vit` 같은 게 안 될 것 같지만,
+`conftest.py`(이 폴더에 있음)가 부모 폴더를 sys.path에 넣어줘서 그대로 동작한다 — pytest는
+`conftest.py`가 있는 폴더를 항상 import 가능하게 만든다.
