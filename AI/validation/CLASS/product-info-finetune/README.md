@@ -273,6 +273,22 @@ feature를 한 번만 뽑고 `aihub_train_head.py`(STEP4)와 같은 sklearn 학�
 수렴시켜 몇 초~몇 분 안에 최종 정확도가 나온다. `--method lora`면 `--r`/`--alpha`/
 `--target-modules`를 체크포인트 학습 때와 같게 준다.
 
+### 미커버 클래스(신발·가방 등) zero-shot이 여전히 유지되는가
+
+브리핑이 원래 전체 파인튜닝을 금지한 이유(§3) — 파인튜닝된 backbone이 AI-Hub가 안 덮는
+클래스에서 zero-shot이 망가지지 않았는지, 우리 정답셋으로 원본 backbone과 비교한다:
+
+```bash
+python validation/CLASS/product-info-finetune/aihub_ground_truth_zero_shot_check.py \
+    --ground-truth-dir validation/CLASS/product-info-check \
+    --checkpoint .../artifacts_finetune/vit_last4_category_masked_lr1e-05/checkpoint.pt \
+    --method last-n --unfreeze-layers 4
+```
+
+체크포인트에 저장된 `classes`(헤드가 실제로 배운 클래스)를 기준으로 "미커버"를 정하고,
+정답셋에서 그 클래스만 골라 두 backbone의 zero-shot 예측을 나란히 찍는다 — 원본과 달라진
+이미지가 있으면 어느 방향(파인튜닝이 틀리게 만들었는지, 오히려 고쳤는지)인지도 표시한다.
+
 ## STEP 3.7 — (선택, 실험) LoRA 파인튜닝
 
 STEP 3.6(last-N 언프리즈)의 대안이다. last-N은 마지막 몇 개 블록을 **통째로** 학습하고,
