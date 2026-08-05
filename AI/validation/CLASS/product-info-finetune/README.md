@@ -258,6 +258,21 @@ python validation/CLASS/product-info-finetune/aihub_finetune_vit.py \
 이 test accuracy를 카테고리 전용으로 학습한 원래 결과와 비교하면, 색상 학습이 카테고리
 성능을 얼마나 깎았는지(또는 안 깎았는지) 알 수 있다. run 폴더 이름엔 `_probe`가 붙는다.
 
+⚠️ **위 진단은 torch SGD로 헤드를 학습시키는데, 실측상 30epoch을 넘게 돌려도 수렴을
+안 했다**(볼록 선형 분류 문제라 sklearn이 훨씬 빠르고 확실하다). 같은 진단을 훨씬 빠르게
+하려면 `aihub_finetune_probe.py`를 대신 쓴다(별도 파일 — 기존 스크립트는 안 건드림):
+
+```bash
+python validation/CLASS/product-info-finetune/aihub_finetune_probe.py \
+    --pixel-cache-dir .../artifacts --task category --variant masked \
+    --method last-n --unfreeze-layers 4 \
+    --checkpoint .../artifacts_finetune/vit_last4_color_masked_lr1e-05_warm/checkpoint.pt
+```
+
+feature를 한 번만 뽑고 `aihub_train_head.py`(STEP4)와 같은 sklearn 학습으로 즉시
+수렴시켜 몇 초~몇 분 안에 최종 정확도가 나온다. `--method lora`면 `--r`/`--alpha`/
+`--target-modules`를 체크포인트 학습 때와 같게 준다.
+
 ## STEP 3.7 — (선택, 실험) LoRA 파인튜닝
 
 STEP 3.6(last-N 언프리즈)의 대안이다. last-N은 마지막 몇 개 블록을 **통째로** 학습하고,
