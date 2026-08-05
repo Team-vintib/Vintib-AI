@@ -83,7 +83,7 @@ const allHandled = computed(
   border: 0;
   background: transparent;
   color: var(--color-live-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   cursor: pointer;
 }
 
@@ -93,13 +93,13 @@ const allHandled = computed(
 
 .unsold-manage__title {
   color: var(--color-live-text-primary);
-  font-size: 22px;
-  font-weight: 800;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-extrabold);
 }
 
 .unsold-manage__desc {
   color: var(--color-live-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   line-height: 19px;
 }
 
@@ -110,8 +110,8 @@ const allHandled = computed(
   border-radius: var(--radius-chip);
   background: var(--color-live-surface-raised);
   color: var(--color-live-text-primary);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .unsold-manage__list {
@@ -127,25 +127,25 @@ const allHandled = computed(
 }
 
 .unsold-manage__ghost {
-  min-height: 46px;
+  min-height: var(--button-height-loose);
   padding: 0 var(--space-5);
   border: 1px solid var(--color-live-border);
   border-radius: var(--radius-control);
   background: var(--color-live-surface);
   color: var(--color-live-text-primary);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .unsold-manage__done {
-  min-height: 46px;
+  min-height: var(--button-height-loose);
   flex: 1;
   border: 0;
   border-radius: var(--radius-control);
   background: var(--color-live);
   color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .unsold-manage__done:disabled {

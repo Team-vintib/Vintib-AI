@@ -422,22 +422,22 @@ onMounted(() => {
 .wishlist-page__header h1 {
   color: var(--color-text-primary);
   font-size: 36px;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   line-height: 48px;
 }
 
 .wishlist-page__header p,
 .wishlist-page__header strong {
   color: var(--color-text-secondary);
-  font-size: 16px;
-  line-height: 26px;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-lg);
 }
 
 .wishlist-page__message,
 .wishlist-results__message {
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .wishlist-page__message {
@@ -474,9 +474,9 @@ onMounted(() => {
 
 .wishlist-filter__group legend {
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .wishlist-filter__price input {
@@ -505,9 +505,9 @@ onMounted(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .wishlist-filter__actions button:hover,
@@ -520,25 +520,25 @@ onMounted(() => {
 .wishlist-filter__group label {
   display: flex;
   align-items: center;
-  min-height: 28px;
+  min-height: var(--badge-height-md);
   gap: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
   cursor: pointer;
 }
 
 .wishlist-filter__group input[type='checkbox'] {
-  width: 15px;
-  height: 15px;
+  width: var(--icon-size-xs);
+  height: var(--icon-size-xs);
   accent-color: var(--color-primary);
 }
 
 .wishlist-filter__empty,
 .wishlist-filter__error {
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .wishlist-filter__error {
@@ -555,9 +555,9 @@ onMounted(() => {
   display: grid;
   gap: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .wishlist-filter__actions {
@@ -589,14 +589,14 @@ onMounted(() => {
 .wishlist-tabs button {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  min-height: var(--button-height-small);
   gap: var(--space-2);
   padding: 0 var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
 }
 
@@ -609,7 +609,7 @@ onMounted(() => {
 
 .wishlist-tabs button span {
   color: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .wishlist-grid {
@@ -659,25 +659,25 @@ onMounted(() => {
 
 .wishlist-card__main span {
   justify-self: start;
-  min-height: 24px;
+  min-height: var(--badge-height-compact);
   padding: 2px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-badge);
   margin-top: var(--space-4);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .wishlist-card__main strong {
   overflow: hidden;
   margin-top: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-extrabold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -685,9 +685,9 @@ onMounted(() => {
 .wishlist-card__main p {
   margin-top: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 16px;
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-extrabold);
-  line-height: 24px;
+  line-height: var(--line-height-body);
 }
 
 .wishlist-card__meta {
@@ -698,8 +698,8 @@ onMounted(() => {
   min-width: 0;
   padding: var(--space-3) var(--space-4) 0;
   color: var(--color-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
 }
 
 .wishlist-card__meta span {
@@ -718,14 +718,14 @@ onMounted(() => {
 }
 
 .wishlist-card__status span {
-  min-height: 22px;
+  min-height: var(--badge-height-xs);
   padding: 1px var(--space-2);
   border-radius: var(--radius-badge);
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .wishlist-card__remove {
@@ -741,7 +741,7 @@ onMounted(() => {
 .wishlist-page__state {
   display: grid;
   justify-items: center;
-  min-height: 320px;
+  min-height: var(--surface-min-height-lg);
   place-content: center;
   gap: var(--space-4);
   padding: var(--space-8);
@@ -775,7 +775,7 @@ onMounted(() => {
   }
 
   .wishlist-page__header h1 {
-    font-size: 30px;
+    font-size: var(--font-size-3xl-plus);
     line-height: 40px;
   }
 

@@ -66,8 +66,8 @@ const emit = defineEmits<{
 
 .product-detail-state__icon {
   display: grid;
-  width: 64px;
-  height: 64px;
+  width: var(--icon-size-lg);
+  height: var(--icon-size-lg);
   border-radius: 50%;
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
@@ -80,8 +80,8 @@ const emit = defineEmits<{
 }
 
 .product-detail-state__icon svg {
-  width: 28px;
-  height: 28px;
+  width: var(--badge-height-md);
+  height: var(--badge-height-md);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -92,24 +92,24 @@ const emit = defineEmits<{
 .product-detail-state__eyebrow {
   margin-top: var(--space-5);
   color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .product-detail-state h1 {
   margin-top: var(--space-2);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 36px;
+  font-size: var(--font-size-2xl-plus);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-2xl-plus);
 }
 
 .product-detail-state__description {
-  max-width: 520px;
+  max-width: var(--prose-max-width);
   margin-top: var(--space-3);
   color: var(--color-text-secondary);
-  font-size: 15px;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 .product-detail-state__actions {
@@ -123,7 +123,7 @@ const emit = defineEmits<{
   height: var(--button-height-standard);
   padding: 0 var(--space-5);
   border-radius: var(--radius-control);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .product-detail-state__primary {

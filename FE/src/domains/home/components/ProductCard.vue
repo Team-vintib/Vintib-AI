@@ -115,7 +115,7 @@ const formatPrice = (value?: number) => {
 
 .product-card__overlay-link {
   position: absolute;
-  z-index: 2;
+  z-index: var(--z-layer-2);
   inset: 0;
 }
 
@@ -138,7 +138,7 @@ const formatPrice = (value?: number) => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-media);
   background: var(--color-image-frame);
-  transition: border-color 220ms ease;
+  transition: border-color var(--transition-standard);
 }
 
 .product-card:hover .product-card__media {
@@ -148,7 +148,7 @@ const formatPrice = (value?: number) => {
 .product-card__media::after {
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, rgba(10, 10, 10, 0.55), transparent 42%);
+  background: linear-gradient(0deg, var(--overlay-scrim-medium), transparent 42%);
   content: '';
 }
 
@@ -157,7 +157,7 @@ const formatPrice = (value?: number) => {
   height: 100%;
   object-fit: cover;
   filter: saturate(0.88) contrast(1.04) brightness(0.95);
-  transition: filter 220ms ease;
+  transition: filter var(--transition-standard);
 }
 
 .product-card:hover .product-card__image {
@@ -166,21 +166,21 @@ const formatPrice = (value?: number) => {
 
 .product-card__tag {
   position: absolute;
-  z-index: 1;
+  z-index: var(--z-layer-1);
   top: 0;
   left: 0;
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
+  min-height: var(--space-6);
   padding: 0 10px;
   border-radius: 0 0 var(--radius-badge) 0;
-  background: rgba(10, 10, 10, 0.82);
+  background: var(--overlay-scrim-strong);
   color: var(--color-text-primary);
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.08em;
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .product-card__tag--auction {
@@ -188,12 +188,12 @@ const formatPrice = (value?: number) => {
 }
 
 .product-card__tag--direct {
-  background: rgba(10, 10, 10, 0.82);
+  background: var(--overlay-scrim-strong);
 }
 
 .product-card__wish {
   position: absolute;
-  z-index: 3;
+  z-index: var(--z-layer-3);
   top: var(--space-2);
   right: var(--space-2);
   display: grid;
@@ -202,14 +202,14 @@ const formatPrice = (value?: number) => {
   height: 34px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-badge);
-  background: rgba(10, 10, 10, 0.55);
+  background: var(--overlay-scrim-medium);
   color: var(--color-text-secondary);
   backdrop-filter: blur(2px);
 }
 
 .product-card__wish svg {
-  width: 20px;
-  height: 20px;
+  width: var(--space-5);
+  height: var(--space-5);
   fill: transparent;
   stroke: currentColor;
   stroke-linecap: round;
@@ -240,19 +240,19 @@ const formatPrice = (value?: number) => {
 .product-card__brand {
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.16em;
-  line-height: 18px;
+  line-height: var(--line-height-snug);
   text-transform: uppercase;
 }
 
 .product-card__seller,
 .product-card__meta {
   color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 300;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-snug);
 }
 
 .product-card__title {
@@ -261,8 +261,8 @@ const formatPrice = (value?: number) => {
   margin-top: 2px;
   color: var(--color-text-primary);
   font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
   letter-spacing: -0.01em;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -272,42 +272,42 @@ const formatPrice = (value?: number) => {
   margin-top: 2px;
   color: var(--color-text-primary);
   font-family: var(--font-mono);
-  font-size: 18px;
-  font-weight: 700;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
   letter-spacing: -0.02em;
-  line-height: 24px;
+  line-height: var(--line-height-body);
   font-variant-numeric: tabular-nums;
 }
 
 .product-card__bid {
   color: var(--color-accent);
   font-family: var(--font-mono);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
-  font-size: 13px;
+  font-size: var(--font-size-caption);
 }
 
 .product-card__action {
   position: relative;
-  z-index: 3;
+  z-index: var(--z-layer-3);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: fit-content;
-  height: 36px;
+  height: var(--button-height-small);
   padding: 0 var(--space-4);
   justify-self: end;
   margin-top: var(--space-2);
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-control);
   transition:
-    background-color 220ms ease,
-    color 220ms ease;
+    background-color var(--transition-standard),
+    color var(--transition-standard);
 }
 
 .product-card__action:hover {
@@ -317,8 +317,8 @@ const formatPrice = (value?: number) => {
 
 @media (max-width: 520px) {
   .product-card__title {
-    font-size: 15px;
-    line-height: 22px;
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-relaxed);
   }
 }
 </style>

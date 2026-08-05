@@ -343,19 +343,19 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 36px;
+  height: var(--button-height-small);
   margin-bottom: var(--space-4);
   padding: 0 var(--space-3) 0 var(--space-2);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
   transition:
-    border-color 160ms ease,
-    color 160ms ease;
+    border-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .product-detail__back:hover {
@@ -364,8 +364,8 @@ onBeforeUnmount(() => {
 }
 
 .product-detail__back svg {
-  width: 18px;
-  height: 18px;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -392,9 +392,9 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .product-detail__sold-banner {
@@ -411,8 +411,8 @@ onBeforeUnmount(() => {
 .product-detail__sold-banner > div:first-child {
   display: grid;
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
+  width: var(--button-height-sm);
+  height: var(--button-height-sm);
   border-radius: 50%;
   background: var(--color-surface);
   color: var(--color-text-secondary);
@@ -429,16 +429,16 @@ onBeforeUnmount(() => {
 }
 
 .product-detail__sold-banner strong {
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
 }
 
 .product-detail__sold-banner p {
   margin-top: 2px;
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
 }
 
 @media (max-width: 940px) {
@@ -484,11 +484,11 @@ onBeforeUnmount(() => {
 .product-try-on-popup__expand {
   display: grid;
   position: absolute;
-  z-index: 2;
+  z-index: var(--z-layer-2);
   top: 14px;
   right: 52px;
-  width: 30px;
-  height: 30px;
+  width: var(--badge-height-lg);
+  height: var(--badge-height-lg);
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-control);
@@ -503,8 +503,8 @@ onBeforeUnmount(() => {
 }
 
 .product-try-on-popup__expand svg {
-  width: 15px;
-  height: 15px;
+  width: var(--icon-size-xs);
+  height: var(--icon-size-xs);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;

@@ -126,22 +126,22 @@ function getQueryValue(value: unknown) {
 .ssafy-header__eyebrow {
   margin-top: var(--space-4);
   color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 16px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-xs);
 }
 
 .ssafy-header__title {
   margin-top: var(--space-2);
-  font-size: 32px;
-  font-weight: 700;
-  line-height: 44px;
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-4xl);
 }
 
 .ssafy-header__description {
   margin-top: var(--space-3);
-  font-size: 15px;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 .ssafy-error {
@@ -150,9 +150,9 @@ function getQueryValue(value: unknown) {
   border-radius: var(--radius-control);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .ssafy-actions {
@@ -171,14 +171,14 @@ function getQueryValue(value: unknown) {
   height: var(--button-height-major);
   padding: 0 var(--space-5);
   border-radius: var(--radius-control);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    color var(--transition-base),
+    transform var(--transition-base);
 }
 
 .ssafy-primary-button {
@@ -204,8 +204,8 @@ function getQueryValue(value: unknown) {
 .ssafy-primary-button:focus-visible,
 .ssafy-header__logo-link:focus-visible,
 .ssafy-secondary-button:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 3px;
+  outline: var(--focus-ring-width) solid var(--color-primary);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .ssafy-primary-button:active:not(:disabled),
@@ -224,8 +224,8 @@ function getQueryValue(value: unknown) {
   }
 
   .ssafy-header__title {
-    font-size: 28px;
-    line-height: 38px;
+    font-size: var(--font-size-3xl);
+    line-height: var(--line-height-3xl);
   }
 }
 </style>

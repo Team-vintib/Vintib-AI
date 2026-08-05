@@ -196,7 +196,7 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 .product-filter__legend {
   margin-bottom: var(--space-4);
   color: var(--color-text-primary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-medium);
   letter-spacing: -0.01em;
 }
@@ -212,19 +212,19 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 
 .product-filter__empty {
   color: var(--color-text-muted);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .product-filter__checkbox {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-size-xs-plus);
+  height: var(--icon-size-xs-plus);
   accent-color: var(--color-primary);
 }
 
 .product-filter__checkbox:focus-visible {
   outline: 2px solid var(--color-primary);
-  outline-offset: 3px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .product-filter__price-fields {
@@ -238,8 +238,8 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
   min-width: 0;
   gap: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
 }
 
 .product-filter__price-control {
@@ -269,7 +269,7 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
   background: transparent;
   color: var(--color-text-primary);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
 }
 
@@ -294,8 +294,8 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 .product-filter__error {
   margin-top: var(--space-3);
   color: var(--color-error);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
 }
 
 .product-filter__actions {
@@ -311,9 +311,9 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-semibold);
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .product-filter__button:focus-visible {

@@ -56,7 +56,7 @@ const emit = defineEmits<{
 .search-state {
   display: grid;
   justify-items: center;
-  min-height: 320px;
+  min-height: var(--surface-min-height-lg);
   gap: var(--space-5);
   place-content: center;
   padding: var(--space-10);
@@ -100,8 +100,8 @@ const emit = defineEmits<{
 
 .search-state__body h2 {
   color: var(--color-text-primary);
-  font-size: 22px;
-  font-weight: 800;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-extrabold);
   line-height: 30px;
 }
 

@@ -798,7 +798,7 @@ watch(
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .profile-summary {
@@ -886,7 +886,7 @@ watch(
 .profile-summary__identity h1 {
   overflow-wrap: anywhere;
   color: var(--color-text-primary);
-  font-size: 32px;
+  font-size: var(--font-size-4xl);
   font-weight: 900;
   line-height: 42px;
 }
@@ -895,8 +895,8 @@ watch(
 .profile-summary__message {
   margin-top: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
 }
 
 .profile-summary__message {
@@ -924,9 +924,9 @@ watch(
 
 .profile-editor__section-title {
   color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-control);
 }
 
 .profile-editor__field {
@@ -936,9 +936,9 @@ watch(
 
 .profile-editor__field label {
   color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-control);
 }
 
 .profile-editor__field textarea {
@@ -962,7 +962,7 @@ watch(
 .profile-editor__message {
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .profile-editor__media-actions {
@@ -1048,23 +1048,23 @@ watch(
 .profile-stats button.profile-stats__item {
   cursor: pointer;
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease;
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .profile-stats__item strong {
   color: var(--color-text-primary);
-  font-size: 22px;
+  font-size: var(--font-size-xl);
   font-weight: 900;
-  line-height: 28px;
+  line-height: var(--line-height-lg-plus);
 }
 
 .profile-stats__item span {
   color: var(--color-text-secondary);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-control);
 }
 
 .profile-stats button.profile-stats__item:hover,
@@ -1104,13 +1104,13 @@ watch(
   border-bottom: 3px solid transparent;
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
   text-align: center;
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease;
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .profile-tabs button + button {
@@ -1157,7 +1157,7 @@ watch(
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .profile-pagination__item--active {
@@ -1224,8 +1224,8 @@ watch(
   }
 
   .profile-summary__identity h1 {
-    font-size: 30px;
-    line-height: 38px;
+    font-size: var(--font-size-3xl-plus);
+    line-height: var(--line-height-3xl);
   }
 
   .profile-stats__item {
@@ -1234,8 +1234,8 @@ watch(
   }
 
   .profile-stats__item strong {
-    font-size: 20px;
-    line-height: 26px;
+    font-size: var(--font-size-lg-plus);
+    line-height: var(--line-height-lg);
   }
 
   .profile-content-card {

@@ -36,13 +36,13 @@ const {
   padding: 0 var(--space-6);
   border: 1px solid transparent;
   border-radius: var(--radius-control);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   line-height: 1;
   cursor: pointer;
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease;
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .base-button:focus-visible {

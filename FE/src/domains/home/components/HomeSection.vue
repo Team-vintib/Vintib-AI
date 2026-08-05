@@ -62,10 +62,10 @@ withDefaults(
 .home-section__eyebrow {
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 400;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-regular);
   letter-spacing: 0.2em;
-  line-height: 16px;
+  line-height: var(--line-height-xs);
   text-transform: uppercase;
 }
 
@@ -74,7 +74,7 @@ withDefaults(
   color: var(--color-text-primary);
   font-family: var(--font-display);
   font-size: 26px;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   letter-spacing: -0.03em;
   line-height: 1.05;
 }
@@ -82,12 +82,12 @@ withDefaults(
 .home-section__link {
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-regular);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   white-space: nowrap;
-  transition: color 160ms ease;
+  transition: color var(--transition-base);
 }
 
 .home-section__link::after {
@@ -107,9 +107,9 @@ withDefaults(
   border-radius: var(--radius-card);
   background: var(--color-surface);
   color: var(--color-text-muted);
-  font-size: 14px;
-  font-weight: 300;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-relaxed);
   text-align: center;
 }
 

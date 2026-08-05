@@ -322,9 +322,9 @@ function getQueryValue(value: unknown) {
   border-radius: var(--radius-control);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .login-form__fields,
@@ -346,9 +346,9 @@ function getQueryValue(value: unknown) {
 
 .login-form__label {
   color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .login-form__input {
@@ -359,9 +359,9 @@ function getQueryValue(value: unknown) {
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-text-primary);
-  font-weight: 300;
+  font-weight: var(--font-weight-light);
   outline: none;
-  transition: border-color 160ms ease;
+  transition: border-color var(--transition-base);
 }
 
 .login-form__input:hover {
@@ -383,7 +383,7 @@ function getQueryValue(value: unknown) {
 }
 
 .login-form__input--password {
-  padding-right: 80px;
+  padding-right: var(--space-20);
 }
 
 .login-form__password {
@@ -394,16 +394,16 @@ function getQueryValue(value: unknown) {
   position: absolute;
   top: 50%;
   right: var(--space-2);
-  height: 36px;
+  height: var(--button-height-small);
   padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
   transform: translateY(-50%);
-  transition: background-color 160ms ease;
+  transition: background-color var(--transition-base);
 }
 
 .login-form__password-toggle:hover {
@@ -417,8 +417,8 @@ function getQueryValue(value: unknown) {
 
 .login-form__field-error {
   color: var(--color-error);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .login-form__options {
@@ -433,14 +433,14 @@ function getQueryValue(value: unknown) {
   align-items: center;
   gap: var(--space-2);
   color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .login-form__checkbox {
-  width: 16px;
-  height: 16px;
+  width: var(--space-4);
+  height: var(--space-4);
   accent-color: var(--color-primary);
 }
 
@@ -448,8 +448,8 @@ function getQueryValue(value: unknown) {
   border: 0;
   background: transparent;
   color: var(--color-text-muted);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
 }
 
 .login-form__submit,
@@ -461,13 +461,13 @@ function getQueryValue(value: unknown) {
   height: var(--button-height-major);
   padding: 0 var(--space-5);
   border-radius: var(--radius-control);
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-control);
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease;
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .login-form__submit {
@@ -518,15 +518,15 @@ function getQueryValue(value: unknown) {
 .login-form__footer {
   margin-top: var(--space-6);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
   text-align: center;
 }
 
 .login-form__link {
   color: var(--color-text-primary);
-  font-weight: 500;
-  transition: color 160ms ease;
+  font-weight: var(--font-weight-medium);
+  transition: color var(--transition-base);
 }
 
 .login-form__link:hover {

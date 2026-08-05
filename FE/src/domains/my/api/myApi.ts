@@ -368,19 +368,21 @@ const getMyHostLives = async (userId: number): Promise<MyLiveItem[]> => {
   const response = await http.get<
     ApiResponse<PageResponse<MyLiveApiDto> | BackendPageResponse<MyLiveApiDto>>
   >('/lives', {
+    // hostId 필터 + 인증 토큰으로 호출해야 종료·취소된 내 라이브까지 서버가 돌려준다.
+    // skipAuth로 비회원 취급되면 공개 상태(SCHEDULED/LIVE)만 내려온다(req 028 §2).
     params: {
+      hostId: userId,
       page: 0,
       size: 100,
       sort: 'LATEST',
     },
-    skipAuth: true,
   })
   const pageResponse = normalizePageResponse(
     unwrapApiData(response.data, '라이브 목록을 불러오지 못했습니다.'),
   )
 
+  // 서버가 hostId로 이미 좁혀 주므로 클라이언트 재필터는 하지 않는다.
   return pageResponse.items
-    .filter((live) => live.hostId === userId)
     .map(toMyLiveItem)
     .filter((item): item is MyLiveItem => item !== null)
 }

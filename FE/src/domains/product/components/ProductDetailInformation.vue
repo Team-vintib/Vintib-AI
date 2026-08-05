@@ -64,8 +64,8 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
 .detail-information > h2 {
   color: var(--color-text-primary);
   font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 600;
+  font-size: var(--font-size-2xl-plus);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: -0.03em;
   line-height: 1.05;
 }
@@ -77,9 +77,9 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
   border-radius: var(--radius-card);
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-body);
 }
 
 .detail-information__specs {
@@ -103,17 +103,17 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
 .detail-information__specs dt {
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-regular);
   letter-spacing: 0.04em;
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .detail-information__specs dd {
   color: var(--color-text-primary);
-  font-size: 17px;
-  font-weight: 500;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-body);
 }
 
 .detail-information__sizes {
@@ -121,9 +121,9 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
 }
 
 .detail-information__sizes h3 {
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .detail-information__sizes dl {
@@ -146,10 +146,10 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
 .detail-information__sizes dt {
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 400;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-regular);
   letter-spacing: 0.08em;
-  line-height: 16px;
+  line-height: var(--line-height-xs);
   text-transform: uppercase;
 }
 
@@ -157,10 +157,10 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
   margin-top: var(--space-1);
   color: var(--color-text-primary);
   font-family: var(--font-mono);
-  font-size: 17px;
-  font-weight: 500;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-medium);
   letter-spacing: -0.02em;
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
   font-variant-numeric: tabular-nums;
 }
 
@@ -176,16 +176,16 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
 
 .detail-information__seller-note strong {
   flex: 0 0 auto;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .detail-information__seller-note p {
   color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-snug);
 }
 
 @media (max-width: 720px) {

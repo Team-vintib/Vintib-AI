@@ -254,9 +254,9 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
   align-items: center;
   border-bottom: 2px solid var(--color-primary);
   color: var(--color-primary);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 36px;
+  font-size: var(--font-size-2xl-plus);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-2xl-plus);
 }
 
 .ai-analysis__tab-heading > span {
@@ -264,9 +264,9 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
   border-radius: var(--radius-badge);
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 16px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-xs);
 }
 
 .ai-analysis__tab-heading .ai-analysis__status--not-requested {
@@ -292,9 +292,9 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 .ai-analysis__intro {
   padding: var(--space-5) var(--space-6) 0;
   color: var(--color-text-secondary);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-body);
 }
 
 .ai-analysis__carousel-nav {
@@ -307,22 +307,22 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 
 .ai-analysis__nav-button {
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: var(--button-height-sm);
+  height: var(--button-height-sm);
   border: 1px solid var(--color-border-strong);
   border-radius: 50%;
   background: var(--color-surface);
   color: var(--color-text-secondary);
   place-items: center;
   transition:
-    border-color 160ms ease,
-    color 160ms ease,
-    opacity 160ms ease;
+    border-color var(--transition-base),
+    color var(--transition-base),
+    opacity var(--transition-base);
 }
 
 .ai-analysis__nav-button svg {
-  width: 20px;
-  height: 20px;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -352,16 +352,16 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 }
 
 .ai-analysis__carousel-label {
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
 }
 
 .ai-analysis__carousel-count {
   color: var(--color-text-secondary);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 .ai-analysis__comparison {
@@ -380,21 +380,21 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 
 .ai-analysis__comparison figcaption {
   display: flex;
-  min-height: 24px;
+  min-height: var(--filter-option-min-height);
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   margin-bottom: var(--space-3);
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .ai-analysis__reference-label {
   color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 16px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-xs);
 }
 
 .ai-analysis__image-frame {
@@ -416,7 +416,7 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
   position: absolute;
   border: 2px solid var(--color-error);
   border-radius: 4px;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
+  box-shadow: var(--shadow-ring);
   pointer-events: none;
 }
 
@@ -435,8 +435,8 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
   border-radius: 50%;
   background: var(--color-border-strong);
   transition:
-    background-color 160ms ease,
-    transform 160ms ease;
+    background-color var(--transition-base),
+    transform var(--transition-base);
 }
 
 .ai-analysis__dot--active {
@@ -455,17 +455,17 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 }
 
 .ai-analysis__description h3 {
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .ai-analysis__description > p {
   margin-top: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-body);
 }
 
 .ai-analysis__description ul {
@@ -492,24 +492,24 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
   border-radius: 50%;
   background: var(--color-error);
   color: var(--color-text-inverse);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-snug);
   place-items: center;
 }
 
 .ai-analysis__description li strong {
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .ai-analysis__description li p {
   margin-top: 2px;
   color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-snug);
 }
 
 .ai-analysis__description .ai-analysis__disclaimer {
@@ -519,20 +519,20 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
   padding: var(--space-4);
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-snug);
 }
 
 .ai-analysis__disclaimer > span {
   display: grid;
   flex: 0 0 auto;
-  width: 20px;
-  height: 20px;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
   border: 1px solid var(--color-text-muted);
   border-radius: 50%;
   font-family: serif;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   place-items: center;
 }
 
@@ -551,8 +551,8 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 
 .ai-analysis__state-icon {
   display: grid;
-  width: 64px;
-  height: 64px;
+  width: var(--icon-size-lg);
+  height: var(--icon-size-lg);
   border-radius: 50%;
   background: var(--color-surface);
   color: var(--color-text-secondary);
@@ -575,8 +575,8 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 }
 
 .ai-analysis__state-icon svg {
-  width: 28px;
-  height: 28px;
+  width: var(--badge-height-md);
+  height: var(--badge-height-md);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -585,8 +585,8 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 }
 
 .ai-analysis__spinner {
-  width: 28px;
-  height: 28px;
+  width: var(--badge-height-md);
+  height: var(--badge-height-md);
   border: 3px solid var(--color-ai-soft);
   border-top-color: var(--color-ai);
   border-radius: 50%;
@@ -595,25 +595,25 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 
 .ai-analysis__state h3 {
   margin-top: var(--space-5);
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .ai-analysis__state > p {
   max-width: 620px;
   margin-top: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: 15px;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
 }
 
 .ai-analysis__state .ai-analysis__state-note {
   margin-top: var(--space-4);
   color: var(--color-ai);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .ai-analysis__state .ai-analysis__state-disclaimer {
@@ -629,12 +629,12 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 .ai-analysis__state-disclaimer > span {
   display: grid;
   flex: 0 0 auto;
-  width: 20px;
-  height: 20px;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
   border: 1px solid var(--color-text-muted);
   border-radius: 50%;
   font-family: serif;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   place-items: center;
 }
 

@@ -39,10 +39,10 @@ defineProps<{
 .live-auction-panel h2 {
   color: var(--color-accent);
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 400;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-regular);
   letter-spacing: 0.2em;
-  line-height: 15px;
+  line-height: var(--line-height-tight);
   text-transform: uppercase;
 }
 
@@ -52,13 +52,13 @@ defineProps<{
   align-content: center;
   gap: var(--space-1);
   color: var(--color-live-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.5;
 }
 
 .live-auction-panel__empty strong {
   color: var(--color-live-text-primary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
 }
 
 .live-auction-panel__empty p {

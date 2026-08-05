@@ -77,9 +77,9 @@ defineExpose({ focus })
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-text-primary);
-  font-weight: 300;
+  font-weight: var(--font-weight-light);
   outline: none;
-  transition: border-color 160ms ease;
+  transition: border-color var(--transition-base);
 }
 
 .base-input::placeholder {

@@ -238,7 +238,7 @@ onBeforeUnmount(() => {
 
 .photo-upload-empty,
 .photo-preview {
-  min-height: 320px;
+  min-height: var(--surface-min-height-lg);
   border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-media);
   background: var(--color-surface-secondary);
@@ -255,14 +255,14 @@ onBeforeUnmount(() => {
 
 .photo-upload-empty strong {
   margin-top: var(--space-4);
-  font-size: 17px;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  line-height: var(--line-height-body);
 }
 
 .photo-upload-empty p {
   margin-top: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
 }
 
 .photo-upload-empty__icon {
@@ -346,8 +346,8 @@ onBeforeUnmount(() => {
 }
 
 .photo-preview__file strong {
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
 }
 
 .photo-preview__file span {
@@ -355,8 +355,8 @@ onBeforeUnmount(() => {
   overflow: hidden;
   margin-top: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -376,9 +376,9 @@ onBeforeUnmount(() => {
   margin-top: var(--space-3);
   background: var(--color-error-soft);
   color: var(--color-error);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-control);
 }
 
 @media (max-width: 720px) {

@@ -203,17 +203,17 @@ watch(
 
 .price-distribution__heading h2 {
   color: var(--color-text-primary);
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 24px;
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
 }
 
 .price-distribution__heading p {
   margin-top: var(--space-1);
   color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-snug);
 }
 
 .price-distribution__current-price {
@@ -224,11 +224,11 @@ watch(
   background: transparent;
   color: var(--color-text-secondary);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   font-variant-numeric: tabular-nums;
-  font-weight: 400;
+  font-weight: var(--font-weight-regular);
   letter-spacing: -0.01em;
-  line-height: 18px;
+  line-height: var(--line-height-snug);
   white-space: nowrap;
 }
 
@@ -253,10 +253,10 @@ watch(
   display: block;
   margin-bottom: var(--space-2);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  line-height: 16px;
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-xs);
 }
 
 .price-distribution__bar-track {
@@ -273,17 +273,17 @@ watch(
   border-radius: 0;
   background: var(--color-border-strong);
   transition:
-    height 180ms ease,
-    background-color 160ms ease;
+    height var(--transition-moderate),
+    background-color var(--transition-base);
 }
 
 .price-distribution__band-label {
   display: block;
   margin-top: var(--space-2);
   color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
   white-space: nowrap;
 }
 
@@ -311,7 +311,7 @@ watch(
 .price-distribution__column:focus-visible {
   border-radius: var(--radius-control);
   outline: 2px solid var(--color-primary);
-  outline-offset: 3px;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .price-distribution__products {
@@ -336,24 +336,24 @@ watch(
   display: block;
   margin-bottom: 2px;
   color: var(--color-primary);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 16px;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-xs);
 }
 
 .price-distribution__products-heading strong {
   display: block;
   color: var(--color-text-primary);
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 24px;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
 }
 
 .price-distribution__products-heading > span {
   color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
 }
 
 .price-distribution__product-list {
@@ -363,7 +363,7 @@ watch(
 .price-distribution__product {
   display: grid;
   width: 100%;
-  min-height: 44px;
+  min-height: var(--button-height-compact);
   grid-template-columns: minmax(0, 1fr) auto 18px;
   align-items: center;
   gap: var(--space-2);
@@ -374,8 +374,8 @@ watch(
   color: var(--color-text-primary);
   text-align: left;
   transition:
-    border-color 160ms ease,
-    color 160ms ease;
+    border-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .price-distribution__product + .price-distribution__product {
@@ -384,26 +384,26 @@ watch(
 
 .price-distribution__product > span {
   overflow: hidden;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .price-distribution__product > strong {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   letter-spacing: -0.02em;
-  line-height: 18px;
+  line-height: var(--line-height-snug);
   white-space: nowrap;
 }
 
 .price-distribution__product svg {
-  width: 18px;
-  height: 18px;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;

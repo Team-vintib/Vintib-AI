@@ -56,8 +56,8 @@ const getProfileRoute = () => ({ name: ROUTE_NAMES.PROFILE, params: { userId: pr
   border-radius: var(--radius-card);
   background: var(--color-surface);
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    border-color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .follow-user-item:hover {
@@ -100,21 +100,21 @@ const getProfileRoute = () => ({ name: ROUTE_NAMES.PROFILE, params: { userId: pr
 .follow-user-item__body strong {
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 18px;
-  line-height: 26px;
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-lg);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .follow-user-item__body span {
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
 }
 
 .follow-user-item__arrow {
   color: var(--color-text-muted);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   line-height: 1;
 }
 
