@@ -20,6 +20,7 @@ interface LiveRealtimeClientOptions {
 }
 
 const NULL = '\u0000'
+const HEARTBEAT_OUTGOING_MS = 10_000
 const LIVE_REALTIME_API_ENABLED =
   import.meta.env.VITE_LIVE_REALTIME_API_ENABLED === 'true' ||
   import.meta.env.VITE_LIVE_WATCH_API_ENABLED === 'true'
@@ -31,6 +32,7 @@ export class LiveRealtimeClient {
   private subscriptions = new Map<string, (body: unknown, frame: StompFrame) => void>()
   private receiveBuffer = ''
   private isConnected = false
+  private heartbeatTimer: number | null = null
 
   constructor(private readonly options: LiveRealtimeClientOptions = {}) {}
 
@@ -46,7 +48,7 @@ export class LiveRealtimeClient {
       const accessToken = getStoredAccessToken()
       const headers: StompHeaders = {
         'accept-version': '1.2',
-        'heart-beat': '0,0',
+        'heart-beat': `${HEARTBEAT_OUTGOING_MS},0`,
       }
 
       if (accessToken) {
@@ -61,6 +63,7 @@ export class LiveRealtimeClient {
     })
 
     socket.addEventListener('close', () => {
+      this.stopHeartbeat()
       this.isConnected = false
       this.options.onDisconnect?.()
     })
@@ -77,6 +80,7 @@ export class LiveRealtimeClient {
       this.sendFrame('DISCONNECT')
     }
 
+    this.stopHeartbeat()
     this.socket.close()
     this.socket = null
     this.subscriptions.clear()
@@ -130,6 +134,7 @@ export class LiveRealtimeClient {
 
       if (frame.command === 'CONNECTED') {
         this.isConnected = true
+        this.startHeartbeat()
         this.options.onConnect?.()
         return
       }
@@ -157,6 +162,24 @@ export class LiveRealtimeClient {
       ([key, value]) => `${key}:${escapeHeader(value)}`,
     )
     this.socket.send(`${command}\n${headerLines.join('\n')}\n\n${body}${NULL}`)
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat()
+    this.heartbeatTimer = window.setInterval(() => {
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        this.socket.send('\n')
+      }
+    }, HEARTBEAT_OUTGOING_MS)
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer === null) {
+      return
+    }
+
+    window.clearInterval(this.heartbeatTimer)
+    this.heartbeatTimer = null
   }
 }
 

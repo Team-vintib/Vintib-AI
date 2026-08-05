@@ -316,6 +316,7 @@ const updateViewerCount = (viewerCount: number) => {
   live.value = {
     ...live.value,
     currentViewerCount: viewerCount,
+    peakViewerCount: Math.max(live.value.peakViewerCount, viewerCount),
   }
 }
 

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { LIVE_AUCTION_MOCK_STATES } from '@/domains/auction/constants/liveAuctionMockData'
 import LiveAuctionPanel from '@/domains/auction/components/LiveAuctionPanel.vue'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import { issueLiveVideoToken } from '@/domains/live/api/liveControlApi'
 import { LiveRealtimeClient } from '@/domains/live/api/liveRealtimeClient'
@@ -19,6 +20,12 @@ import LiveSelectedProduct from '@/domains/live/components/LiveSelectedProduct.v
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchHeader from '@/domains/live/components/LiveWatchHeader.vue'
 import LiveWatchState from '@/domains/live/components/LiveWatchState.vue'
+import {
+  addWish,
+  getWishProductIds,
+  removeWish,
+} from '@/domains/product/api/productApi'
+import { useWishStore } from '@/domains/product/stores/wishStore'
 import { followUser, getPublicProfile, unfollowUser } from '@/domains/profile/api/profileApi'
 import { useFollowStore } from '@/domains/profile/stores/followStore'
 import LiveTryOnPanel from '@/domains/tryon/components/LiveTryOnPanel.vue'
@@ -49,6 +56,8 @@ const LIVE_WATCH_MOCK_SCENARIOS: LiveWatchMockScenario[] = [
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
+const wishStore = useWishStore()
 const live = ref<LiveWatchViewData | null>(null)
 const loadState = ref<LiveWatchLoadState>('loading')
 const errorMessage = ref('')
@@ -60,7 +69,8 @@ const isFollowingHost = computed(() =>
         .isFollowing
     : false,
 )
-const wishedProductIds = ref<number[]>([])
+const pendingWishProductId = ref<number | null>(null)
+const wishMessage = ref('')
 const isTryOnOpen = ref(false)
 const now = ref(Date.now())
 const videoConnectionLabel = ref('')
@@ -179,7 +189,7 @@ const isTryOnAvailable = computed(
 const isSelectedProductWished = computed(
   () =>
     selectedProductId.value !== null &&
-    wishedProductIds.value.includes(selectedProductId.value),
+    wishStore.isProductWished(selectedProductId.value),
 )
 
 const elapsedSeconds = computed(() => {
@@ -246,6 +256,7 @@ const loadLiveWatch = async () => {
     now.value = Date.now()
     loadState.value = 'success'
     void loadHostFollowState(response.hostId)
+    void loadProductWishState(response.products.map((product) => product.id))
 
     if (response.status === 'LIVE') {
       void loadVideoToken(response.id)
@@ -284,14 +295,55 @@ const goToProduct = (productId: number) => {
   })
 }
 
-const toggleWish = () => {
+const loadProductWishState = async (productIds: number[]) => {
+  wishStore.hydrateProducts(productIds.map((id) => ({ id, isWished: false })))
+
+  if (!authStore.isAuthenticated || !authStore.user?.id || productIds.length === 0) {
+    return
+  }
+
+  try {
+    const wishedProductIds = new Set(await getWishProductIds(authStore.user.id))
+    wishStore.hydrateWishedProductIds([...wishedProductIds])
+    wishStore.hydrateProducts(
+      productIds.map((id) => ({
+        id,
+        isWished: wishedProductIds.has(id),
+      })),
+    )
+  } catch {
+    wishMessage.value = '찜 상태를 불러오지 못했습니다.'
+  }
+}
+
+const toggleWish = async () => {
   const productId = selectedProductId.value
 
-  if (productId === null) return
+  if (productId === null || pendingWishProductId.value === productId) return
 
-  wishedProductIds.value = wishedProductIds.value.includes(productId)
-    ? wishedProductIds.value.filter((id) => id !== productId)
-    : [...wishedProductIds.value, productId]
+  if (!authStore.isAuthenticated || !authStore.user?.id) {
+    await router.push({ name: ROUTE_NAMES.AUTH_LOGIN })
+    return
+  }
+
+  const wasWished = wishStore.isProductWished(productId)
+
+  pendingWishProductId.value = productId
+  wishMessage.value = ''
+  wishStore.setProductWish(productId, !wasWished)
+
+  try {
+    if (wasWished) {
+      await removeWish(authStore.user.id, productId)
+    } else {
+      await addWish(authStore.user.id, productId)
+    }
+  } catch {
+    wishStore.setProductWish(productId, wasWished)
+    wishMessage.value = '찜 상태를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+  } finally {
+    pendingWishProductId.value = null
+  }
 }
 
 const openTryOn = () => {
@@ -306,6 +358,7 @@ const updateViewerCount = (viewerCount: number) => {
   live.value = {
     ...live.value,
     currentViewerCount: viewerCount,
+    peakViewerCount: Math.max(live.value.peakViewerCount, viewerCount),
   }
 }
 
@@ -402,6 +455,10 @@ watch(isTryOnAvailable, (isAvailable) => {
   if (!isAvailable) {
     isTryOnOpen.value = false
   }
+})
+
+watch(selectedProductId, () => {
+  wishMessage.value = ''
 })
 
 const elapsedTimer = window.setInterval(() => {
@@ -509,6 +566,8 @@ onBeforeUnmount(() => {
             <LiveSelectedProduct
               :product="selectedProduct"
               :is-wished="isSelectedProductWished"
+              :is-wish-pending="pendingWishProductId === selectedProductId"
+              :wish-message="wishMessage"
               @view-product="goToProduct"
               @toggle-wish="toggleWish"
             />

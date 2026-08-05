@@ -4,6 +4,8 @@ import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
 defineProps<{
   product: LiveWatchProduct | null
   isWished: boolean
+  isWishPending: boolean
+  wishMessage: string
 }>()
 
 defineEmits<{
@@ -60,14 +62,18 @@ defineEmits<{
             :class="{ 'live-selected-product__wish--active': isWished }"
             type="button"
             :aria-pressed="isWished"
+            :disabled="isWishPending"
             @click="$emit('toggleWish')"
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
+            <svg v-if="!isWishPending" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M20.3 5.7a5.1 5.1 0 0 0-7.2 0L12 6.8l-1.1-1.1a5.1 5.1 0 0 0-7.2 7.2L12 21l8.3-8.1a5.1 5.1 0 0 0 0-7.2Z" />
             </svg>
-            {{ isWished ? '찜함' : '찜' }}
+            {{ isWishPending ? '처리 중' : isWished ? '찜함' : '찜' }}
           </button>
         </div>
+        <p v-if="wishMessage" class="live-selected-product__wish-message" role="status">
+          {{ wishMessage }}
+        </p>
       </div>
     </div>
 
@@ -210,9 +216,23 @@ defineEmits<{
 }
 
 .live-selected-product__actions .live-selected-product__wish {
-  width: 37px;
+  width: auto;
+  min-width: 37px;
+  padding: 0 6px;
   gap: 5px;
   background: transparent;
+}
+
+.live-selected-product__actions .live-selected-product__wish:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.live-selected-product__wish-message {
+  margin-top: 5px;
+  color: var(--color-accent);
+  font-size: var(--font-size-badge);
+  line-height: var(--line-height-tight);
 }
 
 .live-selected-product__wish svg {
