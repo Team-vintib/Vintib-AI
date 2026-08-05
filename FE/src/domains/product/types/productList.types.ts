@@ -17,7 +17,7 @@ export interface ProductListItem {
   brand: string
   name: string
   price: number
-  conditionGrade: ProductConditionGrade
+  conditionGrade: ProductConditionGrade | ''
   saleType: ProductSaleType
   saleStatus?: ProductSaleStatus
   categoryId?: number | null
