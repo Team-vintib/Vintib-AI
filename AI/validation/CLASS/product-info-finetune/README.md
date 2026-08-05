@@ -309,6 +309,24 @@ python validation/CLASS/product-info-finetune/aihub_finetune_latency.py \
 그대로 따르되, 다른 스파이크 폴더의 모델 레지스트리는 안 건드리고 체크포인트를 곧바로
 불러와 쓴다.
 
+위 숫자는 전부 `torch.randn()` 랜덤 텐서로만 backbone forward를 잰 것 — 실제 병목인
+이미지 디코드+전처리가 빠져 있다. **정확한 사진 한 장 기준 end-to-end 숫자**가 필요하면
+`--sample-image`를 추가로 준다:
+
+```bash
+python validation/CLASS/product-info-finetune/aihub_finetune_latency.py \
+    --last-n-checkpoint .../artifacts_finetune/vit_last4_category_masked_lr1e-05/checkpoint.pt \
+    --unfreeze-layers 4 \
+    --lora-checkpoint .../artifacts_finetune/lora_r16_a32_d0.05_qv_color_masked_lr0.0001_warm/checkpoint.pt \
+    --r 16 --alpha 32 \
+    --sample-image ../product-info-check/inputs/apc.png
+```
+
+PIL 디코드 → `aihub_preprocess.render_variant()` 전처리 → `get_image_features()`까지
+전부 포함해서 원본/last-N/LoRA 각각의 end-to-end p50/p95를 재고, 두 모델을 다 주면
+디코드를 한 번만 하고 공유하는 **"두 모델 합산 end-to-end"** 숫자도 같이 낸다 — 실제
+배포에서 같은 이미지를 두 번 디코드할 이유가 없어서다.
+
 ## STEP 3.7 — (선택, 실험) LoRA 파인튜닝
 
 STEP 3.6(last-N 언프리즈)의 대안이다. last-N은 마지막 몇 개 블록을 **통째로** 학습하고,

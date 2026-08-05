@@ -11,12 +11,19 @@
 기본은 **CPU**로 잰다 — 원래 123ms 기준선도 CPU였고 실제 배포 기준도 CPU라 비교
 가능해야 한다(`--device cuda`로 바꿀 수는 있음).
 
+`--sample-image`를 주면 랜덤 텐서가 아니라 **실제 이미지 1장**으로 디코드(PIL)+전처리
+(`aihub_preprocess.render_variant`)+backbone forward를 전부 포함한 진짜 end-to-end
+지연시간도 잰다 — 이게 없으면 backbone forward(14~17ms)만 재고 실제 병목인 이미지
+디코드는 빠진 숫자다. 두 모델을 다 주면 디코드를 한 번만 하고 공유하는 "합산" 숫자도
+같이 나온다(실제 배포에서 같은 이미지를 두 번 디코드할 이유가 없어서).
+
 사용법:
     python aihub_finetune_latency.py \\
         --last-n-checkpoint artifacts_finetune/vit_last4_category_.../checkpoint.pt \\
         --unfreeze-layers 4 \\
         --lora-checkpoint artifacts_finetune/lora_r16_a32_..._warm/checkpoint.pt \\
-        --r 16 --alpha 32
+        --r 16 --alpha 32 \\
+        --sample-image ../product-info-check/inputs/apc.png
 """
 
 from __future__ import annotations
@@ -56,8 +63,8 @@ def compute_stats(latencies_ms: list[float]) -> dict[str, float]:
 def load_original(model_id: str, device: str) -> Any:
     import aihub_embed
 
-    model, _ = aihub_embed.load_model(model_id, device)
-    return model
+    model, processor = aihub_embed.load_model(model_id, device)
+    return model, processor
 
 
 def load_last_n(
@@ -164,6 +171,71 @@ def benchmark_threaded(
     return compute_stats(latencies)
 
 
+def benchmark_end_to_end(
+    model: Any, processor: Any, image_path: Path, device: str, *, warmup: int, iterations: int
+) -> dict[str, float]:
+    """실제 이미지 파일에서 **디코드 → 전처리 → backbone forward**까지 전부 포함해 잰다.
+
+    `benchmark_forward()`는 랜덤 텐서라 PIL 디코드가 빠져 있다 — 이 프로젝트에서 이미
+    확인했듯(STEP3) 진짜 병목은 그쪽이다. 헤드/zero-shot 마지막 단계(행렬곱 1회)는
+    무시할 수준이라 안 잰다.
+    """
+    import torch
+    from PIL import Image
+
+    import aihub_preprocess
+
+    def _once() -> float:
+        start = time.perf_counter()
+        with Image.open(image_path) as image:
+            prepared = aihub_preprocess.render_variant(image, None, "raw")
+        inputs = processor(images=[prepared], return_tensors="pt")
+        inputs = {key: value.to(device) for key, value in inputs.items()}
+        with torch.no_grad():
+            model.get_image_features(**inputs)
+        return (time.perf_counter() - start) * 1000
+
+    for _ in range(warmup):
+        _once()
+    latencies = [_once() for _ in range(iterations)]
+    return compute_stats(latencies)
+
+
+def benchmark_end_to_end_combined(
+    models: list[Any],
+    processor: Any,
+    image_path: Path,
+    device: str,
+    *,
+    warmup: int,
+    iterations: int,
+) -> dict[str, float]:
+    """디코드+전처리는 **한 번만** 하고(두 모델이 같은 처리된 텐서를 공유), 그 뒤 각
+    backbone forward만 순서대로 돌린다 — 실제 배포에서 이미지를 두 번 디코드할 이유가
+    없으니, 이게 "모델 두 개 배포"의 진짜 end-to-end 비용이다.
+    """
+    import torch
+    from PIL import Image
+
+    import aihub_preprocess
+
+    def _once() -> float:
+        start = time.perf_counter()
+        with Image.open(image_path) as image:
+            prepared = aihub_preprocess.render_variant(image, None, "raw")
+        inputs = processor(images=[prepared], return_tensors="pt")
+        inputs = {key: value.to(device) for key, value in inputs.items()}
+        with torch.no_grad():
+            for model in models:
+                model.get_image_features(**inputs)
+        return (time.perf_counter() - start) * 1000
+
+    for _ in range(warmup):
+        _once()
+    latencies = [_once() for _ in range(iterations)]
+    return compute_stats(latencies)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="last-N/LoRA 파인튜닝 backbone의 forward 지연시간을 원본과 비교 실측"
@@ -181,11 +253,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--warmup", type=int, default=DEFAULT_WARMUP)
     parser.add_argument("--iterations", type=int, default=DEFAULT_ITERATIONS)
+    parser.add_argument(
+        "--sample-image",
+        type=Path,
+        default=None,
+        help="실제 이미지 1장 경로 — 주면 디코드+전처리 포함 진짜 end-to-end 지연시간도 잰다",
+    )
     args = parser.parse_args(argv)
 
     print(f"device={args.device} warmup={args.warmup} iterations={args.iterations}\n")
 
-    original = load_original(args.model_id, args.device)
+    original, processor = load_original(args.model_id, args.device)
     original_stats = benchmark_forward(
         original, args.device, warmup=args.warmup, iterations=args.iterations
     )
@@ -195,6 +273,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     models_to_combine: list[Any] = []
+    labeled_models: list[tuple[str, Any]] = []
 
     if args.last_n_checkpoint is not None:
         last_n = load_last_n(
@@ -208,6 +287,7 @@ def main(argv: list[str] | None = None) -> int:
             f"p50={last_n_stats['p50']:.1f}ms p95={last_n_stats['p95']:.1f}ms"
         )
         models_to_combine.append(last_n)
+        labeled_models.append((f"last-N={args.unfreeze_layers}", last_n))
 
     if args.lora_checkpoint is not None:
         lora_model = load_lora(
@@ -227,6 +307,7 @@ def main(argv: list[str] | None = None) -> int:
             f"p50={lora_stats['p50']:.1f}ms p95={lora_stats['p95']:.1f}ms"
         )
         models_to_combine.append(lora_model)
+        labeled_models.append((f"LoRA r={args.r}", lora_model))
 
     if len(models_to_combine) == 2:
         seq_stats = benchmark_sequential(
@@ -256,6 +337,52 @@ def main(argv: list[str] | None = None) -> int:
             "\n(--last-n-checkpoint와 --lora-checkpoint를 둘 다 줘야 순차/스레드 비교가 나온다)",
             file=sys.stderr,
         )
+
+    if args.sample_image is not None:
+        print(f"\n--- end-to-end(실제 이미지 1장: {args.sample_image.name}) ---")
+
+        original_e2e = benchmark_end_to_end(
+            original,
+            processor,
+            args.sample_image,
+            args.device,
+            warmup=args.warmup,
+            iterations=args.iterations,
+        )
+        print(
+            f"원본(zero-shot) end-to-end     : "
+            f"p50={original_e2e['p50']:.1f}ms p95={original_e2e['p95']:.1f}ms"
+        )
+
+        for label, model in labeled_models:
+            model_e2e = benchmark_end_to_end(
+                model,
+                processor,
+                args.sample_image,
+                args.device,
+                warmup=args.warmup,
+                iterations=args.iterations,
+            )
+            print(
+                f"{label} end-to-end{' ' * max(0, 15 - len(label))}: "
+                f"p50={model_e2e['p50']:.1f}ms p95={model_e2e['p95']:.1f}ms"
+            )
+
+        if len(models_to_combine) == 2:
+            combined_e2e = benchmark_end_to_end_combined(
+                models_to_combine,
+                processor,
+                args.sample_image,
+                args.device,
+                warmup=args.warmup,
+                iterations=args.iterations,
+            )
+            print(
+                f"\n두 모델 합산 end-to-end(디코드 1회 공유): "
+                f"p50={combined_e2e['p50']:.1f}ms p95={combined_e2e['p95']:.1f}ms"
+            )
+            combined_verdict = "통과" if combined_e2e["p50"] <= LATENCY_BUDGET_MS else "초과"
+            print(f"(참고) 브리핑 §11 기준(≤{LATENCY_BUDGET_MS:.0f}ms) 대비: {combined_verdict}")
 
     return 0
 
