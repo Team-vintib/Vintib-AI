@@ -69,6 +69,49 @@ def test_apply_polo_head_only_intervenes_on_tshirt_shirt_confusion() -> None:
     assert (predicted, intervened) == ("TSHIRT", False)
 
 
+def test_restrict_candidates_keeps_only_allowed_codes_in_order() -> None:
+    codes = ["TSHIRT", "SHOES", "SHIRT", "BAG"]
+    text_embeddings = np.stack([_unit([1, 0]), _unit([0, 1]), _unit([1, 1]), _unit([2, 1])])
+    allowed = {"TSHIRT", "SHIRT"}  # 헤드가 카테고리 헤드가 아는 클래스라고 가정
+
+    restricted_codes, restricted_embeddings = ae.restrict_candidates(
+        codes, text_embeddings, allowed
+    )
+
+    assert restricted_codes == ["TSHIRT", "SHIRT"]
+    assert np.array_equal(restricted_embeddings, text_embeddings[[0, 2]])
+
+
+def test_restricting_candidates_can_flip_zero_shot_top1() -> None:
+    """미커버 클래스(SHOES)가 후보에 있으면 그쪽으로 새던 예측이, 헤드가 아는 클래스로만
+    후보를 제한하면 원래 정답(SHIRT)으로 돌아와야 한다 — 카테고리 zero-shot 기준선이
+    35종 전체 후보 때문에 구조적으로 불리했다는 걸 보여주는 핵심 동작.
+
+    각도로 배치한다: TSHIRT=0°, SHOES=20°, SHIRT=30°, 이미지=22°. 이미지는 SHOES에 가장
+    가깝지만(2° 차이) SHIRT가 진짜 정답이라고 가정한다(TSHIRT/SHIRT 혼동쌍처럼).
+    """
+    import math
+
+    def _angle(degrees: float) -> np.ndarray:
+        radians = math.radians(degrees)
+        return np.array([math.cos(radians), math.sin(radians)], dtype="float32")
+
+    codes = ["TSHIRT", "SHOES", "SHIRT"]
+    text_embeddings = np.stack([_angle(0), _angle(20), _angle(30)])
+    image_embeddings = np.stack([_angle(22)])
+
+    full_labels = ae.zero_shot_labels_for_embeddings(image_embeddings, text_embeddings, codes)
+    assert full_labels == ["SHOES"]  # 35종 전체 후보였다면 이렇게 샜을 상황
+
+    restricted_codes, restricted_embeddings = ae.restrict_candidates(
+        codes, text_embeddings, {"TSHIRT", "SHIRT"}
+    )
+    restricted_labels = ae.zero_shot_labels_for_embeddings(
+        image_embeddings, restricted_embeddings, restricted_codes
+    )
+    assert restricted_labels == ["SHIRT"]  # 헤드가 아는 후보로만 제한하면 정답으로 돌아온다
+
+
 def test_zero_shot_accuracy_matches_manual_count() -> None:
     """evaluate_holdout()의 zero-shot 비교 줄이 하는 계산을 축소 재현한다."""
     codes = ["BLACK", "WHITE"]

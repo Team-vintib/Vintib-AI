@@ -80,6 +80,19 @@ def zero_shot(
     return ranked
 
 
+def restrict_candidates(
+    codes: list[str], text_embeddings: Any, allowed: set[str]
+) -> tuple[list[str], Any]:
+    """`codes`/`text_embeddings`를 `allowed`에 속하는 것만 남긴다(순서는 `codes` 순서 유지).
+
+    카테고리 헤드는 AI-Hub가 덮는 클래스만 알아서, zero-shot을 35종 전체 후보로 두고
+    비교하면 헤드가 구조적으로 유리해진다(헤드는 애초에 나머지를 후보에 못 넣는다).
+    같은 후보 풀로 맞춰야 "헤드가 진짜 더 나은가"를 공정하게 비교할 수 있다.
+    """
+    keep = [i for i, code in enumerate(codes) if code in allowed]
+    return [codes[i] for i in keep], text_embeddings[keep]
+
+
 def zero_shot_labels_for_embeddings(x: Any, text_embeddings: Any, codes: list[str]) -> list[str]:
     """캐시된 이미지 임베딩에 대해 zero-shot top-1 라벨만 뽑는다.
 
@@ -178,9 +191,29 @@ def evaluate_holdout(
             zs_accuracy = zs_correct / len(truth)
             delta = result["accuracy"] - zs_accuracy
             lines.append(
-                f"  ↳ zero-shot 기준선: accuracy={zs_accuracy:.4f}  "
+                f"  ↳ zero-shot 기준선(전체 {len(codes)}종 후보): accuracy={zs_accuracy:.4f}  "
                 f"(헤드 대비 {delta:+.4f}p, 같은 {len(truth):,}건)"
             )
+
+            # 카테고리 헤드는 AI-Hub가 덮는 클래스만 배워서, 애초에 나머지(신발·가방 등)를
+            # 후보에 넣지도 못한다. 위 zero-shot은 35종 전체를 놓고 고르니 후보 풀이 더 넓어
+            # 구조적으로 불리하다 — "헤드가 진짜 더 똑똑한가, 아니면 후보가 더 좁아서 이긴
+            # 것뿐인가"를 가르려면 같은 후보 풀로도 봐야 한다.
+            head_classes = set(getattr(model, "classes_", ()))
+            if head_classes and head_classes != set(codes):
+                restricted_codes, restricted_embeddings = restrict_candidates(
+                    codes, text_embeddings, head_classes
+                )
+                restricted_labels = zero_shot_labels_for_embeddings(
+                    x, restricted_embeddings, restricted_codes
+                )
+                restricted_correct = sum(a == b for a, b in zip(restricted_labels, truth))
+                restricted_accuracy = restricted_correct / len(truth)
+                restricted_delta = result["accuracy"] - restricted_accuracy
+                lines.append(
+                    f"  ↳ zero-shot 기준선(헤드와 동일 {len(restricted_codes)}종 후보로 제한): "
+                    f"accuracy={restricted_accuracy:.4f}  (헤드 대비 {restricted_delta:+.4f}p)"
+                )
 
         # 소스별로 쪼개 본다 — 액세서리를 섞었을 때 의류 성능이 깎이지 않았는지 확인.
         by_source: dict[str, list[int]] = {}
