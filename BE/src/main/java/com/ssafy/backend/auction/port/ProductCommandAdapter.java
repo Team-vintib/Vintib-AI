@@ -20,4 +20,9 @@ public class ProductCommandAdapter implements ProductCommandPort {
     public int markAuctionInProgress(Long productId) {
         return productSaleStatusRepository.updateSaleStatus(productId, SaleStatus.AUCTION_IN_PROGRESS);
     }
+
+    @Override
+    public int markSold(Long productId) {
+        return productSaleStatusRepository.updateSaleStatus(productId, SaleStatus.SOLD);
+    }
 }

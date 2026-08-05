@@ -27,4 +27,14 @@ public interface ProductCommandPort {
      * @return 실제로 바뀐 상품 수
      */
     int markAuctionInProgress(Long productId);
+
+    /**
+     * 낙찰돼 팔렸다고 표시한다(AUCT-012).
+     *
+     * <p>이게 빠지면 <b>같은 물건을 또 팔 수 있다</b> — 낙찰자만 기록되고 상품은 계속
+     * {@code AUCTION_IN_PROGRESS}에 남아 다음 방송에서 다시 경매에 걸린다.
+     *
+     * @return 실제로 바뀐 상품 수
+     */
+    int markSold(Long productId);
 }
