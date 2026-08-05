@@ -1,22 +1,21 @@
-"""반복질문 경로 — 질문 판별(B-1) / 클러스터링(B-2) / 근거 검색(B-3) / 백엔드 스왑.
+"""반복질문 경로 — 질문 판별(B-1) / 클러스터링(B-2) / 근거 검색(B-3, 평가 전용) / 백엔드 스왑.
 
 목업 임베더는 결정적이라 유사도 값이 고정된다. 아래 임계치 분리 테스트가
 `registry.EMBEDDER_BACKENDS["mock_bigram"]` 값의 근거를 코드로 붙잡아 둔다 — 목업 데이터를
 고치다 분리가 깨지면 여기서 먼저 터진다.
+
+`Retriever`/`MockRetriever`는 이제 프로덕션이 아니라 평가 파이프라인 전용이다(`app/chat/faq.py`
+모듈 docstring 참고) — 실제 반복질문 답변은 `chat_rag` 워커가 만든다.
 """
 
 import pytest
 
 from app.chat import registry
 from app.chat.faq import (
-    KananaAnswerGenerator,
     KnowledgeBaseNotReady,
     MockRetriever,
-    PgvectorRetriever,
     QuestionClusterer,
     QuestionDetector,
-    TemplateAnswerGenerator,
-    build_generator,
     build_retriever,
     cosine,
     embed,
@@ -153,27 +152,10 @@ def test_retriever_reports_empty_knowledge_base(tmp_path):
 
 def test_default_backends_need_no_model():
     assert isinstance(build_retriever(), MockRetriever)
-    assert isinstance(build_generator(), TemplateAnswerGenerator)
-
-
-def test_rag_backends_are_declared_but_not_implemented():
-    # RAG 실구현을 비워 둔 자리 — 인터페이스는 있고 호출하면 명확히 실패한다.
-    with pytest.raises(NotImplementedError):
-        PgvectorRetriever().search("질문", 1)
-    with pytest.raises(NotImplementedError):
-        KananaAnswerGenerator().generate("질문", [])
 
 
 def test_unknown_backends_fail_fast():
     with pytest.raises(ValueError, match="등록되지 않은 retriever"):
         build_retriever("faiss")
-    with pytest.raises(ValueError, match="등록되지 않은 generator"):
-        build_generator("gpt")
     with pytest.raises(ValueError, match="등록되지 않은 임베더"):
         registry.embedder_config("word2vec")
-
-
-def test_template_generator_returns_evidence_verbatim():
-    # 생성이 없으니 환각도 없다 — 근거 문서의 답변을 그대로 돌려준다.
-    docs = MockRetriever().search("배송은 얼마나 걸리나요?", 3)
-    assert TemplateAnswerGenerator().generate("배송은 얼마나 걸리나요?", docs) == docs[0].answer

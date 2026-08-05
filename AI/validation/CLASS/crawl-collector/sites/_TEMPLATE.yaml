@@ -1,0 +1,76 @@
+# 사이트 스펙 템플릿 — 새 쇼핑몰을 추가할 때 이 파일을 복사해서 채운다.
+#
+# 작성 순서(권장):
+#   1. 브라우저 개발자도구로 목록 페이지에서 상품 카드 하나를 잡는 셀렉터(item_selector)를 찾는다.
+#   2. `python crawl.py --spec sites/<내파일>.yaml --url "<목록URL>" --limit 3 --dry-run`
+#      으로 몇 건이 잡히는지 본다. 0건이면 SPA일 가능성이 크다 → render: playwright.
+#   3. 출력의 [원본 카테고리] 문자열을 보고 category_map을 채운다.
+#      `python crawl.py --map-only "<그 문자열>"` 로 키워드 규칙이 이미 맞히는지 먼저 확인 —
+#      맞히면 category_map에 넣을 필요가 없다.
+
+# 필수. 수집 행의 source_site로 기록된다.
+site: my-mall
+
+# static: httpx로 HTML만 받는다(빠름). playwright: 헤드리스 브라우저로 렌더(JS 쇼핑몰).
+render: static
+
+# true면 목록에서 링크만 모아 상세 페이지를 연다(정확하지만 요청이 상품 수만큼 늘어난다).
+# false면 목록 카드 안에서 이미지·이름·카테고리를 바로 뽑는다(권장 — 훨씬 예의 바르다).
+follow_detail: false
+
+# worn / flat / hanging 중 하나. 사이트 사진이 대체로 한 유형이면 여기 선언해 두고,
+# 아니면 비워 두고 나중에 사람이 라벨링한다(브리핑 §4.2 도메인 갭 평가에 필요).
+shot_type_default: flat
+
+# 요청 간 지연(초). 낮추지 말 것.
+delay_seconds: 1.5
+
+listing:
+  # 상품 카드 하나를 감싸는 요소.
+  item_selector: "li.product-item"
+  # follow_detail: true일 때 필요 — 카드 안의 상세 링크.
+  link_selector: "a.product-link"
+  # follow_detail: false일 때 필요 — 카드 안의 썸네일.
+  image_selector: "img.thumb"
+  # 비워 두면 src → data-src → data-original → srcset 순으로 알아서 찾는다.
+  image_attr: ""
+  name_selector: ".product-name"
+  # 목록 URL 자체가 카테고리인 경우(가장 흔하다) 그 카테고리를 고정 문자열로 적는다.
+  category: "아우터 > 자켓"
+  # 또는 카드 안에 카테고리 표기가 있으면 셀렉터로.
+  # category_selector: ".category-label"
+  # 카테고리가 URL로만 구분되면(대부분의 SPA) 이 목록을 쓴다 — 스펙 하나로 여러 카테고리를
+  # 순회한다. 실사용 예는 sites/bunjang.yaml 참고.
+  # category_urls:
+  #   - url: "https://example.com/categories/1001"
+  #     category: "아우터 > 코트"
+  # 페이지네이션. {page}가 page_start부터 채워진다. 없으면 --url 한 장만 본다.
+  page_url_template: "https://example.com/category/outer/jacket?page={page}"
+  page_start: 1
+  max_pages: 3
+  # render: playwright일 때만 의미 있다.
+  scroll_times: 0
+  wait_selector: ""
+
+# follow_detail: true일 때만 필요.
+detail:
+  image_selector: "img.main-image"
+  image_attr: ""
+  name_selector: "h1.product-title"
+  # breadcrumb처럼 여러 노드로 나뉜 카테고리는 전부 모아 " > "로 잇는다.
+  category_selector: "nav.breadcrumb li"
+  category_join: " > "
+  # 색상 옵션 텍스트(색상 힌트 추출용, 선택).
+  option_selector: ".option-color li"
+  wait_selector: ""
+
+# 사이트 카테고리 트리를 조사해서 확정한 것만 적는다(정확 일치, 신뢰도 1.0).
+# 여기 없는 값은 mapping_rules.py의 공용 키워드 규칙이 처리하고, 그것도 실패하면
+# unmapped.jsonl로 빠진다 — 임의로 비슷한 코드에 욱여넣지 않는다(브리핑 §5.5).
+category_map:
+  "아우터 > 자켓 > 블루종": JACKET
+  "상의 > 니트/스웨터": KNIT
+
+notes: |
+  이 사이트의 특이사항을 적어 둔다(예: "니트와 맨투맨을 한 카테고리로 묶어서 KNIT로만
+  매핑하면 안 됨 — 검수 필요").

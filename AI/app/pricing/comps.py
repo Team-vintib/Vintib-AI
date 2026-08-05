@@ -1,0 +1,327 @@
+"""슬롯 B — 비교 매물(comps) 수집.
+
+`validation/PRICE/pricing-model-check/comps_sources.py`의 프로덕션판. 백엔드가 달라도 결과가 같은
+`CompItem` 목록으로 정규화되므로, 가격 산정기는 출처를 몰라도 된다.
+
+**"시세를 못 찾았다"는 예외가 아니다.** comps 0건·파싱 실패·검색 미호출은 전부 빈 목록 +
+`reason`으로 돌려준다. 예외(`CompsUnavailable`)는 키 부재·인증 실패·타임아웃 같은 **인프라
+오류**에만 쓴다. 이 구분이 job 상태(success / failed)를 가르고, BE의 재시도 여부를 가른다 —
+근거 부족을 실패로 만들면 BE가 재시도 루프를 돌고 그대로 과금된다.
+
+설계: .claude/plans/ai/CH003-pricing-service-prototype.md
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+
+from app.core.config import settings
+from app.pricing import registry
+from app.pricing.schemas import CompItem, GarmentCategory, ReasonCode
+
+__all__ = [
+    "CompsFetch",
+    "CompsSource",
+    "CompsUnavailable",
+    "LlmWebSearchCompsSource",
+    "MockCompsSource",
+    "build_comps_source",
+    "build_query",
+]
+
+# 카테고리를 쿼리에 붙일 때 쓰는 한국어 표기. enum 값을 그대로 넣으면 검색이 안 된다.
+_CATEGORY_TERMS: dict[GarmentCategory, str] = {
+    GarmentCategory.top_knit: "니트",
+    GarmentCategory.top_shirt: "셔츠",
+    GarmentCategory.outer_jacket: "자켓",
+    GarmentCategory.outer_coat: "코트",
+    GarmentCategory.bottom_pants: "팬츠",
+    GarmentCategory.bottom_skirt: "스커트",
+}
+
+_MOCK_PRICE_RATIOS = (0.82, 0.95, 1.0, 1.12, 1.31)
+
+
+class CompsUnavailable(RuntimeError):
+    """comps를 **수집할 수 없는** 상태. 키 부재·인증 실패·타임아웃 등 인프라 오류 전용.
+
+    근거 부족(0건)은 여기 해당하지 않는다 — 그건 정상 결과이고 `CompsFetch.reason`으로 표현한다.
+    """
+
+
+@dataclass(frozen=True)
+class CompsFetch:
+    """수집 결과 + 왜 비었는지."""
+
+    items: list[CompItem]
+    notes: list[str] = field(default_factory=list)
+    reason: ReasonCode | None = None  # 비어 있을 때의 사유. 채워졌으면 None
+    # CH017 진단 필드. BE 계약(`PricingResult`)이 아니라 서비스 내부 로깅·관측 로그용이다 —
+    # 응답 스키마에 노출하려면 별도 승인이 필요하다.
+    finish_reason: str | None = None  # Gemini candidates[0].finishReason. 네트워크 미접촉이면 None
+    truncated: bool = False  # finish_reason이 MAX_TOKENS라 부분 복구했으면 True
+
+
+def build_query(
+    product_name: str, brand: str | None = None, category: GarmentCategory | None = None
+) -> str:
+    """상품명 + 브랜드 + 카테고리를 검색 쿼리 한 줄로 합친다.
+
+    중복 토큰은 넣지 않는다 — 상품명에 이미 브랜드가 들어 있는 경우가 흔하다.
+    """
+    parts = [product_name.strip()]
+    lowered = product_name.lower()
+    if brand and brand.strip() and brand.strip().lower() not in lowered:
+        parts.insert(0, brand.strip())
+    if category is not None:
+        term = _CATEGORY_TERMS.get(category, "")
+        if term and term not in product_name:
+            parts.append(term)
+    return " ".join(p for p in parts if p)
+
+
+class CompsSource(ABC):
+    """comps 수집기 인터페이스. **모델 교체는 이 구현체를 갈아끼우는 것으로 끝난다.**"""
+
+    key: str
+
+    @abstractmethod
+    def fetch(self, query: str) -> CompsFetch:
+        """쿼리로 비교 매물을 모은다. 인프라 오류면 `CompsUnavailable`."""
+        raise NotImplementedError
+
+
+class MockCompsSource(CompsSource):
+    """키 없이 전 경로를 돌리기 위한 결정적 매물 생성기.
+
+    `hash()`가 아니라 sha256을 쓴다 — 파이썬의 문자열 해시는 프로세스마다 시드가 달라
+    `hash()` 기반이면 실행할 때마다 값이 바뀐다(`validation/` 쪽 구현의 알려진 결함).
+    """
+
+    key = "mock"
+
+    def fetch(self, query: str) -> CompsFetch:
+        digest = hashlib.sha256(query.encode("utf-8")).digest()
+        base = 40_000 + int.from_bytes(digest[:4], "big") % 60_000
+        items = [
+            CompItem(
+                title=f"{query} 중고 매물 {index + 1}",
+                price=int(base * ratio),
+                source=self.key,
+                is_used=True,
+            )
+            for index, ratio in enumerate(_MOCK_PRICE_RATIOS)
+        ]
+        return CompsFetch(items=items, notes=["목업 매물입니다 — 실제 시세가 아닙니다."])
+
+
+class LlmWebSearchCompsSource(CompsSource):
+    """LLM 웹검색(Gemini `google_search` 그라운딩)으로 중고 매물을 모은다.
+
+    2026-07-31부로 Claude(Anthropic Messages API)에서 Gemini(`generateContent`)로
+    전환했다 — GMS가 그라운딩을 통과시키는 것은 LAB-47(웹검색 테스트) V1에서 확인됐다.
+    Anthropic 쪽처럼 날짜 버저닝된 툴 규격 폴백이 없다 — `google_search` 선언 하나로
+    끝이라 규격 폴백 루프가 필요 없다.
+
+    ⚠️ **호출마다 과금된다.** 검색 라운드당 비용 + 결과 본문이 입력 토큰으로 들어온다.
+    """
+
+    key = "llm_web_search"
+
+    def __init__(self, config: registry.CompsSourceConfig | None = None) -> None:
+        self._config = config or registry.comps_config(self.key)
+
+    def fetch(self, query: str) -> CompsFetch:
+        # 키 확인을 build가 아니라 fetch에서 하는 이유: 서비스 조립은 @lru_cache라
+        # build 시점에 던지면 잘못 설정된 컨테이너가 모든 요청에 500을 뱉는다.
+        # 여기서 던지면 job result의 error로 내려가 BE가 원인을 본다.
+        api_key = settings.gms_api_key.strip()
+        if not api_key:
+            raise CompsUnavailable("GMS_API_KEY가 설정되지 않았습니다")
+
+        from app.pricing import gms
+
+        model = self._config["model_id"] or ""
+        try:
+            response = gms.generate_content(
+                api_key=api_key,
+                model=model,
+                prompt=_comps_prompt(query),
+                timeout=self._config["timeout_seconds"],
+                max_output_tokens=self._config["max_output_tokens"],
+            )
+        except gms.GmsError as exc:
+            raise CompsUnavailable(str(exc)) from exc
+        return self._parse(response)
+
+    def _parse(self, response: dict) -> CompsFetch:
+        candidates = response.get("candidates") or []
+        if not candidates:
+            return CompsFetch(
+                items=[],
+                notes=["응답에 candidates가 없습니다."],
+                reason=ReasonCode.no_search_performed,
+            )
+
+        finish_reason = candidates[0].get("finishReason") or None
+
+        grounding = candidates[0].get("groundingMetadata") or {}
+        searched = bool(grounding.get("groundingChunks") or grounding.get("webSearchQueries"))
+        if not searched:
+            # 그라운딩이 안 일어났다 — 검색 없이 지어낸 가격일 수 있으므로 응답을 통째로
+            # 버린다. 근거 없는 시세가 comps로 섞이는 것이 최악이다.
+            return CompsFetch(
+                items=[],
+                notes=["모델이 웹검색을 수행하지 않아 응답을 사용하지 않았습니다."],
+                reason=ReasonCode.no_search_performed,
+                finish_reason=finish_reason,
+            )
+
+        parts = candidates[0].get("content", {}).get("parts", [])
+        text = "".join(p.get("text", "") for p in parts)
+        rows, truncated = _extract_json_array_lenient(text)
+        if not rows:
+            return CompsFetch(
+                items=[],
+                notes=["검색 결과를 구조화하지 못했습니다."],
+                reason=ReasonCode.parse_failed,
+                finish_reason=finish_reason,
+            )
+
+        items = _rows_to_items(rows, self.key)[: self._config["max_comps"]]
+        if not items:
+            return CompsFetch(
+                items=[],
+                notes=["가격을 확인할 수 있는 매물이 없었습니다."],
+                reason=ReasonCode.insufficient_comps,
+                finish_reason=finish_reason,
+            )
+        notes = ["응답이 도중에 잘려 완결된 매물만 사용했습니다."] if truncated else []
+        return CompsFetch(
+            items=items, notes=notes, finish_reason=finish_reason, truncated=truncated
+        )
+
+
+def build_comps_source(key: str | None = None) -> CompsSource:
+    """활성 comps 백엔드 구현체를 만든다."""
+    resolved = key or registry.ACTIVE_COMPS_SOURCE
+    if resolved == "mock":
+        return MockCompsSource()
+    if resolved == "llm_web_search":
+        return LlmWebSearchCompsSource()
+    raise ValueError(f"등록되지 않은 comps 백엔드입니다: {resolved!r}")
+
+
+# --- 파싱 (네트워크 없이 테스트되는 순수 함수들) ------------------------------
+
+
+def _comps_prompt(query: str) -> str:
+    return (
+        f"'{query}' 의 **중고** 거래 시세를 웹에서 검색해라. "
+        "후르츠패밀리·번개장터·중고나라 등 중고 거래 매물을 우선한다.\n"
+        "찾은 매물을 JSON 배열로만 답해라. 설명 문장은 쓰지 마라.\n"
+        '형식: [{"title": "상품명", "price": 숫자(원, 쉼표 없이), "url": "링크", '
+        '"listed_at": "YYYY-MM-DD 또는 빈 문자열", "is_used": true/false}]\n'
+        "가격을 확인할 수 없는 매물은 넣지 마라. 추측한 가격도 넣지 마라."
+    )
+
+
+def _extract_json_array(text: str) -> list[dict]:
+    """응답에서 첫 JSON 배열을 관대하게 건져낸다.
+
+    structured output(`output_config.format`)을 쓰지 않는 이유: GMS 프록시가 그 파라미터를
+    통과시키는지 미확인이고, 거기서 400이 나면 원인 파악이 어려워진다. 파싱 실패는 그 자체를
+    `PARSE_FAILED`로 노출한다.
+    """
+    start = text.find("[")
+    end = text.rfind("]")
+    if start == -1 or end <= start:
+        return []
+    try:
+        parsed = json.loads(text[start : end + 1])
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [row for row in parsed if isinstance(row, dict)]
+
+
+def _extract_json_array_lenient(text: str) -> tuple[list[dict], bool]:
+    """`_extract_json_array()`가 실패하면 완결된 객체만이라도 건진다(CH017 B2).
+
+    응답이 `maxOutputTokens`에 걸려 잘리면 배열이 `]`로 안 끝나 `_extract_json_array()`가
+    통째로 빈 리스트를 돌려준다. 그런데 잘린 건 보통 마지막 객체뿐이고 앞쪽은 완결돼 있다 —
+    중괄호 짝이 맞는 조각만 하나씩 파싱해서 살린다. 둘째 반환값은 이 부분 복구 경로를
+    탔는지(=응답이 잘렸다고 볼 수 있는지)다.
+    """
+    strict = _extract_json_array(text)
+    if strict:
+        return strict, False
+    return _salvage_json_objects(text), True
+
+
+def _salvage_json_objects(text: str) -> list[dict]:
+    """중괄호 짝이 맞는 `{...}` 조각만 개별적으로 파싱한다. 짝이 안 맞는 마지막 조각(잘린
+    부분)은 짝이 끝까지 맞지 않으므로 자연히 버려진다."""
+    rows: list[dict] = []
+    depth = 0
+    start: int | None = None
+    for index, char in enumerate(text):
+        if char == "{":
+            if depth == 0:
+                start = index
+            depth += 1
+        elif char == "}":
+            if depth == 0:
+                continue
+            depth -= 1
+            if depth == 0 and start is not None:
+                chunk = text[start : index + 1]
+                start = None
+                try:
+                    parsed = json.loads(chunk)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(parsed, dict):
+                    rows.append(parsed)
+    return rows
+
+
+def _rows_to_items(rows: list[dict], source: str) -> list[CompItem]:
+    """LLM이 준 dict 목록을 `CompItem`으로. 가격을 못 읽는 행은 버린다."""
+    items: list[CompItem] = []
+    for row in rows:
+        price = _coerce_price(row.get("price"))
+        if price is None or price <= 0:
+            continue
+        raw_used = row.get("is_used")
+        items.append(
+            CompItem(
+                title=str(row.get("title", ""))[:200],
+                price=price,
+                source=source,
+                url=str(row.get("url", "") or ""),
+                listed_at=str(row.get("listed_at", "") or ""),
+                # bool이 아니면 None — 판별 불가를 False로 뭉개면 신품과 구별이 사라진다.
+                is_used=raw_used if isinstance(raw_used, bool) else None,
+            )
+        )
+    return items
+
+
+def _coerce_price(value: object) -> int | None:
+    """`45000` / `"45,000원"` / `45000.0` 을 정수 원 단위로."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        digits = re.sub(r"[^0-9]", "", value)
+        return int(digits) if digits else None
+    return None

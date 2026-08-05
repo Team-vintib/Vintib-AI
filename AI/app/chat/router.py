@@ -18,12 +18,7 @@ from app.chat.schemas import (
     ModerateRequest,
     ModerateResponse,
 )
-from app.chat.service import (
-    AnswerNotFound,
-    ChatModerationService,
-    KnowledgeBaseNotReady,
-    get_chat_service,
-)
+from app.chat.service import AnswerNotFound, ChatModerationService, get_chat_service
 
 router = APIRouter()
 
@@ -46,13 +41,7 @@ def list_live_answers(
     since: datetime | None = Query(None, description="이 시각 이후 생성된 답변만"),
     service: ChatModerationService = Depends(get_chat_service),
 ) -> AnswerListResponse:
-    try:
-        return service.list_answers(live_id, since)
-    except KnowledgeBaseNotReady as exc:
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "faq knowledge base not ready",
-        ) from exc
+    return service.list_answers(live_id, since)
 
 
 @router.get("/answers/{ticket}", response_model=FaqAnswer)

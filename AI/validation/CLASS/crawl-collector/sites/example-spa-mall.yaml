@@ -1,0 +1,39 @@
+# 예시 2 — JS로 상품을 그리는 SPA 쇼핑몰(무신사·지그재그·번개장터류), 상세 페이지까지 여는 구성.
+#
+# ⚠️ 구조 설명용 예시다. 실제 사이트 DOM으로 검증되지 않았다.
+#
+# 정적 파싱으로 0건이 나오면 이 형태로 바꾼다. 대가가 크다는 걸 알고 쓸 것:
+#   - 헤드리스 브라우저라 페이지당 수 초가 걸린다.
+#   - follow_detail: true는 상품 1건마다 요청이 한 번 더 나간다. delay를 더 늘려 잡았다.
+
+site: example-spa-mall
+render: playwright
+follow_detail: true
+# 중고 플랫폼처럼 판매자가 직접 찍은 사진이면 flat/hanging이 섞인다 — 단정하지 말고 비워 두고
+# 사후 라벨링한다(브리핑 §4.2의 도메인 갭을 평가로 확인하려면 이 필드가 정확해야 한다).
+shot_type_default: null
+delay_seconds: 2.5
+
+listing:
+  item_selector: "div[data-testid='product-card']"
+  link_selector: "a"
+  # 상품이 스크롤로 더 붙는 무한스크롤 목록.
+  scroll_times: 5
+  # 이 셀렉터가 보일 때까지 기다린 뒤 HTML을 뜬다 — 없으면 빈 페이지를 파싱하게 된다.
+  wait_selector: "div[data-testid='product-card']"
+  page_url_template: "https://example-spa-mall.com/search?category=outer&page={page}"
+  max_pages: 2
+
+detail:
+  image_selector: "img[data-role='main-image']"
+  name_selector: "h1"
+  category_selector: "nav[aria-label='breadcrumb'] a"
+  category_join: " > "
+  option_selector: "ul.color-option li"
+  wait_selector: "img[data-role='main-image']"
+
+category_map: {}
+
+notes: |
+  breadcrumb이 "홈 > 아우터 > 자켓 > 블루종"처럼 앞에 "홈"이 붙는 사이트가 많다.
+  매핑 엔진은 경로를 깊은 세그먼트부터 보므로 "홈"은 자연히 무시된다 — 굳이 제거하지 않아도 된다.

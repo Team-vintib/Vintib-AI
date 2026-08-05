@@ -1,8 +1,11 @@
-"""반복질문 경로 — 질문 판별(B-1) / 유사질문 클러스터링(B-2) / RAG 검색·생성(B-3).
+"""반복질문 경로 — 질문 판별(B-1) / 유사질문 클러스터링(B-2) / RAG 검색(B-3, 평가 전용).
 
-**RAG 실구현은 의도적으로 비워 뒀다.** `Retriever`/`AnswerGenerator` 인터페이스와 목업 구현만
-두고, pgvector 검색(-184)과 생성 LLM은 스텁이다. 실구현으로 바꿀 때 건드릴 곳은
-`registry.ACTIVE_RETRIEVER` / `ACTIVE_GENERATOR` 키뿐이다.
+**`Retriever`는 이제 프로덕션이 아니라 평가 파이프라인(`app/chat/evaluation.py`,
+`test/chat/test_chat_evaluation.py`, `S15P11A108-196`) 전용이다.** 실제 반복질문 답변 생성은
+`chat_rag` 워커 job(`worker/chat_rag_worker_example.py`)이 `app/chat/rag_store.py`로 가져온
+후보 문서를 그 안에서 직접 임베딩·랭킹·생성까지 처리한다(`S15P11A108-444`) — 검색·그라운딩
+판단·생성을 왕복 1회로 합치기 위해서다. `Retriever`/`MockRetriever`는 클러스터링·그라운딩
+임계치를 오프라인으로 검증할 때만 쓰인다.
 
 임베딩은 문자 bigram을 해싱해 만든 **결정적 벡터**다(torch 불필요 — 서빙 경로는 경량 의존성만,
 CI에서 클러스터링·검색 테스트가 그대로 돈다). 같은 착상을
@@ -161,7 +164,7 @@ class RetrievedDoc:
 
 
 class Retriever(ABC):
-    """질문으로 근거 문서를 찾는 인터페이스. 실구현은 pgvector(-184)로 교체된다."""
+    """질문으로 근거 문서를 찾는 인터페이스. 평가 파이프라인 전용(모듈 docstring 참고)."""
 
     @abstractmethod
     def search(self, query: str, top_k: int) -> list[RetrievedDoc]:
@@ -170,10 +173,7 @@ class Retriever(ABC):
 
 
 class MockRetriever(Retriever):
-    """목업 FAQ JSON + 결정적 bigram 임베딩 코사인 검색.
-
-    pgvector로 바꿔도 인터페이스가 같으므로 상위 로직(그라운딩 게이트·생성)은 그대로 쓴다.
-    """
+    """목업 FAQ JSON + 결정적 bigram 임베딩 코사인 검색. 평가 파이프라인의 기준 구현."""
 
     def __init__(self, path: Path = _MOCK_FAQ_FILE) -> None:
         self._path = path
@@ -210,62 +210,9 @@ class MockRetriever(Retriever):
         return scored[:top_k]
 
 
-class PgvectorRetriever(Retriever):
-    """pgvector 검색 자리(빈 스텁).
-
-    TODO(-184): `app/core/config.py`의 db_* 설정으로 PostgreSQL에 붙어
-    `SELECT ... ORDER BY embedding <=> %s LIMIT k`로 교체한다. 질문 임베딩은 그때 확정되는
-    임베딩 모델(`registry.EMBEDDER_BACKENDS`)을 쓰고, **임계치도 그 모델 기준으로 다시 스윕**해야 한다.
-    """
-
-    def search(self, query: str, top_k: int) -> list[RetrievedDoc]:
-        raise NotImplementedError("PgvectorRetriever는 아직 구현되지 않았습니다 (S15P11A108-184)")
-
-
 def build_retriever(key: str | None = None) -> Retriever:
+    """평가 파이프라인 전용 조립 지점 — 프로덕션 서비스는 더 이상 이걸 안 쓴다."""
     resolved = key or registry.ACTIVE_RETRIEVER
     if resolved == "mock":
         return MockRetriever()
-    if resolved == "pgvector":
-        return PgvectorRetriever()
     raise ValueError(f"등록되지 않은 retriever 백엔드입니다: {resolved!r}")
-
-
-# --- 답변 생성 (LLM 비워둔 자리) -------------------------------------------
-
-
-class AnswerGenerator(ABC):
-    """근거 문서로 답변 문장을 만드는 인터페이스."""
-
-    @abstractmethod
-    def generate(self, question: str, docs: list[RetrievedDoc]) -> str:
-        """근거가 비어 있지 않다는 전제로 호출된다(그라운딩 게이트는 호출부 책임)."""
-        raise NotImplementedError
-
-
-class TemplateAnswerGenerator(AnswerGenerator):
-    """최상위 근거 문서의 답변을 그대로 돌려준다 — 생성이 없으니 환각도 없다(기본값)."""
-
-    def generate(self, question: str, docs: list[RetrievedDoc]) -> str:
-        return docs[0].answer
-
-
-class KananaAnswerGenerator(AnswerGenerator):
-    """생성 LLM 자리(빈 스텁).
-
-    TODO(-192/CHAT-003): `registry.GENERATOR_BACKENDS["kanana"]` 모델을 지연 import로 올리고,
-    근거 문서를 컨텍스트로 넣은 프롬프트로 답변을 생성한다. 근거 밖의 내용을 말하지 않도록
-    프롬프트에 제약을 걸고, 생성 결과가 근거와 어긋나면 폐기하는 검증 단계가 필요하다.
-    """
-
-    def generate(self, question: str, docs: list[RetrievedDoc]) -> str:
-        raise NotImplementedError("KananaAnswerGenerator는 아직 구현되지 않았습니다")
-
-
-def build_generator(key: str | None = None) -> AnswerGenerator:
-    resolved = key or registry.ACTIVE_GENERATOR
-    if resolved == "template":
-        return TemplateAnswerGenerator()
-    if resolved == "kanana":
-        return KananaAnswerGenerator()
-    raise ValueError(f"등록되지 않은 generator 백엔드입니다: {resolved!r}")

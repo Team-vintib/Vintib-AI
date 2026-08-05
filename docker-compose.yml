@@ -33,6 +33,30 @@ services:
       timeout: 5s
       retries: 10
 
+  postgres-vector:
+    # AI 전용 RAG 지식베이스(chat_rag_document) 저장소. BE가 쓰는 위 postgres와는 완전히
+    # 별개 인스턴스다 — 공유 스키마(schema.sql)를 건드리지 않으려고 분리했다(S15P11A108-375).
+    # 순정 postgres 이미지엔 pgvector 확장이 없어 이 전용 이미지를 쓴다.
+    image: pgvector/pgvector:pg18
+    container_name: vintib-postgres-vector
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${VECTOR_DB_NAME:-vintib_rag}
+      POSTGRES_USER: ${VECTOR_DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${VECTOR_DB_PASSWORD:-postgres}
+    volumes:
+      # pgvector/pgvector:pg18 도 공식 postgres:18 이미지를 베이스로 하므로 위 postgres
+      # 서비스와 같은 이유로 /var/lib/postgresql(데이터 디렉터리 아님)에 마운트한다.
+      - postgres-vector-data:/var/lib/postgresql
+    networks:
+      - vintib-net
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${VECTOR_DB_USERNAME:-postgres} -d ${VECTOR_DB_NAME:-vintib_rag}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redis:
     image: redis:8.8-alpine
     container_name: vintib-redis
@@ -192,14 +216,29 @@ services:
       DB_NAME: ${DB_NAME:-vintib}
       DB_USERNAME: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      VECTOR_DB_HOST: postgres-vector
+      VECTOR_DB_PORT: 5432
+      VECTOR_DB_NAME: ${VECTOR_DB_NAME:-vintib_rag}
+      VECTOR_DB_USERNAME: ${VECTOR_DB_USERNAME:-postgres}
+      VECTOR_DB_PASSWORD: ${VECTOR_DB_PASSWORD:-postgres}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       WORKER_API_KEY: ${WORKER_API_KEY}
       PUBLIC_BASE_URL: https://i15a108.p.ssafy.io
       RESULTS_DIR: /app/results
+      # 가격 책정(app/pricing/)이 GMS 게이트웨이로 나갈 때 쓴다. 비어 있으면 mock 백엔드로
+      # 떨어지므로 컨테이너는 정상 기동한다 — 실시세가 필요할 때만 채운다.
+      GMS_API_KEY: ${GMS_API_KEY:-}
+      # 가격 책정(app/pricing/)이 신상품(정가) 조회에 쓰는 네이버 쇼핑 오픈API 키. 비어 있으면
+      # mock 백엔드로 떨어지므로 컨테이너는 정상 기동한다.
+      NAVER_CLIENT_ID: ${NAVER_CLIENT_ID:-}
+      NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET:-}
     volumes:
-      - results-data:/app/results                                      
+      - results-data:/app/results
+    depends_on:
+      postgres-vector:
+        condition: service_healthy
     networks:
       - vintib-net
     mem_limit: 1g
@@ -220,6 +259,7 @@ networks:
 
 volumes:
   postgres-data:
+  postgres-vector-data:
   redis-data:
   minio-data:
   results-data:
