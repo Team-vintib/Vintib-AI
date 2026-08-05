@@ -61,7 +61,7 @@ defineEmits<{
 
 .live-watch-state__icon svg {
   width: 28px;
-  height: 28px;
+  height: var(--badge-height-md);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -70,7 +70,7 @@ defineEmits<{
 }
 
 .live-watch-state h1 {
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   line-height: 34px;
 }
 
@@ -78,8 +78,8 @@ defineEmits<{
   max-width: 460px;
   margin-top: var(--space-3);
   color: var(--color-live-text-secondary);
-  font-size: 13px;
-  line-height: 21px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-comfortable);
 }
 
 .live-watch-state__actions {
@@ -89,14 +89,14 @@ defineEmits<{
 }
 
 .live-watch-state__actions button {
-  min-height: 42px;
+  min-height: var(--button-height-tight);
   padding: 0 var(--space-5);
   border: 1px solid var(--color-live-border);
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .live-watch-state__actions button + button {
@@ -105,7 +105,7 @@ defineEmits<{
 }
 
 .live-watch-state__actions button:focus-visible {
-  outline: 3px solid var(--color-ai);
+  outline: var(--focus-ring-width) solid var(--color-ai);
   outline-offset: 2px;
 }
 </style>

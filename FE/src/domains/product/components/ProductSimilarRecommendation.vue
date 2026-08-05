@@ -113,9 +113,9 @@ watch(
 
 .similar-recommend__head h2 {
   color: var(--color-text-primary);
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 28px;
+  font-size: var(--font-size-lg-plus);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-lg-plus);
 }
 
 .similar-recommend__nav {
@@ -125,18 +125,18 @@ watch(
 
 .similar-recommend__nav button {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: var(--button-height-small);
+  height: var(--button-height-small);
   border: 1px solid var(--color-border-strong);
   border-radius: 50%;
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   line-height: 1;
   place-items: center;
   transition:
-    border-color 160ms ease,
-    color 160ms ease;
+    border-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .similar-recommend__nav button:hover {
@@ -147,7 +147,7 @@ watch(
 .similar-recommend__state {
   padding: var(--space-8) 0;
   color: var(--color-text-muted);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   text-align: center;
 }
 

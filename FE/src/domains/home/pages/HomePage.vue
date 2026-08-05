@@ -125,8 +125,8 @@ watch(
 
 .home-state__title {
   color: var(--color-text-primary);
-  font-size: 18px;
-  font-weight: 700;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
   line-height: 28px;
 }
 
@@ -134,14 +134,14 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 44px;
+  height: var(--button-height-compact);
   padding: 0 var(--space-5);
   border: 0;
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-control);
 }
 </style>

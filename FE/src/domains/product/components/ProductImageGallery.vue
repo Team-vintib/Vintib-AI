@@ -115,7 +115,7 @@ const closeZoom = () => {
 <style scoped lang="scss">
 .product-gallery {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: var(--thumbnail-size-sm) minmax(0, 1fr);
   align-items: start;
   gap: var(--space-4);
   min-width: 0;
@@ -137,15 +137,15 @@ const closeZoom = () => {
   height: 100%;
   object-fit: cover;
   filter: saturate(0.88) contrast(1.04) brightness(0.95);
-  transition: transform 180ms ease;
+  transition: transform var(--transition-moderate);
 }
 
 .product-gallery__empty {
   padding: var(--space-6);
   color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-snug);
   text-align: center;
 }
 
@@ -156,13 +156,13 @@ const closeZoom = () => {
 
 .product-gallery__thumbnail {
   overflow: hidden;
-  width: 72px;
+  width: var(--thumbnail-size-sm);
   aspect-ratio: 4 / 5;
   padding: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
-  transition: border-color 160ms ease;
+  transition: border-color var(--transition-base);
 }
 
 .product-gallery__thumbnail--selected {
@@ -195,21 +195,21 @@ const closeZoom = () => {
   top: var(--space-4);
   right: var(--space-4);
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: var(--button-height-small);
+  height: var(--button-height-small);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: rgba(10, 10, 10, 0.55);
+  background: var(--overlay-scrim-medium);
   color: var(--color-text-secondary);
   backdrop-filter: blur(2px);
   place-items: center;
   transition:
-    background-color 160ms ease,
-    color 160ms ease;
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .product-gallery__zoom svg {
-  width: 18px;
+  width: var(--icon-size-sm);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -251,17 +251,17 @@ const closeZoom = () => {
 
 .product-gallery__dialog > button {
   position: absolute;
-  z-index: 1;
+  z-index: var(--z-layer-1);
   top: var(--space-3);
   right: var(--space-3);
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: var(--button-height-sm);
+  height: var(--button-height-sm);
   border: 1px solid var(--color-border);
   border-radius: 50%;
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 26px;
+  font-size: var(--font-size-2xl-plus);
   line-height: 1;
   place-items: center;
 }

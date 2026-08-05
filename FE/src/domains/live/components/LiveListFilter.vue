@@ -72,8 +72,8 @@ const handleCategoryChange = (event: Event) => {
 .live-list-filter__heading h2 {
   color: var(--color-text-primary);
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 400;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-regular);
   letter-spacing: 0.2em;
   text-transform: uppercase;
 }
@@ -82,7 +82,7 @@ const handleCategoryChange = (event: Event) => {
   border: 0;
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -113,7 +113,7 @@ const handleCategoryChange = (event: Event) => {
 .live-list-filter__group legend {
   margin-bottom: var(--space-4);
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
@@ -123,7 +123,7 @@ const handleCategoryChange = (event: Event) => {
   min-height: var(--filter-option-min-height);
   gap: var(--space-3);
   color: var(--color-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   cursor: pointer;
 }
 

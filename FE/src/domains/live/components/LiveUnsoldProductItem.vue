@@ -191,7 +191,7 @@ const chooseAuction = async () => {
 
 .unsold-item__thumb {
   width: 56px;
-  height: 56px;
+  height: var(--button-height-tall);
   flex-shrink: 0;
   overflow: hidden;
   border-radius: var(--radius-control);
@@ -214,14 +214,14 @@ const chooseAuction = async () => {
 
 .unsold-item__brand {
   color: var(--color-live-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 
 .unsold-item__title {
   overflow: hidden;
   color: var(--color-live-text-primary);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -231,12 +231,12 @@ const chooseAuction = async () => {
   flex-wrap: wrap;
   gap: 8px;
   color: var(--color-live-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .unsold-item__reg-price {
   color: var(--color-live-text-primary);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .unsold-item__done-badge {
@@ -245,13 +245,13 @@ const chooseAuction = async () => {
   border-radius: var(--radius-badge);
   background: var(--color-live);
   color: var(--color-text-inverse);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .unsold-item__done-note {
   color: var(--color-live-text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .unsold-item__actions {
@@ -261,13 +261,13 @@ const chooseAuction = async () => {
 }
 
 .unsold-item__choice {
-  min-height: 44px;
+  min-height: var(--button-height-compact);
   border: 1px solid var(--color-live);
   border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--color-live) 16%, transparent);
   color: var(--color-live-text-primary);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
 }
 
 .unsold-item__choice:hover:not(:disabled) {
@@ -292,8 +292,8 @@ const chooseAuction = async () => {
 
 .unsold-item__direct label {
   color: var(--color-live-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
 }
 
 .unsold-item__price-row {
@@ -304,18 +304,18 @@ const chooseAuction = async () => {
 
 .unsold-item__price-row input {
   width: 100%;
-  min-height: 42px;
+  min-height: var(--button-height-tight);
   padding: 0 var(--space-3);
   border: 1px solid var(--color-live-border);
   border-radius: var(--radius-control);
   background: var(--color-live-background);
   color: var(--color-live-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
 }
 
 .unsold-item__price-row span {
   color: var(--color-live-text-secondary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
 }
 
 .unsold-item__direct-actions {
@@ -324,25 +324,25 @@ const chooseAuction = async () => {
 }
 
 .unsold-item__ghost {
-  min-height: 42px;
+  min-height: var(--button-height-tight);
   padding: 0 var(--space-4);
   border: 1px solid var(--color-live-border);
   border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-live-text-primary);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
 }
 
 .unsold-item__primary {
-  min-height: 42px;
+  min-height: var(--button-height-tight);
   flex: 1;
   border: 0;
   border-radius: var(--radius-control);
   background: var(--color-live);
   color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .unsold-item__primary:hover {
@@ -351,6 +351,6 @@ const chooseAuction = async () => {
 
 .unsold-item__error {
   color: var(--color-error);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 </style>

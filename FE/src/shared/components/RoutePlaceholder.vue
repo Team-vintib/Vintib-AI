@@ -30,21 +30,21 @@ const route = useRoute()
 
 .route-placeholder__eyebrow {
   color: var(--color-primary);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .route-placeholder__title {
   color: var(--color-text-primary);
   font-size: 36px;
-  font-weight: 800;
+  font-weight: var(--font-weight-extrabold);
   line-height: 1.2;
 }
 
 .route-placeholder__description {
   max-width: 520px;
   color: var(--color-text-secondary);
-  font-size: 16px;
+  font-size: var(--font-size-md);
   line-height: 1.7;
 }
 

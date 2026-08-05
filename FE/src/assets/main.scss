@@ -81,6 +81,7 @@
   --space-10: 40px;
   --space-12: 48px;
   --space-16: 64px;
+  --space-20: 80px; /* 비밀번호 입력 필드 토글 버튼 여백 등 반복 사용 */
 
   /* Radius — VinTib은 전부 5px, pill 폐지 */
   --radius-control: 5px;
@@ -92,9 +93,20 @@
 
   /* Controls (버튼 높이 — 값 유지) */
   --button-height-small: 36px;
+  --button-height-compact: 44px;
   --button-height-standard: 48px;
   --button-height-major: 52px;
   --button-height-bid: 60px;
+  --button-height-2xs: 34px; /* SY032 live/auction 배치 */
+  --button-height-sm: 40px; /* SY032 live/auction 배치 */
+  --button-height-tight: 42px; /* SY032 live/auction/chat 배치 */
+  --button-height-loose: 46px; /* SY032 live 배치 */
+  --button-height-tall: 56px; /* SY032 live 배치 */
+
+  /* Surface min-heights — 빈 상태/스테이지/텍스트영역류 큰 컨테이너 최소 높이 (SY032 live 배치) */
+  --surface-min-height-md: 300px;
+  --surface-min-height-lg: 320px;
+  --surface-min-height-xl: 360px;
 
   /* Typography — 3개 서체 */
   --font-display: 'Archivo', 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont,
@@ -126,6 +138,116 @@
   /* Layout — VinTib 풀블리드(좌우 40px). 폭 제한 없음(P1에서 레이아웃 반영). */
   --layout-content-max-width: none;
   --layout-gutter: 40px;
+
+  /* ── 신규 토큰 카테고리 (SY032 리팩토링) ──────────────────
+     각 도메인 배치를 진행하며 실제 하드코딩 값을 발견하는 대로 이 아래에 추가한다.
+     원칙: 값은 발견된 값 그대로(반올림/근사 금지), 2회 이상 반복되거나
+     기존 스케일에 맞는 "체계적 값"만 토큰화한다. */
+
+  /* Typography scale — 기존 --font-size-caption(13px)/-button-small(14px)/-body(15px)와 별개로,
+     그 외 반복 사용되는 폰트 크기를 발견하는 대로 추가한다. */
+  --font-size-3xs: 9px;
+  --font-size-badge: 10px; /* 카드 배지/eyebrow 라벨 */
+  --font-size-2xs: 11px;
+  --font-size-xs: 12px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 28px;
+  --font-size-4xl: 32px;
+  --font-size-hero-display: 34px; /* 홈 히어로류 대형 타이틀 */
+  --font-size-4xs: 8px; /* live 배지/카운트 라벨 (SY032 live 배치) */
+  --font-size-xl: 22px; /* 방송 종료 대시보드류 통계 타이틀 (SY032 live 배치) */
+  --line-height-tight: 15px; /* 라이브 소형 메타 텍스트 (SY032 live 배치) */
+  --line-height-xs: 16px; /* font-size-xs(12px)와 쌍 */
+  --line-height-snug: 18px; /* font-size-caption(13px) 강조 텍스트와 쌍 */
+  --line-height-control: 20px; /* 버튼/메뉴 아이템류 공통 line-height */
+  --line-height-comfortable: 21px;
+  --line-height-relaxed: 22px; /* font-size-button-small(14px) 문단과 쌍 */
+  --line-height-lg: 26px; /* SY032 live/chat 배치: 헤더 타이틀류 */
+  --line-height-2xl: 32px; /* font-size-2xl(24px)와 쌍 */
+  --line-height-3xl: 38px; /* font-size-3xl(28px)와 쌍 */
+  --line-height-4xl: 44px; /* font-size-4xl(32px)와 쌍 */
+  --letter-spacing-num: -0.02em; /* 모노 숫자(.vt-num)와 동일한 자간 */
+  --font-weight-demibold: 650; /* SY032 live 배치: LiveSelectedProduct 배지 숫자 */
+  --font-size-md-plus: 17px; /* SY032 product 배치: md(16)~lg(18) 사이, 소제목류 10회 반복 */
+  --font-size-lg-plus: 20px; /* SY032 product 배치: lg(18)~xl(22) 사이, 3회 반복 */
+  --font-size-2xl-plus: 26px; /* SY032 product 배치: 2xl(24)~3xl(28) 사이, 통계 숫자류 5회 반복 */
+  --font-size-3xl-plus: 30px; /* SY032 product 배치: 3xl(28)~4xl(32) 사이, 2회 반복 */
+  --line-height-lg-plus: 28px; /* SY032 product 배치: font-size-lg-plus(20px)와 쌍, 2회 반복 */
+  --line-height-2xl-plus: 36px; /* SY032 product 배치: font-size-2xl-plus(26px)와 쌍, 3회 반복 */
+  --line-height-2xs: 17px; /* SY032 my/tryon 배치: font-size-2xs(11px)와 쌍, 4회 반복 */
+  --line-height-2xl-loose: 34px; /* SY032 my 배치: 주문/판매 상세 가격 타이틀, font-size-2xl(24px)과 쌍, 2회 반복 */
+
+  /* Icon sizes — 아이콘 SVG 크기 (여러 파일에서 반복) */
+  --icon-size-xs: 15px; /* SY032 live/chat 배치: 헤더 메타 아이콘 */
+  --icon-size-sm: 18px;
+  --icon-size-md: 20px; /* SY032 live 배치: 헤더 뒤로가기 아이콘 등 */
+  --icon-size-xs-plus: 16px; /* SY032 product 배치: 체크박스/닫기류 아이콘, 2회 반복 */
+  --icon-size-lg: 64px; /* SY032 product 배치: AI 패널/상세 상태 패널 대형 아이콘, 2회 반복 */
+
+  /* Badge / control heights — 배지·칩류 최소 높이 (SY032 live/auction 배치) */
+  --badge-height-xs: 22px;
+  --badge-height-sm: 26px;
+  --badge-height-md: 28px;
+  --badge-height-lg: 30px;
+  --badge-height-compact: 24px; /* SY032 my 배치: 주문/찜/프로필 배지·상태 태그 min-height, 6회 반복 */
+
+  /* Search control */
+  --search-input-height: 38px;
+
+  /* Product 도메인 전용 레이아웃 값 (SY032 product 배치) */
+  --thumbnail-size-sm: 72px; /* 갤러리/스켈레톤 썸네일 폭, 5회 반복 */
+  --surface-min-height-2xs: 132px; /* 사진 업로더 빈 상태 그리드 최소 높이, 2회 반복 */
+  --prose-max-width: 520px; /* 설명/완료 문구 본문 폭 제한, 2회 반복 */
+
+  /* My 도메인 전용 사이징 값 (SY032 my 배치) */
+  --avatar-size-lg: 88px; /* 프로필 히어로/사진 편집 아바타, 2회 반복 */
+  --surface-min-height-3xs: 128px; /* 대시보드 카드·수익 차트 막대 min-height, 3회 반복 */
+  --surface-min-height-sm: 240px; /* 주문/판매 상세 카드 이미지 min-height, 2회 반복 */
+
+  /* Brand */
+  --brand-logo-height: 30px;
+
+  /* Focus ring (강조용, 기본 :focus-visible 스펙과 별개로 nav/footer 링크에서 반복) */
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 3px;
+  --underline-thickness: 2px; /* SY032 live 배치: 탭/스텝 밑줄 두께 */
+
+  /* Transition / duration — 이미 코드베이스 전반에서 값이 통일되어 있어 선제 등록 */
+  --transition-fast: 140ms ease;
+  --transition-base: 160ms ease;
+  --transition-moderate: 180ms ease;
+  --transition-slow: 200ms ease;
+  --transition-standard: 220ms ease;
+  --transition-emphasized: 620ms cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-pulse: 1.7s;
+
+  /* Z-index scale — 실사용 문맥(레이어 목적)을 확인하며 이름을 붙여 추가한다. */
+  --z-top: 50; /* 고정 헤더 등 최상단 레이어 */
+  --z-layer-header: 10; /* 라이브 방송/시청 헤더의 sticky 스태킹 (SY032 live 배치) */
+  --z-layer-1: 1; /* 카드/히어로 내부 로컬 스태킹: 이미지 위 그라디언트 */
+  --z-layer-2: 2; /* 로컬 스태킹: 그 위 배지/컨트롤 */
+  --z-layer-3: 3; /* 로컬 스태킹: 최상단 콘텐츠 */
+
+  /* Shadow */
+  --shadow-ring: 0 0 0 1px rgba(255, 255, 255, 0.55);
+
+  /* Overlay / scrim — 배경 위 그라디언트·스크림에 쓰이는 반투명 색을 발견하는 대로 추가한다. */
+  --overlay-scrim-strong: rgba(10, 10, 10, 0.82); /* 카드 배지 배경 등 */
+  --overlay-scrim-medium: rgba(10, 10, 10, 0.55); /* 이미지 하단 그라디언트 스크림 */
+  --overlay-hairline: rgba(242, 240, 237, 0.1); /* SY032 chat 배치: 채팅 오버레이 헤어라인 */
+  --overlay-scrollbar: rgba(242, 240, 237, 0.28); /* SY032 chat 배치: 채팅 오버레이 스크롤바 */
+  --overlay-focus-ring: rgb(47 111 237 / 22%); /* SY032 my 배치: 주문/판매 상세 페이지 버튼 focus 아웃라인, 2회 반복 */
+
+  /* Status colors — 팔레트에 없는 시착 상태 표시 색 (SY032 tryon 배치) */
+  --color-status-error-bg: rgba(196, 61, 70, 0.14);
+  --color-status-error-text: #f0a2a8;
+  --color-status-success-bg: rgba(77, 139, 98, 0.17);
+  --color-status-success-text: #9bd0ac;
+  --gradient-hero-scrim:
+    linear-gradient(90deg, rgba(10, 10, 10, 0.9) 0%, rgba(10, 10, 10, 0.72) 38%, rgba(10, 10, 10, 0.2) 68%, rgba(10, 10, 10, 0.04) 100%),
+    linear-gradient(0deg, rgba(10, 10, 10, 0.3), transparent 56%);
 }
 
 *,

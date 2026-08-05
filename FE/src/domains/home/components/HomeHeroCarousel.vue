@@ -445,7 +445,6 @@ onBeforeUnmount(() => {
 
 <style scoped lang="scss">
 .home-hero-carousel {
-  --hero-ink-black: #0a0a0a;
   --hero-accent-red: var(--color-accent);
   --hero-film-gray: var(--color-text-muted);
 
@@ -490,24 +489,22 @@ onBeforeUnmount(() => {
   height: 440px;
   overflow: hidden;
   isolation: isolate;
-  background: var(--hero-ink-black);
+  background: var(--color-page);
   cursor: pointer;
 }
 
 .home-hero-slide::before {
   position: absolute;
   inset: 0;
-  z-index: 1;
-  background:
-    linear-gradient(90deg, rgba(10, 10, 10, 0.9) 0%, rgba(10, 10, 10, 0.72) 38%, rgba(10, 10, 10, 0.2) 68%, rgba(10, 10, 10, 0.04) 100%),
-    linear-gradient(0deg, rgba(10, 10, 10, 0.3), transparent 56%);
+  z-index: var(--z-layer-1);
+  background: var(--gradient-hero-scrim);
   content: '';
 }
 
 .home-hero-slide__background {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 0; /* --z-layer-1(그라디언트)보다 아래 명시 */
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -522,14 +519,12 @@ onBeforeUnmount(() => {
 
 .home-hero-slide--discover::before,
 .home-hero-slide--sell::before {
-  background:
-    linear-gradient(90deg, rgba(10, 10, 10, 0.9) 0%, rgba(10, 10, 10, 0.72) 38%, rgba(10, 10, 10, 0.2) 68%, rgba(10, 10, 10, 0.04) 100%),
-    linear-gradient(0deg, rgba(10, 10, 10, 0.3), transparent 56%);
+  background: var(--gradient-hero-scrim);
 }
 
 .home-hero-slide__content {
   position: relative;
-  z-index: 2;
+  z-index: var(--z-layer-2);
   display: grid;
   align-content: center;
   justify-items: start;
@@ -541,10 +536,10 @@ onBeforeUnmount(() => {
 .home-hero-slide__label {
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-regular);
   letter-spacing: 0.2em;
-  line-height: 18px;
+  line-height: var(--line-height-snug);
   text-transform: uppercase;
 }
 
@@ -557,8 +552,8 @@ onBeforeUnmount(() => {
   white-space: pre-line;
   color: inherit;
   font-family: var(--font-display);
-  font-size: 34px;
-  font-weight: 600;
+  font-size: var(--font-size-hero-display);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.08;
   letter-spacing: -0.03em;
 }
@@ -567,29 +562,29 @@ onBeforeUnmount(() => {
   max-width: 380px;
   white-space: pre-line;
   color: var(--color-text-secondary);
-  font-size: 15px;
-  font-weight: 300;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-body);
 }
 
 .home-hero-slide__cta {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  min-height: var(--button-height-compact);
   padding: 0 var(--space-5);
   margin-top: var(--space-2);
   border: 0;
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-control);
   white-space: nowrap;
   transition:
-    background-color 220ms ease,
-    color 220ms ease;
+    background-color var(--transition-standard),
+    color var(--transition-standard);
 }
 
 .home-hero-slide__cta:hover {
@@ -608,31 +603,31 @@ onBeforeUnmount(() => {
 
 .home-hero-slide__meta {
   position: absolute;
-  z-index: 2;
+  z-index: var(--z-layer-2);
   right: var(--space-6);
   bottom: var(--space-6);
   max-width: calc(100% - var(--space-12));
-  padding: 8px var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-badge);
-  background: rgba(10, 10, 10, 0.82);
+  background: var(--overlay-scrim-strong);
   color: var(--color-text-secondary);
   font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-regular);
   letter-spacing: 0.04em;
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .home-hero-slide__collage {
   position: absolute;
   inset: 0 0 0 46%;
-  z-index: 1;
+  z-index: var(--z-layer-1);
   pointer-events: none;
 }
 
 .home-hero-slide__collage-image {
   position: absolute;
-  z-index: 1;
+  z-index: var(--z-layer-1);
   object-fit: cover;
   border-radius: var(--radius-media);
   filter: saturate(0.88) contrast(1.04) brightness(0.95);
@@ -661,24 +656,24 @@ onBeforeUnmount(() => {
 
 .home-hero-carousel__arrow {
   position: absolute;
-  z-index: 3;
+  z-index: var(--z-layer-3);
   top: 50%;
   display: inline-flex;
-  width: 32px;
-  height: 48px;
+  width: var(--space-8);
+  height: var(--button-height-standard);
   align-items: center;
   justify-content: center;
   border: 0;
   background: transparent;
   color: var(--color-text-inverse);
   font-size: 44px;
-  font-weight: 300;
+  font-weight: var(--font-weight-light);
   line-height: 1;
   opacity: 0.62;
   transform: translateY(-50%);
   transition:
-    color 160ms ease,
-    opacity 160ms ease;
+    color var(--transition-fast),
+    opacity var(--transition-fast);
 }
 
 .home-hero-carousel:hover .home-hero-carousel__arrow,
@@ -697,7 +692,7 @@ onBeforeUnmount(() => {
 
 .home-hero-carousel__indicators {
   position: absolute;
-  z-index: 3;
+  z-index: var(--z-layer-3);
   right: 0;
   bottom: var(--space-5);
   left: 0;
@@ -715,8 +710,8 @@ onBeforeUnmount(() => {
   background: rgba(242, 240, 237, 0.35);
   pointer-events: auto;
   transition:
-    width 180ms ease,
-    background 180ms ease;
+    width var(--transition-moderate),
+    background var(--transition-moderate);
 }
 
 .home-hero-carousel__indicator--active {
@@ -740,13 +735,13 @@ onBeforeUnmount(() => {
 
   .home-hero-slide__title {
     max-width: 420px;
-    font-size: 24px;
-    line-height: 32px;
+    font-size: var(--font-size-2xl);
+    line-height: var(--line-height-2xl);
   }
 
   .home-hero-slide__description {
-    font-size: 14px;
-    line-height: 22px;
+    font-size: var(--font-size-button-small);
+    line-height: var(--line-height-relaxed);
   }
 
   .home-hero-slide__cta {

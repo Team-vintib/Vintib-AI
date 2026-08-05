@@ -145,7 +145,7 @@ const stageMessage = computed(() => {
 
 .live-video-stage__fallback svg {
   width: 48px;
-  height: 48px;
+  height: var(--button-height-standard);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -164,7 +164,7 @@ const stageMessage = computed(() => {
 
 .live-video-stage__overlay {
   position: absolute;
-  z-index: 1;
+  z-index: var(--z-layer-1);
   inset: 0;
   pointer-events: none;
 }
@@ -175,7 +175,7 @@ const stageMessage = computed(() => {
   top: var(--space-4);
   right: var(--space-4);
   align-items: center;
-  min-height: 28px;
+  min-height: var(--badge-height-md);
   padding: 0 12px;
   border: 1px solid rgba(242, 240, 237, 0.12);
   border-radius: var(--radius-badge);
@@ -183,33 +183,33 @@ const stageMessage = computed(() => {
   gap: 6px;
   color: var(--color-live-text-secondary);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-badge);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   backdrop-filter: blur(8px);
 }
 
 .live-video-stage__notice span {
-  width: 4px;
-  height: 4px;
+  width: var(--space-1);
+  height: var(--space-1);
   background: var(--color-accent);
-  animation: vtPulse 1.7s ease-in-out infinite;
+  animation: vtPulse var(--duration-pulse) ease-in-out infinite;
 }
 
 .live-video-stage__reminder {
   display: inline-flex;
   position: relative;
-  z-index: 2;
+  z-index: var(--z-layer-2);
   align-items: center;
-  min-height: 44px;
+  min-height: var(--button-height-compact);
   padding: 0 var(--space-5);
   border: 1px solid var(--color-accent);
   border-radius: var(--radius-control);
-  background: rgba(10, 10, 10, 0.55);
+  background: var(--overlay-scrim-medium);
   gap: var(--space-2);
   color: var(--color-accent);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-medium);
   backdrop-filter: blur(6px);
 }
 
@@ -219,8 +219,8 @@ const stageMessage = computed(() => {
 }
 
 .live-video-stage__reminder svg {
-  width: 18px;
-  height: 18px;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -229,7 +229,7 @@ const stageMessage = computed(() => {
 }
 
 .live-video-stage__reminder:focus-visible {
-  outline: 1px solid #fff;
+  outline: 1px solid var(--color-primary-strong);
   outline-offset: 2px;
 }
 
@@ -241,13 +241,13 @@ const stageMessage = computed(() => {
   align-items: center;
   gap: var(--space-2);
   color: rgba(255, 255, 255, 0.88);
-  z-index: 2;
+  z-index: var(--z-layer-2);
 }
 
 .live-video-stage__controls > span {
   display: grid;
   width: 30px;
-  height: 30px;
+  height: var(--badge-height-lg);
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.5);
   place-items: center;
@@ -266,25 +266,25 @@ const stageMessage = computed(() => {
 .live-video-stage__try-on {
   display: inline-flex;
   position: absolute;
-  z-index: 2;
+  z-index: var(--z-layer-2);
   right: var(--space-4);
   bottom: var(--space-4);
-  min-height: 44px;
+  min-height: var(--button-height-compact);
   width: 108px;
   align-items: center;
   justify-content: center;
   padding: 0;
   border: 1px solid var(--color-accent);
   border-radius: var(--radius-control);
-  background: rgba(10, 10, 10, 0.55);
+  background: var(--overlay-scrim-medium);
   gap: var(--space-2);
   color: var(--color-accent);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-medium);
   backdrop-filter: blur(6px);
   transition:
-    background-color 160ms ease,
-    color 160ms ease;
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .live-video-stage__try-on:hover:not(:disabled) {
@@ -295,19 +295,19 @@ const stageMessage = computed(() => {
 .live-video-stage__try-on:disabled {
   cursor: not-allowed;
   border-color: var(--color-border-input);
-  background: rgba(10, 10, 10, 0.55);
+  background: var(--overlay-scrim-medium);
   color: var(--color-live-text-secondary);
   opacity: 0.72;
 }
 
 .live-video-stage__try-on:focus-visible {
-  outline: 1px solid #fff;
+  outline: 1px solid var(--color-primary-strong);
   outline-offset: 2px;
 }
 
 .live-video-stage__try-on svg {
-  width: 18px;
-  height: 18px;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -323,7 +323,7 @@ const stageMessage = computed(() => {
 
 @media (max-width: 720px) {
   .live-video-stage {
-    min-height: 320px;
+    min-height: var(--surface-min-height-lg);
   }
 }
 </style>

@@ -188,27 +188,27 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 24px;
+  min-height: var(--badge-height-compact);
   padding: 2px 10px;
   border-radius: var(--radius-badge);
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  line-height: 18px;
+  line-height: var(--line-height-snug);
 }
 
 .my-order-detail-page__header button,
 .my-order-detail-state button {
-  min-height: 40px;
+  min-height: var(--button-height-sm);
   padding: 0 16px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
   cursor: pointer;
 }
 
@@ -230,7 +230,7 @@ onMounted(() => {
 .my-order-detail-card img {
   width: 240px;
   height: 100%;
-  min-height: 240px;
+  min-height: var(--surface-min-height-sm);
   object-fit: cover;
 }
 
@@ -248,22 +248,22 @@ onMounted(() => {
 
 .my-order-detail-card__body h2 {
   color: var(--color-text-primary);
-  font-size: 24px;
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-extrabold);
-  line-height: 34px;
+  line-height: var(--line-height-2xl-loose);
 }
 
 .my-order-detail-card__body p {
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
 }
 
 .my-order-detail-card__body strong {
   color: var(--color-text-primary);
-  font-size: 22px;
+  font-size: var(--font-size-xl);
   font-weight: var(--font-weight-extrabold);
-  line-height: 32px;
+  line-height: var(--line-height-2xl);
 }
 
 .my-order-detail-section {
@@ -274,9 +274,9 @@ onMounted(() => {
 
 .my-order-detail-section__title h2 {
   color: var(--color-text-primary);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-extrabold);
-  line-height: 26px;
+  line-height: var(--line-height-lg);
 }
 
 .my-order-detail-grid {
@@ -301,15 +301,15 @@ onMounted(() => {
 
 .my-order-detail-grid dt {
   color: var(--color-text-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
 }
 
 .my-order-detail-grid dd {
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
   overflow-wrap: anywhere;
 }
 
@@ -319,15 +319,15 @@ onMounted(() => {
   gap: var(--space-3);
   padding: var(--space-10);
   color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
   text-align: center;
 }
 
 .my-order-detail-state strong {
   color: var(--color-text-primary);
-  font-size: 16px;
-  line-height: 24px;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-body);
 }
 
 .sr-only {
@@ -350,7 +350,7 @@ onMounted(() => {
 
 .my-order-detail-page__header button:focus-visible,
 .my-order-detail-state button:focus-visible {
-  outline: 3px solid rgb(47 111 237 / 22%);
+  outline: var(--focus-ring-width) solid var(--overlay-focus-ring);
   outline-offset: 2px;
 }
 

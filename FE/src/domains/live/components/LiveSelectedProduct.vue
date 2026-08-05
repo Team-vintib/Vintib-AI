@@ -93,9 +93,9 @@ defineEmits<{
 
 .live-selected-product__heading h2 {
   color: var(--color-live-text-secondary);
-  font-size: 11px;
-  font-weight: 650;
-  line-height: 15px;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-demibold);
+  line-height: var(--line-height-tight);
 }
 
 .live-selected-product__body {
@@ -121,7 +121,7 @@ defineEmits<{
   border-radius: var(--radius-control);
   background: var(--color-live-surface-raised);
   color: var(--color-live-text-secondary);
-  font-size: 10px;
+  font-size: var(--font-size-badge);
   place-items: center;
 }
 
@@ -139,7 +139,7 @@ defineEmits<{
 }
 
 .live-selected-product__identity strong {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 17px;
 }
 
@@ -159,8 +159,8 @@ defineEmits<{
 .live-selected-product__details dt,
 .live-selected-product__details dd {
   overflow: hidden;
-  font-size: 10px;
-  line-height: 15px;
+  font-size: var(--font-size-badge);
+  line-height: var(--line-height-tight);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -195,8 +195,8 @@ defineEmits<{
   border-radius: var(--radius-control);
   background: var(--color-live-surface-raised);
   color: var(--color-live-text-primary);
-  font-size: 10px;
-  font-weight: 650;
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-demibold);
   line-height: 1;
   white-space: nowrap;
 }
@@ -234,7 +234,7 @@ defineEmits<{
 }
 
 .live-selected-product__actions button:focus-visible {
-  outline: 3px solid var(--color-ai);
+  outline: var(--focus-ring-width) solid var(--color-ai);
   outline-offset: 2px;
 }
 
@@ -244,7 +244,7 @@ defineEmits<{
   border: 1px dashed var(--color-live-border);
   border-radius: var(--radius-control);
   color: var(--color-live-text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   place-items: center;
 }
 
