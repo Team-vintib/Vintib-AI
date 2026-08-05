@@ -229,23 +229,23 @@ const submitCharge = async () => {
 
 .point-panel h2 {
   color: var(--color-text-primary);
-  font-size: 20px;
+  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-extrabold);
-  line-height: 28px;
+  line-height: var(--line-height-lg-plus);
 }
 
 .point-panel h3 {
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
-  line-height: 22px;
+  line-height: var(--line-height-relaxed);
 }
 
 .point-panel p,
 .point-charge__field span {
   color: var(--color-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .point-charge__quick,
@@ -262,7 +262,7 @@ const submitCharge = async () => {
 .point-panel__submit {
   min-height: var(--button-height-small);
   border-radius: var(--radius-control);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
@@ -285,7 +285,7 @@ const submitCharge = async () => {
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: var(--font-size-body);
 }
 
 .point-charge__widget-loading {
@@ -309,17 +309,17 @@ const submitCharge = async () => {
 
 .point-charge__summary dt {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
-  line-height: 20px;
+  line-height: var(--line-height-control);
 }
 
 .point-charge__summary dd {
   margin: var(--space-1) 0 0;
   color: var(--color-text-primary);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-extrabold);
-  line-height: 26px;
+  line-height: var(--line-height-lg);
 }
 
 .point-panel__error {

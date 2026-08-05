@@ -54,21 +54,21 @@ const goToCharge = () => {
   border-radius: var(--radius-card);
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 15px;
-  line-height: 24px;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
   text-align: center;
 }
 
 .point-charge-result__state strong {
   color: var(--color-text-primary);
-  font-size: 18px;
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-extrabold);
-  line-height: 26px;
+  line-height: var(--line-height-lg);
 }
 
 .point-charge-result__code {
   color: var(--color-text-tertiary, var(--color-text-secondary));
-  font-size: 13px;
+  font-size: var(--font-size-caption);
 }
 
 .point-charge-result__state button {
@@ -78,7 +78,7 @@ const goToCharge = () => {
   border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 14px;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 </style>
