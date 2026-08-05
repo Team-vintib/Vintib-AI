@@ -14,6 +14,12 @@ meta.json 구조는 스크립트마다 다르다(LoRA는 `lora_r`, last-N은 `un
 그래서 특정 키를 하드코딩하지 않고, 각 meta.json의 **스칼라 필드를 그대로** 열로 편다.
 `classes`(라벨 목록)·`history`(epoch별 로그)처럼 표에 넣기엔 너무 길거나 무의미한 리스트는
 뺀다.
+
+`--pattern`으로 방법 하나만(예: `lora_*/meta.json`) 걸러 "그 방법 안에서 뭐가 제일
+좋은지"를 볼 수 있고, `--best-per-group method,task`로 **(방법, 태스크)별 1위 run만** 뽑아
+"방법 대 방법, 태스크 대 태스크" 리더보드를 만들 수도 있다 — color·category는 난이도가
+달라 test_accuracy를 직접 비교하면 안 되므로, 항상 task를 그룹 키에 넣어야 한다
+(`aihub_finetune_plots.py`가 플랏에서 겪은 것과 같은 함정).
 """
 
 from __future__ import annotations
@@ -24,9 +30,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from aihub_finetune_plots import method_of
+
 _EXCLUDED_KEYS = frozenset({"classes", "history"})
 _PRIORITY_COLUMNS = (
     "run",
+    "method",
     "task",
     "variant",
     "best_epoch",
@@ -60,6 +69,7 @@ def load_runs(artifacts_finetune_dir: Path, pattern: str = "*/meta.json") -> lis
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
         row = _flatten_meta(meta)
         row["run"] = meta_path.parent.name
+        row["method"] = method_of(row["run"])
         rows.append(row)
     return rows
 
@@ -73,6 +83,26 @@ def sort_rows(
     missing = [row for row in rows if row.get(sort_by) is None]
     present.sort(key=lambda row: row[sort_by], reverse=descending)
     return present + missing
+
+
+def best_per_group(
+    rows: list[dict[str, Any]], group_keys: list[str], sort_by: str, *, descending: bool = True
+) -> list[dict[str, Any]]:
+    """`group_keys`(예: `["method", "task"]`)의 값 조합마다 `sort_by` 기준 1위 행만 남긴다.
+
+    `sort_rows()`가 이미 "있는 값 먼저, 없는 값은 뒤로" 정렬해 주므로, 정렬된 순서로
+    훑으며 그룹 키 조합을 처음 보는 순간의 행이 곧 그 그룹의 1위다.
+    """
+    ordered = sort_rows(rows, sort_by, descending=descending)
+    seen: set[tuple[Any, ...]] = set()
+    best: list[dict[str, Any]] = []
+    for row in ordered:
+        key = tuple(row.get(group_key) for group_key in group_keys)
+        if key in seen:
+            continue
+        seen.add(key)
+        best.append(row)
+    return best
 
 
 def _columns(rows: list[dict[str, Any]]) -> list[str]:
@@ -122,6 +152,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--out", type=Path, default=None, help="지정하면 마크다운 표를 파일로도 저장"
     )
+    parser.add_argument(
+        "--best-per-group",
+        default=None,
+        metavar="키1,키2,...",
+        help="예: 'method,task' — 그 조합별 1위 run만 남긴 리더보드로 축약한다. "
+        "task를 안 넣으면 color·category처럼 난이도가 다른 태스크의 test_accuracy를 "
+        "직접 비교하게 되므로 주의(aihub_finetune_plots.py가 겪은 것과 같은 함정)",
+    )
     args = parser.parse_args(argv)
 
     rows = load_runs(args.artifacts_finetune_dir, args.pattern)
@@ -132,7 +170,11 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    rows = sort_rows(rows, args.sort_by, descending=not args.ascending)
+    if args.best_per_group:
+        group_keys = [key.strip() for key in args.best_per_group.split(",") if key.strip()]
+        rows = best_per_group(rows, group_keys, args.sort_by, descending=not args.ascending)
+    else:
+        rows = sort_rows(rows, args.sort_by, descending=not args.ascending)
     table = render_markdown(rows)
     print(table)
     if args.out:

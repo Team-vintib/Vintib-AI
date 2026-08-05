@@ -30,9 +30,45 @@ def test_load_runs_reads_run_name_from_folder_and_drops_huge_lists(tmp_path: Pat
     assert len(rows) == 1
     row = rows[0]
     assert row["run"] == "lora_r8_a16_d0.05_qv_category_masked_lr0.0001"
+    assert row["method"] == "LoRA"  # run_name 접두어로 자동 분류
     assert row["target_modules"] == "q_proj,v_proj"  # 리스트라도 스칼라뿐이면 문자열로 접힘
     assert "classes" not in row  # 표에 넣기엔 무의미한 라벨 목록
     assert "history" not in row  # dict가 섞인 리스트라 제외
+
+
+def test_best_per_group_keeps_top_run_per_method_and_task(tmp_path: Path) -> None:
+    """color 파인튜닝을 시작하면서 실제로 필요해진 사용례 — last-N·LoRA 각각 category·color
+    베스트만 뽑아 4행짜리 리더보드를 만든다. 같은 (method, task) 안에서 진 run은 빠져야 한다."""
+    def _row(run: str, method: str, task: str, test_accuracy: float) -> dict:
+        return {"run": run, "method": method, "task": task, "test_accuracy": test_accuracy}
+
+    rows = [
+        _row("vit_last2_category_masked_lr1e-05", "last-N", "category", 0.8210),
+        _row("vit_last4_category_masked_lr1e-05", "last-N", "category", 0.8435),
+        _row("lora_r8_category", "LoRA", "category", 0.8307),
+        _row("lora_r16_category", "LoRA", "category", 0.8290),
+        _row("vit_last4_color_masked_lr1e-05", "last-N", "color", 0.79),
+    ]
+
+    best = summary.best_per_group(rows, ["method", "task"], "test_accuracy")
+
+    names = {row["run"] for row in best}
+    assert names == {
+        "vit_last4_category_masked_lr1e-05",  # last-N/category 1위(0.8210 탈락)
+        "lora_r8_category",  # LoRA/category 1위(r16 탈락)
+        "vit_last4_color_masked_lr1e-05",  # last-N/color는 이거 하나뿐이라 그대로
+    }
+
+
+def test_best_per_group_respects_ascending_order() -> None:
+    rows = [
+        {"run": "a", "method": "LoRA", "task": "category", "test_accuracy": 0.9},
+        {"run": "b", "method": "LoRA", "task": "category", "test_accuracy": 0.1},
+    ]
+
+    best = summary.best_per_group(rows, ["method", "task"], "test_accuracy", descending=False)
+
+    assert [row["run"] for row in best] == ["b"]
 
 
 def test_sort_rows_puts_missing_metric_last_regardless_of_direction() -> None:
