@@ -20,6 +20,7 @@ from app.quality.schemas import (
     FindingStatus,
     GarmentCategory,
     GarmentSection,
+    ImageSummary,
     InspectionEnqueued,
     InspectionRequest,
     InspectionResult,
@@ -175,9 +176,15 @@ def test_finding_section_number_stays_in_the_grid(section_no):
 
 
 def test_section_score_shares_the_grid_bounds():
-    assert SectionScore(section_no=9, section=GarmentSection.hem_right, score=0.04).score == 0.04
+    score = SectionScore(image_index=0, section_no=9, section=GarmentSection.hem_right, score=0.04)
+    assert score.score == 0.04
     with pytest.raises(ValidationError):
-        SectionScore(section_no=10, section=GarmentSection.hem_right, score=0.04)
+        SectionScore(image_index=0, section_no=10, section=GarmentSection.hem_right, score=0.04)
+
+
+def test_section_score_requires_a_nonnegative_image_index():
+    with pytest.raises(ValidationError):
+        SectionScore(image_index=-1, section_no=1, section=GarmentSection.hem_right, score=0.04)
 
 
 def test_model_info_allows_a_null_model_id_for_mock_backends():
@@ -216,6 +223,7 @@ def test_response_notes_default_to_empty():
         latency_ms=1.2,
     )
     assert response.notes == []
+    assert response.image_summaries == []
 
 
 def test_response_serializes_enums_as_contract_strings():
@@ -226,9 +234,12 @@ def test_response_serializes_enums_as_contract_strings():
         condition_score=78.5,
         condition_grade=ConditionGrade.b,
         summary="오염 1건이 확인되었습니다.",
+        image_summaries=[ImageSummary(image_index=0, summary="오염 1건이 확인되었습니다.")],
         findings=[Finding(**_finding())],
         section_scores=[
-            SectionScore(section_no=5, section=GarmentSection.chest_center, score=0.81)
+            SectionScore(
+                image_index=0, section_no=5, section=GarmentSection.chest_center, score=0.81
+            )
         ],
         attention_maps=[
             AttentionMap(image_index=0, defect_type=DefectType.stain, url="https://x/0_stain.png")
@@ -243,6 +254,8 @@ def test_response_serializes_enums_as_contract_strings():
     assert dumped["findings"][0]["severity"] == "MODERATE"
     assert dumped["findings"][0]["bbox"] == [0.42, 0.35, 0.55, 0.47]
     assert dumped["attention_maps"][0]["defect_type"] == "STAIN"
+    assert dumped["section_scores"][0]["image_index"] == 0
+    assert dumped["image_summaries"][0]["summary"] == "오염 1건이 확인되었습니다."
 
 
 @pytest.mark.parametrize("score", [-1.0, 100.5])

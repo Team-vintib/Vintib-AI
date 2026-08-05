@@ -298,6 +298,45 @@ def test_extract_findings_produces_nine_section_scores():
     extracted = extract_findings([result], prompt_set, segmenter_config("mock"))
     assert len(extracted.section_scores) == 9
     assert [s.section_no for s in extracted.section_scores] == list(range(1, 10))
+    assert {s.image_index for s in extracted.section_scores} == {0}
+
+
+# --- CH020: 앞/뒤 다중 이미지 — section_scores가 이미지별로 독립적인지 -----------
+
+
+def test_extract_findings_produces_nine_section_scores_per_image():
+    # 앞/뒤 2장이면 9개씩 총 18개 — 이미지 수만큼 늘어나야 한다(합쳐지면 안 된다).
+    front = _segmentation_result(0, [], garment_mask=_full_mask())
+    back = _segmentation_result(1, [], garment_mask=_full_mask())
+    prompt_set = select_prompt_set(GarmentCategory.top_knit, BaseColor.light)
+
+    extracted = extract_findings([front, back], prompt_set, segmenter_config("mock"))
+
+    assert len(extracted.section_scores) == 18
+    assert {s.image_index for s in extracted.section_scores} == {0, 1}
+    for image_index in (0, 1):
+        by_image = [s for s in extracted.section_scores if s.image_index == image_index]
+        assert [s.section_no for s in by_image] == list(range(1, 10))
+
+
+def test_section_scores_do_not_leak_across_images():
+    # 회귀 테스트(CH020): 앞면 5번 섹션에 강한 하자가 있어도 뒷면 5번 섹션 점수는 0이어야
+    # 한다 — 예전에는 image 간 max()로 합쳐져서 뒷면이 앞면 점수를 그대로 물려받았다.
+    front_defect = _instance(DefectType.stain, _mask_at(4, 4), confidence=0.95)
+    front = _segmentation_result(0, [front_defect], garment_mask=_full_mask())
+    back = _segmentation_result(1, [], garment_mask=_full_mask())
+    prompt_set = select_prompt_set(GarmentCategory.top_knit, BaseColor.light)
+
+    extracted = extract_findings([front, back], prompt_set, segmenter_config("mock"))
+
+    front_section_5 = next(
+        s for s in extracted.section_scores if s.image_index == 0 and s.section_no == 5
+    )
+    back_section_5 = next(
+        s for s in extracted.section_scores if s.image_index == 1 and s.section_no == 5
+    )
+    assert front_section_5.score > 0.0
+    assert back_section_5.score == 0.0
 
 
 # --- CH007: Finding.no / Finding.label ----------------------------------------

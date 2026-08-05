@@ -289,8 +289,11 @@ def extract_findings(
     승격한다. SAM3 인스턴스는 defect_type별 독립 프롬프트로 나오다 보니 동일 영역이 여러
     프롬프트에 동시에 반응하는 경우가 실측(scratch.jpg)에서 확인됐다 — `dedupe_cross_type_overlap()`
     이 그 병합을 담당한다(설계: `.claude/plans/ai/CH010-sam3-cross-type-dedup.md`).
+
+    `section_scores`는 이미지마다 독립적으로 9개씩 낸다(CH020) — 예전에는 이미지 간 `max()`로
+    섞어서 앞/뒤 같은 섹션 번호의 확률이 서로를 덮어썼다.
     """
-    section_peaks = [0.0] * SECTION_COUNT
+    section_scores: list[SectionScore] = []
     kept_by_image: list[tuple[int, Instance]] = []
     kept_instances_by_image: dict[int, tuple[Instance, ...]] = {}
 
@@ -312,21 +315,18 @@ def extract_findings(
                 final, config["cross_type_iou_min"]
             )
 
-        section_peaks = [
-            max(existing, peak)
-            for existing, peak in zip(section_peaks, _section_peaks_from(final), strict=True)
-        ]
+        section_scores.extend(
+            SectionScore(
+                image_index=result.image_index,
+                section_no=section_no,
+                section=section_label(prompt_set.category, section_no),
+                score=round(peak, 4),
+            )
+            for section_no, peak in enumerate(_section_peaks_from(final), start=1)
+        )
         kept_by_image.extend((result.image_index, inst) for inst in final)
         kept_instances_by_image[result.image_index] = tuple(final)
 
-    section_scores = [
-        SectionScore(
-            section_no=section_no,
-            section=section_label(prompt_set.category, section_no),
-            score=round(peak, 4),
-        )
-        for section_no, peak in enumerate(section_peaks, start=1)
-    ]
     return FindingsResult(
         findings=_to_findings(kept_by_image, prompt_set, config["confident_threshold"]),
         section_scores=section_scores,

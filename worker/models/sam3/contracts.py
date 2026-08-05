@@ -117,9 +117,29 @@ class Finding:
 
 @dataclass(frozen=True)
 class SectionScore:
+    """부위별 하자 확률 9개, 이미지 1장 기준. 여러 이미지가 오면 이미지마다 9개씩 나온다.
+
+    CH020 전에는 `image_index`가 없어 이미지 간 확률이 `max()`로 섞였다(앞/뒤 5번 섹션이
+    서로의 값을 덮어씀). 이제 이미지별로 완전히 독립된 9개 세트를 낸다.
+    """
+
+    image_index: int
     section_no: int
     section: GarmentSection
     score: float
+
+    def to_dict(self) -> dict:
+        return {key: _plain(value) for key, value in asdict(self).items()}
+
+
+@dataclass(frozen=True)
+class ImageSummary:
+    """이미지 1장에 대한 한 줄 요약(CH020). `InspectionResult.summary`는 전체 합산이고,
+    이건 이미지별 상세다 — 앞/뒤를 캐러셀로 넘길 때 설명도 같이 바뀌어야 하는 요구
+    (`docs/requests/BE/019-product-quality-multi-image.md`)에 대응한다."""
+
+    image_index: int
+    summary: str
 
     def to_dict(self) -> dict:
         return {key: _plain(value) for key, value in asdict(self).items()}
