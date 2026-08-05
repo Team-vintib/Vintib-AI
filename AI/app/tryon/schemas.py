@@ -89,12 +89,19 @@ class TryOnOptions(BaseModel):
         description="핏 옵션. body/garment 측정값이 둘 다 있으면 적응형 계산이 이 값을 대체한다",
     )
     num_inference_steps: int = Field(
-        default=50, ge=10, le=50, description="디퓨전 스텝 수. 클수록 품질↑ 속도↓"
-        " (기본값은 50 vs 20 실측 비교로 확정 — AI/docs/tryon-advancement-strategy.md §7.1)"
+        default=50,
+        ge=10,
+        le=50,
+        description=(
+            "디퓨전 스텝 수. 클수록 품질↑ 속도↓ "
+            "(기본값은 50 vs 20 실측 비교로 확정 — AI/docs/tryon-advancement-strategy.md §7.1)"
+        ),
     )
     guidance_scale: float = Field(
-        default=3.0, ge=1.0, le=10.0, description="condition 이미지 반영 강도"
-        " (§7.1 실측으로 2.5 -> 3.0 확정)"
+        default=3.0,
+        ge=1.0,
+        le=10.0,
+        description="condition 이미지 반영 강도 (§7.1 실측으로 2.5 -> 3.0 확정)",
     )
 
     # --- 적응형 마스킹 입력(전부 선택) ------------------------------------------
