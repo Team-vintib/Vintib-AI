@@ -8,13 +8,16 @@ import type {
   ProductSaleTypeTab,
   ProductSortOption,
 } from '@/domains/product/types/productList.types'
-import type { ProductDetailViewData } from '@/domains/product/types/productDetail.types'
+import type {
+  AiQualityAnalysis,
+  ProductDetailViewData,
+  SimilarProductPricePoint,
+} from '@/domains/product/types/productDetail.types'
 import type {
   ProductRegistrationDraft,
   ProductRegistrationPhotoDraft,
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
-import { buildMockAiQualityAnalysis } from '@/domains/product/constants/aiQualityAnalysisMockData'
 import { buildMockProductDetail } from '@/domains/product/constants/productDetailMockData'
 import { PRODUCT_LIST_MOCK_DATA } from '@/domains/product/constants/productListMockData'
 import { http } from '@/shared/api/http'
@@ -61,7 +64,7 @@ interface ProductListDto {
   brandName?: string | null
   title: string
   description: string | null
-  conditionGrade: ProductConditionGrade
+  conditionGrade: ProductConditionGrade | null
   sizeLabel: string
   saleType: ProductSaleTypeDto
   saleStatus: ProductSaleStatusDto
@@ -103,6 +106,8 @@ interface ProductDetailDto extends ProductListDto {
     startedAt: string | null
     thumbnailUrl: string
   } | null
+  similarProducts?: SimilarProductPricePoint[] | null
+  aiQualityAnalysis?: AiQualityAnalysis | null
   updatedAt: string
 }
 
@@ -201,6 +206,10 @@ export const getProductList = async ({
 // 유사 상품 추천 목록. 실제 유사 판정·목록 API는 미구현(유사 기준도 BE 소관, docs/requests/BE 참고) →
 // 현재는 mock(목록 mock에서 현재 상품 제외). BE 엔드포인트가 확정되면 이 자리를 실제 호출로 교체한다.
 export const getSimilarProducts = async (productId: number): Promise<ProductListItem[]> => {
+  if (PRODUCT_API_ENABLED) {
+    return []
+  }
+
   return PRODUCT_LIST_MOCK_DATA.filter((product) => product.id !== productId).slice(0, 8)
 }
 
@@ -408,7 +417,7 @@ const toProductListItem = async (product: ProductListDto): Promise<ProductListIt
     brand: product.brandName || fallbackBrandLabel(product.brandId),
     name: product.title,
     price: product.price ?? 0,
-    conditionGrade: product.conditionGrade,
+    conditionGrade: normalizeConditionGrade(product.conditionGrade),
     saleType: toProductSaleType(product.saleType),
     saleStatus: product.saleStatus satisfies ProductSaleStatus,
     categoryId: product.categoryId,
@@ -432,14 +441,14 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
 
   return {
     id: product.id,
-    brand: product.brandName || fallbackBrandLabel(product.brandId),
+    brand: product.brandName?.trim() || '',
     title: product.title,
-    description: product.description || '',
-    category: product.categoryName || fallbackCategoryLabel(product.categoryId),
-    conditionLabel: `${product.conditionGrade}급`,
-    sizeLabel: product.sizeLabel,
-    material: product.material || '',
-    color: product.color || '',
+    description: product.description?.trim() || '',
+    category: product.categoryName?.trim() || '',
+    conditionLabel: toConditionLabel(product.conditionGrade),
+    sizeLabel: product.sizeLabel?.trim() || '',
+    material: product.material?.trim() || '',
+    color: product.color?.trim() || '',
     price: product.price ?? 0,
     saleType: product.saleType,
     saleStatus: product.saleStatus,
@@ -453,34 +462,57 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
     },
     linkedLive: toLinkedLive(product.linkedLive),
     measurements: product.measurements ?? {},
-    similarProducts: [],
-    sellerDisclosedDefects: (product.defects ?? []).map((defect) => ({
-      title: defect,
-      description: '',
-    })),
-    // ⚠️ Mock 전용 · BE/AI 확인 필요 — 실제 AI 검수(다중 이미지) 계약 전까지 데모용.
-    //   → docs/requests/BE/019-product-quality-multi-image.md
-    aiQualityAnalysis: buildMockAiQualityAnalysis(images),
+    similarProducts: normalizeSimilarProducts(product.similarProducts),
+    sellerDisclosedDefects: (product.defects ?? [])
+      .map((defect) => defect.trim())
+      .filter(Boolean)
+      .map((defect) => ({
+        title: defect,
+        description: '',
+      })),
+    aiQualityAnalysis: product.aiQualityAnalysis ?? null,
   }
 }
 
-// BE 상세 계약(010)의 linkedLive를 FE 뷰 타입(ProductLinkedLive)으로 변환한다.
-// startedAt이 있으면 방송 중(LIVE), 없으면 방송 예정(SCHEDULED)으로 본다.
+// 종료·취소·예약 방송은 상품 상세의 "라이브 입장" 대상이 아니다.
+// BE status가 실제 LIVE인 경우에만 연결 라이브를 노출한다.
 const toLinkedLive = (
   linkedLive: ProductDetailDto['linkedLive'],
 ): ProductDetailViewData['linkedLive'] => {
-  if (!linkedLive) {
+  if (!linkedLive || linkedLive.status?.trim().toUpperCase() !== 'LIVE') {
     return null
   }
 
   return {
     id: linkedLive.liveId,
     title: linkedLive.title,
-    startsAt: linkedLive.startedAt ?? linkedLive.scheduledAt ?? '',
-    status: linkedLive.startedAt ? 'LIVE' : 'SCHEDULED',
+    startsAt: linkedLive.startedAt ?? '',
+    status: 'LIVE',
     thumbnailUrl: linkedLive.thumbnailUrl,
   }
 }
+
+const normalizeConditionGrade = (
+  conditionGrade: ProductConditionGrade | null | undefined,
+): ProductConditionGrade | '' =>
+  conditionGrade && ['S', 'A', 'B', 'C'].includes(conditionGrade) ? conditionGrade : ''
+
+const toConditionLabel = (conditionGrade: ProductConditionGrade | null | undefined) => {
+  const normalizedGrade = normalizeConditionGrade(conditionGrade)
+  return normalizedGrade ? `${normalizedGrade}급` : ''
+}
+
+const normalizeSimilarProducts = (
+  products: SimilarProductPricePoint[] | null | undefined,
+): SimilarProductPricePoint[] =>
+  (products ?? []).filter(
+    (product) =>
+      Number.isInteger(product.id) &&
+      product.id > 0 &&
+      product.title.trim() !== '' &&
+      Number.isFinite(product.price) &&
+      product.price >= 0,
+  )
 
 const toProductSaleType = (saleType: ProductSaleTypeDto): ProductSaleType =>
   saleType === 'AUCTION' ? 'AUCTION' : 'DIRECT'

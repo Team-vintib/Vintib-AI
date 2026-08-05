@@ -49,7 +49,9 @@ const handleImageError = (event: Event) => {
           :alt="product.imageAlt"
           @error="handleImageError"
         />
-        <span class="product-card__grade">{{ product.conditionGrade }}급</span>
+        <span v-if="product.conditionGrade" class="product-card__grade">
+          {{ product.conditionGrade }}급
+        </span>
       </RouterLink>
 
       <button

@@ -20,6 +20,7 @@ interface ProductPriceBand {
   products: SimilarProductPricePoint[]
 }
 
+const MAX_VISIBLE_PRODUCTS = 3
 const selectedBandStart = ref<number | null>(null)
 
 const availableProducts = computed(() =>
@@ -72,6 +73,10 @@ const maximumProductCount = computed(() =>
 
 const selectedBand = computed(() =>
   priceBands.value.find((band) => band.start === selectedBandStart.value),
+)
+
+const visibleSelectedProducts = computed(
+  () => selectedBand.value?.products.slice(0, MAX_VISIBLE_PRODUCTS) ?? [],
 )
 
 const getBarHeight = (productCount: number) => {
@@ -152,12 +157,12 @@ watch(
             <span>선택한 가격대</span>
             <strong>{{ selectedBand.label }} 유사 상품</strong>
           </div>
-          <span>{{ selectedBand.products.length }}개</span>
+          <span>{{ visibleSelectedProducts.length }}개</span>
         </div>
 
         <div class="price-distribution__product-list">
           <button
-            v-for="product in selectedBand.products"
+            v-for="product in visibleSelectedProducts"
             :key="product.id"
             class="price-distribution__product"
             type="button"
