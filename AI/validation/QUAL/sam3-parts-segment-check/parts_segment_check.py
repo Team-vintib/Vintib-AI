@@ -131,6 +131,8 @@ def run_parts_based(caller: Sam3Caller, image: Image.Image, category: str, dry_r
         # 원본 전체에서 곧바로 탐지한다("하자 없음"과 "탐지 실패"를 구별하기 위한 안전장치,
         # 프로덕션 findings.py의 같은 원칙).
         defects, benigns = _detect_defects_and_benigns(caller, image, dry_run)
+        for inst in defects:
+            inst["part"] = None
         kept = _finalize(defects, benigns, garment_mask)
         return {"kept": kept, "garment_found": False, "parts": []}
 
@@ -158,6 +160,12 @@ def run_parts_based(caller: Sam3Caller, image: Image.Image, category: str, dry_r
             garment_crop, part["bbox"], part["mask"], PART_CROP_PAD_RATIO
         )
         defects, benigns = _detect_defects_and_benigns(caller, part_crop, dry_run)
+        # 공간 매칭: 이 하자가 "어느 파츠 크롭 안에서" 나왔는지 태그한다. 파츠끼리는 크롭이
+        # 서로 겹치지 않는 게 원칙이라(각자 별도 bbox+mask) 하자 1건이 여러 파츠에 동시에
+        # 속하는 경우는 이 구조에서 생기지 않는다 — IoU 비교 없이 "어느 크롭에서 탐지됐는가"
+        # 자체가 매칭 결과다.
+        for inst in defects:
+            inst["part"] = part["type"]
         # 파츠 크롭 좌표 -> 의류 크롭 좌표(아직 원본 좌표 아님, 다음 단계에서 한 번 더 remap).
         all_defects.extend(
             qc_shared.remap_instances_to_full(defects, part_crop_box, garment_crop.size)
@@ -168,8 +176,10 @@ def run_parts_based(caller: Sam3Caller, image: Image.Image, category: str, dry_r
 
     if not part_instances:
         # 파츠를 하나도 못 찾았으면(어휘 미스매치 등) 의류 크롭 전체에서 곧바로 탐지 —
-        # baseline과 사실상 같은 경로로 폴백한다.
+        # baseline과 사실상 같은 경로로 폴백한다. 파츠가 없으니 매칭도 없다.
         all_defects, all_benigns = _detect_defects_and_benigns(caller, garment_crop, dry_run)
+        for inst in all_defects:
+            inst["part"] = None
 
     # 의류 크롭 좌표 -> 원본 좌표.
     all_defects = qc_shared.remap_instances_to_full(all_defects, garment_crop_box, full_size)

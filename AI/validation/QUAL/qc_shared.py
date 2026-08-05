@@ -528,7 +528,7 @@ def to_serializable(instances):
     `type` 은 코드(STAIN 등)로 그대로 두고 `label` 에 한글 표시명을 별도로 담는다 —
     FE 전달 스키마(안)이 `defect_type` + `label` 두 필드로 나눈 것과 같은 이유다.
     """
-    fields = ("no", "type", "prompt", "bbox", "confidence", "garment_overlap")
+    fields = ("no", "type", "prompt", "bbox", "confidence", "garment_overlap", "part")
     out = []
     for d in instances:
         row = {k: d[k] for k in fields if k in d}
