@@ -67,7 +67,7 @@ const handleAvatarError = (event: Event) => {
     >
       <div class="seller-grid">
         <RouterLink
-          v-for="seller in homeData.followedSellers"
+          v-for="seller in homeData.followedSellers.slice(0, 8)"
           :key="seller.id"
           class="seller-card"
           :to="getSellerProfilePath(seller.id)"
@@ -104,7 +104,7 @@ const handleAvatarError = (event: Event) => {
     >
       <div class="live-grid">
         <LiveCard
-          v-for="live in homeData.liveNow"
+          v-for="live in homeData.liveNow.slice(0, 8)"
           :key="live.id"
           :live="live"
           :to="getLivePath(live.id)"
@@ -122,7 +122,7 @@ const handleAvatarError = (event: Event) => {
     >
       <div class="schedule-grid">
         <LiveCard
-          v-for="live in homeData.scheduledLives"
+          v-for="live in homeData.scheduledLives.slice(0, 8)"
           :key="live.id"
           :live="live"
           variant="scheduled"
@@ -140,7 +140,7 @@ const handleAvatarError = (event: Event) => {
     >
       <div class="product-grid">
         <ProductCard
-          v-for="product in homeData.recommendedProducts"
+          v-for="product in homeData.recommendedProducts.slice(0, 8)"
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
@@ -167,7 +167,7 @@ const handleAvatarError = (event: Event) => {
     >
       <div class="product-grid">
         <ProductCard
-          v-for="product in homeData.upcomingAuctionProducts"
+          v-for="product in homeData.upcomingAuctionProducts.slice(0, 8)"
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
