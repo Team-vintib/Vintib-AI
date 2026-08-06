@@ -9,6 +9,7 @@ import { PRODUCT_LIST_MOCK_DATA } from '@/domains/product/constants/productListM
 
 import type {
   MyLiveItem,
+  MyMonthlyRevenue,
   MyOrderItem,
   MyOrderStatus,
   MyPageViewData,
@@ -17,7 +18,9 @@ import type {
   MyProfile,
   MyProfileUpdateRequest,
   MySaleItem,
+  MySalesPerformance,
   MySettlementStatus,
+  MySettlementSummary,
   MyWishItem,
 } from '@/domains/my/types/my.types'
 import type {
@@ -187,7 +190,6 @@ const createEmptyMyPageViewData = (userId: number): MyPageViewData => ({
     },
     todoCounts: {
       shippingPending: 0,
-      refundRequests: 0,
       scheduledLives: 0,
     },
     productStatusCounts: {
@@ -233,8 +235,12 @@ export const getMyPageViewData = async (userId: number): Promise<MyPageViewData>
   const products = getSettledValue(productsResult)
   const lives = getSettledValue(livesResult)
   const unreadNotifications = getSettledValue(notificationCountResult)
+  const sellerOrders = getSettledValue(salesResult)
   const orders = getSettledValue(ordersResult)?.map(toMyOrderItem) ?? null
-  const sales = getSettledValue(salesResult)?.map(toMySaleItem) ?? null
+  const sales = sellerOrders?.map(toMySaleItem) ?? null
+  const dashboardMetrics = sellerOrders
+    ? buildSellerDashboardMetrics(sellerOrders, products?.length ?? 0)
+    : null
 
   return {
     ...baseViewData,
@@ -254,11 +260,16 @@ export const getMyPageViewData = async (userId: number): Promise<MyPageViewData>
         orders: orders?.length ?? 0,
         sales: sales?.length ?? 0,
       },
+      salesPerformance: dashboardMetrics?.salesPerformance ?? baseViewData.summary.salesPerformance,
+      settlementSummary: dashboardMetrics
+        ? { ...dashboardMetrics.settlementSummary, withdrawableAmount: 0 }
+        : baseViewData.summary.settlementSummary,
       productStatusCounts: products ? getProductStatusCounts(products) : baseViewData.summary.productStatusCounts,
       todoCounts: {
-        ...baseViewData.summary.todoCounts,
+        shippingPending: dashboardMetrics?.shippingPending ?? 0,
         scheduledLives: lives?.filter((live) => live.status === 'SCHEDULED').length ?? 0,
       },
+      monthlyRevenue: dashboardMetrics?.monthlyRevenue ?? baseViewData.summary.monthlyRevenue,
     },
   }
 }
@@ -344,24 +355,40 @@ const getMySellerProducts = async (userId: number): Promise<MyProductItem[]> => 
   return products.filter((item): item is MyProductItem => item !== null)
 }
 
+const MY_ORDERS_PAGE_SIZE = 100
+
+// 판매자 대시보드 집계(월별 수익 등)가 정확하려면 첫 페이지만으론 부족해 전체를 순회한다.
 const getMyOrders = async (
   userId: number,
   role: 'BUYER' | 'SELLER',
 ): Promise<OrderListItemDto[]> => {
+  const firstPage = await fetchMyOrdersPage(userId, role, 0)
+
+  if (firstPage.meta.totalPages <= 1) {
+    return firstPage.items
+  }
+
+  const restPages = await Promise.all(
+    Array.from({ length: firstPage.meta.totalPages - 1 }, (_, index) =>
+      fetchMyOrdersPage(userId, role, index + 1),
+    ),
+  )
+
+  return [firstPage, ...restPages].flatMap((page) => page.items)
+}
+
+const fetchMyOrdersPage = async (userId: number, role: 'BUYER' | 'SELLER', page: number) => {
   const response = await http.get<
     ApiResponse<PageResponse<OrderListItemDto> | BackendPageResponse<OrderListItemDto>>
   >(`/users/${userId}/orders`, {
     params: {
       role,
-      page: 0,
-      size: 100,
+      page,
+      size: MY_ORDERS_PAGE_SIZE,
     },
   })
-  const pageResponse = normalizePageResponse(
-    unwrapApiData(response.data, '주문 목록을 불러오지 못했습니다.'),
-  )
 
-  return pageResponse.items
+  return normalizePageResponse(unwrapApiData(response.data, '주문 목록을 불러오지 못했습니다.'))
 }
 
 const getMyHostLives = async (userId: number): Promise<MyLiveItem[]> => {
@@ -385,21 +412,6 @@ const getMyHostLives = async (userId: number): Promise<MyLiveItem[]> => {
   return pageResponse.items
     .map(toMyLiveItem)
     .filter((item): item is MyLiveItem => item !== null)
-}
-
-export const getMyOrderDetail = async (
-  userId: number,
-  orderId: number,
-): Promise<MyOrderItem> => {
-  void userId
-  void orderId
-  throw new Error('구매 상세 API가 아직 연결되지 않았습니다.')
-}
-
-export const getMySaleDetail = async (userId: number, saleId: number): Promise<MySaleItem> => {
-  void userId
-  void saleId
-  throw new Error('판매 상세 API가 아직 연결되지 않았습니다.')
 }
 
 export const updateMyProfile = async (
@@ -606,6 +618,91 @@ const toMySaleItem = (order: OrderListItemDto): MySaleItem => ({
   address: '',
   detailAddress: '',
 })
+
+const MONTHLY_REVENUE_MONTH_COUNT = 12
+const SHIPPING_PENDING_STATUSES = new Set(['PAID', 'SHIPPING'])
+const SETTLEMENT_PENDING_STATUSES = new Set(['PAID', 'SHIPPING', 'DELIVERED', 'CONFIRMED'])
+
+interface SellerDashboardMetrics {
+  salesPerformance: MySalesPerformance
+  settlementSummary: Omit<MySettlementSummary, 'withdrawableAmount'>
+  shippingPending: number
+  monthlyRevenue: MyMonthlyRevenue[]
+}
+
+// 판매자 대시보드 전용 집계 API가 없어, 판매 주문 목록(role=SELLER)을 클라이언트에서 묶어
+// salesPerformance/settlementSummary/monthlyRevenue를 만든다.
+// 정산 완료 "시각"을 담는 필드가 BE에 없어(docs/requests/BE/030), 주문 생성일(createdAt)을
+// 정산일 근사치로 쓴다 — BE가 필드를 추가하면 이 함수만 교체하면 된다.
+const buildSellerDashboardMetrics = (
+  sellerOrders: OrderListItemDto[],
+  registeredProductCount: number,
+): SellerDashboardMetrics => {
+  const settledOrders = sellerOrders.filter((order) => order.status === 'SETTLED')
+  const pendingOrders = sellerOrders.filter((order) => SETTLEMENT_PENDING_STATUSES.has(order.status))
+
+  const grossRevenue = settledOrders.reduce((sum, order) => sum + order.orderPrice, 0)
+  const soldCount = settledOrders.length
+  const averageOrderAmount = soldCount > 0 ? Math.round(grossRevenue / soldCount) : 0
+  const sellThroughRate =
+    registeredProductCount > 0 ? Math.round((soldCount / registeredProductCount) * 100) : 0
+
+  const purchaseCountByBuyerId = new Map<number, number>()
+  settledOrders.forEach((order) => {
+    purchaseCountByBuyerId.set(order.buyerId, (purchaseCountByBuyerId.get(order.buyerId) ?? 0) + 1)
+  })
+  const repeatBuyerCount = [...purchaseCountByBuyerId.values()].filter((count) => count > 1).length
+
+  const pendingAmount = pendingOrders.reduce((sum, order) => sum + order.orderPrice, 0)
+  const lastSettledAt = settledOrders.map((order) => order.createdAt).sort().at(-1) ?? ''
+
+  return {
+    salesPerformance: {
+      soldCount,
+      grossRevenue,
+      // BE 응답에 수수료 관련 필드가 없어 순수익은 총매출과 동일하게 둔다.
+      netRevenue: grossRevenue,
+      averageOrderAmount,
+      sellThroughRate,
+      repeatBuyerCount,
+    },
+    settlementSummary: {
+      settledAmount: grossRevenue,
+      pendingAmount,
+      escrowAmount: pendingAmount,
+      lastSettledAt,
+    },
+    shippingPending: sellerOrders.filter((order) => SHIPPING_PENDING_STATUSES.has(order.status)).length,
+    monthlyRevenue: buildMonthlyRevenue(settledOrders),
+  }
+}
+
+// 이번 달을 포함한 최근 12개월을 항상 12칸으로 채운다(주문이 없는 달도 0으로 표시).
+const buildMonthlyRevenue = (settledOrders: OrderListItemDto[]): MyMonthlyRevenue[] => {
+  const now = new Date()
+  const months = Array.from({ length: MONTHLY_REVENUE_MONTH_COUNT }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (MONTHLY_REVENUE_MONTH_COUNT - 1 - index), 1)
+
+    return { key: `${date.getFullYear()}-${date.getMonth()}`, month: `${date.getMonth() + 1}월` }
+  })
+
+  const bucketByKey = new Map<string, { revenue: number; soldCount: number }>()
+  settledOrders.forEach((order) => {
+    const orderDate = new Date(order.createdAt)
+    const key = `${orderDate.getFullYear()}-${orderDate.getMonth()}`
+    const bucket = bucketByKey.get(key) ?? { revenue: 0, soldCount: 0 }
+
+    bucket.revenue += order.orderPrice
+    bucket.soldCount += 1
+    bucketByKey.set(key, bucket)
+  })
+
+  return months.map(({ key, month }) => {
+    const bucket = bucketByKey.get(key) ?? { revenue: 0, soldCount: 0 }
+
+    return { month, revenue: bucket.revenue, soldCount: bucket.soldCount }
+  })
+}
 
 const toMySettlementStatus = (status: string): MySettlementStatus => {
   if (status === 'SETTLED') {

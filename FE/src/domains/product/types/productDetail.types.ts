@@ -102,5 +102,5 @@ export interface ProductDetailViewData {
   measurements: Record<string, number>
   similarProducts: SimilarProductPricePoint[]
   sellerDisclosedDefects: SellerDisclosedDefect[]
-  aiQualityAnalysis: AiQualityAnalysis
+  aiQualityAnalysis: AiQualityAnalysis | null
 }

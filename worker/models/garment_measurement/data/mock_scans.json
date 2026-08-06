@@ -1,0 +1,31 @@
+{
+  "scenarios": {
+    "default": {
+      "reference_found": true,
+      "pixel_to_cm_ratio": 0.2645,
+      "garment_found": true,
+      "bbox": [140.0, 150.0, 660.0, 600.0],
+      "landmarks": {
+        "SHOULDER_LEFT": { "x": 320.0, "y": 210.0, "confidence": 0.93 },
+        "SHOULDER_RIGHT": { "x": 610.0, "y": 208.0, "confidence": 0.94 },
+        "SLEEVE_END_LEFT": { "x": 180.0, "y": 430.0, "confidence": 0.88 },
+        "SLEEVE_END_RIGHT": { "x": 760.0, "y": 428.0, "confidence": 0.87 },
+        "NECKLINE_CENTER": { "x": 465.0, "y": 240.0, "confidence": 0.90 },
+        "HEM_LEFT": { "x": 300.0, "y": 700.0, "confidence": 0.91 },
+        "HEM_CENTER": { "x": 465.0, "y": 705.0, "confidence": 0.92 },
+        "HEM_RIGHT": { "x": 630.0, "y": 698.0, "confidence": 0.90 }
+      }
+    },
+    "9001": {
+      "reference_found": false,
+      "garment_found": false,
+      "landmarks": {}
+    },
+    "9002": {
+      "reference_found": true,
+      "pixel_to_cm_ratio": 0.2645,
+      "garment_found": false,
+      "landmarks": {}
+    }
+  }
+}

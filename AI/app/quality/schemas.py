@@ -126,9 +126,35 @@ class InspectionRequest(BaseModel):
             "켜면 이미지·하자유형마다 PNG를 만들어 응답이 느려진다"
         ),
     )
+    include_descriptions: bool = Field(
+        default=False,
+        description=(
+            "하자 한 줄 설명(sVLM, finding.description) 생성 여부. 기본 off — finding당 "
+            "수 초가 걸려 이미지당 수십 초~수 분까지 늘어날 수 있다(CH011). 켜지 않으면 "
+            "description은 계속 None"
+        ),
+    )
 
 
-# --- 응답 ------------------------------------------------------------------
+# --- 접수 응답 --------------------------------------------------------------
+
+
+class InspectionEnqueued(BaseModel):
+    """`POST /quality/inspections`의 응답. **결과가 아니라 접수증이다.**
+
+    실제 결과는 `GET /ai/jobs/{job_id}`로 폴링한다 — 시착과 같은 형식이라 BE가 폴링 로직을
+    하나만 유지하면 된다. `result` 필드에 아래 `InspectionResult` 형태가 담긴다.
+    """
+
+    job_id: str = Field(description="게이트웨이가 채번한 job id. 이 값으로 결과를 폴링한다")
+    product_id: int = Field(description="요청에서 받은 값을 그대로 에코")
+
+
+# --- job result 계약 --------------------------------------------------------
+# 아래 모델들은 **AI가 직접 생성하지 않는다.** 워커(worker/models/sam3/)가 만들어
+# `JobResult.result`에 dict로 싣는 값의 형태를 문서화·고정하는 용도다. 워커 쪽 사본은
+# `worker/models/sam3/contracts.py`이며, 둘이 어긋나지 않는지는
+# `AI/test/quality/test_quality_contract.py`가 검사한다.
 
 
 class ModelInfo(BaseModel):
@@ -157,6 +183,25 @@ class Finding(BaseModel):
     matched_prompt: str = Field(description="이 항목을 잡아낸 프롬프트")
     statement_required: bool = Field(description="판매자 소명 입력 대상인지(저장은 BE)")
     needs_seller_review: bool = Field(description="모델 신뢰도가 낮아 판매자 확인이 필수인지")
+    no: int | None = Field(
+        default=None,
+        description=(
+            "같은 image_index 안에서의 표시 번호(1부터). annotated_images의 bbox 숫자와 "
+            "일치한다 — FE가 이 값으로 이미지 위 숫자와 리스트 항목을 매칭한다. 이 필드를 "
+            "아직 채우지 않는 백엔드는 None"
+        ),
+    )
+    label: str | None = Field(
+        default=None, description="하자 유형의 한글 태그(오염/얼룩/구멍·찢어짐 등). 미채움 시 None"
+    )
+    description: str | None = Field(
+        default=None,
+        description=(
+            "하자에 대한 sVLM 생성 한 줄 설명(CH011). 요청의 include_descriptions가 "
+            "True이고 status가 DETECTED일 때만 채워진다 — 그 외(옵트인 안 함, SUSPECTED, "
+            "개별 생성 실패)에는 None"
+        ),
+    )
 
 
 class SectionScore(BaseModel):
@@ -175,8 +220,19 @@ class AttentionMap(BaseModel):
     url: str
 
 
-class InspectionResponse(BaseModel):
-    """검수 1건의 결과. `GET /quality/inspections/{id}` 재조회 시에도 같은 형태다."""
+class AnnotatedImage(BaseModel):
+    """숫자만 넘버링된 bbox 오버레이 PNG의 공개 URL. 이미지 1장당 최대 1개(하자가 있을 때만).
+
+    `attention_maps`(하자유형별 연속 히트맵, 여러 장)와는 다른 산출물이다 — 이건 원본 위에
+    박스 + 숫자만 그린 이미지 1장이고, 숫자는 같은 image_index의 `Finding.no`와 일치한다.
+    """
+
+    image_index: int = Field(ge=0)
+    url: str
+
+
+class InspectionResult(BaseModel):
+    """검수 1건의 결과. `GET /ai/jobs/{job_id}` 응답의 `result` 필드에 담긴다."""
 
     inspection_id: str
     product_id: int
@@ -187,60 +243,17 @@ class InspectionResponse(BaseModel):
     findings: list[Finding]
     section_scores: list[SectionScore]
     attention_maps: list[AttentionMap]
+    annotated_images: list[AnnotatedImage] = Field(
+        default_factory=list,
+        description="숫자 넘버링 bbox 이미지(이미지당 최대 1장, 하자 있는 이미지만). 미구현 백엔드는 빈 리스트",
+    )
     notes: list[str] = Field(
         default_factory=list, description="판매자·FE에 보일 주의 문구(모델 한계 안내 등)"
     )
-    latency_ms: float
+    latency_ms: float = Field(description="워커의 추론+후처리 소요 시간(큐 대기 제외)")
 
 
-# --- 활성 설정 노출 (디버그·데모용) ---------------------------------------
-
-
-class BackendView(BaseModel):
-    """세그멘터 백엔드 하나의 설정. "모델을 갈아끼웠다"를 API로 확인하는 용도."""
-
-    backend: str
-    model_id: str | None
-    description: str
-    active: bool
-    mask_size: int
-    defect_threshold: float
-    confident_threshold: float
-    clean_margin: float
-    min_area_ratio: float
-
-
-class DefectPolicyView(BaseModel):
-    """하자 유형 하나의 취급 정책과 그 **근거**."""
-
-    defect_type: DefectType
-    label: str
-    trusted: bool = Field(description="False면 확률이 높아도 DETECTED로 노출하지 않는다")
-    needs_seller_review: bool
-    statement_required: bool
-    weight: float = Field(description="감점 가중치 — 미확정 임의값")
-    evidence: str = Field(description="LAB-12 실측 결과 또는 미검증 표시")
-
-
-class PromptSetView(BaseModel):
-    """카테고리 × 기본색 조합 하나의 프롬프트 세트."""
-
-    key: str
-    category: GarmentCategory
-    base_color: BaseColor
-    clean_prompt: str
-    defect_prompts: dict[str, DefectType] = Field(description="프롬프트 문구 → 하자 유형")
-    sections: list[GarmentSection] = Field(description="3×3 부위 라벨(섹션 1~9 순서)")
-
-
-class QualityConfigResponse(BaseModel):
-    """현재 활성 설정 전체. 값 확정 전 단계라 무엇이 임의값인지 함께 드러낸다."""
-
-    active_segmenter: str
-    backends: list[BackendView]
-    taxonomy: list[DefectPolicyView]
-    prompt_sets: list[PromptSetView]
-    mock_product_ids: list[int] = Field(
-        description="목업 백엔드에서 시나리오가 등록된 product_id. 그 외는 시드 기반 합성"
-    )
-    unverified_notice: str = Field(description="아직 실측으로 확정되지 않은 값에 대한 경고")
+# 활성 설정 노출용 스키마(`GET /quality/prompt-sets`)는 제거했다 — 프롬프트·임계치·하자 분류
+# 체계가 전부 워커(`worker/models/sam3/registry.py`)로 옮겨가서 게이트웨이가 그 값을 알지
+# 못한다. 설정을 확인하려면 워커 쪽 파일을 보거나, 필요해지면 워커가 job result에 실어 보내는
+# 방식으로 되살린다(`ModelInfo`가 이미 백엔드·프롬프트 세트를 담고 있다).

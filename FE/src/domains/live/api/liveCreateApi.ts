@@ -50,6 +50,7 @@ interface LiveCreateProductDto {
   brandName?: string | null
   title: string
   conditionGrade?: string | null
+  saleType?: string | null
   saleStatus?: string | null
   price: number | null
   primaryImageUrl?: string | null
@@ -115,6 +116,7 @@ const toLiveCreateProduct = async (product: LiveCreateProductDto): Promise<LiveC
   category: product.categoryName || '카테고리 미상',
   condition: product.conditionGrade || product.saleStatus || '상태 미상',
   price: product.price ?? 0,
+  isAuctionScheduled: product.saleType === 'AUCTION' || product.saleStatus === 'AUCTION_SCHEDULED',
   thumbnailUrl:
     product.primaryImageUrl || (await getProductPrimaryImageUrl(product.id).catch(() => '')),
 })

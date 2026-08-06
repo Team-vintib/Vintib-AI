@@ -129,13 +129,8 @@ onMounted(() => {
 
 <template>
   <DefaultLayout content-max-width="960px">
-    <section class="notification-page" aria-labelledby="notification-title">
-      <header class="notification-page__header">
-        <div>
-          <h1 id="notification-title">알림센터</h1>
-          <p>라이브, 경매, 거래와 배송 상태를 한곳에서 확인합니다.</p>
-        </div>
-
+    <section class="notification-page" aria-label="알림센터">
+      <div class="notification-page__actions">
         <button
           class="notification-page__read-all"
           type="button"
@@ -149,7 +144,7 @@ onMounted(() => {
         >
           {{ readAllButtonLabel }}
         </button>
-      </header>
+      </div>
 
       <div class="notification-page__tabs" role="tablist" aria-label="알림 카테고리">
         <button
@@ -231,33 +226,9 @@ onMounted(() => {
   gap: var(--space-6);
 }
 
-.notification-page__header {
+.notification-page__actions {
   display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: var(--space-6);
-}
-
-.notification-page__eyebrow {
-  margin-bottom: var(--space-1);
-  color: var(--color-primary);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-control);
-}
-
-.notification-page__header h1 {
-  color: var(--color-text-primary);
-  font-size: 36px;
-  font-weight: var(--font-weight-extrabold);
-  line-height: var(--line-height-4xl);
-}
-
-.notification-page__header p:not(.notification-page__eyebrow) {
-  margin-top: var(--space-2);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
+  justify-content: flex-end;
 }
 
 .notification-page__read-all {
@@ -388,17 +359,6 @@ button.notification-page__tab--active::after {
 }
 
 @media (max-width: 640px) {
-  .notification-page__header {
-    align-items: stretch;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-
-  .notification-page__header h1 {
-    font-size: var(--font-size-3xl-plus);
-    line-height: var(--line-height-3xl);
-  }
-
   .notification-page__read-all {
     width: 100%;
   }

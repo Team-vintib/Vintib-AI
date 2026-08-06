@@ -18,11 +18,36 @@
 
 - Python 3.12+, FastAPI 0.139.0, Uvicorn(standard), Pydantic v2 / pydantic-settings
 - Lint/Format: Ruff, Black (requirements-dev.txt)
-- 비동기 작업 큐: Celery + Redis 도입 예정 (무거운 시착 합성 요청 처리, 아직 미설치)
+- 비동기 작업 큐: **Celery는 안 쓴다.** Redis(큐 저장소) + AI 게이트웨이의 HTTP poll/result
+  엔드포인트로 직접 구현(`app/gateway/`, `worker/base_worker.py`). 이유는 아래 "왜 Celery가
+  아닌가" 참고
 - 가상 시착 모델: 미확정 (diffusion 기반 try-on 계열 검토)
 - 이미지 처리: Pillow, OpenCV (아직 미설치)
 - STT: 미확정 (Whisper 계열 또는 클라우드 API)
 - 반복 질문 답변용 RAG: pgvector(PostgreSQL) 검토
+
+### 왜 Celery가 아닌가
+
+한때(`-191`) `AI/tryon_service/`에 FastAPI+Celery 조합을 실제로 만들었다가 `-189`에서
+제거했다. 이유는 네트워크 제약과 정면충돌해서다.
+
+- Celery 워커는 브로커(Redis)에 **직접** TCP로 접속해서 그 프로토콜로 대화한다 — HTTP가
+  아니다.
+- 이 Redis는 EC2 Docker 내부망에만 떠 있고 호스트 포트를 절대 열지 않는다(`docker-compose.yml`
+  베이스 파일 규칙). 인증 없는 Redis를 인터넷에 그대로 노출하는 셈이라 의도적으로 막아둔
+  것이다.
+- 그래서 팀원 노트북(워커)이 Redis에 접속하려 해도 애초에 연결할 공인 주소 자체가 없다.
+  워커가 NAT 뒤에 있어 "인바운드가 안 되는" 것과는 별개 문제다 — 워커가 먼저 거는 연결(아웃
+  바운드)조차 받아줄 상대가 없는 것.
+- 대신 워커는 유일하게 열려 있는 문(Caddy 443, HTTPS)으로 AI 게이트웨이에 HTTP 요청만
+  보낸다. 게이트웨이가 Redis와 같은 내부망에 있으니 워커를 대신해 `RPUSH`/`BLPOP`을 해준다
+  (`AI/app/gateway/router.py`의 `/ai/workers/poll`, `/ai/workers/result`). Celery가 하던
+  역할(큐 적재/소비, 재시도)을 게이트웨이 + 워커의 HTTP 폴링 조합으로 필요한 만큼만 직접
+  구현한 것 — Celery의 스케줄링·모니터링 같은 부가기능은 지금 규모에 필요 없어 가져오지
+  않았다.
+
+자세한 구조는 [`docs/infra-architecture.md`](./docs/infra-architecture.md) §2·§3.4,
+API 계약은 [`docs/api-reference.md`](./docs/api-reference.md) 참고.
 
 > 로컬에 Python이 없어 실제 설치·실행은 못 해봤고, `requirements.txt`는 PyPI 최신 안정 버전으로 고정만 해둠. 최초 실행 시 버전 충돌 있으면 조정 필요.
 

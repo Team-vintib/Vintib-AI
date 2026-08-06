@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import logoImage from '@/assets/images/logo.png'
+import logoImage from '@/assets/images/logo-white.png'
 import { linkSsafyAccount } from '@/domains/auth/api/authApi'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import {

@@ -3,6 +3,32 @@
 담당 범위와 기술 스택(Python 3.12+, FastAPI 0.139.0)은 루트 `CLAUDE.md` 참고. 이 문서는
 `AI/` 폴더 안에서만 적용되는 실행/CI/코딩 규칙을 다룬다.
 
+## 🚫 하드 룰 — GMS API 호출은 Claude가 절대 실행하지 않는다
+
+**`GMS_API_KEY`를 쓰는 코드를 Claude가 직접 실행하는 것을 금지한다.** 스크립트 작성·수정은
+하되, **실행은 항상 사용자가 직접 한다.**, **Cost가 비쌀 것으로 예상되는 모델들은 코드에 추가하지 않는다. 사용자가 직접 변경하도록 안내만 해준다.**
+
+- 금지 대상: GMS 게이트웨이(`gms.ssafy.io`)를 경유하는 **모든** 스크립트·스모크 테스트·노트북 셀·
+  프로덕션 코드 경로. 모델 종류(haiku/sonnet/gemini)나 호출 횟수와 무관하게 **한 번도
+  실행하지 않는다.** 구체적으로:
+  - `validation/PRICE/pricing-model-check/*.py`
+  - **`app/pricing/`의 `llm_web_search` comps 백엔드** — 프로덕션 경로에도 GMS 호출이 있다.
+    `registry.ACTIVE_COMPS_SOURCE`의 기본값은 항상 `"mock"`이어야 하고, Claude가 이 값을
+    `"llm_web_search"`로 바꾸거나 그 상태로 서버·pytest를 실행하는 것을 금지한다.
+    실백엔드 전환은 사용자만 한다.
+  - **`app/pricing/`의 `naver` retail 백엔드** — GMS는 아니지만 같은 이유로 금지 대상이다.
+    `registry.ACTIVE_RETAIL_SOURCE`의 기본값은 항상 `"mock"`이어야 하고, Claude가 이 값을
+    `"naver"`로 바꾸거나 그 상태로 서버·pytest를 실행하는 것을 금지한다. 실백엔드 전환은
+    사용자만 한다.
+- 연결 확인·지연시간 측정·커버리지 비교처럼 "가볍다"고 판단되는 경우에도 예외 없다.
+  판단 근거가 필요하면 실행을 사용자에게 요청하고 결과를 받아서 해석한다.
+- **이유**: GMS는 팀 공용 유료 쿼터다. 서버사이드 웹검색은 별도 과금이고, 후보 목록을 순회하는
+  스크립트는 사용자가 의도하지 않은 고가 모델까지 자동으로 호출한다. 실제로 `smoke_gms.py`가
+  후보를 순회하며 `claude-opus-4-6`을 호출한 사고가 있었다(2026-07-29).
+- 네이버 오픈API처럼 GMS와 무관한 무료 API도 **호출 비용·쿼터가 있는 외부 API면 먼저 물어본다.**
+- 스크립트를 새로 만들 때는 **고가 모델이 기본 후보로 들어가지 않게** 하고, 비용이 드는 경로는
+  기본 off(mock 폴백) + 명시적 플래그로만 켜지게 설계한다.
+
 ## 디렉터리 구조
 
 - `app/` — **프로덕션 코드**(도메인 우선 구조, 아래 "프로덕션 모듈 구조" 참고). 진입점은
@@ -18,10 +44,14 @@
   sentence-transformers, FlagEmbedding, datasets 등)이 모여 있는데, **CI에는 설치되지 않는다**
   (아래 CI 섹션 참고) — 로컬에서 별도로 `pip install -r validation/requirements-test.txt`가 필요하다.
 - `pyproject.toml` — `ruff`/`black`(`line-length=100`, `target-version=py312`) 설정과
-  `pytest` 설정. `validation/AI_tryon/{tryondiffusion,catvton}`, `validation/**/*.ipynb`는
-  외부/서드파티 코드·노트북이라 lint/format 대상에서 제외되어 있다.
+  `pytest` 설정. `extend-exclude`에 있는 건 `validation/TRYON/AI_tryon/{tryondiffusion,CatVTON}`
+  **뿐이다**(외부/서드파티 코드).
   `per-file-ignores`(`E402`/`BLE001`/`F401` 완화)는 **`validation/**` 에만** 걸려 있다 —
   `test/`에 같이 걸면 테스트 코드의 미사용 import가 그냥 통과한다.
+- **노트북(`.ipynb`)은 ruff 검사 대상이다.** 제외 설정이 없다 — 실제로 새 노트북에서 F541이
+  잡힌 적이 있다(2026-07-30). `black`만 노트북을 건너뛰는데 그것도 설정이 아니라
+  `black[jupyter]` 미설치 때문이고("Skipping .ipynb files as Jupyter dependencies are not
+  installed") CI도 같은 상태다. **노트북을 추가·수정했으면 `ruff check .`를 반드시 돌릴 것.**
 
 ### 추론 코드는 `AI/`에 두지 않는다
 
@@ -67,6 +97,13 @@ Dockerfile은 그것만 설치하므로, `app/` 안에 실모델 경로를 만�
 - 테스트에서 목업 데이터를 읽을 때 `Path(__file__)` 상대경로를 쓰지 않는다 — 데이터는 프로덕션
   패키지(`app/<도메인>/data/`)에 있고 테스트는 `test/` 아래라 경로가 어긋난다. 프로덕션 모듈의
   경로 상수를 재사용한다(예: `test/chat/test_chat_service.py`가 `app.chat.faq._DATA_DIR`를 씀).
+- **`validation/<어떤 폴더>/`에 테스트 파일을 새로 추가하면 그 폴더가 통째로 `sys.path`에 올라간다**
+  (pytest 기본 `prepend` import 모드). 그래서 **테스트 파일 이름뿐 아니라 그 폴더의 형제 모듈
+  이름도** 다른 스파이크 폴더와 충돌하면 안 된다. 실제로 `CLASS/product-info-check/`에 테스트를
+  하나 넣었더니 그 폴더의 `dataset.py`가 `REC/recommendation-embedding-finetune/dataset.py`를
+  가려서 그쪽 `test_dataset.py`가 수집 단계에서 깨졌다(2026-08-03). 스파이크 폴더에 테스트를
+  넣기 전에 `dataset.py`·`evaluate.py`처럼 흔한 이름이 다른 폴더와 겹치는지 먼저 확인할 것 —
+  겹치면 테스트를 포기하거나(스파이크 코드면 그래도 된다) 모듈 이름을 먼저 정리한다.
 
 ## CI 규칙 — 커밋 전 반드시 로컬에서 통과시킬 것
 
@@ -115,7 +152,7 @@ from my_module import Something  # noqa: E402 — importorskip 이후 import
 필요 없다 — CI에서 그대로 실행된다.
 
 - 가드 적용 예: `validation/model_selection/test_recommendation_benchmark.py`(torch 필요)
-- 가드 불필요 예: `validation/recommendation-embedding-finetune/test_dataset.py`(순수 로직만,
+- 가드 불필요 예: `validation/REC/recommendation-embedding-finetune/test_dataset.py`(순수 로직만,
   무거운 의존성은 함수 내부에서 지연 import)
 
 ## `AI/validation/` 코드 관례 (PoC/스파이크)

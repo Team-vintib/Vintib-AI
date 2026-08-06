@@ -2,12 +2,18 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import type { HomeProductCardItem, HomeViewData } from '@/domains/home/types/homeView.types'
+import { registerLiveReminder } from '@/domains/live/api/liveWatchApi'
+import type {
+  HomePopularHostLive,
+  HomeProductCardItem,
+  HomeViewData,
+} from '@/domains/home/types/homeView.types'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import type { RouteLocationRaw } from 'vue-router'
 
 const props = defineProps<{
   homeData: HomeViewData
+  popularHostLive?: HomePopularHostLive | null
 }>()
 
 type HeroSlideTone = 'live' | 'discover' | 'sell'
@@ -24,8 +30,8 @@ interface HeroSlide {
   visualKind: HeroVisualKind
   imageUrl: string
   imageAlt: string
-  metaText?: string
   collageImages?: string[]
+  onCtaClick?: () => void
 }
 
 const AUTO_PLAY_DELAY = 5000
@@ -56,6 +62,9 @@ const dragDeltaX = ref(0)
 const didDrag = ref(false)
 let autoPlayTimer: ReturnType<typeof window.setInterval> | null = null
 let manualPauseTimer: ReturnType<typeof window.setTimeout> | null = null
+
+type ReminderState = 'idle' | 'pending' | 'done' | 'error'
+const popularHostReminderState = ref<ReminderState>('idle')
 
 const selectedLive = computed(() => props.homeData.liveNow[0])
 const selectedScheduledLive = computed(() =>
@@ -99,7 +108,6 @@ const liveEntrySlide = computed<HeroSlide>(() => {
       visualKind: 'live',
       imageUrl: live.thumbnailUrl || fallbackImages.live,
       imageAlt: live.title,
-      metaText: `${live.hostName} · ${formatViewerCount(live.viewerCount)} 시청 중`,
     }
   }
 
@@ -116,11 +124,42 @@ const liveEntrySlide = computed<HeroSlide>(() => {
     visualKind: 'scheduled',
     imageUrl: scheduledLive?.thumbnailUrl || fallbackImages.live,
     imageAlt: scheduledLive?.title ?? '예약 라이브 대표 이미지',
-    metaText: scheduledLive?.hostName,
+  }
+})
+
+const popularHostReminderLabel = computed(() => {
+  if (popularHostReminderState.value === 'pending') return '설정 중...'
+  if (popularHostReminderState.value === 'done') return '알림 설정 완료'
+  if (popularHostReminderState.value === 'error') return '다시 시도'
+  return '알림 설정'
+})
+
+const popularHostLiveSlide = computed<HeroSlide | null>(() => {
+  const popularHostLive = props.popularHostLive
+
+  if (!popularHostLive) {
+    return null
+  }
+
+  const live = popularHostLive.live
+
+  return {
+    id: 'popular-host-live',
+    label: 'MOST FOLLOWED',
+    title: '인기 셀러의\n다음 라이브를 놓치지 마세요',
+    description: formatScheduledAt(live.scheduledAt),
+    ctaLabel: popularHostReminderLabel.value,
+    to: getLiveWatchRoute(live.id),
+    tone: 'live',
+    visualKind: 'scheduled',
+    imageUrl: live.thumbnailUrl || fallbackImages.live,
+    imageAlt: live.title,
+    onCtaClick: () => handlePopularHostReminderClick(live.id),
   }
 })
 
 const slides = computed<HeroSlide[]>(() => [
+  ...(popularHostLiveSlide.value ? [popularHostLiveSlide.value] : []),
   liveEntrySlide.value,
   {
     id: 'discover-vintage',
@@ -158,8 +197,20 @@ const trackStyle = computed(() => ({
   transform: `translateX(calc(${-activeIndex.value * 100}% + ${dragDeltaX.value}px))`,
 }))
 
-function formatViewerCount(value?: number) {
-  return new Intl.NumberFormat('ko-KR').format(value ?? 0)
+function formatScheduledAt(value?: string) {
+  if (!value) {
+    return '라이브 일정 확인 중'
+  }
+
+  const formatted = new Intl.DateTimeFormat('ko-KR', {
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(value))
+
+  return `${formatted} 라이브 예정`
 }
 
 function getLiveWatchRoute(liveId: number): RouteLocationRaw {
@@ -301,6 +352,31 @@ function navigateToSlide(slide: HeroSlide) {
   void router.push(slide.to)
 }
 
+function handleCtaClick(slide: HeroSlide) {
+  if (slide.onCtaClick) {
+    pauseAfterManualInteraction()
+    slide.onCtaClick()
+    return
+  }
+
+  navigateToSlide(slide)
+}
+
+async function handlePopularHostReminderClick(liveId: number) {
+  if (popularHostReminderState.value === 'pending' || popularHostReminderState.value === 'done') {
+    return
+  }
+
+  popularHostReminderState.value = 'pending'
+
+  try {
+    await registerLiveReminder(liveId)
+    popularHostReminderState.value = 'done'
+  } catch {
+    popularHostReminderState.value = 'error'
+  }
+}
+
 function handleImageError(event: Event) {
   if (event.target instanceof HTMLImageElement) {
     event.target.onerror = null
@@ -382,15 +458,16 @@ onBeforeUnmount(() => {
             <h1 v-if="index === 0" class="home-hero-slide__title">{{ slide.title }}</h1>
             <h2 v-else class="home-hero-slide__title">{{ slide.title }}</h2>
             <p class="home-hero-slide__description">{{ slide.description }}</p>
-            <button
-              class="home-hero-slide__cta"
-              type="button"
-              :tabindex="index === activeIndex ? 0 : -1"
-              @click.stop="navigateToSlide(slide)"
-            >
-              {{ slide.ctaLabel }}
-            </button>
           </div>
+
+          <button
+            class="home-hero-slide__cta"
+            type="button"
+            :tabindex="index === activeIndex ? 0 : -1"
+            @click.stop="handleCtaClick(slide)"
+          >
+            {{ slide.ctaLabel }}
+          </button>
 
           <div
             v-if="slide.visualKind === 'collage' && slide.collageImages"
@@ -406,7 +483,6 @@ onBeforeUnmount(() => {
               @error="handleImageError"
             />
           </div>
-          <span v-if="slide.metaText" class="home-hero-slide__meta">{{ slide.metaText }}</span>
         </article>
       </div>
     </div>
@@ -417,7 +493,7 @@ onBeforeUnmount(() => {
       aria-label="이전 배너 보기"
       @click.stop="handlePreviousClick"
     >
-      <span aria-hidden="true">‹</span>
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg>
     </button>
     <button
       class="home-hero-carousel__arrow home-hero-carousel__arrow--next"
@@ -425,7 +501,7 @@ onBeforeUnmount(() => {
       aria-label="다음 배너 보기"
       @click.stop="handleNextClick"
     >
-      <span aria-hidden="true">›</span>
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg>
     </button>
 
     <div class="home-hero-carousel__indicators" aria-label="배너 위치">
@@ -526,11 +602,13 @@ onBeforeUnmount(() => {
   position: relative;
   z-index: var(--z-layer-2);
   display: grid;
-  align-content: center;
+  align-content: start;
   justify-items: start;
   gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-12) var(--space-10);
+  max-height: 62%;
+  padding: var(--space-12) var(--space-10) 0;
+  overflow: hidden;
 }
 
 .home-hero-slide__label {
@@ -568,12 +646,15 @@ onBeforeUnmount(() => {
 }
 
 .home-hero-slide__cta {
+  position: absolute;
+  z-index: var(--z-layer-2);
+  top: 72%;
+  left: var(--space-10);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: var(--button-height-compact);
   padding: 0 var(--space-5);
-  margin-top: var(--space-2);
   border: 0;
   border-radius: var(--radius-control);
   background: var(--color-primary);
@@ -582,6 +663,7 @@ onBeforeUnmount(() => {
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-control);
   white-space: nowrap;
+  transform: translateY(-50%);
   transition:
     background-color var(--transition-standard),
     color var(--transition-standard);
@@ -599,23 +681,6 @@ onBeforeUnmount(() => {
 
 .home-hero-slide--live .home-hero-slide__cta:hover {
   background: var(--color-accent-hover);
-}
-
-.home-hero-slide__meta {
-  position: absolute;
-  z-index: var(--z-layer-2);
-  right: var(--space-6);
-  bottom: var(--space-6);
-  max-width: calc(100% - var(--space-12));
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-badge);
-  background: var(--overlay-scrim-strong);
-  color: var(--color-text-secondary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
-  font-weight: var(--font-weight-regular);
-  letter-spacing: 0.04em;
-  line-height: var(--line-height-snug);
 }
 
 .home-hero-slide__collage {
@@ -666,14 +731,21 @@ onBeforeUnmount(() => {
   border: 0;
   background: transparent;
   color: var(--color-text-inverse);
-  font-size: 44px;
-  font-weight: var(--font-weight-light);
-  line-height: 1;
   opacity: 0.62;
   transform: translateY(-50%);
   transition:
     color var(--transition-fast),
     opacity var(--transition-fast);
+}
+
+.home-hero-carousel__arrow svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .home-hero-carousel:hover .home-hero-carousel__arrow,
@@ -745,6 +817,7 @@ onBeforeUnmount(() => {
   }
 
   .home-hero-slide__cta {
+    left: var(--space-5);
     min-height: 50px;
   }
 
@@ -758,13 +831,6 @@ onBeforeUnmount(() => {
 
   .home-hero-carousel__arrow {
     display: none;
-  }
-
-  .home-hero-slide__meta {
-    right: var(--space-4);
-    bottom: calc(var(--space-4) + 14px);
-    left: var(--space-4);
-    max-width: none;
   }
 
   .home-hero-slide__collage-image--1 {

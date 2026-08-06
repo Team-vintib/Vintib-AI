@@ -7,33 +7,59 @@ const props = defineProps<{
   product: ProductDetailViewData
 }>()
 
+const description = computed(() => props.product.description.trim())
+
+const specItems = computed(() =>
+  [
+    { label: '표기 사이즈', value: props.product.sizeLabel },
+    { label: '색상', value: props.product.color },
+    { label: '소재', value: props.product.material },
+    { label: '상품 상태', value: props.product.conditionLabel },
+  ]
+    .map((item) => ({ ...item, value: item.value.trim() }))
+    .filter((item) => item.value),
+)
+
 // 실측(measurements)은 BE 상세 계약(010)이 { 라벨: 값(cm) } 형태로 준다.
 // 키가 라벨, 값이 cm 수치. 값이 없으면 실측 섹션 자체를 숨긴다.
-const measurementEntries = computed(() => Object.entries(props.product.measurements ?? {}))
+const measurementEntries = computed(() =>
+  Object.entries(props.product.measurements ?? {}).filter(
+    ([label, value]) => label.trim() && Number.isFinite(value) && value > 0,
+  ),
+)
+
+const disclosedDefects = computed(() =>
+  props.product.sellerDisclosedDefects
+    .map((defect) => ({
+      title: defect.title.trim(),
+      description: defect.description.trim(),
+    }))
+    .filter((defect) => defect.title || defect.description),
+)
+
+const hasInformation = computed(
+  () =>
+    Boolean(description.value) ||
+    specItems.value.length > 0 ||
+    measurementEntries.value.length > 0 ||
+    disclosedDefects.value.length > 0,
+)
 </script>
 
 <template>
-  <section class="detail-information" aria-labelledby="detail-information-title">
+  <section
+    v-if="hasInformation"
+    class="detail-information"
+    aria-labelledby="detail-information-title"
+  >
     <h2 id="detail-information-title">상품 상세 정보</h2>
 
-    <p class="detail-information__description">{{ product.description }}</p>
+    <p v-if="description" class="detail-information__description">{{ description }}</p>
 
-    <dl class="detail-information__specs">
-      <div>
-        <dt>표기 사이즈</dt>
-        <dd>{{ product.sizeLabel }}</dd>
-      </div>
-      <div>
-        <dt>색상</dt>
-        <dd>{{ product.color }}</dd>
-      </div>
-      <div>
-        <dt>소재</dt>
-        <dd>{{ product.material }}</dd>
-      </div>
-      <div>
-        <dt>상품 상태</dt>
-        <dd>{{ product.conditionLabel }}</dd>
+    <dl v-if="specItems.length" class="detail-information__specs">
+      <div v-for="item in specItems" :key="item.label">
+        <dt>{{ item.label }}</dt>
+        <dd>{{ item.value }}</dd>
       </div>
     </dl>
 
@@ -47,11 +73,18 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
       </dl>
     </div>
 
-    <aside class="detail-information__seller-note" aria-label="판매자 고지">
-      <strong>판매자 고지</strong>
-      <p>
-        판매자가 직접 입력한 상품 정보입니다. 아래 AI 분석 결과와 구분해서 확인해 주세요.
-      </p>
+    <aside
+      v-if="disclosedDefects.length"
+      class="detail-information__seller-note"
+      aria-label="상품 하자"
+    >
+      <strong>상품 하자</strong>
+      <ul>
+        <li v-for="(defect, index) in disclosedDefects" :key="`${defect.title}-${index}`">
+          <p v-if="defect.title">{{ defect.title }}</p>
+          <span v-if="defect.description">{{ defect.description }}</span>
+        </li>
+      </ul>
     </aside>
   </section>
 </template>
@@ -181,11 +214,29 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
   line-height: var(--line-height-body);
 }
 
-.detail-information__seller-note p {
+.detail-information__seller-note ul {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+  list-style: none;
+}
+
+.detail-information__seller-note li {
+  min-width: 0;
+}
+
+.detail-information__seller-note p,
+.detail-information__seller-note span {
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-regular);
   line-height: var(--line-height-snug);
+}
+
+.detail-information__seller-note span {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-muted);
 }
 
 @media (max-width: 720px) {
@@ -203,7 +254,7 @@ const measurementEntries = computed(() => Object.entries(props.product.measureme
     display: block;
   }
 
-  .detail-information__seller-note p {
+  .detail-information__seller-note ul {
     margin-top: var(--space-1);
   }
 }

@@ -4,14 +4,19 @@ import type { ProductCategoryOption } from '@/domains/product/types/productList.
 
 interface Props {
   categoryOptions: ProductCategoryOption[]
+  categoryStatusMessage: string
   selectedCategoryIds: number[]
   selectedConditionIds: string[]
   minimumPrice: string
   maximumPrice: string
   priceError: string
+  canReset: boolean
+  disabled?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  disabled: false,
+})
 
 const emit = defineEmits<{
   'update:selectedCategoryIds': [categoryIds: number[]]
@@ -62,11 +67,22 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 
 <template>
   <aside class="product-filter" aria-label="상품 필터">
+    <div class="product-filter__heading">
+      <h2>필터</h2>
+      <button
+        type="button"
+        :disabled="disabled || !canReset"
+        @click="emit('reset')"
+      >
+        초기화
+      </button>
+    </div>
+
     <fieldset class="product-filter__group">
       <legend class="product-filter__legend">카테고리</legend>
 
       <p v-if="!categoryOptions.length" class="product-filter__empty">
-        카테고리를 불러오는 중입니다.
+        {{ categoryStatusMessage }}
       </p>
 
       <label
@@ -78,6 +94,7 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
           class="product-filter__checkbox"
           type="checkbox"
           :checked="selectedCategoryIds.includes(option.id)"
+          :disabled="disabled"
           @change="handleCategoryChange($event, option.id)"
         />
         <span>{{ option.label }}</span>
@@ -96,6 +113,7 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
           class="product-filter__checkbox"
           type="checkbox"
           :checked="selectedConditionIds.includes(option.id)"
+          :disabled="disabled"
           @change="handleConditionChange($event, option.id)"
         />
         <span>{{ option.label }}</span>
@@ -116,6 +134,7 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
               step="1000"
               inputmode="numeric"
               placeholder="0"
+              :disabled="disabled"
               :aria-invalid="Boolean(priceError)"
               :aria-describedby="priceError ? 'product-price-error' : undefined"
               @input="handlePriceInput($event, 'minimum')"
@@ -136,6 +155,7 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
               step="1000"
               inputmode="numeric"
               placeholder="제한 없음"
+              :disabled="disabled"
               :aria-invalid="Boolean(priceError)"
               :aria-describedby="priceError ? 'product-price-error' : undefined"
               @input="handlePriceInput($event, 'maximum')"
@@ -152,15 +172,9 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 
     <div class="product-filter__actions">
       <button
-        class="product-filter__button product-filter__button--reset"
-        type="button"
-        @click="emit('reset')"
-      >
-        초기화
-      </button>
-      <button
         class="product-filter__button product-filter__button--apply"
         type="button"
+        :disabled="disabled"
         @click="emit('apply')"
       >
         적용
@@ -173,12 +187,55 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 .product-filter {
   position: sticky;
   top: var(--space-6);
+  display: grid;
   align-self: start;
   width: var(--filter-panel-width);
+  gap: var(--space-6);
   padding: var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
+}
+
+.product-filter__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.product-filter__heading h2 {
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.product-filter__heading button {
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.product-filter__heading button:hover:not(:disabled) {
+  color: var(--color-primary);
+}
+
+.product-filter__heading button:focus-visible {
+  outline: 1px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.product-filter__heading button:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .product-filter__group {
@@ -188,7 +245,6 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 }
 
 .product-filter__group + .product-filter__group {
-  margin-top: var(--space-6);
   padding-top: var(--space-6);
   border-top: 1px solid var(--color-border);
 }
@@ -208,6 +264,11 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
   gap: var(--space-3);
   color: var(--color-text-secondary);
   cursor: pointer;
+}
+
+.product-filter__option:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .product-filter__empty {
@@ -299,13 +360,11 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 }
 
 .product-filter__actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
-  margin-top: var(--space-8);
+  display: block;
 }
 
 .product-filter__button {
+  width: 100%;
   min-height: var(--button-height-small);
   border-radius: var(--radius-control);
   font-size: var(--font-size-button-small);
@@ -316,20 +375,14 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
     color var(--transition-base);
 }
 
+.product-filter__button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .product-filter__button:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-}
-
-.product-filter__button--reset {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-}
-
-.product-filter__button--reset:hover {
-  border-color: var(--color-border-strong);
-  background: var(--color-surface-secondary);
 }
 
 .product-filter__button--apply {
@@ -351,10 +404,6 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 
   .product-filter__group {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .product-filter__group + .product-filter__group {
-    margin-top: var(--space-6);
   }
 
   .product-filter__legend {
