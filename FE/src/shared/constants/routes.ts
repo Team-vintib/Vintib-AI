@@ -35,6 +35,7 @@ export const ROUTE_NAMES = {
   MY_SALE_DETAIL: 'my-sale-detail',
   POINT: 'point',
   POINT_HISTORY: 'point-history',
+  POINT_CHARGE_CHECKOUT: 'point-charge-checkout',
   POINT_CHARGE_SUCCESS: 'point-charge-success',
   POINT_CHARGE_FAIL: 'point-charge-fail',
 } as const
@@ -76,6 +77,7 @@ export const ROUTE_PATHS = {
   MY_SALE_DETAIL: '/my/sales/:saleId',
   POINT: '/points',
   POINT_HISTORY: '/points/history',
+  POINT_CHARGE_CHECKOUT: '/points/charge/checkout',
   POINT_CHARGE_SUCCESS: '/points/charge/success',
   POINT_CHARGE_FAIL: '/points/charge/fail',
 } as const

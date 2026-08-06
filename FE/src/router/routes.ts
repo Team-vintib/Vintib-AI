@@ -228,6 +228,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: '포인트' },
   },
   {
+    path: ROUTE_PATHS.POINT_CHARGE_CHECKOUT,
+    name: ROUTE_NAMES.POINT_CHARGE_CHECKOUT,
+    component: () => import('@/domains/point/pages/PointChargeCheckoutPage.vue'),
+    meta: { requiresAuth: true, title: '포인트 충전 결제' },
+  },
+  {
     path: ROUTE_PATHS.POINT_CHARGE_SUCCESS,
     name: ROUTE_NAMES.POINT_CHARGE_SUCCESS,
     component: () => import('@/domains/point/pages/PointChargeSuccessPage.vue'),
