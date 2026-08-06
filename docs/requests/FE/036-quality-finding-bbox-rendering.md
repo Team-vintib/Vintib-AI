@@ -54,6 +54,23 @@
    "AI가 의심하는 부분 — 확인해 주세요" 톤으로 구분해서 보여주시는 걸 권장합니다(색을
    다르게 하든 아이콘을 붙이든 FE 판단).
 
+## 참고 — 상품등록 페이지의 목업 구현과 이미 정확히 맞습니다
+
+`ProductRegistrationPage.vue`/`productRegistration.types.ts`의
+`ProductRegistrationAiPhotoResult`/`ProductRegistrationAiDefectCandidate` 목업 형태를 봤는데,
+저희 계약과 그대로 맞아떨어집니다 — 새로 구조를 바꾸실 필요 없습니다.
+
+| FE 필드 | 매핑 |
+| --- | --- |
+| `candidates[].id` | `findings[].key` |
+| `candidates[].labelNumber` | `findings[].no` |
+| `candidates[].description` | `findings[].description` |
+| `candidates[].box` | `findings[].bbox`를 FE가 `{x,y,width,height}`(%)로 변환(위 렌더링 방식 그대로) |
+| `candidates[].isActualDefect` | AI가 주는 값이 아니라 BE가 저장하는 판매자 응답 상태(기본 `true`) |
+| `photoResult.photoId` | `image_index`를 BE가 매핑(앞면=0, 뒷면=1 — `image_urls` 전송 순서 기준) |
+
+`image_index` ↔ `photoId` 매핑은 BE가 해서 넘겨주는 거라 FE가 직접 신경 쓸 부분은 없습니다.
+
 ## 확인이 필요한 것 (BE와 같이 정해야 함)
 
 - 판매자가 "아니다"라고 답한 걸 저장하는 엔드포인트/필드는 아직 저희 쪽에서 확정한 게
