@@ -13,8 +13,20 @@ GATEWAY_URL 환경변수에는 /ai 까지 포함해서 넣는다.
 import os
 import time
 import socket
+from pathlib import Path
 
 import requests
+
+# worker/.env를 자동으로 읽는다 — 없으면(패키지 미설치 포함) 조용히 넘어가고 기존처럼
+# 셸에서 직접 export/set한 값을 그대로 쓴다. 매 워커 스크립트가 `from base_worker import
+# BaseWorker`를 자기 자신의 os.getenv() 호출보다 먼저 하기 때문에, 여기서 로드해두면
+# TRYON_VLM_BACKEND 같은 워커별 환경변수에도 그대로 적용된다.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except ImportError:
+    pass
 
 
 class BaseWorker:
