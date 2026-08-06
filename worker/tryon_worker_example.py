@@ -23,6 +23,7 @@ TRYON_VLM_BACKEND=qwen3_vl TRYON_FLUX_BACKEND=flux2_klein python tryon_worker_ex
 설계: `.claude/plans/ai/CH019-tryon-worker-promotion.md`
 """
 
+import gc
 import os
 import sys
 
@@ -157,6 +158,9 @@ class TryonWorker(BaseWorker):
         self._pipeline = None
         self._automasker = None
         self._mask_processor = None
+        # AutoMasker(DensePose/SCHP)와 diffusers 파이프라인이 참조 순환을 만들 수 있어
+        # gc.collect()로 먼저 끊어야 empty_cache()가 실제로 VRAM을 반환한다.
+        gc.collect()
         torch.cuda.empty_cache()
 
     def _ensure_vlm_loaded(self):
@@ -173,6 +177,9 @@ class TryonWorker(BaseWorker):
         if self._vlm_bundle is None:
             return
         self._vlm_bundle = None
+        # bitsandbytes 4bit 양자화 + accelerate device_map="auto" 훅이 참조 순환을 만든다 --
+        # gc.collect() 없이 empty_cache()만 부르면 VRAM이 실제로는 반환되지 않는다.
+        gc.collect()
         torch.cuda.empty_cache()
 
     def _caption_garment(self, cloth_image: Image.Image) -> str:
