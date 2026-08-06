@@ -415,6 +415,7 @@ export const mockMyPageViewData: MyPageViewData = {
     todoCounts: {
       shippingPending: 3,
       scheduledLives: 2,
+      refundRequests: 1,
     },
     productStatusCounts: {
       onSale: 9,
