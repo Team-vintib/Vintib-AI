@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * deliveryapi.co.kr 배송 조회 웹훅 수신(SHIP-002). JWT 인증 대상이 아니다(외부 서비스가 호출) —
+ * deliveryapi.co.kr 배송 조회 웹훅 수신. JWT 인증 대상이 아니다(외부 서비스가 호출) —
  * 대신 {@code X-Webhook-Signature}로 검증한다({@code SecurityConfig} PUBLIC_ENDPOINTS 참고).
  *
  * <p>엔드포인트 등록({@code POST /v1/webhooks/endpoints}) 시 deliveryapi.co.kr이 이 URL로
