@@ -5,6 +5,7 @@ model_selection/loaders.py 관례(무거운 import는 함수 내부, dataclass �
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -232,3 +233,30 @@ def describe_defects_batch(bundle: VLMBundle, image, instances, max_new_tokens: 
     annotated = draw_numbered_boxes(image, instances)
     prompt_text = build_batch_prompt(instances)
     return generate_from_image(bundle, annotated, prompt_text, max_new_tokens)
+
+
+_BATCH_LINE_PATTERN = re.compile(r"^\s*(\d+)\s*[:.\)]\s*(.+)$")
+
+
+def parse_batch_response(text: str, expected_nos: list[int]) -> dict[int, str | None]:
+    """`describe_defects_batch()` 원문을 번호->설명으로 파싱한다(§4-2 TODO: 번호-영역
+    매칭 정확도 확인).
+
+    `build_batch_prompt()`가 "번호. 설명" 형식을 요청하므로 그 형식(구분자는 `:`/`.`/`)`
+    관용)을 줄 단위로 매칭한다. 한 줄에 번호가 안 보이면 건너뛴다 — 억지로 분리하지 않는다.
+    못 찾은 번호는 조용히 비우지 않고 `None`으로 남겨 "이 번호는 배치 방식이 놓쳤다"는 걸
+    드러낸다.
+    """
+    found: dict[int, str] = {}
+    for line in text.splitlines():
+        match = _BATCH_LINE_PATTERN.match(line)
+        if not match:
+            continue
+        no = int(match.group(1))
+        found[no] = match.group(2).strip()
+    return {no: found.get(no) for no in expected_nos}
+
+
+def missing_batch_numbers(parsed: dict[int, str | None]) -> list[int]:
+    """`parse_batch_response()` 결과에서 설명을 못 받은 번호 목록(정렬됨)."""
+    return sorted(no for no, description in parsed.items() if description is None)
