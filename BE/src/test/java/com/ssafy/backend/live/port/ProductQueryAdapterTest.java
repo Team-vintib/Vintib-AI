@@ -171,4 +171,28 @@ class ProductQueryAdapterTest {
         assertThat(card.measurements()).isNull();
         assertThat(card.defectSummary()).isNull();
     }
+
+    /**
+     * 판매 상태는 판매 방식과 별개 축이다. 경매 예정 상품도 {@code saleType} 은 {@code AUCTION},
+     * {@code saleStatus} 는 {@code AUCTION_SCHEDULED} 로 따로 내려가야 FE 가 "경매 예정" 과
+     * "판매 완료" 를 구분할 수 있다.
+     */
+    @Test
+    void 판매_상태가_판매_방식과_따로_카드에_담긴다() {
+        Category 자켓 = 소분류("자켓");
+        Product 등록전 = productRepository.save(
+                Product.builder().seller(seller).categoryId(자켓.getId()).title("초안 자켓").build());
+        Product 경매예정 = productRepository.save(
+                Product.builder().seller(seller).categoryId(자켓.getId()).title("경매 자켓").build());
+        경매예정.scheduleAuction();
+        productRepository.save(경매예정);
+
+        Map<Long, ProductCard> cards =
+                productQueryPort.findCards(List.of(등록전.getId(), 경매예정.getId()));
+
+        assertThat(cards.get(등록전.getId()).saleStatus()).isEqualTo("DRAFT");
+        assertThat(cards.get(등록전.getId()).saleType()).isNull();
+        assertThat(cards.get(경매예정.getId()).saleStatus()).isEqualTo("AUCTION_SCHEDULED");
+        assertThat(cards.get(경매예정.getId()).saleType()).isEqualTo("AUCTION");
+    }
 }
