@@ -22,39 +22,49 @@ FE 상품 등록 화면(`ProductRegistrationPage.vue`)에 "AI 착용컷 설정" 
 
 ## 접근 방식
 
-### 1. 페르소나 참조 이미지를 프로덕션 위치로 정리 (완료)
+### 1. 페르소나 참조 이미지 — AI가 자체 호스팅 (완료, 방향 수정)
 
-`worker/models/catvton/assets/personas/{heedongi,dooner}.png` — 검증 폴더
-(`AI/validation/`)가 아니라 워커가 실제로 참조할 위치로 복사했다. 지금은 워커가
-이 파일을 직접 읽지 않는다(아래 3번 참고) — BE가 한 번 자체 스토리지에 업로드해서
-안정적인 URL을 만드는 게 목적이다.
+처음엔 "BE가 자체 버킷에 업로드해서 URL을 만들어달라"고 요청할 계획이었으나,
+**job 호출·페르소나 관리 같은 AI 관련 인프라는 AI 팀이 직접 맡기로 한 기존 결정**과
+어긋나서 방향을 바꿨다. 페르소나 이미지 2장(`heedongi.png`/`dooner.png`)은
+`AI/app/static/personas/`에 두고 `AI/app/main.py`가 `/personas`로 정적 서빙한다 —
+BE는 이 URL을 몰라도 되고, 업로드·관리도 필요 없다.
+(`worker/models/catvton/assets/personas/`에도 같은 파일이 있다 — 그건 워커 코드가
+참조하는 원본 자산 위치이고, `AI/app/static/personas/`는 게이트웨이 컨테이너가
+실제로 배포·서빙하는 사본이다. `AI/Dockerfile`이 `AI/` 안만 `COPY`하므로 워커 쪽
+파일을 게이트웨이 이미지에서 직접 참조할 수 없어 사본이 필요했다.)
 
-### 2. 새 AI 추론 로직 — 없음
+### 2. 새 AI 추론 로직 — 없음, 대신 얇은 트리거 엔드포인트 하나 추가
 
-기존 `POST /ai/tryon` job 계약(`AI/app/tryon/schemas.py`, `worker/
-tryon_worker_example.py`)을 **그대로** 쓴다. `mask_type`(상의/하의는 상품 카테고리에
-따라 BE가 정하거나, `docs/requests/BE/035-tryon-product-category.md`가 풀리기
-전까지는 요청 시 값을 지정), `fit_type`은 기본값(regular)이면 충분하다 — 판매자가
-등록 중에 상세 사이즈까지 고르게 하는 건 범위 밖으로 본다(이미 등록 흐름이 복잡하다).
+추론 자체는 기존 `type="tryon"` job 계약(`worker/tryon_worker_example.py`)을
+**그대로** 쓴다. 다만 "job 호출은 AI가 한다"는 방향에 맞춰, BE가 범용
+`POST /ai/{feature}`의 job payload 스키마(`user_image_url`/`mask_type`/`fit_type`
+조합)를 직접 몰라도 되도록 전용 엔드포인트를 새로 만들었다:
 
-### 3. BE 요청 — 전체 연동 필요 (범위가 크다)
+- `POST /ai/tryon/registration-model-cut` (`AI/app/tryon/router.py`, 신규) — BE가
+  상품 사진 URL과 성별만 넘기면, AI가 내부에서 페르소나 URL을 골라 기존 `tryon`
+  큐(`queue:tryon`)에 그대로 job을 넣는다. 응답은 `{"job_id": ...}` 접수증뿐이다.
+- 결과 조회는 새 엔드포인트를 만들지 않았다 — 일반 시착 job과 완전히 같은 결과
+  계약이라 기존 게이트웨이 공통 경로 `GET /ai/jobs/{job_id}`를 그대로 쓴다.
+- `mask_type`(상의/하의)은 여전히 BE가 상품 카테고리 기준으로 정해 보내야 한다
+  (`docs/requests/BE/035-tryon-product-category.md`가 풀리기 전까지). `fit_type`은
+  `regular`로 고정한다.
 
-BE 쪽엔 지금 아무것도 없어서(값도 안 보냄, API도 없음), 요청 문서에 전체 흐름을
-정리해서 전달한다:
-- 페르소나 이미지 2장(`worker/models/catvton/assets/personas/*.png`)을 BE 자체
-  퍼블릭 버킷에 한 번 업로드하고, 그 URL을 저장(설정값 또는 상수)
-- 상품 등록 시 `aiModelEnabled=true`면, 업로드된 상품 사진 + 위 URL로 `POST /ai/tryon`
-  job을 생성
-- job 완료 후 결과 이미지를 상품의 보조 이미지로 저장(어떤 테이블/필드로 둘지는 BE
-  판단 — 새 컬럼이 될 수도, 기존 상품 이미지 테이블에 "AI 생성" 플래그를 추가하는
-  것일 수도 있다)
-- FE에는 이 결과(생성 상태 + 이미지 URL)를 조회할 수 있는 응답 필드가 필요하다
+### 3. BE 요청 — 크게 축소됨
+
+이제 BE는 AI의 job 큐 내부 스키마를 몰라도 된다. 필요한 건:
+- 상품 등록 시 `aiModelEnabled=true`면 `POST /ai/tryon/registration-model-cut`
+  (상품 사진 URL + 성별 + mask_type)을 호출해 `job_id`를 받는다.
+- `GET /ai/jobs/{job_id}`로 폴링해 완료 시 결과 이미지를 상품의 보조 이미지로
+  저장한다(어떤 테이블/필드로 둘지는 BE 판단).
+- FE에는 이 결과(생성 상태 + 이미지 URL)를 조회할 수 있는 응답 필드가 필요하다.
 
 ### 4. FE 요청 — 실제 연동
 
 지금 있는 토글(`aiModelEnabled`/`aiModelGender`)을 실제로 제출 payload에 포함하고,
-결과(생성 중/완료/실패, 이미지 URL)를 받아서 보여주는 UI가 필요하다. BE 계약이
-먼저 확정돼야 하므로, 이번엔 "이런 필드가 올 것이다" 정도만 미리 공유한다.
+결과(생성 중/완료/실패, 이미지 URL)를 받아서 보여주는 UI가 필요하다. BE·FE가
+주고받을 정확한 필드는 요청 문서(`docs/requests/BE/039-*`,
+`docs/requests/FE/035-*`)에 API 명세로 정리했다.
 
 ## 범위 밖
 
@@ -70,3 +80,7 @@ BE 쪽엔 지금 아무것도 없어서(값도 안 보냄, API도 없음), 요�
 2. `docs:` 계획 문서(이 문서)
 3. `docs:` BE 전체 연동 요청 문서
 4. `docs:` FE 실제 연동 요청 문서
+5. `feat:` `POST /ai/tryon/registration-model-cut` 트리거 엔드포인트 + 페르소나
+   정적 서빙(`AI/app/static/personas/`, `AI/app/main.py`), 테스트
+6. `docs:` 방향 수정 반영(페르소나 호스팅·job 호출은 AI 소관) — 계획 문서 + BE/FE
+   요청 문서에 API 명세 추가

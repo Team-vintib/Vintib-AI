@@ -21,11 +21,53 @@
 2. **생성 결과 표시**: AI 이미지 생성은 시간이 걸립니다(경험상 2~3분대 — VLM 캡션 →
    FLUX → CatVTON 순차 처리). 즉시 완료되지 않으므로 "생성 중" 상태를 보여주고,
    완료되면 이미지 URL을 받아 상품 상세 페이지 보조 이미지로 노출하는 흐름이
-   필요합니다. BE가 상태값(대기/진행중/완료/실패)을 어떻게 내려줄지는 BE 응답
-   계약이 확정되면 다시 안내드리겠습니다.
+   필요합니다.
 3. **실패 처리**: 생성 실패 시(워커 미가동, 이미지 다운로드 실패 등) 등록 자체는
    막지 않고 착용컷만 없는 채로 진행되게 해주세요 — 필수 기능이 아니라 보조
    기능입니다.
+
+## API 명세 (BE에 제안한 계약 — `docs/requests/BE/039-registration-ai-model-tryon.md`)
+
+BE 쪽에 아래 계약을 제안해뒀습니다. 최종 필드명은 BE 컨벤션에 따라 조정될 수 있으니,
+실제 착수 시점에 BE 응답을 한 번 더 확인해 주세요.
+
+#### 등록 요청 — 기존 `POST /products`
+
+```json
+{
+  "...": "기존 필드",
+  "aiModelEnabled": true,
+  "aiModelGender": "MALE"
+}
+```
+
+`aiModelGender`는 `"FEMALE"`(도우너) \| `"MALE"`(희동이) 중 하나이고,
+`aiModelEnabled=true`일 때만 필수입니다.
+
+#### 등록 응답에 포함될 상태
+
+```json
+{
+  "aiModelCut": { "status": "PENDING", "imageUrl": null }
+}
+```
+
+#### 상태/결과 폴링 — 신규 `GET /products/{productId}/ai-model-cut`
+
+```json
+{
+  "success": true,
+  "data": { "status": "PROCESSING", "imageUrl": null },
+  "error": null
+}
+```
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `status` | `"NONE"` \| `"PENDING"` \| `"PROCESSING"` \| `"COMPLETED"` \| `"FAILED"` | `NONE`=미사용(이 영역 자체를 숨기면 됩니다), `PENDING`/`PROCESSING`=생성 중 UI, `COMPLETED`=`imageUrl` 노출, `FAILED`=착용컷 없이 등록 정상 진행 |
+| `imageUrl` | string \| null | `status="COMPLETED"`일 때만 존재 |
+
+폴링 주기는 FE 재량입니다(BE 제안 참고치: 5초 간격, 최대 1~2분).
 
 ## 참고
 
