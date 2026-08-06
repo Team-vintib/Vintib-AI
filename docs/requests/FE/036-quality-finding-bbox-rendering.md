@@ -18,9 +18,26 @@
 좌표(`bbox`)를 받아서 FE가 캔버스/오버레이 엘리먼트로 직접 그리면 상태 변경 시 즉시 색만
 바꿀 수 있습니다.
 
+## job은 언제 시작되고, 언제/어떻게 폴링하는지
+
+- **트리거는 BE가 하고, 시점은 앞/뒤 사진 업로드 완료 직후입니다.** 상품 분류(색상·카테고리)
+  칸을 띄우는 이벤트와는 별개입니다 — 검수 job은 그보다 먼저, 사진 두 장이 채워지는 즉시
+  백그라운드로 시작됩니다(분류 브랜치와 병렬). FE가 직접 job을 트리거할 필요는 없습니다.
+- BE는 이 시점에 만든 `job_id`를 사진 업로드/임시저장 응답에 실어서 내려줄 예정입니다 — 이
+  값을 등록 폼 상태에 들고 있다가, 검수 결과를 보여줄 페이지(현재 목업상 'condition' 스텝)에
+  진입했을 때 그 `job_id`로 **FE가 AI 게이트웨이를 직접 폴링**합니다: `GET
+  https://i15a108.p.ssafy.io/ai/jobs/{job_id}` (BE를 거치지 않는 외부 경로입니다). BE는
+  AI를 따로 조회하지 않습니다 — 대신 FE가 상태 확정/최종 제출 등 각 단계에서 **이미 받아둔
+  `condition_score`/`condition_grade`/`findings[].key`별 응답을 그 단계의 요청 payload에
+  실어서** BE로 넘겨주셔야 합니다(자세한 필드는 `docs/requests/BE/041` 참고).
+- 사용자가 카테고리 선택 등 앞 스텝에서 시간을 쓰는 동안 검수가 이미 끝나 있을 가능성이 높지만,
+  **`status`가 `queued`/`processing`으로 올 수 있다는 걸 감안해서 로딩(`analyzing`) 상태와
+  재폴링 로직은 그대로 유지해 주세요** — 워커가 바쁘거나 꺼져 있으면 시간이 걸릴 수 있습니다.
+  `status: "failed"`나 1시간 뒤 만료(404)도 처리해 주세요.
+
 ## 지금 실제로 오는 JSON (이미 확정된 계약)
 
-`GET /ai/jobs/{job_id}` 결과의 `findings[]` 배열, 항목 1건:
+`GET /ai/jobs/{job_id}` 결과 중 `status: "success"`일 때 `result.findings[]` 배열, 항목 1건:
 
 ```jsonc
 {
@@ -66,10 +83,12 @@
 | `candidates[].labelNumber` | `findings[].no` |
 | `candidates[].description` | `findings[].description` |
 | `candidates[].box` | `findings[].bbox`를 FE가 `{x,y,width,height}`(%)로 변환(위 렌더링 방식 그대로) |
-| `candidates[].isActualDefect` | AI가 주는 값이 아니라 BE가 저장하는 판매자 응답 상태(기본 `true`) |
-| `photoResult.photoId` | `image_index`를 BE가 매핑(앞면=0, 뒷면=1 — `image_urls` 전송 순서 기준) |
+| `candidates[].isActualDefect` | AI가 주는 값이 아니라 FE 로컬 상태(기본 `true`, 판매자가 "아니다" 누르면 `false`) — 최종 제출 시 BE로 전달 |
+| `photoResult.photoId` | `image_index` → `photoId`, FE가 직접 매핑 |
 
-`image_index` ↔ `photoId` 매핑은 BE가 해서 넘겨주는 거라 FE가 직접 신경 쓸 부분은 없습니다.
+BE는 `image_urls`를 AI에 보낼 때 항상 앞면=0, 뒷면=1 순서로 고정해서 보냅니다. FE는 애초에
+어느 사진을 앞면/뒷면으로 업로드했는지 알고 있으므로, 이 고정 순서만 알면 `image_index`를
+자기 `photoId`로 바로 매핑할 수 있습니다 — BE가 매핑 정보를 따로 내려줄 필요가 없습니다.
 
 ## 확인이 필요한 것 (BE와 같이 정해야 함)
 
