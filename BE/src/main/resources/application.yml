@@ -90,7 +90,7 @@ openvidu:
 # 구독을 시도하지 않고 false 를 반환 — 그 자리에서 OrderService가 즉시-확정 폴백으로 처리한다
 # (자격증명 없는 로컬/CI 환경에서도 주문 흐름이 끊기지 않게 하기 위함).
 delivery-api:
-  base-url: ${DELIVERY_API_BASE_URL:https://www.deliveryapi.co.kr}
+  base-url: ${DELIVERY_API_BASE_URL:https://api.deliveryapi.co.kr}
   api-key: ${DELIVERY_API_KEY:}
   secret-key: ${DELIVERY_API_SECRET_KEY:}
   # 웹훅 수신 엔드포인트 등록은 1회성 인프라 설정이라 앱이 대신 하지 않는다 — POST

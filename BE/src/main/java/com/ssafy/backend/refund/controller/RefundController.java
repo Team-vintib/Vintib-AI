@@ -30,7 +30,7 @@ public class RefundController {
 
     private final RefundService refundService;
 
-    @Operation(summary = "환불 요청(REFUND-001)",
+    @Operation(summary = "환불 요청",
             description = "구매자가 환불을 요청한다. 주문이 PAID/SHIPPING/DELIVERED 상태여야 하며, "
                     + "이미 진행 중인(REQUESTED) 환불 요청이 있으면 거부된다.")
     @ApiResponses({
@@ -50,7 +50,7 @@ public class RefundController {
         return ResponseEntity.ok(ApiResponse.success(refundService.requestRefund(orderId, memberId, request)));
     }
 
-    @Operation(summary = "환불 요청 목록 조회(REFUND-001)",
+    @Operation(summary = "환불 요청 목록 조회",
             description = "해당 주문의 환불 요청을 최신순으로 조회한다. 구매자·판매자 모두 조회할 수 있다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
@@ -66,7 +66,7 @@ public class RefundController {
         return ResponseEntity.ok(ApiResponse.success(refundService.getRefunds(orderId, memberId)));
     }
 
-    @Operation(summary = "환불 승인/거절 처리(REFUND-002)",
+    @Operation(summary = "환불 승인/거절 처리",
             description = "판매자가 환불 요청을 승인하거나 거절한다. 승인하면 보관 중이던 대금이 판매자에게 정산되지 "
                     + "않고 구매자 available 포인트로 바로 환급되며 주문 상태가 REFUNDED로 바뀐다. 거절하면 주문은 "
                     + "이전 상태 그대로 이어간다. 거절 시 rejectionReason은 필수다.")
