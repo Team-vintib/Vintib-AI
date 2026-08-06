@@ -15,10 +15,40 @@
 
 ## 요청 내용
 
-### 1. 동기 REST가 아니라 job 등록 → 폴링입니다
+### 0. 언제 호출하는지 — 앞/뒤 사진 업로드 완료 즉시 (신규 명시)
+
+카테고리 선택이나 다른 스텝을 기다리지 않고, **앞/뒤 사진이 둘 다 올라온 시점에 바로**
+`POST /quality/inspections`를 호출해 주세요. `AI/README.md`가 그린 원래 그림대로 분류
+브랜치와 **병렬로** 먼저 돌려두는 것입니다 — 사용자가 이후 스텝(카테고리 확인, 가격 등)을
+진행하는 동안 무거운 검수가 백그라운드에서 끝나 있어서, 검수 결과를 보여줄 페이지에
+도달했을 때 FE가 기다리는 시간이 줄어듭니다. 이 호출로 받은 `job_id`는 상품 등록 draft
+응답에 실어서 FE에 넘겨주시면 됩니다(FE가 이후 스텝에서 그 `job_id`로 직접 폴링 — 1번 참고).
+
+### 1. 동기 REST가 아니라 job 등록 → 폴링입니다 — 그리고 폴링은 FE가 직접 합니다
 
 EC2 `ai` 컨테이너에 GPU가 없어서(`mem_limit: 1g`) 실모델 추론은 팀원 노트북이 하고, 워커가
 게이트웨이를 아웃바운드로 폴링하는 구조입니다. 그래서 시착(TRYON)과 동일한 패턴입니다.
+
+**BE는 AI 게이트웨이를 다시 조회할 필요가 없습니다.** 결과는 FE가 `GET /ai/jobs/{job_id}`를
+외부 경로로 직접 폴링해서 실시간으로 이미 들고 있으므로, BE는 **FE가 그 값을 필요한 단계의
+요청에 실어 보낼 때 받아서 저장**하면 됩니다. AI 쪽에는 결과를 위한 영구 저장소가 없습니다
+(`app/quality/`는 Redis TTL 1시간짜리 큐 어댑터일 뿐입니다) — 하지만 BE가 AI를 다시 찌를
+필요는 없고, 아래처럼 FE가 이미 손에 든 값을 그대로 넘겨받으면 됩니다.
+
+- **상태(condition) 확정 단계**: FE가 `condition_score`/`condition_grade`를 그 단계의 확정
+  요청 payload에 실어 보내주세요. 이후 가격책정(`app/pricing/`)이 이 값을 **요청 payload로**
+  받는 것으로 이미 설계돼 있습니다(`AI/app/pricing/schemas.py` 주석: "상품 등록 흐름에서 BE가
+  검수 결과를 들고 있으므로 그대로 실어 보낸다") — BE가 그 값을 갖고 있으려면 FE가 넘겨주는
+  경로가 있어야 합니다.
+- **최종 제출 단계**: FE가 findings의 `key`별 판매자 응답(어느 게 "아니다"로 처리됐는지 등,
+  2번 하단)을 실어 보내주세요.
+
+이러면 BE가 별도 폴링 인프라를 둘 필요가 없고, TTL(1시간) 만료 리스크도 자연히 없어집니다 —
+FE가 애초에 실시간으로 받아둔 값을 넘기는 것뿐이라 AI 쪽 TTL과 무관합니다.
+
+**참고(당장 처리할 필요는 없음)**: 이 구조는 FE가 넘긴 값을 BE가 그대로 신뢰하는 구조입니다.
+나중에 어뷰징(예: 클라이언트에서 `condition_score` 조작)이 문제되면, BE가 저장 시점에
+`job_id`로 AI를 한 번 더 조회해 검증하는 절차를 추가할 수 있습니다.
 
 ```jsonc
 // 1) 요청 — POST /quality/inspections (컨테이너 내부망: http://ai:8000/quality/inspections)
@@ -103,36 +133,39 @@ EC2 `ai` 컨테이너에 GPU가 없어서(`mem_limit: 1g`) 실모델 추론은 �
 넘버링 리스트**(여러 줄 문자열)입니다. 이미지가 2장 이상이면 `[이미지 N]` 헤더로 나뉩니다.
 한 줄로 보여줄 곳이 있다면 `image_summaries[i].summary`를 이미지별로 쓰시는 게 낫습니다.
 
-**BE가 저장해야 하는 것**: `findings[].key`와 `statement_required`. 판매자 소명 본문은 AI가
-받지 않습니다.
+**BE가 저장해야 하는 것**: 위 1번대로 FE가 각 단계에서 넘겨주는 값 — 상태 확정 단계의
+`condition_score`/`condition_grade`, 최종 제출 단계의 `findings[].key`별 판매자 응답
+(어느 `key`가 "아니다"로 처리됐는지, `statement_required`인 항목의 소명 텍스트 등). `key`를
+앵커로 매칭하시면 됩니다. 판매자 소명 본문 자체는 AI가 생성하지 않고 받지도 않습니다.
 
 `condition_score`는 가중치·등급 경계가 근거 없는 임의값이라 가격책정 등에 그대로 신뢰해 쓰시면
 안 됩니다.
 
-### 3. FE로 전달 시 참고 — FE가 이미 만들어 둔 목업 형태와의 매핑
+### 3. (참고용) FE가 실제로 매핑하는 형태 — BE가 이 매핑 자체를 만들 필요는 없습니다
 
-FE 상품등록 페이지(`ProductRegistrationPage.vue`)에 이미 목업으로 구현돼 있는 형태
-(`ProductRegistrationAiPhotoResult`/`ProductRegistrationAiDefectCandidate`,
-`productRegistration.types.ts`)와 맞추면 아래처럼 매핑됩니다. **`box` 좌표 변환은 FE가
-직접 합니다** — BE는 `findings[].bbox`를 그대로 전달하면 됩니다(AI 원본 포맷 유지, FE가
-0~1 정규화 xyxy → 자기 쪽 `{x,y,width,height}` %로 변환).
+아래 매핑은 FE가 자기 UI 필드로 변환할 때 직접 수행합니다(자세한 내용은
+`docs/requests/FE/036-quality-finding-bbox-rendering.md` 참고). BE는 위 1·2번대로 FE가
+넘겨주는 `key`/`condition_score`/`condition_grade` 등만 저장하면 되고, 이 표처럼 FE 전용
+필드 형태로 가공할 필요는 없습니다 — "FE 쪽에서 최종 제출로 뭐가 넘어올지" 감을 잡는 참고
+자료로만 보시면 됩니다.
 
-| FE 필드 | AI/BE에서 채울 값 |
+| FE 필드 | AI에서 채울 값 |
 | --- | --- |
 | `candidates[].id` | `findings[].key` |
 | `candidates[].labelNumber` | `findings[].no` |
 | `candidates[].description` | `findings[].description` |
-| `candidates[].box` | `findings[].bbox` 그대로(변환은 FE가) |
-| `candidates[].isActualDefect` | AI가 주는 값 아님 — 판매자 응답 저장용 BE 로컬 상태(기본 `true`, 판매자가 "아니다" 누르면 `false`) |
-| `photoResult.photoId` | 아래 4번의 `image_index` ↔ 사진 매핑으로 결정 |
-| `photoResult.status` | job 상태에서 매핑(`queued/processing`→`analyzing`, `failed`→`failed`, `success`+findings 0건→`noFindings`, `success`+findings 있음→`completed`). `regenerating`/`confirmed`는 BE/FE 로컬 상태라 AI가 모릅니다 |
+| `candidates[].box` | `findings[].bbox`(FE가 0~1 정규화 xyxy → 자기 쪽 `{x,y,width,height}` %로 변환) |
+| `candidates[].isActualDefect` | AI가 주는 값 아님 — 판매자 응답, FE 로컬 상태(기본 `true`, 판매자가 "아니다" 누르면 `false`) → 최종 제출 시 BE로 전달 |
+| `photoResult.photoId` | 아래 4번의 `image_index` ↔ 사진 매핑으로 FE가 결정 |
+| `photoResult.status` | FE가 job 상태에서 매핑(`queued/processing`→`analyzing`, `failed`→`failed`, `success`+findings 0건→`noFindings`, `success`+findings 있음→`completed`) |
 
 ### 4. `image_index` ↔ 프론트/백 매핑 규칙 (신규 요청)
 
-`image_urls`는 **순서가 곧 `image_index`**입니다(0부터). FE의 `photoId`(사진별 로컬 id)로
-결과를 되돌려 매핑하려면, **BE가 `image_urls`를 보낼 때 항상 앞면을 0번, 뒷면을 1번으로 고정된
-순서로 보내고**, 결과를 받을 때 그 순서 그대로 어느 `photoId`였는지 기억해서 매핑해 주셔야
-합니다(AI는 `photoId`라는 개념 자체를 모릅니다).
+`image_urls`는 **순서가 곧 `image_index`**입니다(0부터). BE는 `POST /quality/inspections`에
+`image_urls`를 보낼 때 **항상 앞면을 0번, 뒷면을 1번으로 고정된 순서**로만 보내주시면 됩니다.
+그 뒤 FE가 `image_index`를 자기 `photoId`로 매핑하는 건 FE 몫입니다(FE는 애초에 자기가 앞면을
+0번째로 업로드했다는 걸 알고 있으므로, 별도로 순서를 넘겨받을 필요가 없습니다). AI는
+`photoId`라는 개념 자체를 모릅니다.
 
 ### 5. 참고 — CH011 sVLM 설명(`include_descriptions`)은 아직 검증 중
 
