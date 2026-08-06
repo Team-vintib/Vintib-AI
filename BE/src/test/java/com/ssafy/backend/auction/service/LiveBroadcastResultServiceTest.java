@@ -124,7 +124,7 @@ class LiveBroadcastResultServiceTest {
 
     private ProductCard 카드(Long productId, String title) {
         return new ProductCard(
-                productId, title, null, null, null, null, "https://cdn/" + productId + ".jpg",
+                productId, title, null, null, null, null, null, "https://cdn/" + productId + ".jpg",
                 null, null, null);
     }
 
