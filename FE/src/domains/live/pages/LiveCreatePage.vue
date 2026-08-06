@@ -7,6 +7,7 @@ import {
   scheduleLive,
   uploadLiveThumbnail,
 } from '@/domains/live/api/liveCreateApi'
+import { getLiveListViewData } from '@/domains/live/api/liveListApi'
 import {
   LIVE_CREATE_BASE_STEPS,
   LIVE_CREATE_COMPLETE_STEP,
@@ -47,6 +48,7 @@ const createdLiveId = ref<number | null>(null)
 const isSubmittingLive = ref(false)
 const isLoadingProducts = ref(false)
 const submitError = ref('')
+const activeLiveBlocked = ref(false)
 const productLoadError = ref('')
 const thumbnailInput = ref<HTMLInputElement | null>(null)
 const thumbnailFile = ref<File | null>(null)
@@ -450,6 +452,25 @@ const submitLiveCreate = async () => {
   submitError.value = ''
 
   try {
+    // 즉시 개설이면, 이미 진행 중인 내 라이브가 있는지 확인해 2개 동시 개설을 막는다.
+    if (form.mode !== 'SCHEDULED' && authStore.user?.id) {
+      try {
+        const active = await getLiveListViewData({
+          hostId: authStore.user.id,
+          status: 'LIVE',
+          page: 1,
+          size: 1,
+        })
+
+        if (active.items.length > 0) {
+          activeLiveBlocked.value = true
+          return false
+        }
+      } catch {
+        // 확인 호출 실패는 개설을 막지 않는다(가드는 best-effort).
+      }
+    }
+
     const baseRequest = {
       title: form.title.trim(),
       thumbnailUrl: await resolveThumbnailUrl(),
@@ -1003,6 +1024,23 @@ onMounted(() => {
         </aside>
       </div>
     </section>
+
+    <div
+      v-if="activeLiveBlocked"
+      class="live-create__block-backdrop"
+      @click.self="activeLiveBlocked = false"
+    >
+      <div
+        class="live-create__block-modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="live-create-block-title"
+      >
+        <h2 id="live-create-block-title">이미 진행 중인 라이브가 있어요</h2>
+        <p>진행 중인 방송을 먼저 종료한 뒤 새 방송을 시작해 주세요.</p>
+        <button type="button" @click="activeLiveBlocked = false">확인</button>
+      </div>
+    </div>
   </DefaultLayout>
 </template>
 
@@ -1011,6 +1049,52 @@ onMounted(() => {
   display: grid;
   gap: var(--space-8);
   padding-bottom: var(--space-16);
+}
+
+.live-create__block-backdrop {
+  display: grid;
+  position: fixed;
+  z-index: var(--z-top);
+  inset: 0;
+  place-items: center;
+  padding: var(--space-4);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.live-create__block-modal {
+  display: flex;
+  width: 100%;
+  max-width: 360px;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.live-create__block-modal h2 {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-bold);
+}
+
+.live-create__block-modal p {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
+}
+
+.live-create__block-modal button {
+  min-height: var(--button-height-tight);
+  margin-top: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
 }
 
 .live-create__eyebrow,
