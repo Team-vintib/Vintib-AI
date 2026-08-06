@@ -30,12 +30,20 @@ class VLMBundle:
     device: str
 
 
-def load_qwen_vl(model_id: str, quantization: str = "4bit") -> VLMBundle:
+def load_qwen_vl(
+    model_id: str, quantization: str = "4bit", enable_cpu_offload: bool = False
+) -> VLMBundle:
     """Qwen3VLForConditionalGeneration/AutoProcessor로 로드.
 
     quantization="4bit"면 bitsandbytes nf4로 양자화한다(8GB급 GPU 기준 bf16 풀로드가
     안 들어가서 필수 — AI/validation/QUAL/vlm-description-check/ 실측). "none"이면
     dtype="auto" + device_map="auto"로 그대로 올린다 — 더 큰 GPU에서만 실제로 돈다.
+
+    `enable_cpu_offload=True`면 `device_map="auto"`가 VRAM 부족으로 일부 레이어를 CPU에
+    두려 할 때 실패 대신 실제로 오프로드하게 허용한다(속도는 떨어지지만 완주는 한다).
+    tryon 워커처럼 **CatVTON이 이미 GPU에 상주한 채로** VLM을 얹는 경우처럼, 이 함수
+    자체는 넉넉한 VRAM을 가정하지만 호출부의 실제 여유 공간이 그보다 작을 때 켠다
+    (6GB급 노트북 GPU 실측 — CatVTON 상주 + VLM 4bit이 그대로는 안 들어감).
     """
     import torch
     from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
@@ -51,6 +59,7 @@ def load_qwen_vl(model_id: str, quantization: str = "4bit") -> VLMBundle:
             bnb_4bit_compute_dtype=torch.bfloat16,
             bnb_4bit_quant_type="nf4",
             bnb_4bit_use_double_quant=True,
+            llm_int8_enable_fp32_cpu_offload=enable_cpu_offload,
         )
         model = Qwen3VLForConditionalGeneration.from_pretrained(
             model_id, quantization_config=quant_config, device_map="auto"
