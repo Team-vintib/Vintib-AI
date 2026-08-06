@@ -29,7 +29,6 @@
 erDiagram
     member ||--o| member_body_profile : has
     member ||--o| business_info : has
-    member ||--o{ member_social_account : links
     member ||--o| point_account : owns
     member ||--o{ point_transaction : records
     member ||--o{ follow : follows

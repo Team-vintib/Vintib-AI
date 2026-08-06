@@ -229,6 +229,7 @@
 | `host_id` | `bigint` | NOT NULL |  | FK→member | 방송 진행자(판매자). |
 | `title` | `varchar(200)` | NOT NULL |  |  | 방송명. 통합 검색 대상 (SEARCH-001). |
 | `thumbnail_url` | `varchar(500)` |  |  |  | 방송 썸네일 URL. 홈 목록에 노출된다. |
+| `description` | `varchar(1000)` |  |  |  |  |
 | `status` | `varchar(20)` | NOT NULL | `'SCHEDULED'` |  | SCHEDULED(예정) \| LIVE(진행 중) \| ENDED(종료) \| CANCELED(방송 전 취소) |
 | `scheduled_at` | `timestamptz` |  |  |  | 예약 방송 시작 예정 시각 (LIVE-001). 즉시 개설(LIVE-002)은 NULL. |
 | `started_at` | `timestamptz` |  |  |  | 실제 방송 시작 시각. 예정 시각(scheduled_at)과 다를 수 있다. |
@@ -270,6 +271,23 @@
 
 ---
 
+### `live_reminder`
+
+| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
+| `live_id` | `bigint` | NOT NULL |  | FK→live, UQ | 대상 라이브. |
+| `member_id` | `bigint` | NOT NULL |  | FK→member, UQ | 대상 회원. |
+| `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
+| `notified_at` | `timestamptz` |  |  |  |  |
+
+**인덱스**
+
+- `ix_live_reminder_pending` — `CREATE INDEX ix_live_reminder_pending ON public.live_reminder USING btree (live_id) WHERE (notified_at IS NULL)`
+- `ux_live_reminder` — `CREATE UNIQUE INDEX ux_live_reminder ON public.live_reminder USING btree (live_id, member_id)`
+
+---
+
 ### `member`
 
 서비스 회원. 판매자·구매자 구분 없이 한 테이블을 쓴다.
@@ -279,6 +297,7 @@
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `email` | `varchar(255)` | NOT NULL |  | UQ | 로그인 ID 겸 연락 수단. 경매 화면에는 노출하지 않는다. |
 | `password` | `varchar(255)` |  |  |  | 자체 로그인용 해시. SSO 전용 계정은 NULL. |
+| `google_id` | `varchar(100)` |  |  | UQ | 구글 로그인 연동 식별자(id_token의 sub, SY039). 미연동 회원은 NULL. |
 | `nickname` | `varchar(30)` |  |  | UQ | 공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011). |
 | `name` | `varchar(50)` |  |  |  | 실명. 배송·정산용이며 외부 노출 금지. |
 | `phone_number` | `varchar(20)` |  |  |  | 연락처. 배송·정산 확인용이며 외부 노출 금지. |
@@ -306,6 +325,7 @@
 
 - `ix_member_nickname_trgm` — `CREATE INDEX ix_member_nickname_trgm ON public.member USING gin (nickname gin_trgm_ops)`
 - `member_email_key` — `CREATE UNIQUE INDEX member_email_key ON public.member USING btree (email)`
+- `member_google_id_key` — `CREATE UNIQUE INDEX member_google_id_key ON public.member USING btree (google_id)`
 - `member_nickname_key` — `CREATE UNIQUE INDEX member_nickname_key ON public.member USING btree (nickname)`
 
 ---
@@ -346,28 +366,6 @@
 | --- | --- | --- | --- | --- | --- |
 | `member_id` | `bigint` | NOT NULL |  | FK→member, PK | 대상 회원. |
 | `category_id` | `bigint` | NOT NULL |  | FK→category, PK | 카테고리. |
-
----
-
-### `member_social_account`
-
-외부 계정 연결 (AUTH-003, AUTH-004). 한 회원이 여러 provider 를 가질 수 있다.
-
-| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
-| --- | --- | --- | --- | --- | --- |
-| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
-| `member_id` | `bigint` | NOT NULL |  | FK→member | 대상 회원. |
-| `provider` | `varchar(30)` | NOT NULL |  | UQ | SSO 공급자. 현재 SSAFY 만 허용. |
-| `provider_user_id` | `varchar(255)` | NOT NULL |  | UQ | 공급자 측 고유 ID. provider 와 묶어 유일하다. |
-| `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
-
-**CHECK 제약**
-
-- `ck_social_provider` — `CHECK (((provider)::text = 'SSAFY'::text))`
-
-**인덱스**
-
-- `uq_social_provider_user` — `CREATE UNIQUE INDEX uq_social_provider_user ON public.member_social_account USING btree (provider, provider_user_id)`
 
 ---
 
@@ -427,6 +425,7 @@
 | `seller_id` | `bigint` | NOT NULL |  | FK→member | 판매자. 상품 등록자와 같다. |
 | `product_id` | `bigint` | NOT NULL |  | FK→product | 대상 상품. |
 | `auction_id` | `bigint` |  |  | FK→auction | 낙찰로 생성된 주문의 경매. 상시 판매 주문은 NULL. |
+| `live_id` | `bigint` |  |  | FK→live | 대상 라이브. |
 | `order_price` | `bigint` | NOT NULL |  |  | 결제 금액(원). |
 | `status` | `varchar(30)` | NOT NULL | `'PAID'` |  | PAID → SHIPPING → DELIVERED → CONFIRMED → SETTLED (+ REFUNDED / CANCELED) |
 | `auto_confirm_at` | `timestamptz` |  |  |  | 자동 구매 확정 예정 시각(배송 완료 + 3일). 배송 완료 시점에 채워 넣고 스케줄러가 이 컬럼으로 대상을 찾는다. |
@@ -443,6 +442,7 @@
 
 - `ix_orders_auto_confirm` — `CREATE INDEX ix_orders_auto_confirm ON public.orders USING btree (auto_confirm_at) WHERE ((status)::text = 'DELIVERED'::text)`
 - `ix_orders_buyer` — `CREATE INDEX ix_orders_buyer ON public.orders USING btree (buyer_id, created_at DESC)`
+- `ix_orders_live` — `CREATE INDEX ix_orders_live ON public.orders USING btree (live_id) WHERE (live_id IS NOT NULL)`
 - `ix_orders_seller` — `CREATE INDEX ix_orders_seller ON public.orders USING btree (seller_id, created_at DESC)`
 
 ---
@@ -564,12 +564,15 @@
 | `sale_status` | `varchar(30)` | NOT NULL | `'DRAFT'` |  | DRAFT \| ON_SALE \| AUCTION_SCHEDULED \| AUCTION_IN_PROGRESS \| SOLD |
 | `price` | `bigint` |  |  |  | 상시 판매가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002). |
 | `view_count` | `integer` | NOT NULL | `0` |  | 누적 조회수(집계값). ⚠️ 회원별 조회 이력은 남지 않는다 — REC-001 착수 시 재검토 필요. |
+| `ai_model_enabled` | `boolean` | NOT NULL | `false` |  |  |
+| `ai_model_gender` | `varchar(10)` |  |  |  |  |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
 | `deleted_at` | `timestamptz` |  |  |  | 삭제 시각. 주문 이력 보존을 위해 물리 삭제하지 않는다. |
 
 **CHECK 제약**
 
+- `ck_product_ai_model_gender` — `CHECK (((ai_model_enabled = false) OR (ai_model_gender IS NOT NULL)))`
 - `ck_product_price_by_type` — `CHECK ((((sale_type)::text <> 'DIRECT_SALE'::text) OR (price IS NOT NULL)))`
 - `ck_product_sale_status` — `CHECK (((sale_status)::text = ANY ((ARRAY['DRAFT'::character varying, 'ON_SALE'::character varying, 'AUCTION_SCHEDULED'::character varying, 'AUCTION_IN_PROGRESS'::character varying, 'SOLD'::character varying])::text[])))`
 - `ck_product_sale_type` — `CHECK (((sale_type)::text = ANY ((ARRAY['DIRECT_SALE'::character varying, 'AUCTION'::character varying])::text[])))`

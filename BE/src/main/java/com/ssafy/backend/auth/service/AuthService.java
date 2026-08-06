@@ -1,13 +1,19 @@
 package com.ssafy.backend.auth.service;
 
 import com.ssafy.backend.auth.dto.request.SignUpRequest;
+import com.ssafy.backend.auth.dto.response.GoogleAuthResponse;
 import com.ssafy.backend.auth.dto.response.SignUpResponse;
 import com.ssafy.backend.auth.dto.response.TokenResponse;
 import com.ssafy.backend.auth.jwt.JwtTokenProvider;
+import com.ssafy.backend.global.client.GoogleIdentity;
+import com.ssafy.backend.global.client.GoogleOAuthClient;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import java.time.Duration;
+import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -20,11 +26,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AuthService {
 
+    // 구글 연동 확인 대기 시간 — 사용자가 "연동하시겠습니까?" 확인을 미루면 대기 정보를 버린다.
+    private static final Duration GOOGLE_LINK_TOKEN_TTL = Duration.ofMinutes(5);
+
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationService emailVerificationService;
     private final JwtTokenProvider jwtTokenProvider;
     private final StringRedisTemplate redisTemplate;
+    private final GoogleOAuthClient googleOAuthClient;
 
     public void checkEmailDuplicate(String email) {
         if (memberRepository.existsByEmail(normalizeEmail(email))) {
@@ -97,6 +107,61 @@ public class AuthService {
         redisTemplate.delete(refreshTokenKey(memberId));
     }
 
+    /**
+     * 구글 로그인(SY039). 이메일이 없으면 바로 가입시키고, 있는데 구글 연동이 안 돼 있으면
+     * 토큰을 내주지 않고 연동 확인을 먼저 받는다({@link #confirmGoogleLink}).
+     */
+    @Transactional
+    public GoogleAuthResponse signInWithGoogle(String code, String redirectUri) {
+        String idToken = googleOAuthClient.exchangeCode(code, redirectUri);
+        GoogleIdentity identity = googleOAuthClient.verifyIdToken(idToken);
+        String email = normalizeEmail(identity.email());
+
+        Optional<Member> existing = memberRepository.findByEmail(email);
+        if (existing.isEmpty()) {
+            Member member = memberRepository.save(
+                    Member.ofGoogle(email, identity.name(), identity.googleId(), identity.pictureUrl()));
+            return GoogleAuthResponse.login(
+                    issueTokens(member.getId(), member.getEmail()), member.isOnboardingCompleted());
+        }
+
+        Member member = existing.get();
+        if (identity.googleId().equals(member.getGoogleId())) {
+            return GoogleAuthResponse.login(
+                    issueTokens(member.getId(), member.getEmail()), member.isOnboardingCompleted());
+        }
+
+        String linkToken = UUID.randomUUID().toString();
+        redisTemplate.opsForValue().set(
+                googleLinkKey(linkToken), email + ":" + identity.googleId(), GOOGLE_LINK_TOKEN_TTL);
+        return GoogleAuthResponse.linkRequired(linkToken, email);
+    }
+
+    /** 연동 확인 응답(SY039). 사용자가 거부하면 대기 정보만 지우고 로그인시키지 않는다. */
+    @Transactional
+    public GoogleAuthResponse confirmGoogleLink(String linkToken, boolean confirm) {
+        String key = googleLinkKey(linkToken);
+        String saved = redisTemplate.opsForValue().get(key);
+        if (saved == null) {
+            throw new CustomException(ErrorCode.GOOGLE_LINK_EXPIRED);
+        }
+        redisTemplate.delete(key);
+
+        if (!confirm) {
+            return GoogleAuthResponse.linkDeclined();
+        }
+
+        String[] parts = saved.split(":", 2);
+        Member member = memberRepository.findByEmail(parts[0])
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        member.linkGoogleAccount(parts[1]);
+        return GoogleAuthResponse.login(issueTokens(member.getId(), member.getEmail()), member.isOnboardingCompleted());
+    }
+
+    private String googleLinkKey(String linkToken) {
+        return "auth:google-link:" + linkToken;
+    }
+
     private TokenResponse issueTokens(Long memberId, String email) {
         String accessToken = jwtTokenProvider.createAccessToken(memberId, email);
         String refreshToken = jwtTokenProvider.createRefreshToken(memberId);
@@ -104,7 +169,7 @@ public class AuthService {
         redisTemplate.opsForValue().set(
                 refreshTokenKey(memberId), refreshToken, jwtTokenProvider.getRefreshTokenValidity());
 
-        return new TokenResponse(accessToken, refreshToken);
+        return new TokenResponse(accessToken, refreshToken, memberId);
     }
 
     private String normalizeEmail(String email) {

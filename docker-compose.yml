@@ -190,6 +190,10 @@ services:
       # 포인트 충전 결제위젯(토스페이먼츠, POINT-001). 폴백이 없어 비우면 충전 승인 자체가 실패한다.
       TOSS_SECRET_KEY: ${TOSS_SECRET_KEY:-}
       TOSS_CLIENT_KEY: ${TOSS_CLIENT_KEY:-}
+      # 구글 로그인(SY039, SSAFY SSO 대체). 비우면 /api/auth/google 호출 시 구글 쪽에서 인증
+      # 실패로 거절된다(폴백 없음 — 로그인 실패를 조용히 넘기면 안 됨).
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy
