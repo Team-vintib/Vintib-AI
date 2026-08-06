@@ -47,7 +47,7 @@ from sam3.contracts import BaseColor, GarmentCategory  # noqa: E402
 from sam3.findings import extract_findings  # noqa: E402
 from sam3.overlay import build_annotated_images, build_attention_maps  # noqa: E402
 from sam3.prompts import select_prompt_set  # noqa: E402
-from sam3.scoring import build_notes, score_findings, summarize  # noqa: E402
+from sam3.scoring import build_notes, score_findings, summarize, summarize_by_image  # noqa: E402
 from sam3.segmenter import InspectionTarget, build_segmenter  # noqa: E402
 
 # 어떤 세그멘터로 돌릴지. registry.SEGMENTER_BACKENDS 의 키.
@@ -152,6 +152,9 @@ class QualityCheckWorker(BaseWorker):
             "condition_score": score,
             "condition_grade": grade.value,
             "summary": summarize(extracted.findings),
+            "image_summaries": [
+                s.to_dict() for s in summarize_by_image(extracted.findings, len(image_urls))
+            ],
             "findings": [f.to_dict() for f in findings],
             "section_scores": [s.to_dict() for s in extracted.section_scores],
             "attention_maps": [m.to_dict() for m in attention_maps],

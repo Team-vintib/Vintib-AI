@@ -65,3 +65,6 @@ validation/CLASS/product-info-finetune/artifacts/
 # ViT 파인튜닝 비교 실험 산출물(pixel 텐서 캐시 재사용 시 별도 out-dir을 준 경우·파인튜닝
 # 체크포인트) — 선형 프로브 베이스라인(위 artifacts/)과 분리해 재생성 가능
 validation/CLASS/product-info-finetune/artifacts_finetune/
+# GPU 서버의 원본 실행 기록 노트북 — 정리된 aihub_pipeline_final_check.ipynb만 커밋한다.
+# 중복 정의(run/time 등)가 남아 있어 ruff .ipynb 린트도 통과 못 한다.
+validation/CLASS/product-info-finetune/aihub_pipeline_server.ipynb
