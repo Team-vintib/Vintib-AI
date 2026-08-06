@@ -12,7 +12,6 @@ import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionRe
 import SellerAuctionPanel from '@/domains/auction/components/SellerAuctionPanel.vue'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import {
-  issueLiveVideoToken,
   patchCurrentProduct,
   updateLiveStatus,
 } from '@/domains/live/api/liveControlApi'
@@ -76,7 +75,6 @@ const unsoldProducts = ref<LiveUnsoldProduct[]>([])
 const resultLoading = ref(false)
 const resultError = ref('')
 const now = ref(Date.now())
-const videoConnectionLabel = ref('')
 // 방송 상세는 시청자와 같은 GET /lives/{liveId} 실 API를 재사용한다(VITE_LIVE_WATCH_API_ENABLED).
 // 소유자 판정(isHost)·현재 소개 상품(currentProductId)은 BE 016 §2.1·§2.5에서 제공된다.
 // isHost는 로그인 토큰이 실려야 채워지므로(비회원/비로그인은 false), host가 아니면 시청 페이지로 보낸다.
@@ -210,7 +208,6 @@ const loadLiveBroadcast = async () => {
   resultError.value = ''
   endView.value = 'dashboard'
   transitionNotice.value = ''
-  videoConnectionLabel.value = ''
   window.clearTimeout(transitionNoticeTimer)
 
   if (liveId === null) {
@@ -240,7 +237,6 @@ const loadLiveBroadcast = async () => {
     loadState.value = 'success'
 
     if (response.status === 'LIVE') {
-      void loadVideoToken(response.id)
       void loadAuction(response.id)
     }
 
@@ -375,18 +371,6 @@ const confirmEndBroadcast = async () => {
     showTransitionNotice(
       error instanceof Error ? error.message : '방송을 종료하지 못했습니다.',
     )
-  }
-}
-
-const loadVideoToken = async (liveId: number) => {
-  videoConnectionLabel.value = '영상 토큰 발급 중'
-
-  try {
-    const token = await issueLiveVideoToken(liveId)
-    videoConnectionLabel.value =
-      token.role === 'PUBLISHER' ? '송출 토큰 발급 완료' : '시청 토큰 발급 완료'
-  } catch {
-    videoConnectionLabel.value = '영상 토큰 발급 실패'
   }
 }
 
@@ -555,7 +539,7 @@ onBeforeUnmount(() => {
             :title="live.title"
             :poster-url="live.posterUrl"
             :status="live.status"
-            :connection-label="videoConnectionLabel"
+            :live-id="live.id"
             :show-try-on="false"
           >
             <template #overlay>

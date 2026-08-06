@@ -15,6 +15,7 @@
   "dependencies": {
     "@tosspayments/tosspayments-sdk": "^2.7.1",
     "axios": "^1.7.9",
+    "livekit-client": "^2.21.0",
     "pinia": "^4.0.2",
     "vue": "^3.5.39",
     "vue-router": "^5.1.0"
