@@ -33,6 +33,7 @@ import argparse
 import hashlib
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -92,17 +93,30 @@ def build_meta_row(category: str, image_path: str) -> dict[str, Any]:
     }
 
 
+@dataclass(frozen=True)
+class SeedRow:
+    """코퍼스 한 행에 필요한 전부. `label_path`/`width`/`height`는 폴리곤(배경 마스킹용)을
+    읽으려고 들고 있다 — `aihub_dataset.Record`는 폴리곤 좌표 자체는 안 담는다(용량 때문에
+    label_path로 원본 JSON을 다시 읽는 게 관례, `aihub_preprocess.py`와 같은 패턴)."""
+
+    image_path: Path
+    category: str
+    label_path: Path
+    width: int | None
+    height: int | None
+
+
 def collect_rows(
     label_root: Path, image_root: Path, *, max_per_category: int, limit: int | None
-) -> list[tuple[Path, str]]:
-    """AI-Hub 라벨을 순회해 (실제 이미지 경로, 카테고리) 쌍을 카테고리당 상한까지 모은다.
+) -> list[SeedRow]:
+    """AI-Hub 라벨을 순회해 코퍼스 행을 카테고리당 상한까지 모은다.
 
     `label_root`(라벨링데이터 JSON)와 `image_root`(원천데이터 이미지)가 다른 트리인
     경우가 많다 — `aihub_embed.py`와 같은 구분. 매핑이 없는(`subcategory is None`)
     라벨과 실제 이미지 파일을 못 찾은 행은 건너뛴다.
     """
     counts: dict[str, int] = {}
-    rows: list[tuple[Path, str]] = []
+    rows: list[SeedRow] = []
     for raw_label in aihub_dataset.load_labels(label_root, limit=limit):
         record, _reason = aihub_dataset.to_record(raw_label)
         category = record.subcategory
@@ -115,7 +129,15 @@ def collect_rows(
         )
         if image_path is None or not image_path.exists():
             continue
-        rows.append((image_path, category))
+        rows.append(
+            SeedRow(
+                image_path=image_path,
+                category=category,
+                label_path=label_root / record.label_path,
+                width=record.width,
+                height=record.height,
+            )
+        )
         counts[category] = counts.get(category, 0) + 1
     return rows
 
@@ -133,14 +155,23 @@ def load_backbone(model_id: str, unfreeze_layers: int, checkpoint_path: Path, de
     return model
 
 
-def embed_one(model: Any, processor: Any, image_path: Path, device: str) -> list[float]:
-    """이미지 1장 → L2 정규화 임베딩. 폴리곤 정보가 없어 "raw" variant로 전처리한다
-    (`aihub_ground_truth_zero_shot_check.py`와 같은 방식)."""
+def embed_one(model: Any, processor: Any, row: SeedRow, device: str) -> list[float]:
+    """이미지 1장 → L2 정규화 임베딩. **"masked" variant로 전처리한다** — 배포된
+    체크포인트(`*_masked_*`)가 배경을 마스킹한 이미지로 학습됐으니 코퍼스도 같은 전처리를
+    써야 학습 때와 같은 임베딩 공간에 놓인다. 폴리곤을 못 읽으면(`load_polygon`이 `None`)
+    `render_variant`가 자동으로 "raw"로 폴백한다.
+
+    ⚠️ 실제 서비스에서 업로드되는 사진(질의 쪽)은 AI-Hub 라벨이 없어 폴리곤을 못 구한다 —
+    `app/pricing/clip_embed.py`는 여전히 원본 사진 그대로 임베딩한다(코퍼스=마스킹,
+    질의=원본 비대칭). 질의 쪽도 배경을 제외하려면 별도 세그멘테이션(SAM3 등)이 필요하다 —
+    이번 라운드 범위 밖.
+    """
     import torch
     from PIL import Image
 
-    with Image.open(image_path) as image:
-        prepared = aihub_preprocess.render_variant(image, None, "raw")
+    polygon = aihub_preprocess.load_polygon(row.label_path, row.width, row.height)
+    with Image.open(row.image_path) as image:
+        prepared = aihub_preprocess.render_variant(image, polygon, "masked")
     inputs = processor(images=[prepared], return_tensors="pt")
     with torch.no_grad():
         features = model.get_image_features(pixel_values=inputs["pixel_values"].to(device))
@@ -175,8 +206,11 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 1
-    categories = sorted({category for _, category in rows})
-    print(f"{len(rows):,}장 수집 완료 (카테고리 {len(categories)}종: {', '.join(categories)})")
+    categories = sorted({row.category for row in rows})
+    print(
+        f"{len(rows):,}장 수집 완료 (카테고리 {len(categories)}종: {', '.join(categories)})",
+        flush=True,
+    )
 
     import numpy as np
     from transformers import AutoProcessor
@@ -186,9 +220,9 @@ def main(argv: list[str] | None = None) -> int:
 
     vectors = np.zeros((len(rows), model.config.projection_dim), dtype="float32")
     meta: list[dict[str, Any]] = []
-    for index, (image_path, category) in enumerate(rows):
-        vectors[index] = embed_one(model, processor, image_path, args.device)
-        meta.append(build_meta_row(category, str(image_path)))
+    for index, row in enumerate(rows):
+        vectors[index] = embed_one(model, processor, row, args.device)
+        meta.append(build_meta_row(row.category, str(row.image_path)))
         if (index + 1) % 50 == 0:
             print(f"  ... {index + 1:,}/{len(rows):,}", file=sys.stderr, flush=True)
 
