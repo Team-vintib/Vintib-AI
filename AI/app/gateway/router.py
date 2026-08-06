@@ -11,6 +11,7 @@ from fastapi import APIRouter, File, Header, HTTPException, Query, UploadFile
 from app.chat import rag_store
 from app.core.config import settings
 from app.gateway.schemas import FeatureType, Job, JobResult, new_job
+from app.recommend.personalize import embedding_store
 
 # app.chat.service가 이 모듈의 enqueue_job()을 가져다 쓰므로(순환 import 방지를 위해
 # 여기서는 최상단에서 app.chat.service를 import하지 않는다 — 아래 _ingest_chat_rag_result()
@@ -108,6 +109,29 @@ def _ingest_stt_result(result: dict) -> None:
         )
     except Exception as exc:  # noqa: BLE001
         print(f"[gateway] STT 결과 저장 실패(live_id={result.get('live_id')}): {exc}")
+
+
+def _ingest_quality_embedding_result(result: dict) -> None:
+    """품질검수 워커가 실어 보낸 의류 임베딩(`garment_embedding`)을 pgvector에 upsert한다.
+
+    계산은 워커가 이미 끝냈으므로 여기선 통과만 시킨다(`_ingest_stt_result`와 같은 구조).
+    `garment_embedding`이 없으면(mock 백엔드, 의류 미검출, 임베딩 계산 실패) 조용히
+    건너뛴다 — 검수 결과 자체는 이 필드 없이도 완결된 응답이다.
+
+    저장 실패가 job 제출 자체를 실패로 만들면 안 된다 — 검수는 이미 끝난 일이라, 저장소
+    장애 때문에 재시도 루프를 돌게 하지 않는다(`_ingest_stt_result`와 같은 원칙).
+    """
+    embedding = result.get("garment_embedding")
+    if not embedding:
+        return
+    try:
+        embedding_store.save_garment_embedding(
+            product_id=int(result["product_id"]),
+            embedding=embedding,
+            model_id=result.get("garment_embedding_model_id", "unknown"),
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[gateway] 의류 임베딩 저장 실패(product_id={result.get('product_id')}): {exc}")
 
 
 def _ingest_chat_rag_result(job: Job, result: dict) -> None:
@@ -235,6 +259,8 @@ def submit_result(
             _ingest_stt_result(result)
         elif job.type == "chat_rag" and result is not None:
             _ingest_chat_rag_result(job, result)
+        elif job.type == "quality_check" and result is not None:
+            _ingest_quality_embedding_result(result)
         return {"ok": True}
 
     job.retry_count += 1
