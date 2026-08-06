@@ -1,18 +1,26 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import CategoryProductTabs from '@/domains/home/components/CategoryProductTabs.vue'
 import HomeHeroCarousel from '@/domains/home/components/HomeHeroCarousel.vue'
 import HomeSearchPanel from '@/domains/home/components/HomeSearchPanel.vue'
 import HomeSection from '@/domains/home/components/HomeSection.vue'
 import LiveCard from '@/domains/home/components/LiveCard.vue'
 import ProductCard from '@/domains/home/components/ProductCard.vue'
-import type { HomeViewData } from '@/domains/home/types/homeView.types'
-import { ROUTE_PATHS } from '@/shared/constants/routes'
+import type { HomePopularHostLive, HomeViewData } from '@/domains/home/types/homeView.types'
+import type { ProductCategoryTabSection } from '@/domains/product/types/productList.types'
+import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
+
+const authStore = useAuthStore()
 
 defineProps<{
   homeData: HomeViewData
   wishedProductIds: Set<number>
+  productGradeLabels: Map<number, string>
+  popularHostLive: HomePopularHostLive | null
+  categoryProductTabs: ProductCategoryTabSection[]
 }>()
 
 const emit = defineEmits<{
@@ -29,6 +37,11 @@ const formatCompactNumber = (value: number) => {
 const getLivePath = (liveId: number) => `/lives/${liveId}`
 const getProductPath = (productId: number) => `/products/${productId}`
 const getSellerProfilePath = (sellerId: number) => `/profile/${sellerId}`
+const followingListRoute = computed(() =>
+  authStore.user?.id
+    ? { name: ROUTE_NAMES.PROFILE_FOLLOWING, params: { userId: authStore.user.id } }
+    : ROUTE_PATHS.AUTH_LOGIN,
+)
 
 // 아바타 로드에 실패하면 대체 이미지를 새로 추가하는 대신 빈 원형 프레임만 남긴다.
 const handleAvatarError = (event: Event) => {
@@ -42,19 +55,19 @@ const handleAvatarError = (event: Event) => {
   <div class="member-home">
     <HomeSearchPanel />
 
-    <HomeHeroCarousel :home-data="homeData" />
+    <HomeHeroCarousel :home-data="homeData" :popular-host-live="popularHostLive" />
 
     <HomeSection
       title-id="followed-seller-title"
       eyebrow="Following"
-      title="내가 팔로우한 판매자"
-      :link-to="ROUTE_PATHS.FOLLOWING_HOME"
+      title="팔로우 중인 판매자"
+      :link-to="followingListRoute"
       :is-empty="homeData.followedSellers.length === 0"
       empty-message="팔로우한 판매자가 없습니다."
     >
       <div class="seller-grid">
         <RouterLink
-          v-for="seller in homeData.followedSellers"
+          v-for="seller in homeData.followedSellers.slice(0, 8)"
           :key="seller.id"
           class="seller-card"
           :to="getSellerProfilePath(seller.id)"
@@ -70,9 +83,11 @@ const handleAvatarError = (event: Event) => {
           </span>
           <span class="seller-card__body">
             <strong class="seller-card__name">{{ seller.name }}</strong>
-            <span class="seller-card__stats">
+            <span class="seller-card__stats-row">
               <span>팔로워 {{ formatCompactNumber(seller.followerCount) }}</span>
               <span>팔로잉 {{ formatCompactNumber(seller.followingCount) }}</span>
+            </span>
+            <span class="seller-card__stats-row">
               <span>판매 상품 {{ formatCompactNumber(seller.newProductCount) }}</span>
               <span>라이브 {{ formatCompactNumber(seller.liveCount) }}</span>
             </span>
@@ -91,7 +106,7 @@ const handleAvatarError = (event: Event) => {
     >
       <div class="live-grid">
         <LiveCard
-          v-for="live in homeData.liveNow"
+          v-for="live in homeData.liveNow.slice(0, 8)"
           :key="live.id"
           :live="live"
           :to="getLivePath(live.id)"
@@ -109,12 +124,10 @@ const handleAvatarError = (event: Event) => {
     >
       <div class="schedule-grid">
         <LiveCard
-          v-for="live in homeData.scheduledLives"
+          v-for="live in homeData.scheduledLives.slice(0, 8)"
           :key="live.id"
           :live="live"
           variant="scheduled"
-          :action-to="getLivePath(live.id)"
-          action-label="예약하기"
         />
       </div>
     </HomeSection>
@@ -129,12 +142,11 @@ const handleAvatarError = (event: Event) => {
     >
       <div class="product-grid">
         <ProductCard
-          v-for="product in homeData.recommendedProducts"
+          v-for="product in homeData.recommendedProducts.slice(0, 8)"
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
-          :badge-label="product.saleType === 'AUCTION' ? '경매 예정' : '바로 구매'"
-          :badge-variant="product.saleType === 'AUCTION' ? 'auction' : 'direct'"
+          :grade-label="productGradeLabels.get(product.id)"
           :is-wished="wishedProductIds.has(product.id)"
           @toggle-wish="emit('toggleWish', $event)"
         />
@@ -142,7 +154,7 @@ const handleAvatarError = (event: Event) => {
     </HomeSection>
 
     <CategoryProductTabs
-      :sections="homeData.categoryProductSections"
+      :sections="categoryProductTabs"
       :wished-product-ids="wishedProductIds"
       @toggle-wish="emit('toggleWish', $event)"
     />
@@ -151,18 +163,17 @@ const handleAvatarError = (event: Event) => {
       title-id="auction-title"
       eyebrow="Auction"
       title="경매 예정 상품"
-      :link-to="ROUTE_PATHS.PRODUCT_LIST"
+      :link-to="{ path: ROUTE_PATHS.PRODUCT_LIST, query: { saleType: 'AUCTION' } }"
       :is-empty="homeData.upcomingAuctionProducts.length === 0"
       empty-message="경매 예정 상품이 없습니다."
     >
       <div class="product-grid">
         <ProductCard
-          v-for="product in homeData.upcomingAuctionProducts"
+          v-for="product in homeData.upcomingAuctionProducts.slice(0, 8)"
           :key="product.id"
           :product="product"
           :to="getProductPath(product.id)"
-          badge-label="경매 예정"
-          badge-variant="auction"
+          :grade-label="productGradeLabels.get(product.id)"
           price-prefix="가격 "
           :is-wished="wishedProductIds.has(product.id)"
           @toggle-wish="emit('toggleWish', $event)"
@@ -195,18 +206,16 @@ const handleAvatarError = (event: Event) => {
 }
 
 // 낮고 컴팩트한 카드: 얇은 border만, 채워진 배경 박스는 두지 않는다.
-// hover도 뜨지 않고 보더 대비만 미세하게 바뀐다. 정사각형에 가깝게 세로(아바타 위·텍스트 아래) 배치한다.
+// hover도 뜨지 않고 보더 대비만 미세하게 바뀐다. 아바타는 왼쪽, 닉네임·통계는 오른쪽에 배치한다.
 .seller-card {
   position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-4) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   color: inherit;
-  text-align: center;
   transition: border-color var(--transition-standard);
 }
 
@@ -235,7 +244,7 @@ const handleAvatarError = (event: Event) => {
 
 .seller-card__body {
   display: grid;
-  justify-items: center;
+  justify-items: start;
   min-width: 0;
   width: 100%;
   gap: var(--space-1);
@@ -253,21 +262,32 @@ const handleAvatarError = (event: Event) => {
   white-space: nowrap;
 }
 
-.seller-card__stats {
-  justify-content: center;
+.seller-card__stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: var(--space-1) 0;
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-regular);
   letter-spacing: -0.01em;
   line-height: var(--line-height-snug);
   font-variant-numeric: tabular-nums;
 }
 
-.seller-card__stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-3);
+.seller-card__stats-row > span:not(:last-child) {
+  position: relative;
+  padding-right: var(--space-3);
+}
+
+.seller-card__stats-row > span:not(:last-child)::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  color: var(--color-border-strong);
+  content: '·';
+  transform: translateY(-50%);
 }
 
 @media (max-width: 768px) {

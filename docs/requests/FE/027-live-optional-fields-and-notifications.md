@@ -9,6 +9,12 @@ Phase 8(경매 종료) 들어가기 전에, 남아 있던 내 파트(라이브·
 
 ---
 
+> ⚠️ **2026-08-05 확인 — §1이 아직 반영되지 않았습니다.**
+> `FE/src/domains/live/api/liveWatchApi.ts:43` 이 세 필드를 `null` 로 하드코딩하고
+> "`LiveProductResponse` 에 없음"이라는 주석을 달아 두었는데, **지금은 셋 다 내려갑니다.**
+> `dto.material` · `dto.measurements` · `dto.defectSummary` 를 그대로 쓰시면 시청 화면에서
+> 소재·실측·하자 요약이 바로 보입니다(현재는 "정보 준비 중"으로 표시됩니다).
+
 ## 1. `LiveProductResponse` 선택 필드 3종 (003 §3.5)
 
 ```jsonc

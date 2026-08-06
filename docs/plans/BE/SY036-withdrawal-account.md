@@ -45,15 +45,15 @@ POINT-003("출금 계좌 관리")이 정의하는 대로, 계좌 정보를 등�
 
 ## 구현 목록
 
-- [ ] `point.entity.WithdrawalAccount` 엔티티(공유 PK 1:1) + `point.repository.WithdrawalAccountRepository` 추가
-- [ ] `docs/db/schema.sql`에 `withdrawal_account` 테이블 추가
-- [ ] `WithdrawalAccountRequest`(`bankName`/`accountNumber`/`accountHolderName`), `WithdrawalAccountResponse` DTO 추가
-- [ ] `PointService`에 `registerWithdrawalAccount(memberId, ...)`, `getWithdrawalAccount(memberId)` 추가 + `requestWithdrawal`에 계좌 필수 검증 추가 + 테스트
-- [ ] `PointController`에 `PUT/GET /api/users/{userId}/points/account` 추가 + Swagger 문서화
-- [ ] `ErrorCode`에 W007~W008 추가
-- [ ] `docs/APIs.md` 포인트/출금 섹션 갱신
-- [ ] `docs/requests/BE/010-commerce-wallet-contract.md`의 "출금 계좌 관리(POINT-003)" 미반영 항목 반영 완료로 정리(반영된 부분 덜어내고, 남은 게 없으면 문서 자체를 검토해 필요 시 삭제)
-- [ ] `.claude/skills/BE:verify`로 최종 검증
+- [x] `point.entity.WithdrawalAccount` 엔티티(공유 PK 1:1) + `point.repository.WithdrawalAccountRepository` 추가
+- [x] `docs/db/schema.sql`에 `withdrawal_account` 테이블 추가
+- [x] `WithdrawalAccountRequest`(`bankName`/`accountNumber`/`accountHolderName`), `WithdrawalAccountResponse` DTO 추가
+- [x] `PointService`에 `registerWithdrawalAccount(memberId, ...)`, `getWithdrawalAccount(memberId)` 추가 + `requestWithdrawal`에 계좌 필수 검증 추가 + 테스트
+- [x] `PointController`에 `PUT/GET /api/users/{userId}/points/account` 추가 + Swagger 문서화
+- [x] `ErrorCode`에 W007~W008 추가
+- [x] `docs/APIs.md` 포인트/출금 섹션 갱신
+- [x] `docs/requests/BE/010-commerce-wallet-contract.md`의 "출금 계좌 관리(POINT-003)" 미반영 항목 반영 완료로 정리
+- [x] `.claude/skills/BE:verify`로 최종 검증 — `BUILD SUCCESSFUL`
 
 ## 확인 필요 사항
 

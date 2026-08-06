@@ -128,7 +128,7 @@ categories: [{ id: 10, name: "아우터" }, { id: 30, name: "하의" }, { id: 60
 - [x] `ENDED`·`CANCELED`는 상태 허용값·결과 양쪽에서 제외
 - [x] 빈 결과는 200 + 빈 목록, 잘못된 파라미터는 400
 - [x] 정렬 동률 시 `liveId DESC` 고정
-- [ ] `sort=VIEWERS_DESC`는 **-450(시청자 수 집계) 완료 후** 제공 — 이번 범위에서 제외, 허용값에서 빼 400으로 응답
+- [x] `sort=VIEWERS_DESC` — -450(시청자 수 집계, JY008 Phase 3) 완료 후 개방됨 (메모리 정렬 방식, 후보 500개 제한)
 - [x] Swagger 문서화 + 통합 테스트
 
 ### Phase E — 문서·회신

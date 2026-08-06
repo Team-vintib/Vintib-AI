@@ -50,11 +50,43 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     }
 
     /**
+     * 상품 상세의 유사 상품 목록(PROD-006, 011). 같은 카테고리 상품 중 같은 브랜드를 우선 노출한다.
+     *
+     * <p>{@code brandId}가 null(비지정 상품)이면 브랜드 일치 조건이 아무 행과도 매칭되지 않아
+     * 전부 후순위로 취급되고, 결과적으로 최신순 정렬만 적용된다 — SQL의 {@code NULL = NULL}이
+     * false인 동작을 그대로 이용한다.
+     */
+    @Query("""
+            SELECT p FROM Product p
+            WHERE p.categoryId = :categoryId
+              AND p.id <> :excludeProductId
+              AND p.saleStatus <> 'DRAFT'
+            ORDER BY CASE WHEN p.brandId = :brandId THEN 0 ELSE 1 END, p.createdAt DESC
+            """)
+    List<Product> findSimilarProducts(
+            @Param("categoryId") Long categoryId,
+            @Param("excludeProductId") Long excludeProductId,
+            @Param("brandId") Long brandId,
+            Pageable pageable);
+
+    /**
      * 선택적 필터·정렬을 지원하는 상품 목록 조회 (PROD-008).
      *
      * <p>각 boolean 플래그가 false 이면 대응하는 WHERE 절을 건너뛴다
      * — LiveRepository.findPublicLives 가 쓰는 패턴과 동일하다.
-     * DRAFT 상태는 항상 제외한다.
+     * DRAFT(미공개)와 SOLD(판매 완료)는 항상 제외한다.
+     *
+     * <p><b>SOLD 를 빼는 이유</b>(FE 요청 022) — 낙찰·즉시구매로 팔린 상품이 목록에 남으면
+     * 판매 중인 상품과 구분 없이 노출되고, 라이브 개설 화면의 상품 선택 목록(같은 API)에서
+     * 이미 팔린 물건을 다시 편성할 수 있게 된다. 클라이언트 필터로 거르면 서버 페이지네이션과
+     * 어긋나 페이지당 개수가 들쭉날쭉해지므로 질의에서 뺀다.
+     *
+     * <p>{@code AUCTION_IN_PROGRESS}는 남긴다 — 지금 경매 중인 상품은 오히려 목록에 보여
+     * 방송으로 유입시켜야 한다.
+     *
+     * <p>본인 상품 관리(마이페이지)는 이 질의를 쓰면 안 된다 — DRAFT·SOLD 까지 봐야 하므로
+     * {@link #findBySeller_IdOrderByCreatedAtDesc}({@code GET /api/users/{userId}/products})가
+     * 그 용도다.
      *
      * <p>가격 필터(minPrice/maxPrice)는 price 가 null 인 경매 예정 상품에는
      * 실질적으로 작동하지 않는다. 경매 예정은 가격이 없으므로 hasMinPriceFilter=true 이면
@@ -64,6 +96,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("""
             SELECT p FROM Product p
             WHERE p.saleStatus <> 'DRAFT'
+              AND p.saleStatus <> 'SOLD'
               AND (:hasCategoryFilter = false OR p.categoryId IN :categoryIds)
               AND (:hasConditionFilter = false OR p.conditionGrade IN :conditionGrades)
               AND (:hasSaleTypeFilter = false OR p.saleType = :saleType)

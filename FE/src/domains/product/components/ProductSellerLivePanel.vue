@@ -7,11 +7,9 @@ import type { ProductLinkedLive } from '@/domains/product/types/productDetail.ty
 const props = defineProps<{
   linkedLive: ProductLinkedLive | null
   sellerNickname: string
-  isReminderSet: boolean
 }>()
 
 const emit = defineEmits<{
-  toggleReminder: []
   viewLive: [liveId: number]
 }>()
 
@@ -25,17 +23,32 @@ const handleThumbnailError = (event: Event) => {
   }
 }
 
-const formatLiveDate = (date: string) =>
-  new Intl.DateTimeFormat('ko-KR', {
+const formattedLiveDate = computed(() => {
+  if (!props.linkedLive?.startsAt) {
+    return ''
+  }
+
+  const date = new Date(props.linkedLive.startsAt)
+
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return new Intl.DateTimeFormat('ko-KR', {
     month: 'long',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(date))
+  }).format(date)
+})
 </script>
 
 <template>
-  <section v-if="linkedLive" class="seller-live" aria-labelledby="linked-live-title">
+  <section
+    v-if="linkedLive?.status === 'LIVE'"
+    class="seller-live"
+    aria-labelledby="linked-live-title"
+  >
     <h2 id="linked-live-title">연결 라이브</h2>
 
     <article class="seller-live__live">
@@ -45,29 +58,18 @@ const formatLiveDate = (date: string) =>
         @error="handleThumbnailError"
       />
       <div class="seller-live__live-copy">
-        <span class="seller-live__status">
-          {{ linkedLive.status === 'LIVE' ? '방송 중' : '방송 예정' }}
-        </span>
+        <span class="seller-live__status">방송 중</span>
         <h3>{{ linkedLive.title }}</h3>
         <p v-if="props.sellerNickname">{{ props.sellerNickname }}</p>
-        <p>{{ formatLiveDate(linkedLive.startsAt) }}</p>
+        <p v-if="formattedLiveDate">{{ formattedLiveDate }}</p>
       </div>
       <div class="seller-live__actions">
-        <button
-          class="seller-live__secondary"
-          :class="{ 'seller-live__secondary--active': props.isReminderSet }"
-          type="button"
-          :aria-pressed="props.isReminderSet"
-          @click="emit('toggleReminder')"
-        >
-          {{ props.isReminderSet ? '알림 신청됨' : '알림 받기' }}
-        </button>
         <button
           class="seller-live__link"
           type="button"
           @click="emit('viewLive', linkedLive.id)"
         >
-          {{ linkedLive.status === 'LIVE' ? '라이브 입장' : '라이브 상세 보기' }}
+          라이브 입장
         </button>
       </div>
     </article>
@@ -146,8 +148,7 @@ const formatLiveDate = (date: string) =>
   padding-right: var(--space-6);
 }
 
-.seller-live__secondary {
-  flex: 0 0 auto;
+.seller-live__link {
   height: var(--button-height-sm);
   padding: 0 var(--space-4);
   border: 1px solid var(--color-border-strong);
@@ -159,23 +160,8 @@ const formatLiveDate = (date: string) =>
   line-height: var(--line-height-snug);
 }
 
-.seller-live__link {
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-snug);
-}
-
-.seller-live__secondary:hover,
 .seller-live__link:hover {
-  color: var(--color-primary);
-}
-
-.seller-live__secondary--active {
   border-color: var(--color-primary);
-  background: var(--color-primary-soft);
   color: var(--color-primary);
 }
 

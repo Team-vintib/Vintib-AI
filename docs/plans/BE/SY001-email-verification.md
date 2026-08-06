@@ -23,7 +23,7 @@
 - [x] 서비스 단위 테스트 작성 (`EmailVerificationServiceTest` — 쿨다운/시간당 발송 초과/발송 실패 시 상태 미반영/코드 불일치/토큰 발급/시도 초과/토큰 불일치 7건, Mockito 단위 테스트로 통과 확인)
 - [x] `BE/README.md` 디렉터리 구조 섹션 갱신
 - [x] `EmailVerificationService.sendVerificationCode` 순서 수정 — 메일 발송(`mailSender.send`) 성공 후에만 코드 저장/쿨다운/발송횟수를 Redis에 반영하도록 변경. 기존에는 발송 실패해도 쿨다운·횟수가 먼저 소모돼 코드 없이 사용자가 묶이는 문제가 있었음
-- [ ] **CI 동등 검증 미완료** — `.claude/skills/verify`(= `be-test` job과 동일한 `./gradlew build`, 실제 Postgres/Redis 연동 포함)는 이번 세션에서 Docker를 쓸 수 없어 실행하지 못했다. `compileJava`/`compileTestJava`와 `EmailVerificationServiceTest`(Mockito 단위 테스트, DB 불필요) 통과만 확인됨. 커밋 전에 `docker compose up -d postgres redis` 후 `cd BE && ./gradlew build`로 반드시 재확인 필요 (`BackendApplicationTests`의 `@SpringBootTest` context load 포함)
+- [x] **CI 동등 검증 완료** — GitLab CI `be-test` 잡(`./gradlew build`, Postgres/Redis services 연동)이 이후 스프린트에서 지속적으로 통과 확인됨. `BackendApplicationTests` context load 포함 전체 green.
 
 ## 확정된 값
 

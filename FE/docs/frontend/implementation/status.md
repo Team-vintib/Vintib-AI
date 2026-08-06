@@ -79,3 +79,12 @@
 | --- | --- | --- |
 | 찜 버튼 | 부분 | 상품 목록·상품 상세·홈·검색 상품 카드의 하트 버튼이 `POST /api/users/{userId}/wishes`, `DELETE /api/users/{userId}/wishes/{productId}`를 사용해 낙관적 토글 후 실패 시 복구한다. 검색 결과는 실제 검색 API의 `isWished`를 초기 상태로 사용한다. |
 | 찜 목록 | 부분 | `/wishlist` 독립 route에서 `GET /api/users/{userId}/wishes` 결과를 상품 카드형으로 표시하고, 상단 공통 검색바 기반 상품명/브랜드 검색, 카테고리·상태·가격 필터, `전체 / 즉시 구매 / 경매 예정` 탭, 찜 해제를 제공한다. BE 찜 목록 응답의 `primaryImageUrl`이 비어 있으면 상품 상세 API에서 등록된 대표 이미지를 보조 조회한다. BE 찜 목록 API가 검색/필터 파라미터를 지원하지 않아 현재는 클라이언트 필터링이다. |
+
+## 2026-08-06 라이브 경매·방송 결과 상태
+
+| 영역 | 상태 | 비고 |
+| --- | --- | --- |
+| 시청자 경매 | 구현 완료·E2E 대기 | `GET /api/lives/{liveId}/auctions/current`, `POST /api/auctions/{auctionId}/bids`, `/topic/lives/{liveId}/auctions`를 연결했다. 서버 `nextBidPrice`를 밀어서 입찰하며 `endsAt - serverNow` 기준으로 시간을 표시하고, 서버 `AUCTION_CLOSED` 전에는 결과를 확정하지 않는다. |
+| 판매자 경매 | 구현 완료·E2E 대기 | 경매 설정·시작 API와 STOMP snapshot을 연결해 현재가, 최고 입찰자, 입찰 수, 자동 연장과 낙찰·유찰을 표시한다. 기존 경매 설정/결과 mock은 제거했다. |
+| 방송 종료 결과 | 구현 완료·E2E 대기 | `GET /api/lives/{liveId}/summary`, `GET /api/lives/{liveId}/unsold-products`로 판매 결과와 유찰 상품을 표시한다. 유찰 상품은 서버 정책대로 경매 예정 상태를 유지하거나 상시 판매로 전환한다. |
+| 검증 | 정적 검증 완료 | 변경 파일 ESLint, TypeScript 검사, Vite 프로덕션 빌드를 통과했다. 실제 포인트 hold/release·동시 입찰·자동 종료·방송 종료 결과는 배포 BE 환경에서 판매자와 시청자를 함께 접속해 확인해야 한다. |

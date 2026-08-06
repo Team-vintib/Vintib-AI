@@ -33,6 +33,7 @@ import type {
   ProductRegistrationSaleType,
   ProductRegistrationStepId,
 } from '@/domains/product/types/productRegistration.types'
+import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
@@ -162,16 +163,12 @@ const minorCategoryOptions = computed<CategorySelectOption[]>(() => {
 })
 const updateMajorCategory = () => {
   draft.categoryId = categoryMajorId.value
-
-  if (categoryMajorId.value !== 'etc') {
-    draft.customCategory = ''
-  }
+  draft.customCategory = ''
+  basicStepTouched.categoryId = true
 }
 
 const updateMinorCategory = () => {
-  if (draft.categoryId !== 'etc') {
-    draft.customCategory = ''
-  }
+  draft.customCategory = ''
 }
 
 const priceRecommendationBuckets: ProductRegistrationPriceBucket[] = [
@@ -245,14 +242,32 @@ const photoStepErrors = computed(() => ({
     ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.backPhotoRequired
     : '',
 }))
+const isCategorySelectionComplete = computed(() => {
+  if (!categoryMajorId.value) {
+    return false
+  }
+
+  if (minorCategoryOptions.value.length === 0) {
+    return Boolean(draft.categoryId)
+  }
+
+  return minorCategoryOptions.value.some((option) => option.id === draft.categoryId)
+})
+
 const basicStepErrors = computed(() => ({
   name:
     basicStepTouched.name && !draft.name.trim()
       ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.nameRequired
       : '',
   brand: '',
-  color: '',
-  categoryId: '',
+  color:
+    basicStepTouched.color && !draft.color
+      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.colorRequired
+      : '',
+  categoryId:
+    basicStepTouched.categoryId && !isCategorySelectionComplete.value
+      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.categoryRequired
+      : '',
 }))
 const normalizeMeasurementValue = (value: string | number) => String(value ?? '').trim()
 
@@ -328,7 +343,9 @@ const aiModelGenderLabel = computed(() => {
 
   return ''
 })
-const isBasicStepValid = computed(() => Boolean(draft.name.trim()))
+const isBasicStepValid = computed(
+  () => Boolean(draft.name.trim()) && Boolean(draft.color) && isCategorySelectionComplete.value,
+)
 const isAttributesStepValid = computed(
   () =>
     activeMeasurementFields.value.every((field) =>
@@ -559,7 +576,7 @@ const completenessItems: ProductInfoCompletenessItem[] = [
     stepId: 'photos',
     priority: 'strong',
     targetId: 'product-registration-category-major',
-    isCompleted: () => Boolean(draft.categoryId && (draft.categoryId !== 'etc' || draft.customCategory.trim())),
+    isCompleted: () => isCategorySelectionComplete.value,
   },
   {
     id: 'size',
@@ -597,9 +614,9 @@ const completenessItems: ProductInfoCompletenessItem[] = [
     id: 'color',
     label: '색상',
     stepId: 'photos',
-    priority: 'recommended',
+    priority: 'strong',
     targetId: 'product-registration-color',
-    isCompleted: () => Boolean(draft.color && (draft.color !== 'etc' || draft.customColor.trim())),
+    isCompleted: () => Boolean(draft.color),
   },
   {
     id: 'brand',
@@ -733,19 +750,11 @@ const visibleCompletenessItems = computed(() =>
 const findOptionLabel = (options: { id: string; label: string }[], id: string) =>
   options.find((option) => option.id === id)?.label ?? ''
 
-const selectedColorLabel = computed(() => {
-  if (draft.color === 'etc') {
-    return draft.customColor.trim() || '기타'
-  }
-
-  return findOptionLabel(PRODUCT_REGISTRATION_COLOR_OPTIONS, draft.color) || '-'
-})
+const selectedColorLabel = computed(
+  () => findOptionLabel(PRODUCT_REGISTRATION_COLOR_OPTIONS, draft.color) || '-',
+)
 
 const selectedCategoryLabel = computed(() => {
-  if (draft.categoryId === 'etc') {
-    return draft.customCategory.trim() || '기타'
-  }
-
   const selectedOption = [...majorCategoryOptions.value, ...minorCategoryOptions.value].find(
     (option) => option.id === draft.categoryId,
   )
@@ -1171,8 +1180,8 @@ const proceedToNextStep = async (skipCompletenessPrompt = false) => {
         categories: categories.value,
       })
       registeredProductId.value = submitResult.productId
-    } catch {
-      registrationSubmitError.value = '상품 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.'
+    } catch (error) {
+      registrationSubmitError.value = normalizeApiError(error).message
       isSubmittingRegistration.value = false
       return
     }
@@ -1525,6 +1534,8 @@ onBeforeUnmount(() => {
               <label class="product-registration__field" for="product-registration-color">
                 <span>
                   색상
+                  <span class="product-registration__required" aria-hidden="true"> * </span>
+                  <span class="product-registration__required-text"> 필수 입력 </span>
                 </span>
                 <p class="product-registration__field-hint">
                   구매자가 색상 필터로 상품을 찾는 데 활용돼요.
@@ -1533,6 +1544,7 @@ onBeforeUnmount(() => {
                   id="product-registration-color"
                   class="product-registration__select"
                   v-model="draft.color"
+                  required
                   :aria-invalid="basicStepErrors.color ? 'true' : 'false'"
                   aria-describedby="product-registration-color-error"
                   @blur="basicStepTouched.color = true"
@@ -1584,28 +1596,12 @@ onBeforeUnmount(() => {
               </label>
             </div>
 
-            <label
-              v-if="draft.color === 'etc'"
-              class="product-registration__field"
-              for="product-registration-custom-color"
-            >
-              <span>기타 색상</span>
-              <input
-                id="product-registration-custom-color"
-                v-model="draft.customColor"
-                type="text"
-                maxlength="30"
-                placeholder="색상을 직접 입력해 주세요"
-                :aria-invalid="basicStepErrors.color ? 'true' : 'false'"
-                aria-describedby="product-registration-color-error"
-                @blur="basicStepTouched.color = true"
-              />
-            </label>
-
             <div class="product-registration__form-grid">
               <label class="product-registration__field" for="product-registration-category-major">
                 <span>
                   카테고리 대분류
+                  <span class="product-registration__required" aria-hidden="true"> * </span>
+                  <span class="product-registration__required-text"> 필수 입력 </span>
                 </span>
                 <p class="product-registration__field-hint">
                   정확한 카테고리는 구매자가 상품을 쉽게 찾는 데 도움이 돼요.
@@ -1614,8 +1610,12 @@ onBeforeUnmount(() => {
                   id="product-registration-category-major"
                   class="product-registration__select"
                   v-model="categoryMajorId"
+                  required
                   :disabled="majorCategoryOptions.length === 0"
+                  :aria-invalid="basicStepErrors.categoryId ? 'true' : 'false'"
+                  aria-describedby="product-registration-category-error"
                   @change="updateMajorCategory"
+                  @blur="basicStepTouched.categoryId = true"
                 >
                   <option value="">대분류 선택</option>
                   <option
@@ -1629,7 +1629,11 @@ onBeforeUnmount(() => {
               </label>
 
               <label class="product-registration__field" for="product-registration-category-minor">
-                <span>카테고리 소분류</span>
+                <span>
+                  카테고리 소분류
+                  <span class="product-registration__required" aria-hidden="true"> * </span>
+                  <span class="product-registration__required-text"> 필수 입력 </span>
+                </span>
                 <p class="product-registration__field-hint product-registration__field-hint--spacer" aria-hidden="true">
                   정확한 카테고리는 구매자가 상품을 쉽게 찾는 데 도움이 돼요.
                 </p>
@@ -1637,7 +1641,10 @@ onBeforeUnmount(() => {
                   id="product-registration-category-minor"
                   class="product-registration__select"
                   v-model="draft.categoryId"
-                  :disabled="!categoryMajorId || categoryMajorId === 'etc' || minorCategoryOptions.length === 0"
+                  required
+                  :disabled="!categoryMajorId || minorCategoryOptions.length === 0"
+                  :aria-invalid="basicStepErrors.categoryId ? 'true' : 'false'"
+                  aria-describedby="product-registration-category-error"
                   @change="updateMinorCategory"
                   @blur="basicStepTouched.categoryId = true"
                 >
@@ -1653,21 +1660,14 @@ onBeforeUnmount(() => {
               </label>
             </div>
 
-            <label
-              v-if="draft.categoryId === 'etc'"
-              class="product-registration__field"
-              for="product-registration-custom-category"
+            <span
+              v-if="basicStepErrors.categoryId"
+              id="product-registration-category-error"
+              class="product-registration__field-error"
+              role="alert"
             >
-              <span>기타 카테고리</span>
-              <input
-                id="product-registration-custom-category"
-                v-model="draft.customCategory"
-                type="text"
-                maxlength="40"
-                placeholder="카테고리를 직접 입력해 주세요"
-                @blur="basicStepTouched.categoryId = true"
-              />
-            </label>
+              {{ basicStepErrors.categoryId }}
+            </span>
           </form>
 
           <form
@@ -1814,7 +1814,7 @@ onBeforeUnmount(() => {
 
             <section class="product-registration__section" aria-labelledby="seller-defect-title">
               <h3 id="seller-defect-title">
-                판매자 고지 하자
+                상품 하자
               </h3>
               <p class="product-registration__field-hint">
                 오염이나 손상 정보를 미리 알려주면 거래 과정의 오해를 줄일 수 있어요.
@@ -1986,43 +1986,45 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
 
-                <div class="product-registration__ai-image">
-                  <img :src="currentAiPhoto.previewUrl" :alt="`${currentAiPhoto.fileName} AI 품질 검증 결과`" />
-                  <span
-                    v-for="candidate in currentAiResult.candidates"
-                    :key="candidate.id"
-                    class="product-registration__ai-box"
-                    :class="{ 'product-registration__ai-box--actual': candidate.isActualDefect }"
-                    :style="{
-                      left: `${candidate.box.x}%`,
-                      top: `${candidate.box.y}%`,
-                      width: `${candidate.box.width}%`,
-                      height: `${candidate.box.height}%`,
-                    }"
-                  >
-                    {{ candidate.labelNumber }}
-                  </span>
-                </div>
-
-                <div class="product-registration__ai-cards">
-                  <article
-                    v-for="candidate in currentAiResult.candidates"
-                    :key="candidate.id"
-                    class="product-registration__ai-card"
-                    :class="{ 'product-registration__ai-card--actual': candidate.isActualDefect }"
-                  >
-                    <div>
-                      <strong>{{ candidate.labelNumber }}번</strong>
-                      <p>{{ candidate.description }}</p>
-                    </div>
-                    <button
-                      type="button"
-                      :disabled="currentAiResult.confirmed"
-                      @click="toggleAiDefectCandidate(candidate.id)"
+                <div class="product-registration__ai-result-content">
+                  <div class="product-registration__ai-image">
+                    <img :src="currentAiPhoto.previewUrl" :alt="`${currentAiPhoto.fileName} AI 품질 검증 결과`" />
+                    <span
+                      v-for="candidate in currentAiResult.candidates"
+                      :key="candidate.id"
+                      class="product-registration__ai-box"
+                      :class="{ 'product-registration__ai-box--actual': candidate.isActualDefect }"
+                      :style="{
+                        left: `${candidate.box.x}%`,
+                        top: `${candidate.box.y}%`,
+                        width: `${candidate.box.width}%`,
+                        height: `${candidate.box.height}%`,
+                      }"
                     >
-                      {{ candidate.isActualDefect ? '하자 제외' : '하자로 표시' }}
-                    </button>
-                  </article>
+                      {{ candidate.labelNumber }}
+                    </span>
+                  </div>
+
+                  <div class="product-registration__ai-cards">
+                    <article
+                      v-for="candidate in currentAiResult.candidates"
+                      :key="candidate.id"
+                      class="product-registration__ai-card"
+                      :class="{ 'product-registration__ai-card--actual': candidate.isActualDefect }"
+                    >
+                      <div>
+                        <strong>{{ candidate.labelNumber }}번</strong>
+                        <p>{{ candidate.description }}</p>
+                      </div>
+                      <button
+                        type="button"
+                        :disabled="currentAiResult.confirmed"
+                        @click="toggleAiDefectCandidate(candidate.id)"
+                      >
+                        {{ candidate.isActualDefect ? '하자 제외' : '하자로 표시' }}
+                      </button>
+                    </article>
+                  </div>
                 </div>
 
                 <div class="product-registration__ai-result-actions">
@@ -2396,42 +2398,44 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
-          <div
-            v-if="isCompletenessPromptOpen"
-            class="product-registration__prompt-backdrop"
-            role="presentation"
-          >
-            <section
-              class="product-registration__prompt"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="product-registration-completeness-prompt-title"
+          <Teleport to="body">
+            <div
+              v-if="isCompletenessPromptOpen"
+              class="product-registration__prompt-backdrop"
+              role="presentation"
             >
-              <h3 id="product-registration-completeness-prompt-title">
-                상품 정보를 더 채워볼까요?
-              </h3>
-              <p>
-                사진, 설명, 색상, 브랜드, 카테고리, 사이즈, 소재, 실측 정보가 충분하면
-                구매자가 상품을 더 쉽게 판단할 수 있어요.
-              </p>
-              <div class="product-registration__prompt-actions">
-                <button
-                  class="product-registration__button product-registration__button--secondary"
-                  type="button"
-                  @click="continueCompletenessInput"
-                >
-                  정보 입력 이어하기
-                </button>
-                <button
-                  class="product-registration__button product-registration__button--primary"
-                  type="button"
-                  @click="skipCompletenessInput"
-                >
-                  다음
-                </button>
-              </div>
-            </section>
-          </div>
+              <section
+                class="product-registration__prompt"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="product-registration-completeness-prompt-title"
+              >
+                <h3 id="product-registration-completeness-prompt-title">
+                  상품 정보를 더 채워볼까요?
+                </h3>
+                <p>
+                  사진, 설명, 색상, 브랜드, 카테고리, 사이즈, 소재, 실측 정보가 충분하면
+                  구매자가 상품을 더 쉽게 판단할 수 있어요.
+                </p>
+                <div class="product-registration__prompt-actions">
+                  <button
+                    class="product-registration__button product-registration__button--secondary"
+                    type="button"
+                    @click="continueCompletenessInput"
+                  >
+                    정보 입력 이어하기
+                  </button>
+                  <button
+                    class="product-registration__button product-registration__button--primary"
+                    type="button"
+                    @click="skipCompletenessInput"
+                  >
+                    다음
+                  </button>
+                </div>
+              </section>
+            </div>
+          </Teleport>
         </section>
 
         <aside
@@ -2512,7 +2516,7 @@ onBeforeUnmount(() => {
   width: 34px;
   height: 34px;
   border: 1px solid var(--color-border-input);
-  border-radius: var(--radius-badge);
+  border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-muted);
   flex: 0 0 auto;
@@ -3142,6 +3146,13 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 
+.product-registration__ai-result-content {
+  display: grid;
+  grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
 .product-registration__ai-image {
   position: relative;
   overflow: hidden;
@@ -3176,15 +3187,16 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-cards {
   display: grid;
-  gap: var(--space-3);
+  align-content: start;
+  gap: var(--space-2);
 }
 
 .product-registration__ai-card {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-4);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
@@ -3201,23 +3213,24 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-card strong {
   color: var(--color-text-primary);
+  font-size: var(--font-size-body);
 }
 
 .product-registration__ai-card p {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-button-small);
+  font-size: var(--font-size-xs);
   line-height: var(--line-height-control);
 }
 
 .product-registration__ai-card button {
-  min-width: 88px;
+  min-width: 72px;
   height: var(--button-height-small);
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-2);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   white-space: nowrap;
 }
@@ -3514,7 +3527,9 @@ onBeforeUnmount(() => {
 
 .product-registration__prompt-backdrop {
   position: fixed;
-  z-index: 30;
+  /* 뷰포트(현재 보이는 화면) 기준으로 항상 중앙에 뜨도록 fixed + inset:0을 쓴다.
+     다른 겹침 요소보다 위에 오도록 헤더보다 훨씬 높은 값을 쓴다. */
+  z-index: 500;
   display: grid;
   background: rgb(0 0 0 / 28%);
   inset: 0;
@@ -3611,8 +3626,11 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .product-registration__ai-result-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .product-registration__section-header,
-  .product-registration__ai-card,
   .product-registration__review-card-header {
     flex-direction: column;
     align-items: stretch;

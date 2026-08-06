@@ -31,25 +31,6 @@ export interface LiveVideoTokenResponse {
   expiresAt: string
 }
 
-export interface AuctionConfigureRequest {
-  productId: number
-  startPrice: number
-  bidUnit: number
-  durationSeconds: number
-}
-
-export interface AuctionConfigureResponse {
-  id: number
-  liveId: number
-  productId: number
-  startPrice: number
-  bidUnit: number
-  durationSeconds: number
-  status: 'READY' | 'RUNNING' | 'ENDED' | 'CANCELED'
-  currentPrice: number
-  createdAt: string
-}
-
 export const updateLiveStatus = async (liveId: number, status: LiveWatchStatus) => {
   const { data } = await http.patch<ApiResponse<LiveStatusUpdateResponse>>(
     `/lives/${liveId}/status`,
@@ -77,18 +58,6 @@ export const patchCurrentProduct = async (liveId: number, productId: number) => 
   )
 
   return unwrapApiData(data, '현재 상품을 전환하지 못했습니다.')
-}
-
-export const configureLiveAuction = async (
-  liveId: number,
-  request: AuctionConfigureRequest,
-) => {
-  const { data } = await http.post<ApiResponse<AuctionConfigureResponse>>(
-    `/lives/${liveId}/auctions`,
-    request,
-  )
-
-  return unwrapApiData(data, '경매 조건을 저장하지 못했습니다.')
 }
 
 const unwrapApiData = <T>(response: ApiResponse<T>, fallbackMessage: string) => {

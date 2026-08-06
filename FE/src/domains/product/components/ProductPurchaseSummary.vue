@@ -10,19 +10,20 @@ const props = defineProps<{
   product: ProductDetailViewData
   seller: ProductSellerSummary
   isLiked: boolean
-  isInCart: boolean
 }>()
 
 const emit = defineEmits<{
   toggleLike: []
-  toggleCart: []
   openTryOn: []
   purchase: []
+  goLive: []
   viewSeller: []
 }>()
 
+const isAuction = computed(() => props.product.saleType === 'AUCTION')
+
 const formattedPrice = computed(() => {
-  if (props.product.saleType === 'AUCTION') {
+  if (isAuction.value) {
     return '경매 예정'
   }
 
@@ -31,24 +32,60 @@ const formattedPrice = computed(() => {
 })
 
 const saleTypeLabel = computed(() =>
-  props.product.saleType === 'AUCTION' ? '경매 예정' : '정찰제',
+  isAuction.value ? '경매 예정' : '정찰제',
+)
+
+const breadcrumb = computed(() =>
+  [saleTypeLabel.value, props.product.category.trim()].filter(Boolean).join(' · '),
+)
+
+const quickInfoItems = computed(() =>
+  [
+    { label: '상품 상태', value: props.product.conditionLabel },
+    { label: '사이즈', value: props.product.sizeLabel },
+    { label: '색상', value: props.product.color },
+  ]
+    .map((item) => ({ ...item, value: item.value.trim() }))
+    .filter((item) => item.value),
+)
+
+const isAuctionInProgress = computed(
+  () => props.product.saleStatus === 'AUCTION_IN_PROGRESS',
+)
+
+// 경매 진행 중 상품은 라이브에서만 입찰할 수 있으므로, 연결 라이브가 실제 LIVE일 때만 이동 가능.
+const canJoinLiveAuction = computed(
+  () => isAuctionInProgress.value && props.product.linkedLive?.status === 'LIVE',
 )
 
 const purchaseLabel = computed(() => {
   if (props.product.saleStatus === 'SOLD') return '판매 완료'
-  if (props.product.saleStatus === 'AUCTION_SCHEDULED') return '경매 알림 받기'
-  if (props.product.saleStatus === 'AUCTION_IN_PROGRESS') return '입찰하기'
+  if (props.product.saleStatus === 'AUCTION_SCHEDULED') return '경매 예정'
+  if (props.product.saleStatus === 'AUCTION_IN_PROGRESS') {
+    return canJoinLiveAuction.value ? '라이브에서 입찰하기' : '경매 진행 중'
+  }
   if (props.product.saleStatus === 'AUCTION_FAILED') return '경매 종료'
   return '구매하기'
 })
 
-const isPurchaseDisabled = computed(() =>
-  ['DRAFT', 'SOLD', 'AUCTION_FAILED'].includes(props.product.saleStatus),
-)
+// 정찰제 판매중(ON_SALE)만 실제 구매로 연결한다. 경매(예정/진행/종료)·판매완료·비공개는
+// 구매 흐름으로 보내지 않으며, 진행 중 경매만 라이브 입장으로 대체한다.
+const isPurchaseDisabled = computed(() => {
+  if (isAuctionInProgress.value) return !canJoinLiveAuction.value
 
-const isCartDisabled = computed(() =>
-  ['DRAFT', 'SOLD'].includes(props.product.saleStatus),
-)
+  return ['DRAFT', 'SOLD', 'AUCTION_FAILED', 'AUCTION_SCHEDULED'].includes(
+    props.product.saleStatus,
+  )
+})
+
+const handlePrimaryAction = () => {
+  if (canJoinLiveAuction.value) {
+    emit('goLive')
+    return
+  }
+
+  emit('purchase')
+}
 
 const sellerNickname = computed(() => props.seller.nickname?.trim() || '판매자')
 const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCase())
@@ -56,9 +93,14 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 
 <template>
   <section class="purchase-summary" aria-labelledby="product-title">
-    <p class="purchase-summary__breadcrumb">{{ saleTypeLabel }} · {{ product.category }}</p>
+    <p class="purchase-summary__breadcrumb">{{ breadcrumb }}</p>
     <h1 id="product-title" class="purchase-summary__title">{{ product.title }}</h1>
-    <p class="purchase-summary__price">{{ formattedPrice }}</p>
+    <p
+      class="purchase-summary__price"
+      :class="{ 'purchase-summary__price--status': isAuction }"
+    >
+      {{ formattedPrice }}
+    </p>
 
     <article class="purchase-summary__seller">
       <div class="purchase-summary__avatar" aria-hidden="true">
@@ -74,18 +116,10 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
       <button type="button" @click="emit('viewSeller')">판매자 프로필 보기</button>
     </article>
 
-    <dl class="purchase-summary__quick-info">
-      <div>
-        <dt>상품 상태</dt>
-        <dd>{{ product.conditionLabel }}</dd>
-      </div>
-      <div v-if="product.sizeLabel">
-        <dt>사이즈</dt>
-        <dd>{{ product.sizeLabel }}</dd>
-      </div>
-      <div>
-        <dt>색상</dt>
-        <dd>{{ product.color }}</dd>
+    <dl v-if="quickInfoItems.length" class="purchase-summary__quick-info">
+      <div v-for="item in quickInfoItems" :key="item.label">
+        <dt>{{ item.label }}</dt>
+        <dd>{{ item.value }}</dd>
       </div>
     </dl>
 
@@ -106,21 +140,6 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
         찜
       </button>
       <button
-        class="purchase-summary__secondary"
-        :class="{ 'purchase-summary__secondary--active': isInCart }"
-        type="button"
-        :aria-pressed="isInCart"
-        :disabled="isCartDisabled"
-        @click="emit('toggleCart')"
-      >
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path
-            d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.5h7.7a2 2 0 0 0 1.9-1.4L21 7H6m4 12h.01M17 19h.01"
-          />
-        </svg>
-        장바구니
-      </button>
-      <button
         class="purchase-summary__secondary purchase-summary__secondary--ai"
         type="button"
         @click="emit('openTryOn')"
@@ -138,7 +157,7 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
       class="purchase-summary__purchase"
       type="button"
       :disabled="isPurchaseDisabled"
-      @click="emit('purchase')"
+      @click="handlePrimaryAction"
     >
       {{ purchaseLabel }}
     </button>
@@ -177,6 +196,14 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
   font-weight: var(--font-weight-medium);
   letter-spacing: -0.03em;
   line-height: 1.1;
+}
+
+.purchase-summary__price--status {
+  font-family: inherit;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: var(--line-height-xl);
 }
 
 .purchase-summary__seller {
@@ -234,7 +261,7 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 
 .purchase-summary__quick-info {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 1px;
   margin-top: var(--space-6);
   border: 1px solid var(--color-border-grid);
@@ -272,7 +299,7 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 
 .purchase-summary__actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-2);
   margin-top: var(--space-4);
 }
@@ -327,12 +354,6 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 
 .purchase-summary__secondary:hover {
   background: var(--color-primary-soft);
-}
-
-.purchase-summary__secondary--active {
-  border-color: var(--color-primary);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
 }
 
 .purchase-summary__secondary--liked {

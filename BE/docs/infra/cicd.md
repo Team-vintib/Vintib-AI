@@ -49,12 +49,20 @@ volumes = [
 | `PROD_MINIO_ROOT_PASSWORD` | 운영 MinIO root 비밀번호 | **Masked** (8자 이상) |
 | `PROD_MAIL_USERNAME` | 인증코드 발송용 Gmail 계정 | |
 | `PROD_MAIL_PASSWORD` | 위 계정의 앱 비밀번호 | **Masked** 권장 |
+| `PROD_JWT_SECRET` | JWT 서명 키 | **Masked** 권장. `openssl rand -base64 48` |
+| `WORKER_API_KEY` | 백엔드 ↔ AI 워커 내부 인증 키 | **Masked** 권장. `openssl rand -base64 32`. AI 쪽과 같은 값이어야 함 |
 
 `DB_NAME`·`DB_USERNAME`·`SPRING_PROFILES_ACTIVE`·`IMAGE_TAG` 는 `.gitlab-ci.yml` 에서 넣으므로 등록하지 않아도 된다.
 리전·버킷명·S3 엔드포인트도 등록하지 않는다 — `deploy.sh` 와 compose 기본값이 정한다(아래 "오브젝트 스토리지" 참고).
 
 > [!WARNING]
 > **2026-07-31 발견**: `PROD_MAIL_USERNAME`/`PROD_MAIL_PASSWORD`가 지금까지 CI/CD Variables에도, `deploy.sh`의 `.env` 생성 로직에도 없었다. `application.yml`의 `MAIL_USERNAME`/`MAIL_PASSWORD` 기본값은 빈 문자열이고, mail actuator 헬스체크는 "자격증명 미설정 시 배포가 막히는 걸 방지"하려고 의도적으로 꺼둔 상태(아래 참고)라 배포는 계속 성공해 왔지만, 실제로는 **운영에서 이메일 인증코드가 발송되지 않고 있었다**(SMTP 인증 실패). 위 두 변수를 GitLab에 등록하고 재배포해야 정상화된다 — 등록 전까지는 `deploy.sh`가 필수 변수 누락으로 배포 자체를 막는다(2026-07-31 `deploy.sh` 변경).
+
+> [!WARNING]
+> **2026-08-05 발견**: `JWT_SECRET`도 CI/CD Variables·`deploy.sh` 어디에도 없었다. `application.yml`의 기본값(`local-dev-only-secret-key-please-change-in-prod-0123456789`, 소스에 그대로 노출)으로 운영 토큰이 서명되고 있었다는 뜻이다. `PROD_JWT_SECRET`을 GitLab에 등록하고 재배포해야 한다 — 등록 전까지는 `deploy.sh`가 필수 변수 누락으로 배포를 막는다(2026-08-05 `deploy.sh` 변경). 재배포 시점에 서명 키가 바뀌므로 그 이전에 발급된 운영 토큰은 전부 무효화된다(재로그인 필요).
+
+> [!WARNING]
+> **2026-08-06 발견**: `develop-AI`가 `docker-compose.yml`의 `ai` 서비스에 `WORKER_API_KEY`를 추가하면서 `deploy.sh`의 `.env` 생성 로직에도 `WORKER_API_KEY=${WORKER_API_KEY}` 줄을 함께 넣었는데, `REQUIRED_VARS` 사전 검사에는 넣지 않았다. `main` 병합 시점에 GitLab에도 등록돼 있지 않아 `set -u`에 걸려 `.env` 생성 단계에서 곧바로 배포가 실패했다(`WORKER_API_KEY: parameter not set`). `PROD_JWT_SECRET` 때와 달리 이번엔 **조용히 배포되지도 못했다** — 실패 자체는 안전하게 막힌 것. `WORKER_API_KEY`를 GitLab에 등록하고 재배포해야 한다(`REQUIRED_VARS`는 이번에 `deploy.sh`에 함께 추가함). AI 쪽 `_check_worker_key()`가 값이 비어 있으면 무조건 401을 던지므로, 값은 AI 서비스가 기대하는 것과 동일해야 한다(BE↔AI 간 공유 비밀키 — AI 팀과 값 합의 필요).
 
 `deploy.sh` 는 `.env` 를 만들기 **전에** 위 변수가 전부 채워졌는지 검사하고, 하나라도 비면 빠진 이름을 한 번에 출력하고 멈춘다. `.env` 도 임시 파일에 쓴 뒤 교체하므로, 실패해도 운영 `.env` 가 손상되지 않는다(= 롤백용 직전 태그가 보존된다).
 
@@ -148,6 +156,7 @@ docker system prune -a --filter "until=168h"
 | --- | --- |
 | 배포 잡이 계속 pending | `deploy` 태그를 가진 러너가 없거나 offline. 러너 상태 확인 |
 | `DB_PASSWORD` 가 비어 배포 실패 | 변수가 **Protected** 인데 `develop-BE` 가 protected 브랜치가 아님 |
+| `WORKER_API_KEY: parameter not set` 로 `.env` 생성 단계에서 실패 | `WORKER_API_KEY`가 GitLab CI/CD Variables 에 등록되지 않음. 등록 후 재배포 |
 | 백엔드가 DB 인증 실패 | `DB_PASSWORD` 변수 값이 볼륨 생성 시점 비밀번호와 다름 (위 경고 참고) |
 | Caddyfile not found | 배포 디렉터리를 호스트와 다른 경로로 마운트함. 같은 경로여야 함 |
 | develop-BE 에 머지했는데 파이프라인이 안 생김 | `workflow.rules` 에 `develop-BE` 조건이 있는지 확인 |

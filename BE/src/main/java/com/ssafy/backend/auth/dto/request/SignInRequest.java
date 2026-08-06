@@ -6,12 +6,12 @@ import jakarta.validation.constraints.NotBlank;
 
 public record SignInRequest(
 
-        @Schema(example = "user@example.com")
+        @Schema(example = "vintib1@gmail.com")
         @NotBlank
         @Email
         String email,
 
-        @Schema(example = "password12!")
+        @Schema(example = "qwer1234")
         @NotBlank
         String password
 ) {

@@ -11,9 +11,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 // 마이페이지 구매/낙찰 내역(MY-003), 판매/정산 내역(MY-004). 기존 OrderController(/api/orders,
 // 상세 조회)와 경로 prefix가 달라 별도 컨트롤러로 분리한다(MyProductController와 같은 이유).
-@Tag(name = "주문 / 배송 / 환불(Orders)", description = "주문 조회 API")
+@Tag(name = "주문 / 배송 / 환불(Orders)", description = "주문 생성/조회, 배송지·송장, 구매 확정, 환불 요청/승인/거절 API")
 @RestController
 @RequestMapping("/api/users/{userId}/orders")
 @RequiredArgsConstructor
@@ -46,8 +48,11 @@ public class MyOrderController {
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<OrderListItemResponse>>> getOrders(
             Authentication authentication, @PathVariable Long userId,
-            @RequestParam OrderRole role, @PageableDefault(size = 20) Pageable pageable) {
+            @RequestParam OrderRole role,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         requireSelf(authentication, userId);
+        Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(ApiResponse.success(orderService.getOrders(userId, role, pageable)));
     }
 

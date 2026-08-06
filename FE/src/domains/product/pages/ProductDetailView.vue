@@ -41,8 +41,6 @@ const wishStore = useWishStore()
 const product = ref<ProductDetailViewData | null>(null)
 const loadState = ref<ProductDetailLoadState>('loading')
 const selectedImageId = ref('')
-const isInCart = ref(false)
-const isReminderSet = ref(false)
 const isTryOnOpen = ref(false)
 const isTryOnExpanded = ref(false)
 const actionMessage = ref('')
@@ -111,8 +109,6 @@ const loadProductDetail = async () => {
     wishStore.hydrateProducts([{ id: nextProduct.id, isLiked: nextProduct.isLiked }])
     loadState.value = 'success'
     selectedImageId.value = nextProduct.images[0]?.id ?? ''
-    isInCart.value = false
-    isReminderSet.value = false
   } catch (error) {
     if (requestId !== loadRequestId) return
 
@@ -143,10 +139,6 @@ const handleToggleLike = async () => {
     wishStore.setProductWish(product.value.id, wasLiked)
     showTemporaryMessage('찜 상태를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.')
   }
-}
-
-const handleToggleCart = () => {
-  isInCart.value = !isInCart.value
 }
 
 const showTemporaryMessage = (message: string) => {
@@ -273,12 +265,16 @@ const handleViewSimilarProduct = (productId: number) => {
   void router.push({ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId } })
 }
 
-const handleToggleReminder = () => {
-  isReminderSet.value = !isReminderSet.value
-}
-
 const handleViewLive = (liveId: number) => {
   void router.push({ name: ROUTE_NAMES.LIVE_WATCH, params: { liveId } })
+}
+
+// 경매 진행 중 상품의 '라이브에서 입찰하기' — 연결된 라이브가 진행 중일 때만 입장한다.
+const handleGoToLiveAuction = () => {
+  const linkedLive = product.value?.linkedLive
+  if (linkedLive?.status === 'LIVE') {
+    handleViewLive(linkedLive.id)
+  }
 }
 
 const handleGoToProductList = () => {
@@ -358,7 +354,7 @@ onBeforeUnmount(() => {
         </div>
         <div>
           <strong>판매가 완료된 상품입니다</strong>
-          <p>상품 정보는 계속 확인할 수 있지만 구매와 장바구니 기능은 이용할 수 없습니다.</p>
+          <p>상품 정보는 계속 확인할 수 있지만 구매 기능은 이용할 수 없습니다.</p>
         </div>
       </section>
 
@@ -372,11 +368,10 @@ onBeforeUnmount(() => {
           :product="product"
           :seller="product.seller"
           :is-liked="isLiked"
-          :is-in-cart="isInCart"
           @toggle-like="handleToggleLike"
-          @toggle-cart="handleToggleCart"
           @open-try-on="handleTryOn"
           @purchase="handlePurchase"
+          @go-live="handleGoToLiveAuction"
           @view-seller="handleViewSeller"
         />
       </div>
@@ -401,12 +396,13 @@ onBeforeUnmount(() => {
       <ProductSellerLivePanel
         :linked-live="product.linkedLive"
         :seller-nickname="product.seller.nickname"
-        :is-reminder-set="isReminderSet"
-        @toggle-reminder="handleToggleReminder"
         @view-live="handleViewLive"
       />
       <ProductDetailInformation :product="product" />
-      <AiQualityAnalysisPanel :analysis="product.aiQualityAnalysis" />
+      <AiQualityAnalysisPanel
+        v-if="product.aiQualityAnalysis"
+        :analysis="product.aiQualityAnalysis"
+      />
       <ProductSimilarRecommendation :product-id="product.id" />
     </article>
 

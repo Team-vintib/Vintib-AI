@@ -112,6 +112,7 @@ public enum ErrorCode {
     PRODUCT_IMAGE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "P007", "업로드가 확인되지 않았습니다. 먼저 파일을 업로드해주세요."),
     CATEGORY_NOT_FOUND(HttpStatus.BAD_REQUEST, "P008", "존재하지 않는 카테고리입니다."),
     BRAND_NOT_FOUND(HttpStatus.BAD_REQUEST, "P009", "존재하지 않는 브랜드입니다."),
+    AI_MODEL_GENDER_REQUIRED(HttpStatus.BAD_REQUEST, "P010", "AI 착용컷을 사용하려면 모델 성별을 지정해야 합니다."),
 
     // [소셜(팔로우/찜)]
     WISH_ALREADY_EXISTS(HttpStatus.CONFLICT, "S001", "이미 찜한 상품입니다."),

@@ -1581,15 +1581,11 @@ watch(
 }
 
 .search-page__product-grid,
-.search-page__card-grid {
+.search-page__card-grid,
+.search-page__member-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-6);
-}
-
-.search-page__member-list {
-  display: grid;
-  gap: var(--space-4);
 }
 
 .search-page__pagination {
@@ -1789,7 +1785,8 @@ watch(
 
 @media (max-width: 1180px) {
   .search-page__product-grid,
-  .search-page__card-grid {
+  .search-page__card-grid,
+  .search-page__member-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1832,7 +1829,8 @@ watch(
   }
 
   .search-page__product-grid,
-  .search-page__card-grid {
+  .search-page__card-grid,
+  .search-page__member-list {
     grid-template-columns: 1fr;
   }
 

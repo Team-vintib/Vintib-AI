@@ -2,12 +2,16 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import {
+  getBroadcastSummary,
+  getCurrentAuction,
+  getLiveUnsoldProducts,
+  isAuctionEventMessage,
+} from '@/domains/auction/api/auctionApi'
 import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
 import SellerAuctionPanel from '@/domains/auction/components/SellerAuctionPanel.vue'
-import { LIVE_AUCTION_MOCK_RESULT } from '@/domains/auction/constants/liveAuctionMockData'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import {
-  issueLiveVideoToken,
   patchCurrentProduct,
   updateLiveStatus,
 } from '@/domains/live/api/liveControlApi'
@@ -23,10 +27,7 @@ import LiveProductQueue from '@/domains/live/components/LiveProductQueue.vue'
 import LiveUnsoldManage from '@/domains/live/components/LiveUnsoldManage.vue'
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchState from '@/domains/live/components/LiveWatchState.vue'
-import {
-  buildBroadcastEndSummary,
-  type BroadcastEndSummary,
-} from '@/domains/live/constants/liveBroadcastEndMock'
+import { LiveRealtimeClient } from '@/domains/live/api/liveRealtimeClient'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import LiveLayout from '@/shared/layouts/LiveLayout.vue'
@@ -36,6 +37,11 @@ import type {
   LiveWatchMockScenario,
   LiveWatchViewData,
 } from '@/domains/live/types/liveWatch.types'
+import type {
+  AuctionSnapshot,
+  BroadcastEndSummary,
+  LiveUnsoldProduct,
+} from '@/domains/auction/types/liveAuction.types'
 
 const LIVE_BROADCAST_MOCK_SCENARIOS: LiveWatchMockScenario[] = [
   'default',
@@ -59,16 +65,23 @@ const auctionWin = ref<{
   winningBid: number
   productTitle: string | null
 } | null>(null)
+const auctionSnapshot = ref<AuctionSnapshot | null>(null)
+const auctionLoading = ref(false)
+const auctionError = ref('')
 // 438/440 방송 종료 화면 단계: 대시보드 → (미낙찰 있으면) 남은 상품 관리.
 const endView = ref<'dashboard' | 'manage'>('dashboard')
+const broadcastSummary = ref<BroadcastEndSummary | null>(null)
+const unsoldProducts = ref<LiveUnsoldProduct[]>([])
+const resultLoading = ref(false)
+const resultError = ref('')
 const now = ref(Date.now())
-const videoConnectionLabel = ref('')
 // 방송 상세는 시청자와 같은 GET /lives/{liveId} 실 API를 재사용한다(VITE_LIVE_WATCH_API_ENABLED).
 // 소유자 판정(isHost)·현재 소개 상품(currentProductId)은 BE 016 §2.1·§2.5에서 제공된다.
 // isHost는 로그인 토큰이 실려야 채워지므로(비회원/비로그인은 false), host가 아니면 시청 페이지로 보낸다.
 // apiEnabled가 false인 mock 프리뷰에서는 isHost가 항상 false라 판매자 화면 가드/실 API 호출을 건너뛴다.
 const apiEnabled = isLiveWatchApiEnabled()
 let loadRequestId = 0
+let auctionSubscription: ReturnType<LiveRealtimeClient['subscribe']> | null = null
 
 const getRouteLiveId = () => {
   const routeValue = Array.isArray(route.params.liveId)
@@ -115,6 +128,68 @@ const elapsedTime = computed(() => {
     .join(':')
 })
 
+const loadAuction = async (liveId: number) => {
+  auctionSnapshot.value = null
+  auctionError.value = ''
+
+  if (!apiEnabled) {
+    auctionLoading.value = false
+    return
+  }
+
+  auctionLoading.value = true
+  try {
+    const snapshot = await getCurrentAuction(liveId)
+    if (live.value?.id === liveId) {
+      auctionSnapshot.value = snapshot
+    }
+  } catch (error) {
+    if (live.value?.id === liveId) {
+      auctionError.value =
+        normalizeApiError(error).message || '현재 경매 정보를 불러오지 못했습니다.'
+    }
+  } finally {
+    if (live.value?.id === liveId) {
+      auctionLoading.value = false
+    }
+  }
+}
+
+const loadBroadcastResults = async (liveId: number) => {
+  broadcastSummary.value = null
+  unsoldProducts.value = []
+  resultError.value = ''
+
+  if (!apiEnabled) {
+    resultLoading.value = false
+    return
+  }
+
+  resultLoading.value = true
+  const [summaryResult, unsoldResult] = await Promise.allSettled([
+    getBroadcastSummary(liveId),
+    getLiveUnsoldProducts(liveId),
+  ])
+
+  if (live.value?.id !== liveId) return
+
+  if (summaryResult.status === 'fulfilled') {
+    broadcastSummary.value = summaryResult.value
+  }
+  if (unsoldResult.status === 'fulfilled') {
+    unsoldProducts.value = unsoldResult.value
+  }
+
+  if (summaryResult.status === 'rejected') {
+    resultError.value =
+      normalizeApiError(summaryResult.reason).message || '방송 결과를 불러오지 못했습니다.'
+  } else if (unsoldResult.status === 'rejected') {
+    resultError.value = '유찰 상품 목록을 불러오지 못했습니다. 다시 시도해 주세요.'
+  }
+
+  resultLoading.value = false
+}
+
 const loadLiveBroadcast = async () => {
   const requestId = ++loadRequestId
   const liveId = getRouteLiveId()
@@ -126,9 +201,13 @@ const loadLiveBroadcast = async () => {
   errorMessage.value = ''
   isEndConfirmOpen.value = false
   auctionWin.value = null
+  auctionSnapshot.value = null
+  auctionError.value = ''
+  broadcastSummary.value = null
+  unsoldProducts.value = []
+  resultError.value = ''
   endView.value = 'dashboard'
   transitionNotice.value = ''
-  videoConnectionLabel.value = ''
   window.clearTimeout(transitionNoticeTimer)
 
   if (liveId === null) {
@@ -158,16 +237,11 @@ const loadLiveBroadcast = async () => {
     loadState.value = 'success'
 
     if (response.status === 'LIVE') {
-      void loadVideoToken(response.id)
+      void loadAuction(response.id)
     }
 
-    // mock 확인용: ?win 쿼리면 낙찰 축하 오버레이를 바로 띄운다(실사용 트리거는 handleAuctionEnded).
-    if (false && !apiEnabled && route.query.win !== undefined) {
-      auctionWin.value = {
-        winnerNickname: LIVE_AUCTION_MOCK_RESULT.winnerNickname,
-        winningBid: LIVE_AUCTION_MOCK_RESULT.winningBid,
-        productTitle: selectedProduct.value?.title ?? null,
-      }
+    if (response.status === 'ENDED') {
+      void loadBroadcastResults(response.id)
     }
   } catch (error) {
     if (requestId !== loadRequestId) return
@@ -283,12 +357,14 @@ const confirmEndBroadcast = async () => {
       endedAt: response.endedAt,
     }
     isEndConfirmOpen.value = false
+    void loadBroadcastResults(live.value.id)
   } catch (error) {
     // 종료는 멱등이 아니다 — 이미 종료·취소된 방송이면 L007(400)이 온다(BE 013 #3).
     // 이 경우 에러가 아니라 '이미 끝난 것'으로 보고 종료 대시보드 흐름으로 넘어간다.
     if (normalizeApiError(error).code === 'L007') {
       live.value = { ...live.value, status: 'ENDED' }
       isEndConfirmOpen.value = false
+      void loadBroadcastResults(live.value.id)
       return
     }
 
@@ -298,64 +374,52 @@ const confirmEndBroadcast = async () => {
   }
 }
 
-const loadVideoToken = async (liveId: number) => {
-  videoConnectionLabel.value = '영상 토큰 발급 중'
-
-  try {
-    const token = await issueLiveVideoToken(liveId)
-    videoConnectionLabel.value =
-      token.role === 'PUBLISHER' ? '송출 토큰 발급 완료' : '시청 토큰 발급 완료'
-  } catch {
-    videoConnectionLabel.value = '영상 토큰 발급 실패'
-  }
-}
-
 const updateViewerCount = (viewerCount: number) => {
   if (!live.value) return
 
   live.value = {
     ...live.value,
     currentViewerCount: viewerCount,
+    peakViewerCount: Math.max(live.value.peakViewerCount, viewerCount),
   }
 }
 
-const handleAuctionEnded = (result: {
-  outcome: 'WON' | 'FAILED'
-  winnerNickname: string | null
-  winningBid: number
-  productTitle: string | null
-}) => {
-  // 낙찰(WON)일 때만 축하 오버레이. 미낙찰은 패널 표기(ENDED_FAILED)로 충분.
+const applyAuctionSnapshot = (snapshot: AuctionSnapshot) => {
+  auctionSnapshot.value = snapshot
+  auctionError.value = ''
+
   auctionWin.value =
-    result.outcome === 'WON' && result.winnerNickname
+    snapshot.status === 'SUCCESS' && snapshot.highestBidderNickname
       ? {
-          winnerNickname: result.winnerNickname,
-          winningBid: result.winningBid,
-          productTitle: result.productTitle,
+          winnerNickname: snapshot.highestBidderNickname,
+          winningBid: snapshot.currentPrice,
+          productTitle: snapshot.productTitle,
         }
       : null
+}
+
+const clearAuctionSubscription = () => {
+  auctionSubscription?.unsubscribe()
+  auctionSubscription = null
+}
+
+const handleRealtimeReady = (client: LiveRealtimeClient) => {
+  if (!live.value || !client.connected()) return
+
+  clearAuctionSubscription()
+  auctionSubscription = client.subscribe(
+    `/topic/lives/${live.value.id}/auctions`,
+    (body) => {
+      if (isAuctionEventMessage(body) && body.auction.liveId === live.value?.id) {
+        applyAuctionSnapshot(body.auction)
+      }
+    },
+  )
 }
 
 const closeAuctionWin = () => {
   auctionWin.value = null
 }
-
-// 438 방송 종료 대시보드 — 종료 시 방송 요약(mock). 실제 경매 결과/방송 요약 API 없음(docs/requests/BE/018).
-// 기본은 절반 미낙찰로 미판매 처리 흐름을 보여주고, ?result=sold 이면 전부 낙찰(미낙찰 섹션 숨김 확인용).
-const broadcastSummary = computed<BroadcastEndSummary>(() => {
-  const resultQuery = Array.isArray(route.query.result) ? route.query.result[0] : route.query.result
-  return buildBroadcastEndSummary(live.value?.products ?? [], resultQuery === 'sold')
-})
-
-const unsoldProducts = computed(() => {
-  const unsoldIds = new Set(
-    broadcastSummary.value.results
-      .filter((result) => result.outcome === 'UNSOLD')
-      .map((result) => result.productId),
-  )
-
-  return (live.value?.products ?? []).filter((product) => unsoldIds.has(product.id))
-})
 
 watch(
   () => [route.params.liveId, route.query.mock],
@@ -371,6 +435,7 @@ const elapsedTimer = window.setInterval(() => {
 
 onBeforeUnmount(() => {
   loadRequestId += 1
+  clearAuctionSubscription()
   window.clearInterval(elapsedTimer)
   window.clearTimeout(transitionNoticeTimer)
 })
@@ -415,6 +480,10 @@ onBeforeUnmount(() => {
         :elapsed-time="elapsedTime"
         :peak-viewer-count="live.peakViewerCount"
         :summary="broadcastSummary"
+        :manageable-unsold-count="unsoldProducts.length"
+        :is-loading="resultLoading"
+        :error-message="resultError"
+        @retry="loadBroadcastResults(live.id)"
         @manage-unsold="endView = 'manage'"
         @to-list="router.push({ name: ROUTE_NAMES.LIVE_LIST })"
       />
@@ -470,7 +539,7 @@ onBeforeUnmount(() => {
             :title="live.title"
             :poster-url="live.posterUrl"
             :status="live.status"
-            :connection-label="videoConnectionLabel"
+            :live-id="live.id"
             :show-try-on="false"
           >
             <template #overlay>
@@ -479,6 +548,7 @@ onBeforeUnmount(() => {
                 :host-id="live.hostId"
                 :status="live.status"
                 @viewer-count="updateViewerCount"
+                @realtime-ready="handleRealtimeReady"
               />
             </template>
           </LiveVideoStage>
@@ -503,7 +573,11 @@ onBeforeUnmount(() => {
             :live-id="live.id"
             :product="selectedProduct"
             :status="live.status"
-            @auction-ended="handleAuctionEnded"
+            :snapshot="auctionSnapshot"
+            :is-loading="auctionLoading"
+            :load-error="auctionError"
+            @snapshot-change="applyAuctionSnapshot"
+            @auction-closed="applyAuctionSnapshot"
           />
         </aside>
       </div>
