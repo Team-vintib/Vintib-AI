@@ -68,13 +68,16 @@ fi
 REQUIRED_VARS="DB_NAME DB_USERNAME PROD_DB_PASSWORD IMAGE_TAG CORS_ALLOWED_ORIGINS
 PROD_MINIO_ROOT_USER PROD_MINIO_ROOT_PASSWORD PROD_MAIL_USERNAME PROD_MAIL_PASSWORD
 PROD_OPENVIDU_API_KEY PROD_OPENVIDU_API_SECRET PROD_OPENVIDU_SERVER_URL PROD_LIVEKIT_NODE_IP
-PROD_TOSS_SECRET_KEY PROD_TOSS_CLIENT_KEY PROD_JWT_SECRET"
+PROD_TOSS_SECRET_KEY PROD_TOSS_CLIENT_KEY PROD_JWT_SECRET WORKER_API_KEY"
 
 # 택배 배송 조회(deliveryapi.co.kr, SY034)는 필수가 아니다 — 비어 있으면 DeliveryTrackingClient가
 # 즉시-확정 폴백으로 동작하므로, REQUIRED_VARS 에는 넣지 않는다(등록 전에도 배포가 막히면 안 된다).
 #
 # 포인트 충전 토스페이먼츠(SY035)는 폴백이 없어 REQUIRED_VARS 에 넣는다 — 비어 있으면 결제
 # 승인 자체가 항상 실패하므로, 조용히 배포되기보다 배포 단계에서 막히는 게 낫다.
+#
+# WORKER_API_KEY 는 AI 워커(FastAPI)와 백엔드가 주고받는 내부 인증 키다. AI 쪽
+# _check_worker_key() 가 값이 비어 있으면 무조건 401을 던지도록 짜여 있어 폴백이 없다.
 
 missing=""
 for name in $REQUIRED_VARS; do
