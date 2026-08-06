@@ -44,6 +44,14 @@ public record LiveProductResponse(
         String saleType,
 
         @Schema(
+                description = "판매 상태. **`saleType`과는 별개 축이다** — 경매 상품도 팔리면 `SOLD`가 된다. "
+                        + "상품 행을 찾지 못했거나 상태 미지정이면 null",
+                example = "AUCTION_SCHEDULED",
+                allowableValues = {
+                        "DRAFT", "ON_SALE", "AUCTION_SCHEDULED", "AUCTION_IN_PROGRESS", "SOLD"})
+        String saleStatus,
+
+        @Schema(
                 description = "중고 상태 등급. **등급 체계가 미확정이라 자유 문자열이다** — "
                         + "FE에서 enum으로 굳히지 말 것",
                 example = "A")
@@ -86,6 +94,7 @@ public record LiveProductResponse(
                 card == null ? null : card.brandName(),
                 card == null ? null : card.price(),
                 card == null ? null : card.saleType(),
+                card == null ? null : card.saleStatus(),
                 card == null ? null : card.conditionGrade(),
                 card == null ? null : card.thumbnailUrl(),
                 card == null ? null : card.material(),
