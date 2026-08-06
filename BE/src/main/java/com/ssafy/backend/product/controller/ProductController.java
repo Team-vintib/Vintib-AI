@@ -21,9 +21,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -133,9 +135,11 @@ public class ProductController {
             @RequestParam(required = false) Long maxPrice,
             @RequestParam(required = false) ProductSortType sort,
             @RequestParam(required = false) Long sellerId,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         ProductListFilterParams filter =
                 new ProductListFilterParams(categoryIds, conditionGrades, saleType, minPrice, maxPrice, sort, sellerId);
+        Pageable pageable = PageRequest.of(page, size);
         PageResponse<ProductResponse> response = productService.getProductList(filter, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }

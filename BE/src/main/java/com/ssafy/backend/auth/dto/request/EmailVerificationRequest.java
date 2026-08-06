@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 
 public record EmailVerificationRequest(
 
-        @Schema(example = "user@example.com")
+        @Schema(example = "vintib1@gmail.com")
         @NotBlank
         @Email
         String email

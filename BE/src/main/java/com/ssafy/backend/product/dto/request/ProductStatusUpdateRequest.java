@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Positive;
 
 public record ProductStatusUpdateRequest(
 
-        @Schema(example = "50000")
+        @Schema(example = "85000")
         @NotNull
         @Positive
         Long price) {

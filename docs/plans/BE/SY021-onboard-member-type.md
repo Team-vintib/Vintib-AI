@@ -77,7 +77,7 @@ ONBOARD-002(`PUT /users/{id}/interests`)가 이미 `/users/{id}` + `requesterId 
 - [x] `docs/requests/BE/002-onboarding-contract.md`의 3.1/3.2/3.4절 반영 정리 — 3.3(AI 시착)만 남김
 - [x] `docs/plans/BE/SY019-onboarding-enforcement.md`에 "완료 시점은 SY021로 확정"으로 갱신,
       남은 인터셉터/화이트리스트 이슈만 남기기
-- [ ] BE:verify로 최종 검증
+- [x] BE:verify로 최종 검증 — 이후 스프린트 CI 통과 확인됨
 
 ## 확인이 필요한 미결정 사항
 

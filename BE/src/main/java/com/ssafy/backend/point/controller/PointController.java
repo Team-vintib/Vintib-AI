@@ -17,9 +17,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 // 마이페이지 포인트/출금 관리(MY-007). 출금 신청/내역은 별도 리소스라 WithdrawalController가 담당한다
@@ -64,8 +67,11 @@ public class PointController {
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/logs")
     public ResponseEntity<ApiResponse<PageResponse<PointTransactionResponse>>> getTransactions(
-            Authentication authentication, @PathVariable Long userId, @PageableDefault(size = 20) Pageable pageable) {
+            Authentication authentication, @PathVariable Long userId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         requireSelf(authentication, userId);
+        Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(ApiResponse.success(pointService.getTransactions(userId, pageable)));
     }
 

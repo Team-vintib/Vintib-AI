@@ -1,0 +1,53 @@
+# sam3d-garment-finetune-check 전용 의존성.
+#
+# ⚠️ 이건 **이 스파이크 전용**이다. AI/requirements.txt(서비스 런타임)에 넣지 말 것 —
+#    ai 컨테이너는 mem_limit 1g 이고 torch 가 없다(AI/CLAUDE.md "추론 코드는 AI/에 두지 않는다").
+#
+# ⚠️ CI(`ai-test`)는 AI/requirements-dev.txt 만 설치한다. 그래서 이 파일의 것들이 없어도
+#    `pytest -q` 가 통과해야 한다 — torch/peft/trimesh/opencv 를 쓰는 테스트는 전부
+#    `pytest.importorskip` 으로 감싸 있다. 그 규약을 깨면 CI 가 빨개진다.
+#
+# 설치:
+#   python -m venv .venv && .venv/Scripts/activate     # (Windows) / source .venv/bin/activate
+#   pip install -r requirements.txt
+#
+# uv 를 쓰면:
+#   uv venv && uv pip install -r requirements.txt
+
+# ── 필수(스캐폴드 코어) — AI/requirements.txt 에도 있어 CI 에서 이미 만족된다 ──
+numpy>=1.26
+pydantic>=2.9
+Pillow>=10.0
+PyYAML>=6.0
+
+# ── 학습 (LoRA SFT / DPO) ────────────────────────────────────────────────────
+# CPU 휠로 충분하다 — 스모크는 CPU 에서 돈다. GPU 학습은 sam3d-objects 환경 쪽에서 한다
+# (그쪽은 torch 2.5.1+cu121 로 핀이 박혀 있으니 이 파일의 torch 와 섞지 말 것).
+torch>=2.4
+peft>=0.10
+
+# ── 메시 처리 ────────────────────────────────────────────────────────────────
+# trimesh: OBJ 외 포맷 로딩 + quadric decimation. 없으면 OBJ 만 읽고 decimation 은 거부한다.
+trimesh>=4.4
+# pymeshfix: 열린 cloth 메시의 구멍 메우기. upstream requirements.txt 에도 있다.
+pymeshfix>=0.17
+
+# ── 렌더/비디오 ──────────────────────────────────────────────────────────────
+# imageio + ffmpeg: mp4 저장. 없으면 GIF(Pillow)만 남기고 skipped 에 기록한다.
+imageio>=2.34
+imageio-ffmpeg>=0.5
+
+# ── 평가 지표 ────────────────────────────────────────────────────────────────
+# opencv: Farneback optical flow. 없으면 flow_backend=dummy(항등 flow)로 폴백한다.
+opencv-python>=4.10
+# 리포트 플롯. 없으면 표만 나온다.
+matplotlib>=3.9
+
+# ── 선택: 실측 백엔드 ────────────────────────────────────────────────────────
+# 아래는 무겁거나 모델 다운로드가 필요해서 기본 설치에서 빼 뒀다. 실측 비교를 할 때만 넣는다.
+#   pip install lpips              # eval.perceptual_backend=lpips
+#   pip install mediapipe          # eval.pose_backend=mediapipe
+#   pip install insightface onnxruntime   # eval.face_backend=insightface
+
+# 테스트
+pytest>=8.0

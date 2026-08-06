@@ -101,7 +101,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null, false, null);
 
         ProductResponse response = productService.createProduct(SELLER_ID, request);
 
@@ -129,7 +129,9 @@ class ProductServiceTest {
                 "블랙",
                 "데님",
                 Map.of("총장", 70),
-                List.of("소매 끝 실밥 풀림", "안감 얼룩"));
+                List.of("소매 끝 실밥 풀림", "안감 얼룩"),
+                false,
+                null);
 
         ProductResponse response = productService.createProduct(SELLER_ID, request);
 
@@ -154,7 +156,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null, false, null);
 
         productService.createProduct(SELLER_ID, request);
 
@@ -166,7 +168,7 @@ class ProductServiceTest {
         when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.empty());
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", null, CATEGORY_ID, null, null, null, null, null, null, null);
+                "빈티지 자켓", null, CATEGORY_ID, null, null, null, null, null, null, null, false, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class);
@@ -180,12 +182,46 @@ class ProductServiceTest {
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(false);
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null, false, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CATEGORY_NOT_FOUND);
         verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void AI_착용컷을_활성화하면서_모델_성별을_지정하지_않으면_예외를_던진다() {
+        when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.of(seller));
+        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
+
+        ProductCreateRequest request = new ProductCreateRequest(
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null, true, null);
+
+        assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AI_MODEL_GENDER_REQUIRED);
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void AI_착용컷_활성화와_모델_성별을_함께_저장한다() {
+        when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.of(seller));
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ProductCreateRequest request = new ProductCreateRequest(
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null,
+                true, com.ssafy.backend.product.entity.AiModelGender.FEMALE);
+
+        ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
+        productService.createProduct(SELLER_ID, request);
+
+        verify(productRepository).save(captor.capture());
+        assertThat(captor.getValue().isAiModelEnabled()).isTrue();
+        assertThat(captor.getValue().getAiModelGender())
+                .isEqualTo(com.ssafy.backend.product.entity.AiModelGender.FEMALE);
     }
 
     @Test
@@ -764,5 +800,35 @@ class ProductServiceTest {
         assertThat(response.linkedLive().liveId()).isEqualTo(10L);
         assertThat(response.linkedLive().title()).isEqualTo("빈티지 특가");
         assertThat(response.linkedLive().status()).isEqualTo("SCHEDULED");
+    }
+
+    @Test
+    void 상품_상세조회시_유사_상품_목록을_그대로_담아_반환한다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(seller.getNickname()).thenReturn("판매자");
+        Product product = Product.builder()
+                .seller(seller)
+                .categoryId(CATEGORY_ID)
+                .brandId(2L)
+                .title("빈티지 자켓")
+                .build();
+        product.registerDirectSale(50000L);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        Member otherSeller = org.mockito.Mockito.mock(Member.class);
+        Product sameBrand = Product.builder()
+                .seller(otherSeller).categoryId(CATEGORY_ID).brandId(2L).title("같은 브랜드 상품").build();
+        ReflectionTestUtils.setField(sameBrand, "id", 2L);
+        sameBrand.registerDirectSale(70000L);
+        when(productRepository.findSimilarProducts(
+                eq(CATEGORY_ID), eq(1L), eq(2L), any(Pageable.class)))
+                .thenReturn(List.of(sameBrand));
+
+        ProductDetailResponse response = productService.getProductDetail(2L, 1L);
+
+        assertThat(response.similarProducts()).hasSize(1);
+        assertThat(response.similarProducts().get(0).id()).isEqualTo(2L);
+        assertThat(response.similarProducts().get(0).title()).isEqualTo("같은 브랜드 상품");
+        assertThat(response.similarProducts().get(0).price()).isEqualTo(70000L);
     }
 }

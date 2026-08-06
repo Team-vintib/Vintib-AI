@@ -13,9 +13,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 // 경로는 APIs.md의 `/users/{id}/wishes`, `/users/{userId}/wishes/{id}` 스펙을 그대로 따른다.
@@ -83,8 +86,11 @@ public class WishController {
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<WishItemResponse>>> getWishList(
-            Authentication authentication, @PathVariable Long userId, @PageableDefault(size = 20) Pageable pageable) {
+            Authentication authentication, @PathVariable Long userId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         requireSelf(authentication, userId);
+        Pageable pageable = PageRequest.of(page, size);
         PageResponse<WishItemResponse> response = wishService.getWishList(userId, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
