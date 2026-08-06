@@ -101,6 +101,8 @@ public enum ErrorCode {
     TRYON_RESULT_NOT_OWNER(HttpStatus.FORBIDDEN, "T004", "본인의 시착 결과만 처리할 수 있습니다."),
     TRYON_PROFILE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "T005", "업로드가 확인되지 않았습니다. 먼저 사진을 업로드해주세요."),
     TRYON_PROFILE_NOT_OWNER(HttpStatus.FORBIDDEN, "T006", "본인의 시착 프로필만 처리할 수 있습니다."),
+    TRYON_PROFILE_PHOTO_REQUIRED(HttpStatus.BAD_REQUEST, "T007", "시착을 생성하려면 먼저 전신 사진을 등록해야 합니다."),
+    TRYON_JOB_CREATE_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "T008", "AI 시착 요청에 실패했습니다. 잠시 후 다시 시도해주세요."),
 
     // [상품]
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "존재하지 않는 상품입니다."),
