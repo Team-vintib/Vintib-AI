@@ -260,7 +260,10 @@ onBeforeUnmount(() => {
             {{ formattedRemaining }}
           </strong>
         </div>
-        <div>
+        <div
+          class="live-auction-panel__bidder"
+          :class="{ 'live-auction-panel__bidder--active': snapshot.highestBidderNickname }"
+        >
           <span>최고 입찰자</span>
           <strong>{{ snapshot.highestBidderNickname || '입찰 대기 중' }}</strong>
         </div>
@@ -401,6 +404,15 @@ onBeforeUnmount(() => {
 .live-auction-panel__urgent,
 .live-auction-panel__next strong {
   color: var(--color-auction) !important;
+}
+
+.live-auction-panel__bidder--active span,
+.live-auction-panel__bidder--active strong {
+  color: var(--color-auction);
+}
+
+.live-auction-panel__bidder--active strong {
+  font-weight: var(--font-weight-bold);
 }
 
 .live-auction-panel__extension {
