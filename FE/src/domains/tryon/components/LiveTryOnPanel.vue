@@ -8,7 +8,12 @@ import {
 } from '@/domains/tryon/constants/liveTryOnMockData'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { getMyTryOnProfile, saveMyTryOnProfile } from '@/domains/tryon/api/tryOnProfileApi'
-import { saveTryOnResult } from '@/domains/tryon/api/tryOnResultApi'
+import {
+  createTryOnResult,
+  getTryOnResultDetail,
+  isTryOnResultApiEnabled,
+  saveTryOnResult,
+} from '@/domains/tryon/api/tryOnResultApi'
 import { normalizeApiError } from '@/shared/api/http'
 
 import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
@@ -42,6 +47,12 @@ const selectedPhotoUrl = ref<string | null>(
     : LIVE_TRY_ON_REGISTERED_PHOTO_URL,
 )
 const generationPhotoUrl = ref<string | null>(null)
+// 실 API 모드에서 생성이 끝나면 실제 결과(이미지·핏 문구)를 여기 담는다. mock 모드에서도
+// 화면 렌더를 하나로 맞추려고 동일하게 채운다.
+const generatedResult = ref<TryOnResult | null>(null)
+// 실 API 폴링 간격/타임아웃 — job이 보통 1~2분대라 5초 간격, 2분 넘으면 실패로 처리한다.
+const TRYON_POLL_INTERVAL_MS = 5_000
+const TRYON_POLL_TIMEOUT_MS = 120_000
 const panelState = ref<LiveTryOnPanelState>(
   props.mockScenario === 'empty' || authStore.user?.id ? 'EMPTY' : 'READY',
 )
@@ -172,17 +183,57 @@ const handleFileChange = async (event: Event) => {
   }
 }
 
-const startGeneration = () => {
-  if (!selectedPhotoUrl.value || panelState.value === 'GENERATING') return
+const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 
-  clearGenerationTimer()
-  const currentGeneration = generationSequence
-  generationPhotoUrl.value = selectedPhotoUrl.value
-  panelState.value = 'GENERATING'
-  fileError.value = ''
-  isResultSaved.value = false
-  isSavingResult.value = false
+// 실 API 모드: job을 접수하고, 완료(SUCCESS/FAILED)될 때까지 폴링한다. BE가 생성과 동시에
+// 결과를 저장하므로(TryOnResult가 PENDING으로 바로 만들어짐) mock 모드와 달리 별도
+// "저장하기" 단계가 필요 없다 — RESULT 상태에 도달하면 이미 저장이 끝난 상태다.
+const startRealGeneration = async (currentGeneration: number) => {
+  if (!authStore.user?.id) {
+    fileError.value = '로그인 후 이용할 수 있습니다.'
+    panelState.value = 'ERROR'
+    return
+  }
 
+  try {
+    const pending = await createTryOnResult(authStore.user.id, props.product.id)
+    const deadline = Date.now() + TRYON_POLL_TIMEOUT_MS
+    let latest = pending
+
+    while (latest.status === 'PENDING' || latest.status === 'PROCESSING') {
+      if (currentGeneration !== generationSequence) return
+      if (Date.now() > deadline) {
+        if (currentGeneration === generationSequence) {
+          fileError.value = '시착 생성이 너무 오래 걸리고 있습니다. 잠시 후 다시 시도해 주세요.'
+          panelState.value = 'ERROR'
+        }
+        return
+      }
+      await sleep(TRYON_POLL_INTERVAL_MS)
+      if (currentGeneration !== generationSequence) return
+      latest = await getTryOnResultDetail(authStore.user.id, pending.id)
+    }
+
+    if (currentGeneration !== generationSequence) return
+
+    if (latest.status === 'FAILED' || !latest.imageUrl) {
+      fileError.value = '시착 이미지를 생성하지 못했습니다.'
+      panelState.value = 'ERROR'
+      return
+    }
+
+    generatedResult.value = latest
+    isResultSaved.value = true
+    panelState.value = 'RESULT'
+  } catch (error) {
+    if (currentGeneration === generationSequence) {
+      fileError.value = normalizeApiError(error).message
+      panelState.value = 'ERROR'
+    }
+  }
+}
+
+const startMockGeneration = (currentGeneration: number) => {
   const shouldFail = shouldFailNextGeneration.value
   shouldFailNextGeneration.value = false
 
@@ -207,15 +258,44 @@ const startGeneration = () => {
     }
 
     if (currentGeneration === generationSequence) {
+      generatedResult.value = {
+        id: Date.now(),
+        productId: props.product.id,
+        imageUrl: LIVE_TRY_ON_MOCK_RESULT.imageUrl,
+        createdAt: new Date().toISOString(),
+        category: null,
+        fitTitle: LIVE_TRY_ON_MOCK_RESULT.fitTitle,
+        fitDescription: LIVE_TRY_ON_MOCK_RESULT.fitDescription,
+      }
       panelState.value = 'RESULT'
     }
   }, LIVE_TRY_ON_GENERATION_DELAY_MS)
 }
 
+const startGeneration = () => {
+  if (!selectedPhotoUrl.value || panelState.value === 'GENERATING') return
+
+  clearGenerationTimer()
+  const currentGeneration = generationSequence
+  generationPhotoUrl.value = selectedPhotoUrl.value
+  panelState.value = 'GENERATING'
+  fileError.value = ''
+  isResultSaved.value = false
+  isSavingResult.value = false
+  generatedResult.value = null
+
+  if (isTryOnResultApiEnabled()) {
+    void startRealGeneration(currentGeneration)
+    return
+  }
+
+  startMockGeneration(currentGeneration)
+}
+
 const saveResult = async () => {
   if (panelState.value !== 'RESULT' || isSavingResult.value || isResultSaved.value) return
 
-  const result: TryOnResult = {
+  const result: TryOnResult = generatedResult.value ?? {
     id: Date.now(),
     productId: props.product.id,
     imageUrl: LIVE_TRY_ON_MOCK_RESULT.imageUrl,
@@ -437,7 +517,7 @@ onBeforeUnmount(() => {
         aria-labelledby="live-try-on-result-title"
       >
         <figure class="live-try-on-panel__result-media">
-          <img :src="LIVE_TRY_ON_MOCK_RESULT.imageUrl" alt="AI 시착 mock 결과 이미지" />
+          <img :src="generatedResult?.imageUrl ?? undefined" alt="AI 시착 결과 이미지" />
           <figcaption>AI 시착 결과</figcaption>
         </figure>
 
@@ -445,9 +525,9 @@ onBeforeUnmount(() => {
           <div>
             <h3 id="live-try-on-result-title">AI 시착 결과</h3>
           </div>
-          <div class="live-try-on-panel__fit">
-            <strong>{{ LIVE_TRY_ON_MOCK_RESULT.fitTitle }}</strong>
-            <p>{{ LIVE_TRY_ON_MOCK_RESULT.fitDescription }}</p>
+          <div v-if="generatedResult?.fitTitle" class="live-try-on-panel__fit">
+            <strong>{{ generatedResult.fitTitle }}</strong>
+            <p v-if="generatedResult.fitDescription">{{ generatedResult.fitDescription }}</p>
           </div>
           <p v-if="isResultSaved" class="live-try-on-panel__saved" role="status">
             시착 결과를 저장했습니다.
