@@ -74,7 +74,10 @@ const registeredProductId = ref('')
 const aiModelCutStatus = ref<ProductAiModelCutStatusDto['status']>('NONE')
 const aiModelCutImageUrl = ref<string | null>(null)
 const AI_MODEL_CUT_POLL_INTERVAL_MS = 5_000
-const AI_MODEL_CUT_POLL_TIMEOUT_MS = 120_000
+// 워커가 job마다 VLM/FLUX/CatVTON을 순차로 새로 로드하는 구조라(6GB급 GPU 전제),
+// 로컬 실측 기준 완료까지 4분 넘게 걸릴 수 있다 — 120s는 너무 짧아 완료 직전에
+// 폴링이 멈추는 문제가 있었다(-517 로컬 테스트에서 확인).
+const AI_MODEL_CUT_POLL_TIMEOUT_MS = 600_000
 let aiModelCutPollToken = 0
 const isSubmittingRegistration = ref(false)
 const registrationSubmitError = ref('')
