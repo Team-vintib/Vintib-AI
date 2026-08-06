@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import {
   getBroadcastSummary,
@@ -262,12 +262,13 @@ const loadLiveBroadcast = async () => {
 }
 
 const goBack = () => {
-  if (window.history.length > 1) {
-    router.back()
+  // 방송 중이면 바로 나가지 않고 종료 확인 팝업을 먼저 띄운다.
+  if (live.value?.status === 'LIVE') {
+    isEndConfirmOpen.value = true
     return
   }
 
-  void router.push({ name: ROUTE_NAMES.LIVE_LIST })
+  void router.push({ name: ROUTE_NAMES.HOME })
 }
 
 // 판매자 제어(437/439). BE 013/016으로 확정된 실 API에 연결한다.
@@ -373,6 +374,16 @@ const confirmEndBroadcast = async () => {
     )
   }
 }
+
+// 방송 중(LIVE)에 페이지를 벗어나려 하면(브라우저 뒤로 등) 바로 나가지 않고 종료 확인 팝업을 띄운다.
+onBeforeRouteLeave(() => {
+  if (live.value?.status === 'LIVE') {
+    isEndConfirmOpen.value = true
+    return false
+  }
+
+  return true
+})
 
 const updateViewerCount = (viewerCount: number) => {
   if (!live.value) return
@@ -485,14 +496,14 @@ onBeforeUnmount(() => {
         :error-message="resultError"
         @retry="loadBroadcastResults(live.id)"
         @manage-unsold="endView = 'manage'"
-        @to-list="router.push({ name: ROUTE_NAMES.LIVE_LIST })"
+        @to-list="router.push({ name: ROUTE_NAMES.HOME })"
       />
 
       <LiveUnsoldManage
         v-else-if="live.status === 'ENDED' && endView === 'manage'"
         :products="unsoldProducts"
         @back="endView = 'dashboard'"
-        @to-list="router.push({ name: ROUTE_NAMES.LIVE_LIST })"
+        @to-list="router.push({ name: ROUTE_NAMES.HOME })"
       />
 
       <LiveBroadcastHeader
