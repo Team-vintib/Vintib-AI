@@ -428,8 +428,8 @@ function getRealtimeErrorMessage(body: unknown) {
 .live-chat-overlay__reactions {
   display: flex;
   position: absolute;
-  bottom: calc(20px + 250px);
-  left: 20px;
+  bottom: 20px;
+  left: 372px;
   flex-direction: column;
   gap: var(--space-2);
   pointer-events: auto;
@@ -474,8 +474,8 @@ function getRealtimeErrorMessage(body: unknown) {
 
 .live-chat-overlay__reaction-burst {
   position: absolute;
-  bottom: calc(20px + 250px);
-  left: 54px;
+  bottom: 20px;
+  left: 372px;
   width: 76px;
   height: 156px;
   pointer-events: none;
