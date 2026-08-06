@@ -21,8 +21,9 @@ FE가 이미 시착 결과 화면에 "한 줄 핏 예상" UI 자리를 만들어
 ## 요청 내용
 
 시착 job 결과를 실제로 수신·저장하는 로직을 구현하실 때(AI 게이트웨이 job 결과,
-`GET /ai/jobs/{job_id}`), 결과 payload에 아래 두 필드가 새로 포함될 예정이니
-`TryOnResult` 엔티티와 `TryOnResultResponse`에 같이 반영해 주시면 됩니다.
+`GET /ai/jobs/{job_id}`), 결과 payload에 아래 두 필드가 **이미 포함되어 있으니**
+(`worker/tryon_worker_example.py`에 배선 완료) `TryOnResult` 엔티티와
+`TryOnResultResponse`에 같이 반영해 주시면 됩니다.
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
