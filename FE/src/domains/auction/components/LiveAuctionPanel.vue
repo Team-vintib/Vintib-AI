@@ -325,8 +325,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   flex-direction: column;
   gap: var(--space-3);
-  overflow-y: auto;
-  padding: 18px 24px;
+  padding: 16px 18px;
   border-top: 1px solid var(--color-live-border);
   border-left: 1px solid var(--color-live-border);
   background: var(--color-surface-raised);
@@ -341,7 +340,7 @@ onBeforeUnmount(() => {
 .live-auction-panel h2 {
   color: var(--color-accent);
   font-family: var(--font-mono);
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-2xs);
   font-weight: var(--font-weight-regular);
   letter-spacing: 0.2em;
   line-height: var(--line-height-tight);
@@ -386,7 +385,7 @@ onBeforeUnmount(() => {
 .live-auction-panel__balance {
   display: block;
   color: var(--color-live-text-secondary);
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-2xs);
 }
 
 .live-auction-panel__metrics strong {
@@ -395,7 +394,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   color: var(--color-live-text-primary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;

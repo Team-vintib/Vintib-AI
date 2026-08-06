@@ -9,6 +9,7 @@ import {
   isAuctionEventMessage,
 } from '@/domains/auction/api/auctionApi'
 import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
+import LiveAuctionStartOverlay from '@/domains/auction/components/LiveAuctionStartOverlay.vue'
 import SellerAuctionPanel from '@/domains/auction/components/SellerAuctionPanel.vue'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import {
@@ -68,6 +69,9 @@ const auctionWin = ref<{
 const auctionSnapshot = ref<AuctionSnapshot | null>(null)
 const auctionLoading = ref(false)
 const auctionError = ref('')
+const announcedAuctionId = ref<number | null>(null)
+const startedAuctionTitle = ref<string | null>(null)
+let startNoticeTimer: number | undefined
 // 438/440 방송 종료 화면 단계: 대시보드 → (미낙찰 있으면) 남은 상품 관리.
 const endView = ref<'dashboard' | 'manage'>('dashboard')
 const broadcastSummary = ref<BroadcastEndSummary | null>(null)
@@ -142,6 +146,7 @@ const loadAuction = async (liveId: number) => {
     const snapshot = await getCurrentAuction(liveId)
     if (live.value?.id === liveId) {
       auctionSnapshot.value = snapshot
+      announcedAuctionId.value = snapshot?.status === 'RUNNING' ? snapshot.auctionId : null
     }
   } catch (error) {
     if (live.value?.id === liveId) {
@@ -203,6 +208,8 @@ const loadLiveBroadcast = async () => {
   auctionWin.value = null
   auctionSnapshot.value = null
   auctionError.value = ''
+  announcedAuctionId.value = null
+  startedAuctionTitle.value = null
   broadcastSummary.value = null
   unsoldProducts.value = []
   resultError.value = ''
@@ -385,6 +392,15 @@ onBeforeRouteLeave(() => {
   return true
 })
 
+// 방송 중(LIVE)엔 탭 닫기·새로고침도 실수로 방송이 끊기지 않도록 브라우저 기본 이탈 경고를 띄운다.
+const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+  if (live.value?.status === 'LIVE') {
+    event.preventDefault()
+    event.returnValue = ''
+  }
+}
+window.addEventListener('beforeunload', handleBeforeUnload)
+
 const updateViewerCount = (viewerCount: number) => {
   if (!live.value) return
 
@@ -407,6 +423,24 @@ const applyAuctionSnapshot = (snapshot: AuctionSnapshot) => {
           productTitle: snapshot.productTitle,
         }
       : null
+
+  // 경매가 새로 시작(RUNNING)되면 팝업으로 알린다(시청자 화면과 동일).
+  if (snapshot.status === 'RUNNING' && snapshot.auctionId !== announcedAuctionId.value) {
+    announcedAuctionId.value = snapshot.auctionId
+    startedAuctionTitle.value = snapshot.productTitle || '상품'
+    window.clearTimeout(startNoticeTimer)
+    startNoticeTimer = window.setTimeout(() => {
+      startedAuctionTitle.value = null
+    }, 4000)
+  }
+
+  // 낙찰(SUCCESS)되면 그 상품은 즉시 SOLD가 되므로 상품 큐에도 바로 반영한다.
+  if (snapshot.status === 'SUCCESS' && live.value) {
+    const soldProduct = live.value.products.find((product) => product.id === snapshot.productId)
+    if (soldProduct) {
+      soldProduct.saleStatus = 'SOLD'
+    }
+  }
 }
 
 const clearAuctionSubscription = () => {
@@ -432,6 +466,11 @@ const closeAuctionWin = () => {
   auctionWin.value = null
 }
 
+const dismissAuctionStart = () => {
+  window.clearTimeout(startNoticeTimer)
+  startedAuctionTitle.value = null
+}
+
 watch(
   () => [route.params.liveId, route.query.mock],
   () => {
@@ -447,8 +486,10 @@ const elapsedTimer = window.setInterval(() => {
 onBeforeUnmount(() => {
   loadRequestId += 1
   clearAuctionSubscription()
+  window.removeEventListener('beforeunload', handleBeforeUnload)
   window.clearInterval(elapsedTimer)
   window.clearTimeout(transitionNoticeTimer)
+  window.clearTimeout(startNoticeTimer)
 })
 </script>
 
@@ -545,52 +586,60 @@ onBeforeUnmount(() => {
           </div>
         </aside>
 
-        <main class="live-broadcast-page__stage">
-          <LiveVideoStage
-            :title="live.title"
-            :poster-url="live.posterUrl"
-            :status="live.status"
-            :live-id="live.id"
-            :show-try-on="false"
-          >
-            <template #overlay>
-              <LiveChatOverlay
-                :live-id="live.id"
-                :host-id="live.hostId"
-                :status="live.status"
-                @viewer-count="updateViewerCount"
-                @realtime-ready="handleRealtimeReady"
-              />
-            </template>
-          </LiveVideoStage>
+        <main class="live-broadcast-page__content">
+          <div class="live-broadcast-page__stage">
+            <LiveVideoStage
+              :title="live.title"
+              :poster-url="live.posterUrl"
+              :status="live.status"
+              :live-id="live.id"
+              :show-try-on="false"
+            >
+              <template #overlay>
+                <LiveChatOverlay
+                  :live-id="live.id"
+                  :host-id="live.hostId"
+                  :status="live.status"
+                  @viewer-count="updateViewerCount"
+                  @realtime-ready="handleRealtimeReady"
+                />
+              </template>
+            </LiveVideoStage>
 
-          <LiveAuctionResultOverlay
-            v-if="auctionWin"
-            :winner-nickname="auctionWin.winnerNickname"
-            :winning-bid="auctionWin.winningBid"
-            :product-title="auctionWin.productTitle"
-            @close="closeAuctionWin"
-          />
+            <LiveAuctionResultOverlay
+              v-if="auctionWin"
+              :winner-nickname="auctionWin.winnerNickname"
+              :winning-bid="auctionWin.winningBid"
+              :product-title="auctionWin.productTitle"
+              @close="closeAuctionWin"
+            />
 
-          <p v-if="transitionNotice" class="live-broadcast-page__notice" role="status">
-            {{ transitionNotice }}
-          </p>
+            <LiveAuctionStartOverlay
+              v-if="startedAuctionTitle"
+              :product-title="startedAuctionTitle"
+              @close="dismissAuctionStart"
+            />
+
+            <p v-if="transitionNotice" class="live-broadcast-page__notice" role="status">
+              {{ transitionNotice }}
+            </p>
+          </div>
+
+          <div class="live-broadcast-page__details">
+            <SellerAuctionPanel
+              :live-id="live.id"
+              :product="selectedProduct"
+              :status="live.status"
+              :snapshot="auctionSnapshot"
+              :is-loading="auctionLoading"
+              :load-error="auctionError"
+              @snapshot-change="applyAuctionSnapshot"
+              @auction-closed="applyAuctionSnapshot"
+            />
+
+            <LiveBroadcastInfo :live="live" :elapsed-time="elapsedTime" />
+          </div>
         </main>
-
-        <aside class="live-broadcast-page__control">
-          <LiveBroadcastInfo :live="live" :elapsed-time="elapsedTime" />
-
-          <SellerAuctionPanel
-            :live-id="live.id"
-            :product="selectedProduct"
-            :status="live.status"
-            :snapshot="auctionSnapshot"
-            :is-loading="auctionLoading"
-            :load-error="auctionError"
-            @snapshot-change="applyAuctionSnapshot"
-            @auction-closed="applyAuctionSnapshot"
-          />
-        </aside>
       </div>
 
       <div
@@ -638,7 +687,15 @@ onBeforeUnmount(() => {
   display: grid;
   min-height: calc(100vh - var(--button-height-major));
   height: calc(100vh - var(--button-height-major));
-  grid-template-columns: 240px minmax(0, 1fr) 360px;
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+/* 시청 화면과 동일: 영상(위) / 방송 정보·경매(아래) */
+.live-broadcast-page__content {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(340px, 1fr) 260px;
 }
 
 .live-broadcast-page__queue {
@@ -692,15 +749,27 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.live-broadcast-page__control {
-  display: flex;
+.live-broadcast-page__details {
+  display: grid;
+  min-width: 0;
   min-height: 0;
-  flex-direction: column;
-  gap: var(--space-3);
-  overflow-y: auto;
-  padding: var(--space-4);
-  border-left: 1px solid var(--color-live-border);
+  grid-template-columns: minmax(0, 1fr) 300px;
+  border-top: 1px solid var(--color-live-border);
   background: var(--color-live-background);
+}
+
+.live-broadcast-page__details > * {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.live-broadcast-page__details > :last-child {
+  padding: var(--space-4);
+}
+
+.live-broadcast-page__details > * + * {
+  border-left: 1px solid var(--color-live-border);
 }
 
 .live-broadcast-page__slot-note {
@@ -847,7 +916,10 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1100px) {
-  .live-broadcast-page__body,
+  .live-broadcast-page__body {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+
   .live-broadcast-loading__body {
     grid-template-columns: 220px minmax(0, 1fr) 320px;
   }
@@ -865,13 +937,17 @@ onBeforeUnmount(() => {
     border-bottom: 1px solid var(--color-live-border);
   }
 
+  .live-broadcast-page__content {
+    height: auto;
+    grid-template-rows: var(--surface-min-height-xl) auto;
+  }
+
   .live-broadcast-page__stage {
     min-height: var(--surface-min-height-xl);
   }
 
-  .live-broadcast-page__control {
-    border-left: 0;
-    border-top: 1px solid var(--color-live-border);
+  .live-broadcast-page__details {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .live-broadcast-loading__body {

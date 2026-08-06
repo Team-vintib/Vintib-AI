@@ -56,7 +56,6 @@ defineEmits<{
         </dl>
 
         <div class="live-selected-product__actions">
-          <button type="button" @click="$emit('viewProduct', product.id)">상품 상세 보기</button>
           <button
             class="live-selected-product__wish"
             :class="{ 'live-selected-product__wish--active': isWished }"
@@ -99,16 +98,16 @@ defineEmits<{
 
 .live-selected-product__heading h2 {
   color: var(--color-live-text-secondary);
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-demibold);
   line-height: var(--line-height-tight);
 }
 
 .live-selected-product__body {
   display: grid;
-  align-items: start;
-  grid-template-columns: 53px minmax(0, 1fr);
-  gap: 10px;
+  align-items: center;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 16px;
 }
 
 .live-selected-product__identity {
@@ -121,8 +120,8 @@ defineEmits<{
 
 .live-selected-product__image {
   display: grid;
-  width: 53px;
-  height: 53px;
+  width: 180px;
+  height: 180px;
   overflow: hidden;
   border-radius: var(--radius-control);
   background: var(--color-live-surface-raised);
@@ -138,15 +137,12 @@ defineEmits<{
 }
 
 .live-selected-product__identity strong {
-  display: block;
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.live-selected-product__identity strong {
-  font-size: var(--font-size-xs);
-  line-height: 17px;
+  font-size: var(--font-size-2xl);
+  line-height: 30px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .live-selected-product__details {
@@ -158,15 +154,15 @@ defineEmits<{
 
 .live-selected-product__details > div {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-columns: 46px minmax(0, 1fr);
   gap: 4px;
 }
 
 .live-selected-product__details dt,
 .live-selected-product__details dd {
   overflow: hidden;
-  font-size: var(--font-size-badge);
-  line-height: var(--line-height-tight);
+  font-size: var(--font-size-md);
+  line-height: 22px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -192,7 +188,7 @@ defineEmits<{
 
 .live-selected-product__actions button {
   display: inline-flex;
-  height: 23px;
+  height: 40px;
   min-height: 0;
   align-items: center;
   justify-content: center;
@@ -201,14 +197,10 @@ defineEmits<{
   border-radius: var(--radius-control);
   background: var(--color-live-surface-raised);
   color: var(--color-live-text-primary);
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-demibold);
   line-height: 1;
   white-space: nowrap;
-}
-
-.live-selected-product__actions button:first-child {
-  width: 75px;
 }
 
 .live-selected-product__actions button:hover {
@@ -218,8 +210,8 @@ defineEmits<{
 .live-selected-product__actions .live-selected-product__wish {
   width: auto;
   min-width: 37px;
-  padding: 0 6px;
-  gap: 5px;
+  padding: 0 18px;
+  gap: 8px;
   background: transparent;
 }
 
@@ -236,8 +228,8 @@ defineEmits<{
 }
 
 .live-selected-product__wish svg {
-  width: 12px;
-  height: 12px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
   stroke-linejoin: round;
