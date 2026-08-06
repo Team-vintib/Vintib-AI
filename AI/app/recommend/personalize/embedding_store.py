@@ -8,8 +8,9 @@
 대해 재검수(재촬영 등)로 여러 번 돌 수 있는데, 그때마다 새 행이 쌓이면 안 되고 상품당 최신
 임베딩 1개만 유지해야 한다(추천은 "이 상품의 지금 임베딩"이 필요하지, 이력이 필요하지 않다).
 
-이번 라운드 범위는 저장까지다 — 추천 API가 이 벡터를 실제로 조회·서빙하는 로직은 여기 없다
-(`fetch_garment_embedding()`은 다음 단계가 바로 쓸 수 있게 미리 추가해 둔 것).
+`find_similar()`가 실제 조회·서빙 로직이다 — `app/recommend/similar/service.py`가 이걸 쓴다.
+pgvector의 코사인 거리 연산자(`<=>`)를 이 프로젝트에서 처음 실시간 쿼리로 쓰는 곳이다(CH020은
+"동일 상품" 판별에 이 방식이 안 맞아 의도적으로 안 썼다 — 여긴 다른 목적).
 
 설계: `docs/plans/AI/CH020-internal-clip-price-comps.md`(zero-shot 선택 근거),
 `worker/models/sam3/garment_embedding.py`(임베딩 계산)
@@ -45,6 +46,9 @@ class ProductGarmentEmbedding(Base):
     product_id: Mapped[int] = mapped_column(Integer, nullable=False, unique=True, index=True)
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM), nullable=False)
     model_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    # 품질검수 payload의 GarmentCategory 값(예: "TOP_KNIT"). nullable — 이 컬럼 추가 이전에
+    # 저장된 행은 값이 없고, category 필터를 안 쓰는 조회엔 영향 없다.
+    category: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -66,6 +70,14 @@ class GarmentEmbeddingRecord:
     updated_at: datetime
 
 
+@dataclass(frozen=True)
+class SimilarGarmentMatch:
+    """`find_similar()` 결과 한 건 — 코사인 유사도(거리의 역, 1에 가까울수록 유사)."""
+
+    product_id: int
+    score: float
+
+
 def init_schema() -> None:
     """`CREATE EXTENSION vector` + 테이블 생성. 이미 있으면 아무 것도 안 한다(멱등).
 
@@ -78,17 +90,23 @@ def init_schema() -> None:
         Base.metadata.create_all(conn)
 
 
-def save_garment_embedding(product_id: int, embedding: list[float], model_id: str) -> None:
+def save_garment_embedding(
+    product_id: int,
+    embedding: list[float],
+    model_id: str,
+    category: str | None = None,
+) -> None:
     """상품 하나의 임베딩을 upsert한다 — 같은 `product_id`가 이미 있으면 덮어쓴다(재검수)."""
     with Session(get_vector_engine()) as session:
         stmt = insert(ProductGarmentEmbedding).values(
-            product_id=product_id, embedding=embedding, model_id=model_id
+            product_id=product_id, embedding=embedding, model_id=model_id, category=category
         )
         stmt = stmt.on_conflict_do_update(
             index_elements=[ProductGarmentEmbedding.product_id],
             set_={
                 "embedding": stmt.excluded.embedding,
                 "model_id": stmt.excluded.model_id,
+                "category": stmt.excluded.category,
                 "updated_at": func.now(),
             },
         )
@@ -110,3 +128,37 @@ def fetch_garment_embedding(product_id: int) -> GarmentEmbeddingRecord | None:
             model_id=row.model_id,
             updated_at=row.updated_at,
         )
+
+
+def find_similar(product_id: int, k: int, category: str | None = None) -> list[SimilarGarmentMatch]:
+    """`product_id` 상품과 코사인 거리가 가까운 순으로 최대 `k`개를 돌려준다.
+
+    대상 상품 자체에 임베딩이 없으면(품질검수 미완료·옷 미검출) 빈 리스트 — 에러가 아니다,
+    호출부(`app/recommend/similar/service.py`)가 "아직 추천 불가"로 정상 처리한다.
+    `category`를 주면 그 값이 일치하는 상품으로만 후보를 좁힌다(카테고리 컬럼이 없던 시절에
+    저장된 행은 `category is None`이라 이 필터에 걸리지 않는다 — 의도된 동작).
+    """
+    with Session(get_vector_engine()) as session:
+        query_embedding = session.execute(
+            select(ProductGarmentEmbedding.embedding).where(
+                ProductGarmentEmbedding.product_id == product_id
+            )
+        ).scalar_one_or_none()
+        if query_embedding is None:
+            return []
+
+        distance = ProductGarmentEmbedding.embedding.cosine_distance(query_embedding)
+        stmt = (
+            select(ProductGarmentEmbedding.product_id, distance.label("distance"))
+            .where(ProductGarmentEmbedding.product_id != product_id)
+            .order_by(distance)
+            .limit(k)
+        )
+        if category is not None:
+            stmt = stmt.where(ProductGarmentEmbedding.category == category)
+
+        rows = session.execute(stmt).all()
+        return [
+            SimilarGarmentMatch(product_id=row.product_id, score=round(1 - row.distance, 4))
+            for row in rows
+        ]
