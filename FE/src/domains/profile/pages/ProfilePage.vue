@@ -57,6 +57,7 @@ const products = ref<ProductListItem[]>([])
 const lives = ref<LiveListItem[]>([])
 const productTotalPages = ref(1)
 const liveTotalPages = ref(1)
+const activeProductTotalCount = ref(0)
 const activeLiveTotalCount = ref(0)
 const productLoadState = ref<ListLoadState>('idle')
 const liveLoadState = ref<ListLoadState>('idle')
@@ -108,6 +109,7 @@ const productEmptyMessage = computed(() =>
 const liveEmptyMessage = computed(() =>
   isSelfProfile.value ? '아직 개설한 라이브가 없습니다.' : '등록된 라이브가 없습니다.',
 )
+const profileProductCount = computed(() => activeProductTotalCount.value)
 const profileLiveCount = computed(() => activeLiveTotalCount.value)
 const visibleProductPages = computed(() =>
   Array.from({ length: productTotalPages.value }, (_, index) => index + 1),
@@ -124,6 +126,8 @@ const loadProfile = async () => {
   profileMessage.value = ''
   products.value = []
   lives.value = []
+  activeProductTotalCount.value = 0
+  activeLiveTotalCount.value = 0
 
   await authStore.validateStoredSession()
 
@@ -193,6 +197,7 @@ const loadProducts = async () => {
 
     products.value = response.items
     productTotalPages.value = Math.max(response.meta.totalPages, 1)
+    activeProductTotalCount.value = response.meta.totalElements
     wishStore.hydrateProducts(response.items)
     await hydrateProductWishes(response.items)
     productLoadState.value = 'success'
@@ -201,6 +206,7 @@ const loadProducts = async () => {
 
     products.value = []
     productTotalPages.value = 1
+    activeProductTotalCount.value = 0
     productLoadState.value = 'error'
     productMessage.value = '상품 목록을 불러오지 못했습니다.'
   }
@@ -592,7 +598,7 @@ watch(
 
               <div class="profile-summary__stats" aria-label="프로필 통계">
                 <span class="profile-summary__stat">
-                  <strong>{{ profile.productCount.toLocaleString('ko-KR') }}</strong> 상품
+                  <strong>{{ profileProductCount.toLocaleString('ko-KR') }}</strong> 상품
                 </span>
                 <button
                   class="profile-summary__stat profile-summary__stat--button"
@@ -715,7 +721,7 @@ watch(
               :class="{ 'profile-tabs__item--active': activeTab === 'products' }"
               @click="selectTab('products')"
             >
-              상품 {{ profile.productCount.toLocaleString('ko-KR') }}
+              상품 {{ profileProductCount.toLocaleString('ko-KR') }}
             </button>
             <button
               type="button"
