@@ -21,6 +21,9 @@ interface LiveRealtimeClientOptions {
 
 const NULL = '\u0000'
 const HEARTBEAT_OUTGOING_MS = 10_000
+const CONNECT_TIMEOUT_MS = 8_000
+const RECONNECT_BASE_MS = 1_000
+const RECONNECT_MAX_MS = 15_000
 const LIVE_REALTIME_API_ENABLED =
   import.meta.env.VITE_LIVE_REALTIME_API_ENABLED === 'true' ||
   import.meta.env.VITE_LIVE_WATCH_API_ENABLED === 'true'
@@ -33,6 +36,10 @@ export class LiveRealtimeClient {
   private receiveBuffer = ''
   private isConnected = false
   private heartbeatTimer: number | null = null
+  private reconnectTimer: number | null = null
+  private connectTimer: number | null = null
+  private reconnectAttempts = 0
+  private shouldReconnect = false
 
   constructor(private readonly options: LiveRealtimeClientOptions = {}) {}
 
@@ -41,8 +48,17 @@ export class LiveRealtimeClient {
       return
     }
 
+    this.shouldReconnect = true
     const socket = new WebSocket(resolveWebSocketUrl())
     this.socket = socket
+
+    // 연결이 열리지도 닫히지도 않고 멈춰 있으면(핸드셰이크 지연 등) 강제로 닫아 재연결을 태운다.
+    this.clearConnectTimer()
+    this.connectTimer = window.setTimeout(() => {
+      if (!this.isConnected) {
+        socket.close()
+      }
+    }, CONNECT_TIMEOUT_MS)
 
     socket.addEventListener('open', () => {
       const accessToken = getStoredAccessToken()
@@ -64,8 +80,10 @@ export class LiveRealtimeClient {
 
     socket.addEventListener('close', () => {
       this.stopHeartbeat()
+      this.clearConnectTimer()
       this.isConnected = false
       this.options.onDisconnect?.()
+      this.scheduleReconnect()
     })
 
     socket.addEventListener('error', (event) => {
@@ -74,6 +92,10 @@ export class LiveRealtimeClient {
   }
 
   disconnect() {
+    this.shouldReconnect = false
+    this.clearReconnectTimer()
+    this.clearConnectTimer()
+
     if (!this.socket) return
 
     if (this.socket.readyState === WebSocket.OPEN) {
@@ -134,6 +156,10 @@ export class LiveRealtimeClient {
 
       if (frame.command === 'CONNECTED') {
         this.isConnected = true
+        this.reconnectAttempts = 0
+        this.clearConnectTimer()
+        // 재연결이면 죽은 소켓의 이전 구독 핸들러를 비우고 onConnect에서 다시 등록한다.
+        this.subscriptions.clear()
         this.startHeartbeat()
         this.options.onConnect?.()
         return
@@ -180,6 +206,37 @@ export class LiveRealtimeClient {
 
     window.clearInterval(this.heartbeatTimer)
     this.heartbeatTimer = null
+  }
+
+  // 예기치 않게 끊기면(초기 연결 실패·중간 단절) 백오프로 자동 재연결한다.
+  // 재연결 성공(CONNECTED) 시 onConnect가 다시 불려 앱이 구독을 다시 얹는다.
+  private scheduleReconnect() {
+    if (!this.shouldReconnect || this.reconnectTimer !== null) {
+      return
+    }
+
+    const delay = Math.min(RECONNECT_BASE_MS * 2 ** this.reconnectAttempts, RECONNECT_MAX_MS)
+    this.reconnectAttempts += 1
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null
+      this.socket = null
+      this.receiveBuffer = ''
+      this.connect()
+    }, delay)
+  }
+
+  private clearReconnectTimer() {
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+  }
+
+  private clearConnectTimer() {
+    if (this.connectTimer !== null) {
+      window.clearTimeout(this.connectTimer)
+      this.connectTimer = null
+    }
   }
 }
 
