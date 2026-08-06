@@ -11,11 +11,13 @@ import { getPointBalance } from '@/domains/point/api/pointApi'
 import {
   isPointBalanceUpdatedEvent,
   POINT_BALANCE_UPDATED_EVENT,
+  subscribePointBalanceUpdatedAcrossTabs,
 } from '@/domains/point/utils/pointBalanceEvents'
 import { ROUTE_NAMES, ROUTE_PATHS, type RoutePath } from '@/shared/constants/routes'
 
 import type { NotificationItem } from '@/domains/notification/types/notification.types'
 import type { PointBalance } from '@/domains/point/types/point.types'
+import type { PointBalanceUpdatedDetail } from '@/domains/point/utils/pointBalanceEvents'
 
 interface UserActionItem {
   label: string
@@ -161,12 +163,20 @@ const loadPointBalance = async (userId: number) => {
   }
 }
 
-const handlePointBalanceUpdated = (event: Event) => {
-  if (!isPointBalanceUpdatedEvent(event) || event.detail.userId !== currentUserId.value) {
+const applyPointBalanceUpdate = (detail: PointBalanceUpdatedDetail) => {
+  if (detail.userId !== currentUserId.value) {
     return
   }
 
-  pointBalance.value = event.detail.balance
+  pointBalance.value = detail.balance
+}
+
+const handlePointBalanceUpdated = (event: Event) => {
+  if (!isPointBalanceUpdatedEvent(event)) {
+    return
+  }
+
+  applyPointBalanceUpdate(event.detail)
 }
 
 const handleNotificationButtonClick = async () => {
@@ -252,12 +262,16 @@ watch(
   { immediate: true },
 )
 
+let unsubscribeCrossTabPointBalance: (() => void) | null = null
+
 onMounted(() => {
   window.addEventListener(POINT_BALANCE_UPDATED_EVENT, handlePointBalanceUpdated)
+  unsubscribeCrossTabPointBalance = subscribePointBalanceUpdatedAcrossTabs(applyPointBalanceUpdate)
 })
 
 onUnmounted(() => {
   window.removeEventListener(POINT_BALANCE_UPDATED_EVENT, handlePointBalanceUpdated)
+  unsubscribeCrossTabPointBalance?.()
 })
 </script>
 
