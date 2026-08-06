@@ -322,6 +322,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   flex-direction: column;
   gap: var(--space-3);
+  overflow-y: auto;
   padding: 18px 24px;
   border-top: 1px solid var(--color-live-border);
   border-left: 1px solid var(--color-live-border);
@@ -420,6 +421,7 @@ onBeforeUnmount(() => {
 
 .live-auction-panel__slider {
   position: relative;
+  flex-shrink: 0;
   height: var(--button-height-compact);
   overflow: hidden;
   border: 1px solid var(--color-auction);

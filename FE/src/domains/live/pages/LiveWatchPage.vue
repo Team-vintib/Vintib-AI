@@ -678,7 +678,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
   height: calc(100vh - var(--button-height-major));
-  grid-template-rows: minmax(420px, 1fr) 164px;
+  grid-template-rows: minmax(380px, 1fr) 220px;
 }
 
 .live-watch-page__stage {
@@ -734,7 +734,7 @@ onBeforeUnmount(() => {
 
 .live-watch-loading__body > main {
   display: grid;
-  grid-template-rows: minmax(420px, 1fr) 164px;
+  grid-template-rows: minmax(380px, 1fr) 220px;
 }
 
 .live-watch-loading__body > main > div {
