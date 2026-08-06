@@ -50,9 +50,11 @@ const generationPhotoUrl = ref<string | null>(null)
 // 실 API 모드에서 생성이 끝나면 실제 결과(이미지·핏 문구)를 여기 담는다. mock 모드에서도
 // 화면 렌더를 하나로 맞추려고 동일하게 채운다.
 const generatedResult = ref<TryOnResult | null>(null)
-// 실 API 폴링 간격/타임아웃 — job이 보통 1~2분대라 5초 간격, 2분 넘으면 실패로 처리한다.
+// 실 API 폴링 간격/타임아웃. 워커가 job마다 VLM/FLUX/CatVTON을 순차로 새로 로드하는
+// 구조라(6GB급 GPU 전제) 로컬 실측 기준 완료까지 4분 넘게 걸릴 수 있다 — 120s는 너무
+// 짧아 완료 직전에 폴링이 멈추는 문제가 있었다(-517 로컬 테스트에서 확인).
 const TRYON_POLL_INTERVAL_MS = 5_000
-const TRYON_POLL_TIMEOUT_MS = 120_000
+const TRYON_POLL_TIMEOUT_MS = 600_000
 const panelState = ref<LiveTryOnPanelState>(
   props.mockScenario === 'empty' || authStore.user?.id ? 'EMPTY' : 'READY',
 )
