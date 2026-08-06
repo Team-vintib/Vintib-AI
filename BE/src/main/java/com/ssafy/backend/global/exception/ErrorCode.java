@@ -13,7 +13,7 @@ public enum ErrorCode {
 
     // [인증/회원]
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "존재하지 않는 사용자입니다."),
-    SSO_LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "U002", "싸피어스 SSO 로그인에 실패했습니다."),
+    GOOGLE_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "U002", "구글 로그인에 실패했습니다."),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "U003", "이미 가입된 이메일입니다."),
     ONBOARDING_REQUIRED(HttpStatus.FORBIDDEN, "U004", "온보딩을 완료해야 이용할 수 있습니다."),
     INVALID_VERIFICATION_CODE(HttpStatus.BAD_REQUEST, "U005", "인증 코드가 일치하지 않거나 만료되었습니다."),
@@ -27,6 +27,7 @@ public enum ErrorCode {
     MEMBER_FORBIDDEN(HttpStatus.FORBIDDEN, "U013", "본인의 정보만 수정할 수 있습니다."),
     ONBOARDING_BASIC_INFO_REQUIRED(HttpStatus.BAD_REQUEST, "U014", "기본 정보를 먼저 등록해주세요."),
     MEMBER_IMAGE_UPLOAD_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "U015", "업로드가 확인되지 않았습니다. 먼저 이미지를 업로드해주세요."),
+    GOOGLE_LINK_EXPIRED(HttpStatus.BAD_REQUEST, "U016", "연동 확인 시간이 만료됐습니다. 구글 로그인을 다시 시도해주세요."),
 
     // [라이브/채팅]
     LIVE_NOT_FOUND(HttpStatus.NOT_FOUND, "L001", "진행 중이거나 예약된 라이브가 없습니다."),

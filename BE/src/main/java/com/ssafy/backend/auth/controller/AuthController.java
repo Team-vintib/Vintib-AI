@@ -2,10 +2,13 @@ package com.ssafy.backend.auth.controller;
 
 import com.ssafy.backend.auth.dto.request.EmailCodeVerifyRequest;
 import com.ssafy.backend.auth.dto.request.EmailVerificationRequest;
+import com.ssafy.backend.auth.dto.request.GoogleAuthRequest;
+import com.ssafy.backend.auth.dto.request.GoogleLinkRequest;
 import com.ssafy.backend.auth.dto.request.ReissueRequest;
 import com.ssafy.backend.auth.dto.request.SignInRequest;
 import com.ssafy.backend.auth.dto.request.SignUpRequest;
 import com.ssafy.backend.auth.dto.response.EmailVerificationTokenResponse;
+import com.ssafy.backend.auth.dto.response.GoogleAuthResponse;
 import com.ssafy.backend.auth.dto.response.SignUpResponse;
 import com.ssafy.backend.auth.dto.response.TokenResponse;
 import com.ssafy.backend.auth.service.AuthService;
@@ -89,6 +92,34 @@ public class AuthController {
     @PostMapping("/signin")
     public ResponseEntity<ApiResponse<TokenResponse>> signIn(@Valid @RequestBody SignInRequest request) {
         TokenResponse response = authService.signIn(request.email(), request.password());
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "구글 로그인", description = "구글 Authorization Code를 서버에서 직접 교환·검증한다. "
+            + "이메일이 없으면 신규 가입, 이미 연동돼 있으면 로그인 — 둘 다 status=LOGIN으로 토큰을 발급한다. "
+            + "이메일은 있는데 구글 연동이 안 돼 있으면 토큰 없이 status=LINK_REQUIRED와 linkToken을 내려준다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "LOGIN 또는 LINK_REQUIRED"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "구글 인증 실패")
+    })
+    @PostMapping("/google")
+    public ResponseEntity<ApiResponse<GoogleAuthResponse>> signInWithGoogle(
+            @Valid @RequestBody GoogleAuthRequest request) {
+        GoogleAuthResponse response = authService.signInWithGoogle(request.code(), request.redirectUri());
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "구글 계정 연동 확인", description = "signInWithGoogle이 LINK_REQUIRED로 응답했을 때, "
+            + "사용자가 연동 여부를 확인한 뒤 호출한다. confirm=true면 연동 후 토큰을 발급하고(status=LOGIN), "
+            + "confirm=false면 연동 없이 종료한다(status=LINK_DECLINED).")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "LOGIN 또는 LINK_DECLINED"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "linkToken이 없거나 만료됨")
+    })
+    @PostMapping("/google/link")
+    public ResponseEntity<ApiResponse<GoogleAuthResponse>> confirmGoogleLink(
+            @Valid @RequestBody GoogleLinkRequest request) {
+        GoogleAuthResponse response = authService.confirmGoogleLink(request.linkToken(), request.confirm());
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
