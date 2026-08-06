@@ -269,6 +269,14 @@ const handleViewLive = (liveId: number) => {
   void router.push({ name: ROUTE_NAMES.LIVE_WATCH, params: { liveId } })
 }
 
+// 경매 진행 중 상품의 '라이브에서 입찰하기' — 연결된 라이브가 진행 중일 때만 입장한다.
+const handleGoToLiveAuction = () => {
+  const linkedLive = product.value?.linkedLive
+  if (linkedLive?.status === 'LIVE') {
+    handleViewLive(linkedLive.id)
+  }
+}
+
 const handleGoToProductList = () => {
   void router.push({ name: ROUTE_NAMES.PRODUCT_LIST })
 }
@@ -363,6 +371,7 @@ onBeforeUnmount(() => {
           @toggle-like="handleToggleLike"
           @open-try-on="handleTryOn"
           @purchase="handlePurchase"
+          @go-live="handleGoToLiveAuction"
           @view-seller="handleViewSeller"
         />
       </div>
