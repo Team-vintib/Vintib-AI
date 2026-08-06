@@ -114,18 +114,14 @@ def test_fit_type_is_fixed_to_regular(client, fake_redis):
 
 
 def test_rejects_invalid_gender(client, fake_redis):
-    response = client.post(
-        "/ai/tryon/registration-model-cut", json=_payload(gender="UNISEX")
-    )
+    response = client.post("/ai/tryon/registration-model-cut", json=_payload(gender="UNISEX"))
 
     assert response.status_code == 422
     assert not fake_redis.pushed
 
 
 def test_rejects_missing_product_image_url(client, fake_redis):
-    response = client.post(
-        "/ai/tryon/registration-model-cut", json={"gender": "MALE"}
-    )
+    response = client.post("/ai/tryon/registration-model-cut", json={"gender": "MALE"})
 
     assert response.status_code == 422
     assert not fake_redis.pushed
