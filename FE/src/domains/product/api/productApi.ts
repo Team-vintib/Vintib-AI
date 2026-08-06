@@ -115,6 +115,15 @@ interface ProductDetailDto extends ProductListDto {
   updatedAt: string
 }
 
+// BE 확인 필요 — 등록 화면에서 사용자가 확정한 AI 품질 검증 결과를 담을 필드다.
+// 현재 POST /products는 이 필드를 받지 않는다(docs/requests/BE/042-product-registration-ai-pipeline.md
+// §3에서 저장/노출을 요청 중). BE가 반영하기 전까지는 보내도 무시될 뿐이라 안전하게 앞서 채워둔다.
+interface ProductCreateAiQualityFindingRequest {
+  photoRole: 'front' | 'back'
+  description: string
+  box: { x: number; y: number; width: number; height: number }
+}
+
 interface ProductCreateRequest {
   title: string
   description: string
@@ -128,6 +137,7 @@ interface ProductCreateRequest {
   defects: string[] | null
   aiModelEnabled: boolean
   aiModelGender: 'MALE' | 'FEMALE' | null
+  aiQualityFindings: ProductCreateAiQualityFindingRequest[]
 }
 
 interface ProductCreateResponse extends Partial<ProductListDto> {
@@ -391,6 +401,7 @@ export const submitProduct = async (
     defects: resolveRegistrationDefects(draft),
     aiModelEnabled: draft.aiModelEnabled,
     aiModelGender: draft.aiModelEnabled ? draft.aiModelGender : null,
+    aiQualityFindings: resolveRegistrationAiQualityFindings(draft),
   } satisfies ProductCreateRequest)
   const createdProduct = unwrapApiData(createResponse.data)
   const createdProductId = getCreatedProductId(createdProduct)
@@ -657,13 +668,7 @@ const findCategoryId = (draft: ProductRegistrationDraft, categories: CategoryDto
   return matchedCategory?.id ?? null
 }
 
-const resolveRegistrationColor = (draft: ProductRegistrationDraft) => {
-  if (draft.color === 'etc') {
-    return draft.customColor.trim() || null
-  }
-
-  return draft.color || null
-}
+const resolveRegistrationColor = (draft: ProductRegistrationDraft) => draft.color || null
 
 const resolveRegistrationMeasurements = (draft: ProductRegistrationDraft) => {
   const measurements = Object.entries(draft.measurements).reduce<Record<string, number>>(
@@ -691,6 +696,26 @@ const resolveRegistrationDefects = (draft: ProductRegistrationDraft) => {
 
   return description ? [description] : []
 }
+
+// 사용자가 "하자 제외"로 뒤집지 않은(=하자로 인정한) finding만 제출한다.
+const resolveRegistrationAiQualityFindings = (
+  draft: ProductRegistrationDraft,
+): ProductCreateAiQualityFindingRequest[] =>
+  draft.aiPhotoResults.flatMap((result) => {
+    const photo = draft.photos.find((item) => item.id === result.photoId)
+
+    if (!photo || (photo.role !== 'front' && photo.role !== 'back')) {
+      return []
+    }
+
+    return result.findings
+      .filter((finding) => finding.isActualDefect)
+      .map((finding) => ({
+        photoRole: photo.role as 'front' | 'back',
+        description: finding.description,
+        box: finding.box,
+      }))
+  })
 
 export const getCategoryCode = (categoryName: string) => {
   if (categoryName.includes('아우터')) return 'outer'

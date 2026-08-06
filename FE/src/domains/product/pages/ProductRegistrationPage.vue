@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import {
@@ -9,6 +9,7 @@ import {
   type BrandDto,
   type CategoryDto,
 } from '@/domains/product/api/productApi'
+import { analyzeRegistrationPhotos } from '@/domains/product/api/productAiApi'
 import { submitProductRegistrationDraft } from '@/domains/product/api/productRegistrationApi'
 import ProductPhotoUploader from '@/domains/product/components/ProductPhotoUploader.vue'
 import {
@@ -24,7 +25,6 @@ import {
 import type {
   ProductRegistrationDraft,
   ProductRegistrationAiModelGender,
-  ProductRegistrationAiDefectCandidate,
   ProductRegistrationAiPhotoResult,
   ProductRegistrationPriceBucket,
   ProductRegistrationPhotoDraft,
@@ -58,15 +58,12 @@ const conditionStepTouched = reactive({
   conditionGrade: false,
   hasDefect: false,
   sellerDefectDescription: false,
-  aiPhotos: false,
-  aiConfirmation: false,
 })
 const pricingStepTouched = reactive({
   saleType: false,
   directSalePrice: false,
 })
 const currentAiResultIndex = ref(0)
-const isAdditionalAiPhotoPickerOpen = ref(false)
 const registeredProductId = ref('')
 const isSubmittingRegistration = ref(false)
 const registrationSubmitError = ref('')
@@ -94,39 +91,27 @@ const dedupeCategoryOptionsByLabel = (options: CategorySelectOption[]) => {
   return [...optionMap.values()]
 }
 
-const ensureEtcCategoryOption = (options: CategorySelectOption[]) => {
-  if (options.some((option) => option.id === 'etc' || option.label === '기타')) {
-    return options
-  }
-
-  return [...options, { id: 'etc', label: '기타', parentId: '' }]
-}
-
 const majorCategoryOptions = computed<CategorySelectOption[]>(() => {
   if (!categories.value.length) {
-    return ensureEtcCategoryOption(
-      PRODUCT_REGISTRATION_CATEGORY_OPTIONS.map((option) => ({
-        id: option.id,
-        label: option.label,
-        parentId: '',
-      })),
-    )
+    return PRODUCT_REGISTRATION_CATEGORY_OPTIONS.map((option) => ({
+      id: option.id,
+      label: option.label,
+      parentId: '',
+    }))
   }
 
-  return ensureEtcCategoryOption(
-    dedupeCategoryOptionsByLabel(
-      categories.value
-        .filter((category) => category.depth === 2)
-        .map((category) => ({
-          id: String(category.id),
-          label: category.name,
-          parentId: String(category.parentId ?? ''),
-        })),
-    ),
+  return dedupeCategoryOptionsByLabel(
+    categories.value
+      .filter((category) => category.depth === 2)
+      .map((category) => ({
+        id: String(category.id),
+        label: category.name,
+        parentId: String(category.parentId ?? ''),
+      })),
   )
 })
 const minorCategoryOptions = computed<CategorySelectOption[]>(() => {
-  if (!categories.value.length || !categoryMajorId.value || categoryMajorId.value === 'etc') {
+  if (!categories.value.length || !categoryMajorId.value) {
     return []
   }
 
@@ -146,29 +131,26 @@ const minorCategoryOptions = computed<CategorySelectOption[]>(() => {
     )
     .map((category) => String(category.id))
 
-  return ensureEtcCategoryOption(
-    dedupeCategoryOptionsByLabel(
-      categories.value
-        .filter(
-          (category) =>
-            category.depth === 3 && middleCategoryIds.includes(String(category.parentId)),
-        )
-        .map((category) => ({
-          id: String(category.id),
-          label: category.name,
-          parentId: String(category.parentId ?? ''),
-        })),
-    ),
+  return dedupeCategoryOptionsByLabel(
+    categories.value
+      .filter(
+        (category) =>
+          category.depth === 3 && middleCategoryIds.includes(String(category.parentId)),
+      )
+      .map((category) => ({
+        id: String(category.id),
+        label: category.name,
+        parentId: String(category.parentId ?? ''),
+      })),
   )
 })
 const updateMajorCategory = () => {
   draft.categoryId = categoryMajorId.value
-  draft.customCategory = ''
   basicStepTouched.categoryId = true
 }
 
 const updateMinorCategory = () => {
-  draft.customCategory = ''
+  basicStepTouched.categoryId = true
 }
 
 const priceRecommendationBuckets: ProductRegistrationPriceBucket[] = [
@@ -193,9 +175,7 @@ const createInitialDraft = (): ProductRegistrationDraft => ({
   name: '',
   brand: '',
   color: '',
-  customColor: '',
   categoryId: '',
-  customCategory: '',
   description: '',
   purchasedAt: '',
   purchasedCountry: '',
@@ -205,8 +185,10 @@ const createInitialDraft = (): ProductRegistrationDraft => ({
   conditionGrade: '',
   hasDefect: null,
   sellerDefectDescription: '',
-  aiCheckPhotoIds: [],
+  aiQualityStatus: 'idle',
   aiPhotoResults: [],
+  aiCategorySuggestion: null,
+  aiColorSuggestion: null,
   aiModelEnabled: false,
   aiModelGender: null,
   saleType: 'DIRECT',
@@ -346,21 +328,22 @@ const aiModelGenderLabel = computed(() => {
 const isBasicStepValid = computed(
   () => Boolean(draft.name.trim()) && Boolean(draft.color) && isCategorySelectionComplete.value,
 )
+// 현재 선택값이 AI 추천값과 같은 동안만 배지를 보여준다 — 사용자가 셀렉트를 바꾸면 자동으로 사라진다.
+const isCategoryAiSuggested = computed(
+  () =>
+    draft.aiCategorySuggestion?.status === 'completed' &&
+    categoryMajorId.value === draft.aiCategorySuggestion.majorId &&
+    draft.categoryId === draft.aiCategorySuggestion.minorId,
+)
+const isColorAiSuggested = computed(
+  () => draft.aiColorSuggestion?.status === 'completed' && draft.color === draft.aiColorSuggestion.colorId,
+)
 const isAttributesStepValid = computed(
   () =>
     activeMeasurementFields.value.every((field) =>
       !normalizeMeasurementValue(draft.measurements[field.id] ?? '') ||
       isPositiveMeasurement(draft.measurements[field.id] ?? ''),
     ),
-)
-const requiredAiSelectablePhotos = computed(() =>
-  draft.photos.filter((photo) => photo.role === 'front' || photo.role === 'back'),
-)
-const additionalAiSelectablePhotos = computed(() =>
-  draft.photos.filter((photo) => photo.role === 'additional'),
-)
-const selectedAiPhotos = computed(() =>
-  draft.photos.filter((photo) => draft.aiCheckPhotoIds.includes(photo.id)),
 )
 const currentAiResult = computed<ProductRegistrationAiPhotoResult | null>(
   () => draft.aiPhotoResults[currentAiResultIndex.value] ?? null,
@@ -370,39 +353,24 @@ const currentAiPhoto = computed(() =>
     ? draft.photos.find((photo) => photo.id === currentAiResult.value?.photoId) ?? null
     : null,
 )
-const hasRequiredAiPhotos = computed(() => {
-  const selectedPhotos = selectedAiPhotos.value
-
-  return (
-    selectedPhotos.some((photo) => photo.role === 'front') &&
-    selectedPhotos.some((photo) => photo.role === 'back')
-  )
-})
+// 분석 자체는 사진 2장이 갖춰지는 즉시 자동으로 돈다. 다만 각 사진의 하자 판정은
+// 사용자가 직접 확인하고 "결과 저장"을 눌러야 끝난 것으로 본다 — AI가 실패했을 때는
+// 판매자 잘못이 아니므로 그대로 다음 단계로 넘어갈 수 있게 둔다.
 const areAllAiPhotosConfirmed = computed(
   () =>
-    draft.aiCheckPhotoIds.length > 0 &&
-    draft.aiCheckPhotoIds.every((photoId) =>
-      draft.aiPhotoResults.some((result) => result.photoId === photoId && result.confirmed),
-    ),
+    draft.aiPhotoResults.length > 0 && draft.aiPhotoResults.every((result) => result.confirmed),
+)
+const isAiQualityCheckSettled = computed(
+  () =>
+    (draft.aiQualityStatus === 'completed' && areAllAiPhotosConfirmed.value) ||
+    draft.aiQualityStatus === 'failed',
 )
 const conditionStepErrors = computed(() => ({
   conditionGrade: '',
   hasDefect: '',
   sellerDefectDescription: '',
-  aiPhotos:
-    conditionStepTouched.aiPhotos && !hasRequiredAiPhotos.value
-      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.aiPhotoRequired
-      : '',
-  aiConfirmation:
-    conditionStepTouched.aiConfirmation && !areAllAiPhotosConfirmed.value
-      ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.aiPhotoConfirmationRequired
-      : '',
 }))
-const isConditionStepValid = computed(
-  () =>
-    hasRequiredAiPhotos.value &&
-    areAllAiPhotosConfirmed.value,
-)
+const isConditionStepValid = computed(() => isAiQualityCheckSettled.value)
 const isPositivePrice = (value: string) => {
   const normalizedValue = value.trim()
   const parsedValue = Number(normalizedValue)
@@ -528,20 +496,12 @@ const completenessItems: ProductInfoCompletenessItem[] = [
     isCompleted: () => Boolean(draft.name.trim()),
   },
   {
-    id: 'ai-quality-photos',
-    label: '품질 확인 사진',
+    id: 'ai-quality-check',
+    label: 'AI 품질 검증',
     stepId: 'condition',
     priority: 'strong',
     targetId: 'ai-quality-title',
-    isCompleted: () => hasRequiredAiPhotos.value,
-  },
-  {
-    id: 'ai-quality-confirmation',
-    label: '품질 확인',
-    stepId: 'condition',
-    priority: 'strong',
-    targetId: 'ai-quality-title',
-    isCompleted: () => areAllAiPhotosConfirmed.value,
+    isCompleted: () => isAiQualityCheckSettled.value,
   },
   {
     id: 'sale-type',
@@ -683,7 +643,7 @@ const productInfoCompletenessItems = computed<ProductInfoCompletenessItem[]>(() 
     stepId: 'condition',
     priority: 'strong',
     targetId: 'ai-quality-title',
-    isCompleted: () => areAllAiPhotosConfirmed.value,
+    isCompleted: () => isAiQualityCheckSettled.value,
   },
   {
     id: 'price',
@@ -802,9 +762,16 @@ const selectedDefectSummary = computed(() => {
   return '-'
 })
 
-const selectedAiQualitySummary = computed(() =>
-  areAllAiPhotosConfirmed.value ? `${draft.aiPhotoResults.length}개 사진 확인 완료` : '-',
-)
+const selectedAiQualitySummary = computed(() => {
+  if (draft.aiQualityStatus === 'completed' && areAllAiPhotosConfirmed.value) {
+    return `${draft.aiPhotoResults.length}개 사진 확인 완료`
+  }
+  if (draft.aiQualityStatus === 'completed') return '확인 대기 중'
+  if (draft.aiQualityStatus === 'failed') return '검증 실패'
+  if (draft.aiQualityStatus === 'loading') return '검증 중'
+
+  return '-'
+})
 
 const editRegistrationStep = (stepId: ProductRegistrationStepId) => {
   const stepIndex = PRODUCT_REGISTRATION_STEPS.findIndex((step) => step.id === stepId)
@@ -912,7 +879,6 @@ const addPhotos = (role: ProductRegistrationPhotoRole, files: File[]) => {
       draft.representativePhotoId = ''
     }
 
-    syncDefaultAiCheckPhotos()
     return
   }
 
@@ -933,8 +899,6 @@ const removePhoto = (photoId: string) => {
     draft.representativePhotoId = ''
   }
 
-  syncDefaultAiCheckPhotos()
-
   if (!isAiModelSettingsAvailable.value) {
     resetAiModelSettings()
   }
@@ -946,21 +910,6 @@ const selectRepresentativePhoto = (photoId: string) => {
     ...photo,
     isRepresentative: photo.id === photoId,
   }))
-}
-
-const syncDefaultAiCheckPhotos = () => {
-  const requiredPhotoIds = draft.photos
-    .filter((photo) => photo.role === 'front' || photo.role === 'back')
-    .map((photo) => photo.id)
-  const additionalSelectedPhotoIds = draft.aiCheckPhotoIds.filter((photoId) =>
-    draft.photos.some((photo) => photo.id === photoId && photo.role === 'additional'),
-  )
-
-  draft.aiCheckPhotoIds = [...requiredPhotoIds, ...additionalSelectedPhotoIds]
-  draft.aiPhotoResults = draft.aiPhotoResults.filter((result) =>
-    draft.aiCheckPhotoIds.includes(result.photoId),
-  )
-  currentAiResultIndex.value = Math.min(currentAiResultIndex.value, Math.max(draft.aiPhotoResults.length - 1, 0))
 }
 
 const selectConditionGrade = (conditionGrade: string) => {
@@ -982,60 +931,6 @@ const selectSaleType = (saleType: string) => {
   pricingStepTouched.saleType = true
 }
 
-const toggleAiCheckPhoto = (photoId: string) => {
-  conditionStepTouched.aiPhotos = true
-
-  if (draft.aiCheckPhotoIds.includes(photoId)) {
-    draft.aiCheckPhotoIds = draft.aiCheckPhotoIds.filter((selectedPhotoId) => selectedPhotoId !== photoId)
-    draft.aiPhotoResults = draft.aiPhotoResults.filter((result) => result.photoId !== photoId)
-    currentAiResultIndex.value = Math.min(currentAiResultIndex.value, Math.max(draft.aiPhotoResults.length - 1, 0))
-    return
-  }
-
-  draft.aiCheckPhotoIds = [...draft.aiCheckPhotoIds, photoId]
-}
-
-const selectedAdditionalAiPhotoCount = computed(
-  () =>
-    additionalAiSelectablePhotos.value.filter((photo) => draft.aiCheckPhotoIds.includes(photo.id))
-      .length,
-)
-
-const createMockAiCandidates = (): ProductRegistrationAiDefectCandidate[] => [
-  {
-    id: crypto.randomUUID(),
-    labelNumber: 1,
-    description: '소매 끝단 마모 의심',
-    box: { x: 58, y: 18, width: 24, height: 18 },
-    isActualDefect: true,
-  },
-  {
-    id: crypto.randomUUID(),
-    labelNumber: 2,
-    description: 'Front View 하단 오염 후보',
-    box: { x: 22, y: 56, width: 30, height: 20 },
-    isActualDefect: true,
-  },
-]
-
-const runAiQualityCheck = () => {
-  conditionStepTouched.aiPhotos = true
-  conditionStepTouched.aiConfirmation = true
-
-  if (!hasRequiredAiPhotos.value) {
-    return
-  }
-
-  draft.aiPhotoResults = draft.aiCheckPhotoIds.map((photoId) => ({
-    photoId,
-    status: 'completed',
-    candidates: createMockAiCandidates(),
-    regeneratedImageUrl: '',
-    confirmed: false,
-  }))
-  currentAiResultIndex.value = 0
-}
-
 const moveAiResult = (direction: -1 | 1) => {
   if (draft.aiPhotoResults.length === 0) {
     return
@@ -1046,28 +941,23 @@ const moveAiResult = (direction: -1 | 1) => {
     draft.aiPhotoResults.length
 }
 
-const toggleAiDefectCandidate = (candidateId: string) => {
+const toggleAiDefectCandidate = (findingId: string) => {
   if (!currentAiResult.value || currentAiResult.value.confirmed) {
     return
   }
 
-  currentAiResult.value.confirmed = false
-  currentAiResult.value.status = 'completed'
-  currentAiResult.value.candidates = currentAiResult.value.candidates.map((candidate) => ({
-    ...candidate,
-    isActualDefect: candidate.id === candidateId ? !candidate.isActualDefect : candidate.isActualDefect,
+  currentAiResult.value.findings = currentAiResult.value.findings.map((finding) => ({
+    ...finding,
+    isActualDefect: finding.id === findingId ? !finding.isActualDefect : finding.isActualDefect,
   }))
 }
 
 const confirmCurrentAiPhoto = () => {
-  if (!currentAiResult.value || !currentAiPhoto.value) {
+  if (!currentAiResult.value) {
     return
   }
 
-  currentAiResult.value.status = 'confirmed'
-  currentAiResult.value.regeneratedImageUrl = currentAiPhoto.value.previewUrl
   currentAiResult.value.confirmed = true
-  conditionStepTouched.aiConfirmation = true
 }
 
 const editCurrentAiPhotoResult = () => {
@@ -1075,10 +965,96 @@ const editCurrentAiPhotoResult = () => {
     return
   }
 
-  currentAiResult.value.status = 'completed'
   currentAiResult.value.confirmed = false
-  conditionStepTouched.aiConfirmation = true
 }
+
+const resetAiAnalysis = () => {
+  draft.aiQualityStatus = 'idle'
+  draft.aiPhotoResults = []
+  draft.aiCategorySuggestion = null
+  draft.aiColorSuggestion = null
+  currentAiResultIndex.value = 0
+}
+
+// AI가 채운 값을 사용자가 이미 직접 고른 뒤라면 덮어쓰지 않는다.
+const applyAiCategorySuggestion = (category: { majorId: string; minorId: string } | null) => {
+  if (!category) {
+    draft.aiCategorySuggestion = null
+    return
+  }
+
+  draft.aiCategorySuggestion = { ...category, status: 'completed' }
+
+  if (basicStepTouched.categoryId) {
+    return
+  }
+
+  categoryMajorId.value = category.majorId
+  draft.categoryId = category.minorId
+}
+
+const applyAiColorSuggestion = (color: { colorId: string } | null) => {
+  if (!color) {
+    draft.aiColorSuggestion = null
+    return
+  }
+
+  draft.aiColorSuggestion = { ...color, status: 'completed' }
+
+  if (basicStepTouched.color) {
+    return
+  }
+
+  draft.color = color.colorId
+}
+
+// front/back 사진이 모두 갖춰지면(또는 다시 바뀌면) 자동으로 도는 AI 분석 —
+// 사용자가 누르는 확인 버튼은 더 이상 없다.
+const triggerAiPhotoAnalysis = async () => {
+  const frontPhoto = frontPhotos.value[0]
+  const backPhoto = backPhotos.value[0]
+
+  if (!frontPhoto?.file || !backPhoto?.file) {
+    resetAiAnalysis()
+    return
+  }
+
+  draft.aiQualityStatus = 'loading'
+
+  try {
+    const result = await analyzeRegistrationPhotos(frontPhoto.file, backPhoto.file)
+
+    draft.aiPhotoResults = [
+      { photoId: frontPhoto.id, findings: result.quality.front, confirmed: false },
+      { photoId: backPhoto.id, findings: result.quality.back, confirmed: false },
+    ]
+    currentAiResultIndex.value = 0
+    draft.aiQualityStatus = 'completed'
+
+    applyAiCategorySuggestion(result.category)
+    applyAiColorSuggestion(result.color)
+  } catch (error) {
+    console.error('[ProductRegistrationPage] AI 분석 실패', error)
+    draft.aiQualityStatus = 'failed'
+    draft.aiPhotoResults = []
+    draft.aiCategorySuggestion = null
+    draft.aiColorSuggestion = null
+  }
+}
+
+// front/back 사진의 id(=파일이 바뀌면 새로 생성됨)를 감시해, 사진이 갖춰지거나
+// 다른 사진으로 교체될 때마다 AI 분석을 다시 트리거한다.
+const aiTriggerPhotoKey = computed(
+  () => `${frontPhotos.value[0]?.id ?? ''}|${backPhotos.value[0]?.id ?? ''}`,
+)
+
+watch(aiTriggerPhotoKey, () => {
+  if (isPhotoStepValid.value) {
+    void triggerAiPhotoAnalysis()
+  } else {
+    resetAiAnalysis()
+  }
+})
 
 const markCurrentStepTouched = () => {
   if (currentStep.value.id === 'photos') {
@@ -1122,8 +1098,6 @@ const markCurrentStepTouched = () => {
     conditionStepTouched.conditionGrade = true
     conditionStepTouched.hasDefect = true
     conditionStepTouched.sellerDefectDescription = true
-    conditionStepTouched.aiPhotos = true
-    conditionStepTouched.aiConfirmation = true
     return
   }
 
@@ -1232,12 +1206,9 @@ const resetRegistrationDraft = () => {
   conditionStepTouched.conditionGrade = false
   conditionStepTouched.hasDefect = false
   conditionStepTouched.sellerDefectDescription = false
-  conditionStepTouched.aiPhotos = false
-  conditionStepTouched.aiConfirmation = false
   pricingStepTouched.saleType = false
   pricingStepTouched.directSalePrice = false
   currentAiResultIndex.value = 0
-  isAdditionalAiPhotoPickerOpen.value = false
   registeredProductId.value = ''
   isSubmittingRegistration.value = false
   registrationSubmitError.value = ''
@@ -1536,6 +1507,7 @@ onBeforeUnmount(() => {
                   색상
                   <span class="product-registration__required" aria-hidden="true"> * </span>
                   <span class="product-registration__required-text"> 필수 입력 </span>
+                  <span v-if="isColorAiSuggested" class="product-registration__ai-badge">AI 추천</span>
                 </span>
                 <p class="product-registration__field-hint">
                   구매자가 색상 필터로 상품을 찾는 데 활용돼요.
@@ -1602,6 +1574,7 @@ onBeforeUnmount(() => {
                   카테고리 대분류
                   <span class="product-registration__required" aria-hidden="true"> * </span>
                   <span class="product-registration__required-text"> 필수 입력 </span>
+                  <span v-if="isCategoryAiSuggested" class="product-registration__ai-badge">AI 추천</span>
                 </span>
                 <p class="product-registration__field-hint">
                   정확한 카테고리는 구매자가 상품을 쉽게 찾는 데 도움이 돼요.
@@ -1877,77 +1850,36 @@ onBeforeUnmount(() => {
             <section class="product-registration__section" aria-labelledby="ai-quality-title">
               <div class="product-registration__section-header">
                 <div>
-                  <h3 id="ai-quality-title">
-                    AI 품질 검증
-                    <span class="product-registration__required" aria-hidden="true"> * </span>
-                    <span class="product-registration__required-text"> 필수 입력 </span>
-                  </h3>
-                  <p>AI 품질 검증에 사용할 사진을 선택해 주세요. Front View와 Back View는 필수입니다.</p>
+                  <h3 id="ai-quality-title">AI 품질 검증</h3>
+                  <p>Front View와 Back View 사진을 기준으로 AI가 자동으로 검증합니다.</p>
                 </div>
               </div>
 
-              <div class="product-registration__ai-photo-list" aria-label="AI 품질 검증 사진 선택">
-                <button
-                  v-for="photo in requiredAiSelectablePhotos"
-                  :key="photo.id"
-                  class="product-registration__ai-photo"
-                  :class="{ 'product-registration__ai-photo--selected': draft.aiCheckPhotoIds.includes(photo.id) }"
-                  type="button"
-                  :aria-pressed="draft.aiCheckPhotoIds.includes(photo.id)"
-                  aria-disabled="true"
-                >
-                  <img
-                    :src="photo.previewUrl"
-                    :alt="`${photo.role === 'front' ? 'Front View' : 'Back View'} 품질 검증 사진`"
-                  />
-                  <span>
-                    {{ photo.role === 'front' ? 'Front View' : 'Back View' }}
-                  </span>
-                </button>
-              </div>
-              <button
-                v-if="additionalAiSelectablePhotos.length"
-                class="product-registration__add-ai-photo-button"
-                type="button"
-                @click="isAdditionalAiPhotoPickerOpen = !isAdditionalAiPhotoPickerOpen"
-              >
-                추가 선택
-                <span>{{ selectedAdditionalAiPhotoCount }}개 선택</span>
-              </button>
-              <div
-                v-if="isAdditionalAiPhotoPickerOpen"
-                class="product-registration__additional-ai-panel"
-                aria-label="추가 AI 품질 검증 사진 선택"
-              >
-                <button
-                  v-for="photo in additionalAiSelectablePhotos"
-                  :key="photo.id"
-                  class="product-registration__additional-ai-photo"
-                  :class="{
-                    'product-registration__additional-ai-photo--selected': draft.aiCheckPhotoIds.includes(photo.id),
-                  }"
-                  type="button"
-                  :aria-pressed="draft.aiCheckPhotoIds.includes(photo.id)"
-                  @click="toggleAiCheckPhoto(photo.id)"
-                >
-                  <img :src="photo.previewUrl" :alt="`${photo.fileName} 추가 품질 검증 사진`" />
-                  <span>{{ draft.aiCheckPhotoIds.includes(photo.id) ? '선택됨' : '선택' }}</span>
-                </button>
-              </div>
-              <p v-if="conditionStepErrors.aiPhotos" class="product-registration__field-error" role="alert">
-                {{ conditionStepErrors.aiPhotos }}
-              </p>
-              <div class="product-registration__ai-actions">
-                <button
-                  class="product-registration__button product-registration__button--secondary"
-                  type="button"
-                  @click="runAiQualityCheck"
-                >
-                  확인
-                </button>
+              <div v-if="draft.aiQualityStatus === 'loading'" class="product-registration__ai-empty" role="status">
+                <span class="product-registration__ai-spinner" aria-hidden="true" />
+                <strong>AI가 사진을 검증하고 있습니다…</strong>
+                <p>잠시만 기다려 주세요.</p>
               </div>
 
-              <div v-if="currentAiResult && currentAiPhoto" class="product-registration__ai-result">
+              <div
+                v-else-if="draft.aiQualityStatus === 'failed'"
+                class="product-registration__ai-empty"
+                role="alert"
+              >
+                <strong>AI 품질 검증을 완료하지 못했습니다.</strong>
+                <p>일시적인 오류일 수 있어요. 상품 상태는 아래 항목에서 직접 알려주세요.</p>
+              </div>
+
+              <div
+                v-else-if="draft.aiQualityStatus === 'idle'"
+                class="product-registration__ai-empty"
+                role="status"
+              >
+                <strong>AI 품질 검증 결과가 없습니다.</strong>
+                <p>Front View와 Back View 사진을 등록하면 자동으로 검증이 시작됩니다.</p>
+              </div>
+
+              <div v-else-if="currentAiResult && currentAiPhoto" class="product-registration__ai-result">
                 <div class="product-registration__ai-result-toolbar">
                   <button type="button" aria-label="이전 사진" @click="moveAiResult(-1)">
                     <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -1963,13 +1895,7 @@ onBeforeUnmount(() => {
                   </button>
                   <strong>
                     {{ currentAiResultIndex + 1 }} / {{ draft.aiPhotoResults.length }}
-                    {{
-                      currentAiPhoto.role === 'front'
-                        ? 'Front View'
-                        : currentAiPhoto.role === 'back'
-                          ? 'Back View'
-                          : '추가'
-                    }}
+                    {{ currentAiPhoto.role === 'front' ? 'Front View' : 'Back View' }}
                     검증 결과
                   </strong>
                   <button type="button" aria-label="다음 사진" @click="moveAiResult(1)">
@@ -1990,38 +1916,41 @@ onBeforeUnmount(() => {
                   <div class="product-registration__ai-image">
                     <img :src="currentAiPhoto.previewUrl" :alt="`${currentAiPhoto.fileName} AI 품질 검증 결과`" />
                     <span
-                      v-for="candidate in currentAiResult.candidates"
-                      :key="candidate.id"
+                      v-for="finding in currentAiResult.findings"
+                      :key="finding.id"
                       class="product-registration__ai-box"
-                      :class="{ 'product-registration__ai-box--actual': candidate.isActualDefect }"
+                      :class="{ 'product-registration__ai-box--excluded': !finding.isActualDefect }"
                       :style="{
-                        left: `${candidate.box.x}%`,
-                        top: `${candidate.box.y}%`,
-                        width: `${candidate.box.width}%`,
-                        height: `${candidate.box.height}%`,
+                        left: `${finding.box.x}%`,
+                        top: `${finding.box.y}%`,
+                        width: `${finding.box.width}%`,
+                        height: `${finding.box.height}%`,
                       }"
                     >
-                      {{ candidate.labelNumber }}
+                      {{ finding.labelNumber }}
                     </span>
                   </div>
 
                   <div class="product-registration__ai-cards">
+                    <p v-if="currentAiResult.findings.length === 0" class="product-registration__ai-no-findings">
+                      이상 소견이 발견되지 않았습니다.
+                    </p>
                     <article
-                      v-for="candidate in currentAiResult.candidates"
-                      :key="candidate.id"
+                      v-for="finding in currentAiResult.findings"
+                      :key="finding.id"
                       class="product-registration__ai-card"
-                      :class="{ 'product-registration__ai-card--actual': candidate.isActualDefect }"
+                      :class="{ 'product-registration__ai-card--excluded': !finding.isActualDefect }"
                     >
                       <div>
-                        <strong>{{ candidate.labelNumber }}번</strong>
-                        <p>{{ candidate.description }}</p>
+                        <strong>{{ finding.labelNumber }}번</strong>
+                        <p>{{ finding.description }}</p>
                       </div>
                       <button
                         type="button"
                         :disabled="currentAiResult.confirmed"
-                        @click="toggleAiDefectCandidate(candidate.id)"
+                        @click="toggleAiDefectCandidate(finding.id)"
                       >
-                        {{ candidate.isActualDefect ? '하자 제외' : '하자로 표시' }}
+                        {{ finding.isActualDefect ? '하자 제외' : '하자로 표시' }}
                       </button>
                     </article>
                   </div>
@@ -2048,17 +1977,11 @@ onBeforeUnmount(() => {
                 </div>
               </div>
 
-              <div v-else class="product-registration__ai-empty" role="status">
-                <strong>AI 품질 검증 결과가 없습니다.</strong>
-                <p>Front View와 Back View 사진을 필수로 선택한 뒤 확인 버튼을 눌러 주세요.</p>
-              </div>
-
               <p
-                v-if="conditionStepErrors.aiConfirmation"
-                class="product-registration__field-error"
-                role="alert"
+                v-if="draft.aiQualityStatus === 'completed' && !areAllAiPhotosConfirmed"
+                class="product-registration__ai-confirm-hint"
               >
-                {{ conditionStepErrors.aiConfirmation }}
+                모든 사진의 결과를 저장해야 다음 단계로 진행할 수 있어요.
               </p>
             </section>
           </form>
@@ -2757,6 +2680,16 @@ onBeforeUnmount(() => {
   color: var(--color-error);
 }
 
+.product-registration__ai-badge {
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-badge);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
 .product-registration__required-text {
   position: absolute;
   width: 1px;
@@ -3004,104 +2937,6 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 
-.product-registration__ai-photo-list {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.product-registration__ai-photo {
-  position: relative;
-  display: grid;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-secondary);
-  color: var(--color-text-primary);
-}
-
-.product-registration__ai-photo--selected {
-  border-color: var(--color-primary);
-  box-shadow: none;
-}
-
-.product-registration__ai-photo img {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-}
-
-.product-registration__ai-photo span {
-  padding: var(--space-3);
-  font-weight: var(--font-weight-bold);
-}
-
-.product-registration__add-ai-photo-button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  width: 100%;
-  min-height: var(--button-height-standard);
-  padding: 0 var(--space-4);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-bold);
-}
-
-.product-registration__add-ai-photo-button span {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-}
-
-.product-registration__additional-ai-panel {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-secondary);
-}
-
-.product-registration__ai-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.product-registration__ai-actions .product-registration__button {
-  min-width: 160px;
-}
-
-.product-registration__additional-ai-photo {
-  display: grid;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-}
-
-.product-registration__additional-ai-photo--selected {
-  border-color: var(--color-primary);
-  box-shadow: none;
-}
-
-.product-registration__additional-ai-photo img {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-}
-
-.product-registration__additional-ai-photo span {
-  padding: var(--space-2);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
-}
-
 .product-registration__ai-result {
   display: grid;
   gap: var(--space-4);
@@ -3170,19 +3005,19 @@ onBeforeUnmount(() => {
   position: absolute;
   display: grid;
   padding: 4px 0 0 6px;
-  border: 2px solid #2563eb;
-  background: rgb(37 99 235 / 12%);
-  color: #2563eb;
+  border: 2px solid var(--color-error);
+  background: rgb(196 61 70 / 12%);
+  color: var(--color-error);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   line-height: 1;
   place-items: start;
 }
 
-.product-registration__ai-box--actual {
-  border-color: var(--color-error);
-  background: rgb(220 38 38 / 12%);
-  color: var(--color-error);
+.product-registration__ai-box--excluded {
+  border-color: var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text-muted);
 }
 
 .product-registration__ai-cards {
@@ -3197,13 +3032,19 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   gap: var(--space-2);
   padding: var(--space-3);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-error);
   border-radius: var(--radius-control);
   background: var(--color-surface);
 }
 
-.product-registration__ai-card--actual {
-  border-color: var(--color-error);
+.product-registration__ai-card--excluded {
+  border-color: var(--color-border);
+  opacity: 0.6;
+}
+
+.product-registration__ai-no-findings {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
 }
 
 .product-registration__ai-card div {
@@ -3235,7 +3076,7 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.product-registration__ai-card--actual button {
+.product-registration__ai-card:not(.product-registration__ai-card--excluded) button {
   border-color: var(--color-error);
   background: var(--color-error-soft);
   color: var(--color-error);
@@ -3261,11 +3102,18 @@ onBeforeUnmount(() => {
   font-weight: var(--font-weight-bold);
 }
 
+.product-registration__ai-confirm-hint {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  text-align: right;
+}
+
 .product-registration__ai-empty {
   display: grid;
   gap: var(--space-1);
   min-height: var(--surface-min-height-2xs);
   place-content: center;
+  place-items: center;
   padding: var(--space-5);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-control);
@@ -3276,6 +3124,27 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-empty strong {
   color: var(--color-text-primary);
+}
+
+.product-registration__ai-spinner {
+  width: var(--badge-height-md);
+  height: var(--badge-height-md);
+  border: 3px solid var(--color-primary-soft);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: product-registration-ai-spin 900ms linear infinite;
+}
+
+@keyframes product-registration-ai-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-registration__ai-spinner {
+    animation: none;
+  }
 }
 
 .product-registration__price-chart {
@@ -3617,13 +3486,8 @@ onBeforeUnmount(() => {
   }
 
   .product-registration__option-grid,
-  .product-registration__segmented,
-  .product-registration__ai-photo-list {
+  .product-registration__segmented {
     grid-template-columns: 1fr;
-  }
-
-  .product-registration__additional-ai-panel {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .product-registration__ai-result-content {
@@ -3653,10 +3517,6 @@ onBeforeUnmount(() => {
   .product-registration__complete-actions,
   .product-registration__actions {
     flex-direction: column;
-  }
-
-  .product-registration__additional-ai-panel {
-    grid-template-columns: 1fr;
   }
 }
 </style>
