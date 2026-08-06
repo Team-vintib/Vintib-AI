@@ -109,6 +109,16 @@ toss-payments:
   connect-timeout: 3s
   read-timeout: 5s
 
+# 구글 로그인(SY039, SSAFY SSO 대체). Authorization Code 흐름 — client-secret으로 BE가 직접
+# 구글과 토큰을 교환한다(FE는 client-id만 안다). redirect-uri는 요청마다 FE가 보내는 값을
+# 그대로 써서 별도 설정으로 들고 있지 않는다.
+google-oauth:
+  base-url: ${GOOGLE_OAUTH_BASE_URL:https://oauth2.googleapis.com}
+  client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
+  client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
+  connect-timeout: 3s
+  read-timeout: 5s
+
 aws:
   region: ${AWS_REGION:us-east-1}
   access-key: ${AWS_ACCESS_KEY_ID:}

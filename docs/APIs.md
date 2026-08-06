@@ -18,6 +18,8 @@
 | 로그인 | POST | `/auth/signin` |  | AUTH-002 | ✓ |
 | 토큰 재발급 | POST | `/auth/reissue` |  | AUTH-002 | ✓ |
 | 로그아웃 | POST | `/auth/logout` | ✓ | AUTH-002 | ✓ |
+| 구글 로그인 | POST | `/auth/google` |  | AUTH-003 | ✓ |
+| 구글 계정 연동 확인 | POST | `/auth/google/link` |  | AUTH-003 | ✓ |
 
 ## 회원 (Users)
 

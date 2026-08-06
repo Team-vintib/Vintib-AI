@@ -22,6 +22,7 @@ CREATE TABLE member (
     id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email             VARCHAR(255) NOT NULL UNIQUE,
     password          VARCHAR(255),                    -- SSO 전용 계정은 NULL
+    google_id         VARCHAR(100) UNIQUE,              -- 구글 로그인 연동(SY039). 미연동 회원은 NULL
     -- 온보딩 완료 전에는 NULL이고, 온보딩 완료 시 애플리케이션에서 필수로 검증한다(UNIQUE만 DB가 보장).
     nickname          VARCHAR(30)  UNIQUE,              -- 경매 최고 입찰자 표시에 사용(AUCT-011)
     name              VARCHAR(50),
@@ -43,17 +44,6 @@ CREATE TABLE member (
     CONSTRAINT ck_member_type   CHECK (member_type IN ('GENERAL', 'BUSINESS')),
     CONSTRAINT ck_member_status CHECK (status IN ('ACTIVE', 'SUSPENDED', 'WITHDRAWN')),
     CONSTRAINT ck_member_gender CHECK (gender IN ('MALE', 'FEMALE'))
-);
-
--- 싸피어스 SSO 등 외부 계정 연결 (AUTH-003, AUTH-004)
-CREATE TABLE member_social_account (
-    id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    member_id        BIGINT       NOT NULL REFERENCES member (id),
-    provider         VARCHAR(30)  NOT NULL,
-    provider_user_id VARCHAR(255) NOT NULL,
-    created_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    CONSTRAINT ck_social_provider CHECK (provider IN ('SSAFY')),
-    CONSTRAINT uq_social_provider_user UNIQUE (provider, provider_user_id)
 );
 
 -- 전신 사진·신체 정보 (ONBOARD-003, TRYON-001~002)

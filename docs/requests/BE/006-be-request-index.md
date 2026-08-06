@@ -35,16 +35,13 @@
 
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
-| 001 | `001-auth-contract.md` | Auth | 이메일 auth API 연결 완료 | `GET /api/me`, auth 응답 `user/nextStep`, SSAFY SSO |
 | 002 | `002-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
 | 003 | `003-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 필드(필수+선택 전부: brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId/hostProfileImageUrl/description/material/measurements/defectSummary) 연결 완료 | AI 시착 생성만 남음(서윤/AI 파트) |
 | 004 | `004-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API, 예약 라이브 알림 신청/스케줄러, `LIVE_STARTED`/`AUCTION_OUTBID`/`AUCTION_WON` 알림 생성 연동 완료 | 알림 생성 이벤트 4종(주문/배송/포인트)은 서윤 확인 필요. unread count API, 탭별 bulk read API |
-| 008 | `008-user-tryon-image-contract.md` | TryOn | — | 서윤/AI 파트 |
 | 019 | `019-product-quality-multi-image.md` | Product | 미반영 | 서윤 파트 |
 | 020 | `020-tryon-result-category.md` | TryOn | 미반영 | 서윤/AI 파트 |
-| 023 | `023-product-similar-list.md` | Product | 미확인 | 서윤 파트 |
-| 025 | `025-product-same-price-chart.md` | Product | 미확인 | 서윤 파트 |
-| 026 | `026-toss-client-key-widget-type.md` | Point | 미확인 | 서윤 파트 |
+| 023 | `023-product-similar-list.md` | Product | 부분 반영 | `similarProducts`가 상세 응답에 있으나 필드가 `id/title/price`뿐 — 서윤 파트 |
+| 025 | `025-product-same-price-chart.md` | Product | 미반영 | 서윤 파트 |
 
 **정윤(라이브·경매·채팅·홈·검색) 담당 요청은 전부 반영돼 이 표에 남은 것이 없다.** 위 목록은
 모두 서윤·AI 파트다.
@@ -205,3 +202,41 @@
     포함되긴 했으나 필드가 `id/title/price`뿐이고, 요청한 목록-아이템 동일 필드셋이나 별도
     `/similar` 엔드포인트는 아직 없음 — 부분 반영으로 표시.
 - `025-product-same-price-chart.md`는 관련 코드(`market-price` 등) 전혀 없어 미반영 그대로 둠.
+
+## 2026-08-06 정리 (브랜치 이동 후 재정리)
+
+세션 중간에 `fix/213-delivery` → `develop-BE`(pull) → `feat/190-google-signup`로 브랜치가
+바뀌면서, 위 "026 삭제" 기록은 남았는데 표의 026 행은 pull로 되살아나 있었다 — 다시 지웠다.
+
+- `022-product-list-sold-exclusion.md`는 위 기록 이후 팀원이 실제로 반영·삭제했다
+  (`0cceadfb [PROD] 상품 목록에서 판매 완료(SOLD) 상품 제외`, `8c415565` 요청 문서 정리 커밋).
+  위 "022 여전히 대기 중"은 그 사이에 낡은 기록이 됐다 — 표에서도 빠졌으니 더 손대지 않는다.
+- `030-caddy-route-divergence.md` 삭제 — AI가 보고한 `develop-AI`/`develop-BE` Caddyfile 라우팅
+  분기(`/ai/*`·`/results/*`·`/chat/*` 누락) 문제. 지금 `infra/caddy/Caddyfile`엔 이미 AI 라우트와
+  MinIO 라우트가 함께 들어가 있어 해소 확인.
+- `028`~`037`(AI/FE發, `develop-BE` pull로 새로 생김) 중 `034-pricing-internal-comps-source.md`도
+  삭제했다 — 문서 자체에 "처리 결과"로 BE가 §1·§2에 이미 답했고, AI가 §3·§4(뷰·읽기전용 계정)를
+  "데이터 쌓이면 재요청"으로 스스로 보류했다(닫힌 루프). 나머지(028×2, 029×2, 030, 031~033,
+  035~037)는 실제 기능 구현·정책 결정이 필요한 요청이라 손대지 않았다 — 표에도 아직 반영 안 함
+  (다음 배치 필요).
+- `029-product-detail-intermittent-500.md`는 삭제하지 않았다 — 로컬 시드 276개 상품 전체에
+  `GET /api/products/{id}`를 돌려봐서 500이 하나도 안 났지만(404 116건은 DRAFT라 정상), 원 리포트가
+  **운영 환경 데이터** 기준이라 로컬 무재현이 곧 해결 확정은 아니다. 사용자 판단 필요.
+- `008-user-tryon-image-contract.md` 삭제 — 마이페이지 요약에 시착용 신체 사진을 더 이상
+  노출하지 않기로 정책이 바뀌어(사용자 확인), 유일하게 남아 있던 요청(`bodyPhotoUrl` 필드)
+  자체가 필요 없어졌다.
+- **AI 파트가 요청한 문서 8개를 반영 없이 전부 삭제**했다(사용자 판단 — 지금은 AI 연동 자체를
+  진행하지 않기로 함): `028-pricing-async.md`, `029-quality-inspection-descriptions.md`,
+  `031-garment-measurement-scan.md`, `032-ai-result-disk-retention-policy.md`,
+  `033-category-gender-stays-in-form.md`, `035-tryon-product-category.md`,
+  `036-chat-rag-answer-public-api.md`, `037-quality-inspection-async.md`. 전부 AI 쪽 구현은
+  끝났거나 진행 중이고 BE 연동만 남아 있던 요청들이다 — **반영한 게 아니라 보류/미채택**이니
+  AI 파트가 나중에 재확인하면 그때 다시 논의한다.
+- `001-auth-contract.md` 삭제 — 구글 로그인(SY039)으로 SSAFY SSO 대체는 이미 반영됐고, 남아
+  있던 `GET /api/me`·`user`/`nextStep` 요청은 **별도 엔드포인트 없이 해소**하기로 확정했다:
+  `signin`/`reissue`/구글 로그인 응답에 `id`만 추가해(`TokenResponse`/`GoogleAuthResponse`),
+  FE가 그 `id`로 기존 `GET /api/users/{id}`(이미 email/name/nickname/memberType/
+  onboardingCompleted/businessVerificationStatus 전부 포함)를 호출하게 했다 — `user` 전체를
+  로그인 응답에 중첩하거나 `nextStep`을 신설하지 않는다. §6의 나머지 협의 사항(자동 로그인
+  여부, memberType 기본값 등)도 전부 "지금 구현대로 유지"로 결정돼 더 이상 대기 항목이
+  없다. 계약은 `docs/requests/FE/037-signin-response-id-field.md` 참고.
