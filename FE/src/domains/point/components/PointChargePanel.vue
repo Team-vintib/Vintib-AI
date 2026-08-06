@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
 
+import PointChargeModal from '@/domains/point/components/PointChargeModal.vue'
 import { POINT_CHARGE_MIN_AMOUNT, POINT_QUICK_CHARGE_AMOUNTS } from '@/domains/point/constants/pointOptions'
-import { ROUTE_NAMES } from '@/shared/constants/routes'
-
-const router = useRouter()
 
 const emit = defineEmits<{
   error: [message: string]
@@ -18,23 +15,21 @@ const canSubmit = computed(
   () => Number.isInteger(parsedAmount.value) && parsedAmount.value >= POINT_CHARGE_MIN_AMOUNT,
 )
 
+const isCheckoutOpen = ref(false)
+const checkoutAmount = ref(0)
+
 const selectQuickAmount = (nextAmount: number) => {
   amount.value = String(nextAmount)
 }
 
-// 결제수단 선택은 새 탭에서 진행한다(토스 위젯이 앱 다크 테마와 안 어울려 분리했다). 팝업 차단을
-// 피하려면 window.open을 클릭 핸들러 안에서 await 없이 곧바로 호출해야 한다.
 const openCheckout = () => {
   if (!canSubmit.value) {
     emit('error', `충전 금액은 최소 ${POINT_CHARGE_MIN_AMOUNT.toLocaleString('ko-KR')}P 이상이어야 합니다.`)
     return
   }
 
-  const checkoutRoute = router.resolve({
-    name: ROUTE_NAMES.POINT_CHARGE_CHECKOUT,
-    query: { amount: String(parsedAmount.value) },
-  })
-  window.open(checkoutRoute.href, '_blank')
+  checkoutAmount.value = parsedAmount.value
+  isCheckoutOpen.value = true
 }
 </script>
 
@@ -42,7 +37,7 @@ const openCheckout = () => {
   <section class="point-panel" aria-labelledby="point-charge-title">
     <header>
       <h2 id="point-charge-title">충전</h2>
-      <p>충전 금액을 선택하면 새 탭에서 결제를 진행합니다.</p>
+      <p>충전 금액을 선택하면 결제창이 열립니다.</p>
     </header>
 
     <div class="point-charge__section">
@@ -75,6 +70,12 @@ const openCheckout = () => {
     <button class="point-panel__submit" type="button" :disabled="!canSubmit" @click="openCheckout">
       충전하기
     </button>
+
+    <PointChargeModal
+      v-if="isCheckoutOpen"
+      :amount="checkoutAmount"
+      @close="isCheckoutOpen = false"
+    />
   </section>
 </template>
 
@@ -127,7 +128,7 @@ const openCheckout = () => {
 
 .point-charge__quick button,
 .point-panel__submit {
-  min-height: var(--button-height-small);
+  min-height: var(--button-height-standard);
   border-radius: var(--radius-control);
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
