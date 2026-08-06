@@ -2537,16 +2537,11 @@ onBeforeUnmount(() => {
   color: var(--color-text-primary);
 }
 
+.product-registration__step--current span,
 .product-registration__step--complete span {
   border-color: var(--color-primary);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-}
-
-.product-registration__step--current span {
-  border-color: var(--color-primary);
-  background: var(--color-surface);
-  color: var(--color-primary);
 }
 
 .product-registration__step--current strong {
