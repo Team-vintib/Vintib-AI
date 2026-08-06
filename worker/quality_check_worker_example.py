@@ -45,6 +45,11 @@ from quality_vlm.describer import attach_descriptions, build_describer  # noqa: 
 from sam3 import registry  # noqa: E402
 from sam3.contracts import BaseColor, GarmentCategory  # noqa: E402
 from sam3.findings import extract_findings  # noqa: E402
+from sam3.garment_embedding import (  # noqa: E402
+    EMBEDDING_MODEL_ID,
+    GarmentEmbeddingNotReady,
+    embed_garment,
+)
 from sam3.overlay import build_annotated_images, build_attention_maps  # noqa: E402
 from sam3.prompts import select_prompt_set  # noqa: E402
 from sam3.scoring import build_notes, score_findings, summarize, summarize_by_image  # noqa: E402
@@ -92,6 +97,24 @@ class QualityCheckWorker(BaseWorker):
             print(f"[{self.worker_id}] VLM describer 로드 실패, mock으로 대체: {exc}")
             self._describer = build_describer("mock")
         print(f"[{self.worker_id}] VLM describer 준비 완료")
+
+    @staticmethod
+    def _embed_first_garment(results) -> list[float] | None:
+        """여러 장 중 의류를 찾은 첫 이미지의 크롭으로 임베딩한다(상품당 벡터는 1개면
+        충분 — 추천은 상품 단위지 이미지 단위가 아니다). 못 찾았거나(mock 포함) 계산이
+        실패하면 None — `run_inference()`가 그 경우 결과 dict에 키 자체를 안 넣는다."""
+        for r in results:
+            if r.garment_crop is None:
+                continue
+            try:
+                return embed_garment(r.garment_crop)
+            except GarmentEmbeddingNotReady as exc:
+                print(f"[garment_embedding] 준비 안 됨, 건너뜀: {exc}")
+                return None
+            except Exception as exc:  # noqa: BLE001 — 임베딩 실패가 검수를 막으면 안 된다
+                print(f"[garment_embedding] 계산 실패, 건너뜀: {exc}")
+                return None
+        return None
 
     def run_inference(self, payload: dict) -> dict:
         """
@@ -162,6 +185,14 @@ class QualityCheckWorker(BaseWorker):
             "notes": notes,
             "latency_ms": round((time.perf_counter() - started) * 1000, 3),
         }
+
+        # 유사 상품 추천용 임베딩(범위: 계산+저장까지만) — SAM3가 하자 탐지 전에 이미 만든
+        # 의류 크롭을 재사용한다(새 세그멘테이션 없음). 실패해도 검수 결과 자체는 그대로
+        # 나가야 한다 — mock 백엔드는 garment_crop이 전부 None이라 자연히 건너뛴다.
+        garment_embedding = self._embed_first_garment(results)
+        if garment_embedding is not None:
+            result["garment_embedding"] = garment_embedding
+            result["garment_embedding_model_id"] = EMBEDDING_MODEL_ID
 
         # 판단 근거 로컬 로그(CH008) — Redis job result는 1시간 뒤 사라지고 BE는 finding.key/
         # statement_required만 저장한다. best-effort라 실패해도 검수 응답은 그대로 나간다.
