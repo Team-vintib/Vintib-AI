@@ -31,9 +31,17 @@ const selectedImageIndex = computed(() => {
 
 const representativeImage = computed(() => props.images[selectedImageIndex.value])
 
+// 2~4번째 자리의 확대 스타일은 "상품 실사진 클로즈업"이라는 전제로 만들어졌다.
+// AI 착용컷(전신 합성 이미지)은 그 전제가 안 맞아 몇 번째 자리에 오든 확대하지 않는다.
 const representativeImageStyle = computed(() => {
+  const defaultStyle = { transform: 'scale(1)', transformOrigin: '50% 50%' }
+
+  if (representativeImage.value?.id === 'ai-model-cut') {
+    return defaultStyle
+  }
+
   const detailStyles = [
-    { transform: 'scale(1)', transformOrigin: '50% 50%' },
+    defaultStyle,
     { transform: 'scale(1.35)', transformOrigin: '50% 26%' },
     { transform: 'scale(1.45)', transformOrigin: '45% 78%' },
     { transform: 'scale(1.45)', transformOrigin: '90% 78%' },
@@ -58,7 +66,10 @@ const closeZoom = () => {
         v-for="image in images"
         :key="image.id"
         class="product-gallery__thumbnail"
-        :class="{ 'product-gallery__thumbnail--selected': image.id === representativeImage?.id }"
+        :class="{
+          'product-gallery__thumbnail--selected': image.id === representativeImage?.id,
+          'product-gallery__thumbnail--ai-model-cut': image.id === 'ai-model-cut',
+        }"
         type="button"
         :aria-label="`${image.label} 이미지 보기`"
         :aria-pressed="image.id === representativeImage?.id"
@@ -188,6 +199,14 @@ const closeZoom = () => {
 .product-gallery__thumbnail:nth-child(4) img {
   transform: scale(1.45);
   transform-origin: 90% 78%;
+}
+
+/* AI 착용컷은 몇 번째 자리에 오든(상품 사진 장수에 따라 위치가 달라짐) 위 nth-child
+   확대를 적용하지 않는다 — 전신 합성 이미지라 클로즈업 전제가 안 맞는다. nth-child 규칙과
+   동일한 특이도(클래스 2개+엘리먼트)로 써야 소스 순서로 이 규칙이 이긴다. */
+.product-gallery__thumbnail.product-gallery__thumbnail--ai-model-cut img {
+  transform: none;
+  transform-origin: 50% 50%;
 }
 
 .product-gallery__zoom {
