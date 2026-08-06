@@ -102,7 +102,7 @@ public class EmailVerificationService {
         try {
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
             helper.setTo(email);
-            helper.setSubject("[Vintib] 이메일 인증 코드");
+            helper.setSubject("[VINTIB] 이메일 인증 코드");
             helper.setText(html, true);
         } catch (MessagingException e) {
             throw new MailPreparationException("이메일 메시지 생성에 실패했습니다.", e);

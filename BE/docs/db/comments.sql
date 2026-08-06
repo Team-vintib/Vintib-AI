@@ -13,6 +13,7 @@
 COMMENT ON TABLE member IS '서비스 회원. 판매자·구매자 구분 없이 한 테이블을 쓴다.';
 COMMENT ON COLUMN member.email             IS '로그인 ID 겸 연락 수단. 경매 화면에는 노출하지 않는다.';
 COMMENT ON COLUMN member.password          IS '자체 로그인용 해시. SSO 전용 계정은 NULL.';
+COMMENT ON COLUMN member.google_id         IS '구글 로그인 연동 식별자(id_token의 sub, SY039). 미연동 회원은 NULL.';
 COMMENT ON COLUMN member.nickname          IS '공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011).';
 COMMENT ON COLUMN member.name              IS '실명. 배송·정산용이며 외부 노출 금지.';
 COMMENT ON COLUMN member.member_type       IS 'GENERAL(일반) | BUSINESS(사업자)';
@@ -23,10 +24,6 @@ COMMENT ON COLUMN member.address           IS '기본 주소(도로명/지번). 
 COMMENT ON COLUMN member.detail_address    IS '상세 주소(동/호수 등).';
 COMMENT ON COLUMN member.postal_code       IS '우편번호. 주소 검색을 안 쓰고 직접 입력하면 NULL 허용.';
 COMMENT ON COLUMN member.gender            IS 'MALE | FEMALE';
-
-COMMENT ON TABLE member_social_account IS '외부 계정 연결 (AUTH-003, AUTH-004). 한 회원이 여러 provider 를 가질 수 있다.';
-COMMENT ON COLUMN member_social_account.provider         IS 'SSO 공급자. 현재 SSAFY 만 허용.';
-COMMENT ON COLUMN member_social_account.provider_user_id IS '공급자 측 고유 ID. provider 와 묶어 유일하다.';
 
 COMMENT ON TABLE member_body_profile IS '전신 사진·신체 정보 (ONBOARD-003, TRYON-001~002). 가상 시착 입력값.';
 COMMENT ON COLUMN member_body_profile.body_photo_key IS '전신 사진 S3 key(비공개 버킷). 미등록이면 시착 불가.';
