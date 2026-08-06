@@ -205,11 +205,27 @@ class Finding(BaseModel):
 
 
 class SectionScore(BaseModel):
-    """부위별 하자 확률. LAB-30의 "각 부위 넘버링 / 확률값" 요구에 대응한다."""
+    """부위별 하자 확률. LAB-30의 "각 부위 넘버링 / 확률값" 요구에 대응한다.
 
+    이미지 1장당 9개씩 나온다(CH020) — `image_urls`가 여러 장이면 총 개수는
+    `9 × len(image_urls)`다. 이미지 간 확률을 합치지 않고 완전히 독립적으로 낸다."""
+
+    image_index: int = Field(ge=0, description="요청 image_urls의 인덱스")
     section_no: int = Field(ge=1, le=9)
     section: GarmentSection
     score: float = Field(ge=0.0, le=1.0)
+
+
+class ImageSummary(BaseModel):
+    """이미지 1장에 대한 한 줄 요약(CH020).
+
+    `InspectionResult.summary`는 전체 이미지를 합산한 요약이고, 이건 이미지별 상세다 —
+    앞/뒤 캐러셀에서 넘길 때마다 설명이 그 이미지 것으로 바뀌어야 하는 요구
+    (`docs/requests/BE/019-product-quality-multi-image.md`)에 대응한다. 하자가 없는
+    이미지도 빠짐없이 포함된다("확인된 하자가 없습니다")."""
+
+    image_index: int = Field(ge=0)
+    summary: str
 
 
 class AttentionMap(BaseModel):
@@ -239,7 +255,13 @@ class InspectionResult(BaseModel):
     model: ModelInfo
     condition_score: float = Field(ge=0.0, le=100.0)
     condition_grade: ConditionGrade
-    summary: str
+    summary: str = Field(
+        description="전체 이미지를 합산한 한 줄 요약. 이미지별 요약은 image_summaries"
+    )
+    image_summaries: list[ImageSummary] = Field(
+        default_factory=list,
+        description="이미지별 한 줄 요약(CH020). image_urls 개수만큼, 순서대로 채워진다",
+    )
     findings: list[Finding]
     section_scores: list[SectionScore]
     attention_maps: list[AttentionMap]

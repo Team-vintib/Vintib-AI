@@ -36,6 +36,7 @@ _MODEL_PAIRS = [
     (schemas.SectionScore, contracts.SectionScore),
     (schemas.AttentionMap, contracts.AttentionMap),
     (schemas.AnnotatedImage, contracts.AnnotatedImage),
+    (schemas.ImageSummary, contracts.ImageSummary),
 ]
 
 
@@ -91,12 +92,13 @@ def test_worker_output_validates_against_gateway_schema():
     필드 이름만 같고 값 형태가 다르면(예: enum 대신 인덱스) 여기서 걸린다.
     """
     section = contracts.SectionScore(
-        section_no=5, section=contracts.GarmentSection.chest_center, score=0.81
+        image_index=0, section_no=5, section=contracts.GarmentSection.chest_center, score=0.81
     )
     attention = contracts.AttentionMap(
         image_index=0, defect_type=contracts.DefectType.stain, url="https://x/y.png"
     )
     annotated = contracts.AnnotatedImage(image_index=0, url="https://x/annotated.png")
+    image_summary = contracts.ImageSummary(image_index=0, summary="오염 1건이 확인되었습니다.")
     finding = contracts.Finding(
         key="stain_0_5_1",
         defect_type=contracts.DefectType.stain,
@@ -115,9 +117,12 @@ def test_worker_output_validates_against_gateway_schema():
         label="오염",
     )
 
-    assert schemas.SectionScore(**section.to_dict()).section is schemas.GarmentSection.chest_center
+    gateway_section = schemas.SectionScore(**section.to_dict())
+    assert gateway_section.section is schemas.GarmentSection.chest_center
+    assert gateway_section.image_index == 0
     assert schemas.AttentionMap(**attention.to_dict()).defect_type is schemas.DefectType.stain
     assert schemas.AnnotatedImage(**annotated.to_dict()).image_index == 0
+    assert schemas.ImageSummary(**image_summary.to_dict()).summary == "오염 1건이 확인되었습니다."
     gateway_finding = schemas.Finding(**finding.to_dict())
     assert gateway_finding.no == 1
     assert gateway_finding.label == "오염"

@@ -258,6 +258,75 @@ python validation/CLASS/product-info-finetune/aihub_finetune_vit.py \
 이 test accuracy를 카테고리 전용으로 학습한 원래 결과와 비교하면, 색상 학습이 카테고리
 성능을 얼마나 깎았는지(또는 안 깎았는지) 알 수 있다. run 폴더 이름엔 `_probe`가 붙는다.
 
+⚠️ **위 진단은 torch SGD로 헤드를 학습시키는데, 실측상 30epoch을 넘게 돌려도 수렴을
+안 했다**(볼록 선형 분류 문제라 sklearn이 훨씬 빠르고 확실하다). 같은 진단을 훨씬 빠르게
+하려면 `aihub_finetune_probe.py`를 대신 쓴다(별도 파일 — 기존 스크립트는 안 건드림):
+
+```bash
+python validation/CLASS/product-info-finetune/aihub_finetune_probe.py \
+    --pixel-cache-dir .../artifacts --task category --variant masked \
+    --method last-n --unfreeze-layers 4 \
+    --checkpoint .../artifacts_finetune/vit_last4_color_masked_lr1e-05_warm/checkpoint.pt
+```
+
+feature를 한 번만 뽑고 `aihub_train_head.py`(STEP4)와 같은 sklearn 학습으로 즉시
+수렴시켜 몇 초~몇 분 안에 최종 정확도가 나온다. `--method lora`면 `--r`/`--alpha`/
+`--target-modules`를 체크포인트 학습 때와 같게 준다.
+
+### 미커버 클래스(신발·가방 등) zero-shot이 여전히 유지되는가
+
+브리핑이 원래 전체 파인튜닝을 금지한 이유(§3) — 파인튜닝된 backbone이 AI-Hub가 안 덮는
+클래스에서 zero-shot이 망가지지 않았는지, 우리 정답셋으로 원본 backbone과 비교한다:
+
+```bash
+python validation/CLASS/product-info-finetune/aihub_ground_truth_zero_shot_check.py \
+    --ground-truth-dir validation/CLASS/product-info-check \
+    --checkpoint .../artifacts_finetune/vit_last4_category_masked_lr1e-05/checkpoint.pt \
+    --method last-n --unfreeze-layers 4
+```
+
+체크포인트에 저장된 `classes`(헤드가 실제로 배운 클래스)를 기준으로 "미커버"를 정하고,
+정답셋에서 그 클래스만 골라 두 backbone의 zero-shot 예측을 나란히 찍는다 — 원본과 달라진
+이미지가 있으면 어느 방향(파인튜닝이 틀리게 만들었는지, 오히려 고쳤는지)인지도 표시한다.
+
+### 지연시간 실측 — 모델 두 개 배포 비용
+
+카테고리(last-N=4)·색상(LoRA-웜)을 모델 두 개로 따로 배포하기로 하면서, 실제 forward
+지연시간을 재야 브리핑 §11 기준(CPU p50 ≤200ms)을 지키는지 알 수 있다:
+
+```bash
+python validation/CLASS/product-info-finetune/aihub_finetune_latency.py \
+    --last-n-checkpoint .../artifacts_finetune/vit_last4_category_masked_lr1e-05/checkpoint.pt \
+    --unfreeze-layers 4 \
+    --lora-checkpoint .../artifacts_finetune/lora_r16_a32_d0.05_qv_color_masked_lr0.0001_warm/checkpoint.pt \
+    --r 16 --alpha 32
+```
+
+원본(zero-shot) backbone, last-N=4, LoRA 각각의 forward p50/p95를 재고, 두 모델을
+**순차 실행**했을 때 합산 시간과 **스레드로 동시 실행**했을 때(CPU가 코어 여유로 실제로
+병렬화되는지) 시간을 모두 찍는다. 기본은 CPU로 잰다(원래 123ms 기준선도 CPU 기준이라
+비교 가능해야 한다). `product-info-check/latency.py`의 방법론(idle, N회 반복 후 p50/p95)을
+그대로 따르되, 다른 스파이크 폴더의 모델 레지스트리는 안 건드리고 체크포인트를 곧바로
+불러와 쓴다.
+
+위 숫자는 전부 `torch.randn()` 랜덤 텐서로만 backbone forward를 잰 것 — 실제 병목인
+이미지 디코드+전처리가 빠져 있다. **정확한 사진 한 장 기준 end-to-end 숫자**가 필요하면
+`--sample-image`를 추가로 준다:
+
+```bash
+python validation/CLASS/product-info-finetune/aihub_finetune_latency.py \
+    --last-n-checkpoint .../artifacts_finetune/vit_last4_category_masked_lr1e-05/checkpoint.pt \
+    --unfreeze-layers 4 \
+    --lora-checkpoint .../artifacts_finetune/lora_r16_a32_d0.05_qv_color_masked_lr0.0001_warm/checkpoint.pt \
+    --r 16 --alpha 32 \
+    --sample-image ../product-info-check/inputs/apc.png
+```
+
+PIL 디코드 → `aihub_preprocess.render_variant()` 전처리 → `get_image_features()`까지
+전부 포함해서 원본/last-N/LoRA 각각의 end-to-end p50/p95를 재고, 두 모델을 다 주면
+디코드를 한 번만 하고 공유하는 **"두 모델 합산 end-to-end"** 숫자도 같이 낸다 — 실제
+배포에서 같은 이미지를 두 번 디코드할 이유가 없어서다.
+
 ## STEP 3.7 — (선택, 실험) LoRA 파인튜닝
 
 STEP 3.6(last-N 언프리즈)의 대안이다. last-N은 마지막 몇 개 블록을 **통째로** 학습하고,
@@ -351,8 +420,12 @@ black --check .
 pytest -q
 ```
 
-테스트 8종(`test_class_finetune_{dataset,accessory,preprocess,head,evaluate,cache_pixels,
-finetune_vit,finetune_lora}.py`)은 무거운 의존성이 없어 CI에서 그대로 돈다 — 파싱 함정,
-매핑 우선순위, 그룹 분할 누수, 폴리곤 좌표 처리, 태스크별 행 선택, zero-shot 채점 수학,
-캐시 파일명 분리, 라벨 인코딩/미지 클래스 필터링, run_name 접두어(방법 분류/충돌 방지)를
+테스트는 전부 `tests/` 밑에 있다(스크립트 12종에 대응하는 `test_class_finetune_*.py`) —
+무거운 의존성이 없어 CI에서 그대로 돈다: 파싱 함정, 매핑 우선순위, 그룹 분할 누수, 폴리곤
+좌표 처리, 태스크별 행 선택, zero-shot 채점 수학, 캐시/체크포인트 파일명 규칙, 라벨 인코딩/
+미지 클래스 필터링, run_name 접두어(방법 분류/충돌 방지), (방법,태스크)별 리더보드 그룹핑을
 고정한다. 각 스크립트의 무거운 본체(모델 로드·학습·추론)는 CI 밖(서버)에서만 검증한다.
+
+`tests/`가 `aihub_*.py`와 다른 폴더라 `import aihub_finetune_vit` 같은 게 안 될 것 같지만,
+`conftest.py`(이 폴더에 있음)가 부모 폴더를 sys.path에 넣어줘서 그대로 동작한다 — pytest는
+`conftest.py`가 있는 폴더를 항상 import 가능하게 만든다.

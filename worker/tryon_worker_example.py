@@ -47,6 +47,7 @@ sys.path.insert(0, CATVTON_CODE_PATH)
 from body_estimate import estimate_body_measurements  # noqa: E402
 from model.adaptive_fit import compute_width_adjustment  # noqa: E402
 from model.cloth_masker import AutoMasker, vis_mask  # noqa: E402
+from model.fit_summary import fit_summary_ko  # noqa: E402
 from model.pipeline import CatVTONPipeline  # noqa: E402
 from utils import init_weight_dtype, resize_and_crop, resize_and_padding  # noqa: E402
 
@@ -244,6 +245,12 @@ class TryonWorker(BaseWorker):
         garment_waist_width = garment_measurements.get("WAIST_WIDTH") if garment_measurements else None
         ratio = compute_width_adjustment(body_waist_cm, garment_waist_width)
 
+        # 고객용 "한 줄 핏 예상"(fit_title/fit_description) -- adaptive_fit이 지금
+        # WAIST_WIDTH 축만 지원하므로(§7.5), 이 ratio는 mask_type="lower"일 때만
+        # 의미가 있다. "upper"는 garment_measurements에 WAIST_WIDTH가 실릴 일이 없어
+        # ratio가 자연히 None이 되고, fit_summary_ko()도 None을 그대로 돌려준다.
+        fit_summary = fit_summary_ko(ratio, "waist" if mask_type == "lower" else "chest")
+
         if ratio is not None:
             fit_phrase, needs_emphasis = fit_descriptor(ratio)
             dress_prompt = build_dress_prompt(garment_caption, fit_phrase, needs_emphasis)
@@ -286,6 +293,8 @@ class TryonWorker(BaseWorker):
             "worn_reference_url": worn_reference_url,
             "fit_type": fit_type,
             "adaptive_masking_used": adaptive_masking_used,
+            "fit_title": fit_summary["title"] if fit_summary else None,
+            "fit_description": fit_summary["description"] if fit_summary else None,
         }
 
 

@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
@@ -11,6 +13,7 @@ from app.product_classifier.router import router as product_classifier_router
 from app.quality.router import router as quality_router
 from app.recommend.personalize.router import router as personalize_router
 from app.recommend.router import router as recommend_router
+from app.tryon.router import router as tryon_router
 
 app = FastAPI(title=settings.app_name)
 
@@ -24,8 +27,14 @@ app.include_router(
     product_classifier_router, prefix="/product-classifier", tags=["product-classifier"]
 )
 app.include_router(gateway_router, prefix="/ai", tags=["ai-gateway"])
+app.include_router(tryon_router, prefix="/ai/tryon", tags=["tryon"])
 
 app.mount("/results", StaticFiles(directory=RESULTS_DIR), name="results")
+app.mount(
+    "/personas",
+    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static", "personas")),
+    name="personas",
+)
 
 
 @app.get("/health")
