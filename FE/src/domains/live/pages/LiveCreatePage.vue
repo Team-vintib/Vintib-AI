@@ -976,26 +976,28 @@ onMounted(() => {
 
             <div v-if="selectedProducts.length" class="live-create__products">
               <h3>상품 선택 미리보기</h3>
-              <article v-for="product in selectedProducts" :key="product.id">
-                <img
-                  :src="getProductThumbnail(product.thumbnailUrl)"
-                  :alt="product.name"
-                  @error="handleProductImageError"
-                />
-                <div>
-                  <strong>{{ product.name }}</strong>
-                  <dl class="live-create__summary-product-meta">
-                    <div>
-                      <dt>브랜드</dt>
-                      <dd>{{ product.brand }}</dd>
-                    </div>
-                    <div>
-                      <dt>카테고리</dt>
-                      <dd>{{ product.category }}</dd>
-                    </div>
-                  </dl>
-                </div>
-              </article>
+              <div class="live-create__products-list">
+                <article v-for="product in selectedProducts" :key="product.id">
+                  <img
+                    :src="getProductThumbnail(product.thumbnailUrl)"
+                    :alt="product.name"
+                    @error="handleProductImageError"
+                  />
+                  <div>
+                    <strong>{{ product.name }}</strong>
+                    <dl class="live-create__summary-product-meta">
+                      <div>
+                        <dt>브랜드</dt>
+                        <dd>{{ product.brand }}</dd>
+                      </div>
+                      <div>
+                        <dt>카테고리</dt>
+                        <dd>{{ product.category }}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </article>
+              </div>
             </div>
           </section>
 
@@ -1912,6 +1914,16 @@ onMounted(() => {
 .live-create__products h3 {
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
+}
+
+// 선택 상품이 계속 쌓여도 카드 자체가 무한정 길어지지 않도록, 목록만 안에서 스크롤한다
+// (제목은 스크롤 밖에 고정). 320px는 카드 4개 정도가 보이는 높이.
+.live-create__products-list {
+  display: grid;
+  gap: var(--space-3);
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: var(--space-2);
 }
 
 .live-create__products article {

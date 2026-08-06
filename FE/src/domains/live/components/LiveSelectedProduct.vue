@@ -137,15 +137,12 @@ defineEmits<{
 }
 
 .live-selected-product__identity strong {
-  display: block;
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.live-selected-product__identity strong {
   font-size: var(--font-size-2xl);
   line-height: 30px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .live-selected-product__details {

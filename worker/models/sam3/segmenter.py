@@ -89,6 +89,10 @@ class SegmentationResult:
     garment_mask: np.ndarray | None  # (H, W) uint8, 전체 이미지 좌표
     base_image: Image.Image
     size: tuple[int, int]  # (height, width), 원본 기준
+    # 배경 제거된 의류 크롭(유사 상품 추천용 임베딩 입력). 의류를 못 찾았거나(mock 포함)
+    # 하자 탐지에만 쓰고 버려지던 것을 재사용하는 것이라 새 계산은 없다. 기본값 None —
+    # 기존 키워드 인자 호출(테스트 포함)은 그대로 호환된다.
+    garment_crop: Image.Image | None = None
 
 
 class DefectSegmenter(ABC):
@@ -224,6 +228,7 @@ class MockSegmenter(DefectSegmenter):
             garment_mask=garment_mask,
             base_image=base_image,
             size=(height, width),
+            garment_crop=None,  # 목업은 진짜 크롭이 없다 — 임베딩 계산은 real backend에서만
         )
 
 
@@ -474,6 +479,9 @@ class Sam3PcsSegmenter(DefectSegmenter):
             garment_mask=garment_mask,
             base_image=image,
             size=(full_size_wh[1], full_size_wh[0]),
+            # cropped=False면 _crop_and_mask_to_garment()가 원본을 그대로 돌려준 것이라
+            # (의류를 못 찾음) 임베딩용 크롭으로 쓸 수 없다 — 그때만 None.
+            garment_crop=detect_image if cropped else None,
         )
 
 

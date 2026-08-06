@@ -97,16 +97,32 @@ const handleImageError = (event: Event) => {
   background: var(--color-surface);
   transition:
     border-color var(--transition-base),
+    background-color var(--transition-base),
     transform var(--transition-base);
 }
 
 .product-card:hover {
   border-color: var(--color-border-strong);
-  transform: translateY(-3px);
+  background: #f1f0ed;
+  transform: translateY(-3px) scale(1.03);
 }
 
 .product-card:hover .product-card__image {
   transform: scale(1.045);
+}
+
+// 다크 테마라 브랜드/상품명/가격 등 본문 글자가 기본적으로 밝은색이다 — 호버 배경이 밝은
+// 크림색으로 바뀌면 그대로는 안 보이므로, 흰 블록 위 텍스트용 토큰으로 맞춰준다. 이미지 위
+// 등급 배지·찜 버튼은 이미지에 오버레이라 이 카드 배경과 무관해 건드리지 않는다.
+.product-card:hover .product-card__brand,
+.product-card:hover .product-card__name,
+.product-card:hover .product-card__price {
+  color: var(--color-text-inverse);
+}
+
+.product-card:hover .product-card__sale-badge {
+  border-color: var(--color-border-strong);
+  color: var(--color-text-inverse);
 }
 
 .product-card__media {

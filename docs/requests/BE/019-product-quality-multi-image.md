@@ -43,10 +43,18 @@ FE가 필요한 형태(현재 뷰모델 `AiQualityAnalysis` 기준):
 ## 일정
 - FE는 다중 이미지 캐러셀 구현 완료(현재 mock). **BE/AI 데이터가 상세 응답에 담기는 시점부터** mock 제거 + 매핑 연결(추가 FE 작업 소량).
 
+## 참고 — 데이터 소스 후보 두 곳
+
+1. **AI 검수 job**: `AI/app/quality/router.py`(`POST /quality/inspections`)가 이미 구현돼 있고 `037-quality-inspection-async.md`가 설명한 `findings[]`(`bbox`, `defect_type`, `severity` 등)를 `GET /ai/jobs/{job_id}`로 받을 수 있습니다. 다만 `product_id`가 필수라 `042-product-registration-ai-pipeline.md`의 순서 문제가 먼저 풀려야 호출 가능합니다.
+2. **등록 시 사용자 확정 데이터**: `042` §3에 추가한 대로, 상품 등록 화면에서 사용자가 직접 인정한 하자만 `POST /products` 요청의 `aiQualityFindings` 필드로 이미 보내고 있습니다(BE 미수신). 이쪽은 `product_id` 문제와 무관하게 지금 당장 저장 가능한 데이터입니다.
+
+두 소스를 다 쓸지, 등록 시 확정 데이터만으로 우선 이 탭을 채울지는 BE/AI 판단에 맡깁니다 — 어느 쪽이든 최종적으로 위 `aiQualityAnalysis.images[].findings` 형태로만 내려주시면 FE 쪽은 동일하게 소비합니다.
+
 ## 관련 자료
 - FE: `FE/src/domains/product/components/AiQualityAnalysisPanel.vue`, `FE/src/domains/product/api/productApi.ts`(`toProductDetailViewData` → 현재 `buildMockAiQualityAnalysis`), 타입 `AiQualityAnalysis` / `AiQualityAnalysisImage` / `AiQualityFinding(box)` (`productDetail.types.ts`)
 - Mock(교체 대상): `FE/src/domains/product/constants/aiQualityAnalysisMockData.ts`
 - 기능: 상품 상세 AI 검수 이미지 넘겨보기
+- `docs/requests/BE/042-product-registration-ai-pipeline.md`(등록 시점 확정 데이터), `docs/requests/BE/037-quality-inspection-async.md`(AI 검수 job 계약)
 
 ## 처리 결과
 (BE 반영 후 기입)

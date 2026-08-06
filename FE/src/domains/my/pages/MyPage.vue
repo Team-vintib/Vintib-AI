@@ -2051,10 +2051,19 @@ onMounted(() => {
   text-align: left;
 }
 
-.my-sidebar__nav button:hover,
 .my-sidebar__nav-item--active {
   background: var(--color-primary-soft) !important;
   color: var(--color-primary) !important;
+}
+
+.my-sidebar__nav button:hover:not(:disabled) {
+  background: var(--color-primary-hover) !important;
+  color: var(--color-primary-strong) !important;
+}
+
+.my-sidebar__footer button:hover:not(:disabled) {
+  background: var(--color-primary-hover) !important;
+  color: var(--color-primary-strong) !important;
 }
 
 .my-sidebar__footer {
@@ -2123,10 +2132,12 @@ onMounted(() => {
   color: var(--color-text-inverse);
 }
 
-.my-content__actions button:hover,
-.my-card__title button:hover,
-.my-state button:hover {
-  background: var(--color-surface-secondary);
+.my-content__actions button:hover:not(:disabled),
+.my-card__title button:hover:not(:disabled),
+.my-state button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 .my-content__actions button:first-child:hover,
@@ -2263,6 +2274,12 @@ onMounted(() => {
   font-weight: var(--font-weight-bold);
 }
 
+.my-profile-hero__edit:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: var(--color-primary-strong);
+}
+
 .my-dashboard {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -2292,14 +2309,24 @@ onMounted(() => {
   text-align: left;
   transition:
     border-color var(--transition-base),
+    background-color var(--transition-base),
     box-shadow var(--transition-base),
     transform var(--transition-base);
 }
 
 .my-dashboard__card:hover {
   border-color: var(--color-border-strong);
+  background: #f1f0ed;
   box-shadow: none;
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.04);
+}
+
+// 다크 테마라 기본 텍스트가 밝은색이다 — 호버 배경이 밝은 크림색으로 바뀌면 그대로는 안
+// 보이므로, 흰 블록 위 텍스트용 토큰(--color-text-inverse, 거의 검정)으로 맞춰준다.
+.my-dashboard__card:hover span,
+.my-dashboard__card:hover strong,
+.my-dashboard__card:hover small {
+  color: var(--color-text-inverse);
 }
 
 .my-dashboard--home .my-dashboard__card {
@@ -2339,6 +2366,13 @@ onMounted(() => {
   padding: 0;
   border: 0;
   border-radius: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+}
+
+// "자세히 보기"는 다른 카드 제목 버튼과 달리 배경 없는 텍스트 링크 스타일이라, 공용
+// .my-card__title button:hover(빨강 채움)를 여기서는 끈다.
+.my-point-panel .my-card__title button:hover {
   background: transparent;
   color: var(--color-text-primary);
 }
@@ -2404,8 +2438,10 @@ onMounted(() => {
   color: var(--color-text-inverse);
 }
 
-.my-point-panel__actions button:hover {
-  background: var(--color-surface-secondary);
+.my-point-panel__actions button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 .my-point-panel__actions button:first-child:hover {
@@ -2604,13 +2640,18 @@ onMounted(() => {
   font-weight: var(--font-weight-bold);
 }
 
-.my-product-tabs button:hover,
 .my-product-tabs__item--active,
-.my-order-tabs button:hover,
 .my-order-tabs__item--active {
   border-color: var(--color-primary) !important;
   background: var(--color-primary-soft) !important;
   color: var(--color-primary) !important;
+}
+
+.my-product-tabs button:hover:not(:disabled),
+.my-order-tabs button:hover:not(:disabled) {
+  border-color: var(--color-primary-hover) !important;
+  background: var(--color-primary-hover) !important;
+  color: var(--color-primary-strong) !important;
 }
 
 .my-product-tabs button span,
@@ -2823,6 +2864,12 @@ onMounted(() => {
   opacity: 0.7;
 }
 
+.my-social-card > button:hover:not(:disabled) {
+  border-color: var(--color-primary-hover);
+  background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
+}
+
 .my-social-card__follow--active {
   background: var(--color-surface);
   color: var(--color-primary);
@@ -2889,7 +2936,9 @@ onMounted(() => {
 }
 
 .my-business-status button:hover {
+  border-color: var(--color-primary-hover);
   background: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 .my-business-grid {
@@ -3282,8 +3331,10 @@ onMounted(() => {
   color: var(--color-text-inverse);
 }
 
-.my-tryon-photo__actions button:hover {
-  background: var(--color-surface);
+.my-tryon-photo__actions button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 .my-tryon-photo__actions button:first-child:hover {
@@ -3355,6 +3406,12 @@ onMounted(() => {
   color: var(--color-text-secondary);
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
+}
+
+.my-tryon-actions button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: var(--color-primary-strong);
 }
 
 .my-profile-form__grid {
@@ -3518,11 +3575,16 @@ onMounted(() => {
   font-weight: var(--font-weight-bold);
 }
 
-.my-interest-editor__chips button:hover,
 .my-interest-editor__chip--selected {
   border-color: var(--color-primary) !important;
   background: var(--color-primary-soft) !important;
   color: var(--color-primary) !important;
+}
+
+.my-interest-editor__chips button:hover:not(:disabled) {
+  border-color: var(--color-primary-hover) !important;
+  background: var(--color-primary-hover) !important;
+  color: var(--color-primary-strong) !important;
 }
 
 .my-interest-editor__categories {

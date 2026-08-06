@@ -40,7 +40,6 @@
 | 004 | `004-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API, 예약 라이브 알림 신청/스케줄러, `LIVE_STARTED`/`AUCTION_OUTBID`/`AUCTION_WON` 알림 생성 연동 완료 | 알림 생성 이벤트 4종(주문/배송/포인트)은 서윤 확인 필요. unread count API, 탭별 bulk read API |
 | 019 | `019-product-quality-multi-image.md` | Product | 미반영 | 서윤 파트 |
 | 020 | `020-tryon-result-category.md` | TryOn | 미반영 | 서윤/AI 파트 |
-| 023 | `023-product-similar-list.md` | Product | 부분 반영 | `similarProducts`가 상세 응답에 있으나 필드가 `id/title/price`뿐 — 서윤 파트 |
 | 025 | `025-product-same-price-chart.md` | Product | 미반영 | 서윤 파트 |
 
 **정윤(라이브·경매·채팅·홈·검색) 담당 요청은 전부 반영돼 이 표에 남은 것이 없다.** 위 목록은
@@ -202,6 +201,16 @@
     포함되긴 했으나 필드가 `id/title/price`뿐이고, 요청한 목록-아이템 동일 필드셋이나 별도
     `/similar` 엔드포인트는 아직 없음 — 부분 반영으로 표시.
 - `025-product-same-price-chart.md`는 관련 코드(`market-price` 등) 전혀 없어 미반영 그대로 둠.
+
+## 2026-08-06 정리 (023 삭제 — 유사 판정을 AI가 직접 처리하기로 결정)
+
+- `023-product-similar-list.md` 삭제 — 위 항목에서 "부분 반영"으로 남겨뒀던 것을 뒤집는다.
+  AI 쪽에 이미 상품 의류 이미지 임베딩(zero-shot CLIP, 품질검수 SAM3 크롭 재사용)과 pgvector
+  코사인 유사도 조회가 구현돼 있어(`AI/app/recommend/similar/`, `GET /recommend/products/{id}/similar`),
+  "유사 판정 기준은 BE 결정"이라는 023의 전제 대신 **AI가 유사 판정 자체를 맡는다.** BE는
+  이 엔드포인트를 그대로 쓰거나 자체 규칙으로 갈 필요가 없어졌다 — 통합 방식(BE가 AI 엔드포인트를
+  호출/캐시할지, AI가 결과를 직접 BE로 push할지)은 별도 논의.
+- FE `getSimilarProducts`(mock)를 실제로 붙일 대상이 필요해지면 그때 새 요청 문서로 정리한다.
 
 ## 2026-08-06 정리 (브랜치 이동 후 재정리)
 
