@@ -20,11 +20,42 @@ def test_saves_embedding_when_present(monkeypatch):
             "product_id": 42,
             "garment_embedding": [0.1, 0.2],
             "garment_embedding_model_id": "patrickjohncyh/fashion-clip",
+            "garment_category": "TOP_KNIT",
         }
     )
 
     assert calls == [
-        {"product_id": 42, "embedding": [0.1, 0.2], "model_id": "patrickjohncyh/fashion-clip"}
+        {
+            "product_id": 42,
+            "embedding": [0.1, 0.2],
+            "model_id": "patrickjohncyh/fashion-clip",
+            "category": "TOP_KNIT",
+        }
+    ]
+
+
+def test_saves_embedding_with_category_none_when_missing(monkeypatch):
+    """`garment_category`가 없어도(옛 워커/부분 실패) 저장 자체는 그대로 진행돼야 한다."""
+    calls = []
+    monkeypatch.setattr(
+        embedding_store, "save_garment_embedding", lambda **kwargs: calls.append(kwargs)
+    )
+
+    gateway_router._ingest_quality_embedding_result(
+        {
+            "product_id": 42,
+            "garment_embedding": [0.1, 0.2],
+            "garment_embedding_model_id": "patrickjohncyh/fashion-clip",
+        }
+    )
+
+    assert calls == [
+        {
+            "product_id": 42,
+            "embedding": [0.1, 0.2],
+            "model_id": "patrickjohncyh/fashion-clip",
+            "category": None,
+        }
     ]
 
 
