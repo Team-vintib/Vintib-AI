@@ -78,6 +78,13 @@ def generate_from_image(
 
     `describe_defect()`는 이 함수 위에 CH009 기본 프롬프트를 얹은 얇은 래퍼다 — 노트북에서
     프롬프트 문구 자체를 바꿔보고 싶으면 이 함수를 직접 호출한다.
+
+    2026-08-06 실측: `do_sample`을 안 정해주면 Qwen3-VL-Instruct 체크포인트에 내장된
+    `generation_config.json`의 샘플링 기본값이 그대로 적용돼서, **같은 이미지·같은
+    프롬프트로 다시 불러도 매번 다른 문장이 나온다** — 배치 방식 응답이 한 번은 findings와
+    무관한 로고 텍스트를 반복하고, 바로 다음 번엔 위치·유형에 맞는 문장이 나오는 게 실제로
+    재현됐다(같은 코드, 같은 입력). "이 방식을 채택할 만한가"를 판단하려면 운에 흔들리지
+    않는 결정적 출력이 필요해서 `do_sample=False`(greedy)로 고정한다.
     """
     import torch
 
@@ -99,7 +106,9 @@ def generate_from_image(
     ).to(bundle.model.device)
 
     with torch.no_grad():
-        generated_ids = bundle.model.generate(**inputs, max_new_tokens=max_new_tokens)
+        generated_ids = bundle.model.generate(
+            **inputs, max_new_tokens=max_new_tokens, do_sample=False
+        )
     trimmed = generated_ids[0][inputs["input_ids"].shape[-1] :]
     return bundle.processor.decode(trimmed, skip_special_tokens=True).strip()
 
