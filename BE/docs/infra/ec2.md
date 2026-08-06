@@ -16,12 +16,18 @@
 
 | 포트 | 용도 | 노출 |
 | --- | --- | --- |
-| 22 | SSH | 공개 (UFW) |
-| 80 | HTTP → HTTPS 리다이렉트 + Let's Encrypt ACME | 공개 (UFW) |
-| 443 | HTTPS (Caddy TLS 종단) | 공개 (UFW) |
-| 7881 | WebRTC 미디어 TCP 폴백 (LiveKit) | 공개 (**Docker publish**) |
-| 7885/udp | WebRTC 미디어 UDP mux (LiveKit) | 공개 (**Docker publish**) |
-| 8989 | **Gerrit (SSAFY, 건드리지 말 것)** | 공개 (UFW) |
+| 22 | SSH | 공개 |
+| 80 | **WebRTC 미디어 TCP (LiveKit)** — JY012 로 Caddy 에서 넘겨받았다 | 공개 |
+| 443 | HTTPS (Caddy TLS 종단) + WebRTC 시그널링 | 공개 |
+| 8989 | **Gerrit (SSAFY, 건드리지 말 것)** | 공개 |
+| 7885/udp | WebRTC 미디어 UDP mux (LiveKit) | **상위 방화벽에서 차단됨 — 현재 못 씀** |
+
+> ⚠️ **SSAFY 상위 방화벽이 TCP 22·80·443·8989 만 통과시킨다.** UFW 에 규칙을 넣고 호스트가
+> LISTEN 해도 그 외 포트는 패킷이 인스턴스에 닿지 않는다. UDP 는 443 을 포함해 전 포트가 막혀
+> 있다. 웹 콘솔이 제공되지 않아 이 방화벽은 우리가 보거나 고칠 수 없다.
+>
+> 그래서 미디어를 80 으로 옮겼다(JY012). 80 을 쓰려면 Caddy 가 그 포트를 비워야 하므로
+> `http://` → `https://` 리다이렉트를 포기하고 ACME 를 TLS-ALPN-01 로 돌렸다.
 
 **앱 내부 포트(8080 backend / 5432 postgres / 6379 redis / 8000 ai)는 호스트에 노출하지 않는다.** Docker는 포트 publish 시 iptables를 직접 조작해 UFW를 우회하므로, 이들을 publish하면 UFW와 무관하게 외부에 뚫린다. 전부 `vintib-net` 내부 통신 전용이며, 외부 접근은 Caddy(443)를 통해서만 backend로 들어간다.
 
@@ -173,7 +179,14 @@ OpenVidu v3 Community 번들은 **자체 Caddy·Redis·MinIO·MongoDB·대시보
 
 **미디어는 Caddy를 통과할 수 없다.** 리버스 프록시가 다룰 수 있는 HTTP가 아니라 브라우저와 서버가 직접 주고받는 UDP 스트림이기 때문이다. 그래서 이 두 포트만은 호스트에 publish한다.
 
-> ⚠️ Docker는 publish 시 iptables를 직접 조작해 **UFW를 우회한다.** 즉 7885/7881은 UFW 규칙과 무관하게 외부에 열린다. **이건 실수가 아니라 의도다** — 시청자가 어디서든 붙어야 한다. `infra/ec2/setup-ufw-media.sh`로 UFW에도 규칙을 넣는 이유는 `ufw status`가 서버의 실제 개방 상태를 그대로 보여주게 하기 위해서다.
+> ⚠️ **한때 "Docker publish 가 UFW 를 우회하므로 미디어 포트는 어차피 외부에 열린다"고 적어
+> 두었는데, 그 판단이 틀렸다.** 호스트 방화벽(UFW) 기준으로는 맞지만 **상위 방화벽 앞에서는
+> 무의미하다.** 실제로 UFW 에 7885/7881 이 허용돼 있고 호스트도 LISTEN 중이었는데 외부에서
+> 닿지 않았다 — tcpdump 에 나가는 패킷만 48개, 들어오는 패킷 0개였다.
+>
+> 열려 있는 포트(22·80·443·8989)와 막힌 포트(7881)가 UFW 상 동일하게 허용돼 있었다는 점이
+> 결정적 증거다. 진단할 때 `ufw status` 와 `ss` 만 보면 "열려 있다"고 오판하게 된다.
+> **외부에서 실제로 찔러 봐야 한다.**
 
 **미디어 포트는 단일 포트로 묶었다(UDP mux).** 기본값은 50000-60000 범위인데, 그러면 UFW에 만 개짜리 규칙이 생기고 Docker publish도 그만큼 느려진다. 우리 규모에서는 차이가 없다.
 
