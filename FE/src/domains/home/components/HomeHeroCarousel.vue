@@ -3,11 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { registerLiveReminder } from '@/domains/live/api/liveWatchApi'
-import type {
-  HomePopularHostLive,
-  HomeProductCardItem,
-  HomeViewData,
-} from '@/domains/home/types/homeView.types'
+import type { HomePopularHostLive, HomeViewData } from '@/domains/home/types/homeView.types'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import type { RouteLocationRaw } from 'vue-router'
 
@@ -41,12 +37,20 @@ const MANUAL_PAUSE_DELAY = 6000
 const fallbackImages = {
   live:
     'https://images.unsplash.com/photo-1516762689617-e1cffcef479d?auto=format&fit=crop&w=1200&q=80',
+  upcoming:
+    'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80',
+  popularHost:
+    'https://images.unsplash.com/photo-1524253482453-3fed8d2fe12b?auto=format&fit=crop&w=1200&q=80',
+  discoverBackground:
+    'https://images.unsplash.com/photo-1490114538077-0a7f8cb49891?auto=format&fit=crop&w=1200&q=80',
   discover:
     'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1200&q=80',
   jacket:
     'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=80',
   knit:
     'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=900&q=80',
+  rack:
+    'https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=900&q=80',
   studio:
     'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
 }
@@ -77,21 +81,13 @@ const selectedScheduledLive = computed(() =>
     return firstTime - secondTime
   })[0],
 )
-const productImageCandidates = computed(() =>
-  getUniqueImageUrls([
-    ...props.homeData.recommendedProducts,
-    ...props.homeData.directSaleProducts,
-    ...props.homeData.upcomingAuctionProducts,
-    ...props.homeData.categoryProductSections.flatMap((section) => section.products),
-  ]),
-)
-const discoverCollageImages = computed(() =>
-  fillImageSlots(productImageCandidates.value, [
-    fallbackImages.discover,
-    fallbackImages.jacket,
-    fallbackImages.knit,
-  ]),
-)
+// 상품 데이터 유무와 무관하게 항상 같은 4장을 보여준다(홈 배너 고정 이미지 요청).
+const discoverCollageImages = [
+  fallbackImages.discover,
+  fallbackImages.jacket,
+  fallbackImages.knit,
+  fallbackImages.rack,
+]
 
 const liveEntrySlide = computed<HeroSlide>(() => {
   if (selectedLive.value) {
@@ -122,7 +118,7 @@ const liveEntrySlide = computed<HeroSlide>(() => {
     to: scheduledLive ? getLiveWatchRoute(scheduledLive.id) : { name: ROUTE_NAMES.LIVE_LIST },
     tone: 'live',
     visualKind: 'scheduled',
-    imageUrl: scheduledLive?.thumbnailUrl || fallbackImages.live,
+    imageUrl: scheduledLive?.thumbnailUrl || fallbackImages.upcoming,
     imageAlt: scheduledLive?.title ?? '예약 라이브 대표 이미지',
   }
 })
@@ -152,7 +148,7 @@ const popularHostLiveSlide = computed<HeroSlide | null>(() => {
     to: getLiveWatchRoute(live.id),
     tone: 'live',
     visualKind: 'scheduled',
-    imageUrl: live.thumbnailUrl || fallbackImages.live,
+    imageUrl: live.thumbnailUrl || fallbackImages.popularHost,
     imageAlt: live.title,
     onCtaClick: () => handlePopularHostReminderClick(live.id),
   }
@@ -170,9 +166,9 @@ const slides = computed<HeroSlide[]>(() => [
     to: { name: ROUTE_NAMES.PRODUCT_LIST },
     tone: 'discover',
     visualKind: 'collage',
-    imageUrl: fallbackImages.discover,
+    imageUrl: fallbackImages.discoverBackground,
     imageAlt: '매거진 화보처럼 배치된 빈티지 의류',
-    collageImages: discoverCollageImages.value,
+    collageImages: discoverCollageImages,
   },
   {
     id: 'sell-vintage',
@@ -218,14 +214,6 @@ function getLiveWatchRoute(liveId: number): RouteLocationRaw {
     name: ROUTE_NAMES.LIVE_WATCH,
     params: { liveId },
   }
-}
-
-function getUniqueImageUrls(products: HomeProductCardItem[]) {
-  return [...new Set(products.map((product) => product.primaryImageUrl).filter(Boolean))]
-}
-
-function fillImageSlots(imageUrls: string[], fallbackUrls: string[]) {
-  return [...new Set([...imageUrls, ...fallbackUrls])].slice(0, 3)
 }
 
 function moveTo(index: number) {
@@ -719,6 +707,13 @@ onBeforeUnmount(() => {
   height: 38%;
 }
 
+.home-hero-slide__collage-image--4 {
+  bottom: 6%;
+  left: 10%;
+  width: 30%;
+  height: 30%;
+}
+
 .home-hero-carousel__arrow {
   position: absolute;
   z-index: var(--z-layer-3);
@@ -854,6 +849,11 @@ onBeforeUnmount(() => {
     bottom: 30%;
     width: 24%;
     height: 28%;
+  }
+
+  // 좁은 화면에서는 3장만으로도 꽉 차서, 4번째는 겹침을 피하려 숨긴다.
+  .home-hero-slide__collage-image--4 {
+    display: none;
   }
 }
 

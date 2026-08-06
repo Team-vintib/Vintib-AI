@@ -62,6 +62,7 @@ public class ProductQueryAdapter implements ProductQueryPort {
                         product.getBrandId() == null ? null : brandNameById.get(product.getBrandId()),
                         product.getPrice(),
                         product.getSaleType() == null ? null : product.getSaleType().name(),
+                        product.getSaleStatus() == null ? null : product.getSaleStatus().name(),
                         product.getConditionGrade(),
                         thumbnailByProductId.get(product.getId()),
                         product.getMaterial(),
