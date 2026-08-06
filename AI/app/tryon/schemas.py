@@ -125,3 +125,46 @@ class TryOnOptions(BaseModel):
             "느슨하게 결합한다."
         ),
     )
+
+
+# --- 상품 등록 "AI 착용컷" (S15P11A108-568) -------------------------------------
+# 페르소나(희동이/도우너) 참조 사진을 실제 고객 사진 자리에 넣어 재사용하는 별도
+# 트리거. 추론 자체는 위 TryOnOptions와 같은 job(type="tryon")을 그대로 쓴다 —
+# 이 스키마는 "페르소나 URL을 무엇으로 넣을지" BE가 몰라도 되게 여기서 대신 정해주는
+# 얇은 계층이다. 설계: `docs/plans/AI/CH021-registration-ai-model-tryon.md`.
+
+
+class PersonaGender(str, Enum):
+    """FE 등록 화면의 성별 토글 값. FEMALE -> 도우너, MALE -> 희동이."""
+
+    FEMALE = "FEMALE"
+    MALE = "MALE"
+
+
+class RegistrationModelCutRequest(BaseModel):
+    """`POST /ai/tryon/registration-model-cut` 요청 바디.
+
+    페르소나 참조 사진은 AI가 자체 호스팅한다(`app/static/personas/`) — BE가 URL을
+    몰라도 되고, 업로드·관리도 필요 없다. BE는 상품 사진 URL과 성별만 넘기면 된다.
+    """
+
+    product_image_url: str = Field(description="판매자가 등록 중 올린 상품 사진 URL")
+    gender: PersonaGender = Field(description="FEMALE -> 도우너, MALE -> 희동이")
+    mask_type: MaskType = Field(
+        default=MaskType.upper,
+        description=(
+            "마스킹할 의류 부위. AI는 상품 카테고리를 모르므로 BE가 카테고리 기준으로 "
+            "정해 보내야 한다(하의 카테고리면 lower, 그 외엔 upper)."
+        ),
+    )
+
+
+class RegistrationModelCutEnqueued(BaseModel):
+    """`POST /ai/tryon/registration-model-cut`의 응답 — 접수증이다.
+
+    결과는 기존 게이트웨이 공통 경로 `GET /ai/jobs/{job_id}`로 폴링한다. 새 조회
+    엔드포인트를 따로 만들지 않았다 — 내부적으로 일반 `tryon` job과 완전히 같은
+    큐·결과 계약을 쓰기 때문이다.
+    """
+
+    job_id: str = Field(description="게이트웨이가 채번한 job id. 이 값으로 결과를 폴링한다")
