@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
-import logoImage from '@/assets/images/logo.png'
+import logoImage from '@/assets/images/logo-white.png'
 import { getSsafySsoStartUrl } from '@/domains/auth/api/authApi'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 

@@ -10,8 +10,7 @@ const props = withDefaults(
     product: HomeProductCardItem
     isWished?: boolean
     to?: RouteLocationRaw
-    badgeLabel?: string
-    badgeVariant?: 'direct' | 'auction'
+    gradeLabel?: string
     pricePrefix?: string
     actionTo?: RouteLocationRaw
     actionLabel?: string
@@ -19,8 +18,7 @@ const props = withDefaults(
   {
     isWished: false,
     to: undefined,
-    badgeLabel: undefined,
-    badgeVariant: undefined,
+    gradeLabel: undefined,
     pricePrefix: '',
     actionTo: undefined,
     actionLabel: undefined,
@@ -44,7 +42,7 @@ const handleImageError = (event: Event) => {
 
 const formatPrice = (value?: number) => {
   if (value === undefined) {
-    return '시작가 미정'
+    return '경매 예정'
   }
 
   return `${value.toLocaleString('ko-KR')}P`
@@ -63,15 +61,8 @@ const formatPrice = (value?: number) => {
         :alt="product.title"
         @error="handleImageError"
       />
-      <span
-        v-if="badgeLabel"
-        class="product-card__tag"
-        :class="{
-          'product-card__tag--auction': badgeVariant === 'auction',
-          'product-card__tag--direct': badgeVariant === 'direct',
-        }"
-      >
-        {{ badgeLabel }}
+      <span v-if="gradeLabel" class="product-card__grade">
+        {{ gradeLabel }}
       </span>
       <button
         class="product-card__wish"
@@ -92,7 +83,9 @@ const formatPrice = (value?: number) => {
       <span class="product-card__brand">{{ product.brandName }}</span>
       <span class="product-card__seller">판매자 {{ product.sellerName }}</span>
       <strong class="product-card__title">{{ product.title }}</strong>
-      <span class="product-card__price">{{ pricePrefix }}{{ formatPrice(product.price) }}</span>
+      <span class="product-card__price">{{
+        product.price !== undefined ? `${pricePrefix}${formatPrice(product.price)}` : formatPrice(product.price)
+      }}</span>
       <span class="product-card__meta">{{ product.categoryName }}</span>
       <span v-if="product.startingBid" class="product-card__bid">
         경매 시작가 {{ formatPrice(product.startingBid) }}
@@ -164,31 +157,21 @@ const formatPrice = (value?: number) => {
   filter: saturate(0.88) contrast(1.04) brightness(1.03);
 }
 
-.product-card__tag {
+.product-card__grade {
   position: absolute;
   z-index: var(--z-layer-1);
-  top: 0;
-  left: 0;
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--space-6);
-  padding: 0 10px;
-  border-radius: 0 0 var(--radius-badge) 0;
+  top: var(--space-2);
+  left: var(--space-2);
+  padding: 5px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
   background: var(--overlay-scrim-strong);
   color: var(--color-text-primary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-badge);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.08em;
-  line-height: var(--line-height-snug);
-}
-
-.product-card__tag--auction {
-  background: var(--color-accent);
-}
-
-.product-card__tag--direct {
-  background: var(--overlay-scrim-strong);
+  font-size: calc(var(--font-size-caption) - 1px);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.03em;
+  line-height: var(--line-height-xs);
+  backdrop-filter: blur(4px);
 }
 
 .product-card__wish {
@@ -198,13 +181,17 @@ const formatPrice = (value?: number) => {
   right: var(--space-2);
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-badge);
-  background: var(--overlay-scrim-medium);
-  color: var(--color-text-secondary);
-  backdrop-filter: blur(2px);
+  width: var(--button-height-small);
+  height: var(--button-height-small);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: var(--overlay-scrim-strong);
+  color: var(--color-text-primary);
+  backdrop-filter: blur(4px);
+  transition:
+    border-color var(--transition-base),
+    color var(--transition-base),
+    transform var(--transition-base);
 }
 
 .product-card__wish svg {
@@ -219,7 +206,9 @@ const formatPrice = (value?: number) => {
 
 .product-card__wish:hover,
 .product-card__wish--active {
+  border-color: var(--color-auction);
   color: var(--color-auction);
+  transform: scale(1.05);
 }
 
 .product-card__wish--active svg {
@@ -271,7 +260,7 @@ const formatPrice = (value?: number) => {
 .product-card__price {
   margin-top: 2px;
   color: var(--color-text-primary);
-  font-family: var(--font-mono);
+  font-family: inherit;
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
   letter-spacing: -0.02em;
@@ -281,7 +270,7 @@ const formatPrice = (value?: number) => {
 
 .product-card__bid {
   color: var(--color-accent);
-  font-family: var(--font-mono);
+  font-family: inherit;
   font-weight: var(--font-weight-medium);
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;

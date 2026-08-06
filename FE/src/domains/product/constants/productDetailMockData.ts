@@ -22,7 +22,7 @@ export const buildMockProductDetail = (productId: number): ProductDetailViewData
   description:
     '미국 오리건 현지에서 직접 셀렉한 빈티지 레더 라이더 재킷입니다. 은은한 사용감이 있으나 원단과 스티치 상태가 양호합니다. 안감 교체 이력은 없습니다.',
   category: '아우터',
-  conditionLabel: '사용감 적음',
+  conditionLabel: 'S급',
   sizeLabel: 'M (100)',
   material: '카우하이드 레더',
   color: '블랙',

@@ -1,30 +1,33 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { BroadcastEndSummary } from '@/domains/live/constants/liveBroadcastEndMock'
+import type { BroadcastEndSummary } from '@/domains/auction/types/liveAuction.types'
 
 const props = defineProps<{
   title: string
   elapsedTime: string
   peakViewerCount: number | null
-  summary: BroadcastEndSummary
+  summary: BroadcastEndSummary | null
+  manageableUnsoldCount: number
+  isLoading: boolean
+  errorMessage: string
 }>()
 
 const emit = defineEmits<{
+  retry: []
   'to-list': []
   'manage-unsold': []
 }>()
 
-const unsoldResults = computed(() =>
-  props.summary.results.filter((result) => result.outcome === 'UNSOLD'),
+const productCount = computed(() => props.summary?.results.length ?? 0)
+const unsoldResults = computed(
+  () => props.summary?.results.filter((result) => result.status === 'UNSOLD') ?? [],
 )
 
 const formatPrice = (value: number) => `${value.toLocaleString('ko-KR')}P`
-
-const outcomeLabel: Record<string, string> = {
-  WON: '낙찰',
-  UNSOLD: '미낙찰',
-  NOT_AUCTIONED: '경매 안 함',
+const resultLabel = (status: 'SOLD' | 'UNSOLD', soldVia: 'AUCTION' | 'DIRECT_SALE' | null) => {
+  if (status === 'UNSOLD') return '미판매'
+  return soldVia === 'AUCTION' ? '낙찰' : '판매'
 }
 </script>
 
@@ -36,64 +39,94 @@ const outcomeLabel: Record<string, string> = {
       <p class="broadcast-end__subtitle">방송 결과를 정리했어요.</p>
     </header>
 
-    <dl class="broadcast-end__stats">
-      <div class="broadcast-end__stat">
-        <dt>방송 시간</dt>
-        <dd>{{ elapsedTime }}</dd>
-      </div>
-      <div class="broadcast-end__stat">
-        <dt>최고 시청자</dt>
-        <dd>{{ peakViewerCount !== null ? `${peakViewerCount.toLocaleString('ko-KR')}명` : '-' }}</dd>
-      </div>
-      <div class="broadcast-end__stat">
-        <dt>낙찰</dt>
-        <dd>{{ summary.soldCount }} / {{ summary.productCount }}개</dd>
-      </div>
-      <div class="broadcast-end__stat broadcast-end__stat--accent">
-        <dt>총 판매액</dt>
-        <dd>{{ formatPrice(summary.totalSales) }}</dd>
-      </div>
-    </dl>
-
-    <div class="broadcast-end__section">
-      <h2 class="broadcast-end__section-title">상품별 결과</h2>
-      <ul class="broadcast-end__list">
-        <li v-for="result in summary.results" :key="result.productId" class="broadcast-end__item">
-          <div class="broadcast-end__item-main">
-            <span
-              class="broadcast-end__outcome"
-              :class="`broadcast-end__outcome--${result.outcome.toLowerCase()}`"
-            >
-              {{ outcomeLabel[result.outcome] }}
-            </span>
-            <span class="broadcast-end__item-title">{{ result.title }}</span>
-          </div>
-          <div class="broadcast-end__item-meta">
-            <template v-if="result.outcome === 'WON'">
-              <span class="broadcast-end__winner">{{ result.winnerNickname }}</span>
-              <strong class="broadcast-end__price">{{ formatPrice(result.finalPrice ?? 0) }}</strong>
-            </template>
-            <span v-else class="broadcast-end__item-none">—</span>
-          </div>
-        </li>
-      </ul>
+    <div v-if="isLoading" class="broadcast-end__state" role="status">
+      방송 결과를 불러오는 중입니다.
     </div>
 
-    <!-- 미낙찰 처리 진입 (실제 경매 재시도/상시 판매 선택 동작은 440에서). 미낙찰 없으면 숨김. -->
-    <div v-if="summary.unsoldCount > 0" class="broadcast-end__section broadcast-end__unsold">
-      <h2 class="broadcast-end__section-title">
-        남은 상품 {{ summary.unsoldCount }}개
-      </h2>
-      <p class="broadcast-end__unsold-desc">
-        낙찰되지 않은 상품이에요. 상시 판매로 전환하거나 경매 예정으로 되돌릴 수 있어요.
-      </p>
-      <ul class="broadcast-end__unsold-list">
-        <li v-for="result in unsoldResults" :key="result.productId">{{ result.title }}</li>
-      </ul>
-      <button type="button" class="broadcast-end__unsold-action" @click="emit('manage-unsold')">
-        남은 상품 관리
-      </button>
+    <div v-else-if="errorMessage" class="broadcast-end__state broadcast-end__state--error">
+      <p>{{ errorMessage }}</p>
+      <button type="button" @click="emit('retry')">다시 시도</button>
     </div>
+
+    <template v-else-if="summary">
+      <dl class="broadcast-end__stats">
+        <div class="broadcast-end__stat">
+          <dt>방송 시간</dt>
+          <dd>{{ elapsedTime }}</dd>
+        </div>
+        <div class="broadcast-end__stat">
+          <dt>최고 시청자</dt>
+          <dd>
+            {{ peakViewerCount !== null ? `${peakViewerCount.toLocaleString('ko-KR')}명` : '-' }}
+          </dd>
+        </div>
+        <div class="broadcast-end__stat">
+          <dt>판매 완료</dt>
+          <dd>{{ summary.soldCount }} / {{ productCount }}개</dd>
+        </div>
+        <div class="broadcast-end__stat broadcast-end__stat--accent">
+          <dt>총 판매액</dt>
+          <dd>{{ formatPrice(summary.totalSales) }}</dd>
+        </div>
+      </dl>
+
+      <div class="broadcast-end__section">
+        <h2 class="broadcast-end__section-title">상품별 결과</h2>
+        <p v-if="summary.results.length === 0" class="broadcast-end__empty">
+          판매 결과가 없습니다.
+        </p>
+        <ul v-else class="broadcast-end__list">
+          <li
+            v-for="result in summary.results"
+            :key="result.productId"
+            class="broadcast-end__item"
+          >
+            <div class="broadcast-end__item-main">
+              <span
+                class="broadcast-end__outcome"
+                :class="`broadcast-end__outcome--${result.status.toLowerCase()}`"
+              >
+                {{ resultLabel(result.status, result.soldVia) }}
+              </span>
+              <span class="broadcast-end__item-title">{{ result.title }}</span>
+            </div>
+            <div class="broadcast-end__item-meta">
+              <span v-if="result.status === 'SOLD'" class="broadcast-end__method">
+                {{ result.soldVia === 'AUCTION' ? '경매' : '상시 판매' }}
+              </span>
+              <strong v-if="result.finalPrice !== null" class="broadcast-end__price">
+                {{ formatPrice(result.finalPrice) }}
+              </strong>
+              <span v-else class="broadcast-end__item-none">—</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div
+        v-if="summary.unsoldCount > 0"
+        class="broadcast-end__section broadcast-end__unsold"
+      >
+        <h2 class="broadcast-end__section-title">미판매 상품 {{ summary.unsoldCount }}개</h2>
+        <p class="broadcast-end__unsold-desc">
+          방송에서 판매되지 않은 상품이에요.
+          <template v-if="manageableUnsoldCount > 0">
+            경매가 유찰된 {{ manageableUnsoldCount }}개 상품은 판매 방식을 정할 수 있어요.
+          </template>
+        </p>
+        <ul class="broadcast-end__unsold-list">
+          <li v-for="result in unsoldResults" :key="result.productId">{{ result.title }}</li>
+        </ul>
+        <button
+          v-if="manageableUnsoldCount > 0"
+          type="button"
+          class="broadcast-end__unsold-action"
+          @click="emit('manage-unsold')"
+        >
+          유찰 상품 관리
+        </button>
+      </div>
+    </template>
 
     <div class="broadcast-end__actions">
       <button type="button" class="broadcast-end__to-list" @click="emit('to-list')">
@@ -114,10 +147,11 @@ const outcomeLabel: Record<string, string> = {
   padding: var(--space-6) var(--space-4) var(--space-8);
 }
 
-.broadcast-end__head {
+.broadcast-end__head,
+.broadcast-end__section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .broadcast-end__badge {
@@ -128,7 +162,6 @@ const outcomeLabel: Record<string, string> = {
   color: var(--color-live-text-secondary);
   font-size: var(--font-size-2xs);
   font-weight: var(--font-weight-bold);
-  letter-spacing: 0.04em;
 }
 
 .broadcast-end__title {
@@ -137,9 +170,36 @@ const outcomeLabel: Record<string, string> = {
   font-weight: var(--font-weight-extrabold);
 }
 
-.broadcast-end__subtitle {
+.broadcast-end__subtitle,
+.broadcast-end__empty,
+.broadcast-end__state {
   color: var(--color-live-text-secondary);
   font-size: var(--font-size-caption);
+}
+
+.broadcast-end__state {
+  padding: var(--space-5);
+  border: 1px solid var(--color-live-border);
+  border-radius: var(--radius-control);
+  background: var(--color-live-surface);
+  text-align: center;
+}
+
+.broadcast-end__state--error {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: var(--space-3);
+  color: var(--color-error);
+}
+
+.broadcast-end__state button {
+  min-height: var(--button-height-tight);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-live-border);
+  border-radius: var(--radius-control);
+  background: var(--color-live-surface-raised);
+  color: var(--color-live-text-primary);
 }
 
 .broadcast-end__stats {
@@ -173,12 +233,6 @@ const outcomeLabel: Record<string, string> = {
   color: var(--color-live);
 }
 
-.broadcast-end__section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
 .broadcast-end__section-title {
   color: var(--color-live-text-primary);
   font-size: var(--font-size-button-small);
@@ -186,8 +240,6 @@ const outcomeLabel: Record<string, string> = {
 }
 
 .broadcast-end__list {
-  display: flex;
-  flex-direction: column;
   border: 1px solid var(--color-live-border);
   border-radius: var(--radius-control);
   overflow: hidden;
@@ -206,11 +258,16 @@ const outcomeLabel: Record<string, string> = {
   border-top: 1px solid var(--color-live-border);
 }
 
-.broadcast-end__item-main {
+.broadcast-end__item-main,
+.broadcast-end__item-meta {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: var(--space-2);
+}
+
+.broadcast-end__item-meta {
+  flex-shrink: 0;
 }
 
 .broadcast-end__outcome {
@@ -221,7 +278,7 @@ const outcomeLabel: Record<string, string> = {
   font-weight: var(--font-weight-bold);
 }
 
-.broadcast-end__outcome--won {
+.broadcast-end__outcome--sold {
   background: var(--color-live);
   color: var(--color-text-inverse);
 }
@@ -229,11 +286,6 @@ const outcomeLabel: Record<string, string> = {
 .broadcast-end__outcome--unsold {
   background: color-mix(in srgb, var(--color-error) 22%, transparent);
   color: var(--color-error);
-}
-
-.broadcast-end__outcome--not_auctioned {
-  background: var(--color-live-surface-raised);
-  color: var(--color-live-text-secondary);
 }
 
 .broadcast-end__item-title {
@@ -245,14 +297,8 @@ const outcomeLabel: Record<string, string> = {
   white-space: nowrap;
 }
 
-.broadcast-end__item-meta {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.broadcast-end__winner {
+.broadcast-end__method,
+.broadcast-end__item-none {
   color: var(--color-live-text-secondary);
   font-size: var(--font-size-xs);
 }
@@ -261,11 +307,6 @@ const outcomeLabel: Record<string, string> = {
   color: var(--color-live-text-primary);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-extrabold);
-}
-
-.broadcast-end__item-none {
-  color: var(--color-live-text-secondary);
-  font-size: var(--font-size-caption);
 }
 
 .broadcast-end__unsold {
@@ -296,41 +337,32 @@ const outcomeLabel: Record<string, string> = {
   font-size: var(--font-size-xs);
 }
 
-.broadcast-end__unsold-action {
-  min-height: var(--button-height-tight);
-  margin-top: var(--space-2);
-  padding: 0 var(--space-5);
-  border: 0;
+.broadcast-end__unsold-action,
+.broadcast-end__to-list {
+  min-height: var(--button-height-compact);
   border-radius: var(--radius-control);
-  background: var(--color-live);
-  color: var(--color-text-inverse);
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
-.broadcast-end__unsold-action:hover {
-  opacity: 0.92;
+.broadcast-end__unsold-action {
+  margin-top: var(--space-2);
+  padding: 0 var(--space-5);
+  border: 0;
+  background: var(--color-live);
+  color: var(--color-text-inverse);
 }
 
 .broadcast-end__actions {
   display: flex;
   margin-top: var(--space-2);
-  padding-top: var(--space-2);
 }
 
 .broadcast-end__to-list {
-  min-height: var(--button-height-compact);
   flex: 1;
   border: 1px solid var(--color-live-border);
-  border-radius: var(--radius-control);
   background: var(--color-live-surface);
   color: var(--color-live-text-primary);
-  font-size: var(--font-size-button-small);
-  font-weight: var(--font-weight-bold);
-}
-
-.broadcast-end__to-list:hover {
-  background: var(--color-live-surface-raised);
 }
 
 @media (max-width: 720px) {

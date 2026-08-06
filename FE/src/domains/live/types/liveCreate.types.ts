@@ -23,6 +23,7 @@ export interface LiveCreateProduct {
   category: string
   condition: string
   price: number
+  isAuctionScheduled: boolean
   thumbnailUrl: string
 }
 

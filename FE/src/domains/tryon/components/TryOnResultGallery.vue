@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
@@ -68,6 +68,20 @@ const handleDelete = (resultId: number) => {
 const goToProductList = () => {
   void router.push({ path: ROUTE_PATHS.PRODUCT_LIST })
 }
+
+const handleKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    closeDetail()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
@@ -130,7 +144,12 @@ const goToProductList = () => {
     </template>
 
     <div v-if="selectedResult" class="tryon-results__overlay" @click.self="closeDetail">
-      <div class="tryon-results__detail" role="dialog" aria-label="시착 결과 상세" aria-modal="true">
+      <div
+        class="tryon-results__detail"
+        role="dialog"
+        aria-label="시착 결과 상세"
+        aria-modal="true"
+      >
         <button type="button" class="tryon-results__detail-close" aria-label="닫기" @click="closeDetail">
           ×
         </button>
@@ -363,18 +382,22 @@ const goToProductList = () => {
   z-index: 100;
   display: grid;
   place-items: center;
-  padding: var(--space-6);
-  background: rgba(10, 10, 10, 0.85);
-  backdrop-filter: blur(2px);
+  padding: 24px;
+  background: rgba(4, 4, 4, 0.92);
+  backdrop-filter: blur(4px);
 }
 
 .tryon-results__detail {
+  display: grid;
   position: relative;
-  width: min(420px, 100%);
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
+  width: min(880px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-card);
   background: var(--color-surface);
+  grid-template-columns: minmax(0, 1fr);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .tryon-results__detail-close {
@@ -386,28 +409,35 @@ const goToProductList = () => {
   height: 36px;
   border: 1px solid var(--color-border);
   border-radius: 50%;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: 22px;
+  background: rgba(10, 10, 10, 0.82);
+  color: #fff;
+  font-size: 24px;
   line-height: 1;
   place-items: center;
 }
 
 .tryon-results__detail-image {
-  overflow: hidden;
-  aspect-ratio: 3 / 4;
-  border-radius: var(--radius-media);
-  background: var(--color-surface-secondary);
+  display: grid;
+  min-height: 0;
+  background: #050505;
+  place-items: center;
 }
 
 .tryon-results__detail-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: min(72vh, 760px);
+  object-fit: contain;
 }
 
 .tryon-results__detail-info {
-  margin-top: var(--space-4);
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--space-6);
 }
 
 .tryon-results__detail-date {
@@ -421,6 +451,7 @@ const goToProductList = () => {
 
 .tryon-results__detail-actions {
   display: flex;
+  width: min(520px, 100%);
   gap: var(--space-3);
   margin-top: var(--space-4);
 }
@@ -443,5 +474,20 @@ const goToProductList = () => {
   border: 0;
   background: var(--color-error-soft);
   color: var(--color-error);
+}
+
+@media (max-width: 720px) {
+  .tryon-results__detail {
+    width: min(100%, calc(100vw - 24px));
+    max-height: calc(100vh - 24px);
+  }
+
+  .tryon-results__detail-image img {
+    max-height: min(68vh, 640px);
+  }
+
+  .tryon-results__detail-info {
+    padding: var(--space-4);
+  }
 }
 </style>
