@@ -11,6 +11,8 @@ export const POINT_CHARGE_MIN_AMOUNT = 10_000
 export const POINT_WITHDRAWAL_MIN_AMOUNT = 10_000
 export const POINT_QUICK_CHARGE_AMOUNTS = [10_000, 30_000, 50_000, 100_000]
 
+// 입찰 보류/해제(HOLD/HOLD_RELEASE)는 낙찰로 이어지지 않는 한 내역에 노출하지 않으므로
+// 필터/라벨 목록에도 없다 — pointApi.ts의 getPointTransactions 참고.
 export const POINT_TRANSACTION_FILTERS: Array<{
   id: PointTransactionType | 'ALL'
   label: string
@@ -18,8 +20,6 @@ export const POINT_TRANSACTION_FILTERS: Array<{
   { id: 'ALL', label: '전체' },
   { id: 'CHARGE', label: '충전' },
   { id: 'USE', label: '사용' },
-  { id: 'HOLD', label: '보류' },
-  { id: 'HOLD_RELEASE', label: '해제' },
   { id: 'SETTLEMENT', label: '정산' },
   { id: 'REFUND', label: '환불' },
   { id: 'WITHDRAWAL', label: '출금' },
@@ -28,8 +28,6 @@ export const POINT_TRANSACTION_FILTERS: Array<{
 export const POINT_TRANSACTION_TYPE_LABELS: Record<PointTransactionType, string> = {
   CHARGE: '충전',
   USE: '사용',
-  HOLD: '입찰 보류',
-  HOLD_RELEASE: '보류 해제',
   SETTLEMENT: '정산',
   REFUND: '환불',
   WITHDRAWAL: '출금',
@@ -61,16 +59,6 @@ export const mockPointTransactions: PointTransaction[] = [
     status: 'COMPLETED',
     createdAt: '2026-08-01T14:20:00',
     memo: '카드 결제',
-  },
-  {
-    id: 100,
-    type: 'HOLD',
-    title: '라이브 경매 입찰 보류',
-    amount: -42_000,
-    balanceAfter: 78_500,
-    status: 'PENDING',
-    createdAt: '2026-08-01T13:04:00',
-    memo: '빈티지 데님 재킷',
   },
   {
     id: 99,
@@ -111,16 +99,6 @@ export const mockPointTransactions: PointTransaction[] = [
     status: 'COMPLETED',
     createdAt: '2026-07-28T11:24:00',
     memo: '울 블렌드 니트',
-  },
-  {
-    id: 95,
-    type: 'HOLD_RELEASE',
-    title: '입찰 보류 해제',
-    amount: 44_000,
-    balanceAfter: 86_000,
-    status: 'COMPLETED',
-    createdAt: '2026-07-27T20:02:00',
-    memo: '상위 입찰자 변경',
   },
   {
     id: 94,

@@ -6,12 +6,11 @@ const props = defineProps<{
 }>()
 
 const formatPoint = (amount: number) => `${amount.toLocaleString('ko-KR')}P`
+// "보유"는 화면에 실제로 펼쳐 보이는 3개 카드(출금 가능/정산 예정/출금 처리 중)의 합과 일치해야
+// 한다. 입찰 보류·거래 대금 보관은 여기 포함하지 않는다 — 입찰 보류는 라이브 경매 화면에,
+// 거래 대금 보관은 주문/구매내역에 이미 노출되므로 지갑 요약에서는 중복 표시하지 않는다.
 const totalPoint = () =>
-  props.balance.available +
-  props.balance.held +
-  props.balance.escrow +
-  props.balance.pendingSettlement +
-  props.balance.withdrawalProcessing
+  props.balance.available + props.balance.pendingSettlement + props.balance.withdrawalProcessing
 </script>
 
 <template>

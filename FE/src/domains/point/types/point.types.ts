@@ -1,13 +1,8 @@
 import type { PageMeta } from '@/shared/types/api.types'
 
-export type PointTransactionType =
-  | 'CHARGE'
-  | 'USE'
-  | 'HOLD'
-  | 'HOLD_RELEASE'
-  | 'SETTLEMENT'
-  | 'REFUND'
-  | 'WITHDRAWAL'
+// BE 입찰 보류/해제(BID_HOLD/BID_RELEASE)는 낙찰로 이어지지 않는 한 사용자 내역에 보여주지
+// 않는다 — getPointTransactions에서 걸러내므로 이 화면 타입에는 아예 없다.
+export type PointTransactionType = 'CHARGE' | 'USE' | 'SETTLEMENT' | 'REFUND' | 'WITHDRAWAL'
 
 export type PointTransactionStatus = 'COMPLETED' | 'PENDING' | 'FAILED'
 export type WithdrawalStatus = 'REQUESTED' | 'PROCESSING' | 'COMPLETED' | 'REJECTED'
