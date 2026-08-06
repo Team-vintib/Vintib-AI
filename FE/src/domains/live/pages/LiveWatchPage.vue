@@ -372,6 +372,13 @@ const cancelLeave = () => {
   showLeaveConfirm.value = false
 }
 
+const showEndedNotice = ref(false)
+
+const leaveEndedLive = () => {
+  showEndedNotice.value = false
+  void router.push({ name: ROUTE_NAMES.HOME })
+}
+
 const goToProduct = (productId: number) => {
   void router.push({
     name: ROUTE_NAMES.PRODUCT_DETAIL,
@@ -494,6 +501,7 @@ const applyStatusMessage = (message: LiveStatusMessage) => {
       endedAt: message.endedAt ?? live.value.endedAt,
     }
     clearRealtimeSubscriptions()
+    showEndedNotice.value = true
   }
 }
 
@@ -697,6 +705,23 @@ onBeforeUnmount(() => {
           </button>
           <button type="button" class="live-watch-page__modal-confirm" @click="confirmLeave">
             나가기
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showEndedNotice" class="live-watch-page__modal-backdrop">
+      <div
+        class="live-watch-page__modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="live-ended-title"
+      >
+        <h2 id="live-ended-title">라이브가 종료되었습니다</h2>
+        <p>방송이 종료되어 더 이상 시청할 수 없습니다.</p>
+        <div class="live-watch-page__modal-actions">
+          <button type="button" class="live-watch-page__modal-confirm" @click="leaveEndedLive">
+            홈으로 가기
           </button>
         </div>
       </div>
