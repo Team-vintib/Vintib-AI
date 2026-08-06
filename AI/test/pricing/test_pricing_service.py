@@ -1,4 +1,4 @@
-"""가격 책정 서비스 — 오케스트레이션과 job 상태 기록 검증.
+﻿"""가격 책정 서비스 — 오케스트레이션과 job 상태 기록 검증.
 
 `run_job`은 백그라운드 스레드에서 도는 함수라 **예외가 밖으로 나가면 아무도 못 본다.**
 그 경우 job이 `queued`인 채 TTL까지 남아 BE가 "워커 없음"과 구별하지 못한다. 그래서 여기서
@@ -24,8 +24,10 @@ class _StubSource(CompsSource):
         self.key = key
         self._fetch_result = fetch_result
         self._error = error
+        self.received_image_url: str | None = None
 
-    def fetch(self, query: str) -> CompsFetch:
+    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
+        self.received_image_url = image_url
         if self._error is not None:
             raise self._error
         return self._fetch_result
@@ -107,6 +109,22 @@ def test_estimate_propagates_fetch_reason_when_unpriced():
     assert result.priced is False
     assert result.reason_code is ReasonCode.no_search_performed
     assert result.notes == ["검색 안 함"]
+
+
+def test_estimate_forwards_image_url_to_comps_source():
+    """`internal_clip`(CH020)은 텍스트 쿼리가 아니라 이미지가 필요하다 — service가
+    request.image_url을 comps_source.fetch()로 그대로 넘겨야 한다."""
+    source = _StubSource(_comps(10_000, 20_000, 30_000))
+    _service(source).estimate(_request(image_url="https://example.com/photo.jpg"))
+
+    assert source.received_image_url == "https://example.com/photo.jpg"
+
+
+def test_estimate_forwards_none_when_no_image_given():
+    source = _StubSource(_comps(10_000, 20_000, 30_000))
+    _service(source).estimate(_request())
+
+    assert source.received_image_url is None
 
 
 def test_estimate_raises_on_infrastructure_failure():

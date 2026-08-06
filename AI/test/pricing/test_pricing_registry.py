@@ -1,4 +1,4 @@
-"""가격 책정 레지스트리 — 설정 조회 헬퍼 검증.
+﻿"""가격 책정 레지스트리 — 설정 조회 헬퍼 검증.
 
 `comps_config()`/`retail_config()`는 `LlmWebSearchCompsSource`/`NaverRetailSource` 등
 구현체 생성자에서 간접적으로만 쓰이고 있었다. 등록되지 않은 키를 넣었을 때의 실패
@@ -16,6 +16,13 @@ def test_comps_config_returns_active_backend_by_default():
 
 def test_comps_config_accepts_explicit_key():
     assert registry.comps_config("mock") == registry.COMPS_BACKENDS["mock"]
+
+
+def test_internal_clip_backend_is_registered():
+    """CH020 — internal_clip은 등록만 돼 있고 기본 활성은 아니다(아래 committed_defaults 참고)."""
+    config = registry.comps_config("internal_clip")
+    assert config["model_id"] == "patrickjohncyh/fashion-clip"
+    assert config["min_comps_for_pricing"] >= 1
 
 
 def test_comps_config_rejects_unknown_key():
