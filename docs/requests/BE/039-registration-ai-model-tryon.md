@@ -28,9 +28,11 @@ AI 팀이 직접 맡기로 한 기존 결정에 따른 것입니다. 그래서 B
 ### 1. AI 착용컷 job 생성 — `POST /ai/tryon/registration-model-cut` 호출
 
 판매자가 상품 등록 시 AI 착용컷을 "사용함"으로 켜고 성별을 고르면, 아래 엔드포인트를
-호출해 주세요(내부 Docker 네트워크 `http://ai:8000`, 인증은 `X-API-Key` 헤더 —
-`AI/docs/infra-architecture.md` 참고. 기존 `AiClient`/`AiClientConfig`가 이미 이
-호스트를 바라보고 있으니 같은 클라이언트를 재사용하시면 됩니다).
+호출해 주세요(내부 Docker 네트워크 `http://ai:8000`). **별도 인증 헤더는 필요 없습니다**
+— `X-API-Key`는 워커 전용 엔드포인트(`/ai/workers/*`)에만 요구되고, 이 엔드포인트처럼
+BE가 호출하는 쪽은 인증이 없습니다(`AI/docs/infra-architecture.md` §3.2 참고). 기존
+`AiClient`/`AiClientConfig`가 이미 이 호스트를 바라보고 있으니 같은 클라이언트를
+재사용하시면 됩니다.
 
 **요청**: `POST http://ai:8000/ai/tryon/registration-model-cut`
 
