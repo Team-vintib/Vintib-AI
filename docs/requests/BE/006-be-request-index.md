@@ -18,6 +18,8 @@
 - 현재 임시 처리 또는 Mock 사용 여부
   - Onboarding: mock-success fallback
   - Business: FE가 아직 `docs/requests/FE/017-business-invoice-contract.md` 미반영 — mock `PENDING` fallback 유지 중
+  - 상품 목록의 판매완료(SOLD) 제외는 반영 완료 — `022-product-list-sold-exclusion.md` 삭제,
+    FE 후속 조치(마이페이지 엔드포인트 전환)는 `docs/requests/FE/035-product-list-sold-exclusion-answer.md`
   - Commerce/Wallet, MyPage: FE 화면 없음
 
 ## 3. 추가 구현 요청
@@ -40,7 +42,6 @@
 | 008 | `008-user-tryon-image-contract.md` | TryOn | — | 서윤/AI 파트 |
 | 019 | `019-product-quality-multi-image.md` | Product | 미반영 | 서윤 파트 |
 | 020 | `020-tryon-result-category.md` | TryOn | 미반영 | 서윤/AI 파트 |
-| 022 | `022-product-list-sold-exclusion.md` | Product | 미확인 | 서윤 파트 |
 | 023 | `023-product-similar-list.md` | Product | 미확인 | 서윤 파트 |
 | 025 | `025-product-same-price-chart.md` | Product | 미확인 | 서윤 파트 |
 | 026 | `026-toss-client-key-widget-type.md` | Point | 미확인 | 서윤 파트 |
@@ -189,3 +190,18 @@
   버그가 없었다.
 - 시청자 수 중복 집계는 FE 원인으로 확인(시청 화면이 STOMP 연결을 2개 열어 세션이 2개로
   잡힘) — BE 집계 로직(세션 단위)은 의도된 설계라 그대로 두고 FE 조치를 요청했다.
+
+## 2026-08-06 정리
+
+- `026-toss-client-key-widget-type.md` 삭제 — 원인은 코드가 아니라 자격증명이었다.
+  `TOSS_CLIENT_KEY`/`TOSS_SECRET_KEY`(로컬 `.env` + GitLab CI/CD `PROD_TOSS_CLIENT_KEY`/
+  `PROD_TOSS_SECRET_KEY`)에 API 개별 연동 키(`test_ck_`/`test_sk_`)가 들어 있어 결제위젯 SDK가
+  거부한 것 — 결제위젯 연동 키(`test_gck_`/`test_gsk_`)로 교체해 해소했다.
+- 겸사겸사 "미확인"으로 남아 있던 022·023도 코드와 대조했다(둘 다 아직 대기 상태라 문서는
+  유지):
+  - `022-product-list-sold-exclusion.md` — `ProductService`에 SOLD 제외 로직 없음. 여전히
+    정책 결정(1/2/3안) 대기 중.
+  - `023-product-similar-list.md` — `SimilarProductResponse`가 상세 응답(`GET /api/products/{id}`)에
+    포함되긴 했으나 필드가 `id/title/price`뿐이고, 요청한 목록-아이템 동일 필드셋이나 별도
+    `/similar` 엔드포인트는 아직 없음 — 부분 반영으로 표시.
+- `025-product-same-price-chart.md`는 관련 코드(`market-price` 등) 전혀 없어 미반영 그대로 둠.
