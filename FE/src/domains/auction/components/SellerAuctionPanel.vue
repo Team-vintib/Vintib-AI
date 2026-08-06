@@ -75,9 +75,13 @@ const isConfigValid = computed(
     isDurationValid.value,
 )
 
+// 이미 판매(낙찰·즉시구매)된 상품은 경매를 다시 시작할 수 없다(BE 035 §2 — saleStatus로 판별).
+const isProductSold = computed(() => props.product?.saleStatus === 'SOLD')
+
 const canStart = computed(
   () =>
     props.product !== null &&
+    !isProductSold.value &&
     props.status === 'LIVE' &&
     isConfigValid.value &&
     !isStarting.value &&
@@ -298,6 +302,17 @@ onBeforeUnmount(() => {
       <button class="seller-auction__relist" type="button" @click="prepareNextAuction">
         다시 경매 설정
       </button>
+    </template>
+
+    <template v-else-if="isProductSold">
+      <p class="seller-auction__target">
+        <span>대상 상품</span>
+        <strong>{{ product.title }}</strong>
+      </p>
+      <div class="seller-auction__result seller-auction__result--failed">
+        <strong>이미 판매된 상품입니다.</strong>
+        <p>판매 완료된 상품은 경매를 시작할 수 없습니다.</p>
+      </div>
     </template>
 
     <template v-else>

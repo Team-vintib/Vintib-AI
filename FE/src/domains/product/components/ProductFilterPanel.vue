@@ -185,8 +185,6 @@ const handlePriceInput = (event: Event, target: 'minimum' | 'maximum') => {
 
 <style scoped lang="scss">
 .product-filter {
-  position: sticky;
-  top: var(--space-6);
   display: grid;
   align-self: start;
   width: var(--filter-panel-width);

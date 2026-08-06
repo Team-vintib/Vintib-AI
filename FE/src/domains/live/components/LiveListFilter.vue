@@ -62,8 +62,6 @@ const handleCategoryChange = (event: Event) => {
 
 <style scoped lang="scss">
 .live-list-filter {
-  position: sticky;
-  top: var(--space-6);
   display: grid;
   align-self: start;
   width: var(--filter-panel-width);

@@ -8,6 +8,7 @@ import {
 } from '@/domains/auction/api/auctionApi'
 import LiveAuctionPanel from '@/domains/auction/components/LiveAuctionPanel.vue'
 import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
+import LiveAuctionStartOverlay from '@/domains/auction/components/LiveAuctionStartOverlay.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import { LiveRealtimeClient } from '@/domains/live/api/liveRealtimeClient'
@@ -80,6 +81,9 @@ const auctionSnapshot = ref<AuctionSnapshot | null>(null)
 const isAuctionLoading = ref(false)
 const auctionLoadError = ref('')
 const dismissedAuctionResultId = ref<number | null>(null)
+const announcedAuctionId = ref<number | null>(null)
+const startedAuctionTitle = ref<string | null>(null)
+let startNoticeTimer: number | undefined
 const apiEnabled = isLiveWatchApiEnabled()
 
 const loadHostFollowState = async (hostId: number) => {
@@ -308,6 +312,8 @@ const loadAuction = async (liveId: number) => {
     const snapshot = await getCurrentAuction(liveId)
     if (live.value?.id === liveId) {
       auctionSnapshot.value = snapshot
+      // 접속 시점에 이미 진행 중인 경매는 '시작 알림'을 띄우지 않는다(이미 announced 처리).
+      announcedAuctionId.value = snapshot?.status === 'RUNNING' ? snapshot.auctionId : null
     }
   } catch (error) {
     if (live.value?.id === liveId) {
@@ -326,19 +332,59 @@ const applyAuctionSnapshot = (snapshot: AuctionSnapshot | null) => {
   auctionSnapshot.value = snapshot
   auctionLoadError.value = ''
 
+  // 경매가 새로 시작(RUNNING)되면 시청자에게 팝업으로 알린다.
+  if (
+    snapshot &&
+    snapshot.status === 'RUNNING' &&
+    snapshot.auctionId !== announcedAuctionId.value
+  ) {
+    announcedAuctionId.value = snapshot.auctionId
+    startedAuctionTitle.value = snapshot.productTitle || '상품'
+    window.clearTimeout(startNoticeTimer)
+    startNoticeTimer = window.setTimeout(() => {
+      startedAuctionTitle.value = null
+    }, 4000)
+  }
+
+  // 낙찰(SUCCESS)되면 그 상품은 즉시 SOLD가 되므로 상품 큐에도 바로 반영한다.
+  if (snapshot && snapshot.status === 'SUCCESS' && live.value) {
+    const soldProduct = live.value.products.find((product) => product.id === snapshot.productId)
+    if (soldProduct) {
+      soldProduct.saleStatus = 'SOLD'
+    }
+  }
 }
 
 const closeAuctionResult = () => {
   dismissedAuctionResultId.value = auctionSnapshot.value?.auctionId ?? null
 }
 
-const goBack = () => {
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
+const dismissAuctionStart = () => {
+  window.clearTimeout(startNoticeTimer)
+  startedAuctionTitle.value = null
+}
 
-  void router.push({ name: ROUTE_NAMES.LIVE_LIST })
+const showLeaveConfirm = ref(false)
+
+// 시청자가 라이브에서 나가려 하면 확인 모달을 띄우고, 확인 시 홈으로 보낸다.
+const goBack = () => {
+  showLeaveConfirm.value = true
+}
+
+const confirmLeave = () => {
+  showLeaveConfirm.value = false
+  void router.push({ name: ROUTE_NAMES.HOME })
+}
+
+const cancelLeave = () => {
+  showLeaveConfirm.value = false
+}
+
+const showEndedNotice = ref(false)
+
+const leaveEndedLive = () => {
+  showEndedNotice.value = false
+  void router.push({ name: ROUTE_NAMES.HOME })
 }
 
 const goToProduct = (productId: number) => {
@@ -463,6 +509,7 @@ const applyStatusMessage = (message: LiveStatusMessage) => {
       endedAt: message.endedAt ?? live.value.endedAt,
     }
     clearRealtimeSubscriptions()
+    showEndedNotice.value = true
   }
 }
 
@@ -517,6 +564,7 @@ const elapsedTimer = window.setInterval(() => {
 onBeforeUnmount(() => {
   loadRequestId += 1
   window.clearInterval(elapsedTimer)
+  window.clearTimeout(startNoticeTimer)
   clearRealtimeSubscriptions()
 })
 </script>
@@ -617,6 +665,12 @@ onBeforeUnmount(() => {
               :product-title="auctionWin.productTitle"
               @close="closeAuctionResult"
             />
+
+            <LiveAuctionStartOverlay
+              v-if="startedAuctionTitle"
+              :product-title="startedAuctionTitle"
+              @close="dismissAuctionStart"
+            />
           </div>
 
           <div class="live-watch-page__details">
@@ -639,6 +693,47 @@ onBeforeUnmount(() => {
         </main>
       </div>
     </div>
+
+    <div
+      v-if="showLeaveConfirm"
+      class="live-watch-page__modal-backdrop"
+      @click.self="cancelLeave"
+    >
+      <div
+        class="live-watch-page__modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="live-leave-title"
+      >
+        <h2 id="live-leave-title">라이브에서 나가시겠어요?</h2>
+        <p>나가면 홈 화면으로 이동합니다.</p>
+        <div class="live-watch-page__modal-actions">
+          <button type="button" class="live-watch-page__modal-cancel" @click="cancelLeave">
+            취소
+          </button>
+          <button type="button" class="live-watch-page__modal-confirm" @click="confirmLeave">
+            나가기
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showEndedNotice" class="live-watch-page__modal-backdrop">
+      <div
+        class="live-watch-page__modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="live-ended-title"
+      >
+        <h2 id="live-ended-title">라이브가 종료되었습니다</h2>
+        <p>방송이 종료되어 더 이상 시청할 수 없습니다.</p>
+        <div class="live-watch-page__modal-actions">
+          <button type="button" class="live-watch-page__modal-confirm" @click="leaveEndedLive">
+            홈으로 가기
+          </button>
+        </div>
+      </div>
+    </div>
   </LiveLayout>
 </template>
 
@@ -646,6 +741,74 @@ onBeforeUnmount(() => {
 .live-watch-page {
   min-height: 100vh;
   background: var(--color-live-background);
+}
+
+.live-watch-page__modal-backdrop {
+  display: grid;
+  position: fixed;
+  z-index: var(--z-top);
+  inset: 0;
+  place-items: center;
+  padding: var(--space-4);
+  background: rgba(4, 6, 5, 0.62);
+}
+
+.live-watch-page__modal {
+  display: flex;
+  width: 100%;
+  max-width: 360px;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  border: 1px solid var(--color-live-border);
+  border-radius: var(--radius-card);
+  background: var(--color-live-surface);
+}
+
+.live-watch-page__modal h2 {
+  color: var(--color-live-text-primary);
+  font-size: 17px;
+  font-weight: var(--font-weight-extrabold);
+}
+
+.live-watch-page__modal p {
+  color: var(--color-live-text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
+}
+
+.live-watch-page__modal-actions {
+  display: flex;
+  margin-top: var(--space-3);
+  gap: var(--space-2);
+}
+
+.live-watch-page__modal-actions button {
+  flex: 1;
+  min-height: var(--button-height-tight);
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+}
+
+.live-watch-page__modal-cancel {
+  border: 1px solid var(--color-live-border);
+  background: transparent;
+  color: var(--color-live-text-primary);
+}
+
+.live-watch-page__modal-confirm {
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-primary-strong);
+}
+
+.live-watch-page__modal-cancel:hover {
+  background: var(--color-live-surface-raised);
+}
+
+.live-watch-page__modal-confirm:hover {
+  opacity: 0.92;
 }
 
 .live-watch-page__body {
@@ -659,7 +822,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
   height: calc(100vh - var(--button-height-major));
-  grid-template-rows: minmax(380px, 1fr) 220px;
+  grid-template-rows: minmax(340px, 1fr) 290px;
 }
 
 .live-watch-page__stage {
@@ -715,7 +878,7 @@ onBeforeUnmount(() => {
 
 .live-watch-loading__body > main {
   display: grid;
-  grid-template-rows: minmax(380px, 1fr) 220px;
+  grid-template-rows: minmax(340px, 1fr) 290px;
 }
 
 .live-watch-loading__body > main > div {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import {
   getBroadcastSummary,
@@ -9,6 +9,7 @@ import {
   isAuctionEventMessage,
 } from '@/domains/auction/api/auctionApi'
 import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
+import LiveAuctionStartOverlay from '@/domains/auction/components/LiveAuctionStartOverlay.vue'
 import SellerAuctionPanel from '@/domains/auction/components/SellerAuctionPanel.vue'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import {
@@ -68,6 +69,9 @@ const auctionWin = ref<{
 const auctionSnapshot = ref<AuctionSnapshot | null>(null)
 const auctionLoading = ref(false)
 const auctionError = ref('')
+const announcedAuctionId = ref<number | null>(null)
+const startedAuctionTitle = ref<string | null>(null)
+let startNoticeTimer: number | undefined
 // 438/440 방송 종료 화면 단계: 대시보드 → (미낙찰 있으면) 남은 상품 관리.
 const endView = ref<'dashboard' | 'manage'>('dashboard')
 const broadcastSummary = ref<BroadcastEndSummary | null>(null)
@@ -142,6 +146,7 @@ const loadAuction = async (liveId: number) => {
     const snapshot = await getCurrentAuction(liveId)
     if (live.value?.id === liveId) {
       auctionSnapshot.value = snapshot
+      announcedAuctionId.value = snapshot?.status === 'RUNNING' ? snapshot.auctionId : null
     }
   } catch (error) {
     if (live.value?.id === liveId) {
@@ -203,6 +208,8 @@ const loadLiveBroadcast = async () => {
   auctionWin.value = null
   auctionSnapshot.value = null
   auctionError.value = ''
+  announcedAuctionId.value = null
+  startedAuctionTitle.value = null
   broadcastSummary.value = null
   unsoldProducts.value = []
   resultError.value = ''
@@ -262,12 +269,13 @@ const loadLiveBroadcast = async () => {
 }
 
 const goBack = () => {
-  if (window.history.length > 1) {
-    router.back()
+  // 방송 중이면 바로 나가지 않고 종료 확인 팝업을 먼저 띄운다.
+  if (live.value?.status === 'LIVE') {
+    isEndConfirmOpen.value = true
     return
   }
 
-  void router.push({ name: ROUTE_NAMES.LIVE_LIST })
+  void router.push({ name: ROUTE_NAMES.HOME })
 }
 
 // 판매자 제어(437/439). BE 013/016으로 확정된 실 API에 연결한다.
@@ -374,6 +382,25 @@ const confirmEndBroadcast = async () => {
   }
 }
 
+// 방송 중(LIVE)에 페이지를 벗어나려 하면(브라우저 뒤로 등) 바로 나가지 않고 종료 확인 팝업을 띄운다.
+onBeforeRouteLeave(() => {
+  if (live.value?.status === 'LIVE') {
+    isEndConfirmOpen.value = true
+    return false
+  }
+
+  return true
+})
+
+// 방송 중(LIVE)엔 탭 닫기·새로고침도 실수로 방송이 끊기지 않도록 브라우저 기본 이탈 경고를 띄운다.
+const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+  if (live.value?.status === 'LIVE') {
+    event.preventDefault()
+    event.returnValue = ''
+  }
+}
+window.addEventListener('beforeunload', handleBeforeUnload)
+
 const updateViewerCount = (viewerCount: number) => {
   if (!live.value) return
 
@@ -396,6 +423,24 @@ const applyAuctionSnapshot = (snapshot: AuctionSnapshot) => {
           productTitle: snapshot.productTitle,
         }
       : null
+
+  // 경매가 새로 시작(RUNNING)되면 팝업으로 알린다(시청자 화면과 동일).
+  if (snapshot.status === 'RUNNING' && snapshot.auctionId !== announcedAuctionId.value) {
+    announcedAuctionId.value = snapshot.auctionId
+    startedAuctionTitle.value = snapshot.productTitle || '상품'
+    window.clearTimeout(startNoticeTimer)
+    startNoticeTimer = window.setTimeout(() => {
+      startedAuctionTitle.value = null
+    }, 4000)
+  }
+
+  // 낙찰(SUCCESS)되면 그 상품은 즉시 SOLD가 되므로 상품 큐에도 바로 반영한다.
+  if (snapshot.status === 'SUCCESS' && live.value) {
+    const soldProduct = live.value.products.find((product) => product.id === snapshot.productId)
+    if (soldProduct) {
+      soldProduct.saleStatus = 'SOLD'
+    }
+  }
 }
 
 const clearAuctionSubscription = () => {
@@ -421,6 +466,11 @@ const closeAuctionWin = () => {
   auctionWin.value = null
 }
 
+const dismissAuctionStart = () => {
+  window.clearTimeout(startNoticeTimer)
+  startedAuctionTitle.value = null
+}
+
 watch(
   () => [route.params.liveId, route.query.mock],
   () => {
@@ -436,8 +486,10 @@ const elapsedTimer = window.setInterval(() => {
 onBeforeUnmount(() => {
   loadRequestId += 1
   clearAuctionSubscription()
+  window.removeEventListener('beforeunload', handleBeforeUnload)
   window.clearInterval(elapsedTimer)
   window.clearTimeout(transitionNoticeTimer)
+  window.clearTimeout(startNoticeTimer)
 })
 </script>
 
@@ -485,14 +537,14 @@ onBeforeUnmount(() => {
         :error-message="resultError"
         @retry="loadBroadcastResults(live.id)"
         @manage-unsold="endView = 'manage'"
-        @to-list="router.push({ name: ROUTE_NAMES.LIVE_LIST })"
+        @to-list="router.push({ name: ROUTE_NAMES.HOME })"
       />
 
       <LiveUnsoldManage
         v-else-if="live.status === 'ENDED' && endView === 'manage'"
         :products="unsoldProducts"
         @back="endView = 'dashboard'"
-        @to-list="router.push({ name: ROUTE_NAMES.LIVE_LIST })"
+        @to-list="router.push({ name: ROUTE_NAMES.HOME })"
       />
 
       <LiveBroadcastHeader
@@ -559,6 +611,12 @@ onBeforeUnmount(() => {
             :winning-bid="auctionWin.winningBid"
             :product-title="auctionWin.productTitle"
             @close="closeAuctionWin"
+          />
+
+          <LiveAuctionStartOverlay
+            v-if="startedAuctionTitle"
+            :product-title="startedAuctionTitle"
+            @close="dismissAuctionStart"
           />
 
           <p v-if="transitionNotice" class="live-broadcast-page__notice" role="status">

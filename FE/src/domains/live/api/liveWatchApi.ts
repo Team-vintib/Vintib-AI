@@ -40,6 +40,7 @@ const mapLiveProductDto = (dto: LiveProductDto): LiveWatchProduct => ({
   price: dto.price ?? null,
   thumbnailUrl: dto.thumbnailUrl ?? null,
   saleType: dto.saleType ?? null,
+  saleStatus: dto.saleStatus ?? null,
   // material·measurements·defectSummary는 LiveProductResponse에 없음(BE 016 §6-B).
   // 필요 시 상품 상세(GET /products/{id})에서 상세 패널로 가져온다.
   material: null,
