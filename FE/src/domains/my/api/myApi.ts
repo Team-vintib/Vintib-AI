@@ -123,6 +123,8 @@ interface OrderListItemDto {
   sellerNickname: string
   orderPrice: number
   status: string
+  // BE 확인 필요(docs/requests/BE/041) — 반영 전에는 항상 undefined로 내려와 환불 대기 카운트가 0으로 집계된다.
+  refundRequested?: boolean
   createdAt: string
 }
 
@@ -191,6 +193,7 @@ const createEmptyMyPageViewData = (userId: number): MyPageViewData => ({
     todoCounts: {
       shippingPending: 0,
       scheduledLives: 0,
+      refundRequests: 0,
     },
     productStatusCounts: {
       onSale: 0,
@@ -268,6 +271,7 @@ export const getMyPageViewData = async (userId: number): Promise<MyPageViewData>
       todoCounts: {
         shippingPending: dashboardMetrics?.shippingPending ?? 0,
         scheduledLives: lives?.filter((live) => live.status === 'SCHEDULED').length ?? 0,
+        refundRequests: dashboardMetrics?.refundRequests ?? 0,
       },
       monthlyRevenue: dashboardMetrics?.monthlyRevenue ?? baseViewData.summary.monthlyRevenue,
     },
@@ -627,6 +631,7 @@ interface SellerDashboardMetrics {
   salesPerformance: MySalesPerformance
   settlementSummary: Omit<MySettlementSummary, 'withdrawableAmount'>
   shippingPending: number
+  refundRequests: number
   monthlyRevenue: MyMonthlyRevenue[]
 }
 
@@ -673,6 +678,7 @@ const buildSellerDashboardMetrics = (
       lastSettledAt,
     },
     shippingPending: sellerOrders.filter((order) => SHIPPING_PENDING_STATUSES.has(order.status)).length,
+    refundRequests: sellerOrders.filter((order) => order.refundRequested === true).length,
     monthlyRevenue: buildMonthlyRevenue(settledOrders),
   }
 }

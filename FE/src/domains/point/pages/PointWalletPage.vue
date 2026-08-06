@@ -33,9 +33,6 @@ const actionMessage = ref('')
 const actionErrorMessage = ref('')
 const isWithdrawing = ref(false)
 
-// PointChargePanel/PointWithdrawalPanel은 loadState가 'success'일 때만 렌더링되고,
-// 그 상태는 authStore.user.id가 있어야만 도달하므로 0 폴백은 실제로 쓰이지 않는다.
-const userId = computed(() => authStore.user?.id ?? 0)
 const isLoading = computed(() => loadState.value === 'loading')
 const hasLoadError = computed(() => loadState.value === 'error')
 const isGuest = computed(() => loadState.value === 'guest')
@@ -187,8 +184,6 @@ onMounted(() => {
 
         <PointChargePanel
           v-else-if="selectedSection === 'charge'"
-          :user-id="userId"
-          :current-balance="balance.available"
           @error="handleChargeError"
         />
 

@@ -74,7 +74,14 @@ const sortedLiveList = computed(() => {
     return matchesCategory && matchesStatus
   })
 
+  const statusRank = (status: string) =>
+    status === 'LIVE' ? 0 : status === 'SCHEDULED' ? 1 : 2
+
   return [...filteredLiveList].sort((first, second) => {
+    // 진행중(LIVE) → 예정(SCHEDULED) → 종료(ENDED) 우선, 같은 상태끼리는 기존 정렬 유지
+    const statusDiff = statusRank(first.status) - statusRank(second.status)
+    if (statusDiff !== 0) return statusDiff
+
     if (selectedSort.value === 'VIEWERS_DESC') {
       return second.viewerCount - first.viewerCount || compareById(first, second)
     }

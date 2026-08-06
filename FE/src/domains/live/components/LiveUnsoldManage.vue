@@ -54,7 +54,7 @@ const allHandled = computed(
         :disabled="!allHandled"
         @click="emit('to-list')"
       >
-        {{ allHandled ? '완료 · 라이브 목록으로' : '남은 상품을 모두 처리해 주세요' }}
+        {{ allHandled ? '완료 · 홈으로 가기' : '남은 상품을 모두 처리해 주세요' }}
       </button>
     </div>
   </section>

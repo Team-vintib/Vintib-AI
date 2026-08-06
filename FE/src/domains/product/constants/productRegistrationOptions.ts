@@ -34,7 +34,6 @@ export const PRODUCT_REGISTRATION_CATEGORY_OPTIONS: ProductRegistrationOption[] 
   { id: 'dress', label: '원피스' },
   { id: 'shoes', label: '신발' },
   { id: 'accessory', label: '액세서리' },
-  { id: 'etc', label: '기타' },
 ]
 
 export const PRODUCT_REGISTRATION_CONDITION_OPTIONS: ProductRegistrationOption[] = [
@@ -64,7 +63,6 @@ export const PRODUCT_REGISTRATION_COLOR_OPTIONS: ProductRegistrationOption[] = [
   { id: 'beige', label: '베이지' },
   { id: 'navy', label: '네이비' },
   { id: 'mixed', label: '혼합' },
-  { id: 'etc', label: '기타' },
 ]
 
 export const PRODUCT_REGISTRATION_SIZE_OPTIONS: ProductRegistrationOption[] = [
@@ -109,7 +107,6 @@ export const PRODUCT_REGISTRATION_MEASUREMENT_FIELDS_BY_CATEGORY: Record<
   ],
   shoes: [{ id: 'size', label: '사이즈' }],
   accessory: [],
-  etc: [],
 }
 
 export const PRODUCT_REGISTRATION_VALIDATION_MESSAGES = {
@@ -121,7 +118,6 @@ export const PRODUCT_REGISTRATION_VALIDATION_MESSAGES = {
   nameRequired: '상품명을 입력해 주세요.',
   brandRequired: '브랜드를 입력해 주세요.',
   colorRequired: '색상을 입력해 주세요.',
-  customColorRequired: '기타 색상을 입력해 주세요.',
   categoryRequired: '카테고리를 선택해 주세요.',
   sizeRequired: '사이즈를 선택해 주세요.',
   measurementRequired: '실측 정보를 입력해 주세요.',
@@ -129,8 +125,6 @@ export const PRODUCT_REGISTRATION_VALIDATION_MESSAGES = {
   conditionRequired: '상품 상태를 선택해 주세요.',
   defectRequired: '하자 여부를 선택해 주세요.',
   sellerDefectDescriptionRequired: '판매자가 확인한 하자 설명을 입력해 주세요.',
-  aiPhotoRequired: 'AI 품질 검증에 사용할 Front View와 Back View 사진을 선택해 주세요.',
-  aiPhotoConfirmationRequired: '품질 검증 사진별 확인을 완료해 주세요.',
   aiModelGenderRequired: 'AI 모델을 선택해 주세요.',
   saleTypeRequired: '판매 방식을 선택해 주세요.',
   directSalePriceRequired: '판매가를 입력해 주세요.',

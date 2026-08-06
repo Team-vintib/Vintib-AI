@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 
 import {
   getBroadcastSummary,
@@ -9,6 +9,7 @@ import {
   isAuctionEventMessage,
 } from '@/domains/auction/api/auctionApi'
 import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
+import LiveAuctionStartOverlay from '@/domains/auction/components/LiveAuctionStartOverlay.vue'
 import SellerAuctionPanel from '@/domains/auction/components/SellerAuctionPanel.vue'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import {
@@ -68,6 +69,9 @@ const auctionWin = ref<{
 const auctionSnapshot = ref<AuctionSnapshot | null>(null)
 const auctionLoading = ref(false)
 const auctionError = ref('')
+const announcedAuctionId = ref<number | null>(null)
+const startedAuctionTitle = ref<string | null>(null)
+let startNoticeTimer: number | undefined
 // 438/440 방송 종료 화면 단계: 대시보드 → (미낙찰 있으면) 남은 상품 관리.
 const endView = ref<'dashboard' | 'manage'>('dashboard')
 const broadcastSummary = ref<BroadcastEndSummary | null>(null)
@@ -142,6 +146,7 @@ const loadAuction = async (liveId: number) => {
     const snapshot = await getCurrentAuction(liveId)
     if (live.value?.id === liveId) {
       auctionSnapshot.value = snapshot
+      announcedAuctionId.value = snapshot?.status === 'RUNNING' ? snapshot.auctionId : null
     }
   } catch (error) {
     if (live.value?.id === liveId) {
@@ -203,6 +208,8 @@ const loadLiveBroadcast = async () => {
   auctionWin.value = null
   auctionSnapshot.value = null
   auctionError.value = ''
+  announcedAuctionId.value = null
+  startedAuctionTitle.value = null
   broadcastSummary.value = null
   unsoldProducts.value = []
   resultError.value = ''
@@ -262,12 +269,13 @@ const loadLiveBroadcast = async () => {
 }
 
 const goBack = () => {
-  if (window.history.length > 1) {
-    router.back()
+  // 방송 중이면 바로 나가지 않고 종료 확인 팝업을 먼저 띄운다.
+  if (live.value?.status === 'LIVE') {
+    isEndConfirmOpen.value = true
     return
   }
 
-  void router.push({ name: ROUTE_NAMES.LIVE_LIST })
+  void router.push({ name: ROUTE_NAMES.HOME })
 }
 
 // 판매자 제어(437/439). BE 013/016으로 확정된 실 API에 연결한다.
@@ -275,6 +283,8 @@ const goBack = () => {
 //   · 현재 상품 전환: PATCH /lives/{liveId}/current-product — 시청자 전파 /topic/lives/{id}/product
 // mock 프리뷰(apiEnabled=false)에서는 로컬 상태만 바꾼다(BE 없음).
 const isEndConfirmOpen = ref(false)
+const isEndingBroadcast = ref(false)
+const endError = ref('')
 const transitionNotice = ref('')
 let transitionNoticeTimer: number | undefined
 
@@ -335,17 +345,24 @@ const transitionToSelectedProduct = async () => {
 const requestEndBroadcast = () => {
   if (live.value?.status !== 'LIVE') return
 
+  endError.value = ''
   isEndConfirmOpen.value = true
 }
 
 const cancelEndBroadcast = () => {
+  if (isEndingBroadcast.value) return
+
   isEndConfirmOpen.value = false
+  endError.value = ''
 }
 
 const confirmEndBroadcast = async () => {
-  if (!live.value) return
+  if (!live.value || isEndingBroadcast.value) return
   // 판매자 전용 액션. 실 API 모드에서는 host만 허용.
   if (apiEnabled && !live.value.isHost) return
+
+  isEndingBroadcast.value = true
+  endError.value = ''
 
   try {
     const response = await updateLiveStatus(live.value.id, 'ENDED')
@@ -361,18 +378,44 @@ const confirmEndBroadcast = async () => {
   } catch (error) {
     // 종료는 멱등이 아니다 — 이미 종료·취소된 방송이면 L007(400)이 온다(BE 013 #3).
     // 이 경우 에러가 아니라 '이미 끝난 것'으로 보고 종료 대시보드 흐름으로 넘어간다.
-    if (normalizeApiError(error).code === 'L007') {
+    const normalized = normalizeApiError(error)
+    if (normalized.code === 'L007') {
       live.value = { ...live.value, status: 'ENDED' }
       isEndConfirmOpen.value = false
       void loadBroadcastResults(live.value.id)
       return
     }
 
-    showTransitionNotice(
-      error instanceof Error ? error.message : '방송을 종료하지 못했습니다.',
-    )
+    // 그 외 실패는 모달을 닫지 않고 에러(코드 포함)를 모달 안에 계속 표시해 재시도/닫기를 선택하게 한다.
+    // HTTP 200 + success:false로 오면 코드 없는 순수 Error라 normalize가 UNKNOWN이 되므로 그때는 원문 메시지를 쓴다.
+    const rawMessage = error instanceof Error ? error.message : ''
+    endError.value =
+      normalized.code === 'UNKNOWN_ERROR'
+        ? rawMessage || '방송을 종료하지 못했습니다.'
+        : `${normalized.message}${normalized.code ? ` (${normalized.code})` : ''}`
+  } finally {
+    isEndingBroadcast.value = false
   }
 }
+
+// 방송 중(LIVE)에 페이지를 벗어나려 하면(브라우저 뒤로 등) 바로 나가지 않고 종료 확인 팝업을 띄운다.
+onBeforeRouteLeave(() => {
+  if (live.value?.status === 'LIVE') {
+    isEndConfirmOpen.value = true
+    return false
+  }
+
+  return true
+})
+
+// 방송 중(LIVE)엔 탭 닫기·새로고침도 실수로 방송이 끊기지 않도록 브라우저 기본 이탈 경고를 띄운다.
+const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+  if (live.value?.status === 'LIVE') {
+    event.preventDefault()
+    event.returnValue = ''
+  }
+}
+window.addEventListener('beforeunload', handleBeforeUnload)
 
 const updateViewerCount = (viewerCount: number) => {
   if (!live.value) return
@@ -396,6 +439,24 @@ const applyAuctionSnapshot = (snapshot: AuctionSnapshot) => {
           productTitle: snapshot.productTitle,
         }
       : null
+
+  // 경매가 새로 시작(RUNNING)되면 팝업으로 알린다(시청자 화면과 동일).
+  if (snapshot.status === 'RUNNING' && snapshot.auctionId !== announcedAuctionId.value) {
+    announcedAuctionId.value = snapshot.auctionId
+    startedAuctionTitle.value = snapshot.productTitle || '상품'
+    window.clearTimeout(startNoticeTimer)
+    startNoticeTimer = window.setTimeout(() => {
+      startedAuctionTitle.value = null
+    }, 4000)
+  }
+
+  // 낙찰(SUCCESS)되면 그 상품은 즉시 SOLD가 되므로 상품 큐에도 바로 반영한다.
+  if (snapshot.status === 'SUCCESS' && live.value) {
+    const soldProduct = live.value.products.find((product) => product.id === snapshot.productId)
+    if (soldProduct) {
+      soldProduct.saleStatus = 'SOLD'
+    }
+  }
 }
 
 const clearAuctionSubscription = () => {
@@ -421,6 +482,11 @@ const closeAuctionWin = () => {
   auctionWin.value = null
 }
 
+const dismissAuctionStart = () => {
+  window.clearTimeout(startNoticeTimer)
+  startedAuctionTitle.value = null
+}
+
 watch(
   () => [route.params.liveId, route.query.mock],
   () => {
@@ -436,8 +502,10 @@ const elapsedTimer = window.setInterval(() => {
 onBeforeUnmount(() => {
   loadRequestId += 1
   clearAuctionSubscription()
+  window.removeEventListener('beforeunload', handleBeforeUnload)
   window.clearInterval(elapsedTimer)
   window.clearTimeout(transitionNoticeTimer)
+  window.clearTimeout(startNoticeTimer)
 })
 </script>
 
@@ -485,14 +553,14 @@ onBeforeUnmount(() => {
         :error-message="resultError"
         @retry="loadBroadcastResults(live.id)"
         @manage-unsold="endView = 'manage'"
-        @to-list="router.push({ name: ROUTE_NAMES.LIVE_LIST })"
+        @to-list="router.push({ name: ROUTE_NAMES.HOME })"
       />
 
       <LiveUnsoldManage
         v-else-if="live.status === 'ENDED' && endView === 'manage'"
         :products="unsoldProducts"
         @back="endView = 'dashboard'"
-        @to-list="router.push({ name: ROUTE_NAMES.LIVE_LIST })"
+        @to-list="router.push({ name: ROUTE_NAMES.HOME })"
       />
 
       <LiveBroadcastHeader
@@ -534,52 +602,60 @@ onBeforeUnmount(() => {
           </div>
         </aside>
 
-        <main class="live-broadcast-page__stage">
-          <LiveVideoStage
-            :title="live.title"
-            :poster-url="live.posterUrl"
-            :status="live.status"
-            :live-id="live.id"
-            :show-try-on="false"
-          >
-            <template #overlay>
-              <LiveChatOverlay
-                :live-id="live.id"
-                :host-id="live.hostId"
-                :status="live.status"
-                @viewer-count="updateViewerCount"
-                @realtime-ready="handleRealtimeReady"
-              />
-            </template>
-          </LiveVideoStage>
+        <main class="live-broadcast-page__content">
+          <div class="live-broadcast-page__stage">
+            <LiveVideoStage
+              :title="live.title"
+              :poster-url="live.posterUrl"
+              :status="live.status"
+              :live-id="live.id"
+              :show-try-on="false"
+            >
+              <template #overlay>
+                <LiveChatOverlay
+                  :live-id="live.id"
+                  :host-id="live.hostId"
+                  :status="live.status"
+                  @viewer-count="updateViewerCount"
+                  @realtime-ready="handleRealtimeReady"
+                />
+              </template>
+            </LiveVideoStage>
 
-          <LiveAuctionResultOverlay
-            v-if="auctionWin"
-            :winner-nickname="auctionWin.winnerNickname"
-            :winning-bid="auctionWin.winningBid"
-            :product-title="auctionWin.productTitle"
-            @close="closeAuctionWin"
-          />
+            <LiveAuctionResultOverlay
+              v-if="auctionWin"
+              :winner-nickname="auctionWin.winnerNickname"
+              :winning-bid="auctionWin.winningBid"
+              :product-title="auctionWin.productTitle"
+              @close="closeAuctionWin"
+            />
 
-          <p v-if="transitionNotice" class="live-broadcast-page__notice" role="status">
-            {{ transitionNotice }}
-          </p>
+            <LiveAuctionStartOverlay
+              v-if="startedAuctionTitle"
+              :product-title="startedAuctionTitle"
+              @close="dismissAuctionStart"
+            />
+
+            <p v-if="transitionNotice" class="live-broadcast-page__notice" role="status">
+              {{ transitionNotice }}
+            </p>
+          </div>
+
+          <div class="live-broadcast-page__details">
+            <SellerAuctionPanel
+              :live-id="live.id"
+              :product="selectedProduct"
+              :status="live.status"
+              :snapshot="auctionSnapshot"
+              :is-loading="auctionLoading"
+              :load-error="auctionError"
+              @snapshot-change="applyAuctionSnapshot"
+              @auction-closed="applyAuctionSnapshot"
+            />
+
+            <LiveBroadcastInfo :live="live" :elapsed-time="elapsedTime" />
+          </div>
         </main>
-
-        <aside class="live-broadcast-page__control">
-          <LiveBroadcastInfo :live="live" :elapsed-time="elapsedTime" />
-
-          <SellerAuctionPanel
-            :live-id="live.id"
-            :product="selectedProduct"
-            :status="live.status"
-            :snapshot="auctionSnapshot"
-            :is-loading="auctionLoading"
-            :load-error="auctionError"
-            @snapshot-change="applyAuctionSnapshot"
-            @auction-closed="applyAuctionSnapshot"
-          />
-        </aside>
       </div>
 
       <div
@@ -595,20 +671,25 @@ onBeforeUnmount(() => {
         >
           <h2 id="end-broadcast-title">방송을 종료할까요?</h2>
           <p>종료하면 시청자에게 방송이 끝난 것으로 표시되고, 다시 시작할 수 없습니다.</p>
+          <p v-if="endError" class="live-broadcast-page__modal-error" role="alert">
+            {{ endError }}
+          </p>
           <div class="live-broadcast-page__modal-actions">
             <button
               type="button"
               class="live-broadcast-page__modal-cancel"
+              :disabled="isEndingBroadcast"
               @click="cancelEndBroadcast"
             >
-              취소
+              {{ endError ? '닫기' : '취소' }}
             </button>
             <button
               type="button"
               class="live-broadcast-page__modal-confirm"
+              :disabled="isEndingBroadcast"
               @click="confirmEndBroadcast"
             >
-              방송 종료
+              {{ isEndingBroadcast ? '종료 중…' : endError ? '다시 시도' : '방송 종료' }}
             </button>
           </div>
         </div>
@@ -627,7 +708,15 @@ onBeforeUnmount(() => {
   display: grid;
   min-height: calc(100vh - var(--button-height-major));
   height: calc(100vh - var(--button-height-major));
-  grid-template-columns: 240px minmax(0, 1fr) 360px;
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+/* 시청 화면과 동일: 영상(위) / 방송 정보·경매(아래) */
+.live-broadcast-page__content {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(340px, 1fr) 260px;
 }
 
 .live-broadcast-page__queue {
@@ -681,15 +770,27 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.live-broadcast-page__control {
-  display: flex;
+.live-broadcast-page__details {
+  display: grid;
+  min-width: 0;
   min-height: 0;
-  flex-direction: column;
-  gap: var(--space-3);
-  overflow-y: auto;
-  padding: var(--space-4);
-  border-left: 1px solid var(--color-live-border);
+  grid-template-columns: minmax(0, 1fr) 300px;
+  border-top: 1px solid var(--color-live-border);
   background: var(--color-live-background);
+}
+
+.live-broadcast-page__details > * {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.live-broadcast-page__details > :last-child {
+  padding: var(--space-4);
+}
+
+.live-broadcast-page__details > * + * {
+  border-left: 1px solid var(--color-live-border);
 }
 
 .live-broadcast-page__slot-note {
@@ -757,6 +858,16 @@ onBeforeUnmount(() => {
   color: var(--color-live-text-secondary);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-control);
+}
+
+.live-broadcast-page__modal .live-broadcast-page__modal-error {
+  color: var(--color-error);
+  font-weight: var(--font-weight-semibold);
+}
+
+.live-broadcast-page__modal-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .live-broadcast-page__modal-actions {
@@ -836,7 +947,10 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1100px) {
-  .live-broadcast-page__body,
+  .live-broadcast-page__body {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+
   .live-broadcast-loading__body {
     grid-template-columns: 220px minmax(0, 1fr) 320px;
   }
@@ -854,13 +968,17 @@ onBeforeUnmount(() => {
     border-bottom: 1px solid var(--color-live-border);
   }
 
+  .live-broadcast-page__content {
+    height: auto;
+    grid-template-rows: var(--surface-min-height-xl) auto;
+  }
+
   .live-broadcast-page__stage {
     min-height: var(--surface-min-height-xl);
   }
 
-  .live-broadcast-page__control {
-    border-left: 0;
-    border-top: 1px solid var(--color-live-border);
+  .live-broadcast-page__details {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .live-broadcast-loading__body {

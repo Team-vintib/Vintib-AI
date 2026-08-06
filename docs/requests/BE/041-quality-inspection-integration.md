@@ -174,6 +174,10 @@ FE가 애초에 실시간으로 받아둔 값을 넘기는 것뿐이라 AI 쪽 T
 자체는 이미 확정**이라 지금 연동하셔도 되지만, 값이 자주 `null`일 수 있습니다(옵트인
 `include_descriptions=false`가 기본값이고, 검증이 끝나기 전까지는 꺼두시는 걸 권장합니다).
 
+## 6. 참고 — `019`(상품 상세 AI 분석 탭)와 저장 범위가 다를 수 있습니다
+
+이 문서 §1은 "BE가 findings의 `key`별 판매자 응답만 저장하면 된다"고 돼 있는데, `docs/requests/BE/019-product-quality-multi-image.md`(상품 상세 "AI 분석" 탭)는 그 화면을 채우려면 각 finding의 원본 데이터(`box`, `description`, `defect_type` 등)도 필요합니다. FE는 최종 제출 시 findings 원본 전체(인정/제외 여부 포함)를 `POST /products` 요청의 `aiQualityFindings` 필드로 보내도록 만들어뒀습니다(BE 미수신 상태) — `key` 목록만 저장할지, 원본 전체를 저장해 019도 함께 채울지 확인 부탁드립니다.
+
 ## 관련 자료
 
 - FE 매핑 원본: `FE/src/domains/product/pages/ProductRegistrationPage.vue`,

@@ -34,15 +34,18 @@ public class SecurityConfig {
             "/api/auth/signin",
             "/api/auth/reissue",
             "/api/auth/email/**",
+            // 구글 로그인 — 로그인 자체이므로 JWT 인증 대상이 아니다.
+            "/api/auth/google",
+            "/api/auth/google/link",
             "/api/health",
-            // deliveryapi.co.kr이 호출하는 배송 조회 웹훅(SHIP-002) — JWT가 아니라 X-Webhook-Signature로 검증한다.
+            // deliveryapi.co.kr이 호출하는 배송 조회 웹훅 — JWT가 아니라 X-Webhook-Signature로 검증한다.
             "/api/webhooks/delivery",
-            // 홈 콘텐츠 조회는 비회원도 가능(HOME-001). 정확 경로만 열어 /api/home/following(HOME-002)은 인증 필요로 남긴다.
+            // 홈 콘텐츠 조회는 비회원도 가능. 정확 경로만 열어 /api/home/following은 인증 필요로 남긴다.
             "/api/home",
-            // 카테고리/브랜드 마스터 조회는 비회원도 가능(SY007)
+            // 카테고리/브랜드 마스터 조회는 비회원도 가능
             "/api/categories",
             "/api/brands",
-            // 통합 검색(SEARCH-001/002)도 비회원 공개. 목록·상세가 열려 있으니 찾는 것도 열어야 한다.
+            // 통합 검색도 비회원 공개. 목록·상세가 열려 있으니 찾는 것도 열어야 한다.
             // 토큰이 붙어 있으면 찜·팔로우 여부가 함께 채워진다.
             "/api/search",
             // STOMP 핸드셰이크는 비회원도 통과해야 한다(라이브 시청·채팅 읽기). 인증은 여기서
@@ -88,8 +91,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-                        // 상품 목록·상세 조회(PROD-006, PROD-008)는 비회원도 가능. 목록은 sellerId 필터로
-                        // 공개 프로필의 판매자 상품 목록에도 쓰인다(011 §3.5). POST /api/products(등록)는
+                        // 상품 목록·상세 조회는 비회원도 가능. 목록은 sellerId 필터로
+                        // 공개 프로필의 판매자 상품 목록에도 쓰인다. POST /api/products(등록)는
                         // 인증 필요로 남긴다.
                         .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/{id}").permitAll()
@@ -99,10 +102,10 @@ public class SecurityConfig {
                         // 라이브 목록·시청 조회(LIVE-005)는 비회원도 가능. 개설·상태 전이는 인증 필요로 남긴다.
                         .requestMatchers(HttpMethod.GET, "/api/lives").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/lives/{liveId}").permitAll()
-                        // 채팅 이력 조회(CHAT-001)도 비회원 공개. 시청이 열려 있으니 대화 읽기도
+                        // 채팅 이력 조회도 비회원 공개. 시청이 열려 있으니 대화 읽기도
                         // 열어야 한다. 발언은 STOMP 쪽에서 principal 유무로 막는다.
                         .requestMatchers(HttpMethod.GET, "/api/lives/{liveId}/chat-messages").permitAll()
-                        // 경매 현황 조회(AUCT-002)도 비회원 공개. 시청이 열려 있으니 지금 무엇이
+                        // 경매 현황 조회도 비회원 공개. 시청이 열려 있으니 지금 무엇이
                         // 얼마에 팔리는지도 보여야 한다. 입찰은 인증 필요로 남긴다.
                         .requestMatchers(HttpMethod.GET, "/api/lives/{liveId}/auctions/current").permitAll()
                         // 입찰 내역 조회도 관전이지 참여가 아니다. 입찰(POST)은 인증 필요로 남긴다.
@@ -110,12 +113,12 @@ public class SecurityConfig {
                         // 영상 접속 토큰도 비회원 발급 대상이다. 시청이 열려 있으니 영상도 열어야 한다.
                         // 발행 권한은 토큰 안에서 갈린다 — 호스트 본인일 때만 송출이 허용된다.
                         .requestMatchers(HttpMethod.POST, "/api/lives/{liveId}/video-token").permitAll()
-                        // 팔로워/팔로잉 목록 조회(MY-006)는 공개 프로필이라 비회원도 가능.
-                        // 팔로우/해제(FOLLOW-001)는 인증 필요로 남긴다(anyRequest().authenticated()에 걸림).
+                        // 팔로워/팔로잉 목록 조회는 공개 프로필이라 비회원도 가능.
+                        // 팔로우/해제는 인증 필요로 남긴다(anyRequest().authenticated()에 걸림).
                         .requestMatchers(HttpMethod.GET, "/api/users/{userId}/followers").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/users/{userId}/followings").permitAll()
-                        // 공개 회원/판매자 프로필 조회(011 §3.3)도 비회원 가능. 본인 전용 조회인
-                        // GET /api/users/{id}(MY-001)와는 별개 경로라 이 규칙에 영향 없다.
+                        // 공개 회원/판매자 프로필 조회도 비회원 가능. 본인 전용 조회인
+                        // GET /api/users/{id}와는 별개 경로라 이 규칙에 영향 없다.
                         .requestMatchers(HttpMethod.GET, "/api/users/{userId}/profile").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))

@@ -130,7 +130,7 @@ const resultLabel = (status: 'SOLD' | 'UNSOLD', soldVia: 'AUCTION' | 'DIRECT_SAL
 
     <div class="broadcast-end__actions">
       <button type="button" class="broadcast-end__to-list" @click="emit('to-list')">
-        라이브 목록으로
+        홈으로 가기
       </button>
     </div>
   </section>
