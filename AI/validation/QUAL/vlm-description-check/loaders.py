@@ -33,6 +33,14 @@ def load_qwen_vl(model_id: str, quantization: str = "4bit") -> VLMBundle:
     quantization="4bit"면 bitsandbytes nf4로 양자화한다(RTX 4070 8GB 기준 bf16 풀로드가
     안 들어가서 필수). "none"이면 dtype="auto" + device_map="auto"로 그대로 올린다 —
     8GB보다 큰 GPU에서만 실제로 돈다.
+
+    2026-08-06 실측: 4bit 경로에서 `device_map="auto"`를 쓰면 "Some modules are
+    dispatched on the CPU or the disk" 에러가 났다 — SAM3를 먼저 로드해서 여유 VRAM이
+    줄어든 상태였거나, accelerate가 Qwen3-VL처럼 비교적 새 아키텍처의 메모리를 보수적으로
+    추정해 실제로는 자리가 있는데도 일부 모듈을 CPU로 돌리려 한 것으로 보인다. 4bit 양자화된
+    모듈은 CPU/디스크 오프로드가 안 되니 그 자리에서 바로 예외가 난다. 단일 GPU 전제(이
+    스파이크는 처음부터 RTX 4070 Laptop 1장 기준)라 `device_map="auto"` 대신 GPU 0에
+    통째로 고정하는 게 이 에러의 표준 우회법이다.
     """
     import torch
     from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
@@ -50,7 +58,7 @@ def load_qwen_vl(model_id: str, quantization: str = "4bit") -> VLMBundle:
             bnb_4bit_use_double_quant=True,
         )
         model = Qwen3VLForConditionalGeneration.from_pretrained(
-            model_id, quantization_config=quant_config, device_map="auto"
+            model_id, quantization_config=quant_config, device_map={"": 0}
         )
     elif quantization == "none":
         model = Qwen3VLForConditionalGeneration.from_pretrained(
