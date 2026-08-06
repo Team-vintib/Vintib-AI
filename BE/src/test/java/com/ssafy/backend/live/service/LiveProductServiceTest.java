@@ -81,7 +81,7 @@ class LiveProductServiceTest {
         when(productQueryPort.findCards(List.of(PRODUCT_ID))).thenReturn(Map.of(
                 PRODUCT_ID,
                 new ProductCard(PRODUCT_ID, "리바이스 501 빈티지", "Levi's", 45000L,
-                        "DIRECT_SALE", "A", "https://cdn.example.com/p/2001.jpg",
+                        "DIRECT_SALE", "ON_SALE", "A", "https://cdn.example.com/p/2001.jpg",
                         null, null, null)));
 
         var response = liveProductService.linkProduct(HOST_ID, LIVE_ID, 연결_요청());
@@ -91,6 +91,7 @@ class LiveProductServiceTest {
         assertThat(response.brandName()).isEqualTo("Levi's");
         assertThat(response.price()).isEqualTo(45000L);
         assertThat(response.saleType()).isEqualTo("DIRECT_SALE");
+        assertThat(response.saleStatus()).isEqualTo("ON_SALE");
         assertThat(response.thumbnailUrl()).isEqualTo("https://cdn.example.com/p/2001.jpg");
     }
 

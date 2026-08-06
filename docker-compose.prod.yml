@@ -15,7 +15,11 @@ services:
     container_name: vintib-caddy
     restart: unless-stopped
     ports:
-      - "80:80"
+      # ⚠️ 80 을 발행하지 않는다 (JY012). 그 포트는 LiveKit 미디어 TCP 가 쓴다 —
+      #    SSAFY 상위 방화벽이 여는 포트가 22·80·443·8989 뿐이라 미디어에 내줄 것이 80 밖에 없다.
+      #    대가로 http:// → https:// 자동 리다이렉트가 사라지고, ACME 는 HTTP-01 대신
+      #    TLS-ALPN-01(443)을 쓴다 — Caddyfile 에 명시해 뒀다. 그걸 빼면 갱신 시점에
+      #    조용히 실패해 인증서가 만료되고 사이트가 통째로 죽는다.
       - "443:443"
       - "443:443/udp"   # HTTP/3
     volumes:
@@ -93,8 +97,14 @@ services:
       #    설정 파일이 use_external_ip: false 라 STUN 자동 탐지도 하지 않는다(의도).
       NODE_IP: ${LIVEKIT_NODE_IP:?LIVEKIT_NODE_IP 가 필요하다 - EC2 공인 IP 를 .env 에 넣어라}
     ports:
-      - "7885:7885/udp"   # 미디어 (UDP mux)
-      - "7881:7881"       # 미디어 TCP 폴백 (UDP 차단 망)
+      # ⚠️ 미디어 TCP 를 80 으로 받는다 (JY012). SSAFY 상위 방화벽이 TCP 22·80·443·8989 만
+      #    통과시켜, 7881 은 UFW·호스트가 열려 있어도 패킷이 도달하지 못한다.
+      #    컨테이너 안쪽도 80 이어야 한다 — LiveKit 이 설정의 tcp_port 를 그대로 ICE 후보로
+      #    광고하기 때문이다(livekit.yaml 주석 참고). 그래서 caddy 는 80 을 비워 뒀다.
+      - "80:80"           # 미디어 TCP (상위 방화벽이 여는 유일한 포트)
+      # 상위에서 UDP 가 전부 막혀 지금은 쓰이지 않는다. SSAFY 가 열어 주면 그 즉시 살아나도록
+      # 발행만 남긴다 — 클라이언트는 UDP 를 먼저 시도하고 실패하면 위 TCP 로 넘어간다.
+      - "7885:7885/udp"   # 미디어 (UDP mux) — 현재 상위 방화벽에서 차단됨
     logging:
       driver: json-file
       options:
