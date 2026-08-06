@@ -26,7 +26,12 @@ def draw_bordered_findings(
     fill_alpha: float = 0.28,
     thickness: int = 3,
 ) -> np.ndarray:
-    """confidence 내림차순 번호 + 한글 라벨 + 마스크 윤곽선(+반투명 채우기). RGB ndarray 반환.
+    """confidence 내림차순 **번호만** + 마스크 윤곽선(+반투명 채우기). RGB ndarray 반환.
+
+    `qc_shared.draw_numbered_boxes`(bbox 버전)와 마찬가지로 하자 유형·확신도는 이미지에
+    그리지 않는다 — 사용자에게는 번호만 보여주고, 유형·점수는 `qc_shared.to_serializable()`이
+    만드는 JSON에만 담는다. `korean_labels`/`font_path_fn` 인자는 더 이상 텍스트 렌더링에
+    쓰이지 않지만, 호출부(노트북 등)와의 시그니처 호환을 위해 그대로 남겨둔다.
 
     `qc_shared.draw_numbered_boxes`와 같은 인스턴스 dict 스키마(`bbox`/`mask`/`type`/
     `confidence`)를 받아 시그니처를 맞췄다 — 같은 인스턴스 리스트를 두 함수에 그대로 넘겨서
@@ -63,8 +68,7 @@ def draw_bordered_findings(
             continue
         # 라벨 위치: 마스크 최상단 픽셀 바로 위(사각형 bbox가 아니라 실제 마스크 기준).
         x1, y1 = int(cols_idx.min()), int(rows_idx.min())
-        label_ko = korean_labels.get(inst["type"], inst["type"])
-        text = f"{no}. {label_ko} {inst['confidence']:.2f}"
+        text = str(no)
         box = draw.textbbox((0, 0), text, font=font)
         tw, th = box[2] - box[0], box[3] - box[1]
         ty = max(y1 - th - 6, 0)
