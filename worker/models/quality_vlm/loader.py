@@ -36,6 +36,10 @@ def load_qwen_vl(model_id: str, quantization: str = "4bit") -> VLMBundle:
     quantization="4bit"면 bitsandbytes nf4로 양자화한다(8GB급 GPU 기준 bf16 풀로드가
     안 들어가서 필수 — AI/validation/QUAL/vlm-description-check/ 실측). "none"이면
     dtype="auto" + device_map="auto"로 그대로 올린다 — 더 큰 GPU에서만 실제로 돈다.
+
+    4bit 양자화는 매번 다시 계산하면 job당 1~2분씩 걸린다(가중치 자체는 이미 로컬 캐시에
+    있어 다운로드가 아니라 양자화 재계산 비용) -- 최초 1회만 계산해 `quant_cache`에 저장해
+    두고, 그다음부터는 재계산 없이 그대로 로드한다(CH022).
     """
     import torch
     from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
@@ -44,17 +48,24 @@ def load_qwen_vl(model_id: str, quantization: str = "4bit") -> VLMBundle:
     processor = AutoProcessor.from_pretrained(model_id)
 
     if quantization == "4bit":
-        from transformers import BitsAndBytesConfig
+        from quant_cache import cached_path, is_cached
 
-        quant_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.bfloat16,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_use_double_quant=True,
-        )
-        model = Qwen3VLForConditionalGeneration.from_pretrained(
-            model_id, quantization_config=quant_config, device_map="auto"
-        )
+        cache_dir = cached_path(model_id)
+        if is_cached(cache_dir):
+            model = Qwen3VLForConditionalGeneration.from_pretrained(str(cache_dir), device_map="auto")
+        else:
+            from transformers import BitsAndBytesConfig
+
+            quant_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_use_double_quant=True,
+            )
+            model = Qwen3VLForConditionalGeneration.from_pretrained(
+                model_id, quantization_config=quant_config, device_map="auto"
+            )
+            model.save_pretrained(str(cache_dir))
     elif quantization == "none":
         model = Qwen3VLForConditionalGeneration.from_pretrained(
             model_id, dtype="auto", device_map="auto"

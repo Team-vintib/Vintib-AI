@@ -1,7 +1,7 @@
 import { TRYON_RESULT_MOCK_DATA } from '@/domains/tryon/constants/tryOnResultMockData'
 import { http } from '@/shared/api/http'
 
-import type { TryOnResult } from '@/domains/tryon/types/tryOnResult.types'
+import type { TryOnGenerationStatus, TryOnResult } from '@/domains/tryon/types/tryOnResult.types'
 import type { ApiResponse } from '@/shared/types/api.types'
 
 const TRYON_API_ENABLED = import.meta.env.VITE_TRYON_API_ENABLED === 'true'
@@ -14,20 +14,33 @@ export class TryOnResultSaveUnavailableError extends Error {
   }
 }
 
+export class TryOnGenerationUnavailableError extends Error {
+  constructor() {
+    super('실제 AI 시착 생성은 mock 모드에서 지원하지 않습니다.')
+    this.name = 'TryOnGenerationUnavailableError'
+  }
+}
+
 // BE 응답: 시착 결과에는 아직 카테고리가 없다(→ docs/requests/BE/020). category는 null로 둔다.
 interface TryOnResultDto {
   id: number
   productId: number
-  imageUrl: string
+  status?: TryOnGenerationStatus
+  imageUrl: string | null
+  fitTitle?: string | null
+  fitDescription?: string | null
   createdAt: string
 }
 
 const toTryOnResult = (dto: TryOnResultDto): TryOnResult => ({
   id: dto.id,
   productId: dto.productId,
+  status: dto.status,
   imageUrl: dto.imageUrl,
   createdAt: dto.createdAt,
   category: null,
+  fitTitle: dto.fitTitle ?? null,
+  fitDescription: dto.fitDescription ?? null,
 })
 
 const unwrapApiData = <T>(response: ApiResponse<T>, fallbackMessage: string) => {
@@ -79,6 +92,26 @@ export const getTryOnResultDetail = async (
   )
 
   return toTryOnResult(unwrapApiData(response.data, '시착 결과를 불러오지 못했습니다.'))
+}
+
+// AI 시착 job을 접수한다(비동기) — 응답은 접수증(status=PENDING)이지 완성된 결과가 아니다.
+// 완료 여부는 getTryOnResultDetail()로 폴링해서 확인한다.
+export const createTryOnResult = async (
+  userId: number | null | undefined,
+  productId: number,
+): Promise<TryOnResult> => {
+  if (!TRYON_API_ENABLED) {
+    throw new TryOnGenerationUnavailableError()
+  }
+
+  const requiredUserId = getRequiredUserId(userId)
+  const response = await http.post<ApiResponse<TryOnResultDto>>(
+    `/users/${requiredUserId}/tryons`,
+    undefined,
+    { params: { productId } },
+  )
+
+  return toTryOnResult(unwrapApiData(response.data, 'AI 시착 생성 요청에 실패했습니다.'))
 }
 
 export const deleteTryOnResult = async (

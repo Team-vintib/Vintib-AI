@@ -2,28 +2,40 @@ package com.ssafy.backend.tryon.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.ssafy.backend.global.client.AiClient;
+import com.ssafy.backend.global.client.dto.AiJobResponse;
 import com.ssafy.backend.global.config.S3Config.AwsProperties;
 import com.ssafy.backend.global.exception.CustomException;
+import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.storage.S3StorageService;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.ProductRepository;
+import com.ssafy.backend.product.service.ProductImageService;
 import com.ssafy.backend.tryon.dto.response.TryOnResultResponse;
+import com.ssafy.backend.tryon.entity.MemberBodyProfile;
 import com.ssafy.backend.tryon.entity.TryOnResult;
+import com.ssafy.backend.tryon.entity.TryOnResultStatus;
+import com.ssafy.backend.tryon.repository.MemberBodyProfileRepository;
 import com.ssafy.backend.tryon.repository.TryOnResultRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestClientException;
 
 @ExtendWith(MockitoExtension.class)
 class TryOnResultServiceTest {
@@ -42,7 +54,16 @@ class TryOnResultServiceTest {
     private ProductRepository productRepository;
 
     @Mock
+    private MemberBodyProfileRepository memberBodyProfileRepository;
+
+    @Mock
+    private ProductImageService productImageService;
+
+    @Mock
     private S3StorageService s3StorageService;
+
+    @Mock
+    private AiClient aiClient;
 
     @Mock
     private Member member;
@@ -61,14 +82,25 @@ class TryOnResultServiceTest {
                 "test-secret",
                 new AwsProperties.S3("", "", "public-bucket", PRIVATE_BUCKET));
         tryOnResultService = new TryOnResultService(
-                tryOnResultRepository, memberRepository, productRepository, s3StorageService, awsProperties);
+                tryOnResultRepository,
+                memberRepository,
+                productRepository,
+                memberBodyProfileRepository,
+                productImageService,
+                s3StorageService,
+                awsProperties,
+                aiClient);
     }
 
     @Test
     void 목록_조회시_각_결과에_presigned_URL을_채운다() {
         when(product.getId()).thenReturn(PRODUCT_ID);
-        TryOnResult result =
-                TryOnResult.builder().member(member).product(product).imageKey("tryon-results/1/a.jpg").build();
+        TryOnResult result = TryOnResult.builder()
+                .member(member)
+                .product(product)
+                .imageKey("tryon-results/1/a.jpg")
+                .status(TryOnResultStatus.SUCCESS)
+                .build();
         when(tryOnResultRepository.findAllByMemberIdAndDeletedAtIsNullOrderByCreatedAtDesc(MEMBER_ID))
                 .thenReturn(List.of(result));
         when(s3StorageService.presignedGetUrl(PRIVATE_BUCKET, "tryon-results/1/a.jpg"))
@@ -84,8 +116,12 @@ class TryOnResultServiceTest {
     @Test
     void 본인의_시착_결과가_아니면_조회를_거부한다() {
         when(member.getId()).thenReturn(MEMBER_ID);
-        TryOnResult result =
-                TryOnResult.builder().member(member).product(product).imageKey("tryon-results/1/a.jpg").build();
+        TryOnResult result = TryOnResult.builder()
+                .member(member)
+                .product(product)
+                .imageKey("tryon-results/1/a.jpg")
+                .status(TryOnResultStatus.SUCCESS)
+                .build();
         when(tryOnResultRepository.findById(10L)).thenReturn(Optional.of(result));
 
         assertThatThrownBy(() -> tryOnResultService.getResult(2L, 10L)).isInstanceOf(CustomException.class);
@@ -102,8 +138,12 @@ class TryOnResultServiceTest {
     @Test
     void 삭제시_S3_객체를_지우고_소프트_삭제한다() {
         when(member.getId()).thenReturn(MEMBER_ID);
-        TryOnResult result =
-                TryOnResult.builder().member(member).product(product).imageKey("tryon-results/1/a.jpg").build();
+        TryOnResult result = TryOnResult.builder()
+                .member(member)
+                .product(product)
+                .imageKey("tryon-results/1/a.jpg")
+                .status(TryOnResultStatus.SUCCESS)
+                .build();
         when(tryOnResultRepository.findById(10L)).thenReturn(Optional.of(result));
 
         tryOnResultService.deleteResult(MEMBER_ID, 10L);
@@ -130,5 +170,112 @@ class TryOnResultServiceTest {
     void 지원하지_않는_이미지_타입으로_저장하면_예외를_던진다() {
         assertThatThrownBy(() -> tryOnResultService.saveResult(MEMBER_ID, PRODUCT_ID, new byte[] {1}, "image/gif"))
                 .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 시착_프로필_사진이_없으면_생성을_거부한다() {
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(memberBodyProfileRepository.findById(MEMBER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> tryOnResultService.createResult(MEMBER_ID, PRODUCT_ID))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.TRYON_PROFILE_PHOTO_REQUIRED);
+    }
+
+    @Test
+    void 상품_대표_이미지가_없으면_생성을_거부한다() {
+        MemberBodyProfile bodyProfile = MemberBodyProfile.builder().member(member).build();
+        ReflectionTestUtils.setField(bodyProfile, "bodyPhotoKey", "tryon-profiles/1/photo.jpg");
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(memberBodyProfileRepository.findById(MEMBER_ID)).thenReturn(Optional.of(bodyProfile));
+        when(s3StorageService.presignedGetUrl(PRIVATE_BUCKET, "tryon-profiles/1/photo.jpg"))
+                .thenReturn("https://s3.example/profile");
+        when(productImageService.getPrimaryImageUrls(List.of(PRODUCT_ID))).thenReturn(Map.of());
+
+        assertThatThrownBy(() -> tryOnResultService.createResult(MEMBER_ID, PRODUCT_ID))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PRODUCT_IMAGE_NOT_FOUND);
+    }
+
+    @Test
+    void 시착_job을_접수하면_PENDING_상태로_저장된다() {
+        MemberBodyProfile bodyProfile = MemberBodyProfile.builder().member(member).build();
+        ReflectionTestUtils.setField(bodyProfile, "bodyPhotoKey", "tryon-profiles/1/photo.jpg");
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(memberBodyProfileRepository.findById(MEMBER_ID)).thenReturn(Optional.of(bodyProfile));
+        when(s3StorageService.presignedGetUrl(PRIVATE_BUCKET, "tryon-profiles/1/photo.jpg"))
+                .thenReturn("https://s3.example/profile");
+        when(productImageService.getPrimaryImageUrls(List.of(PRODUCT_ID)))
+                .thenReturn(Map.of(PRODUCT_ID, "https://s3.example/product.jpg"));
+        when(aiClient.createTryOnJob(any())).thenReturn("job-123");
+
+        TryOnResultResponse response = tryOnResultService.createResult(MEMBER_ID, PRODUCT_ID);
+
+        assertThat(response.status()).isEqualTo(TryOnResultStatus.PENDING);
+        assertThat(response.imageUrl()).isNull();
+        verify(tryOnResultRepository).save(any(TryOnResult.class));
+    }
+
+    @Test
+    void AI_job_접수에_실패하면_예외를_던진다() {
+        MemberBodyProfile bodyProfile = MemberBodyProfile.builder().member(member).build();
+        ReflectionTestUtils.setField(bodyProfile, "bodyPhotoKey", "tryon-profiles/1/photo.jpg");
+        when(memberRepository.findById(MEMBER_ID)).thenReturn(Optional.of(member));
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(memberBodyProfileRepository.findById(MEMBER_ID)).thenReturn(Optional.of(bodyProfile));
+        when(s3StorageService.presignedGetUrl(PRIVATE_BUCKET, "tryon-profiles/1/photo.jpg"))
+                .thenReturn("https://s3.example/profile");
+        when(productImageService.getPrimaryImageUrls(List.of(PRODUCT_ID)))
+                .thenReturn(Map.of(PRODUCT_ID, "https://s3.example/product.jpg"));
+        when(aiClient.createTryOnJob(any())).thenThrow(new RestClientException("connection refused"));
+
+        assertThatThrownBy(() -> tryOnResultService.createResult(MEMBER_ID, PRODUCT_ID))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.TRYON_JOB_CREATE_FAILED);
+        verify(tryOnResultRepository, never()).save(any());
+    }
+
+    @Test
+    void 대기중인_결과를_조회하면_AI_job_상태를_다시_확인해서_완료로_갱신한다() {
+        when(member.getId()).thenReturn(MEMBER_ID);
+        when(product.getId()).thenReturn(PRODUCT_ID);
+        TryOnResult result = TryOnResult.builder()
+                .member(member)
+                .product(product)
+                .jobId("job-123")
+                .status(TryOnResultStatus.PENDING)
+                .build();
+        when(tryOnResultRepository.findById(10L)).thenReturn(Optional.of(result));
+        when(aiClient.getJob("job-123")).thenReturn(new AiJobResponse(
+                "success",
+                Map.of("image_url", "https://ai.example/result.png", "fit_title", "적당해요"),
+                null));
+
+        TryOnResultResponse response = tryOnResultService.getResult(MEMBER_ID, 10L);
+
+        assertThat(response.status()).isEqualTo(TryOnResultStatus.SUCCESS);
+        assertThat(response.imageUrl()).isEqualTo("https://ai.example/result.png");
+        assertThat(response.fitTitle()).isEqualTo("적당해요");
+    }
+
+    @Test
+    void 대기중인_결과가_AI에서_실패로_나오면_FAILED로_갱신한다() {
+        when(member.getId()).thenReturn(MEMBER_ID);
+        TryOnResult result = TryOnResult.builder()
+                .member(member)
+                .product(product)
+                .jobId("job-123")
+                .status(TryOnResultStatus.PENDING)
+                .build();
+        when(tryOnResultRepository.findById(10L)).thenReturn(Optional.of(result));
+        when(aiClient.getJob("job-123")).thenReturn(new AiJobResponse("failed", null, "worker error"));
+
+        TryOnResultResponse response = tryOnResultService.getResult(MEMBER_ID, 10L);
+
+        assertThat(response.status()).isEqualTo(TryOnResultStatus.FAILED);
+        assertThat(response.imageUrl()).isNull();
     }
 }

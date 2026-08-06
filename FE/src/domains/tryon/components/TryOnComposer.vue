@@ -260,7 +260,10 @@ onBeforeUnmount(() => {
               :aria-label="`${preview.productName} 시착 결과 크게 보기`"
               @click="openPreview(preview)"
             >
-              <img :src="preview.result.imageUrl" :alt="`${preview.productName} 시착 결과 미리보기`" />
+              <img
+                :src="preview.result.imageUrl ?? undefined"
+                :alt="`${preview.productName} 시착 결과 미리보기`"
+              />
               <span class="tryon-composer__result-mock">mock</span>
             </button>
             <span class="tryon-composer__result-name">{{ preview.productName }}</span>
@@ -349,7 +352,7 @@ onBeforeUnmount(() => {
           ×
         </button>
         <img
-          :src="selectedPreview.result.imageUrl"
+          :src="selectedPreview.result.imageUrl ?? undefined"
           :alt="`${selectedPreview.productName} 시착 결과 확대`"
         />
         <div class="tryon-composer__preview-info">

@@ -1,5 +1,6 @@
 package com.ssafy.backend.product.service;
 
+import com.ssafy.backend.global.client.AiClient;
 import com.ssafy.backend.global.config.S3Config.AwsProperties;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
@@ -9,6 +10,7 @@ import com.ssafy.backend.product.dto.request.ProductImageUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUploadUrlRequest;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
+import com.ssafy.backend.product.entity.AiModelCutStatus;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductImage;
 import com.ssafy.backend.product.repository.ProductImageRepository;
@@ -19,11 +21,14 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -34,10 +39,15 @@ public class ProductImageService {
     private static final Map<String, String> ALLOWED_CONTENT_TYPE_EXTENSIONS =
             Map.of("image/jpeg", "jpg", "image/png", "png", "image/webp", "webp");
 
+    // 상품 카테고리 -> mask_type 자동 판별은 아직 없다(docs/requests/BE/035-tryon-product-category.md
+    // 미해결). 정확도보다 파이프라인이 실제로 도는지가 이번 목적이라 상의 고정으로 간다.
+    private static final String DEFAULT_AI_MODEL_CUT_MASK_TYPE = "upper";
+
     private final ProductRepository productRepository;
     private final ProductImageRepository productImageRepository;
     private final S3StorageService s3StorageService;
     private final AwsProperties awsProperties;
+    private final AiClient aiClient;
 
     @Transactional
     public ProductImageUploadUrlResponse createUploadUrl(
@@ -83,7 +93,30 @@ public class ProductImageService {
                 .build();
         productImageRepository.save(image);
 
-        return ProductImageResponse.of(image, s3StorageService.publicUrl(bucket, image.getImageKey()));
+        String imageUrl = s3StorageService.publicUrl(bucket, image.getImageKey());
+        if (request.isPrimary()) {
+            triggerAiModelCutJob(product, imageUrl);
+        }
+
+        return ProductImageResponse.of(image, imageUrl);
+    }
+
+    /**
+     * 대표 이미지가 등록되면 AI 착용컷 job을 접수한다(`docs/requests/BE/
+     * 039-registration-ai-model-tryon.md`). 보조 기능이라 실패해도 이미지 등록 자체는
+     * 그대로 성공시킨다 — 로그만 남기고 상태는 NONE으로 둔다(재시도는 이번 범위 밖).
+     */
+    private void triggerAiModelCutJob(Product product, String productImageUrl) {
+        if (!product.isAiModelEnabled() || product.getAiModelCutStatus() != AiModelCutStatus.NONE) {
+            return;
+        }
+        try {
+            String jobId = aiClient.createRegistrationModelCutJob(
+                    productImageUrl, product.getAiModelGender().name(), DEFAULT_AI_MODEL_CUT_MASK_TYPE);
+            product.startAiModelCutJob(jobId);
+        } catch (RestClientException e) {
+            log.warn("AI 착용컷 job 접수 실패(productId={}): {}", product.getId(), e.getMessage());
+        }
     }
 
     @Transactional

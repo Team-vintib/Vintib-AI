@@ -1,5 +1,8 @@
 package com.ssafy.backend.tryon.service;
 
+import com.ssafy.backend.global.client.AiClient;
+import com.ssafy.backend.global.client.dto.AiJobResponse;
+import com.ssafy.backend.global.client.dto.TryOnJobRequest;
 import com.ssafy.backend.global.config.S3Config.AwsProperties;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
@@ -8,21 +11,29 @@ import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.ProductRepository;
+import com.ssafy.backend.product.service.ProductImageService;
 import com.ssafy.backend.tryon.dto.response.TryOnResultResponse;
+import com.ssafy.backend.tryon.entity.MemberBodyProfile;
 import com.ssafy.backend.tryon.entity.TryOnResult;
+import com.ssafy.backend.tryon.entity.TryOnResultStatus;
+import com.ssafy.backend.tryon.repository.MemberBodyProfileRepository;
 import com.ssafy.backend.tryon.repository.TryOnResultRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
 
 /**
- * 시착 결과의 저장/조회/삭제만 다룬다. 실제 AI 호출(합성 생성)은 AI 쪽 계약이
- * 확정되지 않아 이 서비스의 범위 밖이다 — {@link #saveResult}는 이미 생성된
- * 이미지를 저장하는 지점까지만 구현한다.
+ * 시착 결과의 생성(job 접수)/조회/삭제를 다룬다. 실제 합성은 AI 워커가 비동기로 처리하므로,
+ * {@link #createResult}는 job을 접수만 하고, {@link #getResult}가 아직 안 끝난 job을
+ * 조회 시점에 다시 확인하는 지연 폴링으로 완료 여부를 반영한다(`docs/requests/BE/
+ * 040-tryon-job-contract.md`).
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -30,32 +41,91 @@ public class TryOnResultService {
 
     private static final Map<String, String> ALLOWED_CONTENT_TYPE_EXTENSIONS =
             Map.of("image/jpeg", "jpg", "image/png", "png", "image/webp", "webp");
+    private static final String DEFAULT_MASK_TYPE = "upper";
+    private static final String DEFAULT_FIT_TYPE = "regular";
 
     private final TryOnResultRepository tryOnResultRepository;
     private final MemberRepository memberRepository;
     private final ProductRepository productRepository;
+    private final MemberBodyProfileRepository memberBodyProfileRepository;
+    private final ProductImageService productImageService;
     private final S3StorageService s3StorageService;
     private final AwsProperties awsProperties;
+    private final AiClient aiClient;
 
     public List<TryOnResultResponse> getResults(Long memberId) {
-        String bucket = awsProperties.s3().privateBucket();
         return tryOnResultRepository.findAllByMemberIdAndDeletedAtIsNullOrderByCreatedAtDesc(memberId).stream()
-                .map(result -> TryOnResultResponse.of(
-                        result, s3StorageService.presignedGetUrl(bucket, result.getImageKey())))
+                .map(result -> TryOnResultResponse.of(result, resultImageUrl(result)))
                 .toList();
     }
 
     public TryOnResultResponse getResult(Long memberId, Long resultId) {
         TryOnResult result = getOwnedResult(memberId, resultId);
-        String url = s3StorageService.presignedGetUrl(awsProperties.s3().privateBucket(), result.getImageKey());
-        return TryOnResultResponse.of(result, url);
+        if (result.isPending()) {
+            refreshStatus(result);
+        }
+        return TryOnResultResponse.of(result, resultImageUrl(result));
     }
 
     @Transactional
     public void deleteResult(Long memberId, Long resultId) {
         TryOnResult result = getOwnedResult(memberId, resultId);
-        s3StorageService.delete(awsProperties.s3().privateBucket(), result.getImageKey());
+        if (result.getImageKey() != null) {
+            s3StorageService.delete(awsProperties.s3().privateBucket(), result.getImageKey());
+        }
         result.softDelete();
+    }
+
+    /**
+     * 시착 job을 접수한다. 회원의 시착 프로필 사진(bodyPhotoKey)이 없으면 진행할 수 없다 —
+     * AI가 합성할 대상 인물 사진 자체가 없기 때문이다.
+     */
+    @Transactional
+    public TryOnResultResponse createResult(Long memberId, Long productId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+        MemberBodyProfile bodyProfile = memberBodyProfileRepository.findById(memberId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TRYON_PROFILE_PHOTO_REQUIRED));
+        if (bodyProfile.getBodyPhotoKey() == null) {
+            throw new CustomException(ErrorCode.TRYON_PROFILE_PHOTO_REQUIRED);
+        }
+
+        String userImageUrl =
+                s3StorageService.presignedGetUrl(awsProperties.s3().privateBucket(), bodyProfile.getBodyPhotoKey());
+        String productImageUrl = productImageService.getPrimaryImageUrls(List.of(productId)).get(productId);
+        if (productImageUrl == null) {
+            throw new CustomException(ErrorCode.PRODUCT_IMAGE_NOT_FOUND);
+        }
+
+        TryOnJobRequest jobRequest = new TryOnJobRequest(
+                userImageUrl,
+                productImageUrl,
+                DEFAULT_MASK_TYPE,
+                DEFAULT_FIT_TYPE,
+                toDouble(bodyProfile.getHeightCm()),
+                toDouble(bodyProfile.getWeightKg()),
+                toDouble(bodyProfile.getWaist()),
+                null);
+
+        String jobId;
+        try {
+            jobId = aiClient.createTryOnJob(jobRequest);
+        } catch (RestClientException e) {
+            log.warn("AI 시착 job 접수 실패(memberId={}, productId={}): {}", memberId, productId, e.getMessage());
+            throw new CustomException(ErrorCode.TRYON_JOB_CREATE_FAILED);
+        }
+
+        TryOnResult result = TryOnResult.builder()
+                .member(member)
+                .product(product)
+                .jobId(jobId)
+                .status(TryOnResultStatus.PENDING)
+                .build();
+        tryOnResultRepository.save(result);
+
+        return TryOnResultResponse.of(result, null);
     }
 
     @Transactional
@@ -74,10 +144,54 @@ public class TryOnResultService {
         String bucket = awsProperties.s3().privateBucket();
         s3StorageService.put(bucket, key, imageBytes, contentType);
 
-        TryOnResult result = TryOnResult.builder().member(member).product(product).imageKey(key).build();
+        TryOnResult result = TryOnResult.builder()
+                .member(member)
+                .product(product)
+                .imageKey(key)
+                .status(TryOnResultStatus.SUCCESS)
+                .build();
         tryOnResultRepository.save(result);
 
-        return TryOnResultResponse.of(result, s3StorageService.presignedGetUrl(bucket, key));
+        return TryOnResultResponse.of(result, resultImageUrl(result));
+    }
+
+    private void refreshStatus(TryOnResult result) {
+        try {
+            AiJobResponse job = aiClient.getJob(result.getJobId());
+            if (job.isSuccess()) {
+                Map<String, Object> jobResult = job.result();
+                Object imageUrl = jobResult != null ? jobResult.get("image_url") : null;
+                if (imageUrl == null) {
+                    result.fail();
+                    return;
+                }
+                Object fitTitle = jobResult.get("fit_title");
+                Object fitDescription = jobResult.get("fit_description");
+                result.complete(
+                        imageUrl.toString(),
+                        fitTitle != null ? fitTitle.toString() : null,
+                        fitDescription != null ? fitDescription.toString() : null);
+            } else if (job.isFailed()) {
+                result.fail();
+            } else if ("processing".equals(job.status())) {
+                result.markProcessing();
+            }
+        } catch (RestClientException e) {
+            log.warn("AI 시착 job 상태 조회 실패(resultId={}, jobId={}): {}", result.getId(), result.getJobId(), e.getMessage());
+        }
+    }
+
+    // imageKey(BE S3 key, saveResult 레거시 경로)와 resultImageUrl(AI가 준 원본 URL, job 경로)
+    // 중 채워진 쪽을 우선순위대로 반환한다 — 한 결과에 둘 다 채워지는 일은 없다.
+    private String resultImageUrl(TryOnResult result) {
+        if (result.getImageKey() != null) {
+            return s3StorageService.presignedGetUrl(awsProperties.s3().privateBucket(), result.getImageKey());
+        }
+        return result.getResultImageUrl();
+    }
+
+    private static Double toDouble(Short value) {
+        return value != null ? value.doubleValue() : null;
     }
 
     private TryOnResult getOwnedResult(Long memberId, Long resultId) {
