@@ -126,6 +126,8 @@ interface ProductCreateRequest {
   material: string | null
   measurements: Record<string, number> | null
   defects: string[] | null
+  aiModelEnabled: boolean
+  aiModelGender: 'MALE' | 'FEMALE' | null
 }
 
 interface ProductCreateResponse extends Partial<ProductListDto> {
@@ -387,6 +389,8 @@ export const submitProduct = async (
     material: draft.material.trim() || null,
     measurements: resolveRegistrationMeasurements(draft),
     defects: resolveRegistrationDefects(draft),
+    aiModelEnabled: draft.aiModelEnabled,
+    aiModelGender: draft.aiModelEnabled ? draft.aiModelGender : null,
   } satisfies ProductCreateRequest)
   const createdProduct = unwrapApiData(createResponse.data)
   const createdProductId = getCreatedProductId(createdProduct)
