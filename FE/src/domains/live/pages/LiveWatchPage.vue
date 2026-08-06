@@ -332,13 +332,20 @@ const closeAuctionResult = () => {
   dismissedAuctionResultId.value = auctionSnapshot.value?.auctionId ?? null
 }
 
-const goBack = () => {
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
+const showLeaveConfirm = ref(false)
 
-  void router.push({ name: ROUTE_NAMES.LIVE_LIST })
+// 시청자가 라이브에서 나가려 하면 확인 모달을 띄우고, 확인 시 홈으로 보낸다.
+const goBack = () => {
+  showLeaveConfirm.value = true
+}
+
+const confirmLeave = () => {
+  showLeaveConfirm.value = false
+  void router.push({ name: ROUTE_NAMES.HOME })
+}
+
+const cancelLeave = () => {
+  showLeaveConfirm.value = false
 }
 
 const goToProduct = (productId: number) => {
@@ -639,6 +646,30 @@ onBeforeUnmount(() => {
         </main>
       </div>
     </div>
+
+    <div
+      v-if="showLeaveConfirm"
+      class="live-watch-page__modal-backdrop"
+      @click.self="cancelLeave"
+    >
+      <div
+        class="live-watch-page__modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="live-leave-title"
+      >
+        <h2 id="live-leave-title">라이브에서 나가시겠어요?</h2>
+        <p>나가면 홈 화면으로 이동합니다.</p>
+        <div class="live-watch-page__modal-actions">
+          <button type="button" class="live-watch-page__modal-cancel" @click="cancelLeave">
+            취소
+          </button>
+          <button type="button" class="live-watch-page__modal-confirm" @click="confirmLeave">
+            나가기
+          </button>
+        </div>
+      </div>
+    </div>
   </LiveLayout>
 </template>
 
@@ -646,6 +677,74 @@ onBeforeUnmount(() => {
 .live-watch-page {
   min-height: 100vh;
   background: var(--color-live-background);
+}
+
+.live-watch-page__modal-backdrop {
+  display: grid;
+  position: fixed;
+  z-index: var(--z-top);
+  inset: 0;
+  place-items: center;
+  padding: var(--space-4);
+  background: rgba(4, 6, 5, 0.62);
+}
+
+.live-watch-page__modal {
+  display: flex;
+  width: 100%;
+  max-width: 360px;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  border: 1px solid var(--color-live-border);
+  border-radius: var(--radius-card);
+  background: var(--color-live-surface);
+}
+
+.live-watch-page__modal h2 {
+  color: var(--color-live-text-primary);
+  font-size: 17px;
+  font-weight: var(--font-weight-extrabold);
+}
+
+.live-watch-page__modal p {
+  color: var(--color-live-text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
+}
+
+.live-watch-page__modal-actions {
+  display: flex;
+  margin-top: var(--space-3);
+  gap: var(--space-2);
+}
+
+.live-watch-page__modal-actions button {
+  flex: 1;
+  min-height: var(--button-height-tight);
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+}
+
+.live-watch-page__modal-cancel {
+  border: 1px solid var(--color-live-border);
+  background: transparent;
+  color: var(--color-live-text-primary);
+}
+
+.live-watch-page__modal-confirm {
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-primary-strong);
+}
+
+.live-watch-page__modal-cancel:hover {
+  background: var(--color-live-surface-raised);
+}
+
+.live-watch-page__modal-confirm:hover {
+  opacity: 0.92;
 }
 
 .live-watch-page__body {

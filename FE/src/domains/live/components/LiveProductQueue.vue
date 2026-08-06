@@ -49,12 +49,6 @@ const formatPrice = (price: number | null) =>
           <strong>{{ product.title }}</strong>
           <span>{{ product.brandName || '브랜드 정보 준비 중' }}</span>
           <span class="live-product-queue__price">{{ formatPrice(product.price) }}</span>
-          <span class="live-product-queue__ai">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m12 3 1.35 4.15L17.5 8.5l-4.15 1.35L12 14l-1.35-4.15L6.5 8.5l4.15-1.35L12 3Z" />
-            </svg>
-            AI
-          </span>
         </span>
       </button>
     </div>
@@ -207,32 +201,6 @@ const formatPrice = (price: number | null) =>
   font-size: var(--font-size-badge);
   letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
-}
-
-.live-product-queue__content .live-product-queue__ai {
-  display: inline-flex;
-  width: fit-content;
-  align-items: center;
-  margin-top: 4px;
-  padding: 1px 5px;
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-badge);
-  gap: 3px;
-  color: var(--color-accent);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-4xs);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.1em;
-  line-height: 13px;
-}
-
-.live-product-queue__ai svg {
-  width: 9px;
-  height: 9px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
 }
 
 .live-product-queue__empty {
