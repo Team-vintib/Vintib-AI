@@ -209,7 +209,9 @@ onBeforeUnmount(() => {
 <template>
   <section class="seller-auction" aria-labelledby="seller-auction-title">
     <div class="seller-auction__header">
-      <h2 id="seller-auction-title">경매 설정</h2>
+      <h2 id="seller-auction-title">
+        경매 설정<span v-if="product" class="seller-auction__product"> · {{ product.title }}</span>
+      </h2>
       <span class="seller-auction__phase" :class="`seller-auction__phase--${activeSnapshot?.status.toLowerCase() || 'idle'}`">
         {{ phaseLabel }}
       </span>
@@ -316,12 +318,8 @@ onBeforeUnmount(() => {
     </template>
 
     <template v-else>
-      <p class="seller-auction__target">
-        <span>대상 상품</span>
-        <strong>{{ product.title }}</strong>
-      </p>
-
-      <div class="seller-auction__field">
+      <div class="seller-auction__fields">
+        <div class="seller-auction__field">
         <label for="seller-auction-start-price">시작가</label>
         <div class="seller-auction__input">
           <input id="seller-auction-start-price" v-model.number="startPrice" type="number" min="0" step="1000" inputmode="numeric" />
@@ -369,6 +367,7 @@ onBeforeUnmount(() => {
           1초 이상의 진행 시간을 입력해 주세요.
         </p>
         <p v-else class="seller-auction__hint">{{ durationLabel }} 동안 진행합니다.</p>
+        </div>
       </div>
 
       <button class="seller-auction__start" type="button" :disabled="!canStart" @click="runAuctionStart">
@@ -394,6 +393,17 @@ onBeforeUnmount(() => {
   background: var(--color-live-surface);
 }
 
+/* 경매 설정 필드(시작가·입찰단위·진행시간)를 가로로 펼쳐 짧은 하단 영역에서 스크롤 없이 보이게 */
+.seller-auction__fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.seller-auction__fields > .seller-auction__field {
+  flex: 1 1 160px;
+}
+
 .seller-auction__header,
 .seller-auction__ready div,
 .seller-auction__result dl div {
@@ -403,9 +413,22 @@ onBeforeUnmount(() => {
 }
 
 .seller-auction__header h2 {
+  min-width: 0;
+  overflow: hidden;
   color: var(--color-live-text-primary);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seller-auction__product {
+  color: var(--color-live-text-secondary);
+  font-weight: var(--font-weight-regular);
+}
+
+.seller-auction__header .seller-auction__phase {
+  flex-shrink: 0;
 }
 
 .seller-auction__phase {
