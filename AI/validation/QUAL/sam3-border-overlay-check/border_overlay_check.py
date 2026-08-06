@@ -32,7 +32,15 @@ from border_overlay import draw_bordered_findings  # noqa: E402
 from sam3_caller import Sam3Caller, crop_and_mask_to  # noqa: E402
 
 # ---------------- 설정 ----------------
-GARMENT_CROP_PAD_RATIO = 0.05
+# sam3-condition-check/sam3_qc_test_masking.ipynb(§0-6)가 실제로 실측 검증한 값과 맞춘다.
+# 이전엔 0.05로 임의로 적어둬서 그 노트북에서 잡히던 하자가 이 파이프라인에서는 0건으로
+# 나오는 회귀가 있었다(2026-08-06 확인) — 크롭 여백이 좁아져 경계 하자가 잘려나갔다.
+GARMENT_CROP_PAD_RATIO = 0.06
+# qc_shared.filter_by_garment()의 기본값(GARMENT_OVERLAP_MIN=0.7)은 masking 노트북이
+# §0-6에서 실측으로 확정한 0.6보다 더 엄격하다 — 0.7을 그대로 쓰면 실제로는 의류 안에 있는
+# 하자도 "배경(off-garment)"으로 잘못 걸러진다. 그래서 이 파이프라인에서는 명시적으로
+# 0.6을 준다(qc_shared의 공용 기본값은 다른 스파이크에 영향 줄 수 있어 그대로 둔다).
+GARMENT_OVERLAP_MIN = 0.6
 # ---------------------------------------
 
 OUTPUT_DIR = Path("./outputs/border_overlay_check")
@@ -80,7 +88,9 @@ def run_one(caller: Sam3Caller, image: Image.Image) -> dict:
         defects = qc_shared.remap_instances_to_full(defects, crop_box, full_size)
         benigns = qc_shared.remap_instances_to_full(benigns, crop_box, full_size)
 
-    kept, _dropped_off_garment = qc_shared.filter_by_garment(defects, garment_mask)
+    kept, _dropped_off_garment = qc_shared.filter_by_garment(
+        defects, garment_mask, min_overlap=GARMENT_OVERLAP_MIN
+    )
     kept, _dropped_benign = qc_shared.suppress_benign(kept, benigns)
     kept, _dropped_dupe = qc_shared.dedupe_cross_type(kept)
     kept = qc_shared.renumber(kept)
