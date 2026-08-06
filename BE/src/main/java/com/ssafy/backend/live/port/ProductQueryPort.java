@@ -66,13 +66,16 @@ public interface ProductQueryPort {
     /**
      * 시청 화면 상품 카드 한 장(FE 요청 {@code docs/requests/FE/006}).
      *
-     * <p><b>{@code saleType}을 문자열로 받는 이유.</b> 이 포트는 라이브가 상품의 내부 구조를 모르게
-     * 하려고 둔 것이라 상품 도메인 enum을 그대로 노출하지 않는다. 값은 FE로 그대로 흘러갈 뿐
-     * 라이브 쪽에서 분기하지 않는다.
+     * <p><b>{@code saleType}·{@code saleStatus}를 문자열로 받는 이유.</b> 이 포트는 라이브가 상품의
+     * 내부 구조를 모르게 하려고 둔 것이라 상품 도메인 enum을 그대로 노출하지 않는다. 값은 FE로
+     * 그대로 흘러갈 뿐 라이브 쪽에서 분기하지 않는다.
      *
      * @param brandName      브랜드명. 브랜드 미지정 상품은 {@code null}
      * @param price          상시 판매가. 경매 예정 상품은 아직 가격이 없어 {@code null}
      * @param saleType       {@code DIRECT_SALE} / {@code AUCTION}. 판매 방식 미정이면 {@code null}
+     * @param saleStatus     판매 상태. {@code DRAFT} / {@code ON_SALE} / {@code AUCTION_SCHEDULED} /
+     *                       {@code AUCTION_IN_PROGRESS} / {@code SOLD}. <b>판매 방식과 별개 축이다</b> —
+     *                       경매 상품도 팔리면 {@code SOLD}가 된다
      * @param conditionGrade 중고 상태 등급. 등급 체계가 미확정이라 자유 문자열이다
      * @param thumbnailUrl   대표 이미지 URL. 등록된 이미지가 없으면 {@code null}
      * @param material       소재. 등록하지 않았으면 {@code null}(FE 요청 003 §3.5 선택 필드)
@@ -86,6 +89,7 @@ public interface ProductQueryPort {
             String brandName,
             Long price,
             String saleType,
+            String saleStatus,
             String conditionGrade,
             String thumbnailUrl,
             String material,
