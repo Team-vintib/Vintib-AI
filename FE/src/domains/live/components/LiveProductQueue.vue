@@ -13,6 +13,9 @@ defineEmits<{
 
 const formatPrice = (price: number | null) =>
   price === null ? '가격 정보 준비 중' : `${price.toLocaleString('ko-KR')}P`
+
+// 이미 낙찰·판매된 상품은 큐에서 선택할 수 없다(BE 035 §2 — saleStatus로 판별).
+const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
 </script>
 
 <template>
@@ -29,8 +32,10 @@ const formatPrice = (price: number | null) =>
         :class="{
           'live-product-queue__item--selected': product.id === selectedProductId,
           'live-product-queue__item--current': product.id === currentProductId,
+          'live-product-queue__item--sold': isSold(product),
         }"
         type="button"
+        :disabled="isSold(product)"
         :aria-current="product.id === currentProductId ? 'true' : undefined"
         :aria-pressed="product.id === selectedProductId"
         @click="$emit('select', product.id)"
@@ -42,7 +47,8 @@ const formatPrice = (price: number | null) =>
             :alt="`${product.title} 상품 이미지`"
           />
           <span v-else aria-hidden="true">상품</span>
-          <span v-if="product.id === currentProductId" class="live-product-queue__now">NOW</span>
+          <span v-if="isSold(product)" class="live-product-queue__sold-badge">판매완료</span>
+          <span v-else-if="product.id === currentProductId" class="live-product-queue__now">NOW</span>
         </span>
 
         <span class="live-product-queue__content">
@@ -131,6 +137,37 @@ const formatPrice = (price: number | null) =>
 
 .live-product-queue__item--current {
   border-left-color: var(--color-accent);
+}
+
+.live-product-queue__item:disabled {
+  cursor: not-allowed;
+}
+
+.live-product-queue__item--sold {
+  opacity: 0.55;
+}
+
+.live-product-queue__item--sold:hover {
+  background: transparent;
+}
+
+.live-product-queue__item--sold .live-product-queue__content strong,
+.live-product-queue__item--sold .live-product-queue__price {
+  text-decoration: line-through;
+}
+
+.live-product-queue__sold-badge {
+  display: grid;
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 6, 5, 0.62);
+  color: var(--color-live-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-4xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  place-items: center;
 }
 
 .live-product-queue__image {
