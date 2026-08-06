@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.ssafy.backend.global.client.AiClient;
 import com.ssafy.backend.global.config.S3Config.AwsProperties;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.storage.S3StorageService;
@@ -52,6 +53,9 @@ class ProductImageServiceTest {
     @Mock
     private Product imageProduct;
 
+    @Mock
+    private AiClient aiClient;
+
     private AwsProperties awsProperties;
     private ProductImageService productImageService;
     private Product product;
@@ -63,8 +67,8 @@ class ProductImageServiceTest {
                 "test-key",
                 "test-secret",
                 new AwsProperties.S3("", "", PUBLIC_BUCKET, "private-bucket"));
-        productImageService =
-                new ProductImageService(productRepository, productImageRepository, s3StorageService, awsProperties);
+        productImageService = new ProductImageService(
+                productRepository, productImageRepository, s3StorageService, awsProperties, aiClient);
         product = Product.builder().seller(seller).title("빈티지 자켓").build();
     }
 
@@ -117,6 +121,58 @@ class ProductImageServiceTest {
 
         assertThat(response.url()).isEqualTo("https://s3.example/" + key);
         assertThat(response.isPrimary()).isTrue();
+        verify(aiClient, org.mockito.Mockito.never()).createRegistrationModelCutJob(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void AI_착용컷이_켜진_상품에_대표_이미지를_등록하면_job을_접수한다() {
+        String key = "product-images/%d/abc.jpg".formatted(PRODUCT_ID);
+        com.ssafy.backend.product.entity.Product aiProduct = com.ssafy.backend.product.entity.Product.builder()
+                .seller(seller)
+                .title("빈티지 자켓")
+                .aiModelEnabled(true)
+                .aiModelGender(com.ssafy.backend.product.entity.AiModelGender.MALE)
+                .build();
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(aiProduct));
+        when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(0);
+        when(s3StorageService.headObject(PUBLIC_BUCKET, key))
+                .thenReturn(HeadObjectResponse.builder().contentLength(1024L).build());
+        when(s3StorageService.publicUrl(PUBLIC_BUCKET, key)).thenReturn("https://s3.example/" + key);
+        when(aiClient.createRegistrationModelCutJob("https://s3.example/" + key, "MALE", "upper"))
+                .thenReturn("job-456");
+
+        productImageService.registerImage(SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true));
+
+        assertThat(aiProduct.getAiModelCutStatus())
+                .isEqualTo(com.ssafy.backend.product.entity.AiModelCutStatus.PENDING);
+        assertThat(aiProduct.getAiModelCutJobId()).isEqualTo("job-456");
+    }
+
+    @Test
+    void AI_착용컷_job_접수가_실패해도_이미지_등록은_성공한다() {
+        String key = "product-images/%d/abc.jpg".formatted(PRODUCT_ID);
+        com.ssafy.backend.product.entity.Product aiProduct = com.ssafy.backend.product.entity.Product.builder()
+                .seller(seller)
+                .title("빈티지 자켓")
+                .aiModelEnabled(true)
+                .aiModelGender(com.ssafy.backend.product.entity.AiModelGender.FEMALE)
+                .build();
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(aiProduct));
+        when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(0);
+        when(s3StorageService.headObject(PUBLIC_BUCKET, key))
+                .thenReturn(HeadObjectResponse.builder().contentLength(1024L).build());
+        when(s3StorageService.publicUrl(PUBLIC_BUCKET, key)).thenReturn("https://s3.example/" + key);
+        when(aiClient.createRegistrationModelCutJob(anyString(), anyString(), anyString()))
+                .thenThrow(new org.springframework.web.client.RestClientException("connection refused"));
+
+        ProductImageResponse response = productImageService.registerImage(
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true));
+
+        assertThat(response.url()).isEqualTo("https://s3.example/" + key);
+        assertThat(aiProduct.getAiModelCutStatus())
+                .isEqualTo(com.ssafy.backend.product.entity.AiModelCutStatus.NONE);
     }
 
     @Test
