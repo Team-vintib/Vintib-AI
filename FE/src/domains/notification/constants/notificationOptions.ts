@@ -55,7 +55,13 @@ export const getNotificationCategory = (
   return 'TRADE'
 }
 
-export const getNotificationRoute = (notification: Pick<NotificationItemDto, 'refType' | 'refId'>) => {
+const REFUND_SELLER_TYPES = new Set(['REFUND_REQUESTED'])
+const REFUND_BUYER_TYPES = new Set(['REFUND_APPROVED', 'REFUND_REJECTED'])
+
+export const getNotificationRoute = (
+  notification: Pick<NotificationItemDto, 'type' | 'refType' | 'refId'>,
+) => {
+  const type = notification.type?.toUpperCase()
   const refType = notification.refType?.toUpperCase()
   const refId = notification.refId
 
@@ -73,6 +79,19 @@ export const getNotificationRoute = (notification: Pick<NotificationItemDto, 're
 
   if (refType === 'POINT' || refType === 'WALLET') {
     return { name: ROUTE_NAMES.POINT }
+  }
+
+  // 환불 요청은 판매자가 처리해야 하는 특정 주문으로, 승인/거절 결과는 구매자의 해당 주문으로 보낸다.
+  if (refType === 'REFUND') {
+    if (type && REFUND_SELLER_TYPES.has(type)) {
+      return { name: ROUTE_NAMES.MY_SALE_DETAIL, params: { saleId: refId } }
+    }
+
+    if (type && REFUND_BUYER_TYPES.has(type)) {
+      return { name: ROUTE_NAMES.MY_ORDER_DETAIL, params: { orderId: refId } }
+    }
+
+    return { name: ROUTE_NAMES.MY, query: { section: 'orders' } }
   }
 
   if (refType === 'ORDER' || refType === 'SHIPMENT' || refType === 'SHIPPING') {

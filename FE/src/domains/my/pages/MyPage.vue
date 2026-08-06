@@ -417,6 +417,7 @@ const todoCards = computed(() => {
 
   return [
     { label: '배송 대기', value: todo?.shippingPending ?? 0, section: 'sales' },
+    { label: '환불 요청', value: todo?.refundRequests ?? 0, section: 'sales' },
     { label: '예약 라이브', value: todo?.scheduledLives ?? 0, section: 'lives' },
   ] satisfies Array<{ label: string; value: number; section: MySectionId }>
 })
