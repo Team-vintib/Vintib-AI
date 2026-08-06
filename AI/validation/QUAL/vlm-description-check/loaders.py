@@ -95,19 +95,34 @@ def generate_from_image(
     return bundle.processor.decode(trimmed, skip_special_tokens=True).strip()
 
 
+# 문체 고정용 few-shot 예시(CH019). 프로덕션 `worker/models/quality_vlm/prompts.py`의
+# `_FEW_SHOT_EXAMPLES`와 동일 문구 — 스파이크와 프로덕션이 같은 프롬프트를 검증하도록 맞춘다.
+_FEW_SHOT_EXAMPLES: tuple[str, ...] = (
+    "주변 원단보다 갈색빛이 도는 색상 차이가 확인됩니다.",
+    "원단이 짧게 해지고 올이 드러난 영역이 확인됩니다.",
+)
+
+
 def build_defect_prompt(defect_label: str) -> str:
-    """CH009 기본 프롬프트 문구. **위치는 절대 묻지 않는다.**
+    """CH009 기본 프롬프트 + CH019 few-shot. **위치는 절대 묻지 않는다.**
 
     크롭 이미지만으로는 옷 전체에서 어디인지 알 방법이 없는데, 1차 검증(2026-07-31)에서
     모델이 그걸 "청바지의 허리 부분" 식으로 그럴듯하게 지어내는 게 반복 확인됐다 — 크롭
     범위 밖 정보를 요구해서 생기는 hallucination이었다. 위치는 SAM3 bbox로 기하학적으로
     계산하는 `bbox_grid_position()`에 맡기고, VLM에게는 시각적 특징만 맡긴다.
+
+    프로덕션 `worker/models/quality_vlm/prompts.py`의 `build_defect_prompt()`와 동일
+    문구를 쓴다 — 이 노트북의 "default" 변형이 실제 프로덕션 프롬프트를 그대로 검증하게
+    하기 위함. 문구를 한쪽만 고치면 노트북 실측이 프로덕션과 어긋난다.
     """
+    examples = "\n".join(f"- {example}" for example in _FEW_SHOT_EXAMPLES)
     return (
+        "아래는 하자 시각 설명의 좋은 답변 예시입니다.\n"
+        f"{examples}\n\n"
         f"이 이미지는 중고 의류의 '{defect_label}' 하자 부분을 확대한 사진입니다. "
         "옷의 어느 부위인지는 추측하거나 언급하지 마세요. "
-        "색상, 모양, 크기, 질감 등 사진에서 실제로 보이는 시각적 특징만 한국어 한 문장으로 "
-        "설명해 주세요. 보이지 않는 내용은 지어내지 마세요."
+        "색상, 모양, 크기, 질감 등 사진에서 실제로 보이는 시각적 특징만, 위 예시와 같은 "
+        "문체로 한국어 한 문장으로 설명해 주세요. 보이지 않는 내용은 지어내지 마세요."
     )
 
 
@@ -155,3 +170,65 @@ def bbox_grid_position(bbox, image_size: tuple[int, int]) -> str:
 def compose_finding_bullet(position_label: str, description: str) -> str:
     """SAM3 bbox 기반 위치(신뢰 가능) + VLM 크롭 설명(시각 디테일)을 한 줄로 합친다."""
     return f"{position_label} 부분 — {description}"
+
+
+def draw_numbered_boxes(image, instances):
+    """전체 이미지에 bbox·번호를 그린 복사본을 반환한다 — 일괄 프롬프팅(§4-2) 전용.
+
+    정밀한 렌더링이 목적이 아니라, VLM이 이미지 속 번호와 프롬프트의 번호를 매칭할 수
+    있도록 눈에 띄는 사각형 + 큰 숫자만 그린다. 개발 노트북(Windows)과 다른 OS 양쪽에서
+    돌 수 있게 폰트 후보를 몇 개 시도하고, 전부 없으면 PIL 기본 폰트로 넘어간다.
+    """
+    from pathlib import Path
+
+    from PIL import ImageDraw, ImageFont
+
+    font = None
+    for candidate in (
+        r"C:\Windows\Fonts\arialbd.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ):
+        if Path(candidate).is_file():
+            font = ImageFont.truetype(candidate, 28)
+            break
+    if font is None:
+        font = ImageFont.load_default()
+
+    annotated = image.copy()
+    draw = ImageDraw.Draw(annotated)
+    for inst in instances:
+        x1, y1, x2, y2 = inst["bbox"]
+        draw.rectangle([x1, y1, x2, y2], outline="red", width=4)
+        tag_y = max(0, y1 - 32)
+        draw.rectangle([x1, tag_y, x1 + 30, tag_y + 30], fill="red")
+        draw.text((x1 + 6, tag_y + 2), str(inst["no"]), fill="white", font=font)
+    return annotated
+
+
+def build_batch_prompt(instances) -> str:
+    """전체 이미지 + 번호 목록으로 모든 finding을 한 번에 요청하는 프롬프트(§4-2).
+
+    크롭 방식(`build_defect_prompt`)과 다르게 위치는 이미지 속 번호 사각형으로 이미
+    주어져 있다 — 크롭 N번 호출 대비 인코딩 비용을 줄일 수 있는지 가늠하기 위한 러프
+    비교용이라, 출력 형식을 엄격하게 파싱하지 않는다(원문 그대로 눈으로 비교).
+    """
+    listing = "\n".join(f"{inst['no']}번: '{inst['label']}' 하자" for inst in instances)
+    return (
+        "이 이미지에는 빨간 사각형과 번호로 표시된 하자 부분이 여러 곳 있습니다.\n"
+        f"{listing}\n\n"
+        "각 번호에 대해 '번호. 설명' 형식으로 한 줄씩, 색상·모양·크기·질감 등 실제로 "
+        "보이는 시각적 특징만 한국어로 설명해 주세요. 보이지 않는 내용은 지어내지 마세요."
+    )
+
+
+def describe_defects_batch(bundle: VLMBundle, image, instances, max_new_tokens: int = 300) -> str:
+    """전체 이미지 1장 + 번호 프롬프트로 모든 finding 설명을 한 번에 생성한다(§4-2).
+
+    크롭 N회 호출(`describe_defect` 반복) 대비 이미지 인코딩이 1번뿐이라 지연시간
+    이득이 있는지, 대신 번호-영역 매칭 정확도가 떨어지는지를 나란히 비교하기 위한
+    함수다. 결과 신뢰도가 크롭 방식보다 낮을 수 있다는 전제의 비교 실험용이다.
+    """
+    annotated = draw_numbered_boxes(image, instances)
+    prompt_text = build_batch_prompt(instances)
+    return generate_from_image(bundle, annotated, prompt_text, max_new_tokens)
