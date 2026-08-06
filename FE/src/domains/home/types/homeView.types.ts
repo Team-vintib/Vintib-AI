@@ -8,6 +8,7 @@ export interface HomeLiveCardItem {
   status: HomeLiveStatus
   title: string
   thumbnailUrl: string
+  hostId: number
   hostName: string
   scheduledAt?: string
   startedAt?: string
@@ -60,6 +61,11 @@ export interface HomeCategoryProductSection {
   title: string
   categoryName: string
   products: HomeProductCardItem[]
+}
+
+export interface HomePopularHostLive {
+  live: HomeLiveCardItem
+  hostFollowerCount: number
 }
 
 export interface HomeViewData {

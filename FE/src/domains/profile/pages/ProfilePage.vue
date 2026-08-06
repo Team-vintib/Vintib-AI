@@ -95,6 +95,13 @@ const followState = computed(() =>
 )
 const profileDescription = computed(() => profile.value?.description?.trim() ?? '')
 const isProfileEditBusy = computed(() => editLoadState.value !== 'idle')
+const editToggleLabel = computed(() => {
+  if (isEditPanelOpen.value) {
+    return editLoadState.value === 'saving' ? '저장 중' : '저장'
+  }
+
+  return '프로필 편집'
+})
 const productEmptyMessage = computed(() =>
   isSelfProfile.value ? '아직 등록한 상품이 없습니다.' : '판매 중인 상품이 없습니다.',
 )
@@ -355,11 +362,13 @@ const openProfileEditPanel = () => {
 
   bioDraft.value = profile.value.description?.trim() ?? ''
   editMessage.value = ''
-  isEditPanelOpen.value = !isEditPanelOpen.value
+  isEditPanelOpen.value = true
 }
 
+// 저장에 성공했는지 여부를 돌려준다 — 헤더의 "저장" 토글 버튼이 실패 시 패널을 닫지 않고
+// 에러 메시지를 볼 수 있게 두기 위해서다.
 const saveProfileBio = async () => {
-  if (!profile.value || !isSelfProfile.value || isProfileEditBusy.value) return
+  if (!profile.value || !isSelfProfile.value || isProfileEditBusy.value) return false
 
   editLoadState.value = 'saving'
   editMessage.value = ''
@@ -368,10 +377,35 @@ const saveProfileBio = async () => {
     const result = await updateProfileBio(profile.value.id, bioDraft.value.trim())
     applyProfileMutation(result)
     editMessage.value = '소개글을 저장했습니다.'
+    return true
   } catch {
     editMessage.value = '소개글을 저장하지 못했습니다.'
+    return false
   } finally {
     editLoadState.value = 'idle'
+  }
+}
+
+// 헤더의 "프로필 편집"/"저장" 토글 버튼. 닫혀 있으면 편집 패널을 열고, 열려 있으면 바뀐
+// 소개글이 있을 때만 저장한 뒤 패널을 닫아 다시 "프로필 편집"으로 돌아간다.
+const handleEditToggleClick = async () => {
+  if (!profile.value || !isSelfProfile.value || isProfileEditBusy.value) return
+
+  if (!isEditPanelOpen.value) {
+    openProfileEditPanel()
+    return
+  }
+
+  const trimmedDraft = bioDraft.value.trim()
+  const currentDescription = (profile.value.description ?? '').trim()
+
+  if (trimmedDraft === currentDescription) {
+    isEditPanelOpen.value = false
+    return
+  }
+
+  if (await saveProfileBio()) {
+    isEditPanelOpen.value = false
   }
 }
 
@@ -525,35 +559,60 @@ watch(
           </div>
 
           <div class="profile-summary__top">
-            <div class="profile-summary__main">
-              <img
-                v-if="profile.profileImageUrl"
-                class="profile-summary__image"
-                :src="profile.profileImageUrl"
-                :alt="`${profile.nickname} 프로필 이미지`"
-              />
-              <div class="profile-summary__identity">
-                <h1 id="profile-title">{{ profile.nickname }}</h1>
-                <p v-if="profileDescription">{{ profileDescription }}</p>
-              </div>
-            </div>
+            <img
+              v-if="profile.profileImageUrl"
+              class="profile-summary__avatar"
+              :src="profile.profileImageUrl"
+              :alt="`${profile.nickname} 프로필 이미지`"
+            />
 
-            <div class="profile-summary__actions">
-              <button
-                v-if="isSelfProfile"
-                class="profile-summary__edit"
-                type="button"
-                :aria-expanded="isEditPanelOpen"
-                @click="openProfileEditPanel"
-              >
-                프로필 편집
-              </button>
-              <FollowButton
-                :is-following="followState.isFollowing"
-                :is-pending="followStore.isPending(profile.id)"
-                :is-self="isSelfProfile"
-                @toggle="toggleProfileFollow"
-              />
+            <div class="profile-summary__info">
+              <div class="profile-summary__row">
+                <h1 id="profile-title">{{ profile.nickname }}</h1>
+
+                <div class="profile-summary__actions">
+                  <button
+                    v-if="isSelfProfile"
+                    class="profile-summary__edit"
+                    type="button"
+                    :aria-expanded="isEditPanelOpen"
+                    :disabled="isProfileEditBusy"
+                    @click="handleEditToggleClick"
+                  >
+                    {{ editToggleLabel }}
+                  </button>
+                  <FollowButton
+                    :is-following="followState.isFollowing"
+                    :is-pending="followStore.isPending(profile.id)"
+                    :is-self="isSelfProfile"
+                    @toggle="toggleProfileFollow"
+                  />
+                </div>
+              </div>
+
+              <div class="profile-summary__stats" aria-label="프로필 통계">
+                <span class="profile-summary__stat">
+                  <strong>{{ profile.productCount.toLocaleString('ko-KR') }}</strong> 상품
+                </span>
+                <button
+                  class="profile-summary__stat profile-summary__stat--button"
+                  type="button"
+                  @click="goToFollowList('followers')"
+                >
+                  <strong>{{ followState.followerCount.toLocaleString('ko-KR') }}</strong> 팔로워
+                </button>
+                <button
+                  class="profile-summary__stat profile-summary__stat--button"
+                  type="button"
+                  @click="goToFollowList('following')"
+                >
+                  <strong>{{ profile.followingCount.toLocaleString('ko-KR') }}</strong> 팔로잉
+                </button>
+              </div>
+
+              <p v-if="profileDescription" class="profile-summary__description">
+                {{ profileDescription }}
+              </p>
             </div>
           </div>
 
@@ -645,21 +704,6 @@ watch(
               {{ editMessage }}
             </p>
           </div>
-
-          <div class="profile-stats" aria-label="프로필 통계">
-            <button class="profile-stats__item" type="button" @click="goToFollowList('followers')">
-              <strong>{{ followState.followerCount.toLocaleString('ko-KR') }}</strong>
-              <span>팔로워</span>
-            </button>
-            <button class="profile-stats__item" type="button" @click="goToFollowList('following')">
-              <strong>{{ profile.followingCount.toLocaleString('ko-KR') }}</strong>
-              <span>팔로잉</span>
-            </button>
-            <div class="profile-stats__item" aria-label="상품 수">
-              <strong>{{ profile.productCount.toLocaleString('ko-KR') }}</strong>
-              <span>상품</span>
-            </div>
-          </div>
         </header>
 
         <div class="profile-content-card">
@@ -735,7 +779,7 @@ watch(
               <button type="button" @click="loadLives">다시 시도</button>
             </div>
             <div v-else-if="lives.length" class="profile-live-grid">
-              <LiveListCard v-for="live in lives" :key="live.id" :live="live" />
+              <LiveListCard v-for="live in lives" :key="live.id" :live="live" variant="profile" />
             </div>
             <p v-else class="profile-empty">{{ liveEmptyMessage }}</p>
 
@@ -826,27 +870,44 @@ watch(
   object-fit: cover;
 }
 
+// 인스타그램 스타일: 아바타는 왼쪽에 고정, 오른쪽 정보 컬럼에 [이름+버튼] → [통계] → [소개글]을
+// 세로로 쌓는다.
 .profile-summary__top {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-5);
+  align-items: flex-start;
+  gap: var(--space-6);
 }
 
-.profile-summary__main {
+.profile-summary__avatar {
+  flex: 0 0 auto;
+  width: 120px;
+  height: 120px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-summary__info {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: var(--space-3);
+}
+
+.profile-summary__row {
   display: flex;
   align-items: center;
-  min-width: 0;
-  gap: var(--space-5);
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-4);
 }
 
-.profile-summary__image {
-  flex: 0 0 auto;
-  width: 88px;
-  height: 88px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-media);
-  object-fit: cover;
+.profile-summary__row h1 {
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-4xl);
+  font-weight: 900;
+  line-height: 42px;
 }
 
 .profile-summary__top :deep(.follow-button) {
@@ -873,34 +934,61 @@ watch(
   font-weight: var(--font-weight-bold);
 }
 
-.profile-summary__edit:hover,
+.profile-summary__edit:hover:not(:disabled),
 .profile-summary__edit:focus-visible {
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
 
-.profile-summary__identity {
-  min-width: 0;
+.profile-summary__edit:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
-.profile-summary__identity h1 {
-  overflow-wrap: anywhere;
+.profile-summary__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+}
+
+.profile-summary__stat {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-control);
+}
+
+.profile-summary__stat strong {
+  margin-right: 4px;
   color: var(--color-text-primary);
-  font-size: var(--font-size-4xl);
   font-weight: 900;
-  line-height: 42px;
 }
 
-.profile-summary__identity p,
-.profile-summary__message {
-  margin-top: var(--space-2);
+.profile-summary__stat--button {
+  cursor: pointer;
+  transition: color var(--transition-base);
+}
+
+.profile-summary__stat--button:hover,
+.profile-summary__stat--button:focus-visible {
+  color: var(--color-primary);
+}
+
+.profile-summary__description {
   color: var(--color-text-secondary);
   font-size: var(--font-size-button-small);
   line-height: var(--line-height-relaxed);
+  overflow-wrap: anywhere;
 }
 
 .profile-summary__message {
+  margin-top: var(--space-2);
   color: var(--color-danger);
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-relaxed);
 }
 
 .profile-editor {
@@ -1017,66 +1105,6 @@ watch(
   clip: rect(0, 0, 0, 0);
   border: 0;
   white-space: nowrap;
-}
-
-.profile-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface-secondary);
-}
-
-.profile-stats__item {
-  display: grid;
-  place-items: center;
-  min-height: 76px;
-  gap: var(--space-1);
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--color-text-primary);
-  text-align: center;
-}
-
-.profile-stats__item + .profile-stats__item {
-  border-left: 1px solid var(--color-border);
-}
-
-.profile-stats button.profile-stats__item {
-  cursor: pointer;
-  transition:
-    border-color var(--transition-base),
-    background-color var(--transition-base),
-    color var(--transition-base);
-}
-
-.profile-stats__item strong {
-  color: var(--color-text-primary);
-  font-size: var(--font-size-xl);
-  font-weight: 900;
-  line-height: var(--line-height-lg-plus);
-}
-
-.profile-stats__item span {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-button-small);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-control);
-}
-
-.profile-stats button.profile-stats__item:hover,
-.profile-stats button.profile-stats__item:focus-visible {
-  border-color: var(--color-primary);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-}
-
-.profile-stats button.profile-stats__item:focus-visible {
-  outline: 1px solid var(--color-primary);
-  outline-offset: 3px;
 }
 
 .profile-content-card {
@@ -1199,15 +1227,15 @@ watch(
     gap: var(--space-4);
   }
 
-  .profile-summary__main {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-
-  .profile-summary__image {
+  .profile-summary__avatar {
     width: 72px;
     height: 72px;
+  }
+
+  .profile-summary__row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
   }
 
   .profile-summary__actions {
@@ -1223,19 +1251,9 @@ watch(
     width: 100%;
   }
 
-  .profile-summary__identity h1 {
+  .profile-summary__row h1 {
     font-size: var(--font-size-3xl-plus);
     line-height: var(--line-height-3xl);
-  }
-
-  .profile-stats__item {
-    min-height: 78px;
-    border-radius: 0;
-  }
-
-  .profile-stats__item strong {
-    font-size: var(--font-size-lg-plus);
-    line-height: var(--line-height-lg);
   }
 
   .profile-content-card {

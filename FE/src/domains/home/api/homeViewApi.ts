@@ -21,6 +21,7 @@ type HomeProductSellStatus = 'ON_SALE' | 'RESERVED' | 'SOLD_OUT'
 interface HomeLiveCardResponse {
   liveId: number
   title: string
+  hostId: number
   hostNickname: string
   thumbnailUrl: string
   broadcastStatus: HomeLiveBroadcastStatus
@@ -215,6 +216,7 @@ const toHomeLiveCardItem = (live: HomeLiveCardResponse): HomeLiveCardItem => ({
   status: live.broadcastStatus,
   title: live.title,
   thumbnailUrl: live.thumbnailUrl,
+  hostId: live.hostId,
   hostName: live.hostNickname,
   scheduledAt: live.scheduledAt ?? undefined,
   startedAt: live.startedAt ?? undefined,

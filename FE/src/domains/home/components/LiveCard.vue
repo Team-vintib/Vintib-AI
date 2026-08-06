@@ -24,7 +24,6 @@ const props = withDefaults(
 
 const rootComponent = computed(() => (props.to ? RouterLink : 'article'))
 const isScheduled = computed(() => props.variant === 'scheduled')
-const rootClass = computed(() => (isScheduled.value ? 'schedule-card' : 'live-card'))
 const rootProps = computed(() => (props.to ? { to: props.to } : {}))
 const displayImageUrl = computed(() => props.live.thumbnailUrl || fallbackImageUrl)
 
@@ -51,17 +50,19 @@ const formatSchedule = (value?: string) => {
 </script>
 
 <template>
-  <component :is="rootComponent" :class="rootClass" v-bind="rootProps">
-    <span :class="isScheduled ? 'schedule-card__media' : 'live-card__media'">
+  <component :is="rootComponent" class="live-card" v-bind="rootProps">
+    <span class="live-card__media">
       <img
-        :class="isScheduled ? 'schedule-card__image' : 'live-card__image'"
+        class="live-card__image"
         :src="displayImageUrl"
         :alt="live.title"
         @error="handleImageError"
       />
-      <span v-if="isScheduled" class="schedule-card__time">
-        {{ formatSchedule(live.scheduledAt) }}
-      </span>
+      <template v-if="isScheduled">
+        <span class="live-card__badge live-card__badge--scheduled">
+          {{ formatSchedule(live.scheduledAt) }}
+        </span>
+      </template>
       <template v-else>
         <span class="live-card__badge">LIVE</span>
         <span v-if="live.viewerCount !== undefined" class="live-card__viewers">
@@ -69,21 +70,17 @@ const formatSchedule = (value?: string) => {
         </span>
       </template>
     </span>
-    <span v-if="isScheduled" class="schedule-card__body">
-      <span class="schedule-card__row">
-        <strong class="schedule-card__title">{{ live.title }}</strong>
-        <span class="schedule-card__time-text">{{ formatSchedule(live.scheduledAt) }}</span>
+    <span class="live-card__body">
+      <strong class="live-card__title">{{ live.title }}</strong>
+      <span class="live-card__meta">
+        <template v-if="isScheduled">
+          판매자 {{ live.hostName }} · 예정 상품 {{ live.scheduledProductCount ?? 0 }}개
+        </template>
+        <template v-else>판매자 {{ live.hostName }}</template>
       </span>
-      <span class="schedule-card__meta">
-        판매자 {{ live.hostName }} · 예정 상품 {{ live.scheduledProductCount ?? 0 }}개
-      </span>
-      <RouterLink v-if="actionTo && actionLabel" class="schedule-card__action" :to="actionTo">
+      <RouterLink v-if="actionTo && actionLabel" class="live-card__action" :to="actionTo">
         {{ actionLabel }}
       </RouterLink>
-    </span>
-    <span v-else class="live-card__body">
-      <strong class="live-card__title">{{ live.title }}</strong>
-      <span class="live-card__meta">판매자 {{ live.hostName }}</span>
     </span>
   </component>
 </template>
@@ -91,39 +88,24 @@ const formatSchedule = (value?: string) => {
 <style scoped lang="scss">
 // 카드 자체는 박스(테두리/배경)를 두르지 않는다 — 페이지 배경과 자연스럽게 연결하고,
 // 얇은 border는 이미지 프레임에만 준다. hover도 뜨는 대신 이미지/보더 대비만 미세하게 바뀐다.
+// 진행 중/예약 라이브 카드는 같은 마크업·스타일을 쓰고, 배지 내용과 하단 액션 버튼 유무만 다르다.
 .live-card {
   display: grid;
   gap: var(--space-3);
 }
 
-.schedule-card {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.live-card__media,
-.schedule-card__media {
+.live-card__media {
   position: relative;
   overflow: hidden;
   display: block;
+  aspect-ratio: 4 / 3;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-media);
   background: var(--color-image-frame);
   transition: border-color var(--transition-standard);
 }
 
-.live-card__media {
-  aspect-ratio: 4 / 3;
-}
-
-.schedule-card__media {
-  flex: 0 0 96px;
-  aspect-ratio: 1 / 1;
-}
-
-.live-card:hover .live-card__media,
-.schedule-card:hover .schedule-card__media {
+.live-card:hover .live-card__media {
   border-color: var(--color-border-strong);
 }
 
@@ -134,8 +116,7 @@ const formatSchedule = (value?: string) => {
   content: '';
 }
 
-.live-card__image,
-.schedule-card__image {
+.live-card__image {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -143,38 +124,42 @@ const formatSchedule = (value?: string) => {
   transition: filter var(--transition-standard);
 }
 
-.live-card:hover .live-card__image,
-.schedule-card:hover .schedule-card__image {
+.live-card:hover .live-card__image {
   filter: saturate(0.88) contrast(1.04) brightness(1.03);
 }
 
+// 상품 카드 등급 뱃지(.product-card__grade)와 동일한 형태/위치 — 박스 안쪽으로 8px 들어온
+// 둥근 뱃지, blur 배경. LIVE/예약 시각은 좌측, 시청자 수는 우측에 같은 모양으로 대칭 배치한다.
 .live-card__badge,
-.live-card__viewers,
-.schedule-card__time {
+.live-card__viewers {
   position: absolute;
   z-index: var(--z-layer-1);
-  top: 0;
+  top: var(--space-2);
   display: inline-flex;
   align-items: center;
-  min-height: var(--line-height-relaxed);
-  padding: 0 var(--space-2);
+  gap: 6px;
+  padding: 5px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
   color: var(--color-text-primary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-badge);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.12em;
+  font-size: calc(var(--font-size-caption) - 1px);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.03em;
   line-height: var(--line-height-xs);
+  backdrop-filter: blur(4px);
 }
 
 .live-card__badge {
-  left: 0;
-  gap: 6px;
+  left: var(--space-2);
   background: var(--color-accent);
-  border-radius: 0 0 var(--radius-badge) 0;
-  letter-spacing: 0.18em;
 }
 
-.live-card__badge::before {
+.live-card__badge--scheduled {
+  background: var(--overlay-scrim-strong);
+  letter-spacing: -0.01em;
+}
+
+.live-card__badge:not(.live-card__badge--scheduled)::before {
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -196,30 +181,14 @@ const formatSchedule = (value?: string) => {
 }
 
 .live-card__viewers {
-  right: 0;
+  right: var(--space-2);
   background: var(--overlay-scrim-strong);
-  border-radius: 0 0 0 var(--radius-badge);
   color: var(--color-text-secondary);
-  letter-spacing: -0.01em;
-  text-transform: none;
-}
-
-.schedule-card__time {
-  left: 0;
-  background: var(--overlay-scrim-strong);
-  border-radius: 0 0 var(--radius-badge) 0;
 }
 
 .live-card__body {
   display: grid;
   gap: var(--space-1);
-}
-
-.schedule-card__body {
-  display: grid;
-  flex: 1 1 auto;
-  gap: var(--space-1);
-  min-width: 0;
 }
 
 .live-card__title {
@@ -234,43 +203,14 @@ const formatSchedule = (value?: string) => {
   -webkit-line-clamp: 2;
 }
 
-.schedule-card__row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-
-.schedule-card__title {
-  overflow: hidden;
-  min-width: 0;
-  color: var(--color-text-primary);
-  font-size: var(--font-size-button-small);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: -0.01em;
-  line-height: var(--line-height-control);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.schedule-card__time-text {
-  flex: 0 0 auto;
-  color: var(--color-text-secondary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.live-card__meta,
-.schedule-card__meta {
+.live-card__meta {
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-light);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
   line-height: var(--line-height-snug);
 }
 
-.schedule-card__action {
+.live-card__action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -290,7 +230,7 @@ const formatSchedule = (value?: string) => {
     color var(--transition-standard);
 }
 
-.schedule-card__action:hover {
+.live-card__action:hover {
   background: var(--color-primary-hover);
   color: var(--color-primary-strong);
 }
@@ -299,10 +239,6 @@ const formatSchedule = (value?: string) => {
   .live-card__title {
     font-size: var(--font-size-body);
     line-height: var(--line-height-relaxed);
-  }
-
-  .schedule-card__media {
-    flex-basis: 76px;
   }
 }
 </style>

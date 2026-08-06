@@ -3,6 +3,10 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { getMyProfile } from '@/domains/my/api/myApi'
+import { createOrder, updateOrderAddress } from '@/domains/order/api/orderApi'
+import PurchaseConfirmDialog from '@/domains/order/components/PurchaseConfirmDialog.vue'
+import type { OrderAddressInput } from '@/domains/order/types/order.types'
 import { addWish, removeWish } from '@/domains/product/api/productApi'
 import { useWishStore } from '@/domains/product/stores/wishStore'
 import {
@@ -18,9 +22,12 @@ import ProductPriceDistribution from '@/domains/product/components/ProductPriceD
 import ProductPurchaseSummary from '@/domains/product/components/ProductPurchaseSummary.vue'
 import ProductSellerLivePanel from '@/domains/product/components/ProductSellerLivePanel.vue'
 import ProductSimilarRecommendation from '@/domains/product/components/ProductSimilarRecommendation.vue'
+import { getPointBalance } from '@/domains/point/api/pointApi'
+import { dispatchPointBalanceUpdated } from '@/domains/point/utils/pointBalanceEvents'
 import LiveTryOnPanel from '@/domains/tryon/components/LiveTryOnPanel.vue'
 import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
 import type { ProductDetailViewData } from '@/domains/product/types/productDetail.types'
+import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
@@ -34,13 +41,19 @@ const wishStore = useWishStore()
 const product = ref<ProductDetailViewData | null>(null)
 const loadState = ref<ProductDetailLoadState>('loading')
 const selectedImageId = ref('')
-const isInCart = ref(false)
-const isReminderSet = ref(false)
 const isTryOnOpen = ref(false)
 const isTryOnExpanded = ref(false)
 const actionMessage = ref('')
 let actionMessageTimer: ReturnType<typeof setTimeout> | undefined
 let loadRequestId = 0
+
+const isPurchaseDialogOpen = ref(false)
+const purchasePointBalance = ref<number | null>(null)
+const isPurchaseBalanceLoading = ref(false)
+const isPurchaseSubmitting = ref(false)
+const purchaseErrorMessage = ref('')
+const purchaseSuccessOrderId = ref<number | null>(null)
+const purchaseInitialAddress = ref<OrderAddressInput | null>(null)
 
 const isSold = computed(() => product.value?.saleStatus === 'SOLD')
 const isLiked = computed(() =>
@@ -75,6 +88,7 @@ const loadProductDetail = async () => {
   product.value = null
   loadState.value = 'loading'
   actionMessage.value = ''
+  purchaseSuccessOrderId.value = null
   clearTimeout(actionMessageTimer)
 
   if (!Number.isInteger(productId) || productId < 1) {
@@ -95,8 +109,6 @@ const loadProductDetail = async () => {
     wishStore.hydrateProducts([{ id: nextProduct.id, isLiked: nextProduct.isLiked }])
     loadState.value = 'success'
     selectedImageId.value = nextProduct.images[0]?.id ?? ''
-    isInCart.value = false
-    isReminderSet.value = false
   } catch (error) {
     if (requestId !== loadRequestId) return
 
@@ -127,10 +139,6 @@ const handleToggleLike = async () => {
     wishStore.setProductWish(product.value.id, wasLiked)
     showTemporaryMessage('찜 상태를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.')
   }
-}
-
-const handleToggleCart = () => {
-  isInCart.value = !isInCart.value
 }
 
 const showTemporaryMessage = (message: string) => {
@@ -164,8 +172,85 @@ const handleTryOnKeydown = (event: KeyboardEvent) => {
   if (event.key === 'Escape') closeTryOn()
 }
 
-const handlePurchase = () =>
-  showTemporaryMessage('구매 확인 화면은 후속 스토리에서 연결됩니다.')
+const handlePurchase = async () => {
+  if (!product.value) return
+
+  if (!authStore.isAuthenticated || !authStore.user) {
+    await router.push({ name: ROUTE_NAMES.AUTH_LOGIN, query: { redirect: route.fullPath } })
+    return
+  }
+
+  purchaseErrorMessage.value = ''
+  purchaseSuccessOrderId.value = null
+  isPurchaseDialogOpen.value = true
+  isPurchaseBalanceLoading.value = true
+  purchasePointBalance.value = null
+  purchaseInitialAddress.value = null
+
+  const [balanceResult, profileResult] = await Promise.allSettled([
+    getPointBalance(authStore.user.id),
+    getMyProfile(authStore.user.id),
+  ])
+
+  if (balanceResult.status === 'fulfilled') {
+    purchasePointBalance.value = balanceResult.value.available
+  }
+
+  if (profileResult.status === 'fulfilled' && profileResult.value.address.trim() !== '') {
+    const profile = profileResult.value
+    purchaseInitialAddress.value = {
+      recipientName: profile.name,
+      recipientPhone: profile.phoneNumber,
+      zipcode: profile.postalCode ?? '',
+      address1: profile.address,
+      address2: profile.detailAddress,
+    }
+  }
+
+  isPurchaseBalanceLoading.value = false
+}
+
+const closePurchaseDialog = () => {
+  if (isPurchaseSubmitting.value) return
+
+  isPurchaseDialogOpen.value = false
+  purchaseErrorMessage.value = ''
+}
+
+const handlePurchaseSubmit = async (address: OrderAddressInput) => {
+  if (!product.value || !authStore.user) return
+
+  const userId = authStore.user.id
+  isPurchaseSubmitting.value = true
+  purchaseErrorMessage.value = ''
+
+  try {
+    const order = await createOrder(product.value.id)
+
+    clearTimeout(actionMessageTimer)
+    product.value.saleStatus = 'SOLD'
+    isPurchaseDialogOpen.value = false
+    purchaseSuccessOrderId.value = order.orderId
+
+    try {
+      await updateOrderAddress(order.orderId, address)
+      actionMessage.value = '구매가 완료되었습니다.'
+    } catch {
+      // 주문 자체는 이미 생성됐으므로 상품은 판매완료로 반영하고, 배송지는 구매 내역에서 재입력하도록 안내한다.
+      actionMessage.value =
+        '구매는 완료됐지만 배송지 등록에 실패했습니다. 구매 내역에서 다시 입력해 주세요.'
+    }
+
+    const nextBalance = await getPointBalance(userId).catch(() => null)
+    if (nextBalance) {
+      dispatchPointBalanceUpdated({ userId, balance: nextBalance })
+    }
+  } catch (error) {
+    purchaseErrorMessage.value = normalizeApiError(error).message
+  } finally {
+    isPurchaseSubmitting.value = false
+  }
+}
 
 const handleViewSeller = () => {
   if (!product.value) return
@@ -178,10 +263,6 @@ const handleViewSeller = () => {
 
 const handleViewSimilarProduct = (productId: number) => {
   void router.push({ name: ROUTE_NAMES.PRODUCT_DETAIL, params: { productId } })
-}
-
-const handleToggleReminder = () => {
-  isReminderSet.value = !isReminderSet.value
 }
 
 const handleViewLive = (liveId: number) => {
@@ -265,7 +346,7 @@ onBeforeUnmount(() => {
         </div>
         <div>
           <strong>판매가 완료된 상품입니다</strong>
-          <p>상품 정보는 계속 확인할 수 있지만 구매와 장바구니 기능은 이용할 수 없습니다.</p>
+          <p>상품 정보는 계속 확인할 수 있지만 구매 기능은 이용할 수 없습니다.</p>
         </div>
       </section>
 
@@ -279,9 +360,7 @@ onBeforeUnmount(() => {
           :product="product"
           :seller="product.seller"
           :is-liked="isLiked"
-          :is-in-cart="isInCart"
           @toggle-like="handleToggleLike"
-          @toggle-cart="handleToggleCart"
           @open-try-on="handleTryOn"
           @purchase="handlePurchase"
           @view-seller="handleViewSeller"
@@ -297,17 +376,24 @@ onBeforeUnmount(() => {
 
       <p v-if="actionMessage" class="product-detail__action-message" role="status">
         {{ actionMessage }}
+        <RouterLink
+          v-if="purchaseSuccessOrderId"
+          :to="{ name: ROUTE_NAMES.MY_ORDER_DETAIL, params: { orderId: purchaseSuccessOrderId } }"
+        >
+          구매 내역 보기
+        </RouterLink>
       </p>
 
       <ProductSellerLivePanel
         :linked-live="product.linkedLive"
         :seller-nickname="product.seller.nickname"
-        :is-reminder-set="isReminderSet"
-        @toggle-reminder="handleToggleReminder"
         @view-live="handleViewLive"
       />
       <ProductDetailInformation :product="product" />
-      <AiQualityAnalysisPanel :analysis="product.aiQualityAnalysis" />
+      <AiQualityAnalysisPanel
+        v-if="product.aiQualityAnalysis"
+        :analysis="product.aiQualityAnalysis"
+      />
       <ProductSimilarRecommendation :product-id="product.id" />
     </article>
 
@@ -335,6 +421,20 @@ onBeforeUnmount(() => {
         <LiveTryOnPanel :product="tryOnProduct" @close="closeTryOn" />
       </div>
     </div>
+
+    <PurchaseConfirmDialog
+      v-if="product && isPurchaseDialogOpen"
+      :product-title="product.title"
+      :product-price="product.price"
+      :product-thumbnail-url="product.images[0]?.url ?? ''"
+      :point-balance="purchasePointBalance"
+      :is-balance-loading="isPurchaseBalanceLoading"
+      :is-submitting="isPurchaseSubmitting"
+      :error-message="purchaseErrorMessage"
+      :initial-address="purchaseInitialAddress"
+      @close="closePurchaseDialog"
+      @submit="handlePurchaseSubmit"
+    />
   </DefaultLayout>
 </template>
 
@@ -395,6 +495,12 @@ onBeforeUnmount(() => {
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);
+}
+
+.product-detail__action-message a {
+  margin-left: var(--space-2);
+  color: inherit;
+  text-decoration: underline;
 }
 
 .product-detail__sold-banner {

@@ -28,7 +28,7 @@ import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 import fallbackProductThumbnail from '@/assets/images/products/product-denim-jacket.webp'
 
-type LiveCreateField = 'mode' | 'title' | 'description' | 'mainBrand' | 'products' | 'scheduledDate' | 'scheduledTime'
+type LiveCreateField = 'mode' | 'title' | 'products' | 'scheduledDate' | 'scheduledTime'
 
 const authStore = useAuthStore()
 const form = reactive<LiveCreateFormState>({
@@ -64,8 +64,6 @@ const deviceState = reactive<LiveDeviceState>({
 const touched = reactive<Record<LiveCreateField, boolean>>({
   mode: false,
   title: false,
-  description: false,
-  mainBrand: false,
   products: false,
   scheduledDate: false,
   scheduledTime: false,
@@ -112,9 +110,9 @@ const isDeviceTesting = computed(
 const isDeviceReady = computed(
   () => deviceState.camera === 'success' && deviceState.microphone === 'success',
 )
-const isInfoStepValid = computed(
-  () => Boolean(form.title.trim()) && Boolean(form.description.trim()) && Boolean(form.mainBrand.trim()),
-)
+// 방송 제목만 필수다. 썸네일/한 줄 소개/대표 브랜드는 선택 입력이라 값이 없어도 다음 단계로
+// 넘어갈 수 있다.
+const isInfoStepValid = computed(() => Boolean(form.title.trim()))
 const isProductsStepValid = computed(() => form.selectedProductIds.length > 0)
 const scheduledDateTime = computed(() => {
   if (!form.scheduledDate || !form.scheduledTime) {
@@ -185,14 +183,6 @@ const fieldErrors = computed<Record<LiveCreateField, string>>(() => ({
   mode: touched.mode && !form.mode ? LIVE_CREATE_VALIDATION_MESSAGES.modeRequired : '',
   title:
     touched.title && !form.title.trim() ? LIVE_CREATE_VALIDATION_MESSAGES.titleRequired : '',
-  description:
-    touched.description && !form.description.trim()
-      ? LIVE_CREATE_VALIDATION_MESSAGES.descriptionRequired
-      : '',
-  mainBrand:
-    touched.mainBrand && !form.mainBrand.trim()
-      ? LIVE_CREATE_VALIDATION_MESSAGES.mainBrandRequired
-      : '',
   products:
     touched.products && form.selectedProductIds.length === 0
       ? LIVE_CREATE_VALIDATION_MESSAGES.productRequired
@@ -237,8 +227,6 @@ const markCurrentStepTouched = () => {
 
   if (currentStep.value.id === 'info') {
     touched.title = true
-    touched.description = true
-    touched.mainBrand = true
     return
   }
 
@@ -527,12 +515,7 @@ onMounted(() => {
 
 <template>
   <DefaultLayout content-max-width="1120px">
-    <section class="live-create" aria-labelledby="live-create-title">
-      <header class="live-create__header">
-        <h1 id="live-create-title">라이브 시작</h1>
-        <p>방송 방식과 기본 정보를 정리한 뒤 라이브를 개설합니다.</p>
-      </header>
-
+    <section class="live-create" aria-label="라이브 시작">
       <nav class="live-create__steps" aria-label="라이브 개설 단계">
         <ol>
           <li
@@ -544,7 +527,7 @@ onMounted(() => {
             }"
             :aria-current="index === currentStepIndex ? 'step' : undefined"
           >
-            <span>{{ index + 1 }}</span>
+            <span>{{ index < currentStepIndex ? '✓' : index + 1 }}</span>
             <strong>{{ step.label }}</strong>
           </li>
         </ol>
@@ -619,7 +602,11 @@ onMounted(() => {
             </div>
 
             <label class="live-create__field" for="live-create-title-input">
-              <span>방송 제목</span>
+              <span>
+                방송 제목
+                <span class="live-create__required" aria-hidden="true">*</span>
+                <span class="live-create__required-text">필수 입력</span>
+              </span>
               <input
                 id="live-create-title-input"
                 v-model="form.title"
@@ -648,18 +635,7 @@ onMounted(() => {
                 maxlength="120"
                 rows="3"
                 placeholder="시청자에게 보여질 소개 문구를 입력해 주세요"
-                :aria-invalid="fieldErrors.description ? 'true' : 'false'"
-                aria-describedby="live-create-description-error"
-                @blur="touched.description = true"
               />
-              <span
-                v-if="fieldErrors.description"
-                id="live-create-description-error"
-                class="live-create__field-error"
-                role="alert"
-              >
-                {{ fieldErrors.description }}
-              </span>
             </label>
 
             <label class="live-create__field" for="live-create-brand-input">
@@ -670,18 +646,7 @@ onMounted(() => {
                 type="text"
                 maxlength="40"
                 placeholder="예: Burberry, Levi's"
-                :aria-invalid="fieldErrors.mainBrand ? 'true' : 'false'"
-                aria-describedby="live-create-brand-error"
-                @blur="touched.mainBrand = true"
               />
-              <span
-                v-if="fieldErrors.mainBrand"
-                id="live-create-brand-error"
-                class="live-create__field-error"
-                role="alert"
-              >
-                {{ fieldErrors.mainBrand }}
-              </span>
             </label>
           </form>
 
@@ -736,7 +701,9 @@ onMounted(() => {
                       <dd>{{ product.category }}</dd>
                     </div>
                   </dl>
-                  <em>{{ product.price.toLocaleString() }}원</em>
+                  <em>{{
+                    product.isAuctionScheduled ? '경매 예정' : `${product.price.toLocaleString('ko-KR')}P`
+                  }}</em>
                 </div>
                 <button type="button" @click="toggleProductSelection(product.id)">
                   {{ isProductSelected(product.id) ? '선택 해제' : '선택' }}
@@ -1046,12 +1013,6 @@ onMounted(() => {
   padding-bottom: var(--space-16);
 }
 
-.live-create__header {
-  display: grid;
-  gap: var(--space-2);
-  padding-top: var(--space-6);
-}
-
 .live-create__eyebrow,
 .live-create__section-label {
   color: var(--color-accent);
@@ -1063,16 +1024,6 @@ onMounted(() => {
   text-transform: uppercase;
 }
 
-.live-create__header h1 {
-  color: var(--color-text-primary);
-  font-family: var(--font-display);
-  font-size: 40px;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.035em;
-  line-height: 1.08;
-}
-
-.live-create__header p:last-child,
 .live-create__panel > p:last-child {
   color: var(--color-text-secondary);
 }
@@ -1090,46 +1041,47 @@ onMounted(() => {
   flex-direction: column;
   min-width: 0;
   gap: var(--space-2);
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   text-align: center;
 }
 
 .live-create__steps li:not(:last-child)::after {
   position: absolute;
-  top: 15px;
-  left: calc(50% + 22px);
-  width: calc(100% - 44px);
-  height: var(--underline-thickness);
-  background: var(--color-border-strong);
+  top: 17px;
+  left: calc(50% + 24px);
+  width: calc(100% - 48px);
+  height: 2px;
+  background: var(--color-border);
   content: '';
 }
 
 .live-create__step--complete:not(:last-child)::after {
-  background: var(--color-live);
+  background: var(--color-primary);
 }
 
 .live-create__steps span {
   position: relative;
   z-index: var(--z-layer-1);
   display: grid;
-  width: var(--space-8);
-  height: var(--space-8);
-  border: 1px solid var(--color-border-strong);
-  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-badge);
   background: var(--color-surface);
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   flex: 0 0 auto;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
   place-items: center;
 }
 
 .live-create__steps strong {
-  overflow: hidden;
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: var(--line-height-snug);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .live-create__step--current {
@@ -1138,14 +1090,13 @@ onMounted(() => {
 
 .live-create__step--current span,
 .live-create__step--complete span {
-  border-color: var(--color-live);
-  background: var(--color-live);
+  border-color: var(--color-primary);
+  background: var(--color-primary);
   color: var(--color-text-inverse);
 }
 
-.live-create__step--current strong,
-.live-create__step--complete strong {
-  color: var(--color-text-primary);
+.live-create__step--current strong {
+  color: var(--color-primary);
 }
 
 .live-create__body {
@@ -1205,6 +1156,7 @@ onMounted(() => {
 .live-create__method strong {
   color: var(--color-text-primary);
   font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-extrabold);
   line-height: var(--line-height-lg);
 }
 
@@ -1307,6 +1259,23 @@ onMounted(() => {
   font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-control);
+}
+
+.live-create__required {
+  margin-left: 2px;
+  color: var(--color-error);
+}
+
+.live-create__required-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  margin: -1px;
+  white-space: nowrap;
 }
 
 .live-create__field input,
@@ -1413,7 +1382,7 @@ onMounted(() => {
 }
 
 .live-create__camera-placeholder p {
-  max-width: 320px;
+  white-space: nowrap;
   line-height: var(--line-height-body);
 }
 
@@ -1888,7 +1857,6 @@ onMounted(() => {
 }
 
 @media (max-width: 960px) {
-  .live-create__steps ol,
   .live-create__body,
   .live-create__method-grid {
     grid-template-columns: 1fr;

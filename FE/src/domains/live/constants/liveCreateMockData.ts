@@ -66,6 +66,7 @@ export const LIVE_CREATE_MOCK_PRODUCTS: LiveCreateProduct[] = [
     category: '아우터',
     condition: '사용감 적음',
     price: 89000,
+    isAuctionScheduled: false,
     thumbnailUrl: denimJacketImage,
   },
   {
@@ -75,6 +76,7 @@ export const LIVE_CREATE_MOCK_PRODUCTS: LiveCreateProduct[] = [
     category: '아우터',
     condition: '생활 사용감',
     price: 248000,
+    isAuctionScheduled: false,
     thumbnailUrl: trenchCoatImage,
   },
   {
@@ -84,6 +86,7 @@ export const LIVE_CREATE_MOCK_PRODUCTS: LiveCreateProduct[] = [
     category: '가방',
     condition: '모서리 스크래치',
     price: 320000,
+    isAuctionScheduled: false,
     thumbnailUrl: leatherBagImage,
   },
   {
@@ -93,6 +96,7 @@ export const LIVE_CREATE_MOCK_PRODUCTS: LiveCreateProduct[] = [
     category: '신발',
     condition: '밑창 사용감',
     price: 76000,
+    isAuctionScheduled: false,
     thumbnailUrl: sneakersImage,
   },
 ]
@@ -100,8 +104,6 @@ export const LIVE_CREATE_MOCK_PRODUCTS: LiveCreateProduct[] = [
 export const LIVE_CREATE_VALIDATION_MESSAGES = {
   modeRequired: '방송 방식을 선택해 주세요.',
   titleRequired: '방송 제목을 입력해 주세요.',
-  descriptionRequired: '한 줄 소개를 입력해 주세요.',
-  mainBrandRequired: '대표 브랜드를 입력해 주세요.',
   productRequired: '라이브에 연결할 상품을 1개 이상 선택해 주세요.',
   scheduledDateRequired: '방송 날짜를 선택해 주세요.',
   scheduledTimeRequired: '시작 시간을 선택해 주세요.',

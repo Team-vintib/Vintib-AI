@@ -17,7 +17,7 @@ export interface ProductListItem {
   brand: string
   name: string
   price: number
-  conditionGrade: ProductConditionGrade
+  conditionGrade: ProductConditionGrade | ''
   saleType: ProductSaleType
   saleStatus?: ProductSaleStatus
   categoryId?: number | null
@@ -35,6 +35,7 @@ export interface ProductFilterOption {
 export interface ProductCategoryOption {
   id: number
   label: string
+  categoryIds: number[]
 }
 
 export interface ProductSaleTypeTab {
@@ -45,4 +46,10 @@ export interface ProductSaleTypeTab {
 export interface ProductSortItem {
   id: ProductSortOption
   label: string
+}
+
+export interface ProductCategoryTabSection {
+  id: string
+  title: string
+  products: ProductListItem[]
 }

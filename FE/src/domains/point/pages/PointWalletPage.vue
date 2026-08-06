@@ -136,15 +136,7 @@ onMounted(() => {
 
 <template>
   <DefaultLayout content-max-width="1120px">
-    <section class="point-page" aria-labelledby="point-page-title">
-      <header class="point-page__header">
-        <div>
-          <p class="point-page__eyebrow">POINT WALLET</p>
-          <h1 id="point-page-title">포인트</h1>
-          <p>충전, 정산과 출금 상태를 한 곳에서 확인합니다.</p>
-        </div>
-      </header>
-
+    <section class="point-page" aria-label="포인트">
       <div v-if="isLoading" class="point-page__state" role="status">
         포인트 정보를 불러오는 중입니다.
       </div>
@@ -218,35 +210,6 @@ onMounted(() => {
   gap: var(--space-6);
 }
 
-.point-page__header {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: var(--space-5);
-}
-
-.point-page__eyebrow {
-  margin-bottom: var(--space-1);
-  color: var(--color-primary);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-control);
-}
-
-.point-page__header h1 {
-  color: var(--color-text-primary);
-  font-size: 36px;
-  font-weight: var(--font-weight-extrabold);
-  line-height: var(--line-height-4xl);
-}
-
-.point-page__header p:not(.point-page__eyebrow) {
-  margin-top: var(--space-2);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
-}
-
 .point-page__section-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -318,13 +281,6 @@ onMounted(() => {
 .point-page__error {
   background: var(--color-error-soft);
   color: var(--color-error);
-}
-
-@media (max-width: 860px) {
-  .point-page__header {
-    align-items: stretch;
-    flex-direction: column;
-  }
 }
 
 @media (max-width: 520px) {

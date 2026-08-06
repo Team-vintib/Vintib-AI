@@ -1,0 +1,99 @@
+# 기본 config — **전부 무과금·무의존 백엔드**다. 이 상태로 `make smoke` 가 돈다.
+#
+# 실백엔드 전환은 configs/real_backends.yaml 를 참고. 이 파일은 CI/스모크의 기준선이라
+# 여기의 백엔드 값을 바꾸지 말 것.
+
+paths:
+  # SAM 3D Objects 리포 클론. sam3d 백엔드들이 여기서 import 한다.
+  sam3d_repo: "~/workspace/sam-3d-objects"
+  sam3d_pipeline_config: "checkpoints/hf/pipeline.yaml"
+  # ⚠️ TODO(데이터 확보): 실샘플 인덱스(jsonl) 경로를 넣으면 더미 대신 그걸 쓴다.
+  #    형식은 garment3d/contracts.py::GarmentSampleIndex.to_jsonl 참고.
+  sample_index: null
+  data_root: "data"
+  cache_dir: "artifacts/cache"
+  checkpoint_dir: "artifacts/checkpoints"
+  output_dir: "artifacts/outputs"
+
+preprocess:
+  # numpy = 의존성 없는 표면 복셀화(테스트용). 학습 데이터 생성에는 sam3d 를 쓴다.
+  voxelizer: "numpy"
+  resolution: 64
+  # dummy = 결정적 난수. sam3d_ss = stage 1 실인코더. sam3d_slat 은 미구현(REPORT.md §5).
+  latent_encoder: "dummy"
+  repair_non_watertight: true
+  target_faces: null
+  min_active_voxels: 8
+
+lora:
+  rank: 16
+  alpha: 32
+  dropout: 0.0
+  # ⚠️ SparseLinear 모듈(mlp / input_layer / out_layer)을 넣으면 PEFT 가 깨진다 — REPORT.md §10.
+  target_modules: ["to_qkv", "to_q", "to_kv", "to_out"]
+  target_models: ["ss_generator"]
+
+sft:
+  max_steps: 1000
+  batch_size: 1
+  grad_accum_steps: 1
+  learning_rate: 0.0001
+  weight_decay: 0.0
+  save_every: 100
+  log_every: 10
+  seed: 42
+  resume: null
+  # texture 는 SLat 인코더가 없어 데이터 준비가 막혀 있다(REPORT.md §5).
+  stage: "geometry"
+  device: "cpu"
+
+dpo:
+  num_candidates: 4
+  min_margin: 0.05
+  beta: 0.1
+  max_steps: 200
+  learning_rate: 0.000005
+  batch_size: 1
+  save_every: 50
+  seed: 42
+  device: "cpu"
+
+render:
+  backend: "dummy"
+  # ⚠️ i2v.num_frames 와 반드시 같아야 비교가 성립한다.
+  num_frames: 24
+  resolution: 256
+  fov: 60.0
+  pitch_deg: 15.0
+  yaw_start_deg: -45.0
+  radius: 1.0
+  fps: 12
+  write_mp4: true
+
+i2v:
+  backend: "dummy"
+  api_key_env: "VIDEOGEN_API_KEY"
+  endpoint: null
+  model: "unset"
+  prompt: "rotate the garment 360 degrees, fixed camera, neutral background"
+  num_frames: 24
+  fps: 12
+  resolution: 256
+  use_end_keyframe: false
+  use_depth_condition: false
+  timeout_sec: 300.0
+
+eval:
+  pose_backend: "dummy"
+  flow_backend: "dummy"
+  perceptual_backend: "l2"
+  face_backend: "dummy"
+  # 렌더 배경이 어둡다는 가정. I2V 출력 배경이 밝으면 올려야 한다.
+  background_threshold: 12
+  symmetry_offset: null
+  measure_identity: true
+
+report:
+  formats: ["markdown", "html"]
+  plots: true
+  title: "turntable vs I2V 비교"

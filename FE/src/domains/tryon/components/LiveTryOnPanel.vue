@@ -8,6 +8,7 @@ import {
 } from '@/domains/tryon/constants/liveTryOnMockData'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { getMyTryOnProfile, saveMyTryOnProfile } from '@/domains/tryon/api/tryOnProfileApi'
+import { saveTryOnResult } from '@/domains/tryon/api/tryOnResultApi'
 import { normalizeApiError } from '@/shared/api/http'
 
 import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
@@ -16,6 +17,7 @@ import type {
   LiveTryOnPanelState,
 } from '@/domains/tryon/types/liveTryOn.types'
 import type { TryOnProfile } from '@/domains/tryon/types/tryOnProfile.types'
+import type { TryOnResult } from '@/domains/tryon/types/tryOnResult.types'
 
 const props = withDefaults(
   defineProps<{
@@ -35,28 +37,48 @@ const authStore = useAuthStore()
 const fileInputElement = ref<HTMLInputElement | null>(null)
 const tryOnProfile = ref<TryOnProfile | null>(null)
 const selectedPhotoUrl = ref<string | null>(
-  props.mockScenario === 'empty' ? null : LIVE_TRY_ON_REGISTERED_PHOTO_URL,
+  props.mockScenario === 'empty' || authStore.user?.id
+    ? null
+    : LIVE_TRY_ON_REGISTERED_PHOTO_URL,
 )
 const generationPhotoUrl = ref<string | null>(null)
 const panelState = ref<LiveTryOnPanelState>(
-  props.mockScenario === 'empty' ? 'EMPTY' : 'READY',
+  props.mockScenario === 'empty' || authStore.user?.id ? 'EMPTY' : 'READY',
 )
+const isProfileLoading = ref(Boolean(authStore.user?.id))
 const fileError = ref('')
 const isResultSaved = ref(false)
+const isSavingResult = ref(false)
 const shouldFailNextGeneration = ref(props.mockScenario === 'error')
 let previewObjectUrl: string | null = null
 let generationTimer: number | null = null
+let generationSequence = 0
 
 const displayedSourcePhoto = computed(
   () => generationPhotoUrl.value ?? selectedPhotoUrl.value,
 )
 
 const clearGenerationTimer = () => {
+  generationSequence += 1
+
   if (generationTimer === null) return
 
   window.clearTimeout(generationTimer)
   generationTimer = null
 }
+
+const preloadImage = (source: string) =>
+  new Promise<void>((resolve, reject) => {
+    const image = new Image()
+
+    image.onload = () => resolve()
+    image.onerror = () => reject(new Error('이미지를 불러오지 못했습니다.'))
+    image.src = source
+
+    if (image.complete && image.naturalWidth > 0) {
+      resolve()
+    }
+  })
 
 const releasePreviewObjectUrl = () => {
   if (!previewObjectUrl) return
@@ -70,6 +92,7 @@ const resetResultForCurrentPhoto = () => {
   generationPhotoUrl.value = null
   fileError.value = ''
   isResultSaved.value = false
+  isSavingResult.value = false
   panelState.value = selectedPhotoUrl.value ? 'READY' : 'EMPTY'
 }
 
@@ -83,6 +106,7 @@ const resetMockScenario = (scenario: LiveTryOnMockScenario) => {
   shouldFailNextGeneration.value = scenario === 'error'
   fileError.value = ''
   isResultSaved.value = false
+  isSavingResult.value = false
 }
 
 const openFilePicker = () => {
@@ -105,14 +129,25 @@ const handleFileChange = async (event: Event) => {
     return
   }
 
+  const nextPreviewObjectUrl = URL.createObjectURL(selectedFile)
+
+  try {
+    await preloadImage(nextPreviewObjectUrl)
+  } catch {
+    URL.revokeObjectURL(nextPreviewObjectUrl)
+    fileError.value = '선택한 이미지를 불러오지 못했습니다.'
+    return
+  }
+
   clearGenerationTimer()
   releasePreviewObjectUrl()
-  previewObjectUrl = URL.createObjectURL(selectedFile)
-  selectedPhotoUrl.value = previewObjectUrl
+  previewObjectUrl = nextPreviewObjectUrl
+  selectedPhotoUrl.value = nextPreviewObjectUrl
   generationPhotoUrl.value = null
   panelState.value = 'READY'
   fileError.value = ''
   isResultSaved.value = false
+  isSavingResult.value = false
 
   if (!authStore.user?.id) {
     return
@@ -132,7 +167,6 @@ const handleFileChange = async (event: Event) => {
     )
 
     tryOnProfile.value = nextProfile
-    selectedPhotoUrl.value = nextProfile.bodyPhotoUrl || selectedPhotoUrl.value
   } catch (error) {
     fileError.value = normalizeApiError(error).message
   }
@@ -142,37 +176,69 @@ const startGeneration = () => {
   if (!selectedPhotoUrl.value || panelState.value === 'GENERATING') return
 
   clearGenerationTimer()
+  const currentGeneration = generationSequence
   generationPhotoUrl.value = selectedPhotoUrl.value
   panelState.value = 'GENERATING'
   fileError.value = ''
   isResultSaved.value = false
+  isSavingResult.value = false
 
   const shouldFail = shouldFailNextGeneration.value
   shouldFailNextGeneration.value = false
 
-  generationTimer = window.setTimeout(() => {
-    panelState.value = shouldFail ? 'ERROR' : 'RESULT'
+  generationTimer = window.setTimeout(async () => {
     generationTimer = null
+
+    if (shouldFail) {
+      if (currentGeneration === generationSequence) {
+        panelState.value = 'ERROR'
+      }
+      return
+    }
+
+    try {
+      await preloadImage(LIVE_TRY_ON_MOCK_RESULT.imageUrl)
+    } catch {
+      if (currentGeneration === generationSequence) {
+        fileError.value = '시착 결과 이미지를 불러오지 못했습니다.'
+        panelState.value = 'ERROR'
+      }
+      return
+    }
+
+    if (currentGeneration === generationSequence) {
+      panelState.value = 'RESULT'
+    }
   }, LIVE_TRY_ON_GENERATION_DELAY_MS)
 }
 
-const saveMockResult = () => {
-  if (panelState.value !== 'RESULT') return
+const saveResult = async () => {
+  if (panelState.value !== 'RESULT' || isSavingResult.value || isResultSaved.value) return
 
-  isResultSaved.value = true
-}
+  const result: TryOnResult = {
+    id: Date.now(),
+    productId: props.product.id,
+    imageUrl: LIVE_TRY_ON_MOCK_RESULT.imageUrl,
+    createdAt: new Date().toISOString(),
+    category: null,
+  }
 
-const returnToReady = () => {
-  clearGenerationTimer()
-  generationPhotoUrl.value = null
-  isResultSaved.value = false
-  panelState.value = selectedPhotoUrl.value ? 'READY' : 'EMPTY'
+  isSavingResult.value = true
+  fileError.value = ''
+
+  try {
+    await saveTryOnResult(authStore.user?.id, result)
+    isResultSaved.value = true
+  } catch (error) {
+    fileError.value = normalizeApiError(error).message
+  } finally {
+    isSavingResult.value = false
+  }
 }
 
 const loadRegisteredTryOnProfile = async () => {
-  await authStore.validateStoredSession()
-
   if (!authStore.user?.id) {
+    isProfileLoading.value = false
     return
   }
 
@@ -181,6 +247,7 @@ const loadRegisteredTryOnProfile = async () => {
     tryOnProfile.value = profile
 
     if (profile.bodyPhotoUrl) {
+      await preloadImage(profile.bodyPhotoUrl)
       clearGenerationTimer()
       releasePreviewObjectUrl()
       selectedPhotoUrl.value = profile.bodyPhotoUrl
@@ -194,6 +261,8 @@ const loadRegisteredTryOnProfile = async () => {
     }
   } catch (error) {
     fileError.value = normalizeApiError(error).message
+  } finally {
+    isProfileLoading.value = false
   }
 }
 
@@ -256,7 +325,18 @@ onBeforeUnmount(() => {
       />
 
       <section
-        v-if="panelState === 'EMPTY'"
+        v-if="isProfileLoading"
+        class="live-try-on-panel__state live-try-on-panel__state--loading"
+        aria-live="polite"
+      >
+        <div class="live-try-on-panel__profile-loading" role="status">
+          <span aria-hidden="true"></span>
+          <p>등록 사진을 불러오는 중입니다</p>
+        </div>
+      </section>
+
+      <section
+        v-else-if="panelState === 'EMPTY'"
         class="live-try-on-panel__state live-try-on-panel__state--empty"
         aria-labelledby="live-try-on-empty-title"
       >
@@ -370,7 +450,10 @@ onBeforeUnmount(() => {
             <p>{{ LIVE_TRY_ON_MOCK_RESULT.fitDescription }}</p>
           </div>
           <p v-if="isResultSaved" class="live-try-on-panel__saved" role="status">
-            결과를 저장했습니다. 실제 저장 API는 연결 전입니다.
+            시착 결과를 저장했습니다.
+          </p>
+          <p v-if="fileError" class="live-try-on-panel__error" role="alert">
+            {{ fileError }}
           </p>
         </div>
 
@@ -378,17 +461,18 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="live-try-on-panel__button--secondary"
-            @click="returnToReady"
+            :disabled="isSavingResult"
+            @click="openFilePicker"
           >
-            다시 시착하기
+            다른 사진 고르기
           </button>
           <button
             type="button"
             class="live-try-on-panel__button--primary"
-            :disabled="isResultSaved"
-            @click="saveMockResult"
+            :disabled="isSavingResult || isResultSaved"
+            @click="saveResult"
           >
-            {{ isResultSaved ? '저장 완료' : '결과 저장' }}
+            {{ isResultSaved ? '저장 완료' : isSavingResult ? '저장 중' : '저장하기' }}
           </button>
         </div>
       </section>
@@ -537,6 +621,34 @@ onBeforeUnmount(() => {
   min-height: 100%;
   height: 100%;
   flex-direction: column;
+}
+
+.live-try-on-panel__profile-loading {
+  display: flex;
+  min-height: 292px;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-live-border);
+  border-radius: var(--radius-media);
+  background: #090c0b;
+  color: var(--color-live-text-secondary);
+  flex-direction: column;
+}
+
+.live-try-on-panel__profile-loading > span {
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(255, 255, 255, 0.24);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: live-try-on-spin 800ms linear infinite;
+}
+
+.live-try-on-panel__profile-loading p {
+  margin-top: var(--space-4);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .live-try-on-panel__photo,
@@ -863,6 +975,7 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .live-try-on-panel__profile-loading > span,
   .live-try-on-panel__processing > span {
     animation: none;
   }

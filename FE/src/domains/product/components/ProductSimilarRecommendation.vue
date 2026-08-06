@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { addWish, getSimilarProducts, removeWish } from '@/domains/product/api/productApi'
@@ -15,12 +15,30 @@ const props = defineProps<{
 const authStore = useAuthStore()
 const wishStore = useWishStore()
 
+const MAX_VISIBLE_PRODUCTS = 5
 const products = ref<ProductListItem[]>([])
 const loadState = ref<'loading' | 'loaded' | 'error'>('loading')
-const track = ref<HTMLElement | null>(null)
+const currentPage = ref(0)
+
+const pageCount = computed(() =>
+  Math.max(1, Math.ceil(products.value.length / MAX_VISIBLE_PRODUCTS)),
+)
+
+const visibleProducts = computed(() => {
+  const start = currentPage.value * MAX_VISIBLE_PRODUCTS
+  return products.value.slice(start, start + MAX_VISIBLE_PRODUCTS)
+})
+
+const trackStyle = computed(() => ({
+  '--visible-card-count': Math.max(visibleProducts.value.length, 1),
+}))
+
+const canMovePrevious = computed(() => currentPage.value > 0)
+const canMoveNext = computed(() => currentPage.value < pageCount.value - 1)
 
 const load = async (productId: number) => {
   loadState.value = 'loading'
+  currentPage.value = 0
 
   try {
     const list = await getSimilarProducts(productId)
@@ -33,8 +51,12 @@ const load = async (productId: number) => {
   }
 }
 
-const scrollTrack = (direction: 1 | -1) => {
-  track.value?.scrollBy({ left: direction * 320, behavior: 'smooth' })
+const movePage = (direction: 1 | -1) => {
+  const nextPage = currentPage.value + direction
+
+  if (nextPage < 0 || nextPage >= pageCount.value) return
+
+  currentPage.value = nextPage
 }
 
 const isLiked = (product: ProductListItem) =>
@@ -71,30 +93,54 @@ watch(
 </script>
 
 <template>
-  <section class="similar-recommend" aria-labelledby="similar-recommend-title">
+  <section
+    v-if="loadState !== 'loaded' || products.length > 0"
+    class="similar-recommend"
+    aria-labelledby="similar-recommend-title"
+  >
     <div class="similar-recommend__head">
       <h2 id="similar-recommend-title">유사 상품 추천</h2>
-      <div class="similar-recommend__nav">
-        <button type="button" aria-label="이전 상품 보기" @click="scrollTrack(-1)">‹</button>
-        <button type="button" aria-label="다음 상품 보기" @click="scrollTrack(1)">›</button>
-      </div>
     </div>
 
     <p v-if="loadState === 'loading'" class="similar-recommend__state">유사 상품을 불러오는 중…</p>
     <p v-else-if="loadState === 'error'" class="similar-recommend__state">
       유사 상품을 불러오지 못했습니다.
     </p>
-    <p v-else-if="!products.length" class="similar-recommend__state">추천할 유사 상품이 없습니다.</p>
+    <div v-else-if="products.length" class="similar-recommend__carousel">
+      <button
+        class="similar-recommend__arrow"
+        type="button"
+        aria-label="이전 유사 상품 보기"
+        :disabled="!canMovePrevious"
+        @click="movePage(-1)"
+      >
+        ‹
+      </button>
 
-    <ul v-else ref="track" class="similar-recommend__track">
-      <li v-for="product in products" :key="product.id" class="similar-recommend__item">
-        <ProductCard
-          :product="product"
-          :is-liked="isLiked(product)"
-          @toggle-like="handleToggleLike"
-        />
-      </li>
-    </ul>
+      <ul class="similar-recommend__track" :style="trackStyle">
+        <li
+          v-for="product in visibleProducts"
+          :key="product.id"
+          class="similar-recommend__item"
+        >
+          <ProductCard
+            :product="product"
+            :is-liked="isLiked(product)"
+            @toggle-like="handleToggleLike"
+          />
+        </li>
+      </ul>
+
+      <button
+        class="similar-recommend__arrow"
+        type="button"
+        aria-label="다음 유사 상품 보기"
+        :disabled="!canMoveNext"
+        @click="movePage(1)"
+      >
+        ›
+      </button>
+    </div>
   </section>
 </template>
 
@@ -106,7 +152,7 @@ watch(
 .similar-recommend__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: var(--space-4);
   margin-bottom: var(--space-4);
 }
@@ -118,15 +164,18 @@ watch(
   line-height: var(--line-height-lg-plus);
 }
 
-.similar-recommend__nav {
-  display: flex;
-  gap: var(--space-2);
+.similar-recommend__carousel {
+  display: grid;
+  grid-template-columns: var(--button-height-small) minmax(0, 1fr) var(--button-height-small);
+  align-items: center;
+  gap: var(--space-3);
 }
 
-.similar-recommend__nav button {
+.similar-recommend__arrow {
   display: grid;
   width: var(--button-height-small);
   height: var(--button-height-small);
+  padding: 0;
   border: 1px solid var(--color-border-strong);
   border-radius: 50%;
   background: var(--color-surface);
@@ -139,9 +188,19 @@ watch(
     color var(--transition-base);
 }
 
-.similar-recommend__nav button:hover {
+.similar-recommend__arrow:not(:disabled):hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
+}
+
+.similar-recommend__arrow:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+.similar-recommend__arrow:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .similar-recommend__state {
@@ -152,17 +211,28 @@ watch(
 }
 
 .similar-recommend__track {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(var(--visible-card-count), minmax(0, 200px));
+  justify-content: center;
   gap: var(--space-4);
-  padding-bottom: var(--space-2);
   list-style: none;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
 }
 
 .similar-recommend__item {
-  flex: 0 0 auto;
-  width: 200px;
-  scroll-snap-align: start;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .similar-recommend__carousel {
+    grid-template-columns: var(--button-height-small) minmax(0, 1fr) var(--button-height-small);
+    gap: var(--space-2);
+  }
+
+  .similar-recommend__track {
+    grid-template-columns: repeat(var(--visible-card-count), minmax(140px, 200px));
+    justify-content: start;
+    padding-bottom: var(--space-2);
+    overflow-x: auto;
+  }
 }
 </style>

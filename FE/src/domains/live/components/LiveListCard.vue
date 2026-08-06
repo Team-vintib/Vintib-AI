@@ -9,9 +9,15 @@ import { ROUTE_NAMES } from '@/shared/constants/routes'
 
 import type { LiveListItem } from '@/domains/live/types/liveList.types'
 
-const props = defineProps<{
-  live: LiveListItem
-}>()
+const props = withDefaults(
+  defineProps<{
+    live: LiveListItem
+    variant?: 'default' | 'profile'
+  }>(),
+  {
+    variant: 'default',
+  },
+)
 
 const router = useRouter()
 const route = useRoute()
@@ -133,6 +139,7 @@ const handleActionClick = () => {
     :class="{
       'live-list-card--clickable': canEnterLive,
       'live-list-card--ended': isEndedLive,
+      'live-list-card--profile': variant === 'profile',
     }"
     :role="canEnterLive ? 'link' : undefined"
     :tabindex="canEnterLive ? 0 : undefined"
@@ -148,7 +155,7 @@ const handleActionClick = () => {
         :alt="`${live.title} 썸네일`"
         @error="handleThumbnailError"
       />
-      <span class="live-list-card__badge" :class="statusClass">
+      <span v-if="variant !== 'profile'" class="live-list-card__badge" :class="statusClass">
         {{ statusLabel }}
       </span>
     </span>
@@ -183,9 +190,11 @@ const handleActionClick = () => {
 <style scoped lang="scss">
 .live-list-card {
   display: grid;
+  grid-template-rows: auto 1fr;
   overflow: hidden;
+  height: 100%;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
+  border-radius: 15px;
   background: var(--color-surface);
   transition:
     border-color var(--transition-standard),
@@ -215,7 +224,7 @@ const handleActionClick = () => {
   position: relative;
   display: block;
   overflow: hidden;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 4 / 5;
   background: var(--color-image-frame);
 }
 
@@ -231,20 +240,59 @@ const handleActionClick = () => {
   transform: scale(1.045);
 }
 
+// 프로필 화면 전용 모양: 홈 라이브 카드(LiveCard.vue)와 같은 박스 없는 카드 — 이미지 프레임에만
+// 얇은 border를 두고, hover도 뜨는 대신 이미지 밝기만 미세하게 바뀐다. 글씨 크기/구성(뱃지 숨김,
+// 큰 폰트)은 위 --profile 규칙을 그대로 따른다.
+.live-list-card--profile {
+  gap: var(--space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.live-list-card--profile.live-list-card--clickable:hover {
+  border-color: transparent;
+  transform: none;
+}
+
+.live-list-card--profile .live-list-card__media {
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-media);
+  transition: border-color var(--transition-standard);
+}
+
+.live-list-card--profile.live-list-card--clickable:hover .live-list-card__media {
+  border-color: var(--color-border-strong);
+}
+
+.live-list-card--profile .live-list-card__media::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, var(--overlay-scrim-medium), transparent 42%);
+  content: '';
+}
+
+.live-list-card--profile.live-list-card--clickable:hover .live-list-card__image {
+  filter: saturate(0.86) contrast(1.05) brightness(1.02);
+  transform: none;
+}
+
 .live-list-card__badge {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: var(--space-2);
+  left: var(--space-2);
   display: inline-flex;
   align-items: center;
-  padding: 6px 9px;
-  border-radius: 0 0 var(--radius-badge) 0;
+  padding: 5px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
   color: var(--color-text-primary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-3xs);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.16em;
-  line-height: 1;
+  font-size: calc(var(--font-size-caption) - 1px);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.03em;
+  line-height: var(--line-height-xs);
+  backdrop-filter: blur(4px);
 }
 
 .live-list-card__badge--live {
@@ -272,19 +320,28 @@ const handleActionClick = () => {
 }
 
 .live-list-card__body {
-  display: grid;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-5);
+  padding: var(--space-4);
+}
+
+.live-list-card--profile .live-list-card__body {
+  padding: 0;
 }
 
 .live-list-card__title {
   display: -webkit-box;
   overflow: hidden;
+  min-height: 2.7em;
   color: var(--color-text-primary);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
   line-height: 1.35;
   letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -295,6 +352,8 @@ const handleActionClick = () => {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-light);
   line-height: var(--line-height-snug);
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .live-list-card__viewer {
@@ -314,11 +373,21 @@ const handleActionClick = () => {
   font-size: var(--font-size-4xs);
 }
 
+// 프로필 화면 전용: 예정/LIVE 뱃지를 숨기는 대신(variant prop) 판매자·예약일·시청자 수 글씨를 키운다.
+.live-list-card--profile .live-list-card__seller,
+.live-list-card--profile .live-list-card__meta {
+  font-size: var(--font-size-body);
+}
+
+.live-list-card--profile .live-list-card__viewer {
+  font-size: var(--font-size-caption);
+}
+
 .live-list-card__action {
   justify-self: start;
   min-width: 104px;
   height: var(--button-height-sm);
-  margin-top: var(--space-2);
+  margin-top: auto;
   padding: 0 var(--space-4);
   border: 1px solid var(--color-primary);
   border-radius: var(--radius-control);

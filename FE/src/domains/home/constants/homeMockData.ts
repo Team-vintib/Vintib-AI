@@ -7,6 +7,7 @@ export const homeMockData: HomeViewData = {
       id: 101,
       status: 'LIVE',
       title: '90s 데님 재킷 라이브 셀렉션',
+      hostId: 9101,
       hostName: 'Archive Room',
       categoryName: '아우터',
       thumbnailUrl:
@@ -18,6 +19,7 @@ export const homeMockData: HomeViewData = {
       id: 102,
       status: 'LIVE',
       title: '디자이너 백 빈티지 경매',
+      hostId: 9102,
       hostName: 'Second Vault',
       categoryName: '가방',
       thumbnailUrl:
@@ -29,6 +31,7 @@ export const homeMockData: HomeViewData = {
       id: 103,
       status: 'LIVE',
       title: '레더 아우터 컬렉션 경매',
+      hostId: 9103,
       hostName: 'Heritage Depot',
       categoryName: '아우터',
       thumbnailUrl:
@@ -42,6 +45,7 @@ export const homeMockData: HomeViewData = {
       id: 201,
       status: 'SCHEDULED',
       title: '주말 니트웨어 프리뷰',
+      hostId: 9201,
       hostName: 'Slow Knit Market',
       categoryName: '상의',
       thumbnailUrl:
@@ -54,6 +58,7 @@ export const homeMockData: HomeViewData = {
       id: 202,
       status: 'SCHEDULED',
       title: '실버 주얼리 소장품 오픈',
+      hostId: 9202,
       hostName: '925 Collective',
       categoryName: '액세서리',
       thumbnailUrl:
@@ -66,6 +71,7 @@ export const homeMockData: HomeViewData = {
       id: 203,
       status: 'SCHEDULED',
       title: '데님 팬츠 아카이브 프리뷰',
+      hostId: 9203,
       hostName: 'Blue Label',
       categoryName: '하의',
       thumbnailUrl:

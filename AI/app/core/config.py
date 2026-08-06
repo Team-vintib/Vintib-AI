@@ -13,11 +13,30 @@ class Settings(BaseSettings):
     db_username: str = "postgres"
     db_password: str = "postgres"
 
+    # AI 전용 RAG 저장소(postgres-vector, S15P11A108-375). 위 db_*(BE 공유 DB)와는 별개 인스턴스 —
+    # 혼동 방지를 위해 이름을 분리했다. 아직 어느 코드도 db_*를 안 쓰는 것과 달리 이건 rag_store.py가 쓴다.
+    vector_db_host: str = "localhost"
+    vector_db_port: int = 5433
+    vector_db_name: str = "vintib_rag"
+    vector_db_username: str = "postgres"
+    vector_db_password: str = "postgres"
+
     redis_host: str = "localhost"
     redis_port: int = 6379
     redis_password: str = ""
 
     worker_api_key: str = ""
+
+    # 가격 책정(app/pricing/)이 시세 검색에 쓰는 SSAFY 공용 게이트웨이 키.
+    # **비어 있는 것이 정상 기본값이다** — 그 경우 mock comps 백엔드로 떨어지고 서비스는 뜬다.
+    # 실호출은 팀 공용 유료 쿼터를 소모하고 LLM 웹검색은 별도 과금이라, 채우는 건 의도적 행위여야 한다.
+    gms_api_key: str = ""
+
+    # 가격 책정(app/pricing/)이 신상품(정가) 조회에 쓰는 네이버 쇼핑 오픈API 키.
+    # **비어 있는 것이 정상 기본값이다** — 그 경우 mock retail 백엔드로 떨어지고 서비스는 뜬다.
+    # GMS와 무관한 무료 API지만 쿼터가 있어, 채우는 건 의도적 행위여야 한다.
+    naver_client_id: str = ""
+    naver_client_secret: str = ""
 
     public_base_url: str = "https://i15a108.p.ssafy.io"  # 추가 필요
 
