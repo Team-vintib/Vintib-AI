@@ -392,6 +392,15 @@ onBeforeRouteLeave(() => {
   return true
 })
 
+// 방송 중(LIVE)엔 탭 닫기·새로고침도 실수로 방송이 끊기지 않도록 브라우저 기본 이탈 경고를 띄운다.
+const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+  if (live.value?.status === 'LIVE') {
+    event.preventDefault()
+    event.returnValue = ''
+  }
+}
+window.addEventListener('beforeunload', handleBeforeUnload)
+
 const updateViewerCount = (viewerCount: number) => {
   if (!live.value) return
 
@@ -469,6 +478,7 @@ const elapsedTimer = window.setInterval(() => {
 onBeforeUnmount(() => {
   loadRequestId += 1
   clearAuctionSubscription()
+  window.removeEventListener('beforeunload', handleBeforeUnload)
   window.clearInterval(elapsedTimer)
   window.clearTimeout(transitionNoticeTimer)
   window.clearTimeout(startNoticeTimer)
