@@ -111,6 +111,21 @@ public class Product extends BaseTimeEntity {
     @Column(name = "ai_model_gender", length = 10)
     private AiModelGender aiModelGender;
 
+    // AI 착용컷 생성 job 상태. 대표 이미지가 등록되는 시점(ProductImageService.registerImage)에
+    // PENDING으로 시작한다 — 등록 직후엔 아직 job이 없어 NONE이다.
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'NONE'")
+    @Column(name = "ai_model_cut_status", nullable = false, length = 10)
+    private AiModelCutStatus aiModelCutStatus = AiModelCutStatus.NONE;
+
+    @Column(name = "ai_model_cut_job_id", length = 100)
+    private String aiModelCutJobId;
+
+    // AI 게이트웨이가 돌려준 결과 이미지 URL을 그대로 저장한다 — BE S3 버킷의 key가 아니라
+    // AI 쪽 /results/* 정적 서빙 URL이라 S3StorageService로 다시 변환할 대상이 없다.
+    @Column(name = "ai_model_cut_image_url", length = 500)
+    private String aiModelCutImageUrl;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -196,6 +211,25 @@ public class Product extends BaseTimeEntity {
 
     public void softDelete() {
         this.deletedAt = LocalDateTime.now();
+    }
+
+    /** 대표 이미지 등록 직후, AI 착용컷 job을 접수했을 때 호출한다. */
+    public void startAiModelCutJob(String jobId) {
+        this.aiModelCutJobId = jobId;
+        this.aiModelCutStatus = AiModelCutStatus.PENDING;
+    }
+
+    public void completeAiModelCutJob(String imageUrl) {
+        this.aiModelCutImageUrl = imageUrl;
+        this.aiModelCutStatus = AiModelCutStatus.COMPLETED;
+    }
+
+    public void failAiModelCutJob() {
+        this.aiModelCutStatus = AiModelCutStatus.FAILED;
+    }
+
+    public void markAiModelCutProcessing() {
+        this.aiModelCutStatus = AiModelCutStatus.PROCESSING;
     }
 
     /** 상시 판매 즉시구매 대상인지 확인한다(SALE-002). 경매 상품이나 품절 상품은 구매할 수 없다. */

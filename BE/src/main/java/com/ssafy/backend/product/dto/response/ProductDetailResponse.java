@@ -36,6 +36,7 @@ public record ProductDetailResponse(
         @Schema(description = "마네킹 사진 기반 AI 착용컷 사용 여부", example = "true") boolean aiModelEnabled,
         @Schema(description = "AI 착용컷 모델 성별. aiModelEnabled=false면 null", example = "FEMALE")
                 AiModelGender aiModelGender,
+        @Schema(description = "AI 착용컷 생성 상태/결과") ProductAiModelCutResponse aiModelCut,
         @Schema(description = "같은 카테고리 유사 상품 목록. 같은 브랜드 상품이 앞쪽에 온다")
                 List<SimilarProductResponse> similarProducts,
         @Schema(example = "2026-07-29T12:00:00") LocalDateTime createdAt,
@@ -78,6 +79,7 @@ public record ProductDetailResponse(
                 linkedLive,
                 product.isAiModelEnabled(),
                 product.getAiModelGender(),
+                ProductAiModelCutResponse.from(product),
                 similarProducts,
                 product.getCreatedAt(),
                 product.getUpdatedAt());
