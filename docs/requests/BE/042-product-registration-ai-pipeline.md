@@ -37,6 +37,10 @@ AI 품질 검증 섹션에서 사용자가 각 하자 후보를 "하자로 인�
 
 이걸 저장해두셨다가, 상품 상세 조회(`GET /products/{id}`) 응답에 `docs/requests/BE/019-product-quality-multi-image.md`가 요청한 `aiQualityAnalysis.images[].findings` 형태로 실어 주시면, 상품 상세의 "AI 분석" 탭(`AiQualityAnalysisPanel.vue`)이 등록 시 확정한 하자를 그대로 보여줄 수 있습니다. 019가 원하는 이미지별 `originalImageUrl`/`analyzedImageUrl`/`summary`는 이 등록 흐름만으로는 못 채우는 값이라(원본 이미지 URL 정도는 상품 이미지에서 그대로 가져올 수 있겠지만, `summary`나 주석 이미지는 별도 판단이 필요합니다) 그 부분은 BE/AI 판단에 맡깁니다 — 최소한 `findings`(하자 위치+설명)만큼은 등록 시점 데이터로 채워질 수 있다는 점을 알려드리고 싶었습니다.
 
+## 4. 참고 — AI 쪽 엔드포인트는 이미 구현돼 있습니다
+
+FE에서 직접 확인해보니 `AI/app/product_classifier/router.py`(`POST /product-classifier/classify`)와 `AI/app/quality/router.py`(`POST /quality/inspections`)가 이미 만들어져 있고, 둘 다 `GET /ai/jobs/{job_id}` 폴링으로 결과를 받는 구조까지 동작합니다. 다만 **둘 다 요청 본문에 `product_id`가 필수**라, 정확히 이 문서가 지적한 "상품 생성 전에는 부를 방법이 없다"는 문제 그대로입니다. BE가 이 두 엔드포인트를 호출/프록시하는 코드는 아직 없습니다(컨트롤러 전수 검색 결과 `quality`/`classif`/`/ai/` 매치 0건). 즉 막힌 지점은 AI 구현이 아니라 **이 문서의 방향 A/B 결정과 BE의 프록시·호출 코드**입니다 — 빠른 판단에 참고해주세요.
+
 ## 관련 자료
 - `FE/src/domains/product/api/productApi.ts` (`submitProduct`, `uploadProductImages`, `resolveRegistrationAiQualityFindings`)
 - `docs/requests/BE/037-quality-inspection-async.md` (품질 검수 job 계약)
