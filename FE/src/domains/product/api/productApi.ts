@@ -11,6 +11,7 @@ import type {
 } from '@/domains/product/types/productList.types'
 import type {
   AiQualityAnalysis,
+  ProductAiModelCut,
   ProductDetailViewData,
   SimilarProductPricePoint,
 } from '@/domains/product/types/productDetail.types'
@@ -112,7 +113,28 @@ interface ProductDetailDto extends ProductListDto {
   } | null
   similarProducts?: SimilarProductPricePoint[] | null
   aiQualityAnalysis?: AiQualityAnalysis | null
+  aiModelCut?: ProductAiModelCut | null
   updatedAt: string
+}
+
+// BE 확인 필요 — 등록 화면에서 사용자가 확정한 AI 품질 검증 결과를 담을 필드다.
+// 현재 POST /products는 이 필드를 받지 않는다. 필드명은 docs/requests/BE/041-quality-inspection-integration.md
+// §2가 확정한 AI findings 스키마를 그대로 따른다(BE가 041에서 요구한 "key별 판매자 응답"과
+// 019가 요구하는 "findings 원본"을 둘 다 만족할 수 있도록 원본 필드 전체 + isActualDefect를 함께 보낸다 —
+// 최종적으로 뭘 저장할지는 041 갱신본에서 BE 확인 예정). BE가 반영하기 전까지는 보내도 무시될 뿐이라
+// 안전하게 앞서 채워둔다.
+interface ProductCreateAiQualityFindingRequest {
+  key: string
+  defectType: string
+  label: string
+  imageIndex: number
+  no: number
+  bbox: [number, number, number, number]
+  severity: string
+  statementRequired: boolean
+  description: string | null
+  // 판매자가 "하자 제외"로 뒤집지 않은(=하자로 인정한) 항목인지.
+  isActualDefect: boolean
 }
 
 interface ProductCreateRequest {
@@ -128,6 +150,7 @@ interface ProductCreateRequest {
   defects: string[] | null
   aiModelEnabled: boolean
   aiModelGender: 'MALE' | 'FEMALE' | null
+  aiQualityFindings: ProductCreateAiQualityFindingRequest[]
 }
 
 interface ProductCreateResponse extends Partial<ProductListDto> {
@@ -266,6 +289,27 @@ export const getProductPrimaryImageUrl = async (productId: number) => {
   return getPrimaryImageUrl(product)
 }
 
+export interface ProductAiModelCutStatusDto {
+  status: 'NONE' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+  imageUrl: string | null
+}
+
+// 등록 시 켠 AI 착용컷의 생성 상태/결과를 조회한다(docs/requests/BE/039). 완료 화면에서
+// 폴링용으로 쓴다 — mock 모드에서는 이 기능 자체가 없으니 즉시 NONE으로 응답한다.
+export const getProductAiModelCutStatus = async (
+  productId: number,
+): Promise<ProductAiModelCutStatusDto> => {
+  if (!PRODUCT_API_ENABLED) {
+    return { status: 'NONE', imageUrl: null }
+  }
+
+  const response = await http.get<ApiResponse<ProductAiModelCutStatusDto>>(
+    `/products/${productId}/ai-model-cut`,
+  )
+
+  return unwrapApiData(response.data)
+}
+
 // 미낙찰 상품 처리(440) — 상품을 상시 판매(가격 지정)로 전환하거나 경매 예정으로 되돌린다.
 // 상품 등록의 판매 방식 설정(publishProduct)과 같은 엔드포인트를 재사용한다.
 export const convertProductToDirectSale = async (productId: number, price: number) => {
@@ -391,6 +435,7 @@ export const submitProduct = async (
     defects: resolveRegistrationDefects(draft),
     aiModelEnabled: draft.aiModelEnabled,
     aiModelGender: draft.aiModelEnabled ? draft.aiModelGender : null,
+    aiQualityFindings: resolveRegistrationAiQualityFindings(draft),
   } satisfies ProductCreateRequest)
   const createdProduct = unwrapApiData(createResponse.data)
   const createdProductId = getCreatedProductId(createdProduct)
@@ -556,6 +601,7 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
         description: '',
       })),
     aiQualityAnalysis: product.aiQualityAnalysis ?? null,
+    aiModelCut: product.aiModelCut ?? null,
   }
 }
 
@@ -657,13 +703,7 @@ const findCategoryId = (draft: ProductRegistrationDraft, categories: CategoryDto
   return matchedCategory?.id ?? null
 }
 
-const resolveRegistrationColor = (draft: ProductRegistrationDraft) => {
-  if (draft.color === 'etc') {
-    return draft.customColor.trim() || null
-  }
-
-  return draft.color || null
-}
+const resolveRegistrationColor = (draft: ProductRegistrationDraft) => draft.color || null
 
 const resolveRegistrationMeasurements = (draft: ProductRegistrationDraft) => {
   const measurements = Object.entries(draft.measurements).reduce<Record<string, number>>(
@@ -691,6 +731,26 @@ const resolveRegistrationDefects = (draft: ProductRegistrationDraft) => {
 
   return description ? [description] : []
 }
+
+// 사용자가 "하자 제외"로 뒤집지 않은(=하자로 인정한) finding만 제출한다.
+// 판매자가 인정/제외한 것 둘 다 보낸다 — 041이 "아니다로 처리된 것"도 알아야 한다고 명시했다.
+const resolveRegistrationAiQualityFindings = (
+  draft: ProductRegistrationDraft,
+): ProductCreateAiQualityFindingRequest[] =>
+  draft.aiPhotoResults.flatMap((result) =>
+    result.findings.map((finding) => ({
+      key: finding.key,
+      defectType: finding.defectType,
+      label: finding.label,
+      imageIndex: finding.imageIndex,
+      no: finding.no,
+      bbox: finding.bbox,
+      severity: finding.severity,
+      statementRequired: finding.statementRequired,
+      description: finding.description,
+      isActualDefect: finding.isActualDefect,
+    })),
+  )
 
 export const getCategoryCode = (categoryName: string) => {
   if (categoryName.includes('아우터')) return 'outer'

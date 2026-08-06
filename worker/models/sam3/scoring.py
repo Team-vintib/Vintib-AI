@@ -12,11 +12,11 @@ findings를 뽑았는지와 무관하다(백엔드 비종속) — "같은 하자
 
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import Sequence
 
 from . import registry
 from .contracts import ConditionGrade, DefectType, Finding, FindingStatus, ImageSummary
+from .prompts import SECTION_LABELS_KO
 
 MAX_SCORE = 100.0
 
@@ -67,39 +67,51 @@ def score_findings(findings: Sequence[Finding]) -> tuple[float, ConditionGrade]:
     return score, grade_for(score)
 
 
-def _counts_by_label(findings: Sequence[Finding], status: FindingStatus) -> list[str]:
-    """해당 상태의 항목을 유형별로 세어 "오염 2건" 같은 조각으로 만든다.
+def _finding_line(finding: Finding, display_no: int) -> str:
+    """항목 1건 = 넘버링 리스트 한 줄. `{번호}. {부위} {태그}` + (설명) + (의심 표기).
 
-    나열 순서는 감점 가중치 내림차순 — 판매자에게 중요한 하자가 먼저 보여야 한다.
+    번호는 `Finding.no`(CH007)를 우선 쓴다 — `annotated_images`의 bbox 숫자와 정확히
+    일치해야 사용자가 이미지와 리스트를 매칭할 수 있다. `no`가 없는(레거시/미채움) 백엔드는
+    표시 전용 임시 번호(`display_no`)로 대체한다 — `Finding.no` 필드 자체는 건드리지 않는다.
     """
-    counts = Counter(f.defect_type for f in findings if f.status is status)
-    ordered = sorted(
-        counts.items(),
-        key=lambda item: (-registry.defect_policy(item[0])["weight"], item[0].value),
-    )
-    return [
-        f"{DEFECT_LABELS.get(defect_type, defect_type.value)} {count}건" for defect_type, count in ordered
-    ]
+    no = finding.no if finding.no is not None else display_no
+    section = SECTION_LABELS_KO.get(finding.section, finding.section.value)
+    label = DEFECT_LABELS.get(finding.defect_type, finding.defect_type.value)
+    line = f"{no}. {section} {label}"
+    if finding.description:
+        line += f" — {finding.description}"
+    if finding.status is FindingStatus.suspected:
+        line += " (의심)"
+    return line
 
 
 def summarize(findings: Sequence[Finding]) -> str:
-    """판매자·구매자에게 보여줄 한 줄 요약.
+    """판매자·구매자에게 보여줄 요약 — 이미지별 넘버링 리스트.
 
-    확정(`DETECTED`)과 의심(`SUSPECTED`)을 문장에서부터 구분한다.
+    항목별로 부위·태그를 펼쳐 쓰므로(유형별 개수 집계가 아니다) 위치를 알 수 있고,
+    `Finding.description`(sVLM, CH011)이 채워져 있으면 그대로 이어 붙인다. `no`는
+    `annotated_images`(CH007)의 bbox 숫자와 같은 값이라 이미지-리스트 매칭에 쓸 수 있다.
     """
     if not findings:
         return _NO_DEFECT_SUMMARY
 
-    detected = _counts_by_label(findings, FindingStatus.detected)
-    suspected = _counts_by_label(findings, FindingStatus.suspected)
+    by_image: dict[int, list[Finding]] = {}
+    for finding in findings:
+        by_image.setdefault(finding.image_index, []).append(finding)
 
-    parts = []
-    if detected:
-        parts.append(f"{', '.join(detected)}이 확인되었습니다.")
-    if suspected:
-        prefix = "추가로 " if detected else ""
-        parts.append(f"{prefix}{', '.join(suspected)}이 의심됩니다.")
-    return " ".join(parts)
+    multi_image = len(by_image) > 1
+    blocks: list[str] = []
+    for image_index in sorted(by_image):
+        lines = [
+            _finding_line(finding, display_no)
+            for display_no, finding in enumerate(by_image[image_index], start=1)
+        ]
+        block = "\n".join(lines)
+        if multi_image:
+            block = f"[이미지 {image_index + 1}]\n{block}"
+        blocks.append(block)
+
+    return "\n\n".join(blocks)
 
 
 def summarize_by_image(findings: Sequence[Finding], image_count: int) -> list[ImageSummary]:

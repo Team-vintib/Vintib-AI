@@ -1,4 +1,4 @@
-__pycache__/
+﻿__pycache__/
 *.py[cod]
 *.egg-info/
 
@@ -31,12 +31,22 @@ app/recommend/personalize/artifacts/
 # 라이브 댓글 관리 정확도 평가 리포트(pipeline/evaluate 산출물). 평가셋은 코드(eval_dataset.py)라 커밋한다.
 app/chat/artifacts/
 
+# 내부 CLIP 유사도 코퍼스(CH020) — aihub_seed_pricing_corpus.py 산출물, 재생성 가능한
+# 합성 데이터라 커밋하지 않는다.
+app/pricing/data/
+
 # SAM3 QC 스파이크의 입력 이미지·시각화 산출물. 둘 다 재생성 가능하다
 # (sample_images/ 는 노트북이 공개 URL 에서 받아 채우고, outputs/ 는 히트맵 PNG).
 validation/QUAL/sam3-condition-check/sample_images/
 validation/QUAL/sam3-condition-check/outputs/
 validation/QUAL/clipseg-condition-check/outputs/
 validation/QUAL/clipseg-sam3tracker-hybrid-check/outputs/
+# 파츠 세그먼트 스파이크(CH020 파생) 산출물 — sample_images는 sam3-condition-check와 공유.
+validation/QUAL/sam3-parts-segment-check/outputs/
+# border 오버레이 단독 검증(파츠 분할 폐기 후) 산출물.
+validation/QUAL/sam3-border-overlay-check/outputs/
+# SAM3 실시간 탐지 + 배치 VLM 설명 end-to-end 파이프라인 검증 산출물(결과 JSON).
+validation/QUAL/vlm-description-check/outputs/
 # SAM 3D 스파이크 산출물(.ply splat + 턴테이블 GIF). splat 은 장당 수십 MB 라 커밋 금지.
 validation/TRYON/sam3d-condition-check/outputs/
 # 의류 파인튜닝 스캐폴드의 산출물 — 더미 데이터·캐시·체크포인트·렌더·리포트 전부 재생성 가능하다.

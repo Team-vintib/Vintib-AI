@@ -53,4 +53,5 @@ export const buildMockProductDetail = (productId: number): ProductDetailViewData
     { title: '안감 실밥 풀림', description: '안감 하단 실밥 일부가 풀려 있습니다. 착용과 내구성에는 지장이 없습니다.' },
   ],
   aiQualityAnalysis: buildMockAiQualityAnalysis(detailImages),
+  aiModelCut: null,
 })

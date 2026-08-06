@@ -82,6 +82,13 @@ export interface AiQualityAnalysis {
   disclaimer: string
 }
 
+export type ProductAiModelCutStatus = 'NONE' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+
+export interface ProductAiModelCut {
+  status: ProductAiModelCutStatus
+  imageUrl: string | null
+}
+
 export interface ProductDetailViewData {
   id: number
   brand: string
@@ -103,4 +110,5 @@ export interface ProductDetailViewData {
   similarProducts: SimilarProductPricePoint[]
   sellerDisclosedDefects: SellerDisclosedDefect[]
   aiQualityAnalysis: AiQualityAnalysis | null
+  aiModelCut: ProductAiModelCut | null
 }

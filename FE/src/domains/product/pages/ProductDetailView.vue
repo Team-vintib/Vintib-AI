@@ -7,7 +7,7 @@ import { getMyProfile } from '@/domains/my/api/myApi'
 import { createOrder, updateOrderAddress } from '@/domains/order/api/orderApi'
 import PurchaseConfirmDialog from '@/domains/order/components/PurchaseConfirmDialog.vue'
 import type { OrderAddressInput } from '@/domains/order/types/order.types'
-import { addWish, removeWish } from '@/domains/product/api/productApi'
+import { addWish, getProductAiModelCutStatus, removeWish } from '@/domains/product/api/productApi'
 import { useWishStore } from '@/domains/product/stores/wishStore'
 import {
   getProductDetailViewData,
@@ -26,7 +26,10 @@ import { getPointBalance } from '@/domains/point/api/pointApi'
 import { dispatchPointBalanceUpdated } from '@/domains/point/utils/pointBalanceEvents'
 import LiveTryOnPanel from '@/domains/tryon/components/LiveTryOnPanel.vue'
 import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
-import type { ProductDetailViewData } from '@/domains/product/types/productDetail.types'
+import type {
+  ProductAiModelCutStatus,
+  ProductDetailViewData,
+} from '@/domains/product/types/productDetail.types'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
@@ -46,6 +49,14 @@ const isTryOnExpanded = ref(false)
 const actionMessage = ref('')
 let actionMessageTimer: ReturnType<typeof setTimeout> | undefined
 let loadRequestId = 0
+
+const aiModelCutStatus = ref<ProductAiModelCutStatus>('NONE')
+const aiModelCutImageUrl = ref<string | null>(null)
+let aiModelCutPollToken = 0
+// 워커가 job마다 VLM/FLUX/CatVTON을 순차로 새로 로드하는 구조라(6GB급 GPU 전제) 완료까지
+// 4분 넘게 걸릴 수 있다(-517 로컬 테스트에서 확인) — ProductRegistrationPage.vue와 동일한 값.
+const AI_MODEL_CUT_POLL_INTERVAL_MS = 5_000
+const AI_MODEL_CUT_POLL_TIMEOUT_MS = 600_000
 
 const isPurchaseDialogOpen = ref(false)
 const purchasePointBalance = ref<number | null>(null)
@@ -82,6 +93,56 @@ const tryOnProduct = computed<LiveWatchProduct | null>(() => {
   }
 })
 
+// 갤러리 썸네일 맨 끝에 AI 착용컷 완성 이미지를 추가로 보여준다(생성 전/실패 시엔 상품
+// 실사진만 노출 — 맨 아래 상태 섹션에서 진행 상태를 따로 안내한다).
+const galleryImages = computed(() => {
+  if (!product.value) return []
+
+  if (aiModelCutStatus.value !== 'COMPLETED' || !aiModelCutImageUrl.value) {
+    return product.value.images
+  }
+
+  return [
+    ...product.value.images,
+    {
+      id: 'ai-model-cut',
+      url: aiModelCutImageUrl.value,
+      alt: `${product.value.title} AI 모델 시착 이미지`,
+      label: 'AI 시착',
+    },
+  ]
+})
+
+const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+
+// 등록 시 켠 AI 착용컷의 생성 상태를 상품 상세 마지막에 보여준다. 아직 안 끝났으면
+// ProductRegistrationPage.vue의 완료 화면과 동일한 폴링 패턴으로 완료·실패까지 반복
+// 조회한다. 실패해도 상품 상세 자체는 이미 정상 표시된 상태라 조용히 멈춘다(보조 기능).
+const pollAiModelCutStatus = async (productId: number) => {
+  const token = ++aiModelCutPollToken
+  const deadline = Date.now() + AI_MODEL_CUT_POLL_TIMEOUT_MS
+
+  while (Date.now() < deadline) {
+    if (token !== aiModelCutPollToken) return
+
+    try {
+      const result = await getProductAiModelCutStatus(productId)
+      if (token !== aiModelCutPollToken) return
+
+      aiModelCutStatus.value = result.status
+      aiModelCutImageUrl.value = result.imageUrl
+
+      if (result.status === 'COMPLETED' || result.status === 'FAILED' || result.status === 'NONE') {
+        return
+      }
+    } catch {
+      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도, 화면 상태는 건드리지 않는다.
+    }
+
+    await sleep(AI_MODEL_CUT_POLL_INTERVAL_MS)
+  }
+}
+
 const loadProductDetail = async () => {
   const productId = Number(route.params.productId)
   const requestId = ++loadRequestId
@@ -91,6 +152,9 @@ const loadProductDetail = async () => {
   actionMessage.value = ''
   purchaseSuccessOrderId.value = null
   clearTimeout(actionMessageTimer)
+  aiModelCutPollToken += 1
+  aiModelCutStatus.value = 'NONE'
+  aiModelCutImageUrl.value = null
 
   if (!Number.isInteger(productId) || productId < 1) {
     loadState.value = 'not-found'
@@ -110,6 +174,18 @@ const loadProductDetail = async () => {
     wishStore.hydrateProducts([{ id: nextProduct.id, isLiked: nextProduct.isLiked }])
     loadState.value = 'success'
     selectedImageId.value = nextProduct.images[0]?.id ?? ''
+
+    if (nextProduct.aiModelCut) {
+      aiModelCutStatus.value = nextProduct.aiModelCut.status
+      aiModelCutImageUrl.value = nextProduct.aiModelCut.imageUrl
+
+      if (
+        nextProduct.aiModelCut.status === 'PENDING' ||
+        nextProduct.aiModelCut.status === 'PROCESSING'
+      ) {
+        void pollAiModelCutStatus(nextProduct.id)
+      }
+    }
   } catch (error) {
     if (requestId !== loadRequestId) return
 
@@ -309,6 +385,7 @@ watch(isTryOnOpen, (open) => {
 
 onBeforeUnmount(() => {
   loadRequestId += 1
+  aiModelCutPollToken += 1
   clearTimeout(actionMessageTimer)
   window.removeEventListener('keydown', handleTryOnKeydown)
 })
@@ -361,7 +438,7 @@ onBeforeUnmount(() => {
 
       <div class="product-detail__hero">
         <ProductImageGallery
-          :images="product.images"
+          :images="galleryImages"
           :selected-image-id="selectedImageId"
           @select-image="selectedImageId = $event"
         />
@@ -405,6 +482,31 @@ onBeforeUnmount(() => {
         :analysis="product.aiQualityAnalysis"
       />
       <ProductSimilarRecommendation :product-id="product.id" />
+
+      <section
+        v-if="aiModelCutStatus !== 'NONE'"
+        class="product-detail__ai-model-cut"
+        aria-label="AI 모델 시착 이미지"
+      >
+        <h2 class="product-detail__ai-model-cut-title">AI 모델 시착</h2>
+
+        <div class="product-detail__ai-model-cut-status" role="status">
+          <template v-if="aiModelCutStatus === 'PENDING' || aiModelCutStatus === 'PROCESSING'">
+            <span class="product-detail__ai-model-cut-spinner" aria-hidden="true"></span>
+            <p>생성중입니다. 완료되면 여기에 표시됩니다.</p>
+          </template>
+          <template v-else-if="aiModelCutStatus === 'COMPLETED' && aiModelCutImageUrl">
+            <img
+              :src="aiModelCutImageUrl"
+              alt="AI 모델 시착 이미지"
+              class="product-detail__ai-model-cut-image"
+            />
+          </template>
+          <template v-else-if="aiModelCutStatus === 'FAILED'">
+            <p>AI 모델 시착 이미지 생성에 실패했습니다.</p>
+          </template>
+        </div>
+      </section>
     </article>
 
     <div
@@ -561,6 +663,55 @@ onBeforeUnmount(() => {
   .product-detail__hero {
     grid-template-columns: 1fr;
   }
+}
+
+.product-detail__ai-model-cut {
+  margin-top: var(--space-8);
+}
+
+.product-detail__ai-model-cut-title {
+  margin-bottom: var(--space-4);
+  font-size: var(--font-size-md-plus);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-snug);
+}
+
+.product-detail__ai-model-cut-status {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.product-detail__ai-model-cut-status p {
+  max-width: var(--prose-max-width);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-body);
+}
+
+.product-detail__ai-model-cut-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: product-detail-ai-model-cut-spin 0.8s linear infinite;
+}
+
+@keyframes product-detail-ai-model-cut-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.product-detail__ai-model-cut-image {
+  max-width: 320px;
+  border-radius: var(--radius-control);
+  object-fit: cover;
 }
 
 /* AI 시착 팝업 — 기본은 우하단 고정 floating(스크롤해도 보이고 뒤 페이지 조작 가능),

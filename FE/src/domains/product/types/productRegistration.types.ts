@@ -15,14 +15,9 @@ export type ProductRegistrationSaleType = 'DIRECT' | 'AUCTION'
 
 export type ProductRegistrationAiModelGender = 'FEMALE' | 'MALE'
 
-export type ProductRegistrationAiCheckStatus =
-  | 'idle'
-  | 'analyzing'
-  | 'failed'
-  | 'noFindings'
-  | 'completed'
-  | 'regenerating'
-  | 'confirmed'
+// front/back 사진이 갖춰지면 자동으로 도는 AI 분석(카테고리·색상·품질 검증) 공통 상태.
+// 사용자가 확인 버튼으로 트리거하지 않으므로 idle→loading→completed/failed 전이만 있다.
+export type ProductRegistrationAiPipelineStatus = 'idle' | 'loading' | 'completed' | 'failed'
 
 export interface ProductRegistrationStep {
   id: ProductRegistrationStepId
@@ -45,25 +40,53 @@ export interface ProductRegistrationPhotoDraft {
 
 export type ProductRegistrationMeasurementDraft = Record<string, string>
 
-export interface ProductRegistrationAiDefectCandidate {
-  id: string
-  labelNumber: number
-  description: string
-  box: {
-    x: number
-    y: number
-    width: number
-    height: number
-  }
+export type ProductRegistrationAiDefectType =
+  | 'STAIN'
+  | 'DIRT_MARK'
+  | 'HOLE_TEAR'
+  | 'DISCOLORATION'
+  | 'PILLING'
+  | 'FRAY'
+
+export type ProductRegistrationAiDefectSeverity = 'MINOR' | 'MODERATE' | 'MAJOR'
+
+// docs/requests/BE/041-quality-inspection-integration.md §2, docs/requests/FE/036-quality-finding-bbox-rendering.md의
+// findings[] 필드를 그대로 따른다(필드명까지) — BE/AI가 이 형태로 확정했으므로 임의 변형하지 않는다.
+export interface ProductRegistrationAiFinding {
+  key: string
+  defectType: ProductRegistrationAiDefectType
+  label: string
+  status: 'DETECTED' | 'SUSPECTED'
+  imageIndex: number
+  no: number
+  // 정규화 좌표 [x1, y1, x2, y2] (0~1) — AI가 주는 형태 그대로 보관하고, 렌더링 시에만
+  // qualityFindingBox.ts의 toPercentBox()로 {x,y,width,height}%(0~100)로 변환한다.
+  bbox: [number, number, number, number]
+  confidence: number
+  severity: ProductRegistrationAiDefectSeverity
+  statementRequired: boolean
+  needsSellerReview: boolean
+  description: string | null
+  // AI가 주는 값이 아니다 — 판매자가 직접 인정/제외한 로컬 상태(기본 true).
   isActualDefect: boolean
 }
 
 export interface ProductRegistrationAiPhotoResult {
   photoId: string
-  status: ProductRegistrationAiCheckStatus
-  candidates: ProductRegistrationAiDefectCandidate[]
-  regeneratedImageUrl: string
+  findings: ProductRegistrationAiFinding[]
+  // 사용자가 이 사진의 하자 판정을 다 확인하고 "결과 저장"을 눌렀는지 여부.
   confirmed: boolean
+}
+
+export interface ProductRegistrationAiCategorySuggestion {
+  majorId: string
+  minorId: string
+  status: ProductRegistrationAiPipelineStatus
+}
+
+export interface ProductRegistrationAiColorSuggestion {
+  colorId: string
+  status: ProductRegistrationAiPipelineStatus
 }
 
 export interface ProductRegistrationPriceBucket {
@@ -84,9 +107,7 @@ export interface ProductRegistrationDraft {
   name: string
   brand: string
   color: string
-  customColor: string
   categoryId: string
-  customCategory: string
   description: string
   purchasedAt: string
   purchasedCountry: string
@@ -96,8 +117,10 @@ export interface ProductRegistrationDraft {
   conditionGrade: ProductConditionGrade | ''
   hasDefect: boolean | null
   sellerDefectDescription: string
-  aiCheckPhotoIds: string[]
+  aiQualityStatus: ProductRegistrationAiPipelineStatus
   aiPhotoResults: ProductRegistrationAiPhotoResult[]
+  aiCategorySuggestion: ProductRegistrationAiCategorySuggestion | null
+  aiColorSuggestion: ProductRegistrationAiColorSuggestion | null
   aiModelEnabled: boolean
   aiModelGender: ProductRegistrationAiModelGender | null
   saleType: ProductRegistrationSaleType | ''

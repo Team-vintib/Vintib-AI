@@ -10,6 +10,7 @@ import com.ssafy.backend.product.dto.request.ProductListFilterParams;
 import com.ssafy.backend.product.dto.request.ProductSortType;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
+import com.ssafy.backend.product.dto.response.ProductAiModelCutResponse;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
@@ -157,6 +158,20 @@ public class ProductController {
             Authentication authentication, @PathVariable Long id) {
         Long viewerId = authentication != null ? (Long) authentication.getPrincipal() : null;
         ProductDetailResponse response = productService.getProductDetail(viewerId, id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "AI 착용컷 생성 상태/결과 조회",
+            description = "판매자가 등록 시 AI 착용컷을 켠 상품의 생성 상태를 조회한다. "
+                    + "PENDING/PROCESSING이면 이 호출 시점에 AI 쪽 최신 상태를 다시 확인해 반영한다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @GetMapping("/{id}/ai-model-cut")
+    public ResponseEntity<ApiResponse<ProductAiModelCutResponse>> getAiModelCutStatus(@PathVariable Long id) {
+        ProductAiModelCutResponse response = productService.getAiModelCutStatus(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

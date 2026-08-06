@@ -473,10 +473,11 @@ def renumber(instances):
 # 시각화 — 두 노트북이 **같은 함수**로 그려야 그림도 눈으로 비교가 된다
 # --------------------------------------------------------------------------
 def draw_numbered_boxes(pil_image, instances, box_color=(255, 0, 0), thickness=4):
-    """confidence 내림차순 1,2,3… 번호 + 한글 유형 라벨 + 빨간 박스. RGB ndarray 반환.
+    """confidence 내림차순 1,2,3… **번호만** + 빨간 박스. RGB ndarray 반환.
 
-    `cv2.putText` 는 Hershey 폰트만 지원해 한글을 그리지 못한다(빈 네모/깨진 기호로 나온다).
-    그래서 박스는 OpenCV로, **라벨 텍스트는 PIL** 로 그린다. box_color 는 PIL 기준 RGB.
+    하자 유형·확신도는 이미지에 그리지 않는다 — 사용자에게는 번호만 보여주고, 유형·점수는
+    `to_serializable()`이 만드는 JSON에만 담는다(불릿 리스트/DB가 그 정보를 따로 보여준다).
+    번호는 숫자뿐이라 한글 폰트가 없어도 깨지지 않는다.
     """
     from PIL import Image as PILImage
     from PIL import ImageDraw
@@ -495,13 +496,9 @@ def draw_numbered_boxes(pil_image, instances, box_color=(255, 0, 0), thickness=4
     font_size = max(14, int(0.022 * max(pil_canvas.size)))
     font = korean_font_path(font_size)
 
-    if font is None:
-        print("[주의] 한글 TTF 폰트를 못 찾았습니다 — 라벨이 기본 폰트로 그려져 한글이 깨집니다.")
-
     for no, inst in enumerate(ordered, start=1):
         x1, y1, _, _ = (int(v) for v in inst["bbox"])
-        label_ko = KOREAN_LABELS.get(inst["type"], inst["type"])
-        text = f"{no}. {label_ko} {inst['confidence']:.2f}"
+        text = str(no)
         box = draw.textbbox((0, 0), text, font=font)  # font=None 이면 PIL 기본 비트맵 폰트
         tw, th = box[2] - box[0], box[3] - box[1]
         ty = max(y1 - th - 6, 0)
@@ -528,7 +525,7 @@ def to_serializable(instances):
     `type` 은 코드(STAIN 등)로 그대로 두고 `label` 에 한글 표시명을 별도로 담는다 —
     FE 전달 스키마(안)이 `defect_type` + `label` 두 필드로 나눈 것과 같은 이유다.
     """
-    fields = ("no", "type", "prompt", "bbox", "confidence", "garment_overlap")
+    fields = ("no", "type", "prompt", "bbox", "confidence", "garment_overlap", "part")
     out = []
     for d in instances:
         row = {k: d[k] for k in fields if k in d}

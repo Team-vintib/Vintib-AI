@@ -1,4 +1,4 @@
-"""가격 책정 요청/응답 스키마.
+﻿"""가격 책정 요청/응답 스키마.
 
 **BE 계약이 바뀌면 이 파일만 고친다.**
 
@@ -54,6 +54,7 @@ class ReasonCode(str, Enum):
     insufficient_comps = "INSUFFICIENT_COMPS"  # comps가 백엔드별 최소 표본 미만
     no_search_performed = "NO_SEARCH_PERFORMED"  # 모델이 검색 없이 답함 → 응답 폐기
     parse_failed = "PARSE_FAILED"  # 검색은 했으나 결과를 구조화하지 못함
+    no_image_provided = "NO_IMAGE_PROVIDED"  # internal_clip 활성인데 image_url이 없음
 
 
 class CompsSourceKey(str, Enum):
@@ -61,6 +62,7 @@ class CompsSourceKey(str, Enum):
 
     mock = "mock"
     llm_web_search = "llm_web_search"
+    internal_clip = "internal_clip"
 
 
 class RetailSourceKey(str, Enum):
@@ -80,8 +82,9 @@ class RetailSourceKey(str, Enum):
 class PricingRequest(BaseModel):
     """BE 상품 등록 흐름이 보내는 가격 산정 요청.
 
-    이미지를 받지 않는다 — 사진에서 브랜드·모델명을 뽑는 단계(슬롯 A)는 이번 범위 밖이고,
-    BE가 상품 등록 폼에서 이미 텍스트로 갖고 있다.
+    브랜드·모델명 텍스트는 BE가 상품 등록 폼에서 이미 갖고 있다. `image_url`은
+    `internal_clip` 백엔드(CLIP 이미지 유사도 기반 내부 RAG, CH020)만 쓴다 —
+    mock/llm_web_search는 이 필드를 무시한다.
     """
 
     product_id: int = Field(ge=1, description="BE가 채번한 상품 id. AI는 에코만 한다")
@@ -107,6 +110,13 @@ class PricingRequest(BaseModel):
             "신상품(정가) 참고가 조회 여부. 기본은 끔 — 백엔드가 naver로 전환되면 "
             "요청마다 쿼터가 소모되므로, 언제 켤지는 BE/FE와 트리거 기준을 정한 뒤 "
             "이 필드에 그 판단 결과만 담아 보낸다(임시 스위치, 트리거 기준 미정)"
+        ),
+    )
+    image_url: str | None = Field(
+        default=None,
+        description=(
+            "상품 대표 사진 presigned URL(단일). internal_clip 백엔드가 활성일 때만 쓰인다 — "
+            "없으면 internal_clip은 reason_code=NO_IMAGE_PROVIDED로 빈 결과를 낸다"
         ),
     )
 

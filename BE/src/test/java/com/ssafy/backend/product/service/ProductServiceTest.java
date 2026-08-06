@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.ssafy.backend.global.client.AiClient;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
@@ -82,6 +83,9 @@ class ProductServiceTest {
     private LiveQueryPort liveQueryPort;
 
     @Mock
+    private AiClient aiClient;
+
+    @Mock
     private Member seller;
 
     private ProductService productService;
@@ -90,7 +94,7 @@ class ProductServiceTest {
     void setUp() {
         productService = new ProductService(
                 productRepository, memberRepository, productImageService, categoryRepository,
-                brandRepository, productDefectRepository, socialQueryPort, liveQueryPort);
+                brandRepository, productDefectRepository, socialQueryPort, liveQueryPort, aiClient);
     }
 
     @Test
@@ -222,6 +226,40 @@ class ProductServiceTest {
         assertThat(captor.getValue().isAiModelEnabled()).isTrue();
         assertThat(captor.getValue().getAiModelGender())
                 .isEqualTo(com.ssafy.backend.product.entity.AiModelGender.FEMALE);
+    }
+
+    @Test
+    void PENDING_상태의_착용컷_조회시_AI가_완료를_돌려주면_COMPLETED로_갱신된다() {
+        Product product = Product.builder()
+                .seller(seller)
+                .title("빈티지 자켓")
+                .aiModelEnabled(true)
+                .aiModelGender(com.ssafy.backend.product.entity.AiModelGender.MALE)
+                .build();
+        product.startAiModelCutJob("job-123");
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(aiClient.getJob("job-123")).thenReturn(new com.ssafy.backend.global.client.dto.AiJobResponse(
+                "success", Map.of("image_url", "https://ai.example/result.png"), null));
+
+        com.ssafy.backend.product.dto.response.ProductAiModelCutResponse response =
+                productService.getAiModelCutStatus(1L);
+
+        assertThat(response.status())
+                .isEqualTo(com.ssafy.backend.product.entity.AiModelCutStatus.COMPLETED);
+        assertThat(response.imageUrl()).isEqualTo("https://ai.example/result.png");
+    }
+
+    @Test
+    void NONE_상태의_착용컷은_AI를_조회하지_않고_그대로_반환한다() {
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        com.ssafy.backend.product.dto.response.ProductAiModelCutResponse response =
+                productService.getAiModelCutStatus(1L);
+
+        assertThat(response.status())
+                .isEqualTo(com.ssafy.backend.product.entity.AiModelCutStatus.NONE);
+        verify(aiClient, never()).getJob(any());
     }
 
     @Test
