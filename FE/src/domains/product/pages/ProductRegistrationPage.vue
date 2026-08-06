@@ -6,8 +6,10 @@ import {
   getBrands,
   getCategories,
   getCategoryCode,
+  getProductAiModelCutStatus,
   type BrandDto,
   type CategoryDto,
+  type ProductAiModelCutStatusDto,
 } from '@/domains/product/api/productApi'
 import { analyzeRegistrationPhotos } from '@/domains/product/api/productAiApi'
 import { submitProductRegistrationDraft } from '@/domains/product/api/productRegistrationApi'
@@ -65,6 +67,12 @@ const pricingStepTouched = reactive({
 })
 const currentAiResultIndex = ref(0)
 const registeredProductId = ref('')
+// AI 착용컷 폴링 상태 — 등록(aiModelEnabled=true) 성공 직후에만 값이 채워진다.
+const aiModelCutStatus = ref<ProductAiModelCutStatusDto['status']>('NONE')
+const aiModelCutImageUrl = ref<string | null>(null)
+const AI_MODEL_CUT_POLL_INTERVAL_MS = 5_000
+const AI_MODEL_CUT_POLL_TIMEOUT_MS = 120_000
+let aiModelCutPollToken = 0
 const isSubmittingRegistration = ref(false)
 const registrationSubmitError = ref('')
 const isCompletenessPromptOpen = ref(false)
@@ -1120,6 +1128,36 @@ const moveToPreviousStep = () => {
   scrollToPageTop()
 }
 
+const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+
+// AI 착용컷 생성 상태를 완료 화면에서 폴링한다. 대표 이미지 등록 시점에 BE가 job을
+// 트리거하므로, 상품 생성 직후에는 아직 NONE/PENDING일 수 있다 — 완료·실패까지 반복
+// 조회한다. 실패해도 상품 등록 자체는 이미 끝난 상태라 조용히 멈춘다(보조 기능).
+const pollAiModelCutStatus = async (productId: string) => {
+  const token = ++aiModelCutPollToken
+  const deadline = Date.now() + AI_MODEL_CUT_POLL_TIMEOUT_MS
+
+  while (Date.now() < deadline) {
+    if (token !== aiModelCutPollToken) return
+
+    try {
+      const result = await getProductAiModelCutStatus(Number(productId))
+      if (token !== aiModelCutPollToken) return
+
+      aiModelCutStatus.value = result.status
+      aiModelCutImageUrl.value = result.imageUrl
+
+      if (result.status === 'COMPLETED' || result.status === 'FAILED' || result.status === 'NONE') {
+        return
+      }
+    } catch {
+      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도, 화면 상태는 건드리지 않는다.
+    }
+
+    await sleep(AI_MODEL_CUT_POLL_INTERVAL_MS)
+  }
+}
+
 const proceedToNextStep = async (skipCompletenessPrompt = false) => {
   if (isSubmittingRegistration.value) {
     return
@@ -1154,6 +1192,12 @@ const proceedToNextStep = async (skipCompletenessPrompt = false) => {
         categories: categories.value,
       })
       registeredProductId.value = submitResult.productId
+
+      if (draft.aiModelEnabled) {
+        aiModelCutStatus.value = 'PENDING'
+        aiModelCutImageUrl.value = null
+        void pollAiModelCutStatus(submitResult.productId)
+      }
     } catch (error) {
       registrationSubmitError.value = normalizeApiError(error).message
       isSubmittingRegistration.value = false
@@ -1213,6 +1257,9 @@ const resetRegistrationDraft = () => {
   isSubmittingRegistration.value = false
   registrationSubmitError.value = ''
   isCompletenessPromptOpen.value = false
+  aiModelCutPollToken += 1
+  aiModelCutStatus.value = 'NONE'
+  aiModelCutImageUrl.value = null
 }
 
 const continueRegistration = () => {
@@ -1242,6 +1289,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  aiModelCutPollToken += 1
   draft.photos.forEach((photo) => {
     revokePhotoPreviewUrl(photo)
   })
@@ -2269,6 +2317,29 @@ onBeforeUnmount(() => {
             <span class="product-registration__complete-icon" aria-hidden="true">✓</span>
             <h3>상품 등록이 완료되었습니다.</h3>
             <p>등록한 상품을 확인하거나 이어서 새 상품을 등록할 수 있습니다.</p>
+
+            <div
+              v-if="draft.aiModelEnabled"
+              class="product-registration__ai-model-cut-status"
+              role="status"
+            >
+              <template v-if="aiModelCutStatus === 'PENDING' || aiModelCutStatus === 'PROCESSING'">
+                <span class="product-registration__spinner" aria-hidden="true"></span>
+                <p>AI 착용컷을 생성하고 있어요. 완료되면 여기에 표시됩니다.</p>
+              </template>
+              <template v-else-if="aiModelCutStatus === 'COMPLETED' && aiModelCutImageUrl">
+                <img
+                  :src="aiModelCutImageUrl"
+                  alt="AI 착용컷 결과"
+                  class="product-registration__ai-model-cut-image"
+                />
+                <p>AI 착용컷 생성이 완료됐어요.</p>
+              </template>
+              <template v-else-if="aiModelCutStatus === 'FAILED'">
+                <p>AI 착용컷 생성에는 실패했지만, 상품 등록은 정상적으로 완료됐어요.</p>
+              </template>
+            </div>
+
             <div class="product-registration__complete-actions">
               <button
                 class="product-registration__button product-registration__button--primary"
@@ -3381,6 +3452,44 @@ onBeforeUnmount(() => {
   max-width: var(--prose-max-width);
   color: var(--color-text-secondary);
   line-height: var(--line-height-body);
+}
+
+.product-registration__ai-model-cut-status {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.product-registration__ai-model-cut-status p {
+  max-width: var(--prose-max-width);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-body);
+}
+
+.product-registration__spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: product-registration-spin 0.8s linear infinite;
+}
+
+@keyframes product-registration-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.product-registration__ai-model-cut-image {
+  max-width: 220px;
+  border-radius: var(--radius-control);
+  object-fit: cover;
 }
 
 .product-registration__complete-actions,
