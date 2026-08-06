@@ -10,7 +10,6 @@ import LiveAuctionPanel from '@/domains/auction/components/LiveAuctionPanel.vue'
 import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
-import { issueLiveVideoToken } from '@/domains/live/api/liveControlApi'
 import { LiveRealtimeClient } from '@/domains/live/api/liveRealtimeClient'
 import {
   cancelLiveReminder,
@@ -77,7 +76,6 @@ const pendingWishProductId = ref<number | null>(null)
 const wishMessage = ref('')
 const isTryOnOpen = ref(false)
 const now = ref(Date.now())
-const videoConnectionLabel = ref('')
 const auctionSnapshot = ref<AuctionSnapshot | null>(null)
 const isAuctionLoading = ref(false)
 const auctionLoadError = ref('')
@@ -244,7 +242,6 @@ const loadLiveWatch = async () => {
   isTryOnOpen.value = false
   loadState.value = 'loading'
   errorMessage.value = ''
-  videoConnectionLabel.value = ''
   auctionSnapshot.value = null
   auctionLoadError.value = ''
   dismissedAuctionResultId.value = null
@@ -278,10 +275,6 @@ const loadLiveWatch = async () => {
     void loadHostFollowState(response.hostId)
     void loadProductWishState(response.products.map((product) => product.id))
     void loadAuction(response.id)
-
-    if (response.status === 'LIVE') {
-      void loadVideoToken(response.id)
-    }
   } catch (error) {
     if (requestId !== loadRequestId) return
 
@@ -419,18 +412,6 @@ const updateViewerCount = (viewerCount: number) => {
     ...live.value,
     currentViewerCount: viewerCount,
     peakViewerCount: Math.max(live.value.peakViewerCount, viewerCount),
-  }
-}
-
-const loadVideoToken = async (liveId: number) => {
-  videoConnectionLabel.value = '영상 토큰 발급 중'
-
-  try {
-    const token = await issueLiveVideoToken(liveId)
-    videoConnectionLabel.value =
-      token.role === 'PUBLISHER' ? '송출 토큰 발급 완료' : '시청 토큰 발급 완료'
-  } catch {
-    videoConnectionLabel.value = '영상 토큰 발급 실패'
   }
 }
 
@@ -601,7 +582,7 @@ onBeforeUnmount(() => {
               :title="live.title"
               :poster-url="live.posterUrl"
               :status="live.status"
-              :connection-label="videoConnectionLabel"
+              :live-id="live.id"
               :try-on-disabled="!isTryOnAvailable"
               :try-on-open="isTryOnOpen"
               :show-reminder="live.status === 'SCHEDULED'"
@@ -678,7 +659,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
   height: calc(100vh - var(--button-height-major));
-  grid-template-rows: minmax(420px, 1fr) 164px;
+  grid-template-rows: minmax(380px, 1fr) 220px;
 }
 
 .live-watch-page__stage {
@@ -734,7 +715,7 @@ onBeforeUnmount(() => {
 
 .live-watch-loading__body > main {
   display: grid;
-  grid-template-rows: minmax(420px, 1fr) 164px;
+  grid-template-rows: minmax(380px, 1fr) 220px;
 }
 
 .live-watch-loading__body > main > div {

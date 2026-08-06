@@ -33,6 +33,7 @@ import type {
   ProductRegistrationSaleType,
   ProductRegistrationStepId,
 } from '@/domains/product/types/productRegistration.types'
+import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
@@ -1179,8 +1180,8 @@ const proceedToNextStep = async (skipCompletenessPrompt = false) => {
         categories: categories.value,
       })
       registeredProductId.value = submitResult.productId
-    } catch {
-      registrationSubmitError.value = '상품 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.'
+    } catch (error) {
+      registrationSubmitError.value = normalizeApiError(error).message
       isSubmittingRegistration.value = false
       return
     }
@@ -2537,16 +2538,11 @@ onBeforeUnmount(() => {
   color: var(--color-text-primary);
 }
 
+.product-registration__step--current span,
 .product-registration__step--complete span {
   border-color: var(--color-primary);
   background: var(--color-primary);
   color: var(--color-text-inverse);
-}
-
-.product-registration__step--current span {
-  border-color: var(--color-primary);
-  background: var(--color-surface);
-  color: var(--color-primary);
 }
 
 .product-registration__step--current strong {

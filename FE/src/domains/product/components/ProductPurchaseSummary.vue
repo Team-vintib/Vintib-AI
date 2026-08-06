@@ -16,6 +16,7 @@ const emit = defineEmits<{
   toggleLike: []
   openTryOn: []
   purchase: []
+  goLive: []
   viewSeller: []
 }>()
 
@@ -48,17 +49,43 @@ const quickInfoItems = computed(() =>
     .filter((item) => item.value),
 )
 
+const isAuctionInProgress = computed(
+  () => props.product.saleStatus === 'AUCTION_IN_PROGRESS',
+)
+
+// 경매 진행 중 상품은 라이브에서만 입찰할 수 있으므로, 연결 라이브가 실제 LIVE일 때만 이동 가능.
+const canJoinLiveAuction = computed(
+  () => isAuctionInProgress.value && props.product.linkedLive?.status === 'LIVE',
+)
+
 const purchaseLabel = computed(() => {
   if (props.product.saleStatus === 'SOLD') return '판매 완료'
-  if (props.product.saleStatus === 'AUCTION_SCHEDULED') return '경매 알림 받기'
-  if (props.product.saleStatus === 'AUCTION_IN_PROGRESS') return '입찰하기'
+  if (props.product.saleStatus === 'AUCTION_SCHEDULED') return '경매 예정'
+  if (props.product.saleStatus === 'AUCTION_IN_PROGRESS') {
+    return canJoinLiveAuction.value ? '라이브에서 입찰하기' : '경매 진행 중'
+  }
   if (props.product.saleStatus === 'AUCTION_FAILED') return '경매 종료'
   return '구매하기'
 })
 
-const isPurchaseDisabled = computed(() =>
-  ['DRAFT', 'SOLD', 'AUCTION_FAILED'].includes(props.product.saleStatus),
-)
+// 정찰제 판매중(ON_SALE)만 실제 구매로 연결한다. 경매(예정/진행/종료)·판매완료·비공개는
+// 구매 흐름으로 보내지 않으며, 진행 중 경매만 라이브 입장으로 대체한다.
+const isPurchaseDisabled = computed(() => {
+  if (isAuctionInProgress.value) return !canJoinLiveAuction.value
+
+  return ['DRAFT', 'SOLD', 'AUCTION_FAILED', 'AUCTION_SCHEDULED'].includes(
+    props.product.saleStatus,
+  )
+})
+
+const handlePrimaryAction = () => {
+  if (canJoinLiveAuction.value) {
+    emit('goLive')
+    return
+  }
+
+  emit('purchase')
+}
 
 const sellerNickname = computed(() => props.seller.nickname?.trim() || '판매자')
 const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCase())
@@ -130,7 +157,7 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
       class="purchase-summary__purchase"
       type="button"
       :disabled="isPurchaseDisabled"
-      @click="emit('purchase')"
+      @click="handlePrimaryAction"
     >
       {{ purchaseLabel }}
     </button>
