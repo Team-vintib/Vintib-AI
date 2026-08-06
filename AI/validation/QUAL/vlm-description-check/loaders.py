@@ -274,10 +274,13 @@ def describe_defects_batch(
     return generate_from_image(bundle, image, prompt_text, max_new_tokens)
 
 
-# 숫자 앞에 마크다운 볼드/불릿(`**1.**`, `- 1:`, `• 1)` 등)이 붙어도 매칭하도록 관용적으로
-# 잡는다 — 2026-08-06 실측에서 실제 하자가 있는 이미지 전부(누락 == 건수)가 파싱에 실패했는데,
-# Qwen3-VL이 번호를 마크다운으로 감싸 냈을 가능성이 가장 높은 원인으로 지목됐다.
-_BATCH_LINE_PATTERN = re.compile(r"^[\s*#\-•]*(\d+)[\s*]*[:.\)][\s*]*(.+)$")
+# 2026-08-06 실측: 실제 하자가 있는 이미지 전부(누락 == 건수)가 파싱에 실패한 진짜 원인은
+# 마크다운이 아니라 `build_batch_prompt()`의 입력 목록 문구("1번 (위치 부근): '유형' 하자")를
+# 모델이 출력에서도 그대로 따라 해서였다 — 응답이 "1번. 설명"처럼 숫자와 구분자(`.`/`:`/`)`)
+# 사이에 한국어 카운터 "번"이 끼어 있는데, 기존 정규식은 숫자 바로 뒤에 구분자가 와야 매칭됐다.
+# 캡처된 raw_response(outputs/batch_pipeline_check/result.json)로 재검증: "번" 허용 후
+# denim/fix/scratch/small_pro는 누락 0건으로 해소. 마크다운 볼드/불릿 허용은 만일을 위해 유지.
+_BATCH_LINE_PATTERN = re.compile(r"^[\s*#\-•]*(\d+)\s*번?[\s*]*[:.\)][\s*]*(.+)$")
 
 
 def parse_batch_response(text: str, expected_nos: list[int]) -> dict[int, str | None]:
