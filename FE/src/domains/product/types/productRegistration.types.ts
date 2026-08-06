@@ -40,17 +40,34 @@ export interface ProductRegistrationPhotoDraft {
 
 export type ProductRegistrationMeasurementDraft = Record<string, string>
 
+export type ProductRegistrationAiDefectType =
+  | 'STAIN'
+  | 'DIRT_MARK'
+  | 'HOLE_TEAR'
+  | 'DISCOLORATION'
+  | 'PILLING'
+  | 'FRAY'
+
+export type ProductRegistrationAiDefectSeverity = 'MINOR' | 'MODERATE' | 'MAJOR'
+
+// docs/requests/BE/041-quality-inspection-integration.md §2, docs/requests/FE/036-quality-finding-bbox-rendering.md의
+// findings[] 필드를 그대로 따른다(필드명까지) — BE/AI가 이 형태로 확정했으므로 임의 변형하지 않는다.
 export interface ProductRegistrationAiFinding {
-  id: string
-  labelNumber: number
-  description: string
-  box: {
-    x: number
-    y: number
-    width: number
-    height: number
-  }
-  // AI는 기본 true(하자로 인정)로 채운다 — 사용자가 "하자 제외"를 눌러 false로 뒤집을 수 있다.
+  key: string
+  defectType: ProductRegistrationAiDefectType
+  label: string
+  status: 'DETECTED' | 'SUSPECTED'
+  imageIndex: number
+  no: number
+  // 정규화 좌표 [x1, y1, x2, y2] (0~1) — AI가 주는 형태 그대로 보관하고, 렌더링 시에만
+  // qualityFindingBox.ts의 toPercentBox()로 {x,y,width,height}%(0~100)로 변환한다.
+  bbox: [number, number, number, number]
+  confidence: number
+  severity: ProductRegistrationAiDefectSeverity
+  statementRequired: boolean
+  needsSellerReview: boolean
+  description: string | null
+  // AI가 주는 값이 아니다 — 판매자가 직접 인정/제외한 로컬 상태(기본 true).
   isActualDefect: boolean
 }
 

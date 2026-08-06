@@ -19,18 +19,24 @@
 
 엔드포인트/응답 스키마 형태는 기존 카테고리 판별 계약(`docs/requests/AI/004-category-taxonomy-v2.md`)과 비슷한 형태면 됩니다 — 정확한 경로는 `docs/requests/BE/042-product-registration-ai-pipeline.md`(상품 생성 전 이미지 업로드 방식)와 함께 BE가 정리해 주시면 FE가 맞춰 연동하겠습니다.
 
-## 참고 — 이미 구현된 엔드포인트를 확인했습니다
+## 참고 — 코드까지 직접 확인했고, 요청 1·2는 사실상 해소됐습니다
 
-`AI/app/product_classifier/router.py`(`POST /product-classifier/classify`)가 이미 있고, `GET /ai/jobs/{job_id}` 결과의 `ProductClassifyResult`에 `fields.category{value,path,score,action,candidates}`와 `fields.color_primary{value,hex,score,action,candidates}`/`color_secondary`가 이미 존재합니다(`AI/app/product_classifier/schemas.py`). 요청 1·2가 이미 부분적으로 반영돼 있을 수도 있어 보여 여쭤봅니다:
+`AI/app/product_classifier/`와 `worker/models/product_classifier/`를 직접 읽어봤습니다.
 
-- `fields.category.value`/`.path`가 지금 대분류만 담고 있는지, 아니면 이미 소분류(depth3)까지 포함하는지 확인 부탁드립니다 — `path`라는 이름을 보면 이미 전체 경로일 가능성도 있어 보입니다.
-- `fields.color_primary.value`가 어떤 값 집합인지(자유 텍스트인지, 정해진 팔레트인지) 알려주시면 위 14개 옵션과 매핑할 수 있을지 바로 판단할 수 있습니다.
+- **요청 1(소분류) 해소**: `worker/models/product_classifier/contracts.py`의 `CategoryPrediction.to_dict()`가 `"value": self.subcategory.value`(예: `"CARDIGAN"`, 소분류 코드 그대로), `"path": self.path`(예: `["아우터", "가디건"]`, 대분류→소분류 한글 표시 배열)로 채우고 있어 **이미 소분류까지 응답에 있습니다.** 다만 **성별 조합 depth2 `categoryId`(4~23)는 응답에 없습니다** — FE/BE가 성별과 이 `value`/`path`를 조합해 `categoryId`를 계산해야 합니다. 이 계산 방법(테이블/함수)을 알려주시면 좋겠습니다.
+- **요청 2(색상) 해소**: `worker/models/product_classifier/color.py`의 `PALETTE`가 13색(`BLACK/WHITE/GRAY/RED/ORANGE/PINK/YELLOW/BROWN/GREEN/BLUE/PURPLE/BEIGE/NAVY`) + `MIXED`로 확정돼 있고, 이 14개가 FE 옵션 14개와 정확히 1:1 매핑됩니다(대소문자만 다름). FE는 `mapAiColorKeyToOptionId()`로 이미 매핑 코드를 만들어뒀습니다.
+- 요청 3(bbox 좌표)은 `037`이 아니라 지금은 `docs/requests/BE/041-quality-inspection-integration.md`(037/038 통합본)로 대체됐습니다 — 내용은 동일(정규화 `[x1,y1,x2,y2]`)하니 그대로 확인 부탁드립니다.
 
-둘 다 이미 원하는 형태라면 요청 1·2는 그대로 닫아도 됩니다 — 그게 아니라면 위 요청대로 확장 부탁드립니다.
+## 새로 발견한 것 — 확인 부탁드립니다
+
+1. **`taxonomy_version` 기본값 불일치(버그로 보임)**: `AI/app/product_classifier/schemas.py`의 `ProductClassifyRequest.taxonomy_version` 기본값이 `"v1"`인데, 실제 워커가 쓰는 값은 `worker/models/product_classifier/taxonomy.py`의 `TAXONOMY_VERSION = "v2-be-seed-2026-08-03"`입니다. `worker/product_classifier_worker_example.py`가 결과를 조립할 때 `payload.get("taxonomy_version", TAXONOMY_VERSION)`으로 요청값(`"v1"`)을 그대로 쓰기 때문에, 실제로는 v2 taxonomy로 분류해놓고 응답의 `taxonomy_version`은 `"v1"`이라고 잘못 표시됩니다. BE가 버전 불일치 시 프리필을 거부하는 로직을 넣으면 항상 거부될 수 있어 미리 알려드립니다.
+2. **트리거 시점 확인**: `041-quality-inspection-integration.md`가 "품질 검수는 BE가 앞/뒤 사진 업로드 완료 직후 트리거하고, 분류(카테고리·색상) 이벤트는 그와 별개"라고 명시했습니다. 분류도 041과 같은 패턴(BE가 사진 업로드 시점에 `POST /product-classifier/classify`를 트리거하고, job_id를 등록 draft 응답에 실어 보내면 FE가 `GET /ai/jobs/{job_id}`로 직접 폴링)을 따르는 게 맞는지 확인 부탁드립니다 — 맞다면 041의 폴링 코드를 그대로 재사용할 수 있어 FE 작업이 단순해집니다.
+3. **워커가 아직 mock 스텁**: `worker/models/product_classifier/registry.py`의 `ACTIVE_CATEGORY_BACKEND`/`ACTIVE_COLOR_BACKEND`가 둘 다 `"mock"`이라, 지금 연동해도 카테고리는 항상 `JACKET`(score 0), 색상은 항상 `BLACK`(score 0)로 고정 응답됩니다. 실백엔드(CLIP 등) 전환 일정이 있다면 참고차 알려주시면 좋겠습니다 — FE는 그 전까지는 이 기능을 mock 그대로 두고 실사용자에게 노출하지 않을 계획입니다.
 
 ## 관련 자료
 - `docs/requests/BE/033-category-gender-stays-in-form.md`
 - `docs/requests/AI/004-category-taxonomy-v2.md`
-- `docs/requests/BE/037-quality-inspection-async.md`
+- `docs/requests/BE/041-quality-inspection-integration.md`(037/038 대체)
 - `docs/requests/BE/042-product-registration-ai-pipeline.md`
 - `FE/src/domains/product/constants/productRegistrationOptions.ts` (`PRODUCT_REGISTRATION_COLOR_OPTIONS`)
+- `FE/src/domains/product/constants/aiColorPalette.ts`(`mapAiColorKeyToOptionId`)

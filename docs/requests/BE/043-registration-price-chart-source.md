@@ -29,6 +29,10 @@
 - 필터 기준(카테고리/브랜드/사이즈 등 어디까지 좁힐지)은 `034`의 §1 데이터 실태 확인 결과에 따라 BE/AI가 정하는 대로 따르겠습니다.
 - `034`가 이미 밝힌 대로 실사용 데이터가 사실상 0건이라 지금 당장 되는 요청은 아닙니다 — **인프라(뷰·통계) 작업이 실제로 진행될 때, 최종 응답 형태를 정하실 때 이 문서를 참고 자료로 봐주시면 됩니다.**
 
+## 참고 — 당장은 `044`로 같은 화면을 채울 수 있습니다
+
+`docs/requests/BE/028-pricing-async.md`(AI 외부 시세 검색 기반 가격 추정)가 이미지·실제 상품 없이도 지금 연동 가능하다는 걸 확인했습니다. `docs/requests/BE/044-pricing-estimate-trigger.md`로 그 경량 트리거를 요청해뒀고, 등급별로 4번 호출해 얻은 결과로 이 화면(히스토그램+등급별 추천가)을 "우리 플랫폼 통계"가 아니라 "외부 시세 추정"으로 채우는 방식입니다. **이 문서(043)가 요청한 자체 통계 인프라가 급하지 않다면 044만으로 당분간 충분할 수 있습니다** — 우선순위는 낮춰도 됩니다.
+
 ## 관련 자료
 - `docs/requests/BE/034-pricing-internal-comps-source.md`, `docs/requests/AI/005-pricing-internal-comps-source-answer.md`
 - `FE/src/domains/product/pages/ProductRegistrationPage.vue`(`priceRecommendationBuckets`, `recommendedPrices`, `product-registration__price-chart`)

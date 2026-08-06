@@ -118,12 +118,23 @@ interface ProductDetailDto extends ProductListDto {
 }
 
 // BE 확인 필요 — 등록 화면에서 사용자가 확정한 AI 품질 검증 결과를 담을 필드다.
-// 현재 POST /products는 이 필드를 받지 않는다(docs/requests/BE/042-product-registration-ai-pipeline.md
-// §3에서 저장/노출을 요청 중). BE가 반영하기 전까지는 보내도 무시될 뿐이라 안전하게 앞서 채워둔다.
+// 현재 POST /products는 이 필드를 받지 않는다. 필드명은 docs/requests/BE/041-quality-inspection-integration.md
+// §2가 확정한 AI findings 스키마를 그대로 따른다(BE가 041에서 요구한 "key별 판매자 응답"과
+// 019가 요구하는 "findings 원본"을 둘 다 만족할 수 있도록 원본 필드 전체 + isActualDefect를 함께 보낸다 —
+// 최종적으로 뭘 저장할지는 041 갱신본에서 BE 확인 예정). BE가 반영하기 전까지는 보내도 무시될 뿐이라
+// 안전하게 앞서 채워둔다.
 interface ProductCreateAiQualityFindingRequest {
-  photoRole: 'front' | 'back'
-  description: string
-  box: { x: number; y: number; width: number; height: number }
+  key: string
+  defectType: string
+  label: string
+  imageIndex: number
+  no: number
+  bbox: [number, number, number, number]
+  severity: string
+  statementRequired: boolean
+  description: string | null
+  // 판매자가 "하자 제외"로 뒤집지 않은(=하자로 인정한) 항목인지.
+  isActualDefect: boolean
 }
 
 interface ProductCreateRequest {
@@ -722,24 +733,24 @@ const resolveRegistrationDefects = (draft: ProductRegistrationDraft) => {
 }
 
 // 사용자가 "하자 제외"로 뒤집지 않은(=하자로 인정한) finding만 제출한다.
+// 판매자가 인정/제외한 것 둘 다 보낸다 — 041이 "아니다로 처리된 것"도 알아야 한다고 명시했다.
 const resolveRegistrationAiQualityFindings = (
   draft: ProductRegistrationDraft,
 ): ProductCreateAiQualityFindingRequest[] =>
-  draft.aiPhotoResults.flatMap((result) => {
-    const photo = draft.photos.find((item) => item.id === result.photoId)
-
-    if (!photo || (photo.role !== 'front' && photo.role !== 'back')) {
-      return []
-    }
-
-    return result.findings
-      .filter((finding) => finding.isActualDefect)
-      .map((finding) => ({
-        photoRole: photo.role as 'front' | 'back',
-        description: finding.description,
-        box: finding.box,
-      }))
-  })
+  draft.aiPhotoResults.flatMap((result) =>
+    result.findings.map((finding) => ({
+      key: finding.key,
+      defectType: finding.defectType,
+      label: finding.label,
+      imageIndex: finding.imageIndex,
+      no: finding.no,
+      bbox: finding.bbox,
+      severity: finding.severity,
+      statementRequired: finding.statementRequired,
+      description: finding.description,
+      isActualDefect: finding.isActualDefect,
+    })),
+  )
 
 export const getCategoryCode = (categoryName: string) => {
   if (categoryName.includes('아우터')) return 'outer'

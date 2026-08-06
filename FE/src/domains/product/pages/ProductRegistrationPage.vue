@@ -11,7 +11,12 @@ import {
   type CategoryDto,
   type ProductAiModelCutStatusDto,
 } from '@/domains/product/api/productApi'
-import { analyzeRegistrationPhotos } from '@/domains/product/api/productAiApi'
+import {
+  analyzeRegistrationPhotos,
+  estimateRegistrationPrice,
+  type ProductAiPriceEstimate,
+  type ProductRegistrationPriceGrade,
+} from '@/domains/product/api/productAiApi'
 import { submitProductRegistrationDraft } from '@/domains/product/api/productRegistrationApi'
 import ProductPhotoUploader from '@/domains/product/components/ProductPhotoUploader.vue'
 import {
@@ -35,6 +40,8 @@ import type {
   ProductRegistrationSaleType,
   ProductRegistrationStepId,
 } from '@/domains/product/types/productRegistration.types'
+import { buildPriceRecommendationBuckets } from '@/domains/product/utils/priceBuckets'
+import { toPercentBox } from '@/domains/product/utils/qualityFindingBox'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
@@ -164,21 +171,10 @@ const updateMinorCategory = () => {
   basicStepTouched.categoryId = true
 }
 
-const priceRecommendationBuckets: ProductRegistrationPriceBucket[] = [
-  { id: 'under-30', label: '~3만', productCount: 6 },
-  { id: '30-50', label: '3~5만', productCount: 14 },
-  { id: '50-70', label: '5~7만', productCount: 24 },
-  { id: '70-90', label: '7~9만', productCount: 18 },
-  { id: '90-120', label: '9~12만', productCount: 11 },
-  { id: 'over-120', label: '12만~', productCount: 5 },
-]
-
-const recommendedPrices: ProductRegistrationRecommendedPrice[] = [
-  { grade: 'S', label: 'S급', price: 108000 },
-  { grade: 'A', label: 'A급', price: 92000 },
-  { grade: 'B', label: 'B급', price: 74000 },
-  { grade: 'C', label: 'C급', price: 56000 },
-]
+const priceRecommendationBuckets = ref<ProductRegistrationPriceBucket[]>([])
+const recommendedPrices = ref<ProductRegistrationRecommendedPrice[]>([])
+const aiPriceStatus = ref<'idle' | 'loading' | 'completed' | 'failed'>('idle')
+const PRICE_GRADES: ProductRegistrationPriceGrade[] = ['S', 'A', 'B', 'C']
 
 const createInitialDraft = (): ProductRegistrationDraft => ({
   photos: [],
@@ -403,7 +399,7 @@ const updateDirectSalePrice = (event: Event) => {
   draft.directSalePrice = getNumericInputValue(event)
 }
 const maxPriceBucketCount = computed(() =>
-  Math.max(...priceRecommendationBuckets.map((bucket) => bucket.productCount)),
+  Math.max(1, ...priceRecommendationBuckets.value.map((bucket) => bucket.productCount)),
 )
 const pricingStepErrors = computed(() => ({
   saleType:
@@ -952,14 +948,14 @@ const moveAiResult = (direction: -1 | 1) => {
     draft.aiPhotoResults.length
 }
 
-const toggleAiDefectCandidate = (findingId: string) => {
+const toggleAiDefectCandidate = (findingKey: string) => {
   if (!currentAiResult.value || currentAiResult.value.confirmed) {
     return
   }
 
   currentAiResult.value.findings = currentAiResult.value.findings.map((finding) => ({
     ...finding,
-    isActualDefect: finding.id === findingId ? !finding.isActualDefect : finding.isActualDefect,
+    isActualDefect: finding.key === findingKey ? !finding.isActualDefect : finding.isActualDefect,
   }))
 }
 
@@ -1066,6 +1062,74 @@ watch(aiTriggerPhotoKey, () => {
     resetAiAnalysis()
   }
 })
+
+const applyAiPriceEstimates = (estimates: ProductAiPriceEstimate[]) => {
+  recommendedPrices.value = estimates
+    .filter((estimate) => estimate.priced && estimate.priceRangeMid !== null)
+    .map((estimate) => ({
+      grade: estimate.grade,
+      label: `${estimate.grade}급`,
+      price: estimate.priceRangeMid ?? 0,
+    }))
+
+  // comps는 등급과 무관하게 같은 매물 목록이라(028), 사용자가 실제로 확정한 등급의 결과 하나만
+  // 히스토그램 소스로 쓴다 — 없으면(등급 미확정 등) 첫 결과로 대체한다.
+  const confirmedEstimate =
+    estimates.find((estimate) => estimate.grade === draft.conditionGrade) ?? estimates[0]
+
+  priceRecommendationBuckets.value = confirmedEstimate
+    ? buildPriceRecommendationBuckets(confirmedEstimate.compPrices)
+    : []
+}
+
+const resetAiPriceRecommendation = () => {
+  aiPriceStatus.value = 'idle'
+  recommendedPrices.value = []
+  priceRecommendationBuckets.value = []
+}
+
+// AI 가격 추천(028)은 등급 4개를 각각 job으로 조회해야 하는데, AI 쪽 동시 처리 상한이 2건이라
+// 2개씩 나눠 부른다. pricing 스텝에 처음 진입할 때 한 번만 트리거한다.
+const triggerAiPriceRecommendation = async () => {
+  if (aiPriceStatus.value === 'loading' || aiPriceStatus.value === 'completed') {
+    return
+  }
+
+  aiPriceStatus.value = 'loading'
+
+  const input = {
+    productName: draft.name.trim(),
+    category: categoryMajorId.value || undefined,
+    brand: draft.brand.trim() || undefined,
+  }
+
+  try {
+    const estimates: ProductAiPriceEstimate[] = []
+
+    for (let batchStart = 0; batchStart < PRICE_GRADES.length; batchStart += 2) {
+      const batch = PRICE_GRADES.slice(batchStart, batchStart + 2)
+      const batchResults = await Promise.all(
+        batch.map((grade) => estimateRegistrationPrice(grade, input)),
+      )
+      estimates.push(...batchResults)
+    }
+
+    applyAiPriceEstimates(estimates)
+    aiPriceStatus.value = 'completed'
+  } catch (error) {
+    console.error('[ProductRegistrationPage] AI 가격 추천 실패', error)
+    aiPriceStatus.value = 'failed'
+  }
+}
+
+watch(
+  () => currentStep.value.id,
+  (stepId) => {
+    if (stepId === 'pricing' && aiPriceStatus.value === 'idle') {
+      void triggerAiPriceRecommendation()
+    }
+  },
+)
 
 const markCurrentStepTouched = () => {
   if (currentStep.value.id === 'photos') {
@@ -1263,6 +1327,7 @@ const resetRegistrationDraft = () => {
   aiModelCutPollToken += 1
   aiModelCutStatus.value = 'NONE'
   aiModelCutImageUrl.value = null
+  resetAiPriceRecommendation()
 }
 
 const continueRegistration = () => {
@@ -1968,17 +2033,17 @@ onBeforeUnmount(() => {
                     <img :src="currentAiPhoto.previewUrl" :alt="`${currentAiPhoto.fileName} AI 품질 검증 결과`" />
                     <span
                       v-for="finding in currentAiResult.findings"
-                      :key="finding.id"
+                      :key="finding.key"
                       class="product-registration__ai-box"
                       :class="{ 'product-registration__ai-box--excluded': !finding.isActualDefect }"
                       :style="{
-                        left: `${finding.box.x}%`,
-                        top: `${finding.box.y}%`,
-                        width: `${finding.box.width}%`,
-                        height: `${finding.box.height}%`,
+                        left: `${toPercentBox(finding.bbox).x}%`,
+                        top: `${toPercentBox(finding.bbox).y}%`,
+                        width: `${toPercentBox(finding.bbox).width}%`,
+                        height: `${toPercentBox(finding.bbox).height}%`,
                       }"
                     >
-                      {{ finding.labelNumber }}
+                      {{ finding.no }}
                     </span>
                   </div>
 
@@ -1988,18 +2053,18 @@ onBeforeUnmount(() => {
                     </p>
                     <article
                       v-for="finding in currentAiResult.findings"
-                      :key="finding.id"
+                      :key="finding.key"
                       class="product-registration__ai-card"
                       :class="{ 'product-registration__ai-card--excluded': !finding.isActualDefect }"
                     >
                       <div>
-                        <strong>{{ finding.labelNumber }}번</strong>
-                        <p>{{ finding.description }}</p>
+                        <strong>{{ finding.no }}번 · {{ finding.label }}</strong>
+                        <p>{{ finding.description ?? '설명이 아직 제공되지 않습니다.' }}</p>
                       </div>
                       <button
                         type="button"
                         :disabled="currentAiResult.confirmed"
-                        @click="toggleAiDefectCandidate(finding.id)"
+                        @click="toggleAiDefectCandidate(finding.key)"
                       >
                         {{ finding.isActualDefect ? '하자 제외' : '하자로 표시' }}
                       </button>
@@ -2050,7 +2115,31 @@ onBeforeUnmount(() => {
                 </div>
               </div>
 
-              <div class="product-registration__price-chart" aria-label="가격 추천 그래프">
+              <div v-if="aiPriceStatus === 'loading'" class="product-registration__ai-empty" role="status">
+                <span class="product-registration__ai-spinner" aria-hidden="true" />
+                <strong>AI가 가격을 추정하고 있습니다…</strong>
+                <p>잠시만 기다려 주세요.</p>
+              </div>
+
+              <div
+                v-else-if="aiPriceStatus === 'failed'"
+                class="product-registration__ai-empty"
+                role="alert"
+              >
+                <strong>AI 가격 추천을 불러오지 못했습니다.</strong>
+                <p>가격은 아래 항목에서 직접 입력해 주세요.</p>
+              </div>
+
+              <div
+                v-else-if="aiPriceStatus === 'idle' || recommendedPrices.length === 0"
+                class="product-registration__ai-empty"
+                role="status"
+              >
+                <strong>AI 가격 추천 결과가 없습니다.</strong>
+                <p>이전 단계를 진행하면 자동으로 가격을 추천합니다.</p>
+              </div>
+
+              <div v-else class="product-registration__price-chart" aria-label="가격 추천 그래프">
                 <div class="product-registration__price-chart-plot">
                   <div class="product-registration__price-axis product-registration__price-axis--y">
                     <span>상품 수</span>
