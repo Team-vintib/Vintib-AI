@@ -32,6 +32,13 @@ services:
   ai:
     ports:
       - "${AI_PORT:-8000}:8000"
+    environment:
+      # base(docker-compose.yml)엔 운영 도메인이 리터럴로 박혀 있다. 로컬에서 이 값을
+      # 그대로 쓰면 AI가 자체 호스팅하는 URL(/personas/*, /results/*)이 아직 존재하지
+      # 않는 운영 경로를 가리켜서, 워커가 내려받다가 이미지가 아닌 응답을 받는다
+      # ("cannot identify image file"). 워커도 로컬 게이트웨이(GATEWAY_URL=http://
+      # localhost:8000/ai)를 보게 되므로, 여기서 만든 URL도 같은 호스트를 가리켜야 한다.
+      PUBLIC_BASE_URL: http://localhost:${AI_PORT:-8000}
 
   # 로컬에서는 Caddy 가 없으므로 시그널링(7880)도 호스트에 연다.
   # 브라우저가 ws://localhost:7880 으로 직접 붙는다.
