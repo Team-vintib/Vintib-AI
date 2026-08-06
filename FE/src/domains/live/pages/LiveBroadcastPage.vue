@@ -586,58 +586,60 @@ onBeforeUnmount(() => {
           </div>
         </aside>
 
-        <main class="live-broadcast-page__stage">
-          <LiveVideoStage
-            :title="live.title"
-            :poster-url="live.posterUrl"
-            :status="live.status"
-            :live-id="live.id"
-            :show-try-on="false"
-          >
-            <template #overlay>
-              <LiveChatOverlay
-                :live-id="live.id"
-                :host-id="live.hostId"
-                :status="live.status"
-                @viewer-count="updateViewerCount"
-                @realtime-ready="handleRealtimeReady"
-              />
-            </template>
-          </LiveVideoStage>
+        <main class="live-broadcast-page__content">
+          <div class="live-broadcast-page__stage">
+            <LiveVideoStage
+              :title="live.title"
+              :poster-url="live.posterUrl"
+              :status="live.status"
+              :live-id="live.id"
+              :show-try-on="false"
+            >
+              <template #overlay>
+                <LiveChatOverlay
+                  :live-id="live.id"
+                  :host-id="live.hostId"
+                  :status="live.status"
+                  @viewer-count="updateViewerCount"
+                  @realtime-ready="handleRealtimeReady"
+                />
+              </template>
+            </LiveVideoStage>
 
-          <LiveAuctionResultOverlay
-            v-if="auctionWin"
-            :winner-nickname="auctionWin.winnerNickname"
-            :winning-bid="auctionWin.winningBid"
-            :product-title="auctionWin.productTitle"
-            @close="closeAuctionWin"
-          />
+            <LiveAuctionResultOverlay
+              v-if="auctionWin"
+              :winner-nickname="auctionWin.winnerNickname"
+              :winning-bid="auctionWin.winningBid"
+              :product-title="auctionWin.productTitle"
+              @close="closeAuctionWin"
+            />
 
-          <LiveAuctionStartOverlay
-            v-if="startedAuctionTitle"
-            :product-title="startedAuctionTitle"
-            @close="dismissAuctionStart"
-          />
+            <LiveAuctionStartOverlay
+              v-if="startedAuctionTitle"
+              :product-title="startedAuctionTitle"
+              @close="dismissAuctionStart"
+            />
 
-          <p v-if="transitionNotice" class="live-broadcast-page__notice" role="status">
-            {{ transitionNotice }}
-          </p>
+            <p v-if="transitionNotice" class="live-broadcast-page__notice" role="status">
+              {{ transitionNotice }}
+            </p>
+          </div>
+
+          <div class="live-broadcast-page__details">
+            <SellerAuctionPanel
+              :live-id="live.id"
+              :product="selectedProduct"
+              :status="live.status"
+              :snapshot="auctionSnapshot"
+              :is-loading="auctionLoading"
+              :load-error="auctionError"
+              @snapshot-change="applyAuctionSnapshot"
+              @auction-closed="applyAuctionSnapshot"
+            />
+
+            <LiveBroadcastInfo :live="live" :elapsed-time="elapsedTime" />
+          </div>
         </main>
-
-        <aside class="live-broadcast-page__control">
-          <LiveBroadcastInfo :live="live" :elapsed-time="elapsedTime" />
-
-          <SellerAuctionPanel
-            :live-id="live.id"
-            :product="selectedProduct"
-            :status="live.status"
-            :snapshot="auctionSnapshot"
-            :is-loading="auctionLoading"
-            :load-error="auctionError"
-            @snapshot-change="applyAuctionSnapshot"
-            @auction-closed="applyAuctionSnapshot"
-          />
-        </aside>
       </div>
 
       <div
@@ -685,7 +687,15 @@ onBeforeUnmount(() => {
   display: grid;
   min-height: calc(100vh - var(--button-height-major));
   height: calc(100vh - var(--button-height-major));
-  grid-template-columns: 240px minmax(0, 1fr) 360px;
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+/* 시청 화면과 동일: 영상(위) / 방송 정보·경매(아래) */
+.live-broadcast-page__content {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(340px, 1fr) 260px;
 }
 
 .live-broadcast-page__queue {
@@ -739,15 +749,27 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.live-broadcast-page__control {
-  display: flex;
+.live-broadcast-page__details {
+  display: grid;
+  min-width: 0;
   min-height: 0;
-  flex-direction: column;
-  gap: var(--space-3);
-  overflow-y: auto;
-  padding: var(--space-4);
-  border-left: 1px solid var(--color-live-border);
+  grid-template-columns: minmax(0, 1fr) 300px;
+  border-top: 1px solid var(--color-live-border);
   background: var(--color-live-background);
+}
+
+.live-broadcast-page__details > * {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.live-broadcast-page__details > :last-child {
+  padding: var(--space-4);
+}
+
+.live-broadcast-page__details > * + * {
+  border-left: 1px solid var(--color-live-border);
 }
 
 .live-broadcast-page__slot-note {
@@ -894,7 +916,10 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1100px) {
-  .live-broadcast-page__body,
+  .live-broadcast-page__body {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+
   .live-broadcast-loading__body {
     grid-template-columns: 220px minmax(0, 1fr) 320px;
   }
@@ -912,13 +937,17 @@ onBeforeUnmount(() => {
     border-bottom: 1px solid var(--color-live-border);
   }
 
+  .live-broadcast-page__content {
+    height: auto;
+    grid-template-rows: var(--surface-min-height-xl) auto;
+  }
+
   .live-broadcast-page__stage {
     min-height: var(--surface-min-height-xl);
   }
 
-  .live-broadcast-page__control {
-    border-left: 0;
-    border-top: 1px solid var(--color-live-border);
+  .live-broadcast-page__details {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .live-broadcast-loading__body {
