@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+
+import { connectLiveVideo, type LiveVideoSession } from '@/domains/live/api/liveVideoRoom'
 
 import type { LiveWatchStatus } from '@/domains/live/types/liveWatch.types'
 
@@ -8,6 +10,7 @@ const props = withDefaults(
     title: string
     posterUrl: string | null
     status: LiveWatchStatus
+    liveId?: number | null
     tryOnDisabled?: boolean
     tryOnOpen?: boolean
     showTryOn?: boolean
@@ -16,6 +19,7 @@ const props = withDefaults(
     reminderActive?: boolean
   }>(),
   {
+    liveId: null,
     tryOnDisabled: false,
     tryOnOpen: false,
     showTryOn: true,
@@ -30,8 +34,90 @@ const emit = defineEmits<{
   toggleReminder: []
 }>()
 
+const videoEl = ref<HTMLVideoElement | null>(null)
+const videoState = ref<'idle' | 'connecting' | 'connected' | 'failed'>('idle')
+let session: LiveVideoSession | null = null
+let connectSeq = 0
+
+const isStreaming = computed(() => videoState.value === 'connected')
+
+const startVideo = async () => {
+  if (
+    props.status !== 'LIVE' ||
+    !props.liveId ||
+    !videoEl.value ||
+    session ||
+    videoState.value === 'connecting'
+  ) {
+    return
+  }
+
+  const seq = ++connectSeq
+  videoState.value = 'connecting'
+
+  try {
+    const nextSession = await connectLiveVideo(props.liveId, videoEl.value, () => {
+      if (session === nextSession) {
+        session = null
+        videoState.value = 'idle'
+      }
+    })
+
+    // 연결하는 사이 status가 바뀌었으면(예: 종료) 방금 붙은 세션을 즉시 정리한다.
+    if (seq !== connectSeq) {
+      void nextSession.disconnect()
+      return
+    }
+
+    session = nextSession
+    videoState.value = 'connected'
+  } catch {
+    if (seq === connectSeq) {
+      videoState.value = 'failed'
+    }
+  }
+}
+
+const stopVideo = async () => {
+  connectSeq += 1
+  const current = session
+  session = null
+  videoState.value = 'idle'
+
+  if (current) {
+    await current.disconnect()
+  }
+}
+
+watch(
+  () => props.status,
+  (status) => {
+    if (status === 'LIVE') {
+      void startVideo()
+    } else {
+      void stopVideo()
+    }
+  },
+)
+
+onMounted(() => {
+  if (props.status === 'LIVE') {
+    void startVideo()
+  }
+})
+
+onBeforeUnmount(() => {
+  void stopVideo()
+})
+
 const stageMessage = computed(() => {
-  if (props.status === 'LIVE' && props.connectionLabel) return props.connectionLabel
+  if (props.status === 'LIVE') {
+    if (videoState.value === 'connecting') return '영상 연결 중'
+    if (videoState.value === 'failed') return '영상을 불러오지 못했습니다'
+    if (videoState.value !== 'connected' && props.connectionLabel) return props.connectionLabel
+    return ''
+  }
+
   if (props.status === 'SCHEDULED') return '방송 시작 전입니다'
   if (props.status === 'ENDED') return '종료된 라이브입니다'
   if (props.status === 'CANCELED') return '취소된 라이브입니다'
@@ -41,8 +127,20 @@ const stageMessage = computed(() => {
 
 <template>
   <section class="live-video-stage" aria-label="라이브 영상 영역">
-    <img v-if="posterUrl" :src="posterUrl" :alt="`${title} 방송 미리보기`" />
-    <div v-else class="live-video-stage__fallback" aria-hidden="true">
+    <video
+      v-show="isStreaming"
+      ref="videoEl"
+      class="live-video-stage__media"
+      autoplay
+      playsinline
+    ></video>
+    <img
+      v-if="posterUrl"
+      v-show="!isStreaming"
+      :src="posterUrl"
+      :alt="`${title} 방송 미리보기`"
+    />
+    <div v-else v-show="!isStreaming" class="live-video-stage__fallback" aria-hidden="true">
       <svg viewBox="0 0 24 24">
         <path d="m15 10 5-3v10l-5-3v-4Z" />
         <rect x="3" y="5" width="12" height="14" rx="2" />
@@ -54,7 +152,7 @@ const stageMessage = computed(() => {
       <slot name="overlay"></slot>
     </div>
 
-    <div v-if="status !== 'LIVE' || connectionLabel" class="live-video-stage__notice" role="status">
+    <div v-if="stageMessage" class="live-video-stage__notice" role="status">
       <span aria-hidden="true"></span>
       {{ stageMessage }}
     </div>
@@ -122,7 +220,8 @@ const stageMessage = computed(() => {
 }
 
 .live-video-stage > img,
-.live-video-stage__fallback {
+.live-video-stage__fallback,
+.live-video-stage__media {
   position: absolute;
   z-index: -3;
   inset: 0;
@@ -130,7 +229,8 @@ const stageMessage = computed(() => {
   height: 100%;
 }
 
-.live-video-stage > img {
+.live-video-stage > img,
+.live-video-stage__media {
   object-fit: cover;
 }
 
