@@ -33,6 +33,10 @@ public class Member extends BaseTimeEntity {
     @Column
     private String password;
 
+    // 구글 로그인(SY039) 연동 식별자(id_token의 sub). 이메일/비밀번호로만 가입한 회원은 null.
+    @Column(name = "google_id", unique = true)
+    private String googleId;
+
     @Column(nullable = false)
     private String name;
 
@@ -95,6 +99,23 @@ public class Member extends BaseTimeEntity {
         this.onboardingCompleted = false;
         this.memberType = MemberType.GENERAL;
         this.status = MemberStatus.ACTIVE;
+    }
+
+    /** 구글 로그인 신규 가입(SY039). 비밀번호 없이 생성되고, 구글 프로필 사진을 그대로 채운다. */
+    public static Member ofGoogle(String email, String name, String googleId, String profileImageUrl) {
+        Member member = new Member(email, null, name);
+        member.googleId = googleId;
+        member.profileImageUrl = profileImageUrl;
+        return member;
+    }
+
+    /**
+     * 기존 이메일 계정에 구글 계정을 연동한다(SY039). 사용자가 연동을 직접 확인한 뒤에만
+     * 호출된다({@code AuthService#confirmGoogleLink}) — 프로필 사진은 이미 본인이 올렸을 수
+     * 있어 덮어쓰지 않는다.
+     */
+    public void linkGoogleAccount(String googleId) {
+        this.googleId = googleId;
     }
 
     /**
