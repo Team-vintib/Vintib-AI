@@ -21,15 +21,7 @@ const errorMessage = computed(
   () => firstQueryValue(route.query.message) || '결제가 취소되었거나 실패했습니다.',
 )
 
-// 새 탭(포인트 충전 결제 화면)에서 열린 경우 원래 탭에 이미 충전 화면이 떠 있으니 이 탭은 닫기만 하면 된다.
-const openedAsNewTab = Boolean(window.opener)
-
 const goToCharge = () => {
-  if (openedAsNewTab) {
-    window.close()
-    return
-  }
-
   void router.push({ name: ROUTE_NAMES.POINT, query: { section: 'charge' } })
 }
 </script>
@@ -41,7 +33,7 @@ const goToCharge = () => {
         <strong>충전에 실패했습니다.</strong>
         <p>{{ errorMessage }}</p>
         <p v-if="errorCode" class="point-charge-result__code">오류 코드: {{ errorCode }}</p>
-        <button type="button" @click="goToCharge">{{ openedAsNewTab ? '창 닫기' : '충전 화면으로 돌아가기' }}</button>
+        <button type="button" @click="goToCharge">충전 화면으로 돌아가기</button>
       </div>
     </section>
   </DefaultLayout>

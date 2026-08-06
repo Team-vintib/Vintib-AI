@@ -8,9 +8,10 @@ export interface PointBalanceUpdatedDetail {
   balance: PointBalance
 }
 
-// 결제(충전)는 새 탭에서 끝날 수 있어(포인트 충전 결제 화면), 같은 탭 안에서만 전달되는
-// CustomEvent만으로는 원래 탭(헤더 잔액 등)이 갱신되지 않는다. BroadcastChannel로 같은
-// 오리진의 다른 탭에도 함께 알린다. BroadcastChannel 미지원 환경(구형 브라우저)에서는
+// 결제(충전)는 토스 결제 도메인으로 리다이렉트됐다가 성공/실패 콜백 페이지로 돌아오며
+// 진행 탭이 완전히 새로고침된다. 같은 탭 안에서만 전달되는 CustomEvent만으로는 사용자가
+// 별도로 열어둔 다른 탭(헤더 잔액 등)이 갱신되지 않는다. BroadcastChannel로 같은 오리진의
+// 다른 탭에도 함께 알린다. BroadcastChannel 미지원 환경(구형 브라우저)에서는
 // 같은 탭 CustomEvent만 동작한다.
 const broadcastChannel =
   typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(BROADCAST_CHANNEL_NAME)

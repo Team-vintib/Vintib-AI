@@ -49,15 +49,7 @@ const confirm = async () => {
   }
 }
 
-// 새 탭(포인트 충전 결제 화면)에서 열린 경우 원래 탭이 이미 살아 있으니 이 탭은 닫기만 하면 된다.
-const openedAsNewTab = Boolean(window.opener)
-
 const goToWallet = () => {
-  if (openedAsNewTab) {
-    window.close()
-    return
-  }
-
   void router.push({ name: ROUTE_NAMES.POINT })
 }
 
@@ -84,13 +76,13 @@ const firstQueryValue = (value: unknown): string => {
       <div v-else-if="status === 'success'" class="point-charge-result__state">
         <strong>{{ chargedAmount.toLocaleString('ko-KR') }}P 충전이 완료되었습니다.</strong>
         <p>포인트 지갑에서 잔액을 확인할 수 있습니다.</p>
-        <button type="button" @click="goToWallet">{{ openedAsNewTab ? '창 닫기' : '포인트 지갑으로 이동' }}</button>
+        <button type="button" @click="goToWallet">포인트 지갑으로 이동</button>
       </div>
 
       <div v-else class="point-charge-result__state" role="alert">
         <strong>충전 승인에 실패했습니다.</strong>
         <p>{{ errorMessage }}</p>
-        <button type="button" @click="goToWallet">{{ openedAsNewTab ? '창 닫기' : '포인트 지갑으로 이동' }}</button>
+        <button type="button" @click="goToWallet">포인트 지갑으로 이동</button>
       </div>
     </section>
   </DefaultLayout>
