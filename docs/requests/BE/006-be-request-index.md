@@ -18,6 +18,8 @@
 - 현재 임시 처리 또는 Mock 사용 여부
   - Onboarding: mock-success fallback
   - Business: FE가 아직 `docs/requests/FE/017-business-invoice-contract.md` 미반영 — mock `PENDING` fallback 유지 중
+  - 상품 목록의 판매완료(SOLD) 제외는 반영 완료 — `022-product-list-sold-exclusion.md` 삭제,
+    FE 후속 조치(마이페이지 엔드포인트 전환)는 `docs/requests/FE/035-product-list-sold-exclusion-answer.md`
   - Commerce/Wallet, MyPage: FE 화면 없음
 
 ## 3. 추가 구현 요청
@@ -40,7 +42,6 @@
 | 008 | `008-user-tryon-image-contract.md` | TryOn | — | 서윤/AI 파트 |
 | 019 | `019-product-quality-multi-image.md` | Product | 미반영 | 서윤 파트 |
 | 020 | `020-tryon-result-category.md` | TryOn | 미반영 | 서윤/AI 파트 |
-| 022 | `022-product-list-sold-exclusion.md` | Product | 미확인 | 서윤 파트 |
 | 023 | `023-product-similar-list.md` | Product | 미확인 | 서윤 파트 |
 | 025 | `025-product-same-price-chart.md` | Product | 미확인 | 서윤 파트 |
 | 026 | `026-toss-client-key-widget-type.md` | Point | 미확인 | 서윤 파트 |
