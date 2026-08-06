@@ -129,6 +129,7 @@ def _ingest_quality_embedding_result(result: dict) -> None:
             product_id=int(result["product_id"]),
             embedding=embedding,
             model_id=result.get("garment_embedding_model_id", "unknown"),
+            category=result.get("garment_category"),
         )
     except Exception as exc:  # noqa: BLE001
         print(f"[gateway] 의류 임베딩 저장 실패(product_id={result.get('product_id')}): {exc}")

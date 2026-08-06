@@ -193,6 +193,7 @@ class QualityCheckWorker(BaseWorker):
         if garment_embedding is not None:
             result["garment_embedding"] = garment_embedding
             result["garment_embedding_model_id"] = EMBEDDING_MODEL_ID
+            result["garment_category"] = payload["category"]
 
         # 판단 근거 로컬 로그(CH008) — Redis job result는 1시간 뒤 사라지고 BE는 finding.key/
         # statement_required만 저장한다. best-effort라 실패해도 검수 응답은 그대로 나간다.
