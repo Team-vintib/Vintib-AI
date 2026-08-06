@@ -166,6 +166,8 @@ const subscribeRealtime = () => {
   })
 
   realtimeClient.subscribe('/user/queue/errors', (body) => {
+    // 반응을 너무 빠르게 눌렀을 때(L011)는 사용자에게 표시하지 않고 조용히 무시한다.
+    if (isSuppressedRealtimeError(body)) return
     errorMessage.value = getRealtimeErrorMessage(body)
   })
 }
@@ -347,6 +349,17 @@ function getRealtimeErrorMessage(body: unknown) {
   }
 
   return '메시지를 보내지 못했습니다.'
+}
+
+// 반응 속도 제한(L011)처럼 사용자에게 굳이 노출하지 않을 실시간 에러를 걸러낸다.
+function isSuppressedRealtimeError(body: unknown) {
+  if (!body || typeof body !== 'object' || !('error' in body)) return false
+
+  const error = (body as { error?: { code?: unknown; message?: unknown } }).error
+  const code = error?.code ? String(error.code) : ''
+  const message = error?.message ? String(error.message) : ''
+
+  return code === 'L011' || message.includes('반응을 너무 빠르게')
 }
 </script>
 
