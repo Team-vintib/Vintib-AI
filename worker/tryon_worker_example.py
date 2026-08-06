@@ -150,7 +150,11 @@ class TryonWorker(BaseWorker):
             return
         config = vlm_registry.vlm_config(TRYON_VLM_BACKEND)
         print(f"[{self.worker_id}] VLM 로딩 중... (backend={TRYON_VLM_BACKEND})")
-        self._vlm_bundle = load_qwen_vl(config["model_id"], quantization=config["quantization"])
+        # CatVTON이 이미 GPU에 상주한 채로 VLM을 얹는다 -- 6GB급 GPU에서는 그대로 두면
+        # bitsandbytes device_map="auto"가 일부 레이어를 CPU로 보내려다 실패한다.
+        self._vlm_bundle = load_qwen_vl(
+            config["model_id"], quantization=config["quantization"], enable_cpu_offload=True
+        )
         print(f"[{self.worker_id}] VLM 로딩 완료")
 
     def _unload_vlm(self):
