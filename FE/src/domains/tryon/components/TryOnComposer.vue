@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { getMyWishList } from '@/domains/my/api/myApi'
+import {
+  isTryOnResultApiEnabled,
+  saveTryOnResult,
+} from '@/domains/tryon/api/tryOnResultApi'
 import { getMyTryOnProfile } from '@/domains/tryon/api/tryOnProfileApi'
 import { buildMockTryOnResultImage } from '@/domains/tryon/constants/tryOnResultMockData'
 import { ROUTE_PATHS } from '@/shared/constants/routes'
@@ -22,15 +26,20 @@ interface PreviewResult {
   result: TryOnResult
   productName: string
   saved: boolean
+  saving: boolean
+  error: string
 }
 
 const bodyPhotoUrl = ref<string | null>(null)
 const wishItems = ref<ProductListItem[]>([])
 const selectedProductIds = ref<number[]>([])
 const isLoading = ref(true)
+const isPhotoLoading = ref(true)
 const isGenerating = ref(false)
 const generatedResults = ref<PreviewResult[]>([])
+const selectedPreview = ref<PreviewResult | null>(null)
 const carouselTrack = ref<HTMLElement | null>(null)
+const usesServerResults = isTryOnResultApiEnabled()
 
 const userId = computed(() => authStore.user?.id ?? null)
 const selectedProducts = computed(() =>
@@ -40,15 +49,40 @@ const canTryOn = computed(
   () => Boolean(bodyPhotoUrl.value) && selectedProducts.value.length > 0 && !isGenerating.value,
 )
 
+const preloadImage = (source: string) =>
+  new Promise<void>((resolve, reject) => {
+    const image = new Image()
+
+    image.onload = () => resolve()
+    image.onerror = () => reject(new Error('이미지를 불러오지 못했습니다.'))
+    image.src = source
+
+    if (image.complete && image.naturalWidth > 0) {
+      resolve()
+    }
+  })
+
 const load = async () => {
   isLoading.value = true
+  isPhotoLoading.value = true
 
   const currentUserId = userId.value
 
   try {
     const profile = await getMyTryOnProfile(currentUserId)
-    bodyPhotoUrl.value = profile.bodyPhotoUrl
 
+    if (profile.bodyPhotoUrl) {
+      await preloadImage(profile.bodyPhotoUrl)
+    }
+
+    bodyPhotoUrl.value = profile.bodyPhotoUrl
+  } catch {
+    bodyPhotoUrl.value = null
+  } finally {
+    isPhotoLoading.value = false
+  }
+
+  try {
     // 찜 목록 조회는 회원 ID가 있어야 한다(getMyWishList는 number만 받음).
     wishItems.value =
       currentUserId != null
@@ -120,39 +154,81 @@ const tryOn = () => {
       },
       productName: product.name,
       saved: false,
+      saving: false,
+      error: '',
     }))
     isGenerating.value = false
   }, 700)
 }
 
 // 각 미리보기가 맘에 들 때만 저장 → 이때 갤러리에 추가된다(입어보기만으로 자동 저장하지 않는다).
-const saveResult = (resultId: number) => {
+const saveResult = async (resultId: number) => {
   const preview = generatedResults.value.find((item) => item.result.id === resultId)
-  if (!preview || preview.saved) {
+  if (!preview || preview.saved || preview.saving) {
     return
   }
 
-  emit('generated', preview.result)
-  preview.saved = true
+  preview.saving = true
+  preview.error = ''
+
+  try {
+    preview.result = await saveTryOnResult(userId.value, preview.result)
+    emit('generated', preview.result)
+    preview.saved = true
+  } catch (error) {
+    preview.error =
+      error instanceof Error ? error.message : '시착 결과를 저장하지 못했습니다.'
+  } finally {
+    preview.saving = false
+  }
 }
 
 // 저장하지 않은 것까지 미리보기 전체를 버린다.
 const discardResults = () => {
+  selectedPreview.value = null
   generatedResults.value = []
+}
+
+const openPreview = (preview: PreviewResult) => {
+  selectedPreview.value = preview
+}
+
+const closePreview = () => {
+  selectedPreview.value = null
+}
+
+const handleKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    closePreview()
+  }
 }
 
 const goToProfile = () => {
   void router.push({ path: ROUTE_PATHS.MY, query: { section: 'tryon' } })
 }
 
-onMounted(load)
+onMounted(() => {
+  void load()
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
   <section class="tryon-composer" aria-label="AI 입어보기">
     <div class="tryon-composer__body">
       <div class="tryon-composer__photo">
-        <img v-if="bodyPhotoUrl" :src="bodyPhotoUrl" alt="등록한 전신 사진" />
+        <div
+          v-if="isPhotoLoading"
+          class="tryon-composer__photo-profile-loading"
+          role="status"
+        >
+          등록 사진을 불러오는 중입니다…
+        </div>
+        <img v-else-if="bodyPhotoUrl" :src="bodyPhotoUrl" alt="등록한 전신 사진" />
         <div v-else class="tryon-composer__photo-empty">
           <p>등록된 전신 사진이 없습니다.</p>
           <button type="button" class="tryon-composer__photo-link" @click="goToProfile">
@@ -178,20 +254,31 @@ onMounted(load)
             :key="preview.result.id"
             class="tryon-composer__result-card"
           >
-            <span class="tryon-composer__result-thumb">
+            <button
+              type="button"
+              class="tryon-composer__result-thumb"
+              :aria-label="`${preview.productName} 시착 결과 크게 보기`"
+              @click="openPreview(preview)"
+            >
               <img :src="preview.result.imageUrl" :alt="`${preview.productName} 시착 결과 미리보기`" />
               <span class="tryon-composer__result-mock">mock</span>
-            </span>
+            </button>
             <span class="tryon-composer__result-name">{{ preview.productName }}</span>
             <button
               v-if="!preview.saved"
               type="button"
               class="tryon-composer__result-save"
+              :disabled="preview.saving"
               @click="saveResult(preview.result.id)"
             >
-              저장
+              {{ preview.saving ? '저장 중…' : '저장' }}
             </button>
-            <span v-else class="tryon-composer__result-saved" role="status">저장됨</span>
+            <span v-else class="tryon-composer__result-saved" role="status">
+              {{ usesServerResults ? '저장됨' : '브라우저에 저장됨' }}
+            </span>
+            <p v-if="preview.error" class="tryon-composer__result-error" role="alert">
+              {{ preview.error }}
+            </p>
           </li>
         </ul>
       </div>
@@ -241,6 +328,36 @@ onMounted(load)
         </p>
       </div>
     </div>
+
+    <div
+      v-if="selectedPreview"
+      class="tryon-composer__preview-overlay"
+      @click.self="closePreview"
+    >
+      <div
+        class="tryon-composer__preview-dialog"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="`${selectedPreview.productName} 시착 결과 확대`"
+      >
+        <button
+          type="button"
+          class="tryon-composer__preview-close"
+          aria-label="닫기"
+          @click="closePreview"
+        >
+          ×
+        </button>
+        <img
+          :src="selectedPreview.result.imageUrl"
+          :alt="`${selectedPreview.productName} 시착 결과 확대`"
+        />
+        <div class="tryon-composer__preview-info">
+          <strong>{{ selectedPreview.productName }}</strong>
+          <span>ESC 키 또는 바깥 영역을 눌러 닫을 수 있습니다.</span>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -269,6 +386,14 @@ onMounted(load)
   height: 100%;
   object-fit: cover;
   filter: saturate(0.86) contrast(1.04);
+}
+
+.tryon-composer__photo-profile-loading {
+  padding: var(--space-6);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 20px;
+  text-align: center;
 }
 
 .tryon-composer__photo-empty {
@@ -509,6 +634,7 @@ onMounted(load)
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-image-frame);
+  cursor: zoom-in;
 }
 
 .tryon-composer__result-thumb img {
@@ -559,6 +685,11 @@ onMounted(load)
   color: var(--color-primary-strong);
 }
 
+.tryon-composer__result-save:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .tryon-composer__result-saved {
   display: grid;
   height: 34px;
@@ -568,5 +699,91 @@ onMounted(load)
   font-size: 13px;
   font-weight: 600;
   place-items: center;
+}
+
+.tryon-composer__result-error {
+  color: var(--color-error);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.tryon-composer__preview-overlay {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  background: rgba(4, 4, 4, 0.92);
+  backdrop-filter: blur(4px);
+  place-items: center;
+}
+
+.tryon-composer__preview-dialog {
+  display: grid;
+  position: relative;
+  width: min(920px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  grid-template-columns: minmax(0, 1fr) 240px;
+}
+
+.tryon-composer__preview-dialog > img {
+  width: 100%;
+  height: min(82vh, 860px);
+  object-fit: contain;
+  background: #050505;
+}
+
+.tryon-composer__preview-info {
+  display: flex;
+  justify-content: flex-end;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-6);
+}
+
+.tryon-composer__preview-info strong {
+  color: var(--color-text-primary);
+  font-size: 16px;
+}
+
+.tryon-composer__preview-info span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.tryon-composer__preview-close {
+  position: absolute;
+  z-index: 2;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: grid;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: rgba(10, 10, 10, 0.82);
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  place-items: center;
+}
+
+@media (max-width: 720px) {
+  .tryon-composer__preview-dialog {
+    grid-template-columns: 1fr;
+  }
+
+  .tryon-composer__preview-dialog > img {
+    height: min(72vh, 720px);
+  }
+
+  .tryon-composer__preview-info {
+    padding: var(--space-4);
+  }
 }
 </style>
