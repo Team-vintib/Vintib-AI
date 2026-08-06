@@ -345,6 +345,14 @@ const applyAuctionSnapshot = (snapshot: AuctionSnapshot | null) => {
       startedAuctionTitle.value = null
     }, 4000)
   }
+
+  // 낙찰(SUCCESS)되면 그 상품은 즉시 SOLD가 되므로 상품 큐에도 바로 반영한다.
+  if (snapshot && snapshot.status === 'SUCCESS' && live.value) {
+    const soldProduct = live.value.products.find((product) => product.id === snapshot.productId)
+    if (soldProduct) {
+      soldProduct.saleStatus = 'SOLD'
+    }
+  }
 }
 
 const closeAuctionResult = () => {

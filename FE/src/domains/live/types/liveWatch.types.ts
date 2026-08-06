@@ -15,6 +15,14 @@ export type LiveWatchMockScenario =
 
 export type LiveProductSaleType = 'AUCTION' | 'DIRECT_SALE'
 
+// BE SaleStatus (docs/requests/FE/035 §3-1) — 라이브 상품 응답에도 이 값이 실려 온다.
+export type LiveProductSaleStatus =
+  | 'DRAFT'
+  | 'ON_SALE'
+  | 'AUCTION_SCHEDULED'
+  | 'AUCTION_IN_PROGRESS'
+  | 'SOLD'
+
 export interface LiveWatchProduct {
   id: number
   title: string
@@ -22,6 +30,7 @@ export interface LiveWatchProduct {
   price: number | null
   thumbnailUrl: string | null
   saleType: LiveProductSaleType | null
+  saleStatus: LiveProductSaleStatus | null
   material: string | null
   condition: string | null
   measurements: string | null
@@ -67,6 +76,7 @@ export interface LiveProductDto {
   brandName?: string | null
   price?: number | null
   saleType?: LiveProductSaleType | null
+  saleStatus?: LiveProductSaleStatus | null
   conditionGrade?: string | null
   thumbnailUrl?: string | null
   sortOrder: number
