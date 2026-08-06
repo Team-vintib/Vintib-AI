@@ -8,6 +8,7 @@ import {
 } from '@/domains/auction/api/auctionApi'
 import LiveAuctionPanel from '@/domains/auction/components/LiveAuctionPanel.vue'
 import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
+import LiveAuctionStartOverlay from '@/domains/auction/components/LiveAuctionStartOverlay.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
 import { LiveRealtimeClient } from '@/domains/live/api/liveRealtimeClient'
@@ -80,6 +81,9 @@ const auctionSnapshot = ref<AuctionSnapshot | null>(null)
 const isAuctionLoading = ref(false)
 const auctionLoadError = ref('')
 const dismissedAuctionResultId = ref<number | null>(null)
+const announcedAuctionId = ref<number | null>(null)
+const startedAuctionTitle = ref<string | null>(null)
+let startNoticeTimer: number | undefined
 const apiEnabled = isLiveWatchApiEnabled()
 
 const loadHostFollowState = async (hostId: number) => {
@@ -308,6 +312,8 @@ const loadAuction = async (liveId: number) => {
     const snapshot = await getCurrentAuction(liveId)
     if (live.value?.id === liveId) {
       auctionSnapshot.value = snapshot
+      // 접속 시점에 이미 진행 중인 경매는 '시작 알림'을 띄우지 않는다(이미 announced 처리).
+      announcedAuctionId.value = snapshot?.status === 'RUNNING' ? snapshot.auctionId : null
     }
   } catch (error) {
     if (live.value?.id === liveId) {
@@ -326,10 +332,28 @@ const applyAuctionSnapshot = (snapshot: AuctionSnapshot | null) => {
   auctionSnapshot.value = snapshot
   auctionLoadError.value = ''
 
+  // 경매가 새로 시작(RUNNING)되면 시청자에게 팝업으로 알린다.
+  if (
+    snapshot &&
+    snapshot.status === 'RUNNING' &&
+    snapshot.auctionId !== announcedAuctionId.value
+  ) {
+    announcedAuctionId.value = snapshot.auctionId
+    startedAuctionTitle.value = snapshot.productTitle || '상품'
+    window.clearTimeout(startNoticeTimer)
+    startNoticeTimer = window.setTimeout(() => {
+      startedAuctionTitle.value = null
+    }, 4000)
+  }
 }
 
 const closeAuctionResult = () => {
   dismissedAuctionResultId.value = auctionSnapshot.value?.auctionId ?? null
+}
+
+const dismissAuctionStart = () => {
+  window.clearTimeout(startNoticeTimer)
+  startedAuctionTitle.value = null
 }
 
 const showLeaveConfirm = ref(false)
@@ -524,6 +548,7 @@ const elapsedTimer = window.setInterval(() => {
 onBeforeUnmount(() => {
   loadRequestId += 1
   window.clearInterval(elapsedTimer)
+  window.clearTimeout(startNoticeTimer)
   clearRealtimeSubscriptions()
 })
 </script>
@@ -623,6 +648,12 @@ onBeforeUnmount(() => {
               :winning-bid="auctionWin.winningBid"
               :product-title="auctionWin.productTitle"
               @close="closeAuctionResult"
+            />
+
+            <LiveAuctionStartOverlay
+              v-if="startedAuctionTitle"
+              :product-title="startedAuctionTitle"
+              @close="dismissAuctionStart"
             />
           </div>
 
