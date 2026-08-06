@@ -13,14 +13,15 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-// 생성(POST) 엔드포인트는 없다 — AI 시착 합성 계약이 아직 없어 이 범위에서는
-// 저장/조회/삭제만 다룬다 (.claude/requests/ai/001-tryon-result-contract.md 참고).
 // 경로는 APIs.md의 `/users/{id}/tryons` 스펙을 그대로 따른다(userId/id 두 path variable을
 // 구분해야 해서 바깥쪽을 {userId}로 표기 — 같은 문서의 /users/{userId}/wishes/{id}와 동일한 표기 관례).
 @Tag(name = "AI 가상 시착(TryOns)", description = "시착 결과 조회/삭제 API")
@@ -30,6 +31,27 @@ import org.springframework.web.bind.annotation.RestController;
 public class TryOnController {
 
     private final TryOnResultService tryOnResultService;
+
+    @Operation(
+            summary = "시착 생성",
+            description = "상품 사진 + 본인 시착 프로필 사진으로 AI 시착 job을 접수한다(비동기). "
+                    + "완료 여부는 상세 조회(GET /{id})로 폴링해서 확인한다. "
+                    + "시착 프로필 사진이 등록돼 있지 않으면 실패한다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "접수 성공(status=PENDING)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "시착 프로필 사진 미등록 또는 상품 대표 이미지 없음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자로 요청"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "AI 서버 호출 실패")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @PostMapping
+    public ResponseEntity<ApiResponse<TryOnResultResponse>> createResult(
+            Authentication authentication, @PathVariable Long userId, @RequestParam Long productId) {
+        requireSelf(authentication, userId);
+        TryOnResultResponse response = tryOnResultService.createResult(userId, productId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
 
     @Operation(
             summary = "시착 결과 목록 조회",

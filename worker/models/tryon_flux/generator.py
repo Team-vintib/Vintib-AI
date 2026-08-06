@@ -52,15 +52,30 @@ class Flux2KleinGenerator(WornReferenceGenerator):
     def _load(self):
         import torch
         from diffusers import Flux2KleinPipeline, Flux2Transformer2DModel, GGUFQuantizationConfig
-        from transformers import AutoModelForCausalLM, BitsAndBytesConfig
+        from transformers import AutoModelForCausalLM
 
-        quant_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16)
-        text_encoder = AutoModelForCausalLM.from_pretrained(
-            self._config["model_id"],
-            subfolder="text_encoder",
-            quantization_config=quant_config,
-            torch_dtype=torch.bfloat16,
-        )
+        # 텍스트 인코더 4bit 양자화도 매번 다시 계산하면 느리다 -- 최초 1회만 계산해
+        # quant_cache에 저장해두고 그다음부터는 재계산 없이 로드한다(CH022, quality_vlm/
+        # loader.py의 load_qwen_vl()과 동일 패턴). transformer(GGUF)는 이미 사전 양자화된
+        # 포맷이라 이 최적화 대상이 아니다.
+        from quant_cache import cached_path, is_cached
+
+        text_encoder_cache = cached_path(self._config["model_id"], subfolder="text_encoder")
+        if is_cached(text_encoder_cache):
+            text_encoder = AutoModelForCausalLM.from_pretrained(
+                str(text_encoder_cache), torch_dtype=torch.bfloat16
+            )
+        else:
+            from transformers import BitsAndBytesConfig
+
+            quant_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16)
+            text_encoder = AutoModelForCausalLM.from_pretrained(
+                self._config["model_id"],
+                subfolder="text_encoder",
+                quantization_config=quant_config,
+                torch_dtype=torch.bfloat16,
+            )
+            text_encoder.save_pretrained(str(text_encoder_cache))
         transformer = Flux2Transformer2DModel.from_single_file(
             self._config["transformer_gguf_url"],
             config=self._config["model_id"],
@@ -94,10 +109,18 @@ class Flux2KleinGenerator(WornReferenceGenerator):
     def unload(self):
         """스테이지 종료 후 VRAM을 CatVTON에 넘겨주기 위해 명시적으로 해제한다 —
         VLM+FLUX+CatVTON을 한 프로세스에서 순차로 돌리는 전제(동시 상주 아님,
-        AI/docs/tryon-advancement-strategy.md §10 프로덕션 반영 절 참고)."""
+        AI/docs/tryon-advancement-strategy.md §10 프로덕션 반영 절 참고).
+
+        `enable_model_cpu_offload()`가 건 accelerate 훅이 파이프라인과 참조 순환을
+        만들어서, gc.collect() 없이 empty_cache()만 부르면 VRAM이 실제로는 반환되지
+        않는다(다음 단계 VLM 4bit 로딩이 그만큼 못 들어가 CPU/disk 오프로드 에러로
+        이어짐 -- 실측으로 확인)."""
+        import gc
+
         import torch
 
         self._pipe = None
+        gc.collect()
         torch.cuda.empty_cache()
 
 

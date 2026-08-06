@@ -23,6 +23,7 @@ TRYON_VLM_BACKEND=qwen3_vl TRYON_FLUX_BACKEND=flux2_klein python tryon_worker_ex
 설계: `.claude/plans/ai/CH019-tryon-worker-promotion.md`
 """
 
+import gc
 import os
 import sys
 
@@ -114,7 +115,15 @@ class TryonWorker(BaseWorker):
         self._flux_generator = None
 
     def _ensure_catvton_loaded(self):
-        """모델은 워커 프로세스당 한 번만 로드한다 (매 job마다 로드하면 너무 느림)."""
+        """CatVTON은 4단계(합성) 직전에만 로드하고, 그 job이 끝나면 `_unload_catvton()`으로
+        바로 내린다 -- VLM/FLUX 단계 동안은 GPU를 비워두기 위함이다.
+
+        예전엔 워커 프로세스당 한 번만 로드해 계속 상주시켰는데(재로드 비용 절감 목적),
+        그러면 이 파일 맨 위 설계 의도("세 모델은 동시에 상주하지 않는다")와 실제로
+        어긋난다 -- CatVTON이 상주한 채로 VLM/FLUX가 그 위에 얹히는 상태가 된다. 6GB급
+        GPU에서 VLM(4bit) 로딩이 그걸로 VRAM 부족에 걸려 실측으로 확인했다. 매 job마다
+        다시 로드하는 재로드 비용(수십 초)보다 VRAM 여유가 우선이라 이렇게 바꾼다.
+        """
         if self._pipeline is not None:
             return
 
@@ -143,6 +152,17 @@ class TryonWorker(BaseWorker):
         )
         print(f"[{self.worker_id}] CatVTON 파이프라인 로딩 완료")
 
+    def _unload_catvton(self):
+        if self._pipeline is None:
+            return
+        self._pipeline = None
+        self._automasker = None
+        self._mask_processor = None
+        # AutoMasker(DensePose/SCHP)와 diffusers 파이프라인이 참조 순환을 만들 수 있어
+        # gc.collect()로 먼저 끊어야 empty_cache()가 실제로 VRAM을 반환한다.
+        gc.collect()
+        torch.cuda.empty_cache()
+
     def _ensure_vlm_loaded(self):
         """describer와 달리 실패해도 mock으로 폴백하지 않는다 -- 캡션은 이 파이프라인의
         1단계라 실패하면 job 전체가 실패하는 게 맞다(캡션 없이 뒤 단계를 진행할 수 없음)."""
@@ -157,6 +177,9 @@ class TryonWorker(BaseWorker):
         if self._vlm_bundle is None:
             return
         self._vlm_bundle = None
+        # bitsandbytes 4bit 양자화 + accelerate device_map="auto" 훅이 참조 순환을 만든다 --
+        # gc.collect() 없이 empty_cache()만 부르면 VRAM이 실제로는 반환되지 않는다.
+        gc.collect()
         torch.cuda.empty_cache()
 
     def _caption_garment(self, cloth_image: Image.Image) -> str:
@@ -209,8 +232,6 @@ class TryonWorker(BaseWorker):
 
         AI는 이 값들을 BE에 재조회하지 않고 payload로 받은 그대로 쓴다.
         """
-        self._ensure_catvton_loaded()
-
         mask_type = payload.get("mask_type", "upper")
         if mask_type not in ("upper", "lower"):
             raise ValueError(f"지원하지 않는 mask_type: {mask_type}")
@@ -264,28 +285,36 @@ class TryonWorker(BaseWorker):
         # --- 4단계: CatVTON 합성 (worn-reference-as-person) ---------------------
         # image=worn-reference, condition_image=실제 상품 사진 -- 마스크를
         # worn-reference에서 새로 계산해 그래픽/색상 정확도를 확보한다(§10.2).
-        generator = torch.Generator(device="cuda").manual_seed(42)
+        # VLM/FLUX가 끝난 지금에야 로드한다 -- 그 두 단계 동안은 GPU에 CatVTON이 없어야
+        # 6GB급 GPU에서도 VLM(4bit)이 온전히 들어간다. job이 끝나면(성공/실패 무관)
+        # 바로 언로드해서 다음 job의 VLM 단계에 다시 영향 주지 않는다.
+        try:
+            self._ensure_catvton_loaded()
 
-        mask_result = self._automasker(worn_reference, mask_type=mask_type, fit_type=fit_type)
-        mask = mask_result["mask"]
-        mask = self._mask_processor.blur(mask, blur_factor=2)
+            generator = torch.Generator(device="cuda").manual_seed(42)
 
-        result_image = self._pipeline(
-            image=worn_reference,
-            condition_image=cloth_image,
-            mask=mask,
-            num_inference_steps=num_inference_steps,
-            guidance_scale=guidance_scale,
-            generator=generator,
-        )[0]
-        result_image = composite_with_original(worn_reference, result_image, mask)
+            mask_result = self._automasker(worn_reference, mask_type=mask_type, fit_type=fit_type)
+            mask = mask_result["mask"]
+            mask = self._mask_processor.blur(mask, blur_factor=2)
 
-        image_url = upload_image(result_image, prefix="tryon-results")
+            result_image = self._pipeline(
+                image=worn_reference,
+                condition_image=cloth_image,
+                mask=mask,
+                num_inference_steps=num_inference_steps,
+                guidance_scale=guidance_scale,
+                generator=generator,
+            )[0]
+            result_image = composite_with_original(worn_reference, result_image, mask)
 
-        # 마스크 시각화도 참고용으로 같이 업로드 (디버깅에 유용)
-        masked_worn_reference = vis_mask(worn_reference, mask)
-        mask_url = upload_image(masked_worn_reference, prefix="tryon-masks")
-        worn_reference_url = upload_image(worn_reference, prefix="tryon-worn-references")
+            image_url = upload_image(result_image, prefix="tryon-results")
+
+            # 마스크 시각화도 참고용으로 같이 업로드 (디버깅에 유용)
+            masked_worn_reference = vis_mask(worn_reference, mask)
+            mask_url = upload_image(masked_worn_reference, prefix="tryon-masks")
+            worn_reference_url = upload_image(worn_reference, prefix="tryon-worn-references")
+        finally:
+            self._unload_catvton()
 
         return {
             "image_url": image_url,

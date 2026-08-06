@@ -11,6 +11,7 @@ import type {
 } from '@/domains/product/types/productList.types'
 import type {
   AiQualityAnalysis,
+  ProductAiModelCut,
   ProductDetailViewData,
   SimilarProductPricePoint,
 } from '@/domains/product/types/productDetail.types'
@@ -112,6 +113,7 @@ interface ProductDetailDto extends ProductListDto {
   } | null
   similarProducts?: SimilarProductPricePoint[] | null
   aiQualityAnalysis?: AiQualityAnalysis | null
+  aiModelCut?: ProductAiModelCut | null
   updatedAt: string
 }
 
@@ -264,6 +266,27 @@ export const getProductPrimaryImageUrl = async (productId: number) => {
   const product = unwrapApiData(response.data)
 
   return getPrimaryImageUrl(product)
+}
+
+export interface ProductAiModelCutStatusDto {
+  status: 'NONE' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+  imageUrl: string | null
+}
+
+// 등록 시 켠 AI 착용컷의 생성 상태/결과를 조회한다(docs/requests/BE/039). 완료 화면에서
+// 폴링용으로 쓴다 — mock 모드에서는 이 기능 자체가 없으니 즉시 NONE으로 응답한다.
+export const getProductAiModelCutStatus = async (
+  productId: number,
+): Promise<ProductAiModelCutStatusDto> => {
+  if (!PRODUCT_API_ENABLED) {
+    return { status: 'NONE', imageUrl: null }
+  }
+
+  const response = await http.get<ApiResponse<ProductAiModelCutStatusDto>>(
+    `/products/${productId}/ai-model-cut`,
+  )
+
+  return unwrapApiData(response.data)
 }
 
 // 미낙찰 상품 처리(440) — 상품을 상시 판매(가격 지정)로 전환하거나 경매 예정으로 되돌린다.
@@ -556,6 +579,7 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
         description: '',
       })),
     aiQualityAnalysis: product.aiQualityAnalysis ?? null,
+    aiModelCut: product.aiModelCut ?? null,
   }
 }
 
