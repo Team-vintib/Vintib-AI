@@ -120,7 +120,7 @@ onBeforeUnmount(() => {
         <li v-for="result in filteredResults" :key="result.id">
           <button type="button" class="tryon-results__card" @click="openDetail(result)">
             <span class="tryon-results__thumb">
-              <img :src="result.imageUrl" :alt="`시착 결과 ${result.id}`" />
+              <img :src="result.imageUrl ?? undefined" :alt="`시착 결과 ${result.id}`" />
             </span>
             <span class="tryon-results__meta">
               <span v-if="result.category" class="tryon-results__badge">{{ result.category }}</span>
@@ -154,7 +154,7 @@ onBeforeUnmount(() => {
           ×
         </button>
         <div class="tryon-results__detail-image">
-          <img :src="selectedResult.imageUrl" :alt="`시착 결과 ${selectedResult.id} 확대`" />
+          <img :src="selectedResult.imageUrl ?? undefined" :alt="`시착 결과 ${selectedResult.id} 확대`" />
         </div>
         <div class="tryon-results__detail-info">
           <p class="tryon-results__detail-date">
