@@ -139,12 +139,21 @@ DEFAULT_MIN_CONFIDENCE = 0.5  # 5-way 균등 기준선(0.2)의 2.5배. 근거 �
 # 벤치마크상 8B(114 tok/s)와 30B-A3B(110.8 tok/s)의 생성 속도가 거의 같다(MoE라 토큰당
 # 실제 활성 파라미터는 ~3B뿐이라서다). 즉 속도 손해는 미미한데 총 파라미터·표현력은
 # 훨씬 커서, "정확도 vs 속도" 트레이드오프에서 8B보다 순수하게 더 나은 선택이다.
-# 다만 총 가중치는 30B라 로드에는 그만큼 VRAM이 든다 — --quantization none이면
-# ~30GB대(FP8 리포 "Qwen/Qwen3-VL-30B-A3B-Instruct-FP8"를 쓰면 비슷한 수준), GPU가
-# 그보다 작으면 커뮤니티 4bit AWQ 리포("QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ",
-# --quantization none으로 쓸 것 — 리포 자체가 이미 양자화됨, `pip install autoawq` 필요)를
-# 대신 쓴다. MoE 로딩은 `_load_qwen_vl_bundle()`이 별도로 처리한다(아래 참고) — dense
-# 전용인 quality_vlm/loader.py는 무수정이다.
+# 다만 VRAM은 총 가중치(30B) 기준으로 든다 — MoE는 토큰당 활성 파라미터만 적을 뿐,
+# 전체 전문가 가중치가 다 GPU에 상주해야 한다. bf16 풀로드(~60GB)는 47GB급 단일 GPU
+# (예: L40S)에도 안 들어간다. **공식 FP8 체크포인트
+# ("Qwen/Qwen3-VL-30B-A3B-Instruct-FP8")는 확인 결과 transformers로 직접 못 싣는다**
+# (2026-08, HF 모델 카드: vLLM/SGLang 전용, transformers 미지원) — --model-id에 이
+# 리포를 쓰지 말 것. 대신:
+#   - **VRAM 30GB 안팎 여유(L40S 47.7GB 등)면 --quantization 8bit를 쓴다** — bitsandbytes
+#     int8로 로드 시점에 양자화한다(추가 설치 불필요, 4bit 브랜치와 같은 bitsandbytes
+#     재사용). 4bit보다 정밀도 손실이 훨씬 적으면서도 원본 30B bf16(~60GB)보다 절반
+#     이하 VRAM만 쓴다 — "정확도 vs 속도"에서 굳이 4bit까지 내려갈 필요가 없을 때 최선.
+#   - VRAM이 그보다 더 빠듯하면 --quantization 4bit(기본값, bitsandbytes nf4) 또는
+#     커뮤니티 4bit AWQ 리포("QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ",
+#     --quantization none으로 쓸 것 — 리포 자체가 이미 양자화됨, `pip install autoawq` 필요)를
+#     쓴다. MoE 로딩은 `_load_qwen_vl_bundle()`이 별도로 처리한다(아래 참고) — dense
+#     전용인 quality_vlm/loader.py는 무수정이다.
 QWEN3_VL_MODEL_ID = "Qwen/Qwen3-VL-4B-Instruct"
 
 
@@ -304,11 +313,22 @@ def _load_qwen_vl_bundle(model_id: str, quantization: str):
         model = Qwen3VLMoeForConditionalGeneration.from_pretrained(
             model_id, quantization_config=quant_config, device_map="auto"
         )
+    elif quantization == "8bit":
+        # 4bit보다 정밀도 손실이 적으면서(bitsandbytes int8, 추가 설치 불필요) 원본
+        # bf16(~60GB, 30B-A3B 기준) 절반 이하 VRAM만 쓴다 — VRAM 30GB 안팎 여유가 있는
+        # GPU(L40S 47.7GB 등)에서 4bit 대신 쓰기 좋다.
+        from transformers import BitsAndBytesConfig
+
+        quant_config = BitsAndBytesConfig(load_in_8bit=True)
+        model = Qwen3VLMoeForConditionalGeneration.from_pretrained(
+            model_id, quantization_config=quant_config, device_map="auto"
+        )
     elif quantization == "none":
-        # `-FP8`/`-AWQ` 접미사가 붙은 체크포인트(예: Qwen/Qwen3-VL-30B-A3B-Instruct-FP8,
-        # QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ)는 리포 자체가 이미 양자화돼 있다 —
-        # 그런 리포에는 항상 이 분기(quantization="none")를 쓴다. AWQ 리포는
-        # `pip install autoawq`가 추가로 필요하다.
+        # `-AWQ` 접미사가 붙은 체크포인트(예: QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ)는
+        # 리포 자체가 이미 양자화돼 있다 — 그런 리포에는 항상 이 분기(quantization="none")를
+        # 쓴다. AWQ 리포는 `pip install autoawq`가 추가로 필요하다. 주의: 공식 FP8
+        # 체크포인트("-FP8" 접미사)는 여기 해당하지 않는다 — transformers가 아직 직접
+        # 로딩을 지원하지 않는다(2026-08 기준 vLLM/SGLang 전용, HF 모델 카드 확인).
         model = Qwen3VLMoeForConditionalGeneration.from_pretrained(
             model_id, dtype="auto", device_map="auto"
         )
@@ -411,18 +431,20 @@ def main(argv: list[str] | None = None) -> int:
         default=QWEN3_VL_MODEL_ID,
         help="qwen3_vl 전용. 기본은 4B(항상 안전). GPU가 널널하면 "
         "'Qwen/Qwen3-VL-30B-A3B-Instruct'를 권장 — 실측 벤치마크상 8B와 생성 속도가 "
-        "거의 같은데(MoE, 토큰당 활성 파라미터 ~3B) 총 표현력은 훨씬 크다. VRAM이 더 "
-        "빠듯하면 'Qwen/Qwen3-VL-30B-A3B-Instruct-FP8'(공식 FP8) 또는 "
+        "거의 같은데(MoE, 토큰당 활성 파라미터 ~3B) 총 표현력은 훨씬 크다. VRAM이 "
+        "30GB 안팎 여유(L40S 47.7GB 등)면 --quantization 8bit와 같이 쓴다. 공식 FP8 리포는 "
+        "transformers 미지원이라 쓰지 말 것 — VRAM이 더 빠듯하면 "
         "'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ'(커뮤니티 4bit, --quantization none과 "
-        "같이 쓸 것)를 대신 쓴다",
+        "같이 쓸 것, `pip install autoawq` 필요)를 대신 쓴다",
     )
     parser.add_argument(
         "--quantization",
-        choices=("4bit", "none"),
+        choices=("4bit", "8bit", "none"),
         default="4bit",
-        help="qwen3_vl 전용. 'none'이면 그대로 로드(FP8/AWQ처럼 리포 자체가 이미 양자화된 "
-        "체크포인트는 항상 이 값을 쓴다). '4bit'는 로드 시점에 bitsandbytes로 양자화한다 "
-        "(원본이 아직 안 양자화된 체크포인트에만 의미가 있다). 기본은 로컬 8GB급 GPU "
+        help="qwen3_vl 전용. 'none'이면 그대로 로드(AWQ처럼 리포 자체가 이미 양자화된 "
+        "체크포인트는 항상 이 값을 쓴다). '4bit'/'8bit'는 로드 시점에 bitsandbytes로 "
+        "양자화한다(원본이 아직 안 양자화된 체크포인트에만 의미가 있다) — '8bit'가 "
+        "정밀도 손실이 더 적으니 VRAM 여유가 있으면 '8bit'를 쓴다. 기본은 로컬 8GB급 GPU "
         "기준 4bit(quality_vlm/loader.py와 동일)",
     )
     parser.add_argument(
