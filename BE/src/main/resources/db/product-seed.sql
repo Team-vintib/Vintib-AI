@@ -607,4 +607,404 @@ INSERT INTO product (
         'A', 'XS', 'WHITE', 'Cotton',
         'DIRECT_SALE', 'ON_SALE', 60000, false, NULL,
         NOW(), NOW()
+    ),
+    -- 61. 마제스틱 웜업 L
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'JACKET' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'OUTER' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '마제스틱 웜업 L', '신중하게 구매해주세요.',
+        'A', 'L', 'BLACK', '폴리에스터 100%',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 62. 마제스틱 자켓 켄터키 와일드캣츠 L
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'JACKET' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'OUTER' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '마제스틱 자켓 켄터키 와일드캣츠 L', '신중히 고민해보시고 구매 부탁드립니다. 빈티지 제품이라 생활감 있습니다!',
+        'B', 'L', 'BLUE', NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 63. 마제스틱 세튼홀 파이러츠 NCAA 자켓
+    (
+        (SELECT id FROM member WHERE email = 'vintib3@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'JACKET' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'OUTER' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '마제스틱 세튼홀 파이러츠 NCAA 자켓', '이베이 구매.',
+        'A', 'L', 'BLUE', '면 100%',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 64. 마제스틱 브랜드의 la에인절스 자켓 L
+    (
+        (SELECT id FROM member WHERE email = 'vintib4@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'JACKET' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'OUTER' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '마제스틱 브랜드의 la에인절스 자켓 L', '마제스틱 브랜드의 la에인절스 자켓입니다. 평소 응원하던 팀이라 구매했는 데 옷이 생각보다 작게 나와서 판매합니다. L로 표기되어 있지만 95 입으시는 분들이 입으면 정말 이쁜 핏이 나올 것 같습니다! 상태 좋습니다 사이즈 체크만 했어요~ 가격제안 ok.',
+        'S', 'L', 'RED', NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 65. 네이버후드 퍼블릭에너미 마제스틱 자켓 L size
+    (
+        (SELECT id FROM member WHERE email = 'vintibb1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'JACKET' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'OUTER' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '네이버후드 퍼블릭에너미 마제스틱 자켓 L size', '네이버후드와 퍼블릭에너미 콜라보 자켓 L사이즈입니다. 마제스틱 자켓 디자인, 전면/후면/소매 자수 포인트, 내부 퀼팅 보온성, 네이버 후드 로고 각인 스냅 버튼, ykk 스냅 사용, 드라이 완료. 좋은 상태 유지중입니다. 실측: 총장 71/ 어깨 57.5 / 가슴 68 / 소매 66.5',
+        'A', 'L', 'BLACK', '나일론, 폴리에스터',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 66. (S+급/실측 105) 루이비통 슈프림 맨투맨 백화점판 한글택 M사이즈
+    (
+        (SELECT id FROM member WHERE email = 'vintibb2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'SWEATSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '(S+급/실측 105) 루이비통 슈프림 맨투맨 백화점판 한글택 M사이즈', '저희 샵은 3호점을 보유한 남성 전문 의류 업체입니다. 루이비통 슈프림 맨투맨 백화점판 한글택. 루이비통 택 동봉. M size (실측 105정도). 상점 팔로잉 해주시면 배송비도 무료입니다!',
+        'S', 'M', 'RED', '면 100%',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 67. 슈프림 요지야마모토 맨투맨
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'SWEATSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '슈프림 요지야마모토 맨투맨', '라지. 사용감 적어요. 실측: 총장 73 너비 66',
+        'A', 'L', 'BLACK', NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 68. 슈프림X언더커버 곰돌이 맨투맨 블랙(L)
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'SWEATSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '슈프림X언더커버 곰돌이 맨투맨 블랙(L)', '제품명: 슈프림 언더커버 곰돌이 맨투맨 블랙. 사이즈: L(체감 105). 제품설명: 슈프림과 언더커버 콜라보 곰돌이 맨투맨입니다. 시보리 짱짱하고 눈에 띄는 데미지나 오염 없습니다. ※ 찔러보기, 네고 요청, 실측 요청 응답 안하고 차단 하겠습니다. 구매 원하시는 분만 연락 주세요.',
+        'A', 'L', 'BLACK', '면 100%',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 69. 루이비통 슈프림 슈이비통 로고 맨투맨
+    (
+        (SELECT id FROM member WHERE email = 'vintib3@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'SWEATSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '루이비통 슈프림 슈이비통 로고 맨투맨', 'S사이즈. 하자없이 새상품급 입니다. 사진 촬영 후 깨끗히 보관중인 제품입니다. 상점 팔로우 해주실 시 택배비 무료로 해드립니다. 거래 시 택포 . 에눌 가능합니다',
+        'S', 'S', 'RED', NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 70. 리바이스 Y2K 빈티지 카고 팬츠
+    (
+        (SELECT id FROM member WHERE email = 'vintib4@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'CARGO_PANTS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '리바이스 Y2K 빈티지 카고 팬츠', '총장 / 허리단면 / 밑위 / 허벅지단면 / 밑단 : 100 / 41 / 34 / 29 / 26. 택배비 4,000원 (제주도 7,000원). 상품은 스팀및 케어해서 보내드립니다. 빈티지 상품으로 교환 or 환불은 어렵습니다.',
+        'B', '32', 'KHAKI', '면 100%',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 71. 리바이스 화이트탭 505 커뮤터 라이딩 카고팬츠
+    (
+        (SELECT id FROM member WHERE email = 'vintibb1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'CARGO_PANTS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '리바이스 화이트탭 505 커뮤터 라이딩 카고팬츠', '얼룩있습니다! 사진 확인해주세요. 사이즈 (cm 기준) 허리단면 45 / 허벅지 단면 30 / 엉덩이 단면 54 / 총장 110. 안내사항: 측정 방법에 따라 1~3cm 정도 오차가 있을 수 있습니다. 단순 변심으로 인한 환불은 불가합니다. 중고 상품 특성상 사용감이 있습니다.',
+        'C', '34', 'KHAKI', NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 72. 리바이스 조거 카고바지
+    (
+        (SELECT id FROM member WHERE email = 'vintibb2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'JOGGER_PANTS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '리바이스 조거 카고바지', '남성용. 사이즈 L (32인치 전후). 고무밴딩에 끈 있어서 어느정도 사이즈조절 가능, 스판좋음. 하자없이 깨끗합니다. 색상은 브라운이며, 무난하게 코디하기 좋습니다. 편안하게 입을 수 있는 바지입니다.',
+        'A', 'L', 'BROWN', '면/스판덱스',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 73. 270 조던1 하이 헤리티지 빈티지 커스텀
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'SNEAKERS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'SHOES' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '270 조던1 하이 헤리티지 빈티지 커스텀', '딱 한번신은 상품입니다. 빈티지 커스텀 예쁘게 들어갔고 물에 닿거나 빨아도 지워지지 않는다고 합니다. 커스텀 비용은 20만원 이상 듭니다. 검은 스우시도 안쪽 측면까지 작업되어 있고 신발끈도 빈티지 커스텀에 맞게 염색되었습니다. 실물이 훨씬 예쁩니다.',
+        'S', '270', 'BLACK', NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 74. 나이키 에어조던1 레트로 하이 OG 브레드토 265
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'SNEAKERS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'SHOES' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '나이키 에어조던1 레트로 하이 OG 브레드토 265', '나이키 에어조던1 레트로 하이 OG 브레드토 입니다. 한정판 밤새 줄 서서 구매했었고, 몇 번 안 신어서 바닥 상태도 상급입니다. 사이즈는 265mm 이고, 신발 + 박스 구성입니다.',
+        'A', '265', 'RED', '소가죽, 합성피혁',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 75. 270)조던1 레트로 로우 OG 브레드 2015 새상품, 박스X
+    (
+        (SELECT id FROM member WHERE email = 'vintib3@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'SNEAKERS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'SHOES' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '270)조던1 레트로 로우 OG 브레드 2015 새상품, 박스X', '조던1 레트로 로우 OG 브레드 2015입니다. 착용 0회, 신발끈 맨 적 없는 새상품이구 박스는 없습니다... 급처여서 눈물 머금고.. 던집니다.....ㅜㅠ..',
+        'S', '270', 'BLACK', NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 76. 나이키 260 조던1 미드 브레드토 노블레드
+    (
+        (SELECT id FROM member WHERE email = 'vintib4@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'SNEAKERS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'SHOES' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '나이키 260 조던1 미드 브레드토 노블레드', '쿠션감좋고 상태좋아요. 모든상품 조명에따라 차이가있을수있습니다. 교환환불 불가합니다. 신중하게 구매결정하시길 바랍니다. 신발 단품 입니다.',
+        'A', '260', 'RED', '가죽',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 77. [새상품] 어티슈 윙 캡 블랙
+    (
+        (SELECT id FROM member WHERE email = 'vintibb1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'HAT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'ACCESSORY' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '[새상품] 어티슈 윙 캡 블랙', '성수 젠틀몬스터 신사옥에서 구매 후 잠깐 착용하고 손이 안 가서 판매합니다.',
+        'S', 'FREE', 'BLACK', '면 100%',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 78. eou 페이크 러너 볼캡 블루
+    (
+        (SELECT id FROM member WHERE email = 'vintibb2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'HAT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'ACCESSORY' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        'eou 페이크 러너 볼캡 블루', 'eou 페이크 러너 볼캡 블루입니다. 전면 입체 빈티지 폰트 자수와 로프 디테일, 챙 부분 지그재그 자수까지 디테일이 좋은 모자입니다. 시원한 블루 컬러와 메쉬 소재 조합. 뒷부분이 스트링과 스토퍼로 조절하는 방식. 내부 오염 방지 캡 가이드(종이)까지 그대로 보관 중인 컨디션입니다.',
+        'S', 'FREE', 'BLUE', NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 79. 빈티지 에스닉 보헤미안 파우치 J03737
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'POUCH' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BAG' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '빈티지 에스닉 보헤미안 파우치 J03737', '가로19cm x 세로14~15cm. Condition: 8.5. 빈티지 특성상 오염이 존재할 수 있습니다. 상태에 예민하신 분은 구매를 피해주시면 감사드리겠습니다. 구매 후 교환 및 환불은 어렵습니다.',
+        'A', 'FREE', 'MIXED', '면 혼방',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 80. 은색 오르비 로고 비비안 웨스트우드 빈티지 오르비 플레이트 버클 웹 벨트
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'BELT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'ACCESSORY' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '비비안 웨스트우드 빈티지 오르비 플레이트 버클 웹 벨트', '은색 오르비(Orb) 로고 각인이 들어간 비비안 웨스트우드 빈티지 벨트입니다. 연한 블루-그레이 컬러의 패브릭 스트랩에 핑크 컬러 레터링 자수 디테일이 들어간 2000년대(Y2K) 빈티지 희귀템입니다.',
+        'A', 'FREE', 'GRAY', NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 81. Wknd project 오버링 빈티지 레더 벨트 엘씨디씨 로우클래식
+    (
+        (SELECT id FROM member WHERE email = 'vintib3@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'BELT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'ACCESSORY' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        'Wknd project 오버링 빈티지 레더 벨트 엘씨디씨 로우클래식', '1회착용 입니다. 스타일 바뀌어 판매합니다.',
+        'S', 'FREE', 'BROWN', '천연가죽',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 82. RRL 더블알엘 헤링본 올인원 올리브 점프수트
+    (
+        (SELECT id FROM member WHERE email = 'vintib4@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'JUMPSUIT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'DRESS_JUMPSUIT' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        'RRL 더블알엘 헤링본 올인원 올리브 점프수트', 'RRL 올리브 헤링본 원단 점프수트입니다. M사이즈 어깨48 품57 허리52. 국내 100정도 사이즈입니다만 실측으로 확인 부탁드립니다. 10회 미만착용으로 사용감있지만 좋은 컨디션입니다.',
+        'A', 'M', 'GREEN', NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 83. RRL 더블알엘 헤링본 팬츠 브루스터 그린 32/32
+    (
+        (SELECT id FROM member WHERE email = 'vintibb1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'COTTON_PANTS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        'RRL 더블알엘 헤링본 팬츠 브루스터 그린 32/32', 'RRL 헤링본 팬츠 브루스터 그린 색상이에요. 사이즈는 32/32이며, 택 달린 미시착 새상품입니다. 기장을 잘못보고 사서 빠르게 판매하기위해 1만원 인하해서 판매해요.',
+        'S', '32', 'GREEN', '면 100%',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 84. 더블알엘 헤링본 퍼티그 팬츠 32x30
+    (
+        (SELECT id FROM member WHERE email = 'vintibb2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'CARGO_PANTS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '더블알엘 헤링본 퍼티그 팬츠 32x30', '작년에 구매해서 대략 7~8회 착용, 3회 세탁, 노수선. 실측 허리44.5, 총장102 어드저스트하면 허리 1인치 정도는 줄어듭니다. 원래 빈티지한 부분 외에 하자나 오염 없습니다. 반품 불가 입니다.',
+        'A', '32', 'GREEN', '면 100%',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 85. [32x30 최상] RRL p44 카고 팬츠 올리브 몽키팬츠
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'CARGO_PANTS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '[32x30 최상] RRL p44 카고 팬츠 올리브 몽키팬츠', '더블알엘 p44 카고팬츠 몽키팬츠 올리브 32x30. 실착 5회, 사진 참고해주세요. 네고 답장 안 합니다. 교환 환불 x',
+        'S', '32', 'GREEN', NULL,
+        'DIRECT_SALE', 'ON_SALE', 395000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 86. 빈티지 엑시즈팜 세일러 마린 미니 원피스
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DRESS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'DRESS_JUMPSUIT' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
+        NULL,
+        '빈티지 엑시즈팜 세일러 마린 미니 원피스', '1회 착용. 여름에 시원한 느낌으로 입을 수 있는 디자인입니다. 잔보풀감, 스카프 어깨부분 미세 올나감 있음. 교환/환불 불가합니다. 신중하게 고민하신 후 구매 부탁드려요!',
+        'C', 'FREE', NULL, NULL,
+        'DIRECT_SALE', 'ON_SALE', 9000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 87. [36x32] RRL 헤링본 퍼티그 팬츠
+    (
+        (SELECT id FROM member WHERE email = 'vintib3@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'CARGO_PANTS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '[36x32] RRL 헤링본 퍼티그 팬츠', '몇 번 안 입은 상태 좋은 바지입니다. 노수선 노세탁 비흡연자입니다. 중고 물품 특성상 반품 안 됩니다.',
+        'A', '36', NULL, NULL,
+        'DIRECT_SALE', 'ON_SALE', 350000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 88. 프랑스 핸드메이드 빈티지 입체 절개 A라인 울 원피스
+    (
+        (SELECT id FROM member WHERE email = 'vintib4@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DRESS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'DRESS_JUMPSUIT' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
+        NULL,
+        '프랑스 핸드메이드 빈티지 입체 절개 A라인 울 원피스', '프랑스 디자이너의 핸드메이드 제작 제품으로, 섬세한 패턴과 입체적인 절개 라인이 돋보이는 원피스입니다. 깔끔하게 떨어지는 A라인 실루엣과 보트넥 디자인이 단정하면서도 세련된 분위기를 연출해 드리며, 유행에 구애받지 않고 오래도록 즐기실 수 있는 아이템입니다. 울 소재로 보온성을 챙겼으며, 폴라와 매치하셔도 잘 어우러집니다. 가슴단면42~52(신축성) 총장94.',
+        'A', 'FREE', NULL, '울',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 89. 모리걸 플라워 반팔 원피스 <일본 빈티지 제품>
+    (
+        (SELECT id FROM member WHERE email = 'vintibb1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DRESS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'DRESS_JUMPSUIT' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
+        NULL,
+        '모리걸 플라워 반팔 원피스 일본 빈티지', '일본 빈티지 제품. 총장:75 어깨단면:40 가슴단면:44 소매길이:26 암홀단면:20 밑단단면:59. 신축성 있음. 신중한 구매 부탁드려요.',
+        'A', 'FREE', NULL, NULL,
+        'DIRECT_SALE', 'ON_SALE', 15000, false, NULL,
+        NOW(), NOW()
+    ),  
+    -- 90. 입생로랑(Yves Saint Laurent) 빈티지 원피스 M
+    (
+        (SELECT id FROM member WHERE email = 'vintibb2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DRESS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'DRESS_JUMPSUIT' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
+        NULL,
+        '입생로랑(Yves Saint Laurent) 빈티지 원피스 M', '입생로랑 빈티지 원피스 M. 안쪽에 오염이 있으나 전반적으로 상태 양호합니다. 총장: 113.5 어깨: 33 가단: 42. 가격제안 얼마든지 주세요. 교환/환불 안됩니다.',
+        'B', 'M', NULL, NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 91. 빈티지 코지, 모리, 히피 롱원피스
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'DRESS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'DRESS_JUMPSUIT' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
+        NULL,
+        '빈티지 코지, 모리, 히피 롱원피스', '휴양지느낌이 물씬나는 보헤미안st원피스입니다. 화려한패턴에 금박과 레이스포인트 동남아휴양지룩으로 강추. 어깨끈조절가능 가단29~53cm 어깨끈 제외 총장 91cm.',
+        'A', 'FREE', NULL, NULL,
+        'DIRECT_SALE', 'ON_SALE', 20000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 92. me ISSEY MIYAKE sleeveless 3
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'SLEEVELESS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
+        (SELECT id FROM brand WHERE name_en = 'Issey Miyake'),
+        'me ISSEY MIYAKE sleeveless 3', 'me Issey Miyake sleeveless 3. Size F 총장 57.5 어깨 27 가슴 30.5 (cm). Product Note: 45% Nylon 45% Polyester 10% Polyurethane',
+        'A', 'FREE', 'PURPLE', '45% Nylon 45% Polyester 10% Polyurethane',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 93. me ISSEY MIYAKE sleeveless
+    (
+        (SELECT id FROM member WHERE email = 'vintib3@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'SLEEVELESS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
+        (SELECT id FROM brand WHERE name_en = 'Issey Miyake'),
+        'me ISSEY MIYAKE sleeveless', 'me Issey Miyake sleeveless. Size F 총장 57.5 어깨 27 가슴 30.5 (cm). Product Note: 45% Nylon 45% Polyester 10% Polyurethane',
+        'A', 'FREE', 'PINK', '45% Nylon 45% Polyester 10% Polyurethane',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 94. me ISSEY MIYAKE 슬리브
+    (
+        (SELECT id FROM member WHERE email = 'vintib4@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'SLEEVELESS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
+        (SELECT id FROM brand WHERE name_en = 'Issey Miyake'),
+        'me ISSEY MIYAKE 슬리브', 'me Issey Miyake 슬리브. Size F 총장 57.5 어깨 27 가슴 30.5 (cm). Product Note: 45% Nylon 45% Polyester 10% Polyurethane',
+        'A', 'FREE', 'GREEN', '45% Nylon 45% Polyester 10% Polyurethane',
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 95. Odds On Issey Miyake dot shirt 2
+    (
+        (SELECT id FROM member WHERE email = 'vintib3@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'SHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
+        (SELECT id FROM brand WHERE name_en = 'Issey Miyake'),
+        'Odds On Issey Miyake dot shirt 2', 'Odds On Issey Miyake dot shirt 2. Size Free 총장 75 어깨 52 가슴 59 소매 56(cm). Product Note: 100% Cotton',
+        'A', 'FREE', NULL, '면 100%',
+        'DIRECT_SALE', 'ON_SALE', 170000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 96. Plantation Issey Miyake tote bag
+    (
+        (SELECT id FROM member WHERE email = 'vintib4@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'TOTE_BAG' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BAG' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
+        (SELECT id FROM brand WHERE name_en = 'Issey Miyake'),
+        'Plantation Issey Miyake tote bag', 'Plantation Issey Miyake tote bag. Size OS 30x35(cm).',
+        'A', 'FREE', NULL, NULL,
+        'DIRECT_SALE', 'ON_SALE', 140000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 97. 토가 아카이브 레더 숄더 파우치
+    (
+        (SELECT id FROM member WHERE email = 'vintibb1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'POUCH' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BAG' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '토가 아카이브 레더 숄더 파우치', '토가 아카이브 숄더 파우치 입니다. 구하기 힘든 모델이고 여름에 툭 하고 다니면 최고입니다. 안에는 휴대폰 하나 넣고 다니기 좋은 사이즈입니다. 남자가 매기에도 좋습니다 줄 조절 굿. 공정상의 문제로 본드자국이 있습니다 확인후 구매부탁드려요. 환불은 어렵습니다.',
+        'B', 'FREE', NULL, '가죽',
+        'DIRECT_SALE', 'ON_SALE', 140000, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 98. [정품] 구찌 미키 클러치백
+    (
+        (SELECT id FROM member WHERE email = 'vintibb2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'POUCH' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BAG' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '[정품] 구찌 미키 클러치백', '판매하는 상품은 100% 정품 입니다. 상태는 사진과 같이 좋습니다. 구성품은 가품시 전액환불 정품감정 보증서 + 중고명품샵 박스 + 더스트백 + 컨트롤카드 풀셋. 쿨거래시 택배비는 제가 부담하겠습니다. 구매시 당일택배를 원칙으로 하며 특별한 일 없는 이상 우체국 택배를 통해 보내드려 하루면 받으십니다.',
+        'A', 'FREE', NULL, NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 99. 스파이더맨 코스튬 세트
+    (
+        (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'JUMPSUIT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'DRESS_JUMPSUIT' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '스파이더맨 코스튬 세트', '스파이더맨 코스튬 세트입니다. 마스크 포함 풀세트이며, 특별한 하자 없이 깨끗한 상태입니다. 키165~180 몸무게 60~75추천드리며 하자없습니다. 구성품은 스파이더맨 가면, 몸슈트, 턱 마스크 보호대 입니다. 친절한 이웃 스파이더맨이 되어보세요.',
+        'A', 'FREE', 'RED', NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
+    ),
+    -- 100. (M-L) 브랜드빈티지 반팔 티셔츠 영화 슈퍼맨 맨오브스틸-H36369
+    (
+        (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
+        (SELECT id FROM category WHERE name_en = 'TSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+        NULL,
+        '(M-L) 브랜드빈티지 반팔 티셔츠 영화 슈퍼맨 맨오브스틸-H36369', '영화 슈퍼맨 맨오브스틸 프린팅 반팔 티셔츠. 남녀공용. 실측: 어깨 48, 가슴 46, 소매 19, 총기장 73. 팔로우 하면 무료배송.',
+        'A', 'M', NULL, NULL,
+        'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
+        NOW(), NOW()
     );
