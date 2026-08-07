@@ -8,6 +8,7 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.notification.port.NotificationCommandPort;
 import com.ssafy.backend.point.dto.response.PointBalanceResponse;
 import com.ssafy.backend.point.dto.response.PointChargeReadyResponse;
 import com.ssafy.backend.point.dto.response.PointTransactionResponse;
@@ -51,6 +52,7 @@ public class PointService {
     private final TossPaymentsClient tossPaymentsClient;
     private final TossPaymentsProperties tossPaymentsProperties;
     private final WithdrawalAccountRepository withdrawalAccountRepository;
+    private final NotificationCommandPort notificationCommandPort;
 
     // readOnly=true를 오버라이드한다 — 계정이 없으면 이 조회 안에서 0 잔액 행을 만들어야 하기 때문이다.
     @Transactional
@@ -76,7 +78,7 @@ public class PointService {
     public PointBalanceResponse charge(Long memberId, Long amount, Long chargeRefId) {
         PointAccount account = getOrCreateAccount(memberId);
         account.charge(amount);
-        pointTransactionRepository.save(PointTransaction.builder()
+        PointTransaction transaction = pointTransactionRepository.save(PointTransaction.builder()
                 .member(account.getMember())
                 .type(PointTransactionType.CHARGE)
                 .amount(amount)
@@ -84,6 +86,13 @@ public class PointService {
                 .refType("POINT_CHARGE")
                 .refId(chargeRefId)
                 .build());
+        notificationCommandPort.notify(
+                account.getMember(),
+                "POINT_CHARGED",
+                "포인트가 충전되었습니다",
+                "%,d원이 충전됐어요.".formatted(amount),
+                "POINT",
+                transaction.getId());
         return PointBalanceResponse.from(account);
     }
 
@@ -179,7 +188,7 @@ public class PointService {
     public void refundOrder(Long buyerId, Long amount, Long orderId) {
         PointAccount account = getOrCreateAccount(buyerId);
         account.refund(amount);
-        pointTransactionRepository.save(PointTransaction.builder()
+        PointTransaction transaction = pointTransactionRepository.save(PointTransaction.builder()
                 .member(account.getMember())
                 .type(PointTransactionType.REFUND)
                 .amount(amount)
@@ -187,6 +196,13 @@ public class PointService {
                 .refType("ORDER")
                 .refId(orderId)
                 .build());
+        notificationCommandPort.notify(
+                account.getMember(),
+                "POINT_REFUNDED",
+                "환불이 완료되었습니다",
+                "%,d원이 환불됐어요.".formatted(amount),
+                "POINT",
+                transaction.getId());
     }
 
     @Transactional
@@ -201,12 +217,19 @@ public class PointService {
         }
 
         account.withdraw(amount);
-        pointTransactionRepository.save(PointTransaction.builder()
+        PointTransaction transaction = pointTransactionRepository.save(PointTransaction.builder()
                 .member(account.getMember())
                 .type(PointTransactionType.WITHDRAW)
                 .amount(-amount)
                 .balanceAfter(account.getAvailable())
                 .build());
+        notificationCommandPort.notify(
+                account.getMember(),
+                "WITHDRAW_COMPLETED",
+                "출금이 신청되었습니다",
+                "%,d원 출금이 접수됐어요.".formatted(amount),
+                "POINT",
+                transaction.getId());
         return PointBalanceResponse.from(account);
     }
 

@@ -8,6 +8,7 @@ import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.notification.port.NotificationCommandPort;
 import com.ssafy.backend.order.dto.request.OrderCreateRequest;
 import com.ssafy.backend.order.dto.request.OrderRole;
 import com.ssafy.backend.order.dto.request.OrderShipmentAddressRequest;
@@ -18,6 +19,7 @@ import com.ssafy.backend.order.entity.CourierCode;
 import com.ssafy.backend.order.entity.Order;
 import com.ssafy.backend.order.entity.OrderShipment;
 import com.ssafy.backend.order.entity.OrderStatus;
+import com.ssafy.backend.order.entity.TrackingStatus;
 import com.ssafy.backend.order.repository.OrderRepository;
 import com.ssafy.backend.order.repository.OrderShipmentRepository;
 import com.ssafy.backend.point.service.PointService;
@@ -33,8 +35,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 주문 조회(MY-003/004), 상시 판매 주문 생성(SALE-002), 배송지·송장(ORDER-001, SHIP-001/002),
- * 구매 확정·정산(ORDER-002/003, {@link #confirmOrder}/{@link #autoConfirmDueOrders}).
+ * 주문 조회, 상시 판매 주문 생성, 배송지·송장,
+ * 구매 확정·정산({@link #confirmOrder}/{@link #autoConfirmDueOrders}).
  * 세금계산서 발행은 {@code InvoiceService}가 담당한다.
  */
 @Slf4j
@@ -50,9 +52,10 @@ public class OrderService {
     private final LiveRepository liveRepository;
     private final PointService pointService;
     private final DeliveryTrackingClient deliveryTrackingClient;
+    private final NotificationCommandPort notificationCommandPort;
 
     /**
-     * {@code role}로 구매자/판매자 관점을 구분해 본인 주문 목록을 최신순으로 조회한다(MY-003/004).
+     * {@code role}로 구매자/판매자 관점을 구분해 본인 주문 목록을 최신순으로 조회한다.
      * 정산 완료 여부는 {@code order.status}가 SETTLED인지로 판단하며, 정산액은 수수료 없이
      * orderPrice 그대로다(구매 확정 시 {@link #confirmOrder}가 실제로 이 상태를 만든다).
      */
@@ -63,13 +66,13 @@ public class OrderService {
         return PageResponse.from(orders.map(OrderListItemResponse::from));
     }
 
-    /** 주문 상세 조회(MY-003). 경로에 userId가 없어 order.isPartyOf(principal)로 권한을 확인한다. */
+    /** 주문 상세 조회. 경로에 userId가 없어 order.isPartyOf(principal)로 권한을 확인한다. */
     public OrderListItemResponse getOrderDetail(Long orderId, Long memberId) {
         return OrderListItemResponse.from(findOrder(orderId, memberId));
     }
 
     /**
-     * 상시 판매 즉시구매(SALE-002). 결제(포인트 보관), 주문 생성, 상품 SOLD 처리를 한 트랜잭션으로 묶는다.
+     * 상시 판매 즉시구매. 결제(포인트 보관), 주문 생성, 상품 SOLD 처리를 한 트랜잭션으로 묶는다.
      * 결제는 {@link PointService#pay}가 처리하며 잔액 부족이면 여기서 예외가 전파돼 전체가 롤백된다.
      */
     @Transactional
@@ -85,9 +88,8 @@ public class OrderService {
 
         Member buyer = memberRepository.findById(buyerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        // 라이브 시청 화면에서 산 주문만 방송이 붙는다 — 방송 종료 요약(LIVE-006)이 이 값으로
-        // 판매 실적을 집계한다. 없는 방송 ID를 보내면 404로 막는다(조용히 무시하면 요약에서
-        // 빠진 이유를 FE 가 알 방법이 없다).
+        // 라이브 시청 화면에서 산 주문만 방송이 붙는다 — 방송 종료 요약이 이 값으로
+        // 판매 실적을 집계한다. 없는 방송 ID를 보내면 404로 막는다(무시하면 요약에서 빠진 이유를 FE가 알 수 없기 때문).
         Live live = request.liveId() == null ? null : liveRepository.findById(request.liveId())
                 .orElseThrow(() -> new CustomException(ErrorCode.LIVE_NOT_FOUND));
         Order order = orderRepository.save(
@@ -96,10 +98,18 @@ public class OrderService {
         pointService.pay(buyerId, product.getPrice(), order.getId());
         product.markSold();
 
+        notificationCommandPort.notify(
+                order.getSeller(),
+                "ORDER_PAID",
+                "상품이 판매되었습니다",
+                "주문이 결제됐어요. 배송지를 확인하고 송장을 등록해주세요.",
+                "ORDER",
+                order.getId());
+
         return OrderListItemResponse.from(order);
     }
 
-    /** 배송지 등록/수정(ORDER-001) — 구매자만, 송장이 등록되기 전(PAID)에만 upsert 허용. */
+    /** 배송지 등록/수정 — 구매자만, 송장이 등록되기 전(PAID)에만 upsert 허용. */
     @Transactional
     public OrderShipmentResponse registerAddress(Long orderId, Long buyerId, OrderShipmentAddressRequest request) {
         Order order = findOrder(orderId, buyerId);
@@ -128,7 +138,7 @@ public class OrderService {
         return OrderShipmentResponse.from(shipment);
     }
 
-    /** 배송지/송장 조회(ORDER-001, SHIP-002 공용) — 구매자·판매자 모두 조회 가능. */
+    /** 배송지/송장 조회 — 구매자·판매자 모두 조회 가능. */
     public OrderShipmentResponse getShipment(Long orderId, Long memberId) {
         findOrder(orderId, memberId);
         OrderShipment shipment = orderShipmentRepository.findById(orderId)
@@ -137,9 +147,9 @@ public class OrderService {
     }
 
     /**
-     * 송장 등록(SHIP-001) — 판매자만, PAID 상태 + 배송지 등록 완료 후에만 가능하다.
-     * deliveryapi.co.kr 웹훅 구독에 성공하면 배송완료는 {@link #markShipmentDelivered}(웹훅 수신)로만
-     * 반영된다. 구독에 실패하면(자격증명 없음, API 오류 등) 즉시-확정 방식으로 폴백한다.
+     * 송장 등록 — 판매자만, PAID 상태 + 배송지 등록 완료 후에만 가능하다.
+     * deliveryapi.co.kr 웹훅 구독에 성공하면 배송완료는 {@link #updateShipmentTracking}(웹훅 수신)로만
+     * 반영된다. 구독에 실패하면(자격증명 없음, API 오류 등) 즉시-확정 방식으로 폴백.
      */
     @Transactional
     public OrderShipmentResponse registerShipment(Long orderId, Long sellerId, OrderShipmentRegisterRequest request) {
@@ -157,6 +167,14 @@ public class OrderService {
         shipment.registerTracking(request.courierCode(), request.trackingNumber(), now);
         order.markShipping();
 
+        notificationCommandPort.notify(
+                order.getBuyer(),
+                "SHIPMENT_STARTED",
+                "배송이 시작되었습니다",
+                "판매자가 송장을 등록했어요.",
+                "ORDER",
+                order.getId());
+
         boolean subscribed = deliveryTrackingClient.subscribe(request.courierCode(), request.trackingNumber(), orderId);
         if (!subscribed) {
             log.warn("배송 조회 웹훅 구독 실패, 즉시-확정 폴백으로 처리한다(orderId={})", orderId);
@@ -167,30 +185,39 @@ public class OrderService {
     }
 
     /**
-     * 배송완료 웹훅 수신(SHIP-002, deliveryapi.co.kr) — (택배사, 송장번호)로 대상 주문을 찾아 확정한다.
-     * 이미 SHIPPING이 아니면(중복 웹훅 등) 조용히 무시한다(idempotent).
+     * 배송 진행 상태 웹훅 수신(deliveryapi.co.kr) — (택배사, 송장번호)로 대상 주문을 찾아
+     * 진행 상태를 갱신. {@code DELIVERED}면 기존 확정 로직까지. 이미 SHIPPING이
+     * 아니면(중복 웹훅 등) 확정만 조용히 무시(idempotent) — 상태 갱신 자체는 계속 반영.
      */
     @Transactional
-    public void markShipmentDelivered(CourierCode courier, String trackingNumber) {
+    public void updateShipmentTracking(CourierCode courier, String trackingNumber, TrackingStatus status) {
         OrderShipment shipment = orderShipmentRepository.findByCourierAndTrackingNumber(courier, trackingNumber)
                 .orElse(null);
         if (shipment == null) {
-            log.warn("배송완료 웹훅에 매칭되는 주문이 없다(courier={}, trackingNumber={})", courier, trackingNumber);
+            log.warn("배송 웹훅에 매칭되는 주문이 없다(courier={}, trackingNumber={})", courier, trackingNumber);
             return;
         }
+        shipment.updateTrackingStatus(status);
+
         Order order = shipment.getOrder();
-        if (order.getStatus() != OrderStatus.SHIPPING) {
-            return;
+        if (status == TrackingStatus.DELIVERED && order.getStatus() == OrderStatus.SHIPPING) {
+            deliver(order, shipment, LocalDateTime.now());
         }
-        deliver(order, shipment, LocalDateTime.now());
     }
 
     private void deliver(Order order, OrderShipment shipment, LocalDateTime deliveredAt) {
         order.markDelivered(deliveredAt);
         shipment.markDelivered(deliveredAt);
+        notificationCommandPort.notify(
+                order.getBuyer(),
+                "SHIPMENT_COMPLETED",
+                "배송이 완료되었습니다",
+                "구매를 확정하면 거래가 끝나요. 확정하지 않으면 3일 후 자동으로 처리됩니다.",
+                "ORDER",
+                order.getId());
     }
 
-    /** 구매 확정 처리(ORDER-002) — 구매자만, DELIVERED 상태에서만 가능하다. */
+    /** 구매 확정 처리 — 구매자만, DELIVERED 상태에서만 가능. */
     @Transactional
     public OrderListItemResponse confirmOrder(Long orderId, Long buyerId) {
         Order order = findOrder(orderId, buyerId);
@@ -202,8 +229,8 @@ public class OrderService {
     }
 
     /**
-     * 자동 구매 확정 배치(ORDER-003) — 배송 완료 후 3일이 지난 주문을 같은 확정 로직으로 처리한다.
-     * 환불 요청이 진행 중인 주문은 조회 단계에서 제외된다.
+     * 자동 구매 확정 배치 — 배송 완료 후 3일이 지난 주문을 같은 확정 로직으로 처리.
+     * 환불 요청이 진행 중인 주문은 조회 단계에서 제외.
      */
     @Transactional
     public void autoConfirmDueOrders() {

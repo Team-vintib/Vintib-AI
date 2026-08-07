@@ -3,6 +3,8 @@ package com.ssafy.backend.point.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,6 +17,7 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.notification.port.NotificationCommandPort;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.point.dto.response.PointBalanceResponse;
 import com.ssafy.backend.point.dto.response.PointChargeReadyResponse;
@@ -68,6 +71,9 @@ class PointServiceTest {
     private WithdrawalAccountRepository withdrawalAccountRepository;
 
     @Mock
+    private NotificationCommandPort notificationCommandPort;
+
+    @Mock
     private Member member;
 
     private PointService pointService;
@@ -78,7 +84,10 @@ class PointServiceTest {
                 new TossPaymentsProperties("https://api.tosspayments.com", "test_sk", "test_ck",
                         Duration.ofSeconds(1), Duration.ofSeconds(1));
         pointService = new PointService(pointAccountRepository, pointTransactionRepository, memberRepository,
-                pointChargeRepository, tossPaymentsClient, tossPaymentsProperties, withdrawalAccountRepository);
+                pointChargeRepository, tossPaymentsClient, tossPaymentsProperties, withdrawalAccountRepository,
+                notificationCommandPort);
+        lenient().when(pointTransactionRepository.save(any(PointTransaction.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private PointAccount newAccount() {
@@ -116,6 +125,8 @@ class PointServiceTest {
         PointBalanceResponse response = pointService.charge(MEMBER_ID, 100_000L, null);
 
         assertThat(response.available()).isEqualTo(100_000L);
+        verify(notificationCommandPort).notify(
+                eq(member), eq("POINT_CHARGED"), any(), any(), eq("POINT"), any());
     }
 
     @Test
@@ -127,9 +138,10 @@ class PointServiceTest {
         when(pointAccountRepository.findById(MEMBER_ID)).thenReturn(Optional.of(account));
 
         PointBalanceResponse response = pointService.requestWithdrawal(MEMBER_ID, 30_000L);
-
         assertThat(response.available()).isEqualTo(70_000L);
         assertThat(response.withdrawing()).isEqualTo(30_000L);
+        verify(notificationCommandPort).notify(
+                eq(member), eq("WITHDRAW_COMPLETED"), any(), any(), eq("POINT"), any());
     }
 
     @Test
@@ -232,6 +244,8 @@ class PointServiceTest {
 
         assertThat(buyerAccount.getTradeEscrow()).isZero();
         assertThat(buyerAccount.getAvailable()).isEqualTo(100_000L);
+        verify(notificationCommandPort).notify(
+                eq(member), eq("POINT_REFUNDED"), any(), any(), eq("POINT"), any());
     }
 
     @Test

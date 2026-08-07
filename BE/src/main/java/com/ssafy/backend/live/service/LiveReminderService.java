@@ -6,7 +6,7 @@ import com.ssafy.backend.live.dto.response.LiveReminderResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveReminder;
 import com.ssafy.backend.live.entity.LiveStatus;
-import com.ssafy.backend.live.port.NotificationCommandPort;
+import com.ssafy.backend.notification.port.NotificationCommandPort;
 import com.ssafy.backend.live.repository.LiveReminderRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
