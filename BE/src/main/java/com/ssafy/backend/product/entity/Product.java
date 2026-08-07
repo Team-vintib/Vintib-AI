@@ -132,6 +132,22 @@ public class Product extends BaseTimeEntity {
     @Column(name = "ai_model_cut_image_url", length = 500)
     private String aiModelCutImageUrl;
 
+    // 하자 검수(SAM3) job 상태. 앞/뒤 이미지가 둘 다 등록되는 시점(ProductImageService.
+    // registerImage)에 PENDING으로 시작한다 — ai_model_cut과 같은 이유로 등록 직후엔 NONE.
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'NONE'")
+    @Column(name = "quality_inspection_status", nullable = false, length = 10)
+    private QualityInspectionStatus qualityInspectionStatus = QualityInspectionStatus.NONE;
+
+    @Column(name = "quality_inspection_job_id", length = 100)
+    private String qualityInspectionJobId;
+
+    // AI 검수 결과(condition_score/findings 등) 원본을 그대로 저장한다. AI 쪽 job 결과는 Redis
+    // TTL 1시간 뒤 사라지므로, 완료 시점에 여기 캐시해두지 않으면 그 이후 조회에서 영영 잃는다.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "quality_inspection_result", columnDefinition = "jsonb")
+    private Map<String, Object> qualityInspectionResult;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -248,6 +264,25 @@ public class Product extends BaseTimeEntity {
 
     public void markAiModelCutProcessing() {
         this.aiModelCutStatus = AiModelCutStatus.PROCESSING;
+    }
+
+    /** 앞/뒤 이미지가 둘 다 등록된 직후, 하자 검수 job을 접수했을 때 호출한다. */
+    public void startQualityInspectionJob(String jobId) {
+        this.qualityInspectionJobId = jobId;
+        this.qualityInspectionStatus = QualityInspectionStatus.PENDING;
+    }
+
+    public void completeQualityInspectionJob(Map<String, Object> result) {
+        this.qualityInspectionResult = result;
+        this.qualityInspectionStatus = QualityInspectionStatus.COMPLETED;
+    }
+
+    public void failQualityInspectionJob() {
+        this.qualityInspectionStatus = QualityInspectionStatus.FAILED;
+    }
+
+    public void markQualityInspectionProcessing() {
+        this.qualityInspectionStatus = QualityInspectionStatus.PROCESSING;
     }
 
     /** 상시 판매 즉시구매 대상인지 확인한다(SALE-002). 경매 상품이나 품절 상품은 구매할 수 없다. */

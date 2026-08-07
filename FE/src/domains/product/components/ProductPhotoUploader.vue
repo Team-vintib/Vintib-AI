@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 import type {
   ProductRegistrationPhotoDraft,
   ProductRegistrationPhotoRole,
@@ -16,6 +18,7 @@ interface Props {
   error?: string
   requirementLabel?: string
   requirementMet?: boolean
+  maxCount?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -24,6 +27,7 @@ const props = withDefaults(defineProps<Props>(), {
   error: '',
   requirementLabel: '',
   requirementMet: true,
+  maxCount: undefined,
 })
 
 const emit = defineEmits<{
@@ -31,6 +35,16 @@ const emit = defineEmits<{
   remove: [photoId: string]
   selectRepresentative: [photoId: string]
 }>()
+
+// 단일 사진(front/back)은 이미 등록됐으면 다시 고를 필요가 없고, 여러 장(additional)은
+// maxCount에 닿으면 더 못 고른다 — 두 경우 모두 "사진 선택" 트리거 자체를 숨긴다.
+const canUploadMore = computed(() => {
+  if (props.maxCount !== undefined && props.photos.length >= props.maxCount) {
+    return false
+  }
+
+  return props.multiple || props.photos.length === 0
+})
 
 const handleFileChange = (event: Event) => {
   const input = event.target as HTMLInputElement
@@ -61,7 +75,7 @@ const handleFileChange = (event: Event) => {
         </h3>
         <p>{{ description }}</p>
       </div>
-      <label class="product-photo-uploader__trigger" :for="id">
+      <label v-if="canUploadMore" class="product-photo-uploader__trigger" :for="id">
         사진 선택
         <input
           :id="id"
@@ -78,7 +92,11 @@ const handleFileChange = (event: Event) => {
       {{ error }}
     </p>
 
-    <div v-if="photos.length" class="product-photo-uploader__grid">
+    <div
+      v-if="photos.length"
+      class="product-photo-uploader__grid"
+      :class="{ 'product-photo-uploader__grid--scroll': multiple }"
+    >
       <article
         v-for="photo in photos"
         :key="photo.id"
@@ -87,16 +105,35 @@ const handleFileChange = (event: Event) => {
           'product-photo-uploader__item--representative': photo.id === representativePhotoId,
         }"
       >
-        <img :src="photo.previewUrl" :alt="`${title} 미리보기`" />
-        <div class="product-photo-uploader__item-actions">
+        <div class="product-photo-uploader__media">
+          <img :src="photo.previewUrl" :alt="`${title} 미리보기`" />
+
           <button
             type="button"
+            class="product-photo-uploader__badge"
+            :class="{ 'product-photo-uploader__badge--active': photo.id === representativePhotoId }"
             :aria-pressed="photo.id === representativePhotoId"
             @click="emit('selectRepresentative', photo.id)"
           >
-            {{ photo.id === representativePhotoId ? '대표 이미지' : '대표 선택' }}
+            대표
           </button>
-          <button type="button" @click="emit('remove', photo.id)">삭제</button>
+
+          <button
+            type="button"
+            class="product-photo-uploader__remove"
+            :aria-label="`${title} 사진 삭제`"
+            @click="emit('remove', photo.id)"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path
+                d="M6 6l12 12M18 6 6 18"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-width="2"
+              />
+            </svg>
+          </button>
         </div>
       </article>
     </div>
@@ -217,54 +254,85 @@ const handleFileChange = (event: Event) => {
 
 .product-photo-uploader__grid {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.product-photo-uploader__grid--scroll {
+  display: flex;
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+  scroll-snap-type: x proximity;
+}
+
+.product-photo-uploader__grid--scroll .product-photo-uploader__item {
+  flex: 0 0 240px;
+  scroll-snap-align: start;
+}
+
 .product-photo-uploader__item {
-  display: grid;
   overflow: hidden;
-  gap: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
 }
 
 .product-photo-uploader__item--representative {
-  border-color: var(--color-primary);
+  border-width: 3px;
+  border-color: var(--color-error);
 }
 
-.product-photo-uploader__item img {
+.product-photo-uploader__media {
+  position: relative;
+}
+
+.product-photo-uploader__media img {
+  display: block;
   width: 100%;
   aspect-ratio: 4 / 5;
   object-fit: cover;
 }
 
-.product-photo-uploader__item-actions {
-  display: grid;
-  gap: var(--space-2);
-  padding: 0 var(--space-2) var(--space-3);
-  grid-template-columns: minmax(0, 1.4fr) minmax(64px, 0.8fr);
-}
-
-.product-photo-uploader__item-actions button {
-  min-width: 0;
-  min-height: var(--button-height-standard);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border-strong);
+.product-photo-uploader__badge {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: none;
   border-radius: var(--radius-control);
-  background: var(--color-surface);
+  background: var(--overlay-scrim-strong);
   color: var(--color-text-primary);
-  font-size: var(--font-size-caption);
+  cursor: pointer;
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-snug);
-  white-space: nowrap;
+  line-height: var(--line-height-control);
 }
 
-.product-photo-uploader__item-actions button[aria-pressed='true'] {
-  border-color: var(--color-primary);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
+.product-photo-uploader__badge--active {
+  background: var(--color-error);
+  color: var(--color-text-primary);
+}
+
+.product-photo-uploader__remove {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--overlay-scrim-strong);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.product-photo-uploader__remove svg {
+  width: 14px;
+  height: 14px;
 }
 
 .product-photo-uploader__empty {

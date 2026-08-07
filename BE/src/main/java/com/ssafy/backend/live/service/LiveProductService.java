@@ -1,5 +1,6 @@
 package com.ssafy.backend.live.service;
 
+import com.ssafy.backend.global.client.AiClient;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.live.dto.request.LiveProductLinkRequest;
@@ -21,8 +22,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
 
 /**
  * 라이브 상품 편성(LIVE-003).
@@ -30,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>{@link LiveService}와 분리한 이유는 관심사가 다르기 때문이다 — 이쪽은 방 자체가 아니라
  * 방에 걸리는 상품 목록을 다룬다. 상품 조회는 {@link ProductQueryPort}만 거친다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -41,6 +45,7 @@ public class LiveProductService {
     private final LiveRepository liveRepository;
     private final LiveProductRepository liveProductRepository;
     private final ProductQueryPort productQueryPort;
+    private final AiClient aiClient;
 
     /**
      * 라이브 개설과 동시에 판매 상품을 편성한다.
@@ -58,6 +63,7 @@ public class LiveProductService {
 
         LocalDateTime now = LocalDateTime.now();
         short sortOrder = 0;
+        Map<Long, ProductCard> cards = productQueryPort.findCards(productIds);
 
         for (Long productId : productIds) {
             ProductSummary product = findProduct(productId);
@@ -72,6 +78,7 @@ public class LiveProductService {
                 throw new CustomException(ErrorCode.PRODUCT_ALREADY_LINKED);
             }
             liveProductRepository.save(LiveProduct.link(live, product.id(), sortOrder++, now));
+            seedChatRagDocument(live.getId(), cards.get(productId));
         }
     }
 
@@ -100,7 +107,10 @@ public class LiveProductService {
         LiveProduct linked = liveProductRepository.save(
                 LiveProduct.link(live, product.id(), request.sortOrderOrDefault(), LocalDateTime.now()));
 
-        return LiveProductResponse.of(linked, productQueryPort.findCards(List.of(product.id())).get(product.id()));
+        ProductCard card = productQueryPort.findCards(List.of(product.id())).get(product.id());
+        seedChatRagDocument(liveId, card);
+
+        return LiveProductResponse.of(linked, card);
     }
 
     /**
@@ -209,4 +219,47 @@ public class LiveProductService {
         return productQueryPort.findById(productId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
     }
+
+    /**
+     * 상품 편성 시점에 그 상품 정보를 반복질문 근거 문서로 seed한다(-571, CH024). 판매자
+     * 실시간 발언(STT) 캡처 파이프라인이 아직 없어서, 가격·사이즈 같은 질문도 근거가 하나도
+     * 없어 항상 무응답이었다 — 이미 DB에 있는 상품 정보만으로도 답할 수 있는 질문은 이걸로
+     * 채운다. 실패해도(AI 장애 등) 편성 자체는 막지 않는다 — 보조 기능이다.
+     */
+    private void seedChatRagDocument(Long liveId, ProductCard card) {
+        if (card == null) {
+            return;
+        }
+        try {
+            aiClient.seedChatRagDocument(liveId, buildSeedContent(card));
+        } catch (RestClientException e) {
+            log.warn("반복질문 근거 문서 seed 실패(liveId={}, productId={}): {}", liveId, card.id(), e.getMessage());
+        }
+    }
+
+    private String buildSeedContent(ProductCard card) {
+        StringBuilder content = new StringBuilder(card.title());
+        if (card.brandName() != null) {
+            content.append(" (").append(card.brandName()).append(")");
+        }
+        if (card.conditionGrade() != null) {
+            content.append(", 상태등급 ").append(card.conditionGrade());
+        }
+        if (card.material() != null) {
+            content.append(", 소재 ").append(card.material());
+        }
+        if (card.measurements() != null && !card.measurements().isEmpty()) {
+            String measurements = card.measurements().entrySet().stream()
+                    .map(entry -> entry.getKey() + " " + entry.getValue() + "cm")
+                    .collect(Collectors.joining(", "));
+            content.append(", 실측치수는 ").append(measurements).append("입니다");
+        }
+        if (card.price() != null) {
+            content.append(". 가격은 ").append(card.price()).append("원입니다.");
+        } else {
+            content.append(". 가격은 경매로 진행됩니다.");
+        }
+        return content.toString();
+    }
+
 }

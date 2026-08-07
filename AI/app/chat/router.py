@@ -17,6 +17,7 @@ from app.chat.schemas import (
     FaqAnswer,
     ModerateRequest,
     ModerateResponse,
+    SeedDocumentRequest,
 )
 from app.chat.service import AnswerNotFound, ChatModerationService, get_chat_service
 
@@ -42,6 +43,25 @@ def list_live_answers(
     service: ChatModerationService = Depends(get_chat_service),
 ) -> AnswerListResponse:
     return service.list_answers(live_id, since)
+
+
+@router.post("/lives/{live_id}/documents", status_code=status.HTTP_204_NO_CONTENT)
+def seed_document(
+    live_id: int,
+    request: SeedDocumentRequest,
+    service: ChatModerationService = Depends(get_chat_service),
+) -> None:
+    """STT 없이 반복질문 근거 문서를 채운다(-571, CH024) — BE가 상품 편성 시점에 호출한다."""
+    service.seed_document(live_id, request.content)
+
+
+@router.delete("/lives/{live_id}/documents", status_code=status.HTTP_204_NO_CONTENT)
+def clear_documents(
+    live_id: int,
+    service: ChatModerationService = Depends(get_chat_service),
+) -> None:
+    """방송 종료 시 근거 문서를 전부 지운다(CH026 후속) — BE가 방송 종료 훅에서 호출한다."""
+    service.clear_documents(live_id)
 
 
 @router.get("/answers/{ticket}", response_model=FaqAnswer)

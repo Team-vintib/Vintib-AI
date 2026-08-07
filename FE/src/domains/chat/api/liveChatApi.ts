@@ -16,10 +16,13 @@ export interface BackendChatMessage {
   clientMessageId: string | null
 }
 
-// AI 판정(HIDE/BLOCK)으로 브로드캐스트가 생략된 내 메시지를 발신자에게만 알린다(-571 후속).
-// /user/queue/errors로 온다 — 낙관적 렌더로 그려둔 말풍선을 clientMessageId로 찾아 지운다.
+// AI 판정(HIDE/BLOCK/TIMED_OUT)으로 브로드캐스트가 생략된 내 메시지를 발신자에게만 알린다
+// (-571 후속). /user/queue/errors로 온다 — 낙관적 렌더로 그려둔 말풍선을 clientMessageId로
+// 찾아 지운다. muteRemainingSeconds는 반복 위반으로 방송 내 임시 음소거된 경우에만 채워진다
+// (CH025) — 이 값의 유무로 "메시지 하나만 막힘"과 "당분간 채팅 자체가 막힘"을 구분한다.
 export interface BackendChatBlockedNotice {
   clientMessageId: string
+  muteRemainingSeconds: number | null
 }
 
 export interface BackendReaction {

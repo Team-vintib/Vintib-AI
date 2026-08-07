@@ -14,6 +14,7 @@ import com.ssafy.backend.product.dto.response.ProductAiModelCutResponse;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
+import com.ssafy.backend.product.dto.response.ProductQualityInspectionResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.product.service.ProductImageService;
 import com.ssafy.backend.product.service.ProductService;
@@ -171,6 +172,22 @@ public class ProductController {
     @GetMapping("/{id}/ai-model-cut")
     public ResponseEntity<ApiResponse<ProductAiModelCutResponse>> getAiModelCutStatus(@PathVariable Long id) {
         ProductAiModelCutResponse response = productService.getAiModelCutStatus(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "하자 검수 상태/결과 조회",
+            description = "앞/뒤 사진이 둘 다 등록되면 백그라운드로 도는 AI 하자 검수의 상태를 조회한다. "
+                    + "PENDING/PROCESSING이면 이 호출 시점에 AI 쪽 최신 상태를 다시 확인해 반영한다. "
+                    + "FE는 AI 게이트웨이를 직접 호출하지 않고 이 엔드포인트만 폴링한다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @GetMapping("/{id}/quality-inspection")
+    public ResponseEntity<ApiResponse<ProductQualityInspectionResponse>> getQualityInspectionStatus(
+            @PathVariable Long id) {
+        ProductQualityInspectionResponse response = productService.getQualityInspectionStatus(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

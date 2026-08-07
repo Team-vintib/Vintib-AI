@@ -16,6 +16,8 @@ import type {
   SimilarProductPricePoint,
 } from '@/domains/product/types/productDetail.types'
 import type {
+  ProductRegistrationAiFinding,
+  ProductRegistrationAiPhotoResult,
   ProductRegistrationDraft,
   ProductRegistrationPhotoDraft,
   ProductRegistrationSubmitResult,
@@ -155,6 +157,21 @@ interface ProductCreateRequest {
 
 interface ProductCreateResponse extends Partial<ProductListDto> {
   productId?: number | string | null
+}
+
+// PATCH /products/{id}(부분 수정)이 실제로 받는 필드 — BE의 ProductUpdateRequest.java 그대로.
+// aiModelEnabled/aiModelGender/aiQualityFindings는 이 엔드포인트에 없다(docs/requests/BE/046 참고).
+interface ProductUpdateRequest {
+  title: string
+  description: string
+  categoryId: number | null
+  brandId: number | null
+  conditionGrade: ProductConditionGrade | ''
+  sizeLabel: string
+  color: string | null
+  material: string | null
+  measurements: Record<string, number> | null
+  defects: string[] | null
 }
 
 interface ProductImageUploadUrlResponse {
@@ -310,6 +327,84 @@ export const getProductAiModelCutStatus = async (
   return unwrapApiData(response.data)
 }
 
+// AI 하자 검수 result 원본(docs/requests/BE/041-quality-inspection-integration.md §2). BE가
+// AI 응답을 그대로 실어 보내므로 이 안쪽 필드만 snake_case다(바깥 DTO는 camelCase).
+export interface ProductQualityInspectionResultDto {
+  inspection_id: string
+  product_id: number
+  condition_score: number
+  condition_grade: 'S' | 'A' | 'B' | 'C'
+  summary: string
+  image_summaries: { image_index: number; summary: string }[]
+  findings: {
+    key: string
+    defect_type: 'STAIN' | 'DIRT_MARK' | 'HOLE_TEAR' | 'DISCOLORATION' | 'PILLING' | 'FRAY'
+    label: string
+    status: 'DETECTED' | 'SUSPECTED'
+    image_index: number
+    no: number
+    bbox: [number, number, number, number]
+    confidence: number
+    severity: 'MINOR' | 'MODERATE' | 'MAJOR'
+    statement_required: boolean
+    needs_seller_review: boolean
+    description: string | null
+  }[]
+}
+
+export interface ProductQualityInspectionStatusDto {
+  status: 'NONE' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+  result: ProductQualityInspectionResultDto | null
+}
+
+// 앞/뒤 사진이 둘 다 등록되면 백그라운드로 도는 하자 검수 job의 상태/결과를 조회한다
+// (docs/requests/BE/041). FE는 AI 게이트웨이를 직접 폴링하지 않고 이 BE 엔드포인트만 부른다
+// (기존 aiGatewayApi.ts의 pollAiJob 직접-폴링 방식은 이 기능에는 더 이상 쓰지 않는다).
+export const getProductQualityInspectionStatus = async (
+  productId: number,
+): Promise<ProductQualityInspectionStatusDto> => {
+  if (!PRODUCT_API_ENABLED) {
+    return { status: 'NONE', result: null }
+  }
+
+  const response = await http.get<ApiResponse<ProductQualityInspectionStatusDto>>(
+    `/products/${productId}/quality-inspection`,
+  )
+
+  return unwrapApiData(response.data)
+}
+
+// docs/requests/FE/036 매핑표대로 AI 원본(snake_case)을 화면 렌더링용 타입(camelCase,
+// ProductRegistrationAiFinding)으로 변환한다. photoIdByImageIndex는 앞=0/뒤=1로 업로드한
+// 실제 photoId를 호출부가 넘겨준다(AI는 photoId라는 개념 자체를 모른다).
+export const mapQualityInspectionResultToPhotoResults = (
+  result: ProductQualityInspectionResultDto,
+  photoIdByImageIndex: Record<number, string>,
+): ProductRegistrationAiPhotoResult[] => {
+  return Object.entries(photoIdByImageIndex).map(([imageIndexKey, photoId]) => {
+    const imageIndex = Number(imageIndexKey)
+    const findings: ProductRegistrationAiFinding[] = result.findings
+      .filter((finding) => finding.image_index === imageIndex)
+      .map((finding) => ({
+        key: finding.key,
+        defectType: finding.defect_type,
+        label: finding.label,
+        status: finding.status,
+        imageIndex: finding.image_index,
+        no: finding.no,
+        bbox: finding.bbox,
+        confidence: finding.confidence,
+        severity: finding.severity,
+        statementRequired: finding.statement_required,
+        needsSellerReview: finding.needs_seller_review,
+        description: finding.description,
+        isActualDefect: true,
+      }))
+
+    return { photoId, findings, confirmed: false }
+  })
+}
+
 // 미낙찰 상품 처리(440) — 상품을 상시 판매(가격 지정)로 전환하거나 경매 예정으로 되돌린다.
 // 상품 등록의 판매 방식 설정(publishProduct)과 같은 엔드포인트를 재사용한다.
 export const convertProductToDirectSale = async (productId: number, price: number) => {
@@ -418,10 +513,12 @@ export const getWishProductIds = async (userId: number) => {
   return productIds
 }
 
-export const submitProduct = async (
+// AI 품질 검증(SY043)이 '상태/하자' 스텝 진입 시 미리 만들어두는 DRAFT 상품 생성 호출.
+// submitProduct의 신규 분기와 로직을 공유한다 — 상품 생성 시점만 앞당겨졌을 뿐 필드는 동일하다.
+export const createDraftProduct = async (
   draft: ProductRegistrationDraft,
   { brands = [], categories = [] }: ProductSubmitOptions = {},
-): Promise<ProductRegistrationSubmitResult> => {
+): Promise<number> => {
   const createResponse = await http.post<ApiResponse<ProductCreateResponse>>('/products', {
     title: draft.name.trim(),
     description: draft.description.trim(),
@@ -437,14 +534,45 @@ export const submitProduct = async (
     aiModelGender: draft.aiModelEnabled ? draft.aiModelGender : null,
     aiQualityFindings: resolveRegistrationAiQualityFindings(draft),
   } satisfies ProductCreateRequest)
-  const createdProduct = unwrapApiData(createResponse.data)
-  const createdProductId = getCreatedProductId(createdProduct)
 
-  await publishProduct(createdProductId, draft)
-  await uploadProductImages(createdProductId, draft.photos)
+  return getCreatedProductId(unwrapApiData(createResponse.data))
+}
+
+export const submitProduct = async (
+  draft: ProductRegistrationDraft,
+  options: ProductSubmitOptions = {},
+): Promise<ProductRegistrationSubmitResult> => {
+  let productId: number
+
+  if (draft.draftProductId) {
+    // SY043: '상태/하자' 스텝 진입 시 이미 DRAFT 상품+이미지가 만들어져 있다 — 나머지
+    // 필드만 부분 수정하고 이미지는 재업로드하지 않는다. PATCH가 aiModelEnabled/aiModelGender를
+    // 안 받지만, 이 값들은 '기본 정보' 스텝을 나갈 때 이미 확정돼 draft 생성 시점에
+    // 실려 갔으므로 다시 보낼 필요가 없다(docs/requests/BE/046 참고).
+    productId = draft.draftProductId
+    const { brands = [], categories = [] } = options
+
+    await http.patch<ApiResponse<ProductCreateResponse>>(`/products/${productId}`, {
+      title: draft.name.trim(),
+      description: draft.description.trim(),
+      categoryId: findCategoryId(draft, categories),
+      brandId: findBrandId(draft.brand, brands),
+      conditionGrade: draft.conditionGrade,
+      sizeLabel: draft.size,
+      color: resolveRegistrationColor(draft),
+      material: draft.material.trim() || null,
+      measurements: resolveRegistrationMeasurements(draft),
+      defects: resolveRegistrationDefects(draft),
+    } satisfies ProductUpdateRequest)
+  } else {
+    productId = await createDraftProduct(draft, options)
+    await uploadProductImages(productId, draft.photos)
+  }
+
+  await publishProduct(productId, draft)
 
   return {
-    productId: String(createdProductId),
+    productId: String(productId),
     submittedAt: new Date().toISOString(),
   }
 }
@@ -472,7 +600,10 @@ const getCreatedProductId = (product: ProductCreateResponse) => {
   return productId
 }
 
-const uploadProductImages = async (productId: number, photos: ProductRegistrationPhotoDraft[]) => {
+export const uploadProductImages = async (
+  productId: number,
+  photos: ProductRegistrationPhotoDraft[],
+) => {
   const orderedPhotos = [...photos].sort((left, right) => {
     if (left.isRepresentative !== right.isRepresentative) {
       return left.isRepresentative ? -1 : 1

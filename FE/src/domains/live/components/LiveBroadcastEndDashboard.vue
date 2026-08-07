@@ -1,17 +1,29 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { BroadcastEndSummary } from '@/domains/auction/types/liveAuction.types'
+import type {
+  BroadcastEndSummary,
+  BroadcastProductResult,
+} from '@/domains/auction/types/liveAuction.types'
+import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
 
-const props = defineProps<{
-  title: string
-  elapsedTime: string
-  peakViewerCount: number | null
-  summary: BroadcastEndSummary | null
-  manageableUnsoldCount: number
-  isLoading: boolean
-  errorMessage: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    title: string
+    elapsedTime: string
+    peakViewerCount: number | null
+    summary: BroadcastEndSummary | null
+    manageableUnsoldCount: number
+    isLoading: boolean
+    errorMessage: string
+    // 편성 상품 목록(GET /lives/{id}). 방송 요약 응답에는 판매 방식·등록가가 없어서
+    // productId로 이어 붙여 채운다(요청: docs/requests/BE/045).
+    products?: LiveWatchProduct[]
+  }>(),
+  {
+    products: () => [],
+  },
+)
 
 const emit = defineEmits<{
   retry: []
@@ -24,10 +36,60 @@ const unsoldResults = computed(
   () => props.summary?.results.filter((result) => result.status === 'UNSOLD') ?? [],
 )
 
+const productById = computed(() => new Map(props.products.map((product) => [product.id, product])))
+
+type SaleKind = 'DIRECT_SALE' | 'AUCTION' | null
+
+// 편성 상품의 판매 방식. saleType이 비어 있으면 saleStatus로, 그것도 없으면 가격 유무로 추정한다
+// (BE 016 §6-B — 상품 행을 못 찾은 편성은 관련 필드가 전부 null이다).
+const saleKindOf = (result: BroadcastProductResult): SaleKind => {
+  const product = productById.value.get(result.productId)
+
+  if (!product) return null
+  if (product.saleType === 'DIRECT_SALE') return 'DIRECT_SALE'
+  if (product.saleType === 'AUCTION') return 'AUCTION'
+  if (product.saleStatus === 'AUCTION_SCHEDULED' || product.saleStatus === 'AUCTION_IN_PROGRESS') {
+    return 'AUCTION'
+  }
+
+  return product.price !== null ? 'DIRECT_SALE' : null
+}
+
+const saleKindLabel = (result: BroadcastProductResult) => {
+  const kind = saleKindOf(result)
+
+  if (kind === 'DIRECT_SALE') return '정찰제'
+  if (kind === 'AUCTION') return '경매 예정'
+
+  return ''
+}
+
 const formatPrice = (value: number) => `${value.toLocaleString('ko-KR')}P`
+
+// 팔린 상품은 최종가, 미판매 정찰제 상품은 등록가를 보여 준다. 미판매 경매 상품은 확정된
+// 금액이 없어 그대로 비운다.
+const resultPrice = (result: BroadcastProductResult) => {
+  if (result.finalPrice !== null) return formatPrice(result.finalPrice)
+
+  const product = productById.value.get(result.productId)
+
+  if (saleKindOf(result) === 'DIRECT_SALE' && product?.price != null) {
+    return formatPrice(product.price)
+  }
+
+  return ''
+}
+
 const resultLabel = (status: 'SOLD' | 'UNSOLD', soldVia: 'AUCTION' | 'DIRECT_SALE' | null) => {
   if (status === 'UNSOLD') return '미판매'
   return soldVia === 'AUCTION' ? '낙찰' : '판매'
+}
+
+// 가격 오른쪽에 붙는 라벨 — 팔렸으면 판매 경로, 안 팔렸으면 원래 걸려 있던 판매 방식.
+const methodLabel = (result: BroadcastProductResult) => {
+  if (result.status === 'SOLD') return result.soldVia === 'AUCTION' ? '경매' : '상시 판매'
+
+  return saleKindLabel(result)
 }
 </script>
 
@@ -76,11 +138,7 @@ const resultLabel = (status: 'SOLD' | 'UNSOLD', soldVia: 'AUCTION' | 'DIRECT_SAL
           판매 결과가 없습니다.
         </p>
         <ul v-else class="broadcast-end__list">
-          <li
-            v-for="result in summary.results"
-            :key="result.productId"
-            class="broadcast-end__item"
-          >
+          <li v-for="result in summary.results" :key="result.productId" class="broadcast-end__item">
             <div class="broadcast-end__item-main">
               <span
                 class="broadcast-end__outcome"
@@ -91,31 +149,44 @@ const resultLabel = (status: 'SOLD' | 'UNSOLD', soldVia: 'AUCTION' | 'DIRECT_SAL
               <span class="broadcast-end__item-title">{{ result.title }}</span>
             </div>
             <div class="broadcast-end__item-meta">
-              <span v-if="result.status === 'SOLD'" class="broadcast-end__method">
-                {{ result.soldVia === 'AUCTION' ? '경매' : '상시 판매' }}
-              </span>
-              <strong v-if="result.finalPrice !== null" class="broadcast-end__price">
-                {{ formatPrice(result.finalPrice) }}
+              <strong v-if="resultPrice(result)" class="broadcast-end__price">
+                {{ resultPrice(result) }}
               </strong>
               <span v-else class="broadcast-end__item-none">—</span>
+              <span
+                v-if="methodLabel(result)"
+                class="broadcast-end__method"
+                :class="{ 'broadcast-end__method--kind': result.status === 'UNSOLD' }"
+              >
+                {{ methodLabel(result) }}
+              </span>
+              <span v-else class="broadcast-end__method"></span>
             </div>
           </li>
         </ul>
       </div>
 
-      <div
-        v-if="summary.unsoldCount > 0"
-        class="broadcast-end__section broadcast-end__unsold"
-      >
+      <div v-if="summary.unsoldCount > 0" class="broadcast-end__section broadcast-end__unsold">
         <h2 class="broadcast-end__section-title">미판매 상품 {{ summary.unsoldCount }}개</h2>
         <p class="broadcast-end__unsold-desc">
           방송에서 판매되지 않은 상품이에요.
           <template v-if="manageableUnsoldCount > 0">
-            경매가 유찰된 {{ manageableUnsoldCount }}개 상품은 판매 방식을 정할 수 있어요.
+            {{ manageableUnsoldCount }}개 상품은 지금 판매 방식을 정할 수 있어요.
           </template>
         </p>
         <ul class="broadcast-end__unsold-list">
-          <li v-for="result in unsoldResults" :key="result.productId">{{ result.title }}</li>
+          <li v-for="result in unsoldResults" :key="result.productId">
+            <span class="broadcast-end__unsold-title">{{ result.title }}</span>
+            <span
+              v-if="saleKindLabel(result)"
+              class="broadcast-end__unsold-badge"
+              :class="{
+                'broadcast-end__unsold-badge--auction': saleKindLabel(result) === '경매 예정',
+              }"
+            >
+              {{ saleKindLabel(result) }}
+            </span>
+          </li>
         </ul>
         <button
           v-if="manageableUnsoldCount > 0"
@@ -123,7 +194,7 @@ const resultLabel = (status: 'SOLD' | 'UNSOLD', soldVia: 'AUCTION' | 'DIRECT_SAL
           class="broadcast-end__unsold-action"
           @click="emit('manage-unsold')"
         >
-          유찰 상품 관리
+          미판매 상품 관리
         </button>
       </div>
     </template>
@@ -258,16 +329,24 @@ const resultLabel = (status: 'SOLD' | 'UNSOLD', soldVia: 'AUCTION' | 'DIRECT_SAL
   border-top: 1px solid var(--color-live-border);
 }
 
-.broadcast-end__item-main,
-.broadcast-end__item-meta {
+/* 판매 여부 배지 + 상품명 — 왼쪽 정렬, 긴 이름은 말줄임. */
+.broadcast-end__item-main {
   display: flex;
   min-width: 0;
+  flex: 1;
   align-items: center;
+  justify-content: flex-start;
   gap: var(--space-2);
 }
 
+/* 가격 → 판매 방식 순으로 두고, 두 칸을 고정 폭으로 잡아 행마다 세로줄이 맞게 한다. */
 .broadcast-end__item-meta {
+  display: grid;
   flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-2);
+  grid-template-columns: minmax(90px, auto) 68px;
+  justify-items: end;
 }
 
 .broadcast-end__outcome {
@@ -289,6 +368,7 @@ const resultLabel = (status: 'SOLD' | 'UNSOLD', soldVia: 'AUCTION' | 'DIRECT_SAL
 }
 
 .broadcast-end__item-title {
+  min-width: 0;
   overflow: hidden;
   color: var(--color-live-text-primary);
   font-size: var(--font-size-caption);
@@ -301,6 +381,21 @@ const resultLabel = (status: 'SOLD' | 'UNSOLD', soldVia: 'AUCTION' | 'DIRECT_SAL
 .broadcast-end__item-none {
   color: var(--color-live-text-secondary);
   font-size: var(--font-size-xs);
+}
+
+.broadcast-end__method {
+  justify-self: stretch;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* 미판매 행의 판매 방식(정찰제/경매 예정) — 판매 경로 표기와 구분되게 테두리를 준다. */
+.broadcast-end__method--kind {
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--color-live-text-primary) 24%, transparent);
+  border-radius: var(--radius-badge);
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-bold);
 }
 
 .broadcast-end__price {
@@ -330,11 +425,30 @@ const resultLabel = (status: 'SOLD' | 'UNSOLD', soldVia: 'AUCTION' | 'DIRECT_SAL
 }
 
 .broadcast-end__unsold-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 10px;
   border-radius: var(--radius-chip);
   background: var(--color-live-surface);
   color: var(--color-live-text-primary);
   font-size: var(--font-size-xs);
+}
+
+.broadcast-end__unsold-badge {
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--color-live-text-primary) 28%, transparent);
+  border-radius: var(--radius-badge);
+  color: var(--color-live-text-secondary);
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.broadcast-end__unsold-badge--auction {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  color: var(--color-accent);
 }
 
 .broadcast-end__unsold-action,
