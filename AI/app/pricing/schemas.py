@@ -63,6 +63,7 @@ class CompsSourceKey(str, Enum):
     mock = "mock"
     llm_web_search = "llm_web_search"
     internal_clip = "internal_clip"
+    internal = "internal"
 
 
 class RetailSourceKey(str, Enum):

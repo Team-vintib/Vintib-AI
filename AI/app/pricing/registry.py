@@ -75,9 +75,24 @@ COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
         "min_comps_for_pricing": 3,
         "max_output_tokens": 0,
     },
+    # CH024: 실데이터 CLIP 임베딩 매칭(`app/recommend/similar/`가 쓰는 실 pgvector 코퍼스
+    # 재사용) + BE 공개 API 조회. 요청 시점에 임베딩을 새로 계산하지 않는다(이미 저장된
+    # 임베딩만 조회) — `model_id`는 그 저장된 임베딩을 만든 모델을 응답에 밝히는 용도일
+    # 뿐, 이 백엔드가 직접 호출하지 않는다. `timeout_seconds`는 후보별 BE REST 조회
+    # (`be_client.fetch_product`)에 쓴다. 코퍼스가 아직 작아서(백필 대상 60건, 브랜드 있는
+    # 것만) internal_clip과 같은 최소 표본 기준을 쓴다.
+    "internal": {
+        "model_id": "patrickjohncyh/fashion-clip",
+        "tool_types": (),
+        "timeout_seconds": 5.0,
+        "max_comps": 8,
+        "min_comps_for_pricing": 3,
+        "max_output_tokens": 0,
+    },
 }
-ACTIVE_COMPS_SOURCE = "mock"  # <- 여기 키만 바꾸면 스왑. llm_web_search/internal_clip 전환은
-# 사용자만(하드 룰). llm_web_search / mock / internal_clip
+ACTIVE_COMPS_SOURCE = "mock"  # <- 여기 키만 바꾸면 스왑. llm_web_search 전환은 사용자만
+# (하드 룰). internal은 GMS가 아니라 하드 룰 대상은 아니지만, 백엔드 스왑은 신중해야 하니
+# 기본값 전환은 별도 확인 후 진행한다(CH024). llm_web_search / mock / internal_clip / internal
 
 
 class RetailSourceConfig(TypedDict):

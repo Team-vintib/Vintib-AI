@@ -28,6 +28,7 @@ __all__ = [
     "CompsSource",
     "CompsUnavailable",
     "InternalClipCompsSource",
+    "InternalCompsSource",
     "LlmWebSearchCompsSource",
     "MockCompsSource",
     "build_comps_source",
@@ -89,15 +90,20 @@ class CompsSource(ABC):
     """comps 수집기 인터페이스. **모델 교체는 이 구현체를 갈아끼우는 것으로 끝난다.**
 
     `image_url`은 `internal_clip`(CH020, CLIP 이미지 유사도 검색)만 쓴다 — 텍스트 쿼리
-    기반 백엔드(mock/llm_web_search)는 키워드를 받아도 무시한다. 백엔드마다 필요한 입력이
-    다르다고 호출부(`service.py`)가 분기하게 만들지 않으려고 시그니처에 얹었다.
+    기반 백엔드(mock/llm_web_search)는 키워드를 받아도 무시한다. `product_id`는
+    `internal`(CH024, 실데이터 CLIP 임베딩 매칭)만 쓴다 — 이미 저장된 자기 임베딩을
+    조회하는 키다. 백엔드마다 필요한 입력이 다르다고 호출부(`service.py`)가 분기하게
+    만들지 않으려고 시그니처에 얹었다.
     """
 
     key: str
 
     @abstractmethod
-    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
-        """쿼리(+선택적 이미지)로 비교 매물을 모은다. 인프라 오류면 `CompsUnavailable`."""
+    def fetch(
+        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+    ) -> CompsFetch:
+        """쿼리(+선택적 이미지/product_id)로 비교 매물을 모은다. 인프라 오류면
+        `CompsUnavailable`."""
         raise NotImplementedError
 
 
@@ -110,7 +116,9 @@ class MockCompsSource(CompsSource):
 
     key = "mock"
 
-    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
+    def fetch(
+        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+    ) -> CompsFetch:
         digest = hashlib.sha256(query.encode("utf-8")).digest()
         base = 40_000 + int.from_bytes(digest[:4], "big") % 60_000
         items = [
@@ -141,7 +149,9 @@ class LlmWebSearchCompsSource(CompsSource):
     def __init__(self, config: registry.CompsSourceConfig | None = None) -> None:
         self._config = config or registry.comps_config(self.key)
 
-    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
+    def fetch(
+        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+    ) -> CompsFetch:
         # 키 확인을 build가 아니라 fetch에서 하는 이유: 서비스 조립은 @lru_cache라
         # build 시점에 던지면 잘못 설정된 컨테이너가 모든 요청에 500을 뱉는다.
         # 여기서 던지면 job result의 error로 내려가 BE가 원인을 본다.
@@ -225,7 +235,9 @@ class InternalClipCompsSource(CompsSource):
         self._config = config or registry.comps_config(self.key)
         self._clip_config = registry.INTERNAL_CLIP_CONFIG
 
-    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
+    def fetch(
+        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+    ) -> CompsFetch:
         if not image_url:
             return CompsFetch(
                 items=[],
@@ -277,6 +289,99 @@ class InternalClipCompsSource(CompsSource):
         )
 
 
+class InternalCompsSource(CompsSource):
+    """실데이터 CLIP 임베딩 매칭(CH024).
+
+    `app/recommend/similar/`가 쓰는 실제 pgvector 코퍼스(`product_garment_embedding`,
+    `app.recommend.personalize.embedding_store`)를 그대로 재사용한다 — 품질검수가 끝난
+    상품마다 자동으로 쌓이는 실데이터다(CH020의 AI-Hub 합성 코퍼스와 다르다). 후보
+    product_id의 가격·브랜드·판매방식·판매상태는 BE 공개 API(`app.shared.be_client`)로
+    조회한다 — CH016이 요청했던 DB 뷰·읽기 전용 계정이 필요 없다, BE가 그 필드를 이미
+    공개로 낸다.
+
+    **쿼리 임베딩을 요청 시점에 새로 계산하지 않는다** — `product_id`로 **이미 저장된**
+    자기 임베딩만 조회한다. 대상 상품이 아직 품질검수를 거치지 않았으면(임베딩 없음)
+    `NO_IMAGE_PROVIDED`로 정상 처리한다(`app/recommend/similar/service.py`가 "임베딩
+    없으면 빈 결과, 에러 아님"으로 다루는 것과 같은 원칙). 이 컨테이너엔 torch/SAM3가
+    없어(`docs/infra-architecture.md` §6) 요청 시점 임베딩 계산 자체가 불가능하다 —
+    `internal_clip`(CH020)과 다른 점이다.
+    """
+
+    key = "internal"
+
+    def __init__(self, config: registry.CompsSourceConfig | None = None) -> None:
+        self._config = config or registry.comps_config(self.key)
+
+    def fetch(
+        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+    ) -> CompsFetch:
+        if product_id is None:
+            return CompsFetch(
+                items=[],
+                notes=["상품 id가 없어 내부 시세 비교를 할 수 없습니다."],
+                reason=ReasonCode.no_image_provided,
+            )
+
+        from datetime import UTC, datetime
+
+        from app.pricing import hedge
+        from app.recommend.personalize import embedding_store
+        from app.shared import be_client
+
+        if embedding_store.fetch_garment_embedding(product_id) is None:
+            return CompsFetch(
+                items=[],
+                notes=["아직 이 상품의 의류 임베딩이 없습니다(품질검수 완료 전일 수 있습니다)."],
+                reason=ReasonCode.no_image_provided,
+            )
+
+        matches = embedding_store.find_similar(product_id, self._config["max_comps"])
+        if not matches:
+            return CompsFetch(
+                items=[],
+                notes=["유사도 기준을 넘는 내부 매물이 없습니다."],
+                reason=ReasonCode.insufficient_comps,
+            )
+
+        candidates = []
+        for match in matches:
+            product = be_client.fetch_product(
+                match.product_id, timeout=self._config["timeout_seconds"]
+            )
+            if product is None:
+                continue
+            candidates.append(
+                hedge.InternalCandidate(
+                    product_id=product.product_id,
+                    title=product.title,
+                    price=product.price,
+                    sale_type=product.sale_type,
+                    sale_status=product.sale_status,
+                    created_at=product.created_at,
+                )
+            )
+
+        kept, notes = hedge.apply_hedge_filters(candidates, now=datetime.now(UTC))
+        if not kept:
+            return CompsFetch(
+                items=[],
+                notes=[*notes, "정제 후 남은 내부 매물이 없습니다."],
+                reason=ReasonCode.insufficient_comps,
+            )
+
+        items = [
+            CompItem(
+                title=c.title,
+                price=c.price,
+                source=self.key,
+                is_used=True,  # 세컨핸드 플랫폼 등록 매물이라 기본적으로 중고다
+            )
+            for c in kept
+            if c.price is not None
+        ]
+        return CompsFetch(items=items, notes=notes)
+
+
 def build_comps_source(key: str | None = None) -> CompsSource:
     """활성 comps 백엔드 구현체를 만든다."""
     resolved = key or registry.ACTIVE_COMPS_SOURCE
@@ -286,6 +391,8 @@ def build_comps_source(key: str | None = None) -> CompsSource:
         return LlmWebSearchCompsSource()
     if resolved == "internal_clip":
         return InternalClipCompsSource()
+    if resolved == "internal":
+        return InternalCompsSource()
     raise ValueError(f"등록되지 않은 comps 백엔드입니다: {resolved!r}")
 
 
