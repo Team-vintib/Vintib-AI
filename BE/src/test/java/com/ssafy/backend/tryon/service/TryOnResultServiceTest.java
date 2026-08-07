@@ -278,4 +278,27 @@ class TryOnResultServiceTest {
         assertThat(response.status()).isEqualTo(TryOnResultStatus.FAILED);
         assertThat(response.imageUrl()).isNull();
     }
+
+    @Test
+    void 목록_조회시_대기중인_결과도_AI_job_상태를_다시_확인해서_완료로_갱신한다() {
+        // 실측으로 발견된 버그: getResults()가 pending 항목을 갱신하지 않아서, AI에선 이미
+        // 완료된 job도 목록(저장된 시착 결과)에는 영원히 빈 이미지로 남아 있었다.
+        when(product.getId()).thenReturn(PRODUCT_ID);
+        TryOnResult result = TryOnResult.builder()
+                .member(member)
+                .product(product)
+                .jobId("job-123")
+                .status(TryOnResultStatus.PENDING)
+                .build();
+        when(tryOnResultRepository.findAllByMemberIdAndDeletedAtIsNullOrderByCreatedAtDesc(MEMBER_ID))
+                .thenReturn(List.of(result));
+        when(aiClient.getJob("job-123")).thenReturn(new AiJobResponse(
+                "success", Map.of("image_url", "https://ai.example/result.png"), null));
+
+        List<TryOnResultResponse> responses = tryOnResultService.getResults(MEMBER_ID);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).status()).isEqualTo(TryOnResultStatus.SUCCESS);
+        assertThat(responses.get(0).imageUrl()).isEqualTo("https://ai.example/result.png");
+    }
 }
