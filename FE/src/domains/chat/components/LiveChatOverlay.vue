@@ -372,7 +372,7 @@ function mapChatMessage(message: BackendChatMessage, hostId: number): LiveChatMe
   if (message.senderType === 'AI') {
     return {
       id: String(message.messageId),
-      author: 'AI 자동답변',
+      author: 'AI 채팅 도우미',
       body: message.content,
       role: 'AI',
     }

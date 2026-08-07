@@ -85,7 +85,7 @@ class ChatRagWorker(BaseWorker):
         if CHAT_RAG_BACKEND == "mock" or self._embed_model is not None:
             return
         print(f"[{self.worker_id}] 임베딩/생성 모델 로딩 중... (backend={CHAT_RAG_BACKEND})")
-        from langchain_huggingface import HuggingFacePipeline
+        from langchain_huggingface import ChatHuggingFace, HuggingFacePipeline
         from sentence_transformers import SentenceTransformer
         from transformers import pipeline
 
@@ -98,7 +98,11 @@ class ChatRagWorker(BaseWorker):
             max_new_tokens=200,
             return_full_text=False,  # 기본값(True)이면 입력 프롬프트까지 답변에 그대로 섞여 나온다
         )
-        self._llm = HuggingFacePipeline(pipeline=text_gen)
+        # LFM2.5-230M은 채팅용으로 튜닝된 모델(자체 chat_template 보유)이다. 맨 문자열을
+        # 그대로 이어쓰기시키면(HuggingFacePipeline 단독 사용) 모델이 학습 때 본 채팅 형식과
+        # 안 맞아 엉뚱한 대화를 이어가는 문제가 있었다(실측: "자켓 얼마에요?"에 "받았네요!"라고
+        # 답함) — ChatHuggingFace로 감싸 system/user 역할이 있는 채팅 템플릿을 제대로 태운다.
+        self._llm = ChatHuggingFace(llm=HuggingFacePipeline(pipeline=text_gen))
         print(f"[{self.worker_id}] 로딩 완료")
 
     def _embed(self, text: str) -> np.ndarray:
@@ -150,14 +154,20 @@ class ChatRagWorker(BaseWorker):
             # 생성 없이 근거 문단을 그대로 반환 — 환각 없음. TemplateAnswerGenerator와 같은 안전한 기본값.
             return context
 
-        prompt = (
-            "당신은 라이브 방송 채팅에서 시청자 질문에 답하는 친절한 안내 도우미입니다. "
-            "아래 판매자 발언 내용만 근거로 답하세요. 내용에 없는 정보는 절대 지어내지 마세요. "
-            "존댓말로, 친근하고 상냥하게, 그렇지만 한두 문장으로 간결하게 답하세요. "
-            "'45000원'처럼 단답으로 끝내지 말고 자연스러운 문장으로 답하세요.\n"
-            f"방송 발언: {context}\n질문: {question}\n답변:"
-        )
-        return self._llm.invoke(prompt).strip()
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        messages = [
+            SystemMessage(
+                content=(
+                    "당신은 라이브 방송 채팅에서 시청자 질문에 답하는 친절한 안내 도우미입니다. "
+                    "주어진 판매자 발언 내용만 근거로 답하세요. 내용에 없는 정보는 절대 지어내지 "
+                    "마세요. 존댓말로, 친근하고 상냥하게, 한두 문장으로 간결하게 답하세요. "
+                    "'45000원'처럼 단답으로 끝내지 말고 자연스러운 문장으로 답하세요."
+                )
+            ),
+            HumanMessage(content=f"방송 발언: {context}\n질문: {question}"),
+        ]
+        return self._llm.invoke(messages).content.strip()
 
 
 if __name__ == "__main__":
