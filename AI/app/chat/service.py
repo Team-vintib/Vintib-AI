@@ -263,6 +263,10 @@ class ChatModerationService:
         """
         rag_store.save_document(live_id, source_type="seed", content=content)
 
+    def clear_documents(self, live_id: int) -> int:
+        """방송 종료 시 근거 문서를 전부 지운다(CH026 후속) — BE `LiveCleanupHook`이 호출한다."""
+        return rag_store.delete_for_live(live_id)
+
     # -- 답변 조회 --------------------------------------------------------
     def list_answers(self, live_id: int, since: datetime | None = None) -> AnswerListResponse:
         return AnswerListResponse(

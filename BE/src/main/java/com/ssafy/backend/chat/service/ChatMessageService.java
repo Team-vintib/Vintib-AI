@@ -40,6 +40,7 @@ public class ChatMessageService {
     private final LiveRepository liveRepository;
     private final MemberRepository memberRepository;
     private final AiClient aiClient;
+    private final HostChatRagSeeder hostChatRagSeeder;
 
     /**
      * 회원 발언을 저장한다. AI 판정에서 HIDE/BLOCK/TIMED_OUT을 권고하면 메시지는 저장은
@@ -79,6 +80,11 @@ public class ChatMessageService {
                     ? ChatMessageBlockedNotice.muted(clientMessageId, moderation.muteRemainingSeconds())
                     : ChatMessageBlockedNotice.blocked(clientMessageId);
             return ChatSendOutcome.blocked(notice);
+        }
+
+        // 판매자(호스트) 본인 발언만 근거 문서로 seed한다(CH026) — 시청자 채팅은 대상이 아니다.
+        if (live.isHostedBy(senderId)) {
+            hostChatRagSeeder.seed(liveId, trimmed);
         }
 
         return ChatSendOutcome.broadcast(ChatMessageResponse.of(saved, clientMessageId));

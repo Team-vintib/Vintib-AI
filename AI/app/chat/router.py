@@ -55,6 +55,15 @@ def seed_document(
     service.seed_document(live_id, request.content)
 
 
+@router.delete("/lives/{live_id}/documents", status_code=status.HTTP_204_NO_CONTENT)
+def clear_documents(
+    live_id: int,
+    service: ChatModerationService = Depends(get_chat_service),
+) -> None:
+    """방송 종료 시 근거 문서를 전부 지운다(CH026 후속) — BE가 방송 종료 훅에서 호출한다."""
+    service.clear_documents(live_id)
+
+
 @router.get("/answers/{ticket}", response_model=FaqAnswer)
 def get_answer(
     ticket: str,

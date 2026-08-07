@@ -398,6 +398,23 @@ def test_api_timed_out_response_includes_remaining_seconds():
         app.dependency_overrides.clear()
 
 
+def test_api_clear_documents_deletes_by_live_id(monkeypatch):
+    # 방송 종료 시 근거 문서를 전부 지우는 경로(CH026 후속) — 실제 postgres-vector엔 안 붙는다.
+    deleted_live_ids = []
+    monkeypatch.setattr(
+        rag_store,
+        "delete_for_live",
+        lambda live_id: deleted_live_ids.append(live_id) or 3,
+    )
+    client = _override(_service())
+    try:
+        resp = client.delete("/chat/lives/12/documents")
+        assert resp.status_code == 204
+        assert deleted_live_ids == [12]
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_api_enqueues_chat_rag_job_in_background(monkeypatch, fake_redis):
     _stub_docs(monkeypatch, [_doc(1, "근거 내용")])
     service = _service()

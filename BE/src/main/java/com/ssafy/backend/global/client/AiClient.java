@@ -121,4 +121,16 @@ public class AiClient {
                 .retrieve()
                 .toBodilessEntity();
     }
+
+    /**
+     * {@code DELETE /chat/lives/{liveId}/documents} — 방송 종료 시 근거 문서를 전부 지운다
+     * (CH026 후속). 종료된 방송은 더 이상 채팅을 못 쳐서 반복질문이 다시 트리거될 일이 없어,
+     * 그 시점부터 seed 문서가 영구히 안 쓰인다.
+     */
+    public void deleteChatRagDocuments(Long liveId) {
+        aiRestClient.delete()
+                .uri("/chat/lives/{liveId}/documents", liveId)
+                .retrieve()
+                .toBodilessEntity();
+    }
 }
