@@ -15,17 +15,22 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.product.dto.request.AiQualityFindingRequest;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductListFilterParams;
 import com.ssafy.backend.product.dto.request.ProductSortType;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
+import com.ssafy.backend.product.dto.response.AiQualityAnalysisStatus;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
+import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.product.entity.Brand;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductDefect;
+import com.ssafy.backend.product.entity.ProductImageRole;
+import com.ssafy.backend.product.entity.ProductQualityFinding;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.entity.SaleType;
 import com.ssafy.backend.product.port.LiveQueryPort;
@@ -34,6 +39,7 @@ import com.ssafy.backend.product.port.dto.LinkedLiveSummary;
 import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductDefectRepository;
+import com.ssafy.backend.product.repository.ProductQualityFindingRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +83,9 @@ class ProductServiceTest {
     private ProductDefectRepository productDefectRepository;
 
     @Mock
+    private ProductQualityFindingRepository productQualityFindingRepository;
+
+    @Mock
     private SocialQueryPort socialQueryPort;
 
     @Mock
@@ -94,7 +103,8 @@ class ProductServiceTest {
     void setUp() {
         productService = new ProductService(
                 productRepository, memberRepository, productImageService, categoryRepository,
-                brandRepository, productDefectRepository, socialQueryPort, liveQueryPort, aiClient);
+                brandRepository, productDefectRepository, productQualityFindingRepository,
+                socialQueryPort, liveQueryPort, aiClient);
     }
 
     @Test
@@ -105,7 +115,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null, false, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", null, "M", null, null, null, null, null, false, null);
 
         ProductResponse response = productService.createProduct(SELLER_ID, request);
 
@@ -129,11 +139,13 @@ class ProductServiceTest {
                 CATEGORY_ID,
                 2L,
                 "A급",
+                null,
                 "M",
                 "블랙",
                 "데님",
                 Map.of("총장", 70),
                 List.of("소매 끝 실밥 풀림", "안감 얼룩"),
+                null,
                 false,
                 null);
 
@@ -160,7 +172,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null, false, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", null, "M", null, null, null, null, null, false, null);
 
         productService.createProduct(SELLER_ID, request);
 
@@ -172,7 +184,7 @@ class ProductServiceTest {
         when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.empty());
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", null, CATEGORY_ID, null, null, null, null, null, null, null, false, null);
+                "빈티지 자켓", null, CATEGORY_ID, null, null, null, null, null, null, null, null, null, false, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class);
@@ -186,7 +198,7 @@ class ProductServiceTest {
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(false);
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null, false, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", null, "M", null, null, null, null, null, false, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class)
@@ -200,7 +212,7 @@ class ProductServiceTest {
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null, true, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", null, "M", null, null, null, null, null, true, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class)
@@ -216,7 +228,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", "M", null, null, null, null,
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", null, "M", null, null, null, null, null,
                 true, com.ssafy.backend.product.entity.AiModelGender.FEMALE);
 
         ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
@@ -226,6 +238,48 @@ class ProductServiceTest {
         assertThat(captor.getValue().isAiModelEnabled()).isTrue();
         assertThat(captor.getValue().getAiModelGender())
                 .isEqualTo(com.ssafy.backend.product.entity.AiModelGender.FEMALE);
+    }
+
+    @Test
+    void 등록_시_확정한_AI_품질_검수_finding을_저장한다() {
+        when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.of(seller));
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ProductCreateRequest request = new ProductCreateRequest(
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", 78.0, "M", null, null, null, null,
+                List.of(new AiQualityFindingRequest(
+                        ProductImageRole.FRONT, "소매 끝단 마모 의심",
+                        new AiQualityFindingRequest.Box(58, 18, 24, 18))),
+                false, null);
+
+        productService.createProduct(SELLER_ID, request);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ProductQualityFinding>> captor = ArgumentCaptor.forClass(List.class);
+        verify(productQualityFindingRepository).saveAll(captor.capture());
+        List<ProductQualityFinding> saved = captor.getValue();
+        assertThat(saved).hasSize(1);
+        assertThat(saved.get(0).getPhotoRole()).isEqualTo(ProductImageRole.FRONT);
+        assertThat(saved.get(0).getDescription()).isEqualTo("소매 끝단 마모 의심");
+        assertThat(saved.get(0).getBox()).containsEntry("x", 58).containsEntry("width", 24);
+    }
+
+    @Test
+    void ADDITIONAL_사진에는_AI_품질_검수_finding을_등록할_수_없다() {
+        when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.of(seller));
+        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ProductCreateRequest request = new ProductCreateRequest(
+                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", null, "M", null, null, null, null,
+                List.of(new AiQualityFindingRequest(ProductImageRole.ADDITIONAL, "얼룩", null)),
+                false, null);
+
+        assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AI_QUALITY_FINDING_INVALID_PHOTO_ROLE);
     }
 
     @Test
@@ -485,6 +539,52 @@ class ProductServiceTest {
 
         assertThatThrownBy(() -> productService.getProductDetail(SELLER_ID, 1L))
                 .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 등록된_finding이_없으면_AI_품질_검수_상태는_NOT_REQUESTED다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(seller.getNickname()).thenReturn("판매자");
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductDetailResponse response = productService.getProductDetail(SELLER_ID, 1L);
+
+        assertThat(response.aiQualityAnalysis().status()).isEqualTo(AiQualityAnalysisStatus.NOT_REQUESTED);
+        assertThat(response.aiQualityAnalysis().images()).isEmpty();
+    }
+
+    @Test
+    void finding이_있으면_사진role별로_묶여_원본_이미지_URL과_함께_내려간다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(seller.getNickname()).thenReturn("판매자");
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductQualityFinding frontFinding = ProductQualityFinding.builder()
+                .product(product)
+                .photoRole(ProductImageRole.FRONT)
+                .description("소매 끝단 마모 의심")
+                .box(Map.of("x", 58, "y", 18, "width", 24, "height", 18))
+                .sortOrder((short) 0)
+                .build();
+        when(productQualityFindingRepository.findAllByProductIdOrderBySortOrderAsc(1L))
+                .thenReturn(List.of(frontFinding));
+        when(productImageService.getImages(1L)).thenReturn(List.of(
+                new ProductImageResponse(1L, "https://s3.example/front.jpg", (short) 0, true, ProductImageRole.FRONT),
+                new ProductImageResponse(2L, "https://s3.example/etc.jpg", (short) 1, false, ProductImageRole.ADDITIONAL)));
+
+        ProductDetailResponse response = productService.getProductDetail(SELLER_ID, 1L);
+
+        assertThat(response.aiQualityAnalysis().status()).isEqualTo(AiQualityAnalysisStatus.COMPLETED);
+        assertThat(response.aiQualityAnalysis().images()).hasSize(1);
+        var frontImage = response.aiQualityAnalysis().images().get(0);
+        assertThat(frontImage.label()).isEqualTo("앞면");
+        assertThat(frontImage.originalImageUrl()).isEqualTo("https://s3.example/front.jpg");
+        assertThat(frontImage.analyzedImageUrl()).isEqualTo("https://s3.example/front.jpg");
+        assertThat(frontImage.summary()).isNull();
+        assertThat(frontImage.findings()).hasSize(1);
+        assertThat(frontImage.findings().get(0).description()).isEqualTo("소매 끝단 마모 의심");
     }
 
     @Test

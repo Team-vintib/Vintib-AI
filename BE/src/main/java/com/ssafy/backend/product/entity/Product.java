@@ -74,6 +74,12 @@ public class Product extends BaseTimeEntity {
     @Column(name = "condition_grade", length = 20)
     private String conditionGrade;
 
+    // AI 품질 검수가 매긴 원점수(0~100, SY043). 041-quality-inspection-integration.md 경고 그대로:
+    // 가중치·등급 경계가 근거 없는 임의값이라 가격책정 등 다른 로직이 이 값을 신뢰해 쓰면 안 된다
+    // — 상품 상세에 참고용으로 보여주는 것 외 용도로 참조하지 않는다.
+    @Column(name = "condition_score")
+    private Double conditionScore;
+
     @Column(name = "size_label", length = 50)
     private String sizeLabel;
 
@@ -137,6 +143,7 @@ public class Product extends BaseTimeEntity {
             String title,
             String description,
             String conditionGrade,
+            Double conditionScore,
             String sizeLabel,
             String color,
             String material,
@@ -149,6 +156,7 @@ public class Product extends BaseTimeEntity {
         this.title = title;
         this.description = description;
         this.conditionGrade = conditionGrade;
+        this.conditionScore = conditionScore;
         this.sizeLabel = sizeLabel;
         this.color = color;
         this.material = material;
