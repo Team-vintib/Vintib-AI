@@ -55,34 +55,27 @@ export interface LoginResponse {
   nextStep?: AuthNextStep
 }
 
-export interface LinkAccountRequest {
-  linkToken: string
-  agree: boolean
-}
-
-export interface LinkAccountResponse {
-  accessToken?: string
-  refreshToken?: string
-  user?: AuthUser
-  nextStep?: AuthNextStep
-}
-
 export interface LinkAccountSessionPayload {
   email?: string
   linkToken: string
 }
 
-export interface SsafySsoCallbackRequest {
-  authorizationCode: string
+// docs/requests/FE/036-google-oauth-signin-contract.md
+export interface GoogleAuthRequest {
+  code: string
   redirectUri: string
 }
 
-export interface SsafySsoCallbackResponse {
-  accessToken?: string
-  refreshToken?: string
-  email?: string
-  linked?: boolean
-  linkToken?: string
-  nextStep?: AuthNextStep
-  user?: AuthUser
+export interface GoogleAuthResponse {
+  status: 'LOGIN' | 'LINK_REQUIRED'
+  accessToken: string | null
+  refreshToken: string | null
+  onboardingCompleted: boolean | null
+  linkToken: string | null
+  email: string | null
+}
+
+export interface GoogleLinkRequest {
+  linkToken: string
+  confirm: boolean
 }

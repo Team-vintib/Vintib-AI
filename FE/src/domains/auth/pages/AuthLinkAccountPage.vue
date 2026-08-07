@@ -3,13 +3,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import logoImage from '@/assets/images/logo-white.png'
-import { linkSsafyAccount } from '@/domains/auth/api/authApi'
+import { confirmGoogleLink } from '@/domains/auth/api/authApi'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { startGoogleOAuth } from '@/domains/auth/utils/googleOAuth'
 import {
   clearLinkAccountSession,
   readLinkAccountSession,
 } from '@/domains/auth/utils/linkAccountSession'
-import type { AuthNextStep, LinkAccountSessionPayload } from '@/domains/auth/types/auth.types'
+import type { LinkAccountSessionPayload } from '@/domains/auth/types/auth.types'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
@@ -42,9 +43,9 @@ onMounted(() => {
   accountInfo.value = payload
 })
 
-const handleRetrySso = async () => {
+const handleRetrySso = () => {
   clearLinkAccountSession()
-  await router.push({ name: ROUTE_NAMES.AUTH_SSAFY_SIGNUP })
+  startGoogleOAuth('signup')
 }
 
 const handleMoveToLogin = async () => {
@@ -84,9 +85,9 @@ const handleContinue = async () => {
   isSubmitting.value = true
 
   try {
-    const response = await linkSsafyAccount({
+    const response = await confirmGoogleLink({
       linkToken: accountInfo.value.linkToken,
-      agree: true,
+      confirm: true,
     })
 
     if (!response.success) {
@@ -99,9 +100,13 @@ const handleContinue = async () => {
       return
     }
 
-    authStore.setSession(response.data)
+    authStore.setSession({
+      accessToken: response.data.accessToken,
+      refreshToken: response.data.refreshToken,
+      user: { onboardingCompleted: response.data.onboardingCompleted ?? undefined },
+    })
     clearLinkAccountSession()
-    await moveAfterLink(response.data.nextStep, response.data.user?.onboardingCompleted)
+    await moveAfterLink(response.data.onboardingCompleted)
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -112,7 +117,7 @@ const handleContinue = async () => {
 }
 
 const applyLinkAccountError = (code?: string, message?: string) => {
-  if (code === 'U005' || code === 'U007' || code === 'AUTH_LINK_EXPIRED') {
+  if (code === 'U016') {
     submitError.value = message || '계정 연결 인증 시간이 만료되었습니다. 다시 인증해 주세요.'
     clearLinkAccountSession()
     accountInfo.value = null
@@ -133,13 +138,8 @@ const applyLinkAccountError = (code?: string, message?: string) => {
   submitError.value = message || '계정 연결을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
 }
 
-const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: boolean) => {
-  if (nextStep === 'HOME') {
-    await router.replace(ROUTE_PATHS.HOME)
-    return
-  }
-
-  if (nextStep === 'ONBOARD_PROFILE' || onboardingCompleted === false) {
+const moveAfterLink = async (onboardingCompleted: boolean | null) => {
+  if (onboardingCompleted === false) {
     await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
     return
   }
@@ -162,10 +162,10 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
         >
           <img class="link-header__logo" :src="logoImage" alt="VinTib" />
         </RouterLink>
-        <p class="link-header__eyebrow">SSAFYERS SSO</p>
+        <p class="link-header__eyebrow">GOOGLE SIGN-IN</p>
         <h1 id="link-title" class="link-header__title">기존 계정 연결 안내</h1>
         <p class="link-header__description">
-          싸피어스 인증 이메일과 동일한 VinTib 계정이 확인되었습니다.
+          Google 인증 이메일과 동일한 VinTib 계정이 확인되었습니다.
         </p>
       </header>
 
@@ -177,7 +177,7 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
 
         <section class="link-guide" aria-label="계정 연결 안내">
           <p class="link-guide__text">
-            동의하면 기존 VinTib 계정에 싸피어스 로그인 정보가 연결됩니다.
+            동의하면 기존 VinTib 계정에 Google 로그인 정보가 연결됩니다.
           </p>
           <p class="link-guide__text">
             연결 후에는 같은 계정으로 로그인하고 서비스를 이어서 이용할 수 있습니다.
@@ -195,7 +195,7 @@ const moveAfterLink = async (nextStep?: AuthNextStep, onboardingCompleted?: bool
               aria-describedby="link-account-agreement-message"
               @change="handleAgreementChange"
             />
-            <span>기존 VinTib 계정에 싸피어스 로그인 정보를 연결하는 데 동의합니다.</span>
+            <span>기존 VinTib 계정에 Google 로그인 정보를 연결하는 데 동의합니다.</span>
           </label>
           <p
             v-if="consentError"

@@ -2,12 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import { logout, reissueToken } from '@/domains/auth/api/authApi'
-import type {
-  AuthUser,
-  LinkAccountResponse,
-  LoginResponse,
-  SsafySsoCallbackResponse,
-} from '@/domains/auth/types/auth.types'
+import type { AuthUser } from '@/domains/auth/types/auth.types'
 import { normalizeApiError } from '@/shared/api/http'
 import {
   type AuthStorageType,
@@ -16,7 +11,13 @@ import {
   writeStoredAuthSession,
 } from '@/shared/api/authTokenStorage'
 
-type AuthSession = LoginResponse | SsafySsoCallbackResponse | LinkAccountResponse
+// LoginResponse의 user는 AuthUser 그대로, Google 로그인은 user 객체가 없어 onboardingCompleted
+// 같은 낱개 필드만 Partial<AuthUser> 형태로 조립해 넘긴다 — 그래서 user는 부분 타입으로 받는다.
+type AuthSession = {
+  accessToken?: string | null
+  refreshToken?: string | null
+  user?: Partial<AuthUser>
+}
 type JwtPayload = {
   email?: unknown
   sub?: unknown
