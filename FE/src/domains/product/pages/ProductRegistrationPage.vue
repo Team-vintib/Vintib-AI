@@ -2147,7 +2147,7 @@ onBeforeUnmount(() => {
               <div class="product-registration__section-header">
                 <div>
                   <h3 id="ai-quality-title">AI 품질 검증</h3>
-                  <p>Front View와 Back View 사진을 기준으로 AI가 자동으로 검증합니다.</p>
+                  <p>상품의 앞과 뒤 사진을 기준으로 AI가 자동으로 검증합니다.</p>
                 </div>
               </div>
 
@@ -2217,8 +2217,8 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
 
-                <p v-if="currentAiResult.summary" class="product-registration__ai-summary">
-                  {{ currentAiResult.summary }}
+                <p v-if="currentAiResult.findings.length > 0" class="product-registration__ai-guide">
+                  원래 디자인이라면 체크를 해제해 주세요 !
                 </p>
 
                 <div class="product-registration__ai-result-content">
@@ -2236,7 +2236,9 @@ onBeforeUnmount(() => {
                         height: `${toPercentBox(finding.bbox).height}%`,
                       }"
                     >
-                      {{ finding.no }}
+                      <span class="product-registration__ai-card-badge product-registration__ai-box-badge">
+                        {{ finding.no }}
+                      </span>
                     </span>
                   </div>
 
@@ -2250,16 +2252,39 @@ onBeforeUnmount(() => {
                       class="product-registration__ai-card"
                       :class="{ 'product-registration__ai-card--excluded': !finding.isActualDefect }"
                     >
-                      <div>
-                        <strong>{{ finding.no }}번 · {{ finding.label }} · {{ finding.sectionLabel }}</strong>
+                      <div class="product-registration__ai-card-body">
+                        <div class="product-registration__ai-card-title">
+                          <span class="product-registration__ai-card-badge">{{ finding.no }}</span>
+                          <span class="product-registration__ai-card-defect">{{ finding.label }}</span>
+                        </div>
+                        <span class="product-registration__ai-card-section">{{ finding.sectionLabel }}</span>
                         <p>{{ finding.description ?? '설명이 아직 제공되지 않습니다.' }}</p>
                       </div>
                       <button
                         type="button"
+                        class="product-registration__ai-card-toggle"
                         :disabled="currentAiResult.confirmed"
+                        :aria-pressed="finding.isActualDefect"
+                        :aria-label="
+                          finding.isActualDefect
+                            ? '하자로 인정됨 · 눌러서 목록에서 제외'
+                            : '하자 목록에서 제외됨 · 눌러서 다시 포함'
+                        "
                         @click="toggleAiDefectCandidate(finding.key)"
                       >
-                        {{ finding.isActualDefect ? '하자 제외' : '하자로 표시' }}
+                        <svg v-if="finding.isActualDefect" aria-hidden="true" viewBox="0 0 24 24">
+                          <path
+                            d="M5 13l4 4L19 7"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                          />
+                        </svg>
+                        <svg v-else aria-hidden="true" viewBox="0 0 24 24">
+                          <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2" />
+                        </svg>
                       </button>
                     </article>
                   </div>
@@ -3337,53 +3362,56 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 
-.product-registration__ai-summary {
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-secondary);
+.product-registration__ai-guide {
+  padding: 0 var(--space-1);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-s);
   line-height: var(--line-height-snug);
-  white-space: pre-line;
 }
 
 .product-registration__ai-result-content {
   display: grid;
-  grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
 }
 
 .product-registration__ai-image {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   border-radius: var(--radius-control);
   background: var(--color-surface);
 }
 
 .product-registration__ai-image img {
+  display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
+  height: auto;
+  border-radius: var(--radius-control);
 }
 
 .product-registration__ai-box {
   position: absolute;
-  display: grid;
-  padding: 4px 0 0 6px;
   border: 2px solid var(--color-error);
+  border-radius: 2px;
   background: rgb(196 61 70 / 12%);
-  color: var(--color-error);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
-  line-height: 1;
-  place-items: start;
 }
 
 .product-registration__ai-box--excluded {
   border-color: var(--color-border-strong);
   background: transparent;
-  color: var(--color-text-muted);
+}
+
+.product-registration__ai-box-badge {
+  position: absolute;
+  right: 100%;
+  bottom: 100%;
+  margin-right: 1px;
+  margin-bottom: 1px;
+}
+
+.product-registration__ai-box--excluded .product-registration__ai-card-badge {
+  background: var(--color-text-muted);
 }
 
 .product-registration__ai-cards {
@@ -3394,9 +3422,8 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-card {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--color-error);
   border-radius: var(--radius-control);
@@ -3405,6 +3432,7 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-card--excluded {
   border-color: var(--color-border);
+  border-style: dashed;
   opacity: 0.6;
 }
 
@@ -3413,42 +3441,93 @@ onBeforeUnmount(() => {
   font-size: var(--font-size-caption);
 }
 
-.product-registration__ai-card div {
-  display: grid;
-  gap: var(--space-1);
+.product-registration__ai-card-badge {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-error);
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
 }
 
-.product-registration__ai-card strong {
+.product-registration__ai-card--excluded .product-registration__ai-card-badge {
+  background: var(--color-text-muted);
+}
+
+.product-registration__ai-card-body {
+  display: grid;
+  flex: 1;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.product-registration__ai-card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.product-registration__ai-card-defect {
   color: var(--color-text-primary);
   font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.product-registration__ai-card--excluded .product-registration__ai-card-defect {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+.product-registration__ai-card-section {
+  justify-self: start;
+  margin-left: calc(22px + var(--space-2) - 6px);
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
 }
 
 .product-registration__ai-card p {
+  margin-left: calc(22px + var(--space-2));
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   line-height: var(--line-height-control);
 }
 
-.product-registration__ai-card button {
-  min-width: 72px;
-  height: var(--button-height-small);
-  padding: 0 var(--space-2);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
-  white-space: nowrap;
-}
-
-.product-registration__ai-card:not(.product-registration__ai-card--excluded) button {
-  border-color: var(--color-error);
+.product-registration__ai-card-toggle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-error);
+  border-radius: 999px;
   background: var(--color-error-soft);
   color: var(--color-error);
 }
 
-.product-registration__ai-card button:disabled {
+.product-registration__ai-card-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.product-registration__ai-card--excluded .product-registration__ai-card-toggle {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.product-registration__ai-card-toggle:disabled {
   border-color: var(--color-border);
   background: var(--color-surface-secondary);
   color: var(--color-text-muted);
