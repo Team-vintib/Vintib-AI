@@ -75,7 +75,7 @@ _LABEL_SOURCE_DIR = _HERE.parent / "product-info-check"
 sys.path.insert(0, str(_LABEL_SOURCE_DIR))
 
 from classify import make_embedding_classifier  # noqa: E402
-from taxonomy import PROMPT_TEMPLATES, SUBCATEGORIES  # noqa: E402
+from taxonomy import BOUNDARY_RULES, CONFUSION_PAIRS, PROMPT_TEMPLATES, SUBCATEGORIES  # noqa: E402
 
 _kr_label = PROMPT_TEMPLATES["kr_plain"]  # 코드 -> 한글 라벨 문구(예: "데님"). 공개 접근점.
 
@@ -90,9 +90,55 @@ PANTS_MATERIAL_CODES: tuple[str, ...] = tuple(
     code for code in SUBCATEGORIES["BOTTOM"] if code not in ("SKIRT", "SHORT_PANTS")
 )
 
+# 5종 사이 시각적 구분 기준. taxonomy.py의 두 소스를 그대로 반영한다 — 새로 지어낸 기준이
+# 아니라 이미 이 저장소가 실측/합의한 것을 재사용한다:
+#   - BOUNDARY_RULES["COTTON_PANTS"] — 유일하게 명문화된 경계 규칙(정장 원단 주름=SLACKS).
+#   - CONFUSION_PAIRS 중 하의 3쌍(SLACKS/CARGO_PANTS, SLACKS/COTTON_PANTS,
+#     CARGO_PANTS/JOGGER_PANTS) — CLIP이 실제로 헷갈렸던 조합(product-info-check/REPORT.md
+#     §10). 이 3쌍에 걸친 코드(SLACKS/CARGO_PANTS/JOGGER_PANTS/COTTON_PANTS)만 구분 포인트를
+#     명시하고, 혼동쌍에 없는 DENIM은 원단 설명만 준다 — 오탐 위험이 낮다고 실측이 이미 말해준
+#     조합에 억지로 규칙을 만들지 않는다.
+#
+# **한글/영문 두 벌을 따로 둔다.** fashion-clip의 텍스트 인코더는 영문 CLIP 토크나이저
+# 그대로라(classify.py: "LAION CLIP ViT-B/32 위에 파인튜닝") 한글 문장을 넣으면 토큰화가
+# 깨져 오히려 성능이 떨어진다 — Qwen3-VL(다국어 생성 모델)에만 한글 버전을 쓴다.
+_PANTS_VISUAL_HINTS_KO: dict[str, str] = {
+    "DENIM": "데님(청바지) 원단 — 능직 면, 대개 파란색/검은색 계열, 리벳·오렌지 스티치",
+    "SLACKS": "정장/캐주얼 슬랙스 — 매끈한 원단에 다림질된 앞주름(crease line), 카고 포켓 없음",
+    "CARGO_PANTS": "카고팬츠 — 허벅지·옆면에 덮개 달린 큰 포켓(카고 포켓)이 있는 게 핵심 특징",
+    "JOGGER_PANTS": "조거팬츠 — 밑단이 고무줄/니트 커프스로 조여진 트레이닝복 원단(플리스·저지)",
+    "COTTON_PANTS": (
+        "면 치노 팬츠 — 캐주얼한 면 소재, 자연스러운 구김. "
+        # BOUNDARY_RULES 원문을 그대로 인용하되 코드명(SLACKS)만 한글 라벨로 바꿔
+        # VLM 프롬프트 문장이 자연스럽게 읽히게 한다 — 내용 자체는 손대지 않는다.
+        + BOUNDARY_RULES["COTTON_PANTS"].replace("SLACKS", _kr_label("SLACKS"))
+    ),
+}
+_PANTS_VISUAL_HINTS_EN: dict[str, str] = {
+    "DENIM": "a photo of blue denim jeans with visible stitching",
+    "SLACKS": "a photo of dress slacks with a crisp pressed front crease, no thigh pockets",
+    "CARGO_PANTS": "a photo of cargo pants with large flap pockets on the thigh",
+    "JOGGER_PANTS": "a photo of jogger sweatpants with elastic cuffs at the ankle",
+    "COTTON_PANTS": "a photo of casual cotton chino pants, smooth fabric with no crease line",
+}
+assert set(_PANTS_VISUAL_HINTS_KO) == set(_PANTS_VISUAL_HINTS_EN) == set(PANTS_MATERIAL_CODES)
+# 위 힌트가 겨냥한 3쌍이 실제로 taxonomy.py의 실측 혼동쌍과 일치하는지 대조 — 나중에
+# taxonomy.py가 바뀌었는데 여기 힌트를 안 고치면 여기서 바로 드러난다.
+for _pair in (
+    ("SLACKS", "CARGO_PANTS"),
+    ("SLACKS", "COTTON_PANTS"),
+    ("CARGO_PANTS", "JOGGER_PANTS"),
+):
+    assert _pair in CONFUSION_PAIRS, f"taxonomy.py의 CONFUSION_PAIRS와 어긋남: {_pair}"
+
 DEFAULT_MIN_CONFIDENCE = 0.5  # 5-way 균등 기준선(0.2)의 2.5배. 근거 없는 값 — 스윕 대상.
 
-QWEN3_VL_MODEL_ID = "Qwen/Qwen3-VL-4B-Instruct"  # quality_vlm/registry.py와 동일 체크포인트
+# quality_vlm/registry.py와 같은 계열 체크포인트. GPU가 널널하면 --model-id로 더 큰
+# 체크포인트(예: Qwen/Qwen3-VL-8B-Instruct — 같은 dense 아키텍처라 로더 코드 무수정)로
+# 바꿀 수 있다. 30B-A3B 이상 MoE 계열은 로더가 다른 모델 클래스를 요구할 수 있어 검증
+# 없이 넣지 않는다 — 시도하려면 먼저 `transformers`가 그 체크포인트를
+# `Qwen3VLForConditionalGeneration`으로 로드하는지 확인할 것.
+QWEN3_VL_MODEL_ID = "Qwen/Qwen3-VL-4B-Instruct"
 
 
 def load_index_rows(index_path: Path) -> list[dict]:
@@ -160,7 +206,11 @@ def label_with_fashion_clip(
     progress_every: int,
 ) -> list[dict[str, Any]]:
     classifier = make_embedding_classifier("fashion_clip")
-    label_texts = [PROMPT_TEMPLATES["en_clip_style"](code) for code in PANTS_MATERIAL_CODES]
+    # `PROMPT_TEMPLATES["en_clip_style"]`(예: "a photo of a denim jeans")는 소재 이름만
+    # 담아 SLACKS/CARGO_PANTS/COTTON_PANTS처럼 원단이 비슷한 조합을 못 가른다. fashion-clip은
+    # 상품 설명 문구로 파인튜닝됐으니(classify.py 주석) 구분 포인트를 문장에 얹어 준다 —
+    # `_PANTS_VISUAL_HINTS_EN`이 곧 그 문장이다(영문 — CLIP 토크나이저가 영문 전용).
+    label_texts = [_PANTS_VISUAL_HINTS_EN[code] for code in PANTS_MATERIAL_CODES]
 
     results: list[dict[str, Any]] = []
     missing_image = 0
@@ -220,17 +270,26 @@ def label_with_qwen3_vl(
     *,
     image_root: Path,
     progress_every: int,
+    model_id: str,
+    quantization: str,
 ) -> list[dict[str, Any]]:
     from loader import VLMBundle, generate_from_image, load_qwen_vl  # quality_vlm/loader.py
     from PIL import Image
 
-    bundle: VLMBundle = load_qwen_vl(QWEN3_VL_MODEL_ID, quantization="4bit")
+    bundle: VLMBundle = load_qwen_vl(model_id, quantization=quantization)
 
-    candidate_labels = "/".join(_kr_label(code) for code in PANTS_MATERIAL_CODES)
+    # 후보를 그냥 나열만 하면(기존: "데님/슬랙스/카고팬츠/조거팬츠/코튼팬츠 중...") 모델이
+    # 원단 명칭만 보고 고르게 되는데, 그게 바로 CLIP도 헷갈렸던 지점이다(위 힌트 주석 참고).
+    # 후보마다 구분 포인트를 같이 주면 VLM이 실제로 봐야 할 특징(카고 포켓 유무, 밑단
+    # 커프스, 앞주름 등)을 먼저 알고 이미지를 본다 — taxonomy.py의 BOUNDARY_RULES가
+    # "사람 라벨러도 기준이 없으면 갈린다"는 전제로 만들어진 것과 같은 이유다.
+    candidate_lines = "\n".join(
+        f"- {_kr_label(code)}: {_PANTS_VISUAL_HINTS_KO[code]}" for code in PANTS_MATERIAL_CODES
+    )
     prompt = (
-        f"이 사진은 중고 의류 하의(팬츠) 사진입니다. 다음 중 이 옷의 종류로 가장 알맞은 "
-        f"것 하나만 정확히 그 단어로만 답하세요: {candidate_labels}. "
-        "설명 없이 단어 하나만 답하세요."
+        "이 사진은 중고 의류 하의(팬츠) 사진입니다. 아래 5종의 구분 기준을 참고해서 "
+        f"가장 알맞은 것 하나를 정확히 그 단어로만 답하세요.\n{candidate_lines}\n"
+        "다른 설명 없이 명칭 단어 하나만 출력하세요."
     )
 
     results: list[dict[str, Any]] = []
@@ -295,6 +354,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, required=True, help="출력 JSONL 경로")
     parser.add_argument("--backend", choices=("fashion_clip", "qwen3_vl"), default="fashion_clip")
     parser.add_argument(
+        "--model-id",
+        default=QWEN3_VL_MODEL_ID,
+        help="qwen3_vl 전용. GPU가 넉넉하면 더 큰 체크포인트(예: Qwen/Qwen3-VL-8B-Instruct — "
+        "같은 dense 아키텍처라 로더 코드 무수정)로 바꿀 수 있다. MoE 계열(30B-A3B 이상)은 "
+        "transformers가 Qwen3VLForConditionalGeneration으로 로드되는지 먼저 확인할 것",
+    )
+    parser.add_argument(
+        "--quantization",
+        choices=("4bit", "none"),
+        default="4bit",
+        help="qwen3_vl 전용. GPU 메모리가 넉넉하면 'none'으로 풀정밀도 로드(품질↑, 로드 "
+        "시간·VRAM↑). 기본은 로컬 8GB급 GPU 기준 4bit(quality_vlm/loader.py와 동일)",
+    )
+    parser.add_argument(
         "--min-confidence",
         type=float,
         default=DEFAULT_MIN_CONFIDENCE,
@@ -346,7 +419,12 @@ def main(argv: list[str] | None = None) -> int:
         print("대상 행이 0개다 — 필터 조건을 확인할 것", file=sys.stderr)
         return 1
 
-    print(f"백엔드={args.backend} 대상={len(rows):,}건 -> {args.out}")
+    backend_detail = (
+        f" (model={args.model_id}, quantization={args.quantization})"
+        if args.backend == "qwen3_vl"
+        else ""
+    )
+    print(f"백엔드={args.backend}{backend_detail} 대상={len(rows):,}건 -> {args.out}")
     if args.backend == "fashion_clip":
         results = label_with_fashion_clip(
             rows,
@@ -356,7 +434,11 @@ def main(argv: list[str] | None = None) -> int:
         )
     else:
         results = label_with_qwen3_vl(
-            rows, image_root=args.image_root, progress_every=args.progress_every
+            rows,
+            image_root=args.image_root,
+            progress_every=args.progress_every,
+            model_id=args.model_id,
+            quantization=args.quantization,
         )
 
     mode = "a" if args.resume else "w"
