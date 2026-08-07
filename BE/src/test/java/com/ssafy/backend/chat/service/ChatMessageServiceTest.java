@@ -4,9 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.chat.dto.response.ChatMessageResponse;
@@ -56,9 +53,6 @@ class ChatMessageServiceTest {
     @Mock
     private AiClient aiClient;
 
-    @Mock
-    private HostChatRagSeeder hostChatRagSeeder;
-
     private ChatMessageService chatMessageService;
 
     private Live live() {
@@ -67,13 +61,6 @@ class ChatMessageServiceTest {
         Live live = Live.openNow(host, "빈티지 데님 라이브", null, null, STARTED_AT);
         ReflectionTestUtils.setField(live, "id", LIVE_ID);
         return live;
-    }
-
-    private Member hostMember() {
-        Member member =
-                Member.builder().email("host@example.com").password("encoded").name("호스트").build();
-        ReflectionTestUtils.setField(member, "id", HOST_ID);
-        return member;
     }
 
     private Member viewer() {
@@ -86,8 +73,7 @@ class ChatMessageServiceTest {
 
     private void setUpChatMessageService() {
         chatMessageService =
-                new ChatMessageService(
-                        chatMessageRepository, liveRepository, memberRepository, aiClient, hostChatRagSeeder);
+                new ChatMessageService(chatMessageRepository, liveRepository, memberRepository, aiClient);
     }
 
     private void stubSaveReturnsArgumentWithId(Long messageId) {
@@ -112,53 +98,6 @@ class ChatMessageServiceTest {
 
         assertThat(result.isBlocked()).isFalse();
         assertThat(result.broadcastMessage().content()).isEqualTo("사이즈 M 맞나요?");
-    }
-
-    @Test
-    void 시청자가_채팅해도_RAG_문서로_seed되지_않는다() {
-        setUpChatMessageService();
-        Live live = live();
-        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
-        when(memberRepository.findById(SENDER_ID)).thenReturn(Optional.of(viewer()));
-        stubSaveReturnsArgumentWithId(13L);
-        when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
-                .thenReturn(new ModerateChatResponse("NORMAL", "PASS", "clean"));
-
-        chatMessageService.send(SENDER_ID, LIVE_ID, "사이즈 M 맞나요?", "tmp-viewer");
-
-        verify(hostChatRagSeeder, never()).seed(any(), any());
-    }
-
-    @Test
-    void 호스트가_채팅하면_RAG_문서로_seed된다() {
-        // 실측치·네고 가능 여부처럼 상품 DB에 없는 정보를 판매자가 채팅으로 알려줄 때가
-        // 있다(CH026) — STT가 아직 없어 이 텍스트라도 근거로 쌓는다.
-        setUpChatMessageService();
-        Live live = live();
-        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
-        when(memberRepository.findById(HOST_ID)).thenReturn(Optional.of(hostMember()));
-        stubSaveReturnsArgumentWithId(14L);
-        when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
-                .thenReturn(new ModerateChatResponse("NORMAL", "PASS", "clean"));
-
-        chatMessageService.send(HOST_ID, LIVE_ID, "실측 어깨너비 50입니다", "tmp-host");
-
-        verify(hostChatRagSeeder).seed(eq(LIVE_ID), eq("실측 어깨너비 50입니다"));
-    }
-
-    @Test
-    void 호스트_채팅이_차단되면_RAG_문서로_seed되지_않는다() {
-        setUpChatMessageService();
-        Live live = live();
-        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
-        when(memberRepository.findById(HOST_ID)).thenReturn(Optional.of(hostMember()));
-        stubSaveReturnsArgumentWithId(15L);
-        when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
-                .thenReturn(new ModerateChatResponse("ABUSIVE", "BLOCK", "abuse:term"));
-
-        chatMessageService.send(HOST_ID, LIVE_ID, "욕설성 발언", "tmp-host-blocked");
-
-        verify(hostChatRagSeeder, never()).seed(any(), any());
     }
 
     @Test
