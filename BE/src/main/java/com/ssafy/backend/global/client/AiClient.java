@@ -71,11 +71,19 @@ public class AiClient {
         return response.jobId();
     }
 
-    /** {@code POST /quality/inspections} — 앞/뒤 사진이 갖춰지면 하자 검수 job 생성. */
+    /**
+     * {@code POST /quality/inspections} — 앞/뒤 사진이 갖춰지면 하자 검수 job 생성.
+     *
+     * <p>{@code include_descriptions}/{@code include_attention_maps}는 켠다 — 워커 연동
+     * 검증 단계라 VLM 설명과 판단 근거(attention map) 둘 다 실제로 받아 확인해야 한다.
+     * {@code include_annotated_images}는 끈다 — FE가 bbox를 좌표로 직접 그리기로 해서 정적
+     * PNG가 필요 없어졌다(2026-08-08). 다 지연시간이 늘어나는 옵션이라, 필요 없어지면 다시
+     * 검토할 여지가 있다.
+     */
     public String createQualityInspectionJob(Long productId, List<String> imageUrls, String category) {
         AiJobCreatedResponse response = aiRestClient.post()
                 .uri("/quality/inspections")
-                .body(new QualityInspectionJobRequest(productId, imageUrls, category, false))
+                .body(new QualityInspectionJobRequest(productId, imageUrls, category, true, true, false))
                 .retrieve()
                 .body(AiJobCreatedResponse.class);
         return response.jobId();
