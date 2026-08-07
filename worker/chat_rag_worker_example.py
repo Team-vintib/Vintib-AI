@@ -40,6 +40,30 @@ EMBEDDING_DIM = 1024
 GROUNDING_THRESHOLD = 0.70
 
 
+def _load_preferring_cache(loader, *args, **kwargs):
+    """로컬 HF 캐시에 가중치가 있으면 그걸 바로 쓰고, 없을 때만 온라인으로 받는다.
+
+    `HF_HUB_OFFLINE`을 안 켜두면 캐시가 있어도 매번 Hub에 최신 리비전인지 확인하러
+    나간다 — 그 사이 upstream 리비전이 바뀌어 있으면(실측: LFM2.5-230M) 이미 받아둔
+    가중치가 그대로 있는데도 통째로 다시 받는다. 여기서 오프라인 로드를 먼저 시도해
+    그 왕복 자체를 건너뛰고, 캐시에 없는 것만(최초 1회) 온라인으로 받는다.
+    """
+    previous = os.environ.get("HF_HUB_OFFLINE")
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    try:
+        return loader(*args, **kwargs)
+    except Exception:
+        pass
+    finally:
+        if previous is None:
+            os.environ.pop("HF_HUB_OFFLINE", None)
+        else:
+            os.environ["HF_HUB_OFFLINE"] = previous
+
+    print("[chat_rag] 로컬 캐시에 없어 온라인으로 새로 받습니다...")
+    return loader(*args, **kwargs)
+
+
 def _mock_embedding(text: str, dim: int = EMBEDDING_DIM) -> np.ndarray:
     """실 모델 없이도 검증 가능한 결정적 벡터(`stt_worker_example.py`와 같은 착상)."""
     digest = hashlib.sha256(text.encode("utf-8")).digest()[:8]
@@ -65,8 +89,9 @@ class ChatRagWorker(BaseWorker):
         from sentence_transformers import SentenceTransformer
         from transformers import pipeline
 
-        self._embed_model = SentenceTransformer("nlpai-lab/KURE-v1")
-        text_gen = pipeline(
+        self._embed_model = _load_preferring_cache(SentenceTransformer, "nlpai-lab/KURE-v1")
+        text_gen = _load_preferring_cache(
+            pipeline,
             "text-generation",
             model="LiquidAI/LFM2.5-230M",
             device="cuda",
