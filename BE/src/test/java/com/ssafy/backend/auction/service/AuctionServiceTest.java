@@ -27,7 +27,7 @@ import com.ssafy.backend.global.response.CursorPageResponse;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.live.entity.Live;
-import com.ssafy.backend.live.port.NotificationCommandPort;
+import com.ssafy.backend.notification.port.NotificationCommandPort;
 import com.ssafy.backend.live.port.ProductQueryPort;
 import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;

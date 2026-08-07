@@ -8,6 +8,7 @@ import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.notification.port.NotificationCommandPort;
 import com.ssafy.backend.order.dto.request.OrderCreateRequest;
 import com.ssafy.backend.order.dto.request.OrderRole;
 import com.ssafy.backend.order.dto.request.OrderShipmentAddressRequest;
@@ -51,6 +52,7 @@ public class OrderService {
     private final LiveRepository liveRepository;
     private final PointService pointService;
     private final DeliveryTrackingClient deliveryTrackingClient;
+    private final NotificationCommandPort notificationCommandPort;
 
     /**
      * {@code role}로 구매자/판매자 관점을 구분해 본인 주문 목록을 최신순으로 조회한다.
@@ -95,6 +97,14 @@ public class OrderService {
 
         pointService.pay(buyerId, product.getPrice(), order.getId());
         product.markSold();
+
+        notificationCommandPort.notify(
+                order.getSeller(),
+                "ORDER_PAID",
+                "상품이 판매되었습니다",
+                "주문이 결제됐어요. 배송지를 확인하고 송장을 등록해주세요.",
+                "ORDER",
+                order.getId());
 
         return OrderListItemResponse.from(order);
     }
@@ -157,6 +167,14 @@ public class OrderService {
         shipment.registerTracking(request.courierCode(), request.trackingNumber(), now);
         order.markShipping();
 
+        notificationCommandPort.notify(
+                order.getBuyer(),
+                "SHIPMENT_STARTED",
+                "배송이 시작되었습니다",
+                "판매자가 송장을 등록했어요.",
+                "ORDER",
+                order.getId());
+
         boolean subscribed = deliveryTrackingClient.subscribe(request.courierCode(), request.trackingNumber(), orderId);
         if (!subscribed) {
             log.warn("배송 조회 웹훅 구독 실패, 즉시-확정 폴백으로 처리한다(orderId={})", orderId);
@@ -190,6 +208,13 @@ public class OrderService {
     private void deliver(Order order, OrderShipment shipment, LocalDateTime deliveredAt) {
         order.markDelivered(deliveredAt);
         shipment.markDelivered(deliveredAt);
+        notificationCommandPort.notify(
+                order.getBuyer(),
+                "SHIPMENT_COMPLETED",
+                "배송이 완료되었습니다",
+                "구매를 확정하면 거래가 끝나요. 확정하지 않으면 3일 후 자동으로 처리됩니다.",
+                "ORDER",
+                order.getId());
     }
 
     /** 구매 확정 처리 — 구매자만, DELIVERED 상태에서만 가능. */

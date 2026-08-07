@@ -148,7 +148,7 @@ BE/
 │   │   ├── service/             # LiveService, LiveProductService, LiveViewerService, LiveReactionService, LiveReminderService/Scheduler
 │   │   ├── entity/              # Live, LiveStatus, LiveProduct, LiveReminder, ReactionType(저장 안 함)
 │   │   ├── repository/
-│   │   ├── port/                # ProductQueryPort·NotificationCommandPort — 타 도메인 참조를 한 곳으로 격리
+│   │   ├── port/                # ProductQueryPort — 타 도메인 참조를 한 곳으로 격리
 │   │   ├── websocket/           # LiveSessionEventListener — SUBSCRIBE/DISCONNECT를 시청자 수로
 │   │   └── dto/
 │   ├── chat/                    # 라이브 실시간 채팅 (CHAT) — 정윤
@@ -181,6 +181,7 @@ BE/
 │   │   ├── service/
 │   │   ├── entity/               # Notification
 │   │   ├── repository/
+│   │   ├── port/                 # NotificationCommandPort/Adapter — 다른 도메인이 알림을 만드는 유일한 창구
 │   │   └── dto/response/
 │   ├── business/                 # 사업자 인증 정보 제출/조회/재제출 (BIZ-001) — 서윤
 │   │   ├── controller/
