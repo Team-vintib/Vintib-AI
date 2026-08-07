@@ -260,7 +260,10 @@ onBeforeUnmount(() => {
             {{ formattedRemaining }}
           </strong>
         </div>
-        <div>
+        <div
+          class="live-auction-panel__bidder"
+          :class="{ 'live-auction-panel__bidder--active': snapshot.highestBidderNickname }"
+        >
           <span>최고 입찰자</span>
           <strong>{{ snapshot.highestBidderNickname || '입찰 대기 중' }}</strong>
         </div>
@@ -322,8 +325,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   flex-direction: column;
   gap: var(--space-3);
-  overflow-y: auto;
-  padding: 18px 24px;
+  padding: 16px 18px;
   border-top: 1px solid var(--color-live-border);
   border-left: 1px solid var(--color-live-border);
   background: var(--color-surface-raised);
@@ -338,7 +340,7 @@ onBeforeUnmount(() => {
 .live-auction-panel h2 {
   color: var(--color-accent);
   font-family: var(--font-mono);
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-2xs);
   font-weight: var(--font-weight-regular);
   letter-spacing: 0.2em;
   line-height: var(--line-height-tight);
@@ -383,7 +385,7 @@ onBeforeUnmount(() => {
 .live-auction-panel__balance {
   display: block;
   color: var(--color-live-text-secondary);
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-2xs);
 }
 
 .live-auction-panel__metrics strong {
@@ -392,7 +394,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   color: var(--color-live-text-primary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -401,6 +403,15 @@ onBeforeUnmount(() => {
 .live-auction-panel__urgent,
 .live-auction-panel__next strong {
   color: var(--color-auction) !important;
+}
+
+.live-auction-panel__bidder--active span,
+.live-auction-panel__bidder--active strong {
+  color: var(--color-auction);
+}
+
+.live-auction-panel__bidder--active strong {
+  font-weight: var(--font-weight-bold);
 }
 
 .live-auction-panel__extension {

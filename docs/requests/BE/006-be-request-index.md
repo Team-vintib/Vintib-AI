@@ -39,7 +39,6 @@
 | 003 | `003-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 필드(필수+선택 전부: brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId/hostProfileImageUrl/description/material/measurements/defectSummary) 연결 완료 | AI 시착 생성만 남음(서윤/AI 파트) |
 | 019 | `019-product-quality-multi-image.md` | Product | 미반영 | 서윤 파트 |
 | 020 | `020-tryon-result-category.md` | TryOn | 미반영 | 서윤/AI 파트 |
-| 023 | `023-product-similar-list.md` | Product | 부분 반영 | `similarProducts`가 상세 응답에 있으나 필드가 `id/title/price`뿐 — 서윤 파트 |
 | 025 | `025-product-same-price-chart.md` | Product | 미반영 | 서윤 파트 |
 
 **정윤(라이브·경매·채팅·홈·검색) 담당 요청은 전부 반영돼 이 표에 남은 것이 없다.** 위 목록은
@@ -216,6 +215,16 @@
     따로 필요 없었다. 이 불변식은 `NotificationCommandPort` Javadoc에 정책으로 박아 뒀다(새
     알림 트리거를 추가할 때 참고). 설계 기록은
     `docs/plans/BE/SY041-notification-category-filter.md` 참고.
+
+## 2026-08-06 정리 (023 삭제 — 유사 판정을 AI가 직접 처리하기로 결정)
+
+- `023-product-similar-list.md` 삭제 — 위 항목에서 "부분 반영"으로 남겨뒀던 것을 뒤집는다.
+  AI 쪽에 이미 상품 의류 이미지 임베딩(zero-shot CLIP, 품질검수 SAM3 크롭 재사용)과 pgvector
+  코사인 유사도 조회가 구현돼 있어(`AI/app/recommend/similar/`, `GET /recommend/products/{id}/similar`),
+  "유사 판정 기준은 BE 결정"이라는 023의 전제 대신 **AI가 유사 판정 자체를 맡는다.** BE는
+  이 엔드포인트를 그대로 쓰거나 자체 규칙으로 갈 필요가 없어졌다 — 통합 방식(BE가 AI 엔드포인트를
+  호출/캐시할지, AI가 결과를 직접 BE로 push할지)은 별도 논의.
+- FE `getSimilarProducts`(mock)를 실제로 붙일 대상이 필요해지면 그때 새 요청 문서로 정리한다.
 
 ## 2026-08-06 정리 (브랜치 이동 후 재정리)
 

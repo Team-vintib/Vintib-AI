@@ -99,7 +99,7 @@ public class SecurityConfig {
                         // AI 착용컷 생성 상태 폴링(-568)도 상품 상세와 같은 공개 수준으로 둔다 —
                         // 완료되면 어차피 공개 상품 이미지가 될 결과라 민감 정보가 아니다.
                         .requestMatchers(HttpMethod.GET, "/api/products/{id}/ai-model-cut").permitAll()
-                        // 라이브 목록·시청 조회는 비회원도 가능. 개설·상태 전이는 인증 필요로 남긴다.
+                        // 라이브 목록·시청 조회(LIVE-005)는 비회원도 가능. 개설·상태 전이는 인증 필요로 남긴다.
                         .requestMatchers(HttpMethod.GET, "/api/lives").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/lives/{liveId}").permitAll()
                         // 채팅 이력 조회도 비회원 공개. 시청이 열려 있으니 대화 읽기도

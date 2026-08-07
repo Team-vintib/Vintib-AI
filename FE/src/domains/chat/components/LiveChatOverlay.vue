@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import {
+  type BackendChatBlockedNotice,
   type BackendChatMessage,
   type BackendReaction,
   type BackendReactionType,
@@ -51,6 +52,7 @@ const reactionParticles = ref<LiveReactionParticle[]>([])
 const messageList = ref<HTMLElement | null>(null)
 const isConnected = ref(false)
 const errorMessage = ref('')
+const isChatCollapsed = ref(false)
 let realtimeClient: LiveRealtimeClient | null = null
 let mockMessageSequence = 0
 let reactionSequence = 0
@@ -166,6 +168,17 @@ const subscribeRealtime = () => {
   })
 
   realtimeClient.subscribe('/user/queue/errors', (body) => {
+    // AI 판정(HIDE/BLOCK)으로 브로드캐스트가 생략된 내 메시지는, 브로드캐스트로 오는 "진짜
+    // 메시지 치환" 신호를 영영 못 받는다 — 낙관적 렌더로 먼저 그려둔 말풍선이 내 화면에만
+    // 유령처럼 계속 남아있던 문제(실측으로 확인, -571 후속)를 여기서 지워서 해소한다.
+    if (isBackendChatBlockedNotice(body)) {
+      messages.value = messages.value.filter((message) => message.id !== body.clientMessageId)
+      errorMessage.value = '메시지가 차단되었습니다.'
+      return
+    }
+
+    // 반응을 너무 빠르게 눌렀을 때(L011)는 사용자에게 표시하지 않고 조용히 무시한다.
+    if (isSuppressedRealtimeError(body)) return
     errorMessage.value = getRealtimeErrorMessage(body)
   })
 }
@@ -290,6 +303,17 @@ onBeforeUnmount(() => {
 })
 
 function mapChatMessage(message: BackendChatMessage, hostId: number): LiveChatMessage {
+  // AI 자동답변(CHAT-002)은 특정 발신자를 지칭하지 않는 공통 안내라, 실제 사람 메시지와
+  // 시각적으로 구분한다(요청 문서 032 — "판매자가 직접 답한 것"처럼 보이면 오해 소지가 있음).
+  if (message.senderType === 'AI') {
+    return {
+      id: String(message.messageId),
+      author: 'AI 자동답변',
+      body: message.content,
+      role: 'AI',
+    }
+  }
+
   return {
     id: String(message.messageId),
     author: message.senderNickname || (message.senderType === 'SYSTEM' ? '시스템' : '사용자'),
@@ -336,6 +360,16 @@ function isBackendViewerCount(body: unknown): body is BackendViewerCount {
   )
 }
 
+function isBackendChatBlockedNotice(body: unknown): body is BackendChatBlockedNotice {
+  return Boolean(
+    body &&
+      typeof body === 'object' &&
+      'clientMessageId' in body &&
+      typeof (body as BackendChatBlockedNotice).clientMessageId === 'string' &&
+      !('error' in body),
+  )
+}
+
 function getRealtimeErrorMessage(body: unknown) {
   if (
     body &&
@@ -348,11 +382,22 @@ function getRealtimeErrorMessage(body: unknown) {
 
   return '메시지를 보내지 못했습니다.'
 }
+
+// 반응 속도 제한(L011)처럼 사용자에게 굳이 노출하지 않을 실시간 에러를 걸러낸다.
+function isSuppressedRealtimeError(body: unknown) {
+  if (!body || typeof body !== 'object' || !('error' in body)) return false
+
+  const error = (body as { error?: { code?: unknown; message?: unknown } }).error
+  const code = error?.code ? String(error.code) : ''
+  const message = error?.message ? String(error.message) : ''
+
+  return code === 'L011' || message.includes('반응을 너무 빠르게')
+}
 </script>
 
 <template>
   <div class="live-chat-overlay" aria-label="라이브 채팅과 반응">
-    <div class="live-chat-overlay__reactions" aria-label="라이브 반응">
+    <div v-show="!isChatCollapsed" class="live-chat-overlay__reactions" aria-label="라이브 반응">
       <button
         v-for="emoji in LIVE_REACTION_EMOJIS"
         :key="emoji"
@@ -366,7 +411,11 @@ function getRealtimeErrorMessage(body: unknown) {
       </button>
     </div>
 
-    <div class="live-chat-overlay__reaction-burst" aria-hidden="true">
+    <div
+      class="live-chat-overlay__reaction-burst"
+      :class="{ 'live-chat-overlay__reaction-burst--collapsed': isChatCollapsed }"
+      aria-hidden="true"
+    >
       <span
         v-for="particle in reactionParticles"
         :key="particle.id"
@@ -376,12 +425,23 @@ function getRealtimeErrorMessage(body: unknown) {
       </span>
     </div>
 
-    <section class="live-chat-overlay__panel" aria-label="라이브 채팅">
+    <section v-show="!isChatCollapsed" class="live-chat-overlay__panel" aria-label="라이브 채팅">
+      <button
+        type="button"
+        class="live-chat-overlay__close"
+        aria-label="채팅 끄기"
+        @click="isChatCollapsed = true"
+      >
+        ×
+      </button>
       <ul ref="messageList" class="live-chat-overlay__messages" aria-live="polite">
         <li v-for="message in messages" :key="message.id">
           <span
             class="live-chat-overlay__author"
-            :class="{ 'live-chat-overlay__author--host': message.role === 'HOST' }"
+            :class="{
+              'live-chat-overlay__author--host': message.role === 'HOST',
+              'live-chat-overlay__author--ai': message.role === 'AI',
+            }"
           >
             {{ message.author }}
           </span>
@@ -414,6 +474,27 @@ function getRealtimeErrorMessage(body: unknown) {
         </button>
       </form>
     </section>
+
+    <div v-show="isChatCollapsed" class="live-chat-overlay__collapsed" aria-label="라이브 반응">
+      <button
+        v-for="emoji in LIVE_REACTION_EMOJIS"
+        :key="`collapsed-${emoji}`"
+        type="button"
+        :class="{ 'live-chat-overlay__reaction--active': activeReaction === emoji }"
+        :disabled="status !== 'LIVE'"
+        :aria-label="`${emoji} 반응 보내기`"
+        @click="react(emoji)"
+      >
+        {{ emoji }}
+      </button>
+      <button
+        type="button"
+        class="live-chat-overlay__reopen"
+        @click="isChatCollapsed = false"
+      >
+        채팅 켜기
+      </button>
+    </div>
   </div>
 </template>
 
@@ -425,11 +506,77 @@ function getRealtimeErrorMessage(body: unknown) {
   pointer-events: none;
 }
 
+.live-chat-overlay__close {
+  display: grid;
+  position: absolute;
+  z-index: var(--z-layer-2);
+  top: 8px;
+  right: 8px;
+  width: var(--badge-height-lg);
+  height: var(--badge-height-lg);
+  border: 0;
+  border-radius: 50%;
+  background: rgba(8, 8, 8, 0.7);
+  color: var(--color-live-text-primary);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  pointer-events: auto;
+  place-items: center;
+  backdrop-filter: blur(8px);
+}
+
+/* 채팅 꺼짐: 감정 이모지 가로 일렬 + 채팅 켜기 (채팅창 자리) */
+.live-chat-overlay__collapsed {
+  display: flex;
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: auto;
+}
+
+.live-chat-overlay__collapsed button:not(.live-chat-overlay__reopen) {
+  width: 24px;
+  height: var(--badge-height-sm);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-live-text-primary);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-lg);
+}
+
+.live-chat-overlay__collapsed button:not(.live-chat-overlay__reopen):disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.live-chat-overlay__reopen {
+  min-height: var(--badge-height-lg);
+  margin-left: var(--space-1);
+  padding: 0 12px;
+  border: 1px solid var(--color-live-border);
+  border-radius: var(--radius-badge);
+  background: rgba(8, 8, 8, 0.7);
+  color: var(--color-live-text-primary);
+  font-size: var(--font-size-badge);
+  font-weight: var(--font-weight-medium);
+  backdrop-filter: blur(8px);
+}
+
+.live-chat-overlay__close:focus-visible,
+.live-chat-overlay__reopen:focus-visible,
+.live-chat-overlay__collapsed button:focus-visible {
+  outline: 2px solid var(--color-primary-strong);
+  outline-offset: 2px;
+}
+
 .live-chat-overlay__reactions {
   display: flex;
   position: absolute;
-  bottom: calc(20px + 250px);
-  left: 20px;
+  bottom: 20px;
+  left: 372px;
   flex-direction: column;
   gap: var(--space-2);
   pointer-events: auto;
@@ -474,11 +621,16 @@ function getRealtimeErrorMessage(body: unknown) {
 
 .live-chat-overlay__reaction-burst {
   position: absolute;
-  bottom: calc(20px + 250px);
-  left: 54px;
+  bottom: 20px;
+  left: 372px;
   width: 76px;
   height: 156px;
   pointer-events: none;
+}
+
+/* 채팅 꺼짐: 가로 반응 바(좌하단)에서 버스트가 올라오도록 위치를 맞춘다 */
+.live-chat-overlay__reaction-burst--collapsed {
+  left: 20px;
 }
 
 .live-chat-overlay__reaction-burst span {
@@ -545,6 +697,14 @@ function getRealtimeErrorMessage(body: unknown) {
 }
 
 .live-chat-overlay__author--host {
+  color: var(--color-live-text-primary);
+}
+
+/* AI 자동답변(CHAT-002)은 판매자 발언처럼 보이면 안 된다 — 배지 형태로 확실히 구분한다. */
+.live-chat-overlay__author--ai {
+  padding: 1px 6px;
+  border-radius: var(--radius-badge);
+  background: var(--color-accent);
   color: var(--color-live-text-primary);
 }
 

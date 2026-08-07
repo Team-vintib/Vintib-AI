@@ -1,7 +1,11 @@
-import { Room, RoomEvent, Track } from 'livekit-client'
+import { Room, RoomEvent, Track, VideoPreset } from 'livekit-client'
 import type { RemoteTrack } from 'livekit-client'
 
 import { issueLiveVideoToken } from '@/domains/live/api/liveControlApi'
+
+// LiveKit 기본 프리셋엔 16:9 480p가 없어(h360 다음이 h540) 직접 정의해 화질을 낮춘다.
+const h480 = new VideoPreset(854, 480, 800_000, 24)
+const h180 = new VideoPreset(320, 180, 150_000, 15)
 
 export type LiveVideoRole = 'PUBLISHER' | 'VIEWER'
 
@@ -25,7 +29,16 @@ export const connectLiveVideo = async (
 ): Promise<LiveVideoSession> => {
   const { token, serverUrl, role } = await issueLiveVideoToken(liveId)
 
-  const room = new Room({ adaptiveStream: true, dynacast: true })
+  const room = new Room({
+    adaptiveStream: true,
+    dynacast: true,
+    videoCaptureDefaults: { resolution: h480.resolution },
+    publishDefaults: {
+      videoSimulcastLayers: [h180],
+      videoEncoding: h480.encoding,
+      red: false,
+    },
+  })
   const attachedAudioEls: HTMLMediaElement[] = []
 
   if (onDisconnected) {
