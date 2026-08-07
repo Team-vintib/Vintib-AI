@@ -13,10 +13,18 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import UTC, datetime
 
 from app.chat import registry
 from app.chat.schemas import FaqAnswer
+
+
+def _as_aware_utc(moment: datetime) -> datetime:
+    """`created_at`은 항상 `datetime.now(UTC)`(offset-aware)로 만든다(`gateway/router.py`).
+    `since` 쿼리 파라미터는 호출부가 오프셋 없이 보낼 수 있어(-571 BE 연동에서 실측) naive면
+    UTC로 간주해 맞춰준다 — 안 그러면 "can't compare offset-naive and offset-aware
+    datetimes"로 500이 난다."""
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
 
 
 class AnswerNotFound(Exception):
@@ -63,7 +71,8 @@ class InMemoryAnswerStore(AnswerStore):
     def list_for_live(self, live_id: int, since: datetime | None = None) -> list[FaqAnswer]:
         found = [a for a in self._by_ticket.values() if a.live_id == live_id]
         if since is not None:
-            found = [a for a in found if a.created_at > since]
+            cutoff = _as_aware_utc(since)
+            found = [a for a in found if a.created_at > cutoff]
         found.sort(key=lambda a: a.created_at)
         return found
 
