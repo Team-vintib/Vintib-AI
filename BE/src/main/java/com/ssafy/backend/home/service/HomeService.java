@@ -24,13 +24,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 홈 콘텐츠 조회(HOME-001) 서비스.
+ * 홈 콘텐츠 조회 서비스.
  *
  * <p><b>모든 섹션이 실데이터다.</b> 이전에는 전부 Mock이었는데, 그 탓에 홈 {@code liveNow}가
  * 존재하지 않는 라이브(101·102)를 계속 "진행 중"으로 내려 카드를 누르면 시청 진입이 404가 됐다
- * (FE 요청 004 §3.3). 실데이터 전환으로 그 정합성 문제가 사라진다.
+ * 실데이터 전환으로 그 정합성 문제가 사라진다.
  *
- * <h2>섹션별 노출 정책 (FE 요청 004 §3.2)</h2>
+ * <h2>섹션별 노출 정책</h2>
  *
  * <table>
  *   <tr><th>섹션</th><th>대상</th><th>정렬</th><th>최대</th></tr>
@@ -53,6 +53,9 @@ public class HomeService {
     private static final int PRODUCT_LIMIT = 20;
     private static final int CATEGORY_SECTION_LIMIT = 6;
     private static final int CATEGORY_SECTION_PRODUCT_LIMIT = 8;
+    // 카테고리 마스터의 대분류 depth. 1=성별(남성/여성/공용), 2=옷 종류(아우터/상의/...) — 탭은
+    // depth=2를 쓴다. 성별(depth=1)은 탭이 아니라 카테고리 트리의 루트일 뿐이다.
+    private static final short CATEGORY_TAB_DEPTH = 2;
 
     private final LiveRepository liveRepository;
     private final HomeProductQueryRepository productQueryRepository;
@@ -107,29 +110,35 @@ public class HomeService {
     }
 
     /**
-     * 카테고리 탭 섹션. 탭은 카테고리 마스터의 <b>대분류(부모 없는 카테고리)</b> 앞 6개다.
+     * 카테고리 탭 섹션. 탭은 카테고리 마스터의 <b>옷 종류 대분류(depth=2)</b> 앞 6개다
+     * (아우터·상의·하의·신발·가방·액세서리).
      *
-     * <p>상품은 소분류에 달리므로 탭마다 하위 카테고리 ID를 펼쳐서 묶는다. 탭별로 따로 질의하면
-     * 탭 수만큼 왕복하므로, <b>여섯 탭의 카테고리를 한 번에 묶어 조회한 뒤 메모리에서 나눈다.</b>
+     * <p>상품은 그 아래 소분류(depth=3)에 달리므로 탭마다 하위 카테고리 ID를 재귀적으로 펼쳐서
+     * 묶는다. 탭별로 따로 질의하면 탭 수만큼 왕복하므로, <b>여섯 탭의 카테고리를 한 번에 묶어
+     * 조회한 뒤 메모리에서 나눈다.</b>
      */
     private List<CategoryProductSectionResponse> categoryProductSections(Long memberId) {
         List<Category> all = categoryRepository.findAllByOrderByIdAsc();
         List<Category> roots = all.stream()
-                .filter(category -> category.getParentId() == null)
+                .filter(category -> category.getDepth() == CATEGORY_TAB_DEPTH)
                 .limit(CATEGORY_SECTION_LIMIT)
                 .toList();
         if (roots.isEmpty()) {
             return List.of();
         }
 
-        // 대분류 ID → 그 대분류에 속하는 카테고리 ID들(자기 자신 + 소분류).
+        // parentId → 그 바로 아래 자식 카테고리들. 트리 깊이가 늘어나도 재귀로 그대로 대응한다.
+        Map<Long, List<Category>> childrenByParentId = new LinkedHashMap<>();
+        all.forEach(category -> childrenByParentId
+                .computeIfAbsent(category.getParentId(), key -> new ArrayList<>())
+                .add(category));
+
+        // 대분류 ID → 그 대분류에 속하는 카테고리 ID들(자기 자신 + 모든 하위 소분류, 깊이 무관).
         Map<Long, List<Long>> categoryIdsByRoot = new LinkedHashMap<>();
-        roots.forEach(root -> categoryIdsByRoot.put(root.getId(), new ArrayList<>(List.of(root.getId()))));
-        all.forEach(category -> {
-            List<Long> bucket = categoryIdsByRoot.get(category.getParentId());
-            if (bucket != null) {
-                bucket.add(category.getId());
-            }
+        roots.forEach(root -> {
+            List<Long> descendantIds = new ArrayList<>(List.of(root.getId()));
+            collectDescendantIds(root.getId(), childrenByParentId, descendantIds);
+            categoryIdsByRoot.put(root.getId(), descendantIds);
         });
 
         List<Long> allCategoryIds = categoryIdsByRoot.values().stream().flatMap(List::stream).toList();
@@ -145,6 +154,15 @@ public class HomeService {
         return roots.stream()
                 .map(root -> toSection(root, products, rootByCategoryId, memberId))
                 .toList();
+    }
+
+    /** {@code parentId} 아래 모든 하위 카테고리 ID를 깊이 제한 없이 {@code out}에 누적한다. */
+    private void collectDescendantIds(
+            Long parentId, Map<Long, List<Category>> childrenByParentId, List<Long> out) {
+        for (Category child : childrenByParentId.getOrDefault(parentId, List.of())) {
+            out.add(child.getId());
+            collectDescendantIds(child.getId(), childrenByParentId, out);
+        }
     }
 
     private CategoryProductSectionResponse toSection(
