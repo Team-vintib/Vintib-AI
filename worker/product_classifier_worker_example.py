@@ -84,15 +84,16 @@ class ProductClassifierWorker(BaseWorker):
         """
         payload (= `app/product_classifier/schemas.py`의 `ProductClassifyRequest`):
         {
-            "product_id": 1042,
+            "product_id": 1042,  // 사전업로드(상품 생성 전) 트리거면 None일 수 있다
             "image_url": "https://.../front.jpg",
-            "taxonomy_version": "v1"
+            "taxonomy_version": "v2-be-seed-2026-08-03"
         }
         """
         self._ensure_loaded()
         started = time.perf_counter()
 
-        product_id = int(payload["product_id"])
+        raw_product_id = payload.get("product_id")
+        product_id = int(raw_product_id) if raw_product_id is not None else None
         image = download_image(payload["image_url"])
 
         # 키는 항상 셋 다 채운다(성공하면 값, 실패하면 None) — `app/product_classifier/schemas.py`의
@@ -131,7 +132,12 @@ class ProductClassifierWorker(BaseWorker):
                 "category_backend": PRODUCT_CLASSIFIER_CATEGORY_BACKEND,
                 "color_backend": PRODUCT_CLASSIFIER_COLOR_BACKEND,
             },
-            "taxonomy_version": payload.get("taxonomy_version", TAXONOMY_VERSION),
+            # 요청값을 에코하지 않는다 — 워커는 taxonomy 버전을 선택할 수 없고(taxonomy.py
+            # 하나뿐) 항상 이 값으로 분류하므로, 요청이 뭐라고 보냈든 실제로 쓴 버전을
+            # 그대로 낸다. 예전엔 payload.get("taxonomy_version", TAXONOMY_VERSION)로 요청
+            # 기본값을 그대로 돌려줘서, 실제로는 다른 버전으로 분류해놓고 응답만 옛 버전으로
+            # 잘못 표시하는 버그가 있었다.
+            "taxonomy_version": TAXONOMY_VERSION,
             "latency_ms": round((time.perf_counter() - started) * 1000, 3),
         }
 
