@@ -2,7 +2,11 @@ package com.ssafy.backend.chat.service;
 
 import com.ssafy.backend.chat.dto.response.ChatMessageResponse;
 import com.ssafy.backend.chat.entity.ChatMessage;
+import com.ssafy.backend.chat.entity.SenderType;
 import com.ssafy.backend.chat.repository.ChatMessageRepository;
+import com.ssafy.backend.global.client.AiClient;
+import com.ssafy.backend.global.client.dto.ChatAnswer;
+import com.ssafy.backend.global.client.dto.ModerateChatResponse;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.CursorPageResponse;
@@ -12,14 +16,19 @@ import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
 
 /**
- * 라이브 채팅(CHAT-001). 사람 간 채팅만 다룬다 — AI 채팅 매니저(CHAT-002/003/004)는 보류다.
+ * 라이브 채팅(CHAT-001) + AI 욕설/스팸 판정(CHAT-004)·반복질문 감지(CHAT-002 트리거).
+ * 반복질문 답변 자체는 {@code ChatAnswerPollingScheduler}가 비동기로 채워 넣는다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -28,14 +37,17 @@ public class ChatMessageService {
     private final ChatMessageRepository chatMessageRepository;
     private final LiveRepository liveRepository;
     private final MemberRepository memberRepository;
+    private final AiClient aiClient;
 
     /**
-     * 회원 발언을 저장한다.
+     * 회원 발언을 저장한다. AI 판정에서 HIDE/BLOCK을 권고하면 메시지는 저장은 되지만(관리용
+     * 흔적) 빈 Optional을 돌려준다 — 호출부(STOMP 컨트롤러)는 이때 브로드캐스트를 생략한다.
      *
      * @param senderId STOMP principal에서 꺼낸 회원 ID. <b>{@code null}이면 비회원이다.</b>
      */
     @Transactional
-    public ChatMessageResponse send(Long senderId, Long liveId, String content, String clientMessageId) {
+    public Optional<ChatMessageResponse> send(
+            Long senderId, Long liveId, String content, String clientMessageId) {
         // 비회원은 읽기만 가능하다. DB 의 ck_chat_user_has_member 가 최후 방어선이지만, 거기까지
         // 가면 500 이 되므로 여기서 401 로 돌려준다.
         if (senderId == null) {
@@ -54,10 +66,39 @@ public class ChatMessageService {
         Member sender = memberRepository.findById(senderId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
+        LocalDateTime sentAt = LocalDateTime.now();
+        String trimmed = content.strip();
         ChatMessage saved = chatMessageRepository.save(
-                ChatMessage.userMessage(live, sender, content.strip(), LocalDateTime.now()));
+                ChatMessage.userMessage(live, sender, trimmed, sentAt));
 
-        return ChatMessageResponse.of(saved, clientMessageId);
+        if (moderateAndBlockIfNeeded(saved, senderId, trimmed, sentAt)) {
+            return Optional.empty();
+        }
+
+        return Optional.of(ChatMessageResponse.of(saved, clientMessageId));
+    }
+
+    /**
+     * AI 게이트웨이에 동기 판정을 요청한다(-571). 실패해도(타임아웃 등) 판정 없이 통과시킨다 —
+     * 채팅은 AI 장애와 무관하게 동작해야 하는 핵심 기능이라 보조 기능 실패로 막으면 안 된다.
+     *
+     * @return HIDE/BLOCK 권고를 받아 이 메시지를 차단했으면 {@code true}
+     */
+    private boolean moderateAndBlockIfNeeded(
+            ChatMessage message, Long userId, String content, LocalDateTime sentAt) {
+        try {
+            ModerateChatResponse moderation = aiClient.moderateChatMessage(
+                    message.getLive().getId(), message.getId(), userId, content, sentAt);
+            if (moderation.isBlocked()) {
+                message.block();
+                log.info("채팅 메시지 차단(messageId={}, reason={})", message.getId(), moderation.reason());
+                return true;
+            }
+            return false;
+        } catch (RestClientException e) {
+            log.warn("채팅 AI 판정 실패, 판정 없이 통과시킴(messageId={}): {}", message.getId(), e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -93,5 +134,31 @@ public class ChatMessageService {
     private Live findLive(Long liveId) {
         return liveRepository.findById(liveId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LIVE_NOT_FOUND));
+    }
+
+    /**
+     * 반복질문 자동답변 폴링(-571)이 AI에 물어볼 {@code since} 커서. 아직 이 방송에 AI 메시지가
+     * 하나도 없으면 방송 시작 시각부터 조회한다.
+     */
+    public LocalDateTime lastAiAnswerCursor(Long liveId) {
+        return chatMessageRepository
+                .findTopByLive_IdAndSenderTypeOrderByCreatedAtDesc(liveId, SenderType.AI)
+                .map(ChatMessage::getCreatedAt)
+                .orElseGet(() -> findLive(liveId).getStartedAt());
+    }
+
+    /**
+     * AI가 생성한 반복질문 답변들을 {@code sender_type=AI} 메시지로 저장한다. AI 게이트웨이
+     * 호출(네트워크 I/O)은 호출부(스케줄러)가 트랜잭션 밖에서 먼저 끝내고, 여기는 순수 DB
+     * 쓰기만 한다.
+     */
+    @Transactional
+    public List<ChatMessageResponse> saveAiAnswers(Long liveId, List<ChatAnswer> answers) {
+        Live live = findLive(liveId);
+        return answers.stream()
+                .map(answer -> chatMessageRepository.save(
+                        ChatMessage.aiMessage(live, answer.answer(), answer.createdAt())))
+                .map(ChatMessageResponse::from)
+                .toList();
     }
 }

@@ -1,13 +1,22 @@
 package com.ssafy.backend.chat.repository;
 
 import com.ssafy.backend.chat.entity.ChatMessage;
+import com.ssafy.backend.chat.entity.SenderType;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
+
+    /**
+     * 반복질문 자동답변 폴링(-571)의 {@code since} 커서용 — 이 방송에 마지막으로 저장한 AI
+     * 메시지 1건. 없으면(아직 AI 답변이 하나도 없으면) 호출부가 방송 시작 시각을 대신 쓴다.
+     */
+    Optional<ChatMessage> findTopByLive_IdAndSenderTypeOrderByCreatedAtDesc(
+            Long liveId, SenderType senderType);
 
     /**
      * 최신순 커서 페이징. {@code cursor}는 "이 ID보다 이전(더 오래된) 메시지"를 뜻하며
