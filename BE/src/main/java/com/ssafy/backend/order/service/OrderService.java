@@ -4,7 +4,9 @@ import com.ssafy.backend.global.client.DeliveryTrackingClient;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
+import com.ssafy.backend.live.dto.response.LiveProductSoldResponse;
 import com.ssafy.backend.live.entity.Live;
+import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
@@ -27,6 +29,7 @@ import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -50,6 +53,7 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
     private final LiveRepository liveRepository;
+    private final LiveProductRepository liveProductRepository;
     private final PointService pointService;
     private final DeliveryTrackingClient deliveryTrackingClient;
     private final NotificationCommandPort notificationCommandPort;
@@ -107,6 +111,35 @@ public class OrderService {
                 order.getId());
 
         return OrderListItemResponse.from(order);
+    }
+
+    /**
+     * 방금 팔린 상품을 시청자에게 알릴 이벤트(JY013). 그 상품이 <b>진행 중 방송에 편성돼
+     * 있을 때만</b> 값이 있다.
+     *
+     * <p><b>왜 {@code createOrder} 안에서 쏘지 않는가.</b> 그 메서드는 {@code @Transactional}
+     * 이라 거기서 발행하면 커밋 전에 나간다. 이후 롤백되면 시청자 화면에서만 상품이 사라진 채
+     * 남는다. 그래서 "쏠 내용"만 여기서 만들고 발행은 컨트롤러가 커밋 이후에 한다 —
+     * {@code LiveController.changeCurrentProduct} · {@code AuctionCloseScheduler} 와 같은 규칙이다.
+     *
+     * <p><b>주문의 {@code liveId} 를 쓰지 않는다.</b> 상품 상세 화면에서 사면 그 값이 없지만,
+     * 그래도 진행 중 방송에 걸려 있으면 큐에서 빠져야 하기 때문이다. 주문의 {@code liveId} 는
+     * "어느 방송의 실적으로 집계할지"를 정하는 별개의 값이다.
+     */
+    public Optional<LiveProductSoldResponse> resolveDirectSaleSoldEvent(Long productId) {
+        List<Long> runningLiveIds = liveProductRepository.findRunningLiveIdsByProductId(productId);
+        if (runningLiveIds.isEmpty()) {
+            return Optional.empty();
+        }
+        if (runningLiveIds.size() > 1) {
+            // 한 상품이 진행 중 방송 두 곳에 걸린 상태다. 어느 쪽을 고르든 나머지 방송의 큐가
+            // 어긋나므로 아무 데도 쏘지 않고 로그만 남긴다 — 잘못 고르는 것보다 낫다.
+            log.warn("진행 중 방송이 둘 이상이라 판매 전파를 건너뛴다(productId={}, liveIds={})",
+                    productId, runningLiveIds);
+            return Optional.empty();
+        }
+        return Optional.of(LiveProductSoldResponse.directSale(
+                runningLiveIds.get(0), productId, LocalDateTime.now()));
     }
 
     /** 배송지 등록/수정 — 구매자만, 송장이 등록되기 전(PAID)에만 upsert 허용. */
