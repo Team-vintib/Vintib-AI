@@ -22,3 +22,10 @@ ACTIVE_VLM = "qwen3-vl-4b-instruct"  # <- 여기 키만 바꾸면 스왑
 # 4bit: bitsandbytes nf4, RTX 4070 8GB에 맞춤. none: 양자화 없이 bf16(대형 GPU에서만 실행 가능).
 QUANTIZATION_MODES = ("4bit", "none")
 ACTIVE_QUANTIZATION = "4bit"
+
+# 데모용 고정 카테고리(`worker.models.sam3.contracts.GarmentCategory`의 값 문자열).
+# 이 스파이크에는 실제 카테고리 분류(FashionCLIP)가 없어서, 부위명 표시(§2 텍스트 위치
+# 힌트·최종 JSON의 section)에 쓸 카테고리를 여기 하나로 고정해 둔다 — 실제 서비스에서는
+# 상품 등록 파이프라인의 분류 브랜치 결과를 받는다. 샘플 이미지가 하의(청바지 등)여도
+# 이 값 기준 부위명이 나온다는 점을 감안해서 결과를 읽을 것.
+DEMO_GARMENT_CATEGORY = "TOP_SHIRT"

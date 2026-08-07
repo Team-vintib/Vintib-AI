@@ -31,8 +31,9 @@ import lombok.NoArgsConstructor;
  * {@code updated_at}이 필요 없고, 상속하면 스키마에 없는 컬럼이 생겨
  * {@code docs/db/schema.sql}과 어긋난다({@code LiveProduct}와 같은 이유).
  *
- * <p>{@code isBlocked}는 금칙어·도배 차단(CHAT-004)용 자리다. 해당 기능은 보류 상태이므로
- * 현재 값을 바꾸는 코드는 없고, 조회에서 제외하는 규칙만 먼저 걸어 둔다.
+ * <p>{@code isBlocked}는 금칙어·도배 차단(CHAT-004)용 자리다. AI 게이트웨이(`POST
+ * /chat/moderate`)의 HIDE/BLOCK 권고를 받으면 {@link #block()}으로 세운다 — 조회에서
+ * 제외하는 규칙은 이미 걸려 있다.
  */
 @Entity
 @Table(
@@ -98,6 +99,19 @@ public class ChatMessage {
     /** 입장·퇴장·경매 안내 등 서버가 만드는 메시지. 작성자가 없다. */
     public static ChatMessage systemMessage(Live live, String content, LocalDateTime sentAt) {
         return new ChatMessage(live, null, SenderType.SYSTEM, content, sentAt);
+    }
+
+    /** 반복질문 자동답변(CHAT-002). 특정 발신자를 지칭하지 않으므로 작성자가 없다. */
+    public static ChatMessage aiMessage(Live live, String content, LocalDateTime sentAt) {
+        return new ChatMessage(live, null, SenderType.AI, content, sentAt);
+    }
+
+    /**
+     * 욕설·스팸 판정(CHAT-004)에서 AI 게이트웨이가 HIDE/BLOCK을 권고했을 때 호출한다.
+     * 집행 주체는 BE다 — AI는 판정만 한다.
+     */
+    public void block() {
+        this.blocked = true;
     }
 
     public static boolean isValidContent(String content) {

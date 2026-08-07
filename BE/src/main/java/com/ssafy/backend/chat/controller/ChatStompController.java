@@ -1,7 +1,6 @@
 package com.ssafy.backend.chat.controller;
 
 import com.ssafy.backend.chat.dto.request.ChatSendRequest;
-import com.ssafy.backend.chat.dto.response.ChatMessageResponse;
 import com.ssafy.backend.chat.service.ChatMessageService;
 import com.ssafy.backend.global.websocket.StompPrincipal;
 import java.security.Principal;
@@ -41,12 +40,12 @@ public class ChatStompController {
             Principal principal) {
         Long senderId = memberIdOf(principal);
 
-        ChatMessageResponse response =
-                chatMessageService.send(senderId, liveId, request.content(), request.clientMessageId());
-
         // 저장이 커밋된 뒤에 나간다 — send()의 트랜잭션이 이 시점에 이미 끝나 있다.
-        // 커밋 전에 쏘면 롤백 시 유령 메시지가 모든 시청자 화면에 남는다.
-        messagingTemplate.convertAndSend("/topic/lives/" + liveId + "/chat", response);
+        // 커밋 전에 쏘면 롤백 시 유령 메시지가 모든 시청자 화면에 남는다. AI가 HIDE/BLOCK을
+        // 권고한 메시지는 빈 Optional로 와서 브로드캐스트를 건너뛴다(-571).
+        chatMessageService.send(senderId, liveId, request.content(), request.clientMessageId())
+                .ifPresent(response ->
+                        messagingTemplate.convertAndSend("/topic/lives/" + liveId + "/chat", response));
     }
 
     /** 토큰 없이 붙은 세션은 principal 이 없다 — 그것이 곧 비회원이다. */

@@ -86,6 +86,13 @@ def embed_image(image: Any, *, checkpoint_path: str, model_id: str) -> list[floa
         features = bundle.model.get_image_features(
             pixel_values=inputs["pixel_values"].to(bundle.device)
         )
+        # transformers 버전에 따라 get_image_features()가 이미 투영된 텐서를 바로 주기도
+        # 하고(구버전), BaseModelOutputWithPooling으로 감싸 주기도 한다(신버전, 5.x 실측,
+        # worker/models/sam3/garment_embedding.py에서 같은 문제로 먼저 발견) — 이땐
+        # .pooler_output이 실제 projection_dim 텐서다. requirements-pipeline.txt가
+        # transformers>=4.44로 상한이 없어 5.x가 설치될 수 있다.
+        if hasattr(features, "pooler_output"):
+            features = features.pooler_output
         features = features / features.norm(dim=-1, keepdim=True)
     return features[0].cpu().tolist()
 

@@ -2,8 +2,15 @@ package com.ssafy.backend.global.client;
 
 import com.ssafy.backend.global.client.dto.AiJobCreatedResponse;
 import com.ssafy.backend.global.client.dto.AiJobResponse;
+import com.ssafy.backend.global.client.dto.ChatAnswer;
+import com.ssafy.backend.global.client.dto.ChatAnswerListResponse;
+import com.ssafy.backend.global.client.dto.ModerateChatRequest;
+import com.ssafy.backend.global.client.dto.ModerateChatResponse;
 import com.ssafy.backend.global.client.dto.RegistrationModelCutJobRequest;
 import com.ssafy.backend.global.client.dto.TryOnJobRequest;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -67,5 +74,30 @@ public class AiClient {
                 .uri("/ai/jobs/{jobId}", jobId)
                 .retrieve()
                 .body(AiJobResponse.class);
+    }
+
+    /**
+     * {@code POST /chat/moderate} — 메시지 게시 전 동기 판정(욕설·스팸·반복질문). 채팅 발행
+     * 경로에서 직접 부르므로 {@code ai.read-timeout}(현재 5s)이 채팅 지연 상한이 된다.
+     */
+    public ModerateChatResponse moderateChatMessage(
+            Long liveId, Long messageId, Long userId, String content, LocalDateTime sentAt) {
+        return aiRestClient.post()
+                .uri("/chat/moderate")
+                .body(new ModerateChatRequest(liveId, messageId, userId, content, sentAt))
+                .retrieve()
+                .body(ModerateChatResponse.class);
+    }
+
+    /** {@code GET /chat/lives/{liveId}/answers} — 반복질문 자동답변 폴링(-571). */
+    public List<ChatAnswer> getLiveAnswers(Long liveId, LocalDateTime since) {
+        ChatAnswerListResponse response = aiRestClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/chat/lives/{liveId}/answers")
+                        .queryParamIfPresent("since", Optional.ofNullable(since))
+                        .build(liveId))
+                .retrieve()
+                .body(ChatAnswerListResponse.class);
+        return response.answers();
     }
 }

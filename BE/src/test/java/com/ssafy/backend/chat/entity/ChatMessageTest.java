@@ -76,6 +76,24 @@ class ChatMessageTest {
     }
 
     @Test
+    void AI_메시지는_작성자가_없다() {
+        ChatMessage message = ChatMessage.aiMessage(라이브(), "네, 프리사이즈이며 신축성이 좋습니다.", NOW);
+
+        assertThat(message.getSenderType()).isEqualTo(SenderType.AI);
+        assertThat(message.getSender()).isNull();
+        assertThat(message.isBlocked()).isFalse();
+    }
+
+    @Test
+    void block_호출하면_차단_상태가_된다() {
+        ChatMessage message = ChatMessage.userMessage(라이브(), 회원("시청자", "덕후"), "욕설성 발언", NOW);
+
+        message.block();
+
+        assertThat(message.isBlocked()).isTrue();
+    }
+
+    @Test
     void 빈_내용과_공백만_있는_내용은_거부된다() {
         assertThat(ChatMessage.isValidContent(null)).isFalse();
         assertThat(ChatMessage.isValidContent("")).isFalse();

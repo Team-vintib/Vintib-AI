@@ -184,6 +184,49 @@ def dedupe_cross_type_overlap(
     return kept, dropped
 
 
+def dedupe_same_type_containment(
+    instances: Sequence[Instance], min_containment: float
+) -> tuple[list[Instance], list[Instance]]:
+    """같은 defect_type 인스턴스가 "박스 안에 박스"로 겹칠 때 병합한다. (kept, dropped) 반환.
+
+    `dedupe_cross_type_overlap()`은 **다른** defect_type끼리만 비교하고, 같은 타입끼리는
+    "SAM3 자체 후처리가 이미 걸렀다"고 가정하고 의도적으로 건너뛴다(그 함수의 회귀 테스트
+    `test_dedupe_cross_type_overlap_ignores_same_type_overlap`이 그 전제를 문서화한다).
+    실측(small_pro.jpg)에서 그 전제가 깨지는 사례가 확인됐다 — 같은 STAIN 인스턴스 여러 개가
+    서로 97~100% 포함되는 관계였다. 그래서 같은 타입 전용 병합 단계를 별도로 둔다.
+
+    `dedupe_cross_type_overlap()`은 `_mask_iou`(대칭)를 쓰지만 여기는 `_containment`
+    (비대칭)를 쓴다 — 두 박스 크기가 크게 다르면(작은 박스가 큰 박스 안에 거의 다 들어가는
+    경우) 합집합 기준 IoU는 낮게 나와도 포함 비율은 매우 높다. 어느 쪽이 어느 쪽에 담겼는지
+    모르니 양방향 포함 비율 중 큰 값을 쓴다.
+
+    confidence 내림차순(동률이면 마스크 면적이 큰 쪽 우선 — 작은 중복 박스를 큰 박스 쪽으로
+    흡수한다는 직관)으로 훑으며, **같은 타입**이면서 이미 kept에 들어간 인스턴스와의 포함
+    비율이 `min_containment` 이상이면 버린다.
+
+    ⚠️ 알려진 단순화: `dedupe_cross_type_overlap()`과 동일하게 이미 kept된 것과만 비교하는
+    그리디라 IoU/포함 비율이 전이적이지 않은 경우를 이론상 놓칠 수 있다. 실측 사례는 포함
+    비율이 매우 높아(0.97 이상) 문제가 될 가능성은 낮다.
+    """
+    ordered = sorted(instances, key=lambda inst: (-inst.confidence, -float(inst.mask.sum())))
+    kept: list[Instance] = []
+    dropped: list[Instance] = []
+    for inst in ordered:
+        hit = None
+        for kept_inst in kept:
+            if kept_inst.defect_type != inst.defect_type:
+                continue
+            containment = max(
+                _containment(inst.mask, kept_inst.mask),
+                _containment(kept_inst.mask, inst.mask),
+            )
+            if containment >= min_containment:
+                hit = kept_inst
+                break
+        (dropped if hit is not None else kept).append(inst)
+    return kept, dropped
+
+
 def _severity_of(area_ratio: float, peak: float) -> Severity:
     """`area_ratio × peak`를 3구간으로. 넓고 확신할수록 심각하다."""
     low, high = registry.SEVERITY_BOUNDS
@@ -309,7 +352,13 @@ def extract_findings(
             final = after_garment
 
         # benign 억제 다음, 넘버링/누적 전 — 구조적 개구부 오탐(hole_tear)을 먼저 걷어내야
-        # cross-type dedup이 "진짜 하자끼리의 중복"만 보게 된다.
+        # 이후 dedup 단계들이 "진짜 하자끼리의 중복"만 보게 된다. 같은 타입 포함 병합을
+        # cross-type dedup보다 먼저 둔다 — 같은 타입 중복을 먼저 줄여야 cross-type dedup이
+        # 더 적은 후보로 깨끗하게 동작한다.
+        if config["dedupe_same_type"]:
+            final, _same_type_dupes = dedupe_same_type_containment(
+                final, config["same_type_containment_min"]
+            )
         if config["dedupe_cross_type"]:
             final, _cross_type_dupes = dedupe_cross_type_overlap(
                 final, config["cross_type_iou_min"]

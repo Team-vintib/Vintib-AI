@@ -14,6 +14,7 @@ from sam3.contracts import DefectType
 from sam3.findings import (
     _section_no_of,
     dedupe_cross_type_overlap,
+    dedupe_same_type_containment,
     extract_findings,
     filter_by_garment,
     suppress_benign,
@@ -203,6 +204,46 @@ def test_dedupe_cross_type_overlap_ignores_same_type_overlap():
     assert dropped == []
 
 
+# --- dedupe_same_type_containment ---------------------------------------------
+# small_pro.jpg 실측: 같은 STAIN 인스턴스 여러 개가 서로 97~100% 포함되는 "박스 안에 박스"
+# 사례에 대한 회귀 방지. IoU가 아니라 포함 비율을 쓰는 이유도 여기서 확인한다 — 작은
+# 박스가 큰 박스에 완전히 들어가도(포함 비율=1.0) 합집합 기준 IoU는 낮다.
+
+
+def test_dedupe_same_type_containment_drops_the_smaller_contained_instance():
+    big = _instance(DefectType.stain, _mask_block(0, 7, 0, 7), confidence=0.91)
+    small = _instance(DefectType.stain, _mask_block(1, 4, 1, 4), confidence=0.79)
+    kept, dropped = dedupe_same_type_containment([small, big], min_containment=0.8)
+    assert kept == [big]
+    assert dropped == [small]
+
+
+def test_dedupe_same_type_containment_ignores_different_types():
+    # 타입이 다르면 이 함수의 비교 대상이 아니다 — 그건 dedupe_cross_type_overlap의 몫.
+    big = _instance(DefectType.stain, _mask_block(0, 7, 0, 7), confidence=0.91)
+    small = _instance(DefectType.hole_tear, _mask_block(1, 4, 1, 4), confidence=0.79)
+    kept, dropped = dedupe_same_type_containment([small, big], min_containment=0.8)
+    assert len(kept) == 2 and big in kept and small in kept
+    assert dropped == []
+
+
+def test_dedupe_same_type_containment_keeps_both_when_below_threshold():
+    # 부분 겹침만 있으면(포함 비율이 임계치 미달) 둘 다 생존.
+    a = _instance(DefectType.stain, _mask_block(0, 5, 0, 5), confidence=0.90)
+    b = _instance(DefectType.stain, _mask_block(3, 8, 3, 8), confidence=0.80)
+    kept, dropped = dedupe_same_type_containment([a, b], min_containment=0.8)
+    assert len(kept) == 2 and a in kept and b in kept
+    assert dropped == []
+
+
+def test_dedupe_same_type_containment_prefers_larger_area_on_confidence_tie():
+    big = _instance(DefectType.stain, _mask_block(0, 7, 0, 7), confidence=0.80)
+    small = _instance(DefectType.stain, _mask_block(1, 4, 1, 4), confidence=0.80)
+    kept, dropped = dedupe_same_type_containment([small, big], min_containment=0.8)
+    assert kept == [big]
+    assert dropped == [small]
+
+
 # --- extract_findings: kept_instances_by_image 불변식 -------------------------
 
 
@@ -254,6 +295,37 @@ def test_extract_findings_dedupes_cross_type_duplicates_before_numbering():
     kept = extracted.kept_instances_by_image[0]
     assert higher in kept
     assert lower not in kept
+
+
+def test_extract_findings_dedupes_same_type_containment_before_numbering():
+    # small_pro.jpg 실측 재현: 같은 STAIN이 "박스 안에 박스"로 겹치면 작은 쪽은 findings에도
+    # kept_instances_by_image에도 남으면 안 된다.
+    big = _instance(DefectType.stain, _mask_block(0, 7, 0, 7), confidence=0.91)
+    small = _instance(DefectType.stain, _mask_block(1, 4, 1, 4), confidence=0.79)
+    result = _segmentation_result(0, [small, big], garment_mask=_full_mask())
+    prompt_set = select_prompt_set(GarmentCategory.top_knit, BaseColor.light)
+
+    extracted = extract_findings([result], prompt_set, segmenter_config("mock"))
+
+    assert len(extracted.findings) == 1
+    assert extracted.findings[0].no == 1
+    kept = extracted.kept_instances_by_image[0]
+    assert big in kept
+    assert small not in kept
+
+
+def test_extract_findings_skips_same_type_dedup_when_disabled():
+    big = _instance(DefectType.stain, _mask_block(0, 7, 0, 7), confidence=0.91)
+    small = _instance(DefectType.stain, _mask_block(1, 4, 1, 4), confidence=0.79)
+    result = _segmentation_result(0, [small, big], garment_mask=_full_mask())
+    prompt_set = select_prompt_set(GarmentCategory.top_knit, BaseColor.light)
+    config = dict(segmenter_config("mock"))
+    config["dedupe_same_type"] = False
+
+    extracted = extract_findings([result], prompt_set, config)
+
+    assert len(extracted.findings) == 2
+    assert small in extracted.kept_instances_by_image[0]
 
 
 def test_extract_findings_skips_cross_type_dedup_when_disabled():
