@@ -40,6 +40,11 @@ class Settings(BaseSettings):
 
     public_base_url: str = "https://i15a108.p.ssafy.io"  # 추가 필요
 
+    # BE 공개 REST API(컨테이너 내부망). 가격책정 internal 백엔드·게이트웨이의 임베딩 카테고리
+    # 태깅(CH024)이 상품 상세(`GET /api/products/{id}`)를 조회하는 데 쓴다 — DB 뷰·읽기 전용
+    # 계정 없이도 BE가 이미 공개로 내는 필드(brandId/price/saleType/saleStatus 등)로 충분하다.
+    be_base_url: str = "http://backend:8080"
+
     # 추천 아티팩트(사전계산 그래프) 루트 디렉터리. 비어 있으면
     # app/recommend/artifacts/ 를 기본값으로 사용한다.
     recommend_artifact_dir: str = ""
