@@ -12,15 +12,9 @@ import {
 } from '@/domains/chat/api/liveChatApi'
 import { LIVE_REACTION_EMOJIS } from '@/domains/chat/constants/liveChatMockData'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import {
-  isLiveRealtimeApiEnabled,
-  LiveRealtimeClient,
-} from '@/domains/live/api/liveRealtimeClient'
+import { isLiveRealtimeApiEnabled, LiveRealtimeClient } from '@/domains/live/api/liveRealtimeClient'
 
-import type {
-  LiveChatMessage,
-  LiveReactionEmoji,
-} from '@/domains/chat/types/liveChat.types'
+import type { LiveChatMessage, LiveReactionEmoji } from '@/domains/chat/types/liveChat.types'
 import type { LiveWatchStatus } from '@/domains/live/types/liveWatch.types'
 
 const props = defineProps<{
@@ -335,38 +329,38 @@ function reactionEmojiOf(type: BackendReactionType): LiveReactionEmoji | null {
 function isBackendChatMessage(body: unknown): body is BackendChatMessage {
   return Boolean(
     body &&
-      typeof body === 'object' &&
-      'messageId' in body &&
-      'content' in body &&
-      typeof (body as BackendChatMessage).content === 'string',
+    typeof body === 'object' &&
+    'messageId' in body &&
+    'content' in body &&
+    typeof (body as BackendChatMessage).content === 'string',
   )
 }
 
 function isBackendReaction(body: unknown): body is BackendReaction {
   return Boolean(
     body &&
-      typeof body === 'object' &&
-      'type' in body &&
-      typeof (body as BackendReaction).type === 'string',
+    typeof body === 'object' &&
+    'type' in body &&
+    typeof (body as BackendReaction).type === 'string',
   )
 }
 
 function isBackendViewerCount(body: unknown): body is BackendViewerCount {
   return Boolean(
     body &&
-      typeof body === 'object' &&
-      'viewerCount' in body &&
-      typeof (body as BackendViewerCount).viewerCount === 'number',
+    typeof body === 'object' &&
+    'viewerCount' in body &&
+    typeof (body as BackendViewerCount).viewerCount === 'number',
   )
 }
 
 function isBackendChatBlockedNotice(body: unknown): body is BackendChatBlockedNotice {
   return Boolean(
     body &&
-      typeof body === 'object' &&
-      'clientMessageId' in body &&
-      typeof (body as BackendChatBlockedNotice).clientMessageId === 'string' &&
-      !('error' in body),
+    typeof body === 'object' &&
+    'clientMessageId' in body &&
+    typeof (body as BackendChatBlockedNotice).clientMessageId === 'string' &&
+    !('error' in body),
   )
 }
 
@@ -429,7 +423,8 @@ function isSuppressedRealtimeError(body: unknown) {
       <button
         type="button"
         class="live-chat-overlay__close"
-        aria-label="채팅 끄기"
+        aria-label="채팅 창 줄이기"
+        title="채팅 창 줄이기"
         @click="isChatCollapsed = true"
       >
         ×
@@ -462,11 +457,7 @@ function isSuppressedRealtimeError(body: unknown) {
           :placeholder="composerPlaceholder"
           aria-label="채팅 메시지"
         />
-        <button
-          type="submit"
-          :disabled="!canSubmitMessage"
-          aria-label="채팅 보내기"
-        >
+        <button type="submit" :disabled="!canSubmitMessage" aria-label="채팅 보내기">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="m22 2-7 20-4-9-9-4 20-7Z" />
             <path d="M22 2 11 13" />
@@ -490,9 +481,10 @@ function isSuppressedRealtimeError(body: unknown) {
       <button
         type="button"
         class="live-chat-overlay__reopen"
+        aria-label="채팅 창 다시 열기"
         @click="isChatCollapsed = false"
       >
-        채팅 켜기
+        채팅
       </button>
     </div>
   </div>
@@ -525,7 +517,7 @@ function isSuppressedRealtimeError(body: unknown) {
   backdrop-filter: blur(8px);
 }
 
-/* 채팅 꺼짐: 감정 이모지 가로 일렬 + 채팅 켜기 (채팅창 자리) */
+/* 채팅 창을 줄인 상태: 감정 이모지와 다시 열기 버튼을 가로로 배치한다. */
 .live-chat-overlay__collapsed {
   display: flex;
   position: absolute;
@@ -560,7 +552,7 @@ function isSuppressedRealtimeError(body: unknown) {
   border-radius: var(--radius-badge);
   background: rgba(8, 8, 8, 0.7);
   color: var(--color-live-text-primary);
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-medium);
   backdrop-filter: blur(8px);
 }
