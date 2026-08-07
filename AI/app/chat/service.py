@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import lru_cache
 
 from app.chat import rag_store, registry
@@ -69,6 +69,7 @@ class ChatModerationService:
         abuse_threshold: float = registry.ABUSE_THRESHOLD,
         min_cluster_size: int = registry.MIN_CLUSTER_SIZE,
         candidate_limit: int = registry.CHAT_RAG_CANDIDATE_LIMIT,
+        answer_cooldown_seconds: float = registry.ANSWER_COOLDOWN_SECONDS,
     ) -> None:
         self._spam = spam_detector
         self._classifier = classifier
@@ -79,6 +80,7 @@ class ChatModerationService:
         self._abuse_threshold = abuse_threshold
         self._min_cluster_size = min_cluster_size
         self._candidate_limit = candidate_limit
+        self._answer_cooldown_seconds = answer_cooldown_seconds
         # 이미 워커에 보내 결과를 기다리는 중인 티켓. 프로세스 인메모리라 다중 게이트웨이
         # 환경에서는 안 맞는다 — InMemoryAnswerStore와 같은 한계(S15P11A108-188).
         self._pending: set[str] = set()
@@ -203,17 +205,21 @@ class ChatModerationService:
         return job
 
     def _try_enqueue_chat_rag(self, cluster: Cluster) -> None:
-        """이미 답변됐거나 이미 워커에 보낸 티켓이면 건너뛰고, 아니면 job을 큐에 넣는다.
+        """이미 최근에 답변됐거나 이미 워커에 보낸 티켓이면 건너뛰고, 아니면 job을 큐에 넣는다.
 
         실제 검색·그라운딩 판단·생성은 워커가 한다(`worker/chat_rag_worker_example.py`) —
         여기선 이 방송의 후보 문서를 모아 job payload에 실어 보내기만 한다.
         """
         try:
-            self._answers.get(cluster.ticket)
+            existing = self._answers.get(cluster.ticket)
         except AnswerNotFound:
             pass
         else:
-            return  # 이미 답변됨
+            # 쿨다운 안에 있으면 재생성하지 않는다. 지났으면(방송이 길어져 나중에 들어온
+            # 시청자가 예전 답변을 못 봤을 수 있다) 그냥 통과시켜 아래에서 다시 enqueue한다.
+            age = (datetime.now(UTC) - existing.created_at).total_seconds()
+            if age < self._answer_cooldown_seconds:
+                return
 
         if cluster.ticket in self._pending:
             # 워커 처리가 poll 주기(수 초)만큼 걸리는 동안 같은 클러스터에 메시지가 더 들어와도

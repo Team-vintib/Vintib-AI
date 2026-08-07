@@ -10,7 +10,7 @@ job이 실제로 무엇이 실리는지만 본다(`test/quality/test_quality_rou
 """
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,7 +20,7 @@ from app.chat import service as chat_service_module
 from app.chat.answers import AnswerNotFound, InMemoryAnswerStore
 from app.chat.classifier import RuleBasedClassifier
 from app.chat.faq import _DATA_DIR, QuestionClusterer, QuestionDetector
-from app.chat.schemas import ModerateRequest, ModerationAction, Verdict
+from app.chat.schemas import FaqAnswer, ModerateRequest, ModerationAction, Verdict
 from app.chat.service import ChatModerationService, get_chat_service
 from app.chat.spam import InMemoryStateStore, SpamDetector
 from app.gateway import router as gateway_router
@@ -250,6 +250,61 @@ def test_answer_is_generated_only_once_per_cluster(monkeypatch, fake_redis):
     second()
     assert len(fake_redis.pushed) == 1  # 이미 답변된 티켓이라 새 job이 안 쌓인다
     assert service.get_answer(job.payload["ticket"]).created_at == created_at
+
+
+def test_answer_regenerates_after_cooldown_expires(monkeypatch, fake_redis):
+    """방송이 오래 가면 나중에 들어온 시청자는 예전 답변을 못 봤을 수 있다 — 쿨다운이 지나면
+    같은 클러스터라도 다시 답변을 생성해야 한다(사용자 확인, CH025 후속)."""
+    _stub_docs(monkeypatch, [_doc(1, "근거 내용")])
+    service = _service(answer_cooldown_seconds=60.0)
+    _stub_singleton(monkeypatch, service)
+    service.moderate(_request(content=GROUNDED_QUESTION))
+    _, first = service.moderate(_request(content="M 사이즈도 있나요?"))
+    first()
+    job = _pushed_job(fake_redis)
+    ticket = job.payload["ticket"]
+    gateway_router._ingest_chat_rag_result(
+        job, {"grounded": True, "answer": "A", "grounding_score": 0.9, "sources": []}
+    )
+
+    # 쿨다운(60초)이 지난 것처럼 답변 시각을 과거로 되돌려 둔다.
+    stale = service.get_answer(ticket)
+    service.save_generated_answer(
+        FaqAnswer(
+            ticket=stale.ticket,
+            live_id=stale.live_id,
+            question=stale.question,
+            cluster_size=stale.cluster_size,
+            answer=stale.answer,
+            grounded=stale.grounded,
+            grounding_score=stale.grounding_score,
+            sources=stale.sources,
+            created_at=stale.created_at - timedelta(seconds=61),
+        )
+    )
+
+    _, second = service.moderate(_request(content="혹시 M 사이즈 있나요??"))
+    second()
+
+    assert len(fake_redis.pushed) == 2  # 쿨다운이 지나서 같은 클러스터에 새 job이 다시 쌓인다
+
+
+def test_answer_stays_cached_within_cooldown(monkeypatch, fake_redis):
+    _stub_docs(monkeypatch, [_doc(1, "근거 내용")])
+    service = _service(answer_cooldown_seconds=60.0)
+    _stub_singleton(monkeypatch, service)
+    service.moderate(_request(content=GROUNDED_QUESTION))
+    _, first = service.moderate(_request(content="M 사이즈도 있나요?"))
+    first()
+    job = _pushed_job(fake_redis)
+    gateway_router._ingest_chat_rag_result(
+        job, {"grounded": True, "answer": "A", "grounding_score": 0.9, "sources": []}
+    )
+
+    _, second = service.moderate(_request(content="혹시 M 사이즈 있나요??"))
+    second()
+
+    assert len(fake_redis.pushed) == 1  # 쿨다운(60초) 안이라 새 job이 안 쌓인다
 
 
 def test_does_not_enqueue_duplicate_job_while_pending(monkeypatch, fake_redis):
