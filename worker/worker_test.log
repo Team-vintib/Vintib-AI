@@ -1,0 +1,4 @@
+﻿[DESKTOP-MR7IIH9-quality_check] polling https://i15a108.p.ssafy.io/ai/workers/poll (feature=quality_check)
+[DESKTOP-MR7IIH9-quality_check] 세그멘터 로딩 중... (backend=mock)
+[DESKTOP-MR7IIH9-quality_check] 세그멘터 준비 완료
+[DESKTOP-MR7IIH9-quality_check] poll failed: 502 Server Error: Bad Gateway for url: https://i15a108.p.ssafy.io/ai/workers/poll?feature=quality_check, retry in 5s
