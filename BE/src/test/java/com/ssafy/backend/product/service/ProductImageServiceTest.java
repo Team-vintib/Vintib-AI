@@ -20,6 +20,7 @@ import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductImage;
+import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductImageRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.Optional;
@@ -45,6 +46,9 @@ class ProductImageServiceTest {
     private ProductImageRepository productImageRepository;
 
     @Mock
+    private CategoryRepository categoryRepository;
+
+    @Mock
     private S3StorageService s3StorageService;
 
     @Mock
@@ -68,7 +72,8 @@ class ProductImageServiceTest {
                 "test-secret",
                 new AwsProperties.S3("", "", PUBLIC_BUCKET, "private-bucket"));
         productImageService = new ProductImageService(
-                productRepository, productImageRepository, s3StorageService, awsProperties, aiClient);
+                productRepository, productImageRepository, categoryRepository, s3StorageService, awsProperties,
+                aiClient);
         product = Product.builder().seller(seller).title("빈티지 자켓").build();
     }
 
@@ -173,6 +178,83 @@ class ProductImageServiceTest {
         assertThat(response.url()).isEqualTo("https://s3.example/" + key);
         assertThat(aiProduct.getAiModelCutStatus())
                 .isEqualTo(com.ssafy.backend.product.entity.AiModelCutStatus.NONE);
+    }
+
+    @Test
+    void 앞뒤_사진이_모두_등록되면_하자_검수_job을_접수한다() {
+        String backKey = "product-images/%d/back.jpg".formatted(PRODUCT_ID);
+        String frontKey = "product-images/%d/front.jpg".formatted(PRODUCT_ID);
+        Long categoryId = 31L;
+        com.ssafy.backend.product.entity.Product qualityProduct =
+                com.ssafy.backend.product.entity.Product.builder()
+                        .seller(seller)
+                        .categoryId(categoryId)
+                        .title("빈티지 니트")
+                        .build();
+        com.ssafy.backend.product.entity.Category knitCategory =
+                org.mockito.Mockito.mock(com.ssafy.backend.product.entity.Category.class);
+        when(knitCategory.getNameEn()).thenReturn("KNIT");
+
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(qualityProduct));
+        when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(1);
+        when(s3StorageService.headObject(PUBLIC_BUCKET, backKey))
+                .thenReturn(HeadObjectResponse.builder().contentLength(1024L).build());
+        when(s3StorageService.publicUrl(PUBLIC_BUCKET, backKey)).thenReturn("https://s3.example/" + backKey);
+        when(s3StorageService.publicUrl(PUBLIC_BUCKET, frontKey)).thenReturn("https://s3.example/" + frontKey);
+        when(productImageRepository.findAllByProductIdOrderBySortOrderAsc(any())).thenReturn(java.util.List.of(
+                ProductImage.builder().imageKey(frontKey).sortOrder((short) 0).primary(true).build(),
+                ProductImage.builder().imageKey(backKey).sortOrder((short) 1).primary(false).build()));
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(knitCategory));
+        // qualityProduct는 실제로 저장된 적 없는 순수 builder 인스턴스라 getId()는 null이다
+        // (production에서는 productRepository.findById로 가져온 실제 엔티티라 ID가 있다).
+        when(aiClient.createQualityInspectionJob(
+                org.mockito.ArgumentMatchers.isNull(),
+                eq(java.util.List.of("https://s3.example/" + frontKey, "https://s3.example/" + backKey)),
+                eq("TOP_KNIT")))
+                .thenReturn("job-quality-1");
+
+        productImageService.registerImage(
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(backKey, (short) 1, false));
+
+        assertThat(qualityProduct.getQualityInspectionStatus())
+                .isEqualTo(com.ssafy.backend.product.entity.QualityInspectionStatus.PENDING);
+        assertThat(qualityProduct.getQualityInspectionJobId()).isEqualTo("job-quality-1");
+    }
+
+    @Test
+    void 대응되는_GarmentCategory가_없으면_하자_검수를_건너뛴다() {
+        String backKey = "product-images/%d/back.jpg".formatted(PRODUCT_ID);
+        String frontKey = "product-images/%d/front.jpg".formatted(PRODUCT_ID);
+        Long categoryId = 999L;
+        com.ssafy.backend.product.entity.Product shoeProduct =
+                com.ssafy.backend.product.entity.Product.builder()
+                        .seller(seller)
+                        .categoryId(categoryId)
+                        .title("운동화")
+                        .build();
+        com.ssafy.backend.product.entity.Category sneakersCategory =
+                org.mockito.Mockito.mock(com.ssafy.backend.product.entity.Category.class);
+        when(sneakersCategory.getNameEn()).thenReturn("SNEAKERS");
+
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(shoeProduct));
+        when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(1);
+        when(s3StorageService.headObject(PUBLIC_BUCKET, backKey))
+                .thenReturn(HeadObjectResponse.builder().contentLength(1024L).build());
+        when(s3StorageService.publicUrl(PUBLIC_BUCKET, backKey)).thenReturn("https://s3.example/" + backKey);
+        when(productImageRepository.findAllByProductIdOrderBySortOrderAsc(any())).thenReturn(java.util.List.of(
+                ProductImage.builder().imageKey(frontKey).sortOrder((short) 0).primary(true).build(),
+                ProductImage.builder().imageKey(backKey).sortOrder((short) 1).primary(false).build()));
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(sneakersCategory));
+
+        productImageService.registerImage(
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(backKey, (short) 1, false));
+
+        assertThat(shoeProduct.getQualityInspectionStatus())
+                .isEqualTo(com.ssafy.backend.product.entity.QualityInspectionStatus.NONE);
+        verify(aiClient, org.mockito.Mockito.never())
+                .createQualityInspectionJob(any(), any(), anyString());
     }
 
     @Test

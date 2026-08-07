@@ -4,11 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.ssafy.backend.global.client.AiClient;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.live.dto.request.LiveProductLinkRequest;
@@ -30,6 +35,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.client.RestClientException;
 
 @ExtendWith(MockitoExtension.class)
 class LiveProductServiceTest {
@@ -49,13 +55,17 @@ class LiveProductServiceTest {
     private ProductQueryPort productQueryPort;
 
     @Mock
+    private AiClient aiClient;
+
+    @Mock
     private Member host;
 
     private LiveProductService liveProductService;
 
     @BeforeEach
     void setUp() {
-        liveProductService = new LiveProductService(liveRepository, liveProductRepository, productQueryPort);
+        liveProductService =
+                new LiveProductService(liveRepository, liveProductRepository, productQueryPort, aiClient);
     }
 
     private Live 예약된_라이브() {
@@ -93,6 +103,55 @@ class LiveProductServiceTest {
         assertThat(response.saleType()).isEqualTo("DIRECT_SALE");
         assertThat(response.saleStatus()).isEqualTo("ON_SALE");
         assertThat(response.thumbnailUrl()).isEqualTo("https://cdn.example.com/p/2001.jpg");
+        // 판매자 실시간 발언(STT) 없이도 가격 같은 반복질문에 답할 수 있게, 편성 시점에
+        // 상품 정보를 근거 문서로 seed한다(-571, CH024).
+        verify(aiClient).seedChatRagDocument(eq(LIVE_ID), anyString());
+    }
+
+    @Test
+    void 연결하면_상품_정보가_반복질문_근거_문서로_seed된다() {
+        Live live = 예약된_라이브();
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        when(productQueryPort.findById(PRODUCT_ID))
+                .thenReturn(Optional.of(new ProductSummary(PRODUCT_ID, HOST_ID, "리바이스 501 빈티지")));
+        when(liveProductRepository.existsByLiveIdAndProductIdAndRemovedAtIsNull(LIVE_ID, PRODUCT_ID))
+                .thenReturn(false);
+        when(liveProductRepository.save(any(LiveProduct.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(productQueryPort.findCards(List.of(PRODUCT_ID))).thenReturn(Map.of(
+                PRODUCT_ID,
+                new ProductCard(PRODUCT_ID, "리바이스 501 빈티지", "Levi's", 45000L,
+                        "DIRECT_SALE", "ON_SALE", "A", null, "데님", Map.of("허리", 76), null)));
+
+        liveProductService.linkProduct(HOST_ID, LIVE_ID, 연결_요청());
+
+        ArgumentCaptor<String> contentCaptor = ArgumentCaptor.forClass(String.class);
+        verify(aiClient).seedChatRagDocument(eq(LIVE_ID), contentCaptor.capture());
+        String content = contentCaptor.getValue();
+        assertThat(content).contains("리바이스 501 빈티지", "Levi's", "데님", "45000원");
+    }
+
+    @Test
+    void seed_실패해도_상품_연결은_성공한다() {
+        // AI 게이트웨이 장애는 보조 기능(근거 문서 seed)만 못 하게 할 뿐, 편성 자체를 막으면 안 된다.
+        Live live = 예약된_라이브();
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        when(productQueryPort.findById(PRODUCT_ID))
+                .thenReturn(Optional.of(new ProductSummary(PRODUCT_ID, HOST_ID, "리바이스 501 빈티지")));
+        when(liveProductRepository.existsByLiveIdAndProductIdAndRemovedAtIsNull(LIVE_ID, PRODUCT_ID))
+                .thenReturn(false);
+        when(liveProductRepository.save(any(LiveProduct.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(productQueryPort.findCards(List.of(PRODUCT_ID))).thenReturn(Map.of(
+                PRODUCT_ID,
+                new ProductCard(PRODUCT_ID, "리바이스 501 빈티지", "Levi's", 45000L,
+                        "DIRECT_SALE", "ON_SALE", "A", null, null, null, null)));
+        willThrow(new RestClientException("connection refused"))
+                .given(aiClient).seedChatRagDocument(anyLong(), anyString());
+
+        var response = liveProductService.linkProduct(HOST_ID, LIVE_ID, 연결_요청());
+
+        assertThat(response.productId()).isEqualTo(PRODUCT_ID);
     }
 
     @Test

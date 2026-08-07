@@ -12,15 +12,9 @@ import {
 } from '@/domains/chat/api/liveChatApi'
 import { LIVE_REACTION_EMOJIS } from '@/domains/chat/constants/liveChatMockData'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import {
-  isLiveRealtimeApiEnabled,
-  LiveRealtimeClient,
-} from '@/domains/live/api/liveRealtimeClient'
+import { isLiveRealtimeApiEnabled, LiveRealtimeClient } from '@/domains/live/api/liveRealtimeClient'
 
-import type {
-  LiveChatMessage,
-  LiveReactionEmoji,
-} from '@/domains/chat/types/liveChat.types'
+import type { LiveChatMessage, LiveReactionEmoji } from '@/domains/chat/types/liveChat.types'
 import type { LiveWatchStatus } from '@/domains/live/types/liveWatch.types'
 
 const props = defineProps<{
@@ -52,12 +46,69 @@ const reactionParticles = ref<LiveReactionParticle[]>([])
 const messageList = ref<HTMLElement | null>(null)
 const isConnected = ref(false)
 const errorMessage = ref('')
+// main에서 독립적으로 고친 같은 버그(차단 배너 유령 메시지)의 시각적 강조 스타일
+// (`.live-chat-overlay__error--blocked`)만 가져오고, 사라지는 로직 자체는 아래
+// showTransientError로 통일한다 — 음소거(CH025) 배너까지 같은 메커니즘을 써야 해서다.
+const BLOCKED_NOTICE_TEXT = '메시지가 차단되었습니다.'
+const isBlockedMessage = computed(() => errorMessage.value === BLOCKED_NOTICE_TEXT)
 const isChatCollapsed = ref(false)
+const muteRemainingSeconds = ref<number | null>(null)
 let realtimeClient: LiveRealtimeClient | null = null
 let mockMessageSequence = 0
 let reactionSequence = 0
 let reactionTimer: number | null = null
+let errorMessageTimer: number | null = null
+let muteCountdownTimer: number | null = null
 const reactionParticleTimers = new Map<number, number>()
+
+const isMuted = computed(() => muteRemainingSeconds.value !== null)
+
+// 차단 알림처럼 "그 시점의 1회성 이벤트"를 알리는 배너는 몇 초 뒤 스스로 사라져야 한다 —
+// 이 ref를 지우는 다른 상태 변화(재연결 등)가 없어서, 직접 지우지 않으면 화면에 영영 남는다.
+const showTransientError = (message: string, durationMs = 2000) => {
+  if (errorMessageTimer !== null) {
+    window.clearTimeout(errorMessageTimer)
+  }
+  errorMessage.value = message
+  errorMessageTimer = window.setTimeout(() => {
+    errorMessage.value = ''
+    errorMessageTimer = null
+  }, durationMs)
+}
+
+// 차단 알림이 떠 있는 동안 같은 메시지가 다시 정상 전송되면(재시도 성공 등), 타이머가
+// 끝나길 기다리지 않고 바로 걷어낸다 — 지금 뜬 게 차단 알림일 때만 지운다(다른 에러
+// 메시지를 실수로 지우면 안 된다).
+const clearBlockedNoticeIfShown = () => {
+  if (!isBlockedMessage.value) return
+  if (errorMessageTimer !== null) {
+    window.clearTimeout(errorMessageTimer)
+    errorMessageTimer = null
+  }
+  errorMessage.value = ''
+}
+
+// 음소거 배너/입력창 잠금은 "풀릴 때"가 명확히 보여야 한다 — 서버가 다시 알려주지 않으므로
+// 로컬에서 1초마다 스스로 카운트다운하다가 0이 되면 잠금을 해제한다.
+const startMuteCountdown = (seconds: number) => {
+  if (muteCountdownTimer !== null) {
+    window.clearInterval(muteCountdownTimer)
+  }
+  muteRemainingSeconds.value = Math.max(1, Math.ceil(seconds))
+  muteCountdownTimer = window.setInterval(() => {
+    if (muteRemainingSeconds.value === null) return
+    const next = muteRemainingSeconds.value - 1
+    if (next <= 0) {
+      muteRemainingSeconds.value = null
+      if (muteCountdownTimer !== null) {
+        window.clearInterval(muteCountdownTimer)
+        muteCountdownTimer = null
+      }
+    } else {
+      muteRemainingSeconds.value = next
+    }
+  }, 1000)
+}
 
 const canPublishRealtime = computed(
   () => REALTIME_ENABLED && isConnected.value && isAuthenticated.value,
@@ -65,13 +116,18 @@ const canPublishRealtime = computed(
 
 const composerPlaceholder = computed(() => {
   if (props.status !== 'LIVE') return '방송 중에만 채팅할 수 있습니다'
+  if (isMuted.value) return `도배·욕설 반복으로 ${muteRemainingSeconds.value}초간 채팅이 제한됩니다`
   if (REALTIME_ENABLED && !isAuthenticated.value) return '로그인 후 채팅할 수 있습니다'
   if (REALTIME_ENABLED && !isConnected.value) return '채팅 연결 중...'
   return '채팅...'
 })
 
 const canSubmitMessage = computed(
-  () => props.status === 'LIVE' && draft.value.trim().length > 0 && canPublishRealtime.value,
+  () =>
+    props.status === 'LIVE' &&
+    !isMuted.value &&
+    draft.value.trim().length > 0 &&
+    canPublishRealtime.value,
 )
 
 const scrollToLatestMessage = async () => {
@@ -144,6 +200,9 @@ const subscribeRealtime = () => {
 
     if (existingIndex >= 0) {
       messages.value.splice(existingIndex, 1, nextMessage)
+
+      // 내 메시지가 정상적으로 브로드캐스트됐다 = 차단이 풀렸다는 뜻이라 경고를 지운다.
+      clearBlockedNoticeIfShown()
     } else {
       messages.value.push(nextMessage)
     }
@@ -173,7 +232,13 @@ const subscribeRealtime = () => {
     // 유령처럼 계속 남아있던 문제(실측으로 확인, -571 후속)를 여기서 지워서 해소한다.
     if (isBackendChatBlockedNotice(body)) {
       messages.value = messages.value.filter((message) => message.id !== body.clientMessageId)
-      errorMessage.value = '메시지가 차단되었습니다.'
+      if (typeof body.muteRemainingSeconds === 'number') {
+        // 반복 위반으로 방송 내 임시 음소거(CH025) — 배너를 몇 초 뒤 지우는 대신, 잠금 자체가
+        // 풀릴 때까지 카운트다운하며 입력창을 막는다.
+        startMuteCountdown(body.muteRemainingSeconds)
+      } else {
+        showTransientError(BLOCKED_NOTICE_TEXT)
+      }
       return
     }
 
@@ -192,7 +257,7 @@ const disconnectRealtime = () => {
 const submitMessage = () => {
   const body = draft.value.trim()
 
-  if (!body || props.status !== 'LIVE') return
+  if (!body || props.status !== 'LIVE' || isMuted.value) return
 
   if (!REALTIME_ENABLED) {
     mockMessageSequence += 1
@@ -211,6 +276,9 @@ const submitMessage = () => {
     errorMessage.value = '로그인 후 채팅할 수 있습니다.'
     return
   }
+
+  // 다시 보낸 메시지가 또 차단되면 차단 알림이 새로 오므로, 보낼 때 이전 경고는 걷어낸다.
+  clearBlockedNoticeIfShown()
 
   const clientMessageId = `local-chat-${Date.now()}-${mockMessageSequence++}`
   messages.value.push({
@@ -283,6 +351,11 @@ watch(
   () => [props.liveId, props.status],
   () => {
     errorMessage.value = ''
+    if (muteCountdownTimer !== null) {
+      window.clearInterval(muteCountdownTimer)
+      muteCountdownTimer = null
+    }
+    muteRemainingSeconds.value = null
     void loadChatHistory()
     connectRealtime()
   },
@@ -294,6 +367,14 @@ onBeforeUnmount(() => {
 
   if (reactionTimer !== null) {
     window.clearTimeout(reactionTimer)
+  }
+
+  if (errorMessageTimer !== null) {
+    window.clearTimeout(errorMessageTimer)
+  }
+
+  if (muteCountdownTimer !== null) {
+    window.clearInterval(muteCountdownTimer)
   }
 
   reactionParticleTimers.forEach((timer) => {
@@ -308,7 +389,7 @@ function mapChatMessage(message: BackendChatMessage, hostId: number): LiveChatMe
   if (message.senderType === 'AI') {
     return {
       id: String(message.messageId),
-      author: 'AI 자동답변',
+      author: 'AI 채팅 도우미',
       body: message.content,
       role: 'AI',
     }
@@ -335,38 +416,38 @@ function reactionEmojiOf(type: BackendReactionType): LiveReactionEmoji | null {
 function isBackendChatMessage(body: unknown): body is BackendChatMessage {
   return Boolean(
     body &&
-      typeof body === 'object' &&
-      'messageId' in body &&
-      'content' in body &&
-      typeof (body as BackendChatMessage).content === 'string',
+    typeof body === 'object' &&
+    'messageId' in body &&
+    'content' in body &&
+    typeof (body as BackendChatMessage).content === 'string',
   )
 }
 
 function isBackendReaction(body: unknown): body is BackendReaction {
   return Boolean(
     body &&
-      typeof body === 'object' &&
-      'type' in body &&
-      typeof (body as BackendReaction).type === 'string',
+    typeof body === 'object' &&
+    'type' in body &&
+    typeof (body as BackendReaction).type === 'string',
   )
 }
 
 function isBackendViewerCount(body: unknown): body is BackendViewerCount {
   return Boolean(
     body &&
-      typeof body === 'object' &&
-      'viewerCount' in body &&
-      typeof (body as BackendViewerCount).viewerCount === 'number',
+    typeof body === 'object' &&
+    'viewerCount' in body &&
+    typeof (body as BackendViewerCount).viewerCount === 'number',
   )
 }
 
 function isBackendChatBlockedNotice(body: unknown): body is BackendChatBlockedNotice {
   return Boolean(
     body &&
-      typeof body === 'object' &&
-      'clientMessageId' in body &&
-      typeof (body as BackendChatBlockedNotice).clientMessageId === 'string' &&
-      !('error' in body),
+    typeof body === 'object' &&
+    'clientMessageId' in body &&
+    typeof (body as BackendChatBlockedNotice).clientMessageId === 'string' &&
+    !('error' in body),
   )
 }
 
@@ -429,7 +510,8 @@ function isSuppressedRealtimeError(body: unknown) {
       <button
         type="button"
         class="live-chat-overlay__close"
-        aria-label="채팅 끄기"
+        aria-label="채팅 창 줄이기"
+        title="채팅 창 줄이기"
         @click="isChatCollapsed = true"
       >
         ×
@@ -449,8 +531,17 @@ function isSuppressedRealtimeError(body: unknown) {
         </li>
       </ul>
 
-      <p v-if="errorMessage" class="live-chat-overlay__error" role="status">
+      <p
+        v-if="errorMessage"
+        class="live-chat-overlay__error"
+        :class="{ 'live-chat-overlay__error--blocked': isBlockedMessage }"
+        role="status"
+      >
         {{ errorMessage }}
+      </p>
+
+      <p v-if="isMuted" class="live-chat-overlay__mute-notice" role="status">
+        도배·욕설 반복으로 {{ muteRemainingSeconds }}초간 채팅이 제한됩니다
       </p>
 
       <form class="live-chat-overlay__composer" @submit.prevent="submitMessage">
@@ -458,15 +549,11 @@ function isSuppressedRealtimeError(body: unknown) {
           v-model="draft"
           type="text"
           maxlength="200"
-          :disabled="status !== 'LIVE' || (REALTIME_ENABLED && !canPublishRealtime)"
+          :disabled="status !== 'LIVE' || (REALTIME_ENABLED && !canPublishRealtime) || isMuted"
           :placeholder="composerPlaceholder"
           aria-label="채팅 메시지"
         />
-        <button
-          type="submit"
-          :disabled="!canSubmitMessage"
-          aria-label="채팅 보내기"
-        >
+        <button type="submit" :disabled="!canSubmitMessage" aria-label="채팅 보내기">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="m22 2-7 20-4-9-9-4 20-7Z" />
             <path d="M22 2 11 13" />
@@ -490,9 +577,10 @@ function isSuppressedRealtimeError(body: unknown) {
       <button
         type="button"
         class="live-chat-overlay__reopen"
+        aria-label="채팅 창 다시 열기"
         @click="isChatCollapsed = false"
       >
-        채팅 켜기
+        채팅
       </button>
     </div>
   </div>
@@ -525,7 +613,7 @@ function isSuppressedRealtimeError(body: unknown) {
   backdrop-filter: blur(8px);
 }
 
-/* 채팅 꺼짐: 감정 이모지 가로 일렬 + 채팅 켜기 (채팅창 자리) */
+/* 채팅 창을 줄인 상태: 감정 이모지와 다시 열기 버튼을 가로로 배치한다. */
 .live-chat-overlay__collapsed {
   display: flex;
   position: absolute;
@@ -560,7 +648,7 @@ function isSuppressedRealtimeError(body: unknown) {
   border-radius: var(--radius-badge);
   background: rgba(8, 8, 8, 0.7);
   color: var(--color-live-text-primary);
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-medium);
   backdrop-filter: blur(8px);
 }
@@ -721,6 +809,32 @@ function isSuppressedRealtimeError(body: unknown) {
   color: var(--color-accent);
   font-size: var(--font-size-2xs);
   line-height: var(--line-height-tight);
+}
+
+/* 단순 차단 배너(errorMessage, 2초 뒤 사라짐)와 달리 잠금이 풀릴 때까지 계속 보인다. */
+.live-chat-overlay__mute-notice {
+  margin: 0 0 6px;
+  padding: 4px 8px;
+  border-radius: var(--radius-badge);
+  background: rgba(242, 240, 237, 0.1);
+  color: var(--color-accent);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.live-chat-overlay__error--blocked {
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  font-size: var(--font-size-body);
+  /* 본문 웹폰트(IBM Plex Sans KR)가 700까지만 실려 있어 weight만으로는 더 굵어지지 않는다.
+     경고가 확실히 도드라지도록 획 두께를 조금 더 준다. */
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-snug);
+  -webkit-text-stroke: 0.4px currentColor;
 }
 
 .live-chat-overlay__composer {

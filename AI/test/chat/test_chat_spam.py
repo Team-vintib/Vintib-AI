@@ -49,7 +49,9 @@ def test_window_is_per_user():
 
 
 def test_near_duplicates_trip_before_rate_limit():
-    detector = _detector()
+    # 근접중복 경로 자체를 보는 테스트라, registry 기본값(-571 후속으로 10까지 올라감)과
+    # 무관하게 작은 임계로 고정해 검증한다.
+    detector = _detector(duplicate_count=2)
     text = "품절이요 품절이요 품절이요"
     assert detector.check(7, text, now=BASE).is_spam is False  # 1회차: 이력 없음
     assert detector.check(7, text, now=BASE + 1).is_spam is False  # 2회차: 중복 1건

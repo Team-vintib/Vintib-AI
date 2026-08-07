@@ -13,6 +13,8 @@ interface BackendOrderShipmentDto {
   trackingNumber: string | null
   shippedAt: string | null
   deliveredAt: string | null
+  trackingStatus: string | null
+  trackingStatusLabel: string | null
 }
 
 const unwrapApiData = <T>(response: ApiResponse<T>, fallbackMessage: string): T => {
@@ -34,6 +36,8 @@ const toShipmentInfo = (dto: BackendOrderShipmentDto): OrderShipmentInfo => ({
   trackingNumber: dto.trackingNumber,
   shippedAt: dto.shippedAt,
   deliveredAt: dto.deliveredAt,
+  trackingStatus: dto.trackingStatus as OrderShipmentInfo['trackingStatus'],
+  trackingStatusLabel: dto.trackingStatusLabel,
 })
 
 export const getShipment = async (orderId: number): Promise<OrderShipmentInfo> => {

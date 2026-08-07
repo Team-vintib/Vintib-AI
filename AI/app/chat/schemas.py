@@ -19,6 +19,7 @@ class Verdict(str, Enum):
     abusive = "ABUSIVE"  # 욕설·혐오·인신공격
     spam = "SPAM"  # 도배(rate-limit / 근접중복)
     repeated_question = "REPEATED_QUESTION"  # 같은 질문이 MIN_CLUSTER_SIZE 이상 반복
+    timed_out = "TIMED_OUT"  # 반복 위반으로 방송 내 임시 음소거 중(-571 후속, CH025)
 
 
 class ModerationAction(str, Enum):
@@ -53,6 +54,7 @@ class ModerateResponse(BaseModel):
     reason: str  # 어떤 규칙에 걸렸는지(예: rate_limit, abuse_term, question_repeated)
     scores: Scores
     answer_ticket: str | None = None  # 반복질문일 때만. 답변 조회용 키
+    mute_remaining_seconds: float | None = None  # TIMED_OUT일 때만. 음소거 잔여 초
     latency_ms: float
 
 
@@ -80,3 +82,9 @@ class FaqAnswer(BaseModel):
 class AnswerListResponse(BaseModel):
     live_id: int
     answers: list[FaqAnswer]
+
+
+class SeedDocumentRequest(BaseModel):
+    """STT 없이 반복질문 근거 문서를 채우는 경로(-571, CH024). BE가 상품 편성 시점에 호출한다."""
+
+    content: str = Field(min_length=1, max_length=1000)
