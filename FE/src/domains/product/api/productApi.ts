@@ -22,6 +22,7 @@ import type {
   ProductRegistrationPhotoDraft,
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
+import { mapAiColorKeyToOptionId } from '@/domains/product/constants/aiColorPalette'
 import { buildMockProductDetail } from '@/domains/product/constants/productDetailMockData'
 import {
   PRODUCT_CATEGORY_MOCK_DATA,
@@ -403,6 +404,96 @@ export const mapQualityInspectionResultToPhotoResults = (
 
     return { photoId, findings, confirmed: false }
   })
+}
+
+// ── 상품 등록 사진 기반 카테고리·색상 자동 분류(사전업로드) ──────────────────────────
+// docs/requests/FE/042-product-classify-preupload-integration.md. 상품이 아직 생성되기
+// 전(사전업로드)에 사진 1장만으로 분류하는 완전 무상태 API라, jobId는 BE가 저장하지 않고
+// FE가 직접 들고 있다가 상태 조회에 써야 한다.
+
+interface ProductPreUploadUrlResponse {
+  key: string
+  uploadUrl: string
+  expiresInSeconds: number
+}
+
+interface ProductClassifyJobResponse {
+  jobId: string
+}
+
+interface ProductClassifyCategorySuggestionDto {
+  majorCategoryId: number
+  categoryId: number
+  action: string
+  score: number
+}
+
+interface ProductClassifyColorSuggestionDto {
+  colorId: string
+  action: string
+  score: number
+}
+
+interface ProductClassifyResultDto {
+  category: ProductClassifyCategorySuggestionDto | null
+  colorPrimary: ProductClassifyColorSuggestionDto | null
+  taxonomyVersion: string
+}
+
+export interface ProductClassifyStatusDto {
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+  result: ProductClassifyResultDto | null
+  error: string | null
+}
+
+export const createProductPreUploadUrl = async (file: File) => {
+  const response = await http.post<ApiResponse<ProductPreUploadUrlResponse>>(
+    '/products/pre-upload/upload-url',
+    { fileName: file.name, contentType: file.type },
+  )
+
+  return unwrapApiData(response.data)
+}
+
+export const uploadToPreUploadUrl = async (uploadUrl: string, file: File) => {
+  await axios.put(uploadUrl, file, {
+    headers: { 'Content-Type': file.type },
+  })
+}
+
+export const triggerProductClassify = async (key: string) => {
+  const response = await http.post<ApiResponse<ProductClassifyJobResponse>>(
+    '/products/pre-upload/classify',
+    { key },
+  )
+
+  return unwrapApiData(response.data).jobId
+}
+
+export const getProductClassifyStatus = async (jobId: string) => {
+  const response = await http.get<ApiResponse<ProductClassifyStatusDto>>(
+    `/products/pre-upload/classify/${jobId}`,
+  )
+
+  return unwrapApiData(response.data)
+}
+
+// AI 원본(카테고리 depth2/depth3 숫자 id, 색상 팔레트 코드)을 화면 select가 쓰는 문자열
+// id로 변환한다. category/colorPrimary가 null이면(소분류 미지원 등) 그대로 null을 돌려준다.
+export const mapClassifyResultToSuggestions = (result: ProductClassifyResultDto) => {
+  const category = result.category
+    ? {
+        majorId: String(result.category.majorCategoryId),
+        minorId: String(result.category.categoryId),
+      }
+    : null
+
+  const mappedColorId = result.colorPrimary
+    ? mapAiColorKeyToOptionId(result.colorPrimary.colorId)
+    : null
+  const color = mappedColorId ? { colorId: mappedColorId } : null
+
+  return { category, color }
 }
 
 // 미낙찰 상품 처리(440) — 상품을 상시 판매(가격 지정)로 전환하거나 경매 예정으로 되돌린다.
