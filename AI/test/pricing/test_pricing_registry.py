@@ -25,6 +25,12 @@ def test_internal_clip_backend_is_registered():
     assert config["min_comps_for_pricing"] >= 1
 
 
+def test_internal_backend_is_registered():
+    """CH024 — internal은 등록만 돼 있고 기본 활성은 아니다(아래 committed_defaults 참고)."""
+    config = registry.comps_config("internal")
+    assert config["min_comps_for_pricing"] >= 1
+
+
 def test_comps_config_rejects_unknown_key():
     with pytest.raises(ValueError, match="등록되지 않은"):
         registry.comps_config("없는백엔드")

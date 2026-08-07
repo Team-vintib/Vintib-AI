@@ -25,9 +25,13 @@ class _StubSource(CompsSource):
         self._fetch_result = fetch_result
         self._error = error
         self.received_image_url: str | None = None
+        self.received_product_id: int | None = None
 
-    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
+    def fetch(
+        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+    ) -> CompsFetch:
         self.received_image_url = image_url
+        self.received_product_id = product_id
         if self._error is not None:
             raise self._error
         return self._fetch_result
@@ -127,6 +131,14 @@ def test_estimate_forwards_none_when_no_image_given():
     assert source.received_image_url is None
 
 
+def test_estimate_forwards_product_id_to_comps_source():
+    """`internal`(CH024)은 자기 임베딩을 조회할 product_id가 필요하다."""
+    source = _StubSource(_comps(10_000, 20_000, 30_000))
+    _service(source).estimate(_request(product_id=1042))
+
+    assert source.received_product_id == 1042
+
+
 def test_estimate_raises_on_infrastructure_failure():
     """인프라 오류는 결과가 아니라 예외다 — job을 failed로 만들어야 하기 때문."""
     service = _service(_StubSource(error=CompsUnavailable("GMS_API_KEY가 설정되지 않았습니다")))
@@ -144,6 +156,16 @@ def test_mock_backend_results_are_not_logged(monkeypatch):
     monkeypatch.setattr(store, "save_observations", lambda *a, **k: calls.append(a))
 
     _service(_StubSource(_comps(10_000, 20_000, 30_000), key="mock")).estimate(_request())
+
+    assert calls == []
+
+
+def test_internal_backend_results_are_not_logged(monkeypatch):
+    """`internal`(CH024)은 BE 실데이터라 GMS 관측 원장과는 별개다 — 섞이면 안 된다."""
+    calls = []
+    monkeypatch.setattr(store, "save_observations", lambda *a, **k: calls.append(a))
+
+    _service(_StubSource(_comps(10_000, 20_000, 30_000), key="internal")).estimate(_request())
 
     assert calls == []
 
