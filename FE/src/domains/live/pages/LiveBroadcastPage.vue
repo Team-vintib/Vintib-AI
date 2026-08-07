@@ -12,10 +12,7 @@ import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionRe
 import LiveAuctionStartOverlay from '@/domains/auction/components/LiveAuctionStartOverlay.vue'
 import SellerAuctionPanel from '@/domains/auction/components/SellerAuctionPanel.vue'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
-import {
-  patchCurrentProduct,
-  updateLiveStatus,
-} from '@/domains/live/api/liveControlApi'
+import { patchCurrentProduct, updateLiveStatus } from '@/domains/live/api/liveControlApi'
 import {
   getLiveWatchViewData,
   isLiveWatchApiEnabled,
@@ -107,6 +104,51 @@ const getMockScenario = (): LiveWatchMockScenario => {
 const selectedProduct = computed(
   () => live.value?.products.find((product) => product.id === selectedProductId.value) ?? null,
 )
+
+// 방송 후 판매 방식을 정할 수 있는 상품. BE 유찰 목록(GET /lives/{id}/unsold-products)은
+// **경매를 걸었다가 유찰된 상품만** 준다 — 경매를 한 번도 안 건 미판매 상품(경매 예정 그대로,
+// 정찰제인데 안 팔림)은 빠져서 관리 화면 자체를 못 열었다. 요약의 미판매 결과로 그 빈틈을 메운다.
+const manageableUnsoldProducts = computed<LiveUnsoldProduct[]>(() => {
+  const linkedById = new Map(live.value?.products.map((product) => [product.id, product]) ?? [])
+  const fromAuction = unsoldProducts.value.map((product) => ({
+    ...product,
+    // 판매 방식은 편성 상품 목록에서 붙인다 — 상품 상세는 상품에 따라 500이 난다(요청 029).
+    saleType: linkedById.get(product.productId)?.saleType ?? null,
+  }))
+  const known = new Set(fromAuction.map((product) => product.productId))
+  const fromSummary = (broadcastSummary.value?.results ?? [])
+    .filter((result) => result.status === 'UNSOLD' && !known.has(result.productId))
+    .map((result) => {
+      const linked = linkedById.get(result.productId)
+
+      return {
+        productId: result.productId,
+        title: result.title,
+        thumbnailUrl: result.thumbnailUrl ?? linked?.thumbnailUrl ?? null,
+        // 경매를 건 적이 없으니 시작가가 없다. 정찰제면 등록가를 기본값으로 준다.
+        startPrice: linked?.price ?? null,
+        saleType: linked?.saleType ?? null,
+      }
+    })
+
+  return [...fromAuction, ...fromSummary]
+})
+
+// 미판매 상품 처리 결과를 편성 상품에 반영한다 — 대시보드로 돌아갔을 때 상품별 결과의
+// 가격과 판매 방식 배지가 방금 바꾼 값으로 보여야 한다.
+const applyUnsoldHandled = (result: {
+  productId: number
+  saleType: 'DIRECT_SALE' | 'AUCTION'
+  price: number | null
+}) => {
+  const product = live.value?.products.find((item) => item.id === result.productId)
+
+  if (!product) return
+
+  product.saleType = result.saleType
+  product.price = result.price
+  product.saleStatus = result.saleType === 'DIRECT_SALE' ? 'ON_SALE' : 'AUCTION_SCHEDULED'
+}
 
 const elapsedSeconds = computed(() => {
   if (!live.value?.startedAt) return 0
@@ -336,9 +378,7 @@ const transitionToSelectedProduct = async () => {
       live.value = { ...live.value, currentProductId: previousProductId }
     }
 
-    showTransitionNotice(
-      error instanceof Error ? error.message : '상품을 전환하지 못했습니다.',
-    )
+    showTransitionNotice(error instanceof Error ? error.message : '상품을 전환하지 못했습니다.')
   }
 }
 
@@ -468,14 +508,11 @@ const handleRealtimeReady = (client: LiveRealtimeClient) => {
   if (!live.value || !client.connected()) return
 
   clearAuctionSubscription()
-  auctionSubscription = client.subscribe(
-    `/topic/lives/${live.value.id}/auctions`,
-    (body) => {
-      if (isAuctionEventMessage(body) && body.auction.liveId === live.value?.id) {
-        applyAuctionSnapshot(body.auction)
-      }
-    },
-  )
+  auctionSubscription = client.subscribe(`/topic/lives/${live.value.id}/auctions`, (body) => {
+    if (isAuctionEventMessage(body) && body.auction.liveId === live.value?.id) {
+      applyAuctionSnapshot(body.auction)
+    }
+  })
 }
 
 const closeAuctionWin = () => {
@@ -548,7 +585,8 @@ onBeforeUnmount(() => {
         :elapsed-time="elapsedTime"
         :peak-viewer-count="live.peakViewerCount"
         :summary="broadcastSummary"
-        :manageable-unsold-count="unsoldProducts.length"
+        :products="live.products"
+        :manageable-unsold-count="manageableUnsoldProducts.length"
         :is-loading="resultLoading"
         :error-message="resultError"
         @retry="loadBroadcastResults(live.id)"
@@ -558,7 +596,8 @@ onBeforeUnmount(() => {
 
       <LiveUnsoldManage
         v-else-if="live.status === 'ENDED' && endView === 'manage'"
-        :products="unsoldProducts"
+        :products="manageableUnsoldProducts"
+        @handled="applyUnsoldHandled"
         @back="endView = 'dashboard'"
         @to-list="router.push({ name: ROUTE_NAMES.HOME })"
       />

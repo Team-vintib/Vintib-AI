@@ -49,6 +49,16 @@ const hasBuyerAddress = computed(() => !!shipment.value && shipment.value.addres
 const canRegisterShipment = computed(
   () => order.value?.status === 'PAID' && hasBuyerAddress.value && !shipment.value?.trackingNumber,
 )
+/**
+ * BE의 웹훅 구독 실패 폴백(deliveryapi.co.kr 자격증명 없는 환경 등)은 order.status만 DELIVERED로
+ * 즉시 확정하고 shipment.trackingStatus는 영영 null로 남긴다(실 웹훅에서만 채워짐) — order.status를
+ * 상한으로 같이 봐야 이 경우에도 "배송 완료"가 반영된다.
+ */
+const shipmentStatusLabel = computed(() => {
+  if (shipment.value?.trackingStatusLabel) return shipment.value.trackingStatusLabel
+  if (order.value?.status === 'DELIVERED') return MY_ORDER_STATUS_LABELS.DELIVERED
+  return '송장 등록됨'
+})
 const activeRefund = computed(() => refunds.value.find((refund) => refund.status === 'REQUESTED') ?? null)
 const latestRefund = computed(() => refunds.value[0] ?? null)
 
@@ -106,10 +116,12 @@ const loadSale = async () => {
   }
 }
 
-const refreshOrderStatus = async () => {
+const refreshOrderAndShipment = async () => {
   if (!order.value) return
 
-  order.value = await getOrderDetail(order.value.orderId).catch(() => order.value)
+  const orderId = order.value.orderId
+  order.value = await getOrderDetail(orderId).catch(() => order.value)
+  shipment.value = await getShipment(orderId).catch(() => shipment.value)
 }
 
 const openShipmentForm = () => {
@@ -131,7 +143,7 @@ const submitShipment = async () => {
       trackingNumber: shipmentTrackingNumber.value.trim(),
     })
     isShipmentFormOpen.value = false
-    await refreshOrderStatus()
+    await refreshOrderAndShipment()
   } catch (error) {
     shipmentErrorMessage.value = normalizeApiError(error).message
   } finally {
@@ -148,7 +160,7 @@ const approveRefund = async () => {
   try {
     const reviewed = await reviewRefund(activeRefund.value.refundId, { decision: 'APPROVED' })
     refunds.value = refunds.value.map((refund) => (refund.refundId === reviewed.refundId ? reviewed : refund))
-    await refreshOrderStatus()
+    await refreshOrderAndShipment()
   } catch (error) {
     refundReviewErrorMessage.value = normalizeApiError(error).message
   } finally {
@@ -332,7 +344,7 @@ onMounted(() => {
             </div>
             <div>
               <dt>배송 상태</dt>
-              <dd>{{ MY_ORDER_STATUS_LABELS[order.status] }}</dd>
+              <dd>{{ shipmentStatusLabel }}</dd>
             </div>
             <div>
               <dt>발송/도착 일시</dt>
