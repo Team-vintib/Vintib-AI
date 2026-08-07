@@ -101,7 +101,15 @@ public class AiClient {
                 .body(ModerateChatResponse.class);
     }
 
-    /** {@code GET /chat/lives/{liveId}/answers} — 반복질문 자동답변 폴링(-571). */
+    /**
+     * {@code GET /chat/lives/{liveId}/answers} — 반복질문 자동답변 폴링(-571).
+     *
+     * <p>{@code since}는 오프셋 없이 그대로 보낸다(이 서버 타임존 KST의 벽시계 시각) — AI
+     * 쪽이 "오프셋 없으면 KST로 간주"하고 해석한다(`app/chat/answers.py`의 {@code
+     * _as_aware}). 예전엔 AI가 "오프셋 없으면 UTC로 간주"했는데, 실제로는 KST값이라
+     * 9시간 앞선 것으로 잘못 취급돼 그 뒤에 생성된 답변이 전부 "since 이전"으로 잘려나가
+     * 영원히 조회되지 않는 버그가 있었다(실측으로 발견, S15P11A108-571 후속).
+     */
     public List<ChatAnswer> getLiveAnswers(Long liveId, LocalDateTime since) {
         ChatAnswerListResponse response = aiRestClient.get()
                 .uri(uriBuilder -> uriBuilder
@@ -121,6 +129,18 @@ public class AiClient {
         aiRestClient.post()
                 .uri("/chat/lives/{liveId}/documents", liveId)
                 .body(new SeedChatDocumentRequest(content))
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+    /**
+     * {@code DELETE /chat/lives/{liveId}/documents} — 방송 종료 시 근거 문서를 전부 지운다
+     * (CH026 후속). 종료된 방송은 더 이상 채팅을 못 쳐서 반복질문이 다시 트리거될 일이 없어,
+     * 그 시점부터 seed 문서가 영구히 안 쓰인다.
+     */
+    public void deleteChatRagDocuments(Long liveId) {
+        aiRestClient.delete()
+                .uri("/chat/lives/{liveId}/documents", liveId)
                 .retrieve()
                 .toBodilessEntity();
     }

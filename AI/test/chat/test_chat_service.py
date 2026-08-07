@@ -10,7 +10,7 @@ job이 실제로 무엇이 실리는지만 본다(`test/quality/test_quality_rou
 """
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,7 +20,7 @@ from app.chat import service as chat_service_module
 from app.chat.answers import AnswerNotFound, InMemoryAnswerStore
 from app.chat.classifier import RuleBasedClassifier
 from app.chat.faq import _DATA_DIR, QuestionClusterer, QuestionDetector
-from app.chat.schemas import ModerateRequest, ModerationAction, Verdict
+from app.chat.schemas import FaqAnswer, ModerateRequest, ModerationAction, Verdict
 from app.chat.service import ChatModerationService, get_chat_service
 from app.chat.spam import InMemoryStateStore, SpamDetector
 from app.gateway import router as gateway_router
@@ -149,6 +149,34 @@ def test_second_question_becomes_repeated_and_defers_answer():
     assert deferred is not None
 
 
+def test_repeated_violations_trigger_timeout():
+    # registry 기본값(임계 3회)을 그대로 쓴다 — 서로 다른 욕설이라 스팸(근접중복)엔 안 걸리고
+    # 매번 악성 판정으로 위반이 쌓인다.
+    service = _service()
+    abusive_texts = ["시발 진짜", "병신 아니냐", "지랄하네"]
+    for text in abusive_texts:
+        response, _ = service.moderate(_request(content=text))
+        assert response.verdict is Verdict.abusive
+
+    response, deferred = service.moderate(_request(content="안녕하세요"))
+
+    assert response.verdict is Verdict.timed_out
+    assert response.action is ModerationAction.block
+    assert response.mute_remaining_seconds is not None
+    assert response.mute_remaining_seconds > 0
+    assert deferred is None
+
+
+def test_timeout_is_scoped_per_live():
+    service = _service()
+    for text in ["시발 진짜", "병신 아니냐", "지랄하네"]:
+        service.moderate(_request(live_id=12, content=text))
+
+    # 같은 사용자라도 다른 방송에서는 음소거가 적용되지 않는다.
+    response, _ = service.moderate(_request(live_id=99, content="안녕하세요"))
+    assert response.verdict is Verdict.normal
+
+
 def test_normal_comment_passes():
     response, _ = _service().moderate(_request(content="이 옷 진짜 예쁘네요"))
     assert response.verdict is Verdict.normal
@@ -224,6 +252,61 @@ def test_answer_is_generated_only_once_per_cluster(monkeypatch, fake_redis):
     assert service.get_answer(job.payload["ticket"]).created_at == created_at
 
 
+def test_answer_regenerates_after_cooldown_expires(monkeypatch, fake_redis):
+    """방송이 오래 가면 나중에 들어온 시청자는 예전 답변을 못 봤을 수 있다 — 쿨다운이 지나면
+    같은 클러스터라도 다시 답변을 생성해야 한다(사용자 확인, CH025 후속)."""
+    _stub_docs(monkeypatch, [_doc(1, "근거 내용")])
+    service = _service(answer_cooldown_seconds=60.0)
+    _stub_singleton(monkeypatch, service)
+    service.moderate(_request(content=GROUNDED_QUESTION))
+    _, first = service.moderate(_request(content="M 사이즈도 있나요?"))
+    first()
+    job = _pushed_job(fake_redis)
+    ticket = job.payload["ticket"]
+    gateway_router._ingest_chat_rag_result(
+        job, {"grounded": True, "answer": "A", "grounding_score": 0.9, "sources": []}
+    )
+
+    # 쿨다운(60초)이 지난 것처럼 답변 시각을 과거로 되돌려 둔다.
+    stale = service.get_answer(ticket)
+    service.save_generated_answer(
+        FaqAnswer(
+            ticket=stale.ticket,
+            live_id=stale.live_id,
+            question=stale.question,
+            cluster_size=stale.cluster_size,
+            answer=stale.answer,
+            grounded=stale.grounded,
+            grounding_score=stale.grounding_score,
+            sources=stale.sources,
+            created_at=stale.created_at - timedelta(seconds=61),
+        )
+    )
+
+    _, second = service.moderate(_request(content="혹시 M 사이즈 있나요??"))
+    second()
+
+    assert len(fake_redis.pushed) == 2  # 쿨다운이 지나서 같은 클러스터에 새 job이 다시 쌓인다
+
+
+def test_answer_stays_cached_within_cooldown(monkeypatch, fake_redis):
+    _stub_docs(monkeypatch, [_doc(1, "근거 내용")])
+    service = _service(answer_cooldown_seconds=60.0)
+    _stub_singleton(monkeypatch, service)
+    service.moderate(_request(content=GROUNDED_QUESTION))
+    _, first = service.moderate(_request(content="M 사이즈도 있나요?"))
+    first()
+    job = _pushed_job(fake_redis)
+    gateway_router._ingest_chat_rag_result(
+        job, {"grounded": True, "answer": "A", "grounding_score": 0.9, "sources": []}
+    )
+
+    _, second = service.moderate(_request(content="혹시 M 사이즈 있나요??"))
+    second()
+
+    assert len(fake_redis.pushed) == 1  # 쿨다운(60초) 안이라 새 job이 안 쌓인다
+
+
 def test_does_not_enqueue_duplicate_job_while_pending(monkeypatch, fake_redis):
     """워커 응답을 기다리는 동안(poll 주기만큼) 같은 클러스터에 메시지가 더 들어와도
     job이 중복으로 쌓이면 안 된다 — 동기 시절엔 없던, 큐로 전환하며 새로 생긴 문제다."""
@@ -292,6 +375,42 @@ def test_api_moderate_returns_verdict():
         assert body["verdict"] == "ABUSIVE"
         assert body["action"] == "BLOCK"
         assert body["message_id"] == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_api_timed_out_response_includes_remaining_seconds():
+    client = _override(_service())
+    try:
+        for text in ["시발 진짜", "병신 아니냐", "지랄하네"]:
+            client.post(
+                "/chat/moderate",
+                json={"live_id": 12, "message_id": 1, "user_id": 1, "content": text},
+            )
+        resp = client.post(
+            "/chat/moderate",
+            json={"live_id": 12, "message_id": 2, "user_id": 1, "content": "안녕하세요"},
+        )
+        body = resp.json()
+        assert body["verdict"] == "TIMED_OUT"
+        assert body["mute_remaining_seconds"] > 0
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_api_clear_documents_deletes_by_live_id(monkeypatch):
+    # 방송 종료 시 근거 문서를 전부 지우는 경로(CH026 후속) — 실제 postgres-vector엔 안 붙는다.
+    deleted_live_ids = []
+    monkeypatch.setattr(
+        rag_store,
+        "delete_for_live",
+        lambda live_id: deleted_live_ids.append(live_id) or 3,
+    )
+    client = _override(_service())
+    try:
+        resp = client.delete("/chat/lives/12/documents")
+        assert resp.status_code == 204
+        assert deleted_live_ids == [12]
     finally:
         app.dependency_overrides.clear()
 
