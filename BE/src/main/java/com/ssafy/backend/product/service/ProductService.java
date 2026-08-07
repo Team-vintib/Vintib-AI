@@ -13,6 +13,7 @@ import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
 import com.ssafy.backend.product.dto.response.ProductAiModelCutResponse;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
+import com.ssafy.backend.product.dto.response.ProductQualityInspectionResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.product.dto.response.LinkedLiveSummaryResponse;
@@ -22,6 +23,7 @@ import com.ssafy.backend.product.entity.Brand;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductDefect;
+import com.ssafy.backend.product.entity.QualityInspectionStatus;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
@@ -308,6 +310,48 @@ public class ProductService {
             log.warn(
                     "AI 착용컷 job 상태 조회 실패(productId={}, jobId={}): {}",
                     product.getId(), product.getAiModelCutJobId(), e.getMessage());
+        }
+    }
+
+    /**
+     * 하자 검수 상태/결과를 조회한다(`docs/requests/BE/041-quality-inspection-integration.md`).
+     *
+     * <p>FE는 AI 게이트웨이를 직접 폴링하지 않는다 — BE가 이 엔드포인트에서 아직 안 끝난 job이면
+     * 조회 시점에 AI를 대신 조회해 최신화한다(모델컷과 같은 지연 폴링 방식).
+     */
+    @Transactional
+    public ProductQualityInspectionResponse getQualityInspectionStatus(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        if (product.getQualityInspectionStatus() == QualityInspectionStatus.PENDING
+                || product.getQualityInspectionStatus() == QualityInspectionStatus.PROCESSING) {
+            refreshQualityInspectionStatus(product);
+        }
+
+        return ProductQualityInspectionResponse.from(product);
+    }
+
+    private void refreshQualityInspectionStatus(Product product) {
+        try {
+            AiJobResponse job = aiClient.getJob(product.getQualityInspectionJobId());
+            if (job.isSuccess()) {
+                if (job.result() != null) {
+                    product.completeQualityInspectionJob(job.result());
+                } else {
+                    product.failQualityInspectionJob();
+                }
+            } else if (job.isFailed()) {
+                product.failQualityInspectionJob();
+            } else if ("processing".equals(job.status())) {
+                product.markQualityInspectionProcessing();
+            }
+            // queued -> PENDING 그대로 둔다.
+        } catch (RestClientException e) {
+            // 일시적 네트워크 오류일 수 있다 — FAILED로 단정하지 않고 다음 폴링에서 재시도한다.
+            log.warn(
+                    "하자 검수 job 상태 조회 실패(productId={}, jobId={}): {}",
+                    product.getId(), product.getQualityInspectionJobId(), e.getMessage());
         }
     }
 
