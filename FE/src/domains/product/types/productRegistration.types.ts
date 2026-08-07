@@ -126,6 +126,9 @@ export interface ProductRegistrationDraft {
   saleType: ProductRegistrationSaleType | ''
   directSalePrice: string
   linkedLiveId: string
+  // SY043: '상태/하자' 스텝 진입 시 미리 만들어진 실제 DRAFT 상품 id(있으면 최종 제출은
+  // PATCH로 나머지 필드만 갱신, 이미지도 재업로드하지 않는다).
+  draftProductId: number | null
 }
 
 export interface ProductRegistrationSubmitResult {
