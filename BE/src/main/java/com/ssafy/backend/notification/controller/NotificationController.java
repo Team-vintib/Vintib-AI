@@ -7,6 +7,8 @@ import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.notification.dto.response.NotificationItemResponse;
 import com.ssafy.backend.notification.dto.response.NotificationReadAllResponse;
 import com.ssafy.backend.notification.dto.response.NotificationResponse;
+import com.ssafy.backend.notification.dto.response.NotificationUnreadCountResponse;
+import com.ssafy.backend.notification.entity.NotificationCategory;
 import com.ssafy.backend.notification.service.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -39,9 +41,12 @@ public class NotificationController {
     @Operation(
             summary = "알림 목록 조회",
             description = "알림함을 조회한다. 정렬은 항상 '읽지 않음 우선 → 최신순'으로 고정되며, "
-                    + "sort 파라미터를 보내도 무시된다. unreadOnly=true면 읽지 않은 알림만 조회한다.")
+                    + "sort 파라미터를 보내도 무시된다. unreadOnly=true면 읽지 않은 알림만 조회한다. "
+                    + "category를 주면 그 카테고리에 속한 알림만 조회한다(생략하면 전체) — "
+                    + "LIVE/AUCTION/SHIPPING/POINT/TRADE 중 하나이며, TRADE는 나머지 카테고리에 안 걸리는 알림의 catch-all이다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "category 값이 잘못됨"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자의 알림함을 조회하려 함")
     })
@@ -51,29 +56,55 @@ public class NotificationController {
             Authentication authentication,
             @PathVariable Long userId,
             @RequestParam(defaultValue = "false") boolean unreadOnly,
+            @RequestParam(required = false) NotificationCategory category,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         requireSelf(authentication, userId);
         Pageable pageable = PageRequest.of(page, size);
         PageResponse<NotificationItemResponse> response =
-                notificationService.getNotifications(userId, unreadOnly, pageable);
+                notificationService.getNotifications(userId, unreadOnly, category, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "안 읽은 알림 수 조회",
+            description = "본인의 안 읽은 알림 수를 반환한다. category를 주면 그 카테고리에 속한 알림만 "
+                    + "센다(생략하면 전체) — 헤더 unread badge, 알림센터 탭별 배지에 쓴다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "category 값이 잘못됨"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자의 알림함을 조회하려 함")
+    })
+    @SecurityRequirement(name = "bearerAuth")
+    @GetMapping("/unread-count")
+    public ResponseEntity<ApiResponse<NotificationUnreadCountResponse>> getUnreadCount(
+            Authentication authentication,
+            @PathVariable Long userId,
+            @RequestParam(required = false) NotificationCategory category) {
+        requireSelf(authentication, userId);
+        NotificationUnreadCountResponse response = notificationService.getUnreadCount(userId, category);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "알림 전체 읽음 처리",
-            description = "본인의 읽지 않은 알림을 모두 읽음 처리한다. 대상이 없어도 에러 없이 처리된다.")
+            description = "본인의 읽지 않은 알림을 모두 읽음 처리한다. 대상이 없어도 에러 없이 처리된다. "
+                    + "category를 주면 그 카테고리에 속한 알림만 읽음 처리한다(생략하면 전체).")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "읽음 처리 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "category 값이 잘못됨"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "본인 외 사용자의 알림함을 처리하려 함")
     })
     @SecurityRequirement(name = "bearerAuth")
     @PatchMapping("/read-all")
     public ResponseEntity<ApiResponse<NotificationReadAllResponse>> markAllAsRead(
-            Authentication authentication, @PathVariable Long userId) {
+            Authentication authentication,
+            @PathVariable Long userId,
+            @RequestParam(required = false) NotificationCategory category) {
         requireSelf(authentication, userId);
-        NotificationReadAllResponse response = notificationService.markAllAsRead(userId);
+        NotificationReadAllResponse response = notificationService.markAllAsRead(userId, category);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

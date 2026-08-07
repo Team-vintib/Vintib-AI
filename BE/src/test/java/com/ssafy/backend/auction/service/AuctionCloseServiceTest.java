@@ -19,7 +19,7 @@ import com.ssafy.backend.auction.port.ProductCommandPort;
 import com.ssafy.backend.auction.repository.AuctionRepository;
 import com.ssafy.backend.auction.repository.BidRepository;
 import com.ssafy.backend.live.entity.Live;
-import com.ssafy.backend.live.port.NotificationCommandPort;
+import com.ssafy.backend.notification.port.NotificationCommandPort;
 import com.ssafy.backend.live.port.ProductQueryPort;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;

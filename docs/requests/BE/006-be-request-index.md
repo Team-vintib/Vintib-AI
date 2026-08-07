@@ -37,7 +37,6 @@
 | --- | --- | --- | --- | --- |
 | 002 | `002-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
 | 003 | `003-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 필드(필수+선택 전부: brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId/hostProfileImageUrl/description/material/measurements/defectSummary) 연결 완료 | AI 시착 생성만 남음(서윤/AI 파트) |
-| 004 | `004-social-notification-contract.md` | Social/Notification | 상품 상세 찜, 팔로우/팔로워·팔로잉 목록, 알림 목록/읽음 API, 예약 라이브 알림 신청/스케줄러, `LIVE_STARTED`/`AUCTION_OUTBID`/`AUCTION_WON` 알림 생성 연동 완료 | 알림 생성 이벤트 4종(주문/배송/포인트)은 서윤 확인 필요. unread count API, 탭별 bulk read API |
 | 019 | `019-product-quality-multi-image.md` | Product | 미반영 | 서윤 파트 |
 | 020 | `020-tryon-result-category.md` | TryOn | 미반영 | 서윤/AI 파트 |
 | 025 | `025-product-same-price-chart.md` | Product | 미반영 | 서윤 파트 |
@@ -201,6 +200,21 @@
     포함되긴 했으나 필드가 `id/title/price`뿐이고, 요청한 목록-아이템 동일 필드셋이나 별도
     `/similar` 엔드포인트는 아직 없음 — 부분 반영으로 표시.
 - `025-product-same-price-chart.md`는 관련 코드(`market-price` 등) 전혀 없어 미반영 그대로 둠.
+
+## 2026-08-07 정리
+
+- `004-social-notification-contract.md` 삭제 — 남아 있던 마지막 두 항목까지 전부 해소돼 위
+  표에서도 뺐다.
+  - wish delete path의 `{productId}` 의미: 코드 확인 결과 이미 product id로 확정돼 있었다
+    (`WishController`/`WishService` — 찜은 `(member_id, product_id)` 복합키라 별도 PK가 없다).
+    BE 판단이 필요한 문제가 아니라 FE에 전달만 안 된 상태였다. 계약은
+    `docs/requests/FE/041-wish-delete-path-clarification.md`.
+  - 중복 알림 방지 정책: 알림을 만드는 8개 지점을 전부 감사했는데, 전부 이미 한 방향 상태
+    전이(송장 재등록 불가, 웹훅 재수신 시 상태 검사, 토스 confirm 중복 대비, 환불 재승인 불가,
+    스케줄러 발송 표시 트랜잭션 공유) 뒤에서만 `notify`를 호출하고 있어 알림 레벨 dedup 장치가
+    따로 필요 없었다. 이 불변식은 `NotificationCommandPort` Javadoc에 정책으로 박아 뒀다(새
+    알림 트리거를 추가할 때 참고). 설계 기록은
+    `docs/plans/BE/SY041-notification-category-filter.md` 참고.
 
 ## 2026-08-06 정리 (023 삭제 — 유사 판정을 AI가 직접 처리하기로 결정)
 

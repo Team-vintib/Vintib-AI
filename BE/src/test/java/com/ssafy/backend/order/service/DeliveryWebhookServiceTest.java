@@ -8,6 +8,7 @@ import com.ssafy.backend.global.config.DeliveryApiConfig.DeliveryApiProperties;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.order.entity.CourierCode;
+import com.ssafy.backend.order.entity.TrackingStatus;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -44,43 +45,44 @@ class DeliveryWebhookServiceTest {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(WEBHOOK_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             byte[] hash = mac.doFinal((timestamp + "." + rawBody).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
+            // 문서 예시(Node.js 참조 구현)가 다이제스트 앞에 "sha256=" 접두어를 붙인다.
+            return "sha256=" + HexFormat.of().formatHex(hash);
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
     }
 
     @Test
-    void 서명이_유효하면_배송완료_항목만_주문에_반영한다() {
+    void 서명이_유효하면_모든_품목의_배송상태를_갱신한다() {
         String body = """
                 {"event":"tracking.polled","items":[
-                  {"courierCode":"cj","trackingNumber":"111","isDelivered":true},
-                  {"courierCode":"lotte","trackingNumber":"222","isDelivered":false}
+                  {"courierCode":"cj","trackingNumber":"111","status":"DELIVERED"},
+                  {"courierCode":"lotte","trackingNumber":"222","status":"IN_TRANSIT"}
                 ]}""";
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
 
         deliveryWebhookService.handle(body, timestamp, sign(timestamp, body));
 
-        verify(orderService).markShipmentDelivered(CourierCode.CJ, "111");
-        verify(orderService, never()).markShipmentDelivered(CourierCode.LOTTE, "222");
+        verify(orderService).updateShipmentTracking(CourierCode.CJ, "111", TrackingStatus.DELIVERED);
+        verify(orderService).updateShipmentTracking(CourierCode.LOTTE, "222", TrackingStatus.IN_TRANSIT);
     }
 
     @Test
     void 서명이_틀리면_예외를_던지고_반영하지_않는다() {
         String body = """
-                {"items":[{"courierCode":"cj","trackingNumber":"111","isDelivered":true}]}""";
+                {"items":[{"courierCode":"cj","trackingNumber":"111","status":"DELIVERED"}]}""";
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
 
         assertThatThrownBy(() -> deliveryWebhookService.handle(body, timestamp, "wrong-signature"))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
-        verify(orderService, never()).markShipmentDelivered(CourierCode.CJ, "111");
+        verify(orderService, never()).updateShipmentTracking(CourierCode.CJ, "111", TrackingStatus.DELIVERED);
     }
 
     @Test
     void 타임스탬프가_오래되면_서명이_맞아도_거부한다() {
         String body = """
-                {"items":[{"courierCode":"cj","trackingNumber":"111","isDelivered":true}]}""";
+                {"items":[{"courierCode":"cj","trackingNumber":"111","status":"DELIVERED"}]}""";
         String staleTimestamp = String.valueOf(Instant.now().minusSeconds(600).getEpochSecond());
 
         assertThatThrownBy(() -> deliveryWebhookService.handle(body, staleTimestamp, sign(staleTimestamp, body)))

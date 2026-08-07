@@ -148,7 +148,7 @@ BE/
 │   │   ├── service/             # LiveService, LiveProductService, LiveViewerService, LiveReactionService, LiveReminderService/Scheduler
 │   │   ├── entity/              # Live, LiveStatus, LiveProduct, LiveReminder, ReactionType(저장 안 함)
 │   │   ├── repository/
-│   │   ├── port/                # ProductQueryPort·NotificationCommandPort — 타 도메인 참조를 한 곳으로 격리
+│   │   ├── port/                # ProductQueryPort — 타 도메인 참조를 한 곳으로 격리
 │   │   ├── websocket/           # LiveSessionEventListener — SUBSCRIBE/DISCONNECT를 시청자 수로
 │   │   └── dto/
 │   ├── chat/                    # 라이브 실시간 채팅 (CHAT) — 정윤
@@ -181,6 +181,7 @@ BE/
 │   │   ├── service/
 │   │   ├── entity/               # Notification
 │   │   ├── repository/
+│   │   ├── port/                 # NotificationCommandPort/Adapter — 다른 도메인이 알림을 만드는 유일한 창구
 │   │   └── dto/response/
 │   ├── business/                 # 사업자 인증 정보 제출/조회/재제출 (BIZ-001) — 서윤
 │   │   ├── controller/
@@ -208,8 +209,9 @@ BE/
 │   │   ├── repository/           # RefundRequestRepository
 │   │   └── dto/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
-│       ├── client/              # AiClient(Spring → FastAPI), DeliveryTrackingClient(deliveryapi.co.kr 배송 조회 웹훅), TossPaymentsClient(결제위젯 승인)
-│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig, SchedulingConfig, DeliveryApiConfig, TossPaymentsConfig
+│       ├── client/              # AiClient(Spring → FastAPI), DeliveryTrackingClient(deliveryapi.co.kr 배송 조회 웹훅), TossPaymentsClient(결제위젯 승인), GoogleOAuthClient(구글 로그인)
+│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig, SchedulingConfig, DeliveryApiConfig, TossPaymentsConfig, GoogleOAuthConfig
+│       ├── delivery/            # DeliveryWebhookSetupController(웹훅 엔드포인트 등록, 수동 트리거 전용)
 │       ├── entity/              # BaseTimeEntity 등 공통 베이스 엔티티
 │       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
 │       ├── health/              # HealthController

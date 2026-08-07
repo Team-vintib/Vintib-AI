@@ -52,9 +52,14 @@
 
 - `order.controller.DeliveryWebhookController`: `POST /api/webhooks/delivery`. `SecurityConfig`
   `PUBLIC_ENDPOINTS`에 추가한다(JWT 인증 대상이 아님 — 대신 서명으로 검증).
-- 원문 바디를 `String`으로 받아 `X-Webhook-Signature`를 `HMAC-SHA256(webhookSecret, "{timestamp}.{rawBody}")`
-  로 재계산해 검증하고, `X-Webhook-Timestamp`가 현재 시각과 300초 이상 차이 나면 거부한다.
-- 검증 통과 후 JSON을 파싱해 `items[]`를 순회 — `isDelivered == true`인 항목만 처리한다.
+- 원문 바디를 `String`으로 받아 `X-Webhook-Signature`를 `"sha256=" + HMAC-SHA256(webhookSecret,
+  "{timestamp}.{rawBody}")` 형식(문서 Node.js 참조 구현 기준 — 접두어 없이 다이제스트만 비교하면
+  실제 웹훅에서 전부 검증 실패한다, 2026-08-06 실제 API 문서 확인 후 수정)으로 재계산해 검증하고,
+  `X-Webhook-Timestamp`가 현재 시각과 300초 이상 차이 나면 거부한다.
+- 검증 통과 후 JSON을 파싱해 `items[]`를 순회 — `status == "DELIVERED"`인 항목만 처리한다(당초
+  `isDelivered` boolean으로 가정했으나, 실제 API는 `PENDING`/`REGISTERED`/`PICKUP_READY`/
+  `PICKED_UP`/`IN_TRANSIT`/`OUT_FOR_DELIVERY`/`DELIVERED`/`FAILED`/`RETURNED`/`CANCELLED`/
+  `HOLD`/`UNKNOWN` 상태 코드를 쓴다 — 2026-08-06 수정).
 - `(courierCode, trackingNumber)`로 `OrderShipmentRepository`에서 대상 주문을 찾는다(신규 파생 쿼리).
   주문 상태가 이미 `SHIPPING`이 아니면(중복 웹훅 등) 그냥 무시한다(idempotent).
 - 찾으면 `order.markDelivered(now)` 호출 — 기존 `SY033` 로직(7일 뒤 자동 확정 시각 계산)을 그대로 재사용한다.
@@ -63,6 +68,53 @@
 
 - `docs/db/schema.sql`의 `order_shipment.courier` 컬럼 설명과 CHECK 제약을 갱신한다(실행 스키마 자체는
   `ddl-auto: update`가 로컬에서 자동 반영, 문서는 별도로 맞춰야 함).
+
+### 6. 배송 진행 상태 노출 (2026-08-06 추가)
+
+**배경**: 지금까지는 웹훅이 `status == "DELIVERED"`가 아닌 항목을 전부 버렸다(`continue`). 그
+결과 구매자는 "배송중"인지 "배송지 도착"인지 전혀 알 수 없고 송장 등록/배송완료 두 지점만
+보인다. 구매자가 배송 진행 상황을 추적할 수 있어야 한다는 요구사항에 맞춰, 중간 상태도
+저장·노출한다.
+
+- `order.entity.TrackingStatus` enum 신규 추가 — 문서 기준 12개 상태 코드를 그대로 옮긴다
+  (`PENDING`/`REGISTERED`/`PICKUP_READY`/`PICKED_UP`/`IN_TRANSIT`/`OUT_FOR_DELIVERY`/
+  `DELIVERED`/`FAILED`/`RETURNED`/`CANCELLED`/`HOLD`/`UNKNOWN`). `CourierCode`와 같은 모양으로
+  `apiCode`(문서 값 그대로, 대문자라 apiCode == name)와 한글 `displayName`(집하 준비/배송중/
+  배송완료 등)을 갖는다.
+- `OrderShipment`에 `tracking_status VARCHAR(20)` 컬럼 추가(nullable — 송장 등록 직후 첫 웹훅
+  받기 전에는 null). CHECK 제약은 위 12개 값으로.
+- `OrderShipment.updateTrackingStatus(TrackingStatus)` 메서드 추가 — `markDelivered`와 별개로,
+  웹훅이 올 때마다(상태가 무엇이든) 호출된다.
+- `OrderService.markShipmentDelivered` → `updateShipmentTracking(CourierCode, String, TrackingStatus)`로
+  확장한다. 항상 `shipment.updateTrackingStatus(status)`를 호출하고, `status == DELIVERED`이면서
+  주문이 아직 `SHIPPING`이면 기존 `deliver(...)`(주문 확정 시각 계산 등)를 그대로 이어서 호출한다.
+- `DeliveryWebhookService.handle()`: `status == "DELIVERED"`만 걸러내던 필터를 없애고, 파싱되는
+  모든 item에 대해 `updateShipmentTracking`을 호출한다. `courierCode`/`trackingNumber`/`status`
+  중 하나라도 파싱 실패하면 그 item만 로그 남기고 건너뛴다(기존과 동일한 방어).
+- `OrderShipmentResponse`에 `trackingStatus`(enum name)와 `trackingStatusLabel`(한글, `CourierCode`의
+  `courierName`과 같은 패턴)을 추가한다. 구매확정 버튼 활성화 기준은 그대로 `order.status ==
+  DELIVERED`를 쓴다(이미 노출 중) — `trackingStatus`는 진행 상황 표시 전용이고 버튼 게이팅에는
+  안 쓴다(두 값이 어긋나는 경합 상태를 만들지 않기 위함).
+- FE 계약 문서(`docs/requests/FE/`)에 `trackingStatus`/`trackingStatusLabel` 필드 추가와 12개 상태
+  값·한글 라벨 매핑표를 공유한다.
+
+### 7. 웹훅 엔드포인트 등록 API화 (2026-08-06 추가)
+
+지금까지 `POST /v1/webhooks/endpoints`(deliveryapi.co.kr에 우리 웹훅 수신 URL을 등록하는 1회성
+설정)는 앱 코드가 아니라 수동 curl로 했다. 이걸 앱 코드로 옮기되, **자동 트리거는 걸지 않는다**
+— 계정당 등록 가능 엔드포인트가 최대 10개라 앱 재시작마다 자동 호출하면 한도를 금방 소진한다.
+대신 **수동 트리거용 내부 API**로 만든다(사용자 결정).
+
+- `DeliveryTrackingClient.registerEndpoint(url, name)` 추가 — `POST /v1/webhooks/endpoints` 호출,
+  `webhookSecret`(우리가 미리 정한 값)을 함께 보낸다. `DELIVERY_API_WEBHOOK_SECRET`이 비어 있으면
+  호출 자체를 막는다(`DELIVERY_WEBHOOK_SECRET_REQUIRED`) — 비워 보내면 저쪽이 임의 생성한
+  시크릿으로 검증 테스트 POST에 서명하는데 우리가 그 값을 알 방법이 없어 등록이 항상 실패하는
+  문제를 이미 겪었다(§4 참고).
+- `global.delivery.DeliveryWebhookSetupController`: `POST /api/internal/delivery/webhook-endpoint`
+  신규. 일반 로그인 인증만 요구하고(별도 권한 체계 없음) `PUBLIC_ENDPOINTS`에는 넣지 않는다 —
+  개발자가 필요할 때만 Swagger UI 등에서 직접 호출하는 용도라 항상 열려 있을 필요가 없다.
+- `ErrorCode`에 `DELIVERY_WEBHOOK_SECRET_REQUIRED`(O009), `DELIVERY_ENDPOINT_REGISTRATION_FAILED`
+  (O010) 추가.
 
 ## 구현 목록
 
@@ -79,6 +131,30 @@
 - [x] `docs/requests/FE/023-shipment-courier-code-contract.md` 작성
 - [x] `FE/docs/notion/기능 정의서.md` 히스토리에 SHIP-002 실연동 반영 기록
 - [x] `.claude/skills/BE:verify`로 최종 검증(자격증명 없이도 폴백 경로가 통과하는지 포함)
+
+### 6. 배송 진행 상태 노출 (2026-08-06 추가)
+
+- [x] `order.entity.TrackingStatus` enum 추가(12개 상태, apiCode/displayName)
+- [x] `OrderShipment`에 `trackingStatus` 컬럼 + `updateTrackingStatus()` 메서드 + CHECK 제약
+- [x] `OrderService.markShipmentDelivered` → `updateShipmentTracking`으로 확장(항상 상태 갱신,
+      DELIVERED일 때만 기존 확정 로직 이어감) + 테스트(중간 상태만 오면 확정 안 됨/DELIVERED
+      오면 확정됨/이미 SHIPPING 아니면 무시, 3가지)
+- [x] `DeliveryWebhookService.handle()` — DELIVERED 필터 제거, 모든 item에 대해
+      `updateShipmentTracking` 호출 + 테스트 갱신
+- [x] `OrderShipmentResponse`에 `trackingStatus`/`trackingStatusLabel` 추가
+- [x] `docs/db/schema.sql`·`comments.sql` 갱신 + `regen.sh`로 `data-dictionary.md` 재생성
+- [x] `docs/requests/FE/038-shipment-tracking-status-contract.md` 작성
+- [x] `./gradlew build`로 최종 검증(전체 그린)
+
+### 7. 웹훅 엔드포인트 등록 API화 (2026-08-06 추가)
+
+- [x] `ErrorCode`에 `DELIVERY_WEBHOOK_SECRET_REQUIRED`(O009), `DELIVERY_ENDPOINT_REGISTRATION_FAILED`(O010) 추가
+- [x] `WebhookEndpointResponse` 추가, `DeliveryTrackingClient.registerEndpoint(url, name)` 구현
+      (webhookSecret 비어있으면 호출 전에 막음) + 테스트
+- [x] `global.delivery.DeliveryWebhookSetupController` — `POST /api/internal/delivery/webhook-endpoint`
+      (인증 필요, PUBLIC_ENDPOINTS 미포함)
+- [x] `README.md` 디렉터리 구조에 `global/delivery/` 반영
+- [x] `./gradlew build`로 최종 검증
 
 ## 확인 필요 사항 (해결됨/남은 것)
 

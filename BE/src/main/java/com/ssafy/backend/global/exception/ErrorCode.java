@@ -78,6 +78,8 @@ public enum ErrorCode {
     ORDER_SELLER_ONLY(HttpStatus.FORBIDDEN, "O006", "판매자만 처리할 수 있습니다."),
     ORDER_SHIPMENT_ADDRESS_REQUIRED(HttpStatus.BAD_REQUEST, "O007", "배송지가 아직 등록되지 않았습니다."),
     ORDER_SHIPMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "O008", "등록된 배송지/송장 정보가 없습니다."),
+    DELIVERY_WEBHOOK_SECRET_REQUIRED(HttpStatus.BAD_REQUEST, "O009", "DELIVERY_API_WEBHOOK_SECRET을 먼저 설정해주세요."),
+    DELIVERY_ENDPOINT_REGISTRATION_FAILED(HttpStatus.BAD_GATEWAY, "O010", "배송 조회 웹훅 엔드포인트 등록에 실패했습니다."),
 
     // [환불]
     REFUND_NOT_FOUND(HttpStatus.NOT_FOUND, "R001", "존재하지 않는 환불 요청입니다."),

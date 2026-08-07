@@ -1,9 +1,13 @@
 package com.ssafy.backend.chat.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 
 import com.ssafy.backend.auth.jwt.JwtTokenProvider;
 import com.ssafy.backend.chat.repository.ChatMessageRepository;
+import com.ssafy.backend.global.client.AiClient;
+import com.ssafy.backend.global.client.dto.ModerateChatResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveStatus;
 import com.ssafy.backend.live.repository.LiveRepository;
@@ -26,6 +30,7 @@ import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
 import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.socket.WebSocketHttpHeaders;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
@@ -62,6 +67,12 @@ class ChatStompControllerTest {
     @Autowired
     private ChatMessageRepository chatMessageRepository;
 
+    // 실 AI 게이트웨이가 CI에 없다 — 대체하지 않으면 ChatMessageService의 예외 처리(RestClientException
+    // 캐치)를 우연히 타서 "통과"가 되는 것과, 목업이 null을 돌려줘 NPE가 나는 것을 구분할 수 없다.
+    // 기본은 PASS로 스텁하고, 차단 케이스만 테스트별로 덮어쓴다.
+    @MockitoBean
+    private AiClient aiClient;
+
     private WebSocketStompClient stompClient;
     private Member host;
     private String viewerToken;
@@ -71,6 +82,8 @@ class ChatStompControllerTest {
     void setUp() {
         stompClient = new WebSocketStompClient(new StandardWebSocketClient());
         stompClient.setMessageConverter(new JacksonJsonMessageConverter());
+        given(aiClient.moderateChatMessage(any(), any(), any(), any(), any()))
+                .willReturn(new ModerateChatResponse("NORMAL", "PASS", "clean"));
 
         host = saveMember("호스트");
         Member viewer = saveMember("시청자");
@@ -220,5 +233,30 @@ class ChatStompControllerTest {
 
         assertThat(errorCodeOf(errors.get(TIMEOUT_SECONDS, TimeUnit.SECONDS))).isEqualTo("L009");
         assertThat(chatMessageRepository.count()).isEqualTo(before);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void AI가_차단을_권고하면_발신자에게만_알림이_가고_브로드캐스트되지_않는다() throws Exception {
+        // 실측(프로덕션)에서 발견된 문제: 차단된 메시지는 브로드캐스트가 안 오니 발신자의
+        // 낙관적 렌더 말풍선이 "진짜 메시지로 치환" 신호를 영영 못 받아 발신자 화면에만
+        // 유령처럼 남았다(-571 후속). 발신자 전용 알림으로 그 말풍선을 지울 수 있어야 한다.
+        given(aiClient.moderateChatMessage(any(), any(), any(), any(), any()))
+                .willReturn(new ModerateChatResponse("ABUSIVE", "BLOCK", "abuse:병신"));
+
+        StompSession sender = connect(viewerToken);
+        StompSession watcher = connect(null);
+        CompletableFuture<Map<String, Object>> broadcast =
+                subscribe(watcher, "/topic/lives/" + liveId + "/chat");
+        CompletableFuture<Map<String, Object>> notice = subscribe(sender, "/user/queue/errors");
+
+        long before = chatMessageRepository.count();
+        sender.send("/app/lives/" + liveId + "/chat", chatPayload("욕설성 발언", "tmp-6"));
+
+        Map<String, Object> received = notice.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        assertThat(received.get("clientMessageId")).isEqualTo("tmp-6");
+        // 차단됐어도 관리용 흔적으로 저장은 된다(ChatMessage.block()) — 다만 조회에서 제외된다.
+        assertThat(chatMessageRepository.count()).isEqualTo(before + 1);
+        assertThat(broadcast.isDone()).isFalse();
     }
 }

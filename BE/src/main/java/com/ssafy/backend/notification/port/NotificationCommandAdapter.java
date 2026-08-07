@@ -1,4 +1,4 @@
-package com.ssafy.backend.live.port;
+package com.ssafy.backend.notification.port;
 
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.notification.entity.Notification;

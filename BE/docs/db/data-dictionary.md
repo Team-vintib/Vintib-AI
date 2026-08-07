@@ -407,10 +407,12 @@
 | `tracking_number` | `varchar(50)` |  |  |  | 운송장 번호. 판매자가 등록한다. |
 | `shipped_at` | `timestamptz` |  |  |  | 발송 시각. 송장 등록 시점. |
 | `delivered_at` | `timestamptz` |  |  |  | 배송 완료 시각. orders.auto_confirm_at 계산 기준. |
+| `tracking_status` | `varchar(20)` |  |  |  | 배송 진행 상태(SY034). 웹훅 수신 때마다 갱신, 첫 수신 전에는 NULL. |
 
 **CHECK 제약**
 
 - `ck_order_shipment_courier` — `CHECK (((courier)::text = ANY ((ARRAY['LOTTE'::character varying, 'CJ'::character varying, 'HANJIN'::character varying, 'POST'::character varying, 'KYUNGDONG'::character varying, 'DAESIN'::character varying, 'LOGEN'::character varying, 'HAPDONG'::character varying, 'COUPANG'::character varying, 'WOORI'::character varying])::text[])))`
+- `ck_order_shipment_tracking_status` — `CHECK (((tracking_status)::text = ANY ((ARRAY['PENDING'::character varying, 'REGISTERED'::character varying, 'PICKUP_READY'::character varying, 'PICKED_UP'::character varying, 'IN_TRANSIT'::character varying, 'OUT_FOR_DELIVERY'::character varying, 'DELIVERED'::character varying, 'FAILED'::character varying, 'RETURNED'::character varying, 'CANCELLED'::character varying, 'HOLD'::character varying, 'UNKNOWN'::character varying])::text[])))`
 
 ---
 
