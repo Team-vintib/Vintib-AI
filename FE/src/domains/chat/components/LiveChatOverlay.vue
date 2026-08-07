@@ -290,6 +290,17 @@ onBeforeUnmount(() => {
 })
 
 function mapChatMessage(message: BackendChatMessage, hostId: number): LiveChatMessage {
+  // AI 자동답변(CHAT-002)은 특정 발신자를 지칭하지 않는 공통 안내라, 실제 사람 메시지와
+  // 시각적으로 구분한다(요청 문서 032 — "판매자가 직접 답한 것"처럼 보이면 오해 소지가 있음).
+  if (message.senderType === 'AI') {
+    return {
+      id: String(message.messageId),
+      author: 'AI 자동답변',
+      body: message.content,
+      role: 'AI',
+    }
+  }
+
   return {
     id: String(message.messageId),
     author: message.senderNickname || (message.senderType === 'SYSTEM' ? '시스템' : '사용자'),
@@ -381,7 +392,10 @@ function getRealtimeErrorMessage(body: unknown) {
         <li v-for="message in messages" :key="message.id">
           <span
             class="live-chat-overlay__author"
-            :class="{ 'live-chat-overlay__author--host': message.role === 'HOST' }"
+            :class="{
+              'live-chat-overlay__author--host': message.role === 'HOST',
+              'live-chat-overlay__author--ai': message.role === 'AI',
+            }"
           >
             {{ message.author }}
           </span>
@@ -545,6 +559,14 @@ function getRealtimeErrorMessage(body: unknown) {
 }
 
 .live-chat-overlay__author--host {
+  color: var(--color-live-text-primary);
+}
+
+/* AI 자동답변(CHAT-002)은 판매자 발언처럼 보이면 안 된다 — 배지 형태로 확실히 구분한다. */
+.live-chat-overlay__author--ai {
+  padding: 1px 6px;
+  border-radius: var(--radius-badge);
+  background: var(--color-accent);
   color: var(--color-live-text-primary);
 }
 

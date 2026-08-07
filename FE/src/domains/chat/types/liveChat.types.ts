@@ -1,4 +1,4 @@
-export type LiveChatAuthorRole = 'HOST' | 'VIEWER'
+export type LiveChatAuthorRole = 'HOST' | 'VIEWER' | 'AI'
 
 export type LiveReactionEmoji = '❤️' | '🔥' | '👏' | '😮'
 
