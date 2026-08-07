@@ -156,6 +156,7 @@ COMMENT ON COLUMN invoice.supply_amount        IS '공급가액. round(orders.or
 COMMENT ON COLUMN invoice.tax_amount           IS '부가세. orders.order_price - supply_amount.';
 COMMENT ON COLUMN invoice.total_amount         IS '합계금액. orders.order_price와 동일.';
 COMMENT ON COLUMN order_shipment.delivered_at    IS '배송 완료 시각. orders.auto_confirm_at 계산 기준.';
+COMMENT ON COLUMN order_shipment.tracking_status IS '배송 진행 상태(SY034). 웹훅 수신 때마다 갱신, 첫 수신 전에는 NULL.';
 
 
 -- ---------- 채팅 ----------
