@@ -51,6 +51,7 @@ import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const PRODUCT_REGISTRATION_MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
+const PRODUCT_REGISTRATION_MAX_ADDITIONAL_PHOTOS = 8
 
 const router = useRouter()
 const currentStepIndex = ref(0)
@@ -233,6 +234,9 @@ const additionalPhotos = computed(() =>
 )
 const frontPhotoCountLabel = computed(() => `(${Math.min(frontPhotos.value.length, 1)}/1)`)
 const backPhotoCountLabel = computed(() => `(${Math.min(backPhotos.value.length, 1)}/1)`)
+const additionalPhotoCountLabel = computed(
+  () => `(${additionalPhotos.value.length}/${PRODUCT_REGISTRATION_MAX_ADDITIONAL_PHOTOS})`,
+)
 const photoStepErrors = computed(() => ({
   front: photoStepTouched.value && frontPhotos.value.length === 0
     ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.frontPhotoRequired
@@ -899,6 +903,20 @@ const addPhotos = (role: ProductRegistrationPhotoRole, files: File[]) => {
     return
   }
 
+  const currentAdditionalCount = draft.photos.filter((photo) => photo.role === 'additional').length
+  const remainingSlots = PRODUCT_REGISTRATION_MAX_ADDITIONAL_PHOTOS - currentAdditionalCount
+
+  if (remainingSlots <= 0) {
+    validPhotos.forEach(revokePhotoPreviewUrl)
+    photoUploadError.value = `추가 사진은 최대 ${PRODUCT_REGISTRATION_MAX_ADDITIONAL_PHOTOS}장까지 등록할 수 있습니다.`
+    return
+  }
+
+  if (validPhotos.length > remainingSlots) {
+    validPhotos.splice(remainingSlots).forEach(revokePhotoPreviewUrl)
+    photoUploadError.value = `추가 사진은 최대 ${PRODUCT_REGISTRATION_MAX_ADDITIONAL_PHOTOS}장까지 등록할 수 있습니다.`
+  }
+
   draft.photos.push(...validPhotos)
 }
 
@@ -1544,6 +1562,8 @@ onBeforeUnmount(() => {
               description="디테일, 라벨, 착용감이 드러나는 사진을 더 등록할 수 있습니다."
               role="additional"
               multiple
+              :requirement-label="additionalPhotoCountLabel"
+              :max-count="PRODUCT_REGISTRATION_MAX_ADDITIONAL_PHOTOS"
               :photos="additionalPhotos"
               :representative-photo-id="draft.representativePhotoId"
               @upload="addPhotos"
@@ -2889,7 +2909,7 @@ onBeforeUnmount(() => {
 }
 
 .product-registration__photo-uploader :deep(.product-photo-uploader__item img) {
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 3 / 4;
 }
 
 .product-registration__photo-uploader :deep(.product-photo-uploader__empty) {
