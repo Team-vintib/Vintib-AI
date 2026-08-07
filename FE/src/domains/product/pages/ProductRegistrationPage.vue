@@ -1011,15 +1011,27 @@ const editCurrentAiPhotoResult = () => {
   currentAiResult.value.confirmed = false
 }
 
-const resetAiAnalysis = () => {
+// 품질 검증은 앞/뒤 사진을 둘 다 실제로 쓰므로(BE가 sortOrder 0/1 두 장을 검수 job에 보냄),
+// 둘 중 하나라도 바뀌면 이미 만든 draft가 무효화된다.
+const resetQualityDraftState = () => {
   draft.aiQualityStatus = 'idle'
   draft.aiPhotoResults = []
-  draft.aiCategorySuggestion = null
-  draft.aiColorSuggestion = null
   currentAiResultIndex.value = 0
   isQualityCategoryUnsupported.value = false
-  // 사진이 없어져 트리거 요건이 깨졌으면, 아직 도는 분류 폴링이 있어도 그 결과를 더는
-  // 반영하지 않는다(토큰 불일치로 무시됨).
+  // 아직 도는 검수 폴링이 있어도 그 결과를 더는 반영하지 않는다(토큰 불일치로 무시됨).
+  qualityInspectionPollToken += 1
+  // 사진이 바뀌면 이미 만든 draft 상품(있다면)의 이미지와 어긋난다 — 다음 '상태/하자' 진입 시
+  // 새 사진으로 처음부터 다시 검수하도록 draft 자체를 버린다. 그 draft 상품은 BE에 DRAFT
+  // 상태로 고아처럼 남지만 목록에 노출되지 않아 별도 정리 대상은 아니다.
+  draft.draftProductId = null
+}
+
+// 카테고리/색상 분류는 front 사진 1장만 실제로 쓰므로(back은 존재 여부만 트리거 요건),
+// front가 바뀔 때만 초기화·재트리거한다.
+const resetAiCategoryColorSuggestion = () => {
+  draft.aiCategorySuggestion = null
+  draft.aiColorSuggestion = null
+  // 아직 도는 분류 폴링이 있어도 그 결과를 더는 반영하지 않는다(토큰 불일치로 무시됨).
   classifyPollToken += 1
 }
 
@@ -1121,17 +1133,32 @@ const pollProductClassify = async (jobId: string, token: number) => {
   }
 }
 
-// front/back 사진의 id(=파일이 바뀌면 새로 생성됨)를 감시해, 사진이 갖춰지거나
-// 다른 사진으로 교체될 때마다 카테고리/색상 자동 제안을 다시 트리거한다.
+// front/back 사진의 id(=파일이 바뀌면 새로 생성됨)를 감시한다. 품질 검증은 두 장을 모두
+// 실제로 쓰므로 어느 쪽이 바뀌어도 draft를 무효화해야 하지만(resetQualityDraftState),
+// 카테고리/색상은 front 한 장만 쓰므로 back만 바뀐 경우까지 재분류할 필요는 없다 — 그래서
+// 두 계층으로 나눴다.
 const aiTriggerPhotoKey = computed(
   () => `${frontPhotos.value[0]?.id ?? ''}|${backPhotos.value[0]?.id ?? ''}`,
 )
+// front id 자체(교체) 또는 back의 유무(0장→1장 최초 등록)가 바뀔 때만 재트리거한다 —
+// back "내용"이 다른 사진으로 바뀌는 것만으로는 재분류하지 않는다(front만 실제로 쓰이므로).
+const classifyTriggerKey = computed(
+  () => `${frontPhotos.value[0]?.id ?? ''}|${backPhotos.value[0]?.file ? '1' : '0'}`,
+)
 
 watch(aiTriggerPhotoKey, () => {
-  if (isPhotoStepValid.value) {
+  // 앞/뒤 사진 중 하나라도 바뀌면(교체·삭제 모두) 이미 만든 draft 검수 상태를 초기화한다 —
+  // 이미 만든 draft 상품이 옛 사진을 등록한 채로 남아있으면 안 되기 때문이다.
+  resetQualityDraftState()
+})
+
+watch(classifyTriggerKey, () => {
+  // front가 바뀌거나(또는 없어지거나) back이 처음 갖춰지면 카테고리/색상 제안을 초기화하고,
+  // 트리거 요건(앞/뒤 둘 다 실제 파일이 있어야 함)을 만족하면 front 기준으로 다시 분류한다.
+  resetAiCategoryColorSuggestion()
+
+  if (frontPhotos.value[0]?.file && backPhotos.value[0]?.file) {
     void triggerAiCategoryColorSuggestion()
-  } else {
-    resetAiAnalysis()
   }
 })
 
@@ -2190,6 +2217,10 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
 
+                <p v-if="currentAiResult.summary" class="product-registration__ai-summary">
+                  {{ currentAiResult.summary }}
+                </p>
+
                 <div class="product-registration__ai-result-content">
                   <div class="product-registration__ai-image">
                     <img :src="currentAiPhoto.previewUrl" :alt="`${currentAiPhoto.fileName} AI 품질 검증 결과`" />
@@ -2220,7 +2251,7 @@ onBeforeUnmount(() => {
                       :class="{ 'product-registration__ai-card--excluded': !finding.isActualDefect }"
                     >
                       <div>
-                        <strong>{{ finding.no }}번 · {{ finding.label }}</strong>
+                        <strong>{{ finding.no }}번 · {{ finding.label }} · {{ finding.sectionLabel }}</strong>
                         <p>{{ finding.description ?? '설명이 아직 제공되지 않습니다.' }}</p>
                       </div>
                       <button
@@ -3304,6 +3335,16 @@ onBeforeUnmount(() => {
 .product-registration__ai-result-toolbar strong {
   color: var(--color-text-primary);
   text-align: center;
+}
+
+.product-registration__ai-summary {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
+  white-space: pre-line;
 }
 
 .product-registration__ai-result-content {
