@@ -1,6 +1,7 @@
 package com.ssafy.backend.live.repository;
 
 import com.ssafy.backend.live.entity.LiveProduct;
+import com.ssafy.backend.live.entity.LiveStatus;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -16,8 +17,23 @@ public interface LiveProductRepository extends JpaRepository<LiveProduct, Long> 
 
     Optional<LiveProduct> findByLiveIdAndProductIdAndRemovedAtIsNull(Long liveId, Long productId);
 
-    /** 상품 상세의 "연결된 라이브" 표시용 — 상품이 현재 어느 라이브에 연결돼 있는지 라이브 무관하게 찾는다. */
-    Optional<LiveProduct> findByProductIdAndRemovedAtIsNull(Long productId);
+    /**
+     * 상품 상세의 "연결된 라이브" 표시용 — 상품이 현재 어느 라이브에 연결돼 있는지 라이브 무관하게 찾는다.
+     *
+     * <p>정상 흐름에서는 한 상품이 동시에 최대 하나의 라이브에만 연결돼 있어야 하지만(쓰기 경로는
+     * {@code LiveProductService}가 보장), 그 불변식이 깨진 과거 데이터가 남아 있어도 상세 조회가
+     * {@code IncorrectResultSizeDataAccessException}으로 500을 내지 않도록 최신 연결 1건만 뽑는다
+     * (029). 여러 건이 나오면 가장 최근에 연결된 것을 우선한다.
+     */
+    Optional<LiveProduct> findFirstByProductIdAndRemovedAtIsNullOrderByIdDesc(Long productId);
+
+    /**
+     * 상품이 아직 끝나지 않은 다른 방송(SCHEDULED/LIVE)에 이미 걸려 있는지 — 새 연결 전 중복 방지용.
+     * {@code ENDED}/{@code CANCELED} 방송의 연결은 제외한다 — 종료된 방송은 편집 자체가
+     * 막혀 있어(방송 도중/종료 후 편성 변경 불가) {@code removedAt}이 끝내 채워지지 않는데,
+     * 그걸 "여전히 활성"으로 치면 같은 상품을 나중 방송에 다시 걸 수 없게 된다.
+     */
+    boolean existsByProductIdAndRemovedAtIsNullAndLive_StatusIn(Long productId, Collection<LiveStatus> statuses);
 
     boolean existsByLiveIdAndProductIdAndRemovedAtIsNull(Long liveId, Long productId);
 
