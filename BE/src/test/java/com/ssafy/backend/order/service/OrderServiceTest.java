@@ -12,6 +12,7 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
+import com.ssafy.backend.live.repository.LiveProductRepository;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.notification.port.NotificationCommandPort;
@@ -50,6 +51,7 @@ class OrderServiceTest {
     private static final Long SELLER_ID = 2L;
     private static final Long ORDER_ID = 10L;
     private static final Long PRODUCT_ID = 20L;
+    private static final Long LIVE_ID = 101L;
 
     @Mock
     private OrderRepository orderRepository;
@@ -65,6 +67,9 @@ class OrderServiceTest {
 
     @Mock
     private LiveRepository liveRepository;
+
+    @Mock
+    private LiveProductRepository liveProductRepository;
 
     @Mock
     private PointService pointService;
@@ -93,7 +98,7 @@ class OrderServiceTest {
     void setUp() {
         orderService = new OrderService(
                 orderRepository, orderShipmentRepository, productRepository, memberRepository, liveRepository,
-                pointService, deliveryTrackingClient, notificationCommandPort);
+                liveProductRepository, pointService, deliveryTrackingClient, notificationCommandPort);
     }
 
     private Product realDirectSaleProduct() {
@@ -410,5 +415,38 @@ class OrderServiceTest {
 
         assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.SETTLED);
         verify(pointService).settleOrder(BUYER_ID, SELLER_ID, 50_000L, realOrder.getId());
+    }
+
+    // ---------- 정찰 판매 실시간 전파 (JY013) ----------
+
+    @Test
+    void 진행_중_방송에_편성된_상품이_팔리면_전파_이벤트가_만들어진다() {
+        when(liveProductRepository.findRunningLiveIdsByProductId(PRODUCT_ID)).thenReturn(List.of(LIVE_ID));
+
+        var event = orderService.resolveDirectSaleSoldEvent(PRODUCT_ID);
+
+        assertThat(event).isPresent();
+        assertThat(event.get().liveId()).isEqualTo(LIVE_ID);
+        assertThat(event.get().productId()).isEqualTo(PRODUCT_ID);
+        // FE 가 분기 없이 그대로 대입할 수 있게 두 값은 고정이다.
+        assertThat(event.get().saleStatus()).isEqualTo("SOLD");
+        assertThat(event.get().soldVia()).isEqualTo("DIRECT_SALE");
+    }
+
+    @Test
+    void 진행_중_방송에_편성되지_않은_상품은_전파하지_않는다() {
+        // 라이브와 무관한 일반 상시 판매 구매 — 쏠 방송이 없다.
+        when(liveProductRepository.findRunningLiveIdsByProductId(PRODUCT_ID)).thenReturn(List.of());
+
+        assertThat(orderService.resolveDirectSaleSoldEvent(PRODUCT_ID)).isEmpty();
+    }
+
+    @Test
+    void 진행_중_방송이_둘_이상이면_전파하지_않는다() {
+        // 어느 쪽을 골라도 나머지 방송의 큐가 어긋난다. 잘못 고르느니 쏘지 않는다.
+        when(liveProductRepository.findRunningLiveIdsByProductId(PRODUCT_ID))
+                .thenReturn(List.of(LIVE_ID, LIVE_ID + 1));
+
+        assertThat(orderService.resolveDirectSaleSoldEvent(PRODUCT_ID)).isEmpty();
     }
 }
