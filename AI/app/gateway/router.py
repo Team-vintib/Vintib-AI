@@ -11,6 +11,7 @@ from fastapi import APIRouter, Body, File, Header, HTTPException, Query, UploadF
 from app.chat import rag_store
 from app.core.config import settings
 from app.gateway.schemas import FeatureType, Job, JobResult, new_job
+from app.quality import attention_map_store
 from app.recommend.personalize import embedding_store
 
 # app.chat.service가 이 모듈의 enqueue_job()을 가져다 쓰므로(순환 import 방지를 위해
@@ -133,6 +134,29 @@ def _ingest_quality_embedding_result(result: dict) -> None:
         )
     except Exception as exc:  # noqa: BLE001
         print(f"[gateway] 의류 임베딩 저장 실패(product_id={result.get('product_id')}): {exc}")
+
+
+def _ingest_quality_attention_maps(result: dict) -> None:
+    """검수 워커가 낸 `attention_maps[]`를 로그 테이블에 append한다(판단 근거 확인용, 성능/
+    임계치 튜닝 시 다시 들여다보기 위함). `include_attention_maps`를 안 요청했으면 빈 리스트라
+    조용히 넘어간다. AI 쪽 Redis 결과는 TTL(1시간) 뒤 사라지므로, 여기서 영구 로그로 옮긴다.
+
+    저장 실패가 job 제출 자체를 실패로 만들면 안 된다(`_ingest_quality_embedding_result`와 같은
+    원칙) — 로그 저장은 best-effort다.
+    """
+    attention_maps = result.get("attention_maps")
+    if not attention_maps:
+        return
+    try:
+        attention_map_store.save_attention_maps(
+            product_id=int(result["product_id"]),
+            inspection_id=result.get("inspection_id", ""),
+            attention_maps=attention_maps,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[gateway] attention map 로그 저장 실패(product_id={result.get('product_id')}): {exc}"
+        )
 
 
 def _ingest_chat_rag_result(job: Job, result: dict) -> None:
@@ -262,6 +286,7 @@ def submit_result(
             _ingest_chat_rag_result(job, result)
         elif job.type == "quality_check" and result is not None:
             _ingest_quality_embedding_result(result)
+            _ingest_quality_attention_maps(result)
         return {"ok": True}
 
     job.retry_count += 1
