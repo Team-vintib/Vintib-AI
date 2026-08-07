@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -32,10 +33,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderController {
 
     private final OrderService orderService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Operation(summary = "정찰제 즉시구매",
             description = "정찰제 상품을 즉시 구매한다. 결제는 포인트로만 처리되며, "
-                    + "결제 금액은 즉시 거래 대금 보관(tradeEscrow)으로 옮겨진다.")
+                    + "결제 금액은 즉시 거래 대금 보관(tradeEscrow)으로 옮겨진다.\n\n"
+                    + "**산 상품이 진행 중인 방송에 편성돼 있으면 "
+                    + "`/topic/lives/{liveId}/product-sold`로 시청자 전원에게 전파된다**(JY013). "
+                    + "이게 없으면 이미 팔린 상품이 다른 시청자의 상품 큐에 계속 남아 있게 된다. "
+                    + "전파 대상 방송은 요청의 `liveId`가 아니라 **편성 정보**로 정하므로, "
+                    + "상품 상세 화면에서 산 경우(=`liveId` 없음)에도 전파된다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "주문 생성 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잔액 부족, 구매 불가 상품, 자기 상품 구매 등"),
@@ -47,7 +54,15 @@ public class OrderController {
     public ResponseEntity<ApiResponse<OrderListItemResponse>> createOrder(
             Authentication authentication, @Valid @RequestBody OrderCreateRequest request) {
         Long memberId = (Long) authentication.getPrincipal();
-        return ResponseEntity.ok(ApiResponse.success(orderService.createOrder(memberId, request)));
+        OrderListItemResponse response = orderService.createOrder(memberId, request);
+
+        // 커밋이 끝난 뒤에 나간다 — createOrder 의 트랜잭션이 이 시점에 이미 닫혀 있다.
+        // 커밋 전에 쏘면 롤백 시 시청자 큐에서만 상품이 사라진 채 남는다(JY013 설계 판단 3).
+        orderService.resolveDirectSaleSoldEvent(request.productId()).ifPresent(sold ->
+                messagingTemplate.convertAndSend(
+                        "/topic/lives/" + sold.liveId() + "/product-sold", sold));
+
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(summary = "주문 상세 조회",

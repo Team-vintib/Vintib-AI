@@ -22,6 +22,7 @@ import type {
   ProductRegistrationPhotoDraft,
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
+import { mapAiColorKeyToOptionId } from '@/domains/product/constants/aiColorPalette'
 import { buildMockProductDetail } from '@/domains/product/constants/productDetailMockData'
 import {
   PRODUCT_CATEGORY_MOCK_DATA,
@@ -157,6 +158,21 @@ interface ProductCreateRequest {
 
 interface ProductCreateResponse extends Partial<ProductListDto> {
   productId?: number | string | null
+}
+
+// PATCH /products/{id}(부분 수정)이 실제로 받는 필드 — BE의 ProductUpdateRequest.java 그대로.
+// aiModelEnabled/aiModelGender/aiQualityFindings는 이 엔드포인트에 없다(docs/requests/BE/046 참고).
+interface ProductUpdateRequest {
+  title: string
+  description: string
+  categoryId: number | null
+  brandId: number | null
+  conditionGrade: ProductConditionGrade | ''
+  sizeLabel: string
+  color: string | null
+  material: string | null
+  measurements: Record<string, number> | null
+  defects: string[] | null
 }
 
 interface ProductImageUploadUrlResponse {
@@ -390,6 +406,96 @@ export const mapQualityInspectionResultToPhotoResults = (
   })
 }
 
+// ── 상품 등록 사진 기반 카테고리·색상 자동 분류(사전업로드) ──────────────────────────
+// docs/requests/FE/042-product-classify-preupload-integration.md. 상품이 아직 생성되기
+// 전(사전업로드)에 사진 1장만으로 분류하는 완전 무상태 API라, jobId는 BE가 저장하지 않고
+// FE가 직접 들고 있다가 상태 조회에 써야 한다.
+
+interface ProductPreUploadUrlResponse {
+  key: string
+  uploadUrl: string
+  expiresInSeconds: number
+}
+
+interface ProductClassifyJobResponse {
+  jobId: string
+}
+
+interface ProductClassifyCategorySuggestionDto {
+  majorCategoryId: number
+  categoryId: number
+  action: string
+  score: number
+}
+
+interface ProductClassifyColorSuggestionDto {
+  colorId: string
+  action: string
+  score: number
+}
+
+interface ProductClassifyResultDto {
+  category: ProductClassifyCategorySuggestionDto | null
+  colorPrimary: ProductClassifyColorSuggestionDto | null
+  taxonomyVersion: string
+}
+
+export interface ProductClassifyStatusDto {
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+  result: ProductClassifyResultDto | null
+  error: string | null
+}
+
+export const createProductPreUploadUrl = async (file: File) => {
+  const response = await http.post<ApiResponse<ProductPreUploadUrlResponse>>(
+    '/products/pre-upload/upload-url',
+    { fileName: file.name, contentType: file.type },
+  )
+
+  return unwrapApiData(response.data)
+}
+
+export const uploadToPreUploadUrl = async (uploadUrl: string, file: File) => {
+  await axios.put(uploadUrl, file, {
+    headers: { 'Content-Type': file.type },
+  })
+}
+
+export const triggerProductClassify = async (key: string) => {
+  const response = await http.post<ApiResponse<ProductClassifyJobResponse>>(
+    '/products/pre-upload/classify',
+    { key },
+  )
+
+  return unwrapApiData(response.data).jobId
+}
+
+export const getProductClassifyStatus = async (jobId: string) => {
+  const response = await http.get<ApiResponse<ProductClassifyStatusDto>>(
+    `/products/pre-upload/classify/${jobId}`,
+  )
+
+  return unwrapApiData(response.data)
+}
+
+// AI 원본(카테고리 depth2/depth3 숫자 id, 색상 팔레트 코드)을 화면 select가 쓰는 문자열
+// id로 변환한다. category/colorPrimary가 null이면(소분류 미지원 등) 그대로 null을 돌려준다.
+export const mapClassifyResultToSuggestions = (result: ProductClassifyResultDto) => {
+  const category = result.category
+    ? {
+        majorId: String(result.category.majorCategoryId),
+        minorId: String(result.category.categoryId),
+      }
+    : null
+
+  const mappedColorId = result.colorPrimary
+    ? mapAiColorKeyToOptionId(result.colorPrimary.colorId)
+    : null
+  const color = mappedColorId ? { colorId: mappedColorId } : null
+
+  return { category, color }
+}
+
 // 미낙찰 상품 처리(440) — 상품을 상시 판매(가격 지정)로 전환하거나 경매 예정으로 되돌린다.
 // 상품 등록의 판매 방식 설정(publishProduct)과 같은 엔드포인트를 재사용한다.
 export const convertProductToDirectSale = async (productId: number, price: number) => {
@@ -498,10 +604,12 @@ export const getWishProductIds = async (userId: number) => {
   return productIds
 }
 
-export const submitProduct = async (
+// AI 품질 검증(SY043)이 '상태/하자' 스텝 진입 시 미리 만들어두는 DRAFT 상품 생성 호출.
+// submitProduct의 신규 분기와 로직을 공유한다 — 상품 생성 시점만 앞당겨졌을 뿐 필드는 동일하다.
+export const createDraftProduct = async (
   draft: ProductRegistrationDraft,
   { brands = [], categories = [] }: ProductSubmitOptions = {},
-): Promise<ProductRegistrationSubmitResult> => {
+): Promise<number> => {
   const createResponse = await http.post<ApiResponse<ProductCreateResponse>>('/products', {
     title: draft.name.trim(),
     description: draft.description.trim(),
@@ -517,14 +625,45 @@ export const submitProduct = async (
     aiModelGender: draft.aiModelEnabled ? draft.aiModelGender : null,
     aiQualityFindings: resolveRegistrationAiQualityFindings(draft),
   } satisfies ProductCreateRequest)
-  const createdProduct = unwrapApiData(createResponse.data)
-  const createdProductId = getCreatedProductId(createdProduct)
 
-  await publishProduct(createdProductId, draft)
-  await uploadProductImages(createdProductId, draft.photos)
+  return getCreatedProductId(unwrapApiData(createResponse.data))
+}
+
+export const submitProduct = async (
+  draft: ProductRegistrationDraft,
+  options: ProductSubmitOptions = {},
+): Promise<ProductRegistrationSubmitResult> => {
+  let productId: number
+
+  if (draft.draftProductId) {
+    // SY043: '상태/하자' 스텝 진입 시 이미 DRAFT 상품+이미지가 만들어져 있다 — 나머지
+    // 필드만 부분 수정하고 이미지는 재업로드하지 않는다. PATCH가 aiModelEnabled/aiModelGender를
+    // 안 받지만, 이 값들은 '기본 정보' 스텝을 나갈 때 이미 확정돼 draft 생성 시점에
+    // 실려 갔으므로 다시 보낼 필요가 없다(docs/requests/BE/046 참고).
+    productId = draft.draftProductId
+    const { brands = [], categories = [] } = options
+
+    await http.patch<ApiResponse<ProductCreateResponse>>(`/products/${productId}`, {
+      title: draft.name.trim(),
+      description: draft.description.trim(),
+      categoryId: findCategoryId(draft, categories),
+      brandId: findBrandId(draft.brand, brands),
+      conditionGrade: draft.conditionGrade,
+      sizeLabel: draft.size,
+      color: resolveRegistrationColor(draft),
+      material: draft.material.trim() || null,
+      measurements: resolveRegistrationMeasurements(draft),
+      defects: resolveRegistrationDefects(draft),
+    } satisfies ProductUpdateRequest)
+  } else {
+    productId = await createDraftProduct(draft, options)
+    await uploadProductImages(productId, draft.photos)
+  }
+
+  await publishProduct(productId, draft)
 
   return {
-    productId: String(createdProductId),
+    productId: String(productId),
     submittedAt: new Date().toISOString(),
   }
 }
@@ -552,7 +691,10 @@ const getCreatedProductId = (product: ProductCreateResponse) => {
   return productId
 }
 
-const uploadProductImages = async (productId: number, photos: ProductRegistrationPhotoDraft[]) => {
+export const uploadProductImages = async (
+  productId: number,
+  photos: ProductRegistrationPhotoDraft[],
+) => {
   const orderedPhotos = [...photos].sort((left, right) => {
     if (left.isRepresentative !== right.isRepresentative) {
       return left.isRepresentative ? -1 : 1

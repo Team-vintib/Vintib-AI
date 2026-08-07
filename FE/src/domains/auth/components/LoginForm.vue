@@ -2,9 +2,11 @@
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import googleLogoImage from '@/assets/images/google-logo.png'
 import { login } from '@/domains/auth/api/authApi'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type { LoginResponse } from '@/domains/auth/types/auth.types'
+import { startGoogleOAuth } from '@/domains/auth/utils/googleOAuth'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import { isEmail, isRequired } from '@/shared/utils/validators'
@@ -142,12 +144,12 @@ const handleSubmit = async () => {
   }
 }
 
-const handleSsafyLogin = async () => {
+const handleGoogleLogin = () => {
   if (isSubmitting.value) {
     return
   }
 
-  await router.push({ name: ROUTE_NAMES.AUTH_SSAFY_LOGIN })
+  startGoogleOAuth('login')
 }
 
 const applyLoginError = (code?: string, message?: string) => {
@@ -292,12 +294,13 @@ function getQueryValue(value: unknown) {
       </button>
 
       <button
-        class="login-form__secondary"
+        class="login-form__secondary login-form__google"
         type="button"
         :disabled="isSubmitting"
-        @click="handleSsafyLogin"
+        @click="handleGoogleLogin"
       >
-        싸피어스로 로그인
+        <img class="login-form__google-icon" :src="googleLogoImage" alt="" aria-hidden="true" />
+        Google로 로그인
       </button>
     </section>
   </form>
@@ -499,6 +502,16 @@ function getQueryValue(value: unknown) {
 
 .login-form__secondary:disabled {
   color: var(--color-text-disabled);
+}
+
+.login-form__google {
+  gap: var(--space-2);
+}
+
+.login-form__google-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-control);
 }
 
 .login-form__submit:focus-visible,

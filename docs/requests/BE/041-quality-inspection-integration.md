@@ -58,7 +58,9 @@ FE가 애초에 실시간으로 받아둔 값을 넘기는 것뿐이라 AI 쪽 T
   "category": "TOP_KNIT",
   "base_color": "LIGHT",              // 기본값 LIGHT, 선택
   "include_attention_maps": false,     // 기본값 false, 선택
-  "include_descriptions": false        // 기본값 false, 선택 — 아래 6번 참고
+  "include_descriptions": false,       // 기본값 false, 선택 — 아래 6번 참고
+  "include_annotated_images": false    // 기본값 false, 선택 — 2026-08-08부터 옵트인(원래 항상 생성했음).
+                                        // FE가 bbox 좌표로 직접 그리기로 해서 기본값이 됨
 }
 ```
 
@@ -207,6 +209,10 @@ FE가 애초에 실시간으로 받아둔 값을 넘기는 것뿐이라 AI 쪽 T
   신발/가방/액세서리/원피스·점프슈트처럼 대응값이 없는 카테고리는 검수를 트리거하지 않는다.
 - `base_color`는 보내지 않는다(AI 기본값 LIGHT 사용) — BE의 `color`는 자유 텍스트라 AI의
   LIGHT/DARK/PATTERNED로 신뢰성 있게 매핑할 방법이 없었다.
+- **2026-08-08 갱신**: `include_descriptions`/`include_attention_maps`는 `true`로 보낸다(워커
+  연동 검증 단계라 VLM 설명·판단 근거를 실제로 확인해야 함). `include_annotated_images`는
+  `false`로 보낸다 — 이 필드는 이제 옵트인이고(AI 쪽도 같은 날 기본 산출물에서 옵트인으로
+  전환), FE가 bbox 좌표로 직접 그리기로 정해 정적 PNG가 필요 없어졌다.
 - **남은 것(FE)**: `findings[]`(snake_case)를 화면 렌더링용 타입(`ProductRegistrationAiFinding`,
   camelCase)으로 변환하는 매퍼(`productApi.ts`의 `mapQualityInspectionResultToPhotoResults`)는
   준비해뒀지만, 등록 마법사 UI(`ProductRegistrationPage.vue`)에는 아직 안 붙였다 — 그 화면이 지금

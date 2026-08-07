@@ -3,16 +3,24 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import {
+  createDraftProduct,
+  createProductPreUploadUrl,
   getBrands,
   getCategories,
   getCategoryCode,
   getProductAiModelCutStatus,
+  getProductClassifyStatus,
+  getProductQualityInspectionStatus,
+  mapClassifyResultToSuggestions,
+  mapQualityInspectionResultToPhotoResults,
+  triggerProductClassify,
+  uploadProductImages,
+  uploadToPreUploadUrl,
   type BrandDto,
   type CategoryDto,
   type ProductAiModelCutStatusDto,
 } from '@/domains/product/api/productApi'
 import {
-  analyzeRegistrationPhotos,
   estimateRegistrationPrice,
   type ProductAiPriceEstimate,
   type ProductRegistrationPriceGrade,
@@ -47,6 +55,7 @@ import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import DefaultLayout from '@/shared/layouts/DefaultLayout.vue'
 
 const PRODUCT_REGISTRATION_MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
+const PRODUCT_REGISTRATION_MAX_ADDITIONAL_PHOTOS = 8
 
 const router = useRouter()
 const currentStepIndex = ref(0)
@@ -83,6 +92,15 @@ const AI_MODEL_CUT_POLL_INTERVAL_MS = 5_000
 // 폴링이 멈추는 문제가 있었다(-517 로컬 테스트에서 확인).
 const AI_MODEL_CUT_POLL_TIMEOUT_MS = 600_000
 let aiModelCutPollToken = 0
+// AI 품질 검증(SY043) 실 폴링 상태 — '상태/하자' 스텝 진입 시 draft 상품이 만들어지면서 시작된다.
+const isQualityCategoryUnsupported = ref(false)
+const QUALITY_INSPECTION_POLL_INTERVAL_MS = 5_000
+const QUALITY_INSPECTION_POLL_TIMEOUT_MS = 600_000
+let qualityInspectionPollToken = 0
+// 카테고리/색상 자동 분류(사전업로드, docs/requests/FE/042) 폴링 상태.
+const CLASSIFY_POLL_INTERVAL_MS = 3_000
+const CLASSIFY_POLL_TIMEOUT_MS = 120_000
+let classifyPollToken = 0
 const isSubmittingRegistration = ref(false)
 const registrationSubmitError = ref('')
 const isCompletenessPromptOpen = ref(false)
@@ -201,6 +219,7 @@ const createInitialDraft = (): ProductRegistrationDraft => ({
   saleType: 'DIRECT',
   directSalePrice: '',
   linkedLiveId: '',
+  draftProductId: null,
 })
 
 const draft = reactive<ProductRegistrationDraft>(createInitialDraft())
@@ -223,6 +242,9 @@ const additionalPhotos = computed(() =>
 )
 const frontPhotoCountLabel = computed(() => `(${Math.min(frontPhotos.value.length, 1)}/1)`)
 const backPhotoCountLabel = computed(() => `(${Math.min(backPhotos.value.length, 1)}/1)`)
+const additionalPhotoCountLabel = computed(
+  () => `(${additionalPhotos.value.length}/${PRODUCT_REGISTRATION_MAX_ADDITIONAL_PHOTOS})`,
+)
 const photoStepErrors = computed(() => ({
   front: photoStepTouched.value && frontPhotos.value.length === 0
     ? PRODUCT_REGISTRATION_VALIDATION_MESSAGES.frontPhotoRequired
@@ -889,6 +911,20 @@ const addPhotos = (role: ProductRegistrationPhotoRole, files: File[]) => {
     return
   }
 
+  const currentAdditionalCount = draft.photos.filter((photo) => photo.role === 'additional').length
+  const remainingSlots = PRODUCT_REGISTRATION_MAX_ADDITIONAL_PHOTOS - currentAdditionalCount
+
+  if (remainingSlots <= 0) {
+    validPhotos.forEach(revokePhotoPreviewUrl)
+    photoUploadError.value = `추가 사진은 최대 ${PRODUCT_REGISTRATION_MAX_ADDITIONAL_PHOTOS}장까지 등록할 수 있습니다.`
+    return
+  }
+
+  if (validPhotos.length > remainingSlots) {
+    validPhotos.splice(remainingSlots).forEach(revokePhotoPreviewUrl)
+    photoUploadError.value = `추가 사진은 최대 ${PRODUCT_REGISTRATION_MAX_ADDITIONAL_PHOTOS}장까지 등록할 수 있습니다.`
+  }
+
   draft.photos.push(...validPhotos)
 }
 
@@ -981,6 +1017,10 @@ const resetAiAnalysis = () => {
   draft.aiCategorySuggestion = null
   draft.aiColorSuggestion = null
   currentAiResultIndex.value = 0
+  isQualityCategoryUnsupported.value = false
+  // 사진이 없어져 트리거 요건이 깨졌으면, 아직 도는 분류 폴링이 있어도 그 결과를 더는
+  // 반영하지 않는다(토큰 불일치로 무시됨).
+  classifyPollToken += 1
 }
 
 // AI가 채운 값을 사용자가 이미 직접 고른 뒤라면 덮어쓰지 않는다.
@@ -1015,53 +1055,159 @@ const applyAiColorSuggestion = (color: { colorId: string } | null) => {
   draft.color = color.colorId
 }
 
-// front/back 사진이 모두 갖춰지면(또는 다시 바뀌면) 자동으로 도는 AI 분석 —
-// 사용자가 누르는 확인 버튼은 더 이상 없다.
-const triggerAiPhotoAnalysis = async () => {
+// front/back 사진이 모두 갖춰지면(또는 다시 바뀌면) front 사진 1장을 사전업로드해 카테고리/색상
+// 자동 분류 job을 돌린다(docs/requests/FE/042-product-classify-preupload-integration.md).
+// 상품이 아직 생성되기 전이라 SY043의 draft 상품과는 별개 — 완전 무상태 API라 jobId는 FE가
+// 직접 들고 폴링한다(BE에 저장 안 됨). 품질 검증은 이 함수와 무관 — '상태/하자' 스텝 진입 시
+// 실 job으로 대체됐다(SY043, beginQualityInspection 참고).
+const triggerAiCategoryColorSuggestion = async () => {
   const frontPhoto = frontPhotos.value[0]
   const backPhoto = backPhotos.value[0]
 
   if (!frontPhoto?.file || !backPhoto?.file) {
-    resetAiAnalysis()
+    draft.aiCategorySuggestion = null
+    draft.aiColorSuggestion = null
     return
   }
 
-  draft.aiQualityStatus = 'loading'
+  const token = ++classifyPollToken
+  const frontFile = frontPhoto.file
 
   try {
-    const result = await analyzeRegistrationPhotos(frontPhoto.file, backPhoto.file)
+    const upload = await createProductPreUploadUrl(frontFile)
+    await uploadToPreUploadUrl(upload.uploadUrl, frontFile)
+    if (token !== classifyPollToken) return
 
-    draft.aiPhotoResults = [
-      { photoId: frontPhoto.id, findings: result.quality.front, confirmed: false },
-      { photoId: backPhoto.id, findings: result.quality.back, confirmed: false },
-    ]
-    currentAiResultIndex.value = 0
-    draft.aiQualityStatus = 'completed'
+    const jobId = await triggerProductClassify(upload.key)
+    if (token !== classifyPollToken) return
 
-    applyAiCategorySuggestion(result.category)
-    applyAiColorSuggestion(result.color)
+    await pollProductClassify(jobId, token)
   } catch (error) {
-    console.error('[ProductRegistrationPage] AI 분석 실패', error)
-    draft.aiQualityStatus = 'failed'
-    draft.aiPhotoResults = []
+    if (token !== classifyPollToken) return
+
+    console.error('[ProductRegistrationPage] 카테고리/색상 자동 분류 실패', error)
     draft.aiCategorySuggestion = null
     draft.aiColorSuggestion = null
   }
 }
 
+const pollProductClassify = async (jobId: string, token: number) => {
+  const deadline = Date.now() + CLASSIFY_POLL_TIMEOUT_MS
+
+  while (Date.now() < deadline) {
+    if (token !== classifyPollToken) return
+
+    try {
+      const status = await getProductClassifyStatus(jobId)
+      if (token !== classifyPollToken) return
+
+      if (status.status === 'COMPLETED' && status.result) {
+        const { category, color } = mapClassifyResultToSuggestions(status.result)
+        applyAiCategorySuggestion(category)
+        applyAiColorSuggestion(color)
+        return
+      }
+
+      if (status.status === 'FAILED') {
+        draft.aiCategorySuggestion = null
+        draft.aiColorSuggestion = null
+        return
+      }
+    } catch {
+      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도.
+    }
+
+    await sleep(CLASSIFY_POLL_INTERVAL_MS)
+  }
+}
+
 // front/back 사진의 id(=파일이 바뀌면 새로 생성됨)를 감시해, 사진이 갖춰지거나
-// 다른 사진으로 교체될 때마다 AI 분석을 다시 트리거한다.
+// 다른 사진으로 교체될 때마다 카테고리/색상 자동 제안을 다시 트리거한다.
 const aiTriggerPhotoKey = computed(
   () => `${frontPhotos.value[0]?.id ?? ''}|${backPhotos.value[0]?.id ?? ''}`,
 )
 
 watch(aiTriggerPhotoKey, () => {
   if (isPhotoStepValid.value) {
-    void triggerAiPhotoAnalysis()
+    void triggerAiCategoryColorSuggestion()
   } else {
     resetAiAnalysis()
   }
 })
+
+// AI 품질 검증(SY043) — '상태/하자' 스텝에 처음 진입할 때, 카테고리+앞/뒤 사진이 이미
+// 확정된 상태(스텝 이동 자체가 isIntroStepValid로 막혀 있어 name/color/category/aiModel
+// 설정까지 전부 끝나 있음이 보장된다)를 이용해 실제 DRAFT 상품+이미지를 만들고 진짜
+// 검수 job을 트리거한다. draft.draftProductId가 이미 있으면(스텝을 왔다갔다한 경우)
+// 다시 만들지 않는다 — 사진 교체 후 재트리거는 이번 범위 밖(계획 문서 참고).
+const beginQualityInspection = async () => {
+  if (draft.draftProductId || !isPhotoStepValid.value || !isCategorySelectionComplete.value) {
+    return
+  }
+
+  isQualityCategoryUnsupported.value = false
+  draft.aiQualityStatus = 'loading'
+
+  try {
+    const productId = await createDraftProduct(draft, {
+      brands: brands.value,
+      categories: categories.value,
+    })
+    draft.draftProductId = productId
+    await uploadProductImages(productId, draft.photos)
+    void pollQualityInspectionStatus(productId)
+  } catch (error) {
+    console.error('[ProductRegistrationPage] AI 품질 검증 시작 실패', error)
+    draft.aiQualityStatus = 'failed'
+  }
+}
+
+// BE가 이미지 등록 시점에 이미 검수를 트리거해두므로, FE는 결과만 반복 조회한다
+// (pollAiModelCutStatus와 같은 패턴 — 토큰 기반 취소, 완료/실패/미지원까지 반복).
+const pollQualityInspectionStatus = async (productId: number) => {
+  const token = ++qualityInspectionPollToken
+  const deadline = Date.now() + QUALITY_INSPECTION_POLL_TIMEOUT_MS
+
+  while (Date.now() < deadline) {
+    if (token !== qualityInspectionPollToken) return
+
+    try {
+      const status = await getProductQualityInspectionStatus(productId)
+      if (token !== qualityInspectionPollToken) return
+
+      if (status.status === 'NONE') {
+        isQualityCategoryUnsupported.value = true
+        draft.aiQualityStatus = 'failed'
+        return
+      }
+
+      if (status.status === 'FAILED') {
+        draft.aiQualityStatus = 'failed'
+        return
+      }
+
+      if (status.status === 'COMPLETED' && status.result) {
+        const frontPhoto = frontPhotos.value[0]
+        const backPhoto = backPhotos.value[0]
+        const photoIdByImageIndex: Record<number, string> = {}
+        if (frontPhoto) photoIdByImageIndex[0] = frontPhoto.id
+        if (backPhoto) photoIdByImageIndex[1] = backPhoto.id
+
+        draft.aiPhotoResults = mapQualityInspectionResultToPhotoResults(
+          status.result,
+          photoIdByImageIndex,
+        )
+        currentAiResultIndex.value = 0
+        draft.aiQualityStatus = 'completed'
+        return
+      }
+    } catch {
+      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도, 화면 상태는 건드리지 않는다.
+    }
+
+    await sleep(QUALITY_INSPECTION_POLL_INTERVAL_MS)
+  }
+}
 
 const applyAiPriceEstimates = (estimates: ProductAiPriceEstimate[]) => {
   recommendedPrices.value = estimates
@@ -1127,6 +1273,10 @@ watch(
   (stepId) => {
     if (stepId === 'pricing' && aiPriceStatus.value === 'idle') {
       void triggerAiPriceRecommendation()
+    }
+
+    if (stepId === 'condition' && draft.aiQualityStatus === 'idle') {
+      void beginQualityInspection()
     }
   },
 )
@@ -1358,6 +1508,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   aiModelCutPollToken += 1
+  classifyPollToken += 1
   draft.photos.forEach((photo) => {
     revokePhotoPreviewUrl(photo)
   })
@@ -1463,6 +1614,8 @@ onBeforeUnmount(() => {
               description="디테일, 라벨, 착용감이 드러나는 사진을 더 등록할 수 있습니다."
               role="additional"
               multiple
+              :requirement-label="additionalPhotoCountLabel"
+              :max-count="PRODUCT_REGISTRATION_MAX_ADDITIONAL_PHOTOS"
               :photos="additionalPhotos"
               :representative-photo-id="draft.representativePhotoId"
               @upload="addPhotos"
@@ -1975,6 +2128,15 @@ onBeforeUnmount(() => {
                 <span class="product-registration__ai-spinner" aria-hidden="true" />
                 <strong>AI가 사진을 검증하고 있습니다…</strong>
                 <p>잠시만 기다려 주세요.</p>
+              </div>
+
+              <div
+                v-else-if="draft.aiQualityStatus === 'failed' && isQualityCategoryUnsupported"
+                class="product-registration__ai-empty"
+                role="status"
+              >
+                <strong>이 카테고리는 AI 품질 검증을 지원하지 않습니다.</strong>
+                <p>상품 상태는 아래 항목에서 직접 알려주세요.</p>
               </div>
 
               <div
@@ -2799,7 +2961,7 @@ onBeforeUnmount(() => {
 }
 
 .product-registration__photo-uploader :deep(.product-photo-uploader__item img) {
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 3 / 4;
 }
 
 .product-registration__photo-uploader :deep(.product-photo-uploader__empty) {
