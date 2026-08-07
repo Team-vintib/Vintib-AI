@@ -9,15 +9,27 @@
 
 ## 남은 항목
 
-### 1. AI 게이트웨이 실폴링 미연결 (BE 선행 필요)
+### 1. 실폴링 미연결 (2026-08-07 갱신 — BE 쪽은 준비됨, FE 화면 연결만 남음)
 
-현재 findings는 목업(`productAiApi.ts`의 `analyzeRegistrationPhotos` — real 모드는 throw)에서 오고,
-`aiGatewayApi.ts`의 `pollAiJob`(`GET /ai/jobs/{job_id}`)은 정의만 돼 있고 호출되지 않는다. 실연동하려면:
+**BE/041이 방식을 바꿔서 반영됐다** — FE가 AI 게이트웨이를 직접 폴링하는 게 아니라, BE의
+`GET /products/{id}/quality-inspection`을 폴링한다(자세한 내용은 041 §"처리 결과" 참고).
+`aiGatewayApi.ts`의 `pollAiJob`(`GET /ai/jobs/{job_id}` 직접 폴링)은 이 기능에는 쓰지 않는다
+(다른 기능 — 가격 추천 — 은 여전히 그 방식을 쓰므로 파일 자체는 유지).
 
-- BE가 사진 업로드/임시저장 응답에 `job_id`를 실어 줘야 한다(`docs/requests/BE/041`). 지금 등록 폼 상태에 `job_id`를 들고 있지 않다.
-- condition 스텝 진입 시 그 `job_id`로 **BE를 거치지 않고** `GET https://i15a108.p.ssafy.io/ai/jobs/{job_id}`를 직접 폴링.
-- `status`: `queued`/`processing` → 로딩(`analyzing`) 유지·재폴링, `success` → findings 렌더, `failed`·1시간 만료(404) 처리.
-  (현재 `analyzing` UI는 목업 analyze 결과의 `aiQualityStatus`에만 연결돼 있어 실제 job status와 무관하다.)
+`productApi.ts`에 이미 추가된 것:
+- `getProductQualityInspectionStatus(productId)` — 위 BE 엔드포인트 호출
+- `mapQualityInspectionResultToPhotoResults(result, photoIdByImageIndex)` — AI 원본(snake_case)을
+  `ProductRegistrationAiPhotoResult[]`(camelCase, 화면 렌더링용)로 변환하는 매퍼(아래 매핑표 그대로 구현)
+
+**아직 안 된 것**: 위 두 함수를 `ProductRegistrationPage.vue`에 실제로 연결하는 일. 지금 그 화면의
+`aiQualityStatus`/`aiPhotoResults`는 **상품 등록 전, 로컬 파일 단계**에서 도는 목업
+(`productAiApi.ts`의 `analyzeRegistrationPhotos`)이 채운다 — 반면 검수 job은 이미지가 실제로
+**등록된 뒤**(BE가 트리거)에야 존재한다. 즉 "언제 트리거되는 job"과 "언제 보여주는 화면"의 시점이
+서로 다르다. 두 가지 중 하나를 정해야 한다:
+  (a) 사진 선택 즉시 상품 draft+이미지를 실제로 만들어 그 시점부터 진짜 job을 트리거하고, 지금의
+      목업 미리보기 자리를 실제 폴링으로 교체한다, 또는
+  (b) 모델컷처럼 최종 제출 이후의 별도 화면(완료 화면 등)에서 실제 검수 결과를 보여준다.
+이건 화면 흐름 설계라 AI가 대신 정하지 않았다 — FE가 결정할 사안.
 
 ### 2. `condition_score`/`condition_grade` 미수집·미전달
 
