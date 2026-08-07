@@ -133,11 +133,18 @@ for _pair in (
 
 DEFAULT_MIN_CONFIDENCE = 0.5  # 5-way 균등 기준선(0.2)의 2.5배. 근거 없는 값 — 스윕 대상.
 
-# quality_vlm/registry.py와 같은 계열 체크포인트. GPU가 널널하면 --model-id로 더 큰
-# 체크포인트(예: Qwen/Qwen3-VL-8B-Instruct — 같은 dense 아키텍처라 로더 코드 무수정)로
-# 바꿀 수 있다. 30B-A3B 이상 MoE 계열은 로더가 다른 모델 클래스를 요구할 수 있어 검증
-# 없이 넣지 않는다 — 시도하려면 먼저 `transformers`가 그 체크포인트를
-# `Qwen3VLForConditionalGeneration`으로 로드하는지 확인할 것.
+# 기본값은 quality_vlm/registry.py와 같은 계열(4B, 항상 안전하게 돈다).
+#
+# **GPU가 널널하면 --model-id "Qwen/Qwen3-VL-30B-A3B-Instruct"를 권장한다** — 실측
+# 벤치마크상 8B(114 tok/s)와 30B-A3B(110.8 tok/s)의 생성 속도가 거의 같다(MoE라 토큰당
+# 실제 활성 파라미터는 ~3B뿐이라서다). 즉 속도 손해는 미미한데 총 파라미터·표현력은
+# 훨씬 커서, "정확도 vs 속도" 트레이드오프에서 8B보다 순수하게 더 나은 선택이다.
+# 다만 총 가중치는 30B라 로드에는 그만큼 VRAM이 든다 — --quantization none이면
+# ~30GB대(FP8 리포 "Qwen/Qwen3-VL-30B-A3B-Instruct-FP8"를 쓰면 비슷한 수준), GPU가
+# 그보다 작으면 커뮤니티 4bit AWQ 리포("QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ",
+# --quantization none으로 쓸 것 — 리포 자체가 이미 양자화됨, `pip install autoawq` 필요)를
+# 대신 쓴다. MoE 로딩은 `_load_qwen_vl_bundle()`이 별도로 처리한다(아래 참고) — dense
+# 전용인 quality_vlm/loader.py는 무수정이다.
 QWEN3_VL_MODEL_ID = "Qwen/Qwen3-VL-4B-Instruct"
 
 
@@ -265,6 +272,52 @@ def _match_kr_label(response: str) -> str | None:
     return hits[0] if len(hits) == 1 else None
 
 
+def _load_qwen_vl_bundle(model_id: str, quantization: str):
+    """`quality_vlm/loader.py`의 `load_qwen_vl()`은 dense 계열(4B/8B)만 지원한다 —
+    `Qwen3VLForConditionalGeneration`으로 싣는데, 30B-A3B/235B-A22B 같은 MoE 계열은
+    라우팅 레이어 구조가 달라 이 클래스로 못 싣는다(실측: HF 공식 로딩 예제가
+    `Qwen3VLMoeForConditionalGeneration`을 쓴다). 체크포인트 이름의 "-A숫자B"
+    표기(공식 명명 규칙: <총파라미터>-A<활성파라미터>, 예: 30B-A3B)로 MoE 여부를
+    판별해 그 경우만 이 함수 안에서 직접 싣는다 — 프로덕션 검수 워커가 쓰는 공유
+    로더(`quality_vlm/loader.py`)는 dense 전용으로 그대로 두고 건드리지 않는다."""
+    import re
+
+    from loader import VLMBundle, load_qwen_vl, select_device  # quality_vlm/loader.py
+
+    if not re.search(r"-A\d+B", model_id):
+        return load_qwen_vl(model_id, quantization=quantization)
+
+    import torch
+    from transformers import AutoProcessor, Qwen3VLMoeForConditionalGeneration
+
+    device = select_device()
+    processor = AutoProcessor.from_pretrained(model_id)
+    if quantization == "4bit":
+        from transformers import BitsAndBytesConfig
+
+        quant_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+        )
+        model = Qwen3VLMoeForConditionalGeneration.from_pretrained(
+            model_id, quantization_config=quant_config, device_map="auto"
+        )
+    elif quantization == "none":
+        # `-FP8`/`-AWQ` 접미사가 붙은 체크포인트(예: Qwen/Qwen3-VL-30B-A3B-Instruct-FP8,
+        # QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ)는 리포 자체가 이미 양자화돼 있다 —
+        # 그런 리포에는 항상 이 분기(quantization="none")를 쓴다. AWQ 리포는
+        # `pip install autoawq`가 추가로 필요하다.
+        model = Qwen3VLMoeForConditionalGeneration.from_pretrained(
+            model_id, dtype="auto", device_map="auto"
+        )
+    else:
+        raise ValueError(f"unknown quantization mode: {quantization!r}")
+    model.eval()
+    return VLMBundle(name=model_id, model=model, processor=processor, device=device)
+
+
 def label_with_qwen3_vl(
     rows: list[dict],
     *,
@@ -273,10 +326,10 @@ def label_with_qwen3_vl(
     model_id: str,
     quantization: str,
 ) -> list[dict[str, Any]]:
-    from loader import VLMBundle, generate_from_image, load_qwen_vl  # quality_vlm/loader.py
+    from loader import generate_from_image  # quality_vlm/loader.py
     from PIL import Image
 
-    bundle: VLMBundle = load_qwen_vl(model_id, quantization=quantization)
+    bundle = _load_qwen_vl_bundle(model_id, quantization)
 
     # 후보를 그냥 나열만 하면(기존: "데님/슬랙스/카고팬츠/조거팬츠/코튼팬츠 중...") 모델이
     # 원단 명칭만 보고 고르게 되는데, 그게 바로 CLIP도 헷갈렸던 지점이다(위 힌트 주석 참고).
@@ -356,16 +409,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--model-id",
         default=QWEN3_VL_MODEL_ID,
-        help="qwen3_vl 전용. GPU가 넉넉하면 더 큰 체크포인트(예: Qwen/Qwen3-VL-8B-Instruct — "
-        "같은 dense 아키텍처라 로더 코드 무수정)로 바꿀 수 있다. MoE 계열(30B-A3B 이상)은 "
-        "transformers가 Qwen3VLForConditionalGeneration으로 로드되는지 먼저 확인할 것",
+        help="qwen3_vl 전용. 기본은 4B(항상 안전). GPU가 널널하면 "
+        "'Qwen/Qwen3-VL-30B-A3B-Instruct'를 권장 — 실측 벤치마크상 8B와 생성 속도가 "
+        "거의 같은데(MoE, 토큰당 활성 파라미터 ~3B) 총 표현력은 훨씬 크다. VRAM이 더 "
+        "빠듯하면 'Qwen/Qwen3-VL-30B-A3B-Instruct-FP8'(공식 FP8) 또는 "
+        "'QuantTrio/Qwen3-VL-30B-A3B-Instruct-AWQ'(커뮤니티 4bit, --quantization none과 "
+        "같이 쓸 것)를 대신 쓴다",
     )
     parser.add_argument(
         "--quantization",
         choices=("4bit", "none"),
         default="4bit",
-        help="qwen3_vl 전용. GPU 메모리가 넉넉하면 'none'으로 풀정밀도 로드(품질↑, 로드 "
-        "시간·VRAM↑). 기본은 로컬 8GB급 GPU 기준 4bit(quality_vlm/loader.py와 동일)",
+        help="qwen3_vl 전용. 'none'이면 그대로 로드(FP8/AWQ처럼 리포 자체가 이미 양자화된 "
+        "체크포인트는 항상 이 값을 쓴다). '4bit'는 로드 시점에 bitsandbytes로 양자화한다 "
+        "(원본이 아직 안 양자화된 체크포인트에만 의미가 있다). 기본은 로컬 8GB급 GPU "
+        "기준 4bit(quality_vlm/loader.py와 동일)",
     )
     parser.add_argument(
         "--min-confidence",
