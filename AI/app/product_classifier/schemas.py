@@ -11,6 +11,10 @@ BE가 한다 — 사용자가 폼에서 수정한 값이 최종값이다.
 **성별은 이 응답에 없다.** 사용자가 등록 폼에서 직접 고르기로 확정됐다(2026-08-01) —
 `categoryId = f(성별, subcategory)` 조합은 BE/폼 통합 단계(이 스키마 밖)에서 이뤄진다.
 
+**`product_id`는 optional이다** — 상품 생성 전 사전업로드 단계(방향 B, 상품 등록 위저드
+설계)에서 분류를 트리거할 땐 아직 진짜 상품이 없다. BE가 값을 안 보내면 AI는 `null`을
+그대로 에코한다.
+
 설계: `.claude/plans/ai/CH012-~2.MD`
 """
 
@@ -34,10 +38,20 @@ class Action(str, Enum):
 class ProductClassifyRequest(BaseModel):
     """BE 상품 등록 흐름이 보내는 분류 요청."""
 
-    product_id: int = Field(ge=1, description="BE가 채번한 상품 id. AI는 에코만 한다")
+    product_id: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "BE가 채번한 상품 id. AI는 에코만 한다. 상품 생성 전 사전업로드 단계에서 "
+            "트리거하면 아직 상품이 없어 None일 수 있다"
+        ),
+    )
     image_url: str = Field(description="대표 상품 사진 1장. 1장 = 1 job")
     taxonomy_version: str = Field(
-        default="v1",
+        # 값은 `worker/models/product_classifier/taxonomy.py`의 TAXONOMY_VERSION과 항상
+        # 같게 유지한다("v1"로 방치돼 있던 게 실제 사용 버전과 어긋난 버그였다). 워커는 이
+        # 필드를 실제로 쓰지 않는다 — 응답엔 워커가 실제로 사용한 버전을 그대로 낸다.
+        default="v2-be-seed-2026-08-03",
         description="`worker/models/product_classifier/taxonomy.py`의 TAXONOMY_VERSION",
     )
 
@@ -54,7 +68,7 @@ class ProductClassifyEnqueued(BaseModel):
     """
 
     job_id: str = Field(description="게이트웨이가 채번한 job id. 이 값으로 결과를 폴링한다")
-    product_id: int = Field(description="요청에서 받은 값을 그대로 에코")
+    product_id: int | None = Field(default=None, description="요청에서 받은 값을 그대로 에코")
 
 
 # --- job result 계약 ----------------------------------------------------------
@@ -109,7 +123,7 @@ class ModelInfo(BaseModel):
 class ProductClassifyResult(BaseModel):
     """분류 1건의 결과. `GET /ai/jobs/{job_id}` 응답의 `result` 필드에 담긴다."""
 
-    product_id: int
+    product_id: int | None
     fields: ProductClassifyFields
     model: ModelInfo
     taxonomy_version: str
