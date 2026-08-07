@@ -46,6 +46,27 @@ const reactionParticles = ref<LiveReactionParticle[]>([])
 const messageList = ref<HTMLElement | null>(null)
 const isConnected = ref(false)
 const errorMessage = ref('')
+const BLOCKED_NOTICE_TEXT = '메시지가 차단되었습니다.'
+// 차단 안내는 계속 붙잡아 두지 않는다 — 그 메시지 한 건에 대한 결과일 뿐이라, 잠시 뒤(또는
+// 다음 메시지가 정상 전송되면) 사라져야 채팅이 계속 막힌 것처럼 보이지 않는다.
+const BLOCKED_NOTICE_DURATION_MS = 5000
+const isBlockedMessage = computed(() => errorMessage.value === BLOCKED_NOTICE_TEXT)
+let blockedNoticeTimer: number | undefined
+
+const clearBlockedNotice = () => {
+  window.clearTimeout(blockedNoticeTimer)
+  blockedNoticeTimer = undefined
+
+  if (isBlockedMessage.value) {
+    errorMessage.value = ''
+  }
+}
+
+const showBlockedNotice = () => {
+  window.clearTimeout(blockedNoticeTimer)
+  errorMessage.value = BLOCKED_NOTICE_TEXT
+  blockedNoticeTimer = window.setTimeout(clearBlockedNotice, BLOCKED_NOTICE_DURATION_MS)
+}
 const isChatCollapsed = ref(false)
 let realtimeClient: LiveRealtimeClient | null = null
 let mockMessageSequence = 0
@@ -138,6 +159,9 @@ const subscribeRealtime = () => {
 
     if (existingIndex >= 0) {
       messages.value.splice(existingIndex, 1, nextMessage)
+
+      // 내 메시지가 정상적으로 브로드캐스트됐다 = 차단이 풀렸다는 뜻이라 경고를 지운다.
+      clearBlockedNotice()
     } else {
       messages.value.push(nextMessage)
     }
@@ -167,7 +191,7 @@ const subscribeRealtime = () => {
     // 유령처럼 계속 남아있던 문제(실측으로 확인, -571 후속)를 여기서 지워서 해소한다.
     if (isBackendChatBlockedNotice(body)) {
       messages.value = messages.value.filter((message) => message.id !== body.clientMessageId)
-      errorMessage.value = '메시지가 차단되었습니다.'
+      showBlockedNotice()
       return
     }
 
@@ -205,6 +229,9 @@ const submitMessage = () => {
     errorMessage.value = '로그인 후 채팅할 수 있습니다.'
     return
   }
+
+  // 다시 보낸 메시지가 또 차단되면 차단 알림이 새로 오므로, 보낼 때 이전 경고는 걷어낸다.
+  clearBlockedNotice()
 
   const clientMessageId = `local-chat-${Date.now()}-${mockMessageSequence++}`
   messages.value.push({
@@ -285,6 +312,7 @@ watch(
 
 onBeforeUnmount(() => {
   disconnectRealtime()
+  window.clearTimeout(blockedNoticeTimer)
 
   if (reactionTimer !== null) {
     window.clearTimeout(reactionTimer)
@@ -444,7 +472,12 @@ function isSuppressedRealtimeError(body: unknown) {
         </li>
       </ul>
 
-      <p v-if="errorMessage" class="live-chat-overlay__error" role="status">
+      <p
+        v-if="errorMessage"
+        class="live-chat-overlay__error"
+        :class="{ 'live-chat-overlay__error--blocked': isBlockedMessage }"
+        role="status"
+      >
         {{ errorMessage }}
       </p>
 
@@ -713,6 +746,19 @@ function isSuppressedRealtimeError(body: unknown) {
   color: var(--color-accent);
   font-size: var(--font-size-2xs);
   line-height: var(--line-height-tight);
+}
+
+.live-chat-overlay__error--blocked {
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  font-size: var(--font-size-body);
+  /* 본문 웹폰트(IBM Plex Sans KR)가 700까지만 실려 있어 weight만으로는 더 굵어지지 않는다.
+     경고가 확실히 도드라지도록 획 두께를 조금 더 준다. */
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-snug);
+  -webkit-text-stroke: 0.4px currentColor;
 }
 
 .live-chat-overlay__composer {

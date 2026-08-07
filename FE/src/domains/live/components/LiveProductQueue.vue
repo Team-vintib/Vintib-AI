@@ -11,8 +11,11 @@ defineEmits<{
   select: [productId: number]
 }>()
 
-const formatPrice = (price: number | null) =>
-  price === null ? '가격 정보 준비 중' : `${price.toLocaleString('ko-KR')}P`
+const formatPrice = (product: LiveWatchProduct) => {
+  if (product.saleStatus === 'AUCTION_SCHEDULED') return '경매 예정'
+
+  return product.price === null ? '가격 정보 준비 중' : `${product.price.toLocaleString('ko-KR')}P`
+}
 
 // 이미 낙찰·판매된 상품은 큐에서 선택할 수 없다(BE 035 §2 — saleStatus로 판별).
 const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
@@ -48,13 +51,15 @@ const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
           />
           <span v-else aria-hidden="true">상품</span>
           <span v-if="isSold(product)" class="live-product-queue__sold-badge">판매완료</span>
-          <span v-else-if="product.id === currentProductId" class="live-product-queue__now">NOW</span>
+          <span v-else-if="product.id === currentProductId" class="live-product-queue__now"
+            >NOW</span
+          >
         </span>
 
         <span class="live-product-queue__content">
           <strong>{{ product.title }}</strong>
           <span>{{ product.brandName || '브랜드 정보 준비 중' }}</span>
-          <span class="live-product-queue__price">{{ formatPrice(product.price) }}</span>
+          <span class="live-product-queue__price">{{ formatPrice(product) }}</span>
         </span>
       </button>
     </div>
@@ -130,14 +135,14 @@ const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
   background: var(--color-live-surface);
 }
 
+/* 시청자가 직접 고른 상품만 흰 좌측 바로 표시한다. */
 .live-product-queue__item--selected {
-  border-left-color: var(--color-accent);
+  border-left-color: var(--color-live-text-primary);
   background: var(--color-live-surface);
 }
 
-.live-product-queue__item--current {
-  border-left-color: var(--color-accent);
-}
+/* 현재 소개 중인 상품은 썸네일의 NOW 배지로만 구분한다. 선택 강조(좌측 액센트 바)를 같이
+   그리면 선택된 상품이 두 개로 보인다(-430 QA에서 확인). */
 
 .live-product-queue__item:disabled {
   cursor: not-allowed;

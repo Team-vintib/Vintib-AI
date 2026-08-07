@@ -59,6 +59,24 @@ export interface AuctionWinner {
   endedAt: string | null
 }
 
+export type AuctionBidStatus = 'ACTIVE' | 'OUTBID' | 'WON' | 'LOST'
+
+export interface AuctionBidItem {
+  bidId: number
+  bidderId: number
+  bidderNickname: string
+  amount: number
+  status: AuctionBidStatus
+  createdAt: string
+  isMine: boolean
+}
+
+export interface AuctionBidPage {
+  content: AuctionBidItem[]
+  nextCursor: number | null
+  hasNext: boolean
+}
+
 export type BroadcastSaleStatus = 'SOLD' | 'UNSOLD'
 export type BroadcastSaleMethod = 'AUCTION' | 'DIRECT_SALE'
 

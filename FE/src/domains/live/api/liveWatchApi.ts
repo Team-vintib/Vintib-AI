@@ -33,6 +33,15 @@ const wait = (delay: number) =>
     window.setTimeout(resolve, delay)
   })
 
+const formatMeasurements = (measurements: Record<string, number> | null | undefined) => {
+  if (!measurements) return null
+
+  const entries = Object.entries(measurements)
+  return entries.length > 0
+    ? entries.map(([label, value]) => `${label} ${value}cm`).join(' · ')
+    : null
+}
+
 const mapLiveProductDto = (dto: LiveProductDto): LiveWatchProduct => ({
   id: dto.productId,
   title: dto.productTitle,
@@ -41,12 +50,10 @@ const mapLiveProductDto = (dto: LiveProductDto): LiveWatchProduct => ({
   thumbnailUrl: dto.thumbnailUrl ?? null,
   saleType: dto.saleType ?? null,
   saleStatus: dto.saleStatus ?? null,
-  // material·measurements·defectSummary는 LiveProductResponse에 없음(BE 016 §6-B).
-  // 필요 시 상품 상세(GET /products/{id})에서 상세 패널로 가져온다.
-  material: null,
+  material: dto.material ?? null,
   condition: dto.conditionGrade ?? null,
-  measurements: null,
-  defectSummary: null,
+  measurements: formatMeasurements(dto.measurements),
+  defectSummary: dto.defectSummary ?? null,
 })
 
 const mapLiveDetailDto = (dto: LiveDetailDto): LiveWatchViewData => ({

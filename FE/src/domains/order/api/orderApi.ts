@@ -89,9 +89,12 @@ const toShipmentInfo = (dto: BackendOrderShipmentDto): OrderShipmentInfo => ({
   trackingStatusLabel: dto.trackingStatusLabel,
 })
 
-/** 상시 판매 상품 즉시구매(SALE-001/002). 결제는 포인트로만 처리되며 실패 시 BE 에러 메시지를 던진다. */
-export const createOrder = async (productId: number): Promise<OrderSummary> => {
-  const response = await http.post<ApiResponse<BackendOrderSummaryDto>>('/orders', { productId })
+/** 상시 판매 상품 즉시구매(SALE-001/002). 라이브 구매는 집계를 위해 liveId를 함께 전송한다. */
+export const createOrder = async (productId: number, liveId?: number): Promise<OrderSummary> => {
+  const response = await http.post<ApiResponse<BackendOrderSummaryDto>>('/orders', {
+    productId,
+    ...(liveId === undefined ? {} : { liveId }),
+  })
   return toOrderSummary(unwrapApiData(response.data, '주문을 생성하지 못했습니다.'))
 }
 

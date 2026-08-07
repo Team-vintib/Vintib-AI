@@ -2,6 +2,7 @@ import { http } from '@/shared/api/http'
 import { normalizeApiError } from '@/shared/api/http'
 
 import type {
+  AuctionBidPage,
   AuctionConfigureRequest,
   AuctionConfigured,
   AuctionEventMessage,
@@ -25,10 +26,7 @@ export const getCurrentAuction = async (liveId: number) => {
   return data.data
 }
 
-export const configureAuction = async (
-  liveId: number,
-  request: AuctionConfigureRequest,
-) => {
+export const configureAuction = async (liveId: number, request: AuctionConfigureRequest) => {
   const { data } = await http.post<ApiResponse<AuctionConfigured>>(
     `/lives/${liveId}/auctions`,
     request,
@@ -38,35 +36,40 @@ export const configureAuction = async (
 }
 
 export const startAuction = async (auctionId: number) => {
-  const { data } = await http.post<ApiResponse<AuctionSnapshot>>(
-    `/auctions/${auctionId}/start`,
-  )
+  const { data } = await http.post<ApiResponse<AuctionSnapshot>>(`/auctions/${auctionId}/start`)
 
   return unwrapApiData(data, '경매를 시작하지 못했습니다.')
 }
 
 export const placeAuctionBid = async (auctionId: number, amount: number) => {
-  const { data } = await http.post<ApiResponse<AuctionSnapshot>>(
-    `/auctions/${auctionId}/bids`,
-    { amount },
-  )
+  const { data } = await http.post<ApiResponse<AuctionSnapshot>>(`/auctions/${auctionId}/bids`, {
+    amount,
+  })
 
   return unwrapApiData(data, '입찰하지 못했습니다.')
 }
 
+export const getAuctionBids = async (auctionId: number, cursor?: number, size = 20) => {
+  const { data } = await http.get<ApiResponse<AuctionBidPage>>(`/auctions/${auctionId}/bids`, {
+    params: {
+      ...(cursor === undefined ? {} : { cursor }),
+      size,
+    },
+  })
+
+  return unwrapApiData(data, '입찰 내역을 불러오지 못했습니다.')
+}
+
 export const getAuctionWinner = async (auctionId: number) => {
-  const { data } = await http.get<ApiResponse<AuctionWinner>>(
-    `/auctions/${auctionId}/winner`,
-    { skipAuth: true },
-  )
+  const { data } = await http.get<ApiResponse<AuctionWinner>>(`/auctions/${auctionId}/winner`, {
+    skipAuth: true,
+  })
 
   return unwrapApiData(data, '경매 결과를 불러오지 못했습니다.')
 }
 
 export const getBroadcastSummary = async (liveId: number) => {
-  const { data } = await http.get<ApiResponse<BroadcastEndSummary>>(
-    `/lives/${liveId}/summary`,
-  )
+  const { data } = await http.get<ApiResponse<BroadcastEndSummary>>(`/lives/${liveId}/summary`)
 
   return unwrapApiData(data, '방송 결과를 불러오지 못했습니다.')
 }
@@ -89,12 +92,12 @@ export const isAuctionEventMessage = (body: unknown): body is AuctionEventMessag
 
   return Boolean(
     ['AUCTION_STARTED', 'BID_PLACED', 'AUCTION_CLOSED'].includes(String(event.type)) &&
-      snapshot &&
-      typeof snapshot === 'object' &&
-      Number.isInteger(snapshot.auctionId) &&
-      Number.isInteger(snapshot.liveId) &&
-      Number.isInteger(snapshot.productId) &&
-      typeof snapshot.status === 'string',
+    snapshot &&
+    typeof snapshot === 'object' &&
+    Number.isInteger(snapshot.auctionId) &&
+    Number.isInteger(snapshot.liveId) &&
+    Number.isInteger(snapshot.productId) &&
+    typeof snapshot.status === 'string',
   )
 }
 
