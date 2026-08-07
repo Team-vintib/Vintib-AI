@@ -10,14 +10,18 @@ from tryon_flux.prompts import build_dress_prompt, build_regular_dress_prompt, f
 
 
 def test_dress_prompt는_프레이밍_보존_문구를_포함한다():
-    prompt = build_dress_prompt("a black wide-brim nylon bucket hat", "fitting comfortably in a regular fit", False)
+    prompt = build_dress_prompt(
+        "a black wide-brim nylon bucket hat", "fitting comfortably in a regular fit", False
+    )
 
     assert "do not zoom in" in prompt
     assert "framing" in prompt
 
 
 def test_dress_prompt는_하의_색상_유지_문구를_포함한다():
-    prompt = build_dress_prompt("a black wide-brim nylon bucket hat", "fitting comfortably in a regular fit", False)
+    prompt = build_dress_prompt(
+        "a black wide-brim nylon bucket hat", "fitting comfortably in a regular fit", False
+    )
 
     assert "pants" in prompt
     assert "exactly the same color" in prompt
