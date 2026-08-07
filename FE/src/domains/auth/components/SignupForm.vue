@@ -9,9 +9,11 @@ import {
   signUp,
   verifyEmailCode,
 } from '@/domains/auth/api/authApi'
+import googleLogoImage from '@/assets/images/google-logo.png'
 import EmailVerificationField from '@/domains/auth/components/EmailVerificationField.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type { LoginResponse, SignUpResponse } from '@/domains/auth/types/auth.types'
+import { startGoogleOAuth } from '@/domains/auth/utils/googleOAuth'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import type { ApiErrorBody } from '@/shared/types/api.types'
@@ -573,12 +575,12 @@ const buildSignupSession = (
   },
 })
 
-const handleSsafySignUp = async () => {
+const handleGoogleSignup = () => {
   if (isSubmitting.value) {
     return
   }
 
-  await router.push({ name: ROUTE_NAMES.AUTH_SSAFY_SIGNUP })
+  startGoogleOAuth('signup')
 }
 
 const handleMoveToLogin = async () => {
@@ -863,12 +865,13 @@ const applyDuplicateEmailError = (message?: string) => {
       </button>
 
       <button
-        class="h-12 w-full rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-5 text-[var(--font-size-body)] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
+        class="flex h-12 w-full items-center justify-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border-input)] bg-transparent px-5 text-[var(--font-size-body)] font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-surface-secondary)] focus:outline-none"
         type="button"
         :disabled="isSubmitting"
-        @click="handleSsafySignUp"
+        @click="handleGoogleSignup"
       >
-        싸피어스로 가입하기
+        <img class="h-5 w-5 rounded-[var(--radius-control)]" :src="googleLogoImage" alt="" aria-hidden="true" />
+        Google로 가입하기
       </button>
     </section>
   </form>

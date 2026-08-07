@@ -2,49 +2,51 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { completeSsafySsoCallback } from '@/domains/auth/api/authApi'
-import { writeLinkAccountSession } from '@/domains/auth/utils/linkAccountSession'
+import { signInWithGoogle } from '@/domains/auth/api/authApi'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import type { AuthNextStep } from '@/domains/auth/types/auth.types'
+import {
+  clearGoogleOAuthSource,
+  getGoogleOAuthRedirectUri,
+  readGoogleOAuthSource,
+  startGoogleOAuth,
+  type GoogleOAuthSource,
+} from '@/domains/auth/utils/googleOAuth'
+import { writeLinkAccountSession } from '@/domains/auth/utils/linkAccountSession'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
-
-const SSO_SOURCE_STORAGE_KEY = 'vintib_ssafy_sso_source'
-const SSO_SOURCE_LOGIN = 'login'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
 const isProcessing = ref(true)
-const statusTitle = ref('싸피어스 인증 처리 중')
+const statusTitle = ref('Google 인증 처리 중')
 const statusMessage = ref('인증 결과를 확인하고 있습니다.')
 const errorMessage = ref('')
-const ssoSource = ref<'login' | 'signup'>('signup')
+const oauthSource = ref<GoogleOAuthSource>('signup')
 
 onMounted(() => {
   void handleCallback()
 })
 
 const handleCallback = async () => {
-  ssoSource.value = getSsoSource()
+  oauthSource.value = readGoogleOAuthSource()
 
   const error = getQueryValue(route.query.error)
-  const cancelled = getQueryValue(route.query.cancelled)
-  const authorizationCode = getQueryValue(route.query.code)
+  const code = getQueryValue(route.query.code)
 
-  if (cancelled === 'true' || error === 'access_denied') {
-    applyCallbackError('싸피어스 인증이 취소되었습니다.', '다시 인증을 시도할 수 있습니다.')
+  if (error === 'access_denied') {
+    applyCallbackError('Google 인증이 취소되었습니다.', '다시 인증을 시도할 수 있습니다.')
     return
   }
 
   if (error) {
-    applyCallbackError('싸피어스 인증에 실패했습니다.', '인증 제공자의 응답을 다시 확인해 주세요.')
+    applyCallbackError('Google 인증에 실패했습니다.', '인증 제공자의 응답을 다시 확인해 주세요.')
     return
   }
 
-  if (!authorizationCode) {
+  if (!code) {
     applyCallbackError(
       '인증 정보를 확인하지 못했습니다.',
       '잘못된 접근이거나 인증 시간이 만료되었습니다.',
@@ -53,43 +55,56 @@ const handleCallback = async () => {
   }
 
   try {
-    const response = await completeSsafySsoCallback({
-      authorizationCode,
-      redirectUri: `${window.location.origin}${ROUTE_PATHS.AUTH_SSAFY_CALLBACK}`,
-    })
+    const response = await signInWithGoogle({ code, redirectUri: getGoogleOAuthRedirectUri() })
 
-    if (!response.success) {
+    if (!response.success || !response.data) {
       applyCallbackError(
-        '싸피어스 인증을 완료하지 못했습니다.',
+        'Google 인증을 완료하지 못했습니다.',
         response.error?.message || '잠시 후 다시 시도해 주세요.',
       )
       return
     }
 
-    if (!response.data) {
-      applyCallbackError('인증 결과를 확인하지 못했습니다.', '싸피어스 인증을 다시 진행해 주세요.')
+    if (response.data.status === 'LINK_REQUIRED') {
+      if (!response.data.linkToken) {
+        applyCallbackError(
+          '계정 연결 정보를 확인하지 못했습니다.',
+          'Google 인증을 다시 진행해 주세요.',
+        )
+        return
+      }
+
+      writeLinkAccountSession({
+        email: response.data.email || '',
+        linkToken: response.data.linkToken,
+      })
+      await router.replace(ROUTE_PATHS.AUTH_LINK_ACCOUNT)
       return
     }
 
-    if (response.data.nextStep !== 'LINK_ACCOUNT' && !response.data.accessToken) {
-      applyCallbackError(
-        '인증 결과를 확인하지 못했습니다.',
-        '회원가입을 계속할 수 없어 싸피어스 인증을 다시 진행해 주세요.',
-      )
+    if (!response.data.accessToken) {
+      applyCallbackError('인증 결과를 확인하지 못했습니다.', 'Google 인증을 다시 진행해 주세요.')
       return
     }
 
-    if (response.data.accessToken) {
-      authStore.setSession(response.data)
+    authStore.setSession({
+      accessToken: response.data.accessToken,
+      refreshToken: response.data.refreshToken,
+      user: { onboardingCompleted: response.data.onboardingCompleted ?? undefined },
+    })
+    clearGoogleOAuthSource()
+
+    if (response.data.onboardingCompleted === false) {
+      await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
+      return
     }
 
-    window.sessionStorage.removeItem(SSO_SOURCE_STORAGE_KEY)
-    await moveToNextStep(response.data.nextStep, response.data.email, response.data.linkToken)
+    await router.replace(ROUTE_PATHS.HOME)
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
     applyCallbackError(
-      '싸피어스 인증을 완료하지 못했습니다.',
+      'Google 인증을 완료하지 못했습니다.',
       apiError.message || '네트워크 연결을 확인한 뒤 다시 시도해 주세요.',
     )
   }
@@ -102,53 +117,17 @@ const applyCallbackError = (title: string, message: string) => {
   errorMessage.value = message
 }
 
-const moveToNextStep = async (nextStep?: AuthNextStep, email?: string, linkToken?: string) => {
-  if (nextStep === 'LINK_ACCOUNT') {
-    if (!linkToken) {
-      applyCallbackError(
-        '계정 연결 정보를 확인하지 못했습니다.',
-        '싸피어스 인증을 다시 진행해 주세요.',
-      )
-      return
-    }
-
-    writeLinkAccountSession({
-      email: email || '',
-      linkToken,
-    })
-    await router.replace(ROUTE_PATHS.AUTH_LINK_ACCOUNT)
-    return
-  }
-
-  if (nextStep === 'HOME') {
-    await router.replace(ROUTE_PATHS.HOME)
-    return
-  }
-
-  await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
+const retryAuth = () => {
+  startGoogleOAuth(oauthSource.value)
 }
 
-const retryRoute = computed(() => ({
-  name:
-    ssoSource.value === SSO_SOURCE_LOGIN
-      ? ROUTE_NAMES.AUTH_SSAFY_LOGIN
-      : ROUTE_NAMES.AUTH_SSAFY_SIGNUP,
-}))
-
 const fallbackPath = computed(() =>
-  ssoSource.value === SSO_SOURCE_LOGIN ? ROUTE_PATHS.AUTH_LOGIN : ROUTE_PATHS.AUTH_SIGNUP,
+  oauthSource.value === 'login' ? ROUTE_PATHS.AUTH_LOGIN : ROUTE_PATHS.AUTH_SIGNUP,
 )
 
 const fallbackLabel = computed(() =>
-  ssoSource.value === SSO_SOURCE_LOGIN ? '로그인으로 돌아가기' : '회원가입 선택으로 돌아가기',
+  oauthSource.value === 'login' ? '로그인으로 돌아가기' : '회원가입 선택으로 돌아가기',
 )
-
-function getSsoSource() {
-  const source =
-    getQueryValue(route.query.from) || window.sessionStorage.getItem(SSO_SOURCE_STORAGE_KEY)
-
-  return source === SSO_SOURCE_LOGIN ? SSO_SOURCE_LOGIN : 'signup'
-}
 
 function getQueryValue(value: unknown) {
   if (Array.isArray(value)) {
@@ -177,7 +156,9 @@ function getQueryValue(value: unknown) {
       </p>
 
       <div v-if="errorMessage" class="callback-actions">
-        <RouterLink class="callback-primary-link" :to="retryRoute"> 다시 인증하기 </RouterLink>
+        <button type="button" class="callback-primary-link" @click="retryAuth">
+          다시 인증하기
+        </button>
         <a class="callback-secondary-link" :href="fallbackPath">
           {{ fallbackLabel }}
         </a>
@@ -272,8 +253,10 @@ function getQueryValue(value: unknown) {
 }
 
 .callback-primary-link {
+  border: 0;
   background: var(--color-primary);
   color: var(--color-text-inverse);
+  cursor: pointer;
 }
 
 .callback-primary-link:hover {
