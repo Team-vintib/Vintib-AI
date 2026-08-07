@@ -120,7 +120,9 @@ def test_abusive_comment_is_blocked():
 
 def test_spam_is_evaluated_before_abuse():
     # 도배가 먼저 걸리면 분류기까지 가지 않는다(단락 평가) — 같은 욕설을 반복해도 SPAM이다.
-    service = _service()
+    # registry 기본값(-571 후속으로 10까지 올라감)과 무관하게 이 테스트는 근접중복 경로
+    # 자체를 보는 거라 작은 임계로 고정한다.
+    service = _service(spam_detector=SpamDetector(InMemoryStateStore(), duplicate_count=2))
     text = "미친놈아 미친놈아"
     for _ in range(2):
         service.moderate(_request(content=text))
@@ -254,7 +256,9 @@ def test_no_candidate_docs_skips_enqueue_but_moderation_still_completes(monkeypa
 
 def test_mock_scenario_matches_expected_verdicts(monkeypatch, fake_redis):
     monkeypatch.setattr(rag_store, "fetch_documents", lambda *a, **k: [])
-    service = _service()
+    # 이 목업 시나리오의 "도배 3회차" 케이스는 근접중복 2건에서 임계 도달을 전제로 적혀
+    # 있다 — registry 기본값(-571 후속으로 10까지 올라감)과 무관하게 그 임계로 고정한다.
+    service = _service(spam_detector=SpamDetector(InMemoryStateStore(), duplicate_count=2))
     for row in _load_mock_comments():
         request = ModerateRequest(
             live_id=row["live_id"],
@@ -338,5 +342,27 @@ def test_api_404_for_unknown_ticket():
     client = _override(_service())
     try:
         assert client.get("/chat/answers/a_12_ffffff").status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_api_seed_document_saves_as_seed_source(monkeypatch):
+    # STT 없이 반복질문 근거 문서를 채우는 경로(-571, CH024) — 실제 postgres-vector엔 안 붙는다.
+    saved = []
+    monkeypatch.setattr(
+        rag_store,
+        "save_document",
+        lambda live_id, source_type, content, embedding=None: saved.append(
+            (live_id, source_type, content)
+        ),
+    )
+    client = _override(_service())
+    try:
+        resp = client.post(
+            "/chat/lives/12/documents",
+            json={"content": "빈티지 데님 재킷, 브랜드 리바이스, 가격은 89000원입니다."},
+        )
+        assert resp.status_code == 204
+        assert saved == [(12, "seed", "빈티지 데님 재킷, 브랜드 리바이스, 가격은 89000원입니다.")]
     finally:
         app.dependency_overrides.clear()

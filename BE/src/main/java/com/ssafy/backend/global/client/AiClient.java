@@ -6,7 +6,9 @@ import com.ssafy.backend.global.client.dto.ChatAnswer;
 import com.ssafy.backend.global.client.dto.ChatAnswerListResponse;
 import com.ssafy.backend.global.client.dto.ModerateChatRequest;
 import com.ssafy.backend.global.client.dto.ModerateChatResponse;
+import com.ssafy.backend.global.client.dto.QualityInspectionJobRequest;
 import com.ssafy.backend.global.client.dto.RegistrationModelCutJobRequest;
+import com.ssafy.backend.global.client.dto.SeedChatDocumentRequest;
 import com.ssafy.backend.global.client.dto.TryOnJobRequest;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -68,6 +70,16 @@ public class AiClient {
         return response.jobId();
     }
 
+    /** {@code POST /quality/inspections} — 앞/뒤 사진이 갖춰지면 하자 검수 job 생성. */
+    public String createQualityInspectionJob(Long productId, List<String> imageUrls, String category) {
+        AiJobCreatedResponse response = aiRestClient.post()
+                .uri("/quality/inspections")
+                .body(new QualityInspectionJobRequest(productId, imageUrls, category, false))
+                .retrieve()
+                .body(AiJobCreatedResponse.class);
+        return response.jobId();
+    }
+
     /** {@code GET /ai/jobs/{jobId}} — 모든 AI 기능이 공유하는 공통 job 상태 조회. */
     public AiJobResponse getJob(String jobId) {
         return aiRestClient.get()
@@ -99,5 +111,17 @@ public class AiClient {
                 .retrieve()
                 .body(ChatAnswerListResponse.class);
         return response.answers();
+    }
+
+    /**
+     * {@code POST /chat/lives/{liveId}/documents} — STT 없이 반복질문 근거 문서를 채운다
+     * (-571, CH024). 상품이 라이브에 편성될 때 호출한다.
+     */
+    public void seedChatRagDocument(Long liveId, String content) {
+        aiRestClient.post()
+                .uri("/chat/lives/{liveId}/documents", liveId)
+                .body(new SeedChatDocumentRequest(content))
+                .retrieve()
+                .toBodilessEntity();
     }
 }

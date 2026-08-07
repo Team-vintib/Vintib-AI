@@ -6,7 +6,7 @@ from typing import get_args
 
 import aiofiles
 import redis
-from fastapi import APIRouter, File, Header, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Body, File, Header, HTTPException, Query, UploadFile
 
 from app.chat import rag_store
 from app.core.config import settings
@@ -248,7 +248,7 @@ def submit_result(
     job: Job,
     status: str,
     result: dict | None = None,
-    error: str | None = None,
+    error: str | None = Body(default=None),
     worker_id: str | None = None,
     x_api_key: str | None = Header(default=None),
 ):

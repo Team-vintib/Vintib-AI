@@ -189,4 +189,28 @@ FE가 애초에 실시간으로 받아둔 값을 넘기는 것뿐이라 AI 쪽 T
 
 ## 처리 결과
 
-(BE 반영 후 기입)
+**2026-08-07 반영.** 이 문서 §1의 "FE가 `GET /ai/jobs/{job_id}`를 직접 폴링" 방식 대신, **BE가 중개하는
+방식으로 바꿔서 구현했다** — 그 시점의 판단으로 결정.
+
+- 앞/뒤 사진(`ProductImage.sortOrder` 0/1)이 둘 다 등록되면 `ProductImageService.
+  triggerQualityInspectionJob()`이 `POST /quality/inspections`를 호출하고 `Product.
+  qualityInspectionJobId`/`qualityInspectionStatus`에 저장한다(모델컷과 동일한 지연 폴링 패턴).
+- FE는 AI 게이트웨이를 직접 부르지 않고 신규 `GET /products/{id}/quality-inspection`만 폴링한다.
+  BE가 PENDING/PROCESSING일 때 그 호출 시점에 `aiClient.getJob()`으로 대신 조회해 최신화한다
+  (`ProductService.getQualityInspectionStatus()`/`refreshQualityInspectionStatus()`).
+- `result`(`condition_score`/`findings` 등 원본)는 완료 시점에 `Product.qualityInspectionResult`
+  (jsonb)에 캐시한다 — AI 쪽 Redis TTL(1시간) 만료 뒤에도 잃지 않도록. §1의 "BE가 AI를 다시 찌를
+  필요 없다"는 전제가 이걸로 바뀌었다.
+- **`category`는 BE의 세분류 카테고리(`Category.nameEn`, 예: `KNIT`/`TSHIRT`)를 `worker/models/
+  sam3/contracts.GarmentCategory` 6종으로 매핑해서 보낸다**(`ProductImageService.
+  GARMENT_CATEGORY_BY_LEAF_NAME`). 라벨링된 기준 없이 잡은 매핑이라 AI/BE가 함께 재검토할 대상.
+  신발/가방/액세서리/원피스·점프슈트처럼 대응값이 없는 카테고리는 검수를 트리거하지 않는다.
+- `base_color`는 보내지 않는다(AI 기본값 LIGHT 사용) — BE의 `color`는 자유 텍스트라 AI의
+  LIGHT/DARK/PATTERNED로 신뢰성 있게 매핑할 방법이 없었다.
+- **남은 것(FE)**: `findings[]`(snake_case)를 화면 렌더링용 타입(`ProductRegistrationAiFinding`,
+  camelCase)으로 변환하는 매퍼(`productApi.ts`의 `mapQualityInspectionResultToPhotoResults`)는
+  준비해뒀지만, 등록 마법사 UI(`ProductRegistrationPage.vue`)에는 아직 안 붙였다 — 그 화면이 지금
+  front/back **로컬 파일**을 상품 등록 전에 미리 분석하는 목업 흐름(`productAiApi.ts`의
+  `analyzeRegistrationPhotos`)을 쓰고 있어서, 이번에 만든 "상품+이미지가 실제 등록된 뒤"의 실제
+  job과 트리거 시점이 다르다(연동 시점 자체가 다름) — 화면 흐름을 언제 실제 검수로 바꿀지는
+  FE가 결정할 사안이라 그대로 남겨뒀다.
