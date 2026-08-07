@@ -2,15 +2,15 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import {
-  getCurrentAuction,
-  isAuctionEventMessage,
-} from '@/domains/auction/api/auctionApi'
+import { getCurrentAuction, isAuctionEventMessage } from '@/domains/auction/api/auctionApi'
 import LiveAuctionPanel from '@/domains/auction/components/LiveAuctionPanel.vue'
 import LiveAuctionResultOverlay from '@/domains/auction/components/LiveAuctionResultOverlay.vue'
 import LiveAuctionStartOverlay from '@/domains/auction/components/LiveAuctionStartOverlay.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import LiveChatOverlay from '@/domains/chat/components/LiveChatOverlay.vue'
+import { getMyProfile } from '@/domains/my/api/myApi'
+import { createOrder, updateOrderAddress } from '@/domains/order/api/orderApi'
+import PurchaseConfirmDialog from '@/domains/order/components/PurchaseConfirmDialog.vue'
 import { LiveRealtimeClient } from '@/domains/live/api/liveRealtimeClient'
 import {
   cancelLiveReminder,
@@ -19,17 +19,16 @@ import {
   LiveWatchNotFoundError,
   registerLiveReminder,
 } from '@/domains/live/api/liveWatchApi'
+import LiveDirectSalePanel from '@/domains/live/components/LiveDirectSalePanel.vue'
 import LiveProductQueue from '@/domains/live/components/LiveProductQueue.vue'
 import LiveSelectedProduct from '@/domains/live/components/LiveSelectedProduct.vue'
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchHeader from '@/domains/live/components/LiveWatchHeader.vue'
 import LiveWatchState from '@/domains/live/components/LiveWatchState.vue'
-import {
-  addWish,
-  getWishProductIds,
-  removeWish,
-} from '@/domains/product/api/productApi'
+import { addWish, getWishProductIds, removeWish } from '@/domains/product/api/productApi'
 import { useWishStore } from '@/domains/product/stores/wishStore'
+import { getPointBalance } from '@/domains/point/api/pointApi'
+import { dispatchPointBalanceUpdated } from '@/domains/point/utils/pointBalanceEvents'
 import { followUser, getPublicProfile, unfollowUser } from '@/domains/profile/api/profileApi'
 import { useFollowStore } from '@/domains/profile/stores/followStore'
 import LiveTryOnPanel from '@/domains/tryon/components/LiveTryOnPanel.vue'
@@ -39,11 +38,13 @@ import { ROUTE_NAMES } from '@/shared/constants/routes'
 import LiveLayout from '@/shared/layouts/LiveLayout.vue'
 
 import type { AuctionSnapshot } from '@/domains/auction/types/liveAuction.types'
+import type { OrderAddressInput } from '@/domains/order/types/order.types'
 import type {
   CurrentProductMessage,
   LiveStatusMessage,
   LiveWatchLoadState,
   LiveWatchMockScenario,
+  LiveWatchProduct,
   LiveWatchViewData,
 } from '@/domains/live/types/liveWatch.types'
 import type { LiveTryOnMockScenario } from '@/domains/tryon/types/liveTryOn.types'
@@ -66,6 +67,9 @@ const live = ref<LiveWatchViewData | null>(null)
 const loadState = ref<LiveWatchLoadState>('loading')
 const errorMessage = ref('')
 const selectedProductId = ref<number | null>(null)
+// 시청자가 큐에서 직접 상품을 고른 적이 있는지 — 고른 뒤에는 판매자의 소개 상품 전환을 따라가지
+// 않고 시청자의 선택(과 그 상품 기준 구매 패널)을 유지한다.
+const hasViewerSelectedProduct = ref(false)
 const followStore = useFollowStore()
 const isFollowingHost = computed(() =>
   live.value
@@ -75,6 +79,14 @@ const isFollowingHost = computed(() =>
 )
 const pendingWishProductId = ref<number | null>(null)
 const wishMessage = ref('')
+const purchaseProductId = ref<number | null>(null)
+const isPurchaseDialogOpen = ref(false)
+const isPurchaseBalanceLoading = ref(false)
+const isPurchaseSubmitting = ref(false)
+const purchasePointBalance = ref<number | null>(null)
+const purchaseInitialAddress = ref<OrderAddressInput | null>(null)
+const purchaseErrorMessage = ref('')
+const purchaseMessage = ref('')
 const isTryOnOpen = ref(false)
 const now = ref(Date.now())
 const auctionSnapshot = ref<AuctionSnapshot | null>(null)
@@ -155,7 +167,9 @@ let currentProductSubscription: ReturnType<LiveRealtimeClient['subscribe']> | nu
 let auctionSubscription: ReturnType<LiveRealtimeClient['subscribe']> | null = null
 
 const getRouteLiveId = () => {
-  const routeValue = Array.isArray(route.params.liveId) ? route.params.liveId[0] : route.params.liveId
+  const routeValue = Array.isArray(route.params.liveId)
+    ? route.params.liveId[0]
+    : route.params.liveId
   const liveId = Number(routeValue)
 
   return Number.isInteger(liveId) && liveId > 0 ? liveId : null
@@ -170,9 +184,7 @@ const getMockScenario = (): LiveWatchMockScenario => {
 }
 
 const tryOnMockScenario = computed<LiveTryOnMockScenario>(() => {
-  const queryValue = Array.isArray(route.query.tryon)
-    ? route.query.tryon[0]
-    : route.query.tryon
+  const queryValue = Array.isArray(route.query.tryon) ? route.query.tryon[0] : route.query.tryon
 
   return LIVE_TRY_ON_MOCK_SCENARIOS.includes(queryValue as LiveTryOnMockScenario)
     ? (queryValue as LiveTryOnMockScenario)
@@ -183,14 +195,47 @@ const selectedProduct = computed(
   () => live.value?.products.find((product) => product.id === selectedProductId.value) ?? null,
 )
 
+const purchaseProduct = computed(
+  () => live.value?.products.find((product) => product.id === purchaseProductId.value) ?? null,
+)
+
+// saleType이 비어 있어도 saleStatus로 경매 상품을 가려낸다(BE 016 §6-B — DRAFT 상품은 saleType이 null).
+const isAuctionProduct = (product: LiveWatchProduct) =>
+  product.saleType === 'AUCTION' ||
+  product.saleStatus === 'AUCTION_SCHEDULED' ||
+  product.saleStatus === 'AUCTION_IN_PROGRESS'
+
+// 시청자가 지금 보고 있는(큐에서 고른) 상품이 경매 대상인지 — 그 상품의 경매가 걸려 있을 때만
+// 경매 패널을 유지한다. 다른 상품의 경매가 돌고 있어도 정찰제 상품을 고르면 정찰제 패널로 바꾼다.
+const isSelectedProductOnAuction = computed(() => {
+  const snapshot = auctionSnapshot.value
+
+  return Boolean(
+    snapshot &&
+    snapshot.productId === selectedProductId.value &&
+    (snapshot.status === 'RUNNING' || snapshot.status === 'READY'),
+  )
+})
+
+// 패널은 시청자가 고른 상품을 기준으로 가른다. 경매 상품이 아니면 정찰제 구매 패널을 띄우고,
+// saleType이 null로 와도 가격이 붙어 있으면 정찰제로 본다 — 실제 구매 가능 여부는
+// LiveDirectSalePanel이 saleStatus/price로 다시 막는다.
+const isDirectSaleSelected = computed(() => {
+  const product = selectedProduct.value
+
+  if (!product) return false
+  if (isSelectedProductOnAuction.value) return false
+  if (isAuctionProduct(product)) return false
+
+  return product.saleType === 'DIRECT_SALE' || product.price !== null
+})
+
 const isTryOnAvailable = computed(
   () => live.value?.status === 'LIVE' && selectedProduct.value !== null,
 )
 
 const isSelectedProductWished = computed(
-  () =>
-    selectedProductId.value !== null &&
-    wishStore.isProductWished(selectedProductId.value),
+  () => selectedProductId.value !== null && wishStore.isProductWished(selectedProductId.value),
 )
 
 const auctionWin = computed(() => {
@@ -243,6 +288,10 @@ const loadLiveWatch = async () => {
   clearRealtimeSubscriptions()
   live.value = null
   selectedProductId.value = null
+  hasViewerSelectedProduct.value = false
+  purchaseProductId.value = null
+  isPurchaseDialogOpen.value = false
+  purchaseMessage.value = ''
   isTryOnOpen.value = false
   loadState.value = 'loading'
   errorMessage.value = ''
@@ -272,8 +321,7 @@ const loadLiveWatch = async () => {
     }
 
     live.value = response
-    selectedProductId.value =
-      response.currentProductId ?? response.products.at(0)?.id ?? null
+    selectedProductId.value = response.currentProductId ?? response.products.at(0)?.id ?? null
     now.value = Date.now()
     loadState.value = 'success'
     void loadHostFollowState(response.hostId)
@@ -387,11 +435,136 @@ const leaveEndedLive = () => {
   void router.push({ name: ROUTE_NAMES.HOME })
 }
 
+// 시청자가 큐에서 상품을 고르면 그 선택을 기준으로 상세 정보와 구매·경매 패널이 바뀐다.
+const selectQueueProduct = (productId: number) => {
+  hasViewerSelectedProduct.value = true
+  selectedProductId.value = productId
+}
+
 const goToProduct = (productId: number) => {
   void router.push({
     name: ROUTE_NAMES.PRODUCT_DETAIL,
     params: { productId },
   })
+}
+
+const openDirectPurchase = async () => {
+  const currentLive = live.value
+  const product = selectedProduct.value
+
+  if (
+    !currentLive ||
+    !product ||
+    currentLive.isHost ||
+    currentLive.status !== 'LIVE' ||
+    product.saleType !== 'DIRECT_SALE' ||
+    product.saleStatus !== 'ON_SALE' ||
+    product.price === null
+  ) {
+    return
+  }
+
+  if (!authStore.isAuthenticated || !authStore.user) {
+    await router.push({
+      name: ROUTE_NAMES.AUTH_LOGIN,
+      query: { redirect: route.fullPath },
+    })
+    return
+  }
+
+  purchaseProductId.value = product.id
+  purchaseErrorMessage.value = ''
+  purchaseMessage.value = ''
+  isPurchaseDialogOpen.value = true
+  isPurchaseBalanceLoading.value = true
+  purchasePointBalance.value = null
+  purchaseInitialAddress.value = null
+
+  const [balanceResult, profileResult] = await Promise.allSettled([
+    getPointBalance(authStore.user.id),
+    getMyProfile(authStore.user.id),
+  ])
+
+  if (balanceResult.status === 'fulfilled') {
+    purchasePointBalance.value = balanceResult.value.available
+  }
+
+  if (profileResult.status === 'fulfilled' && profileResult.value.address.trim() !== '') {
+    const profile = profileResult.value
+    purchaseInitialAddress.value = {
+      recipientName: profile.name,
+      recipientPhone: profile.phoneNumber,
+      zipcode: profile.postalCode ?? '',
+      address1: profile.address,
+      address2: profile.detailAddress,
+    }
+  }
+
+  isPurchaseBalanceLoading.value = false
+}
+
+const closePurchaseDialog = () => {
+  if (isPurchaseSubmitting.value) return
+
+  isPurchaseDialogOpen.value = false
+  purchaseErrorMessage.value = ''
+}
+
+const refreshPurchasePointBalance = async (userId: number) => {
+  const balance = await getPointBalance(userId).catch(() => null)
+
+  if (balance) {
+    purchasePointBalance.value = balance.available
+    dispatchPointBalanceUpdated({ userId, balance })
+  }
+}
+
+const handlePurchaseSubmit = async (address: OrderAddressInput) => {
+  const currentLive = live.value
+  const product = purchaseProduct.value
+  const userId = authStore.user?.id
+
+  if (
+    !currentLive ||
+    !product ||
+    !userId ||
+    product.saleType !== 'DIRECT_SALE' ||
+    product.saleStatus !== 'ON_SALE'
+  ) {
+    return
+  }
+
+  isPurchaseSubmitting.value = true
+  purchaseErrorMessage.value = ''
+
+  try {
+    const order = await createOrder(product.id, currentLive.id)
+
+    product.saleStatus = 'SOLD'
+    isPurchaseDialogOpen.value = false
+
+    try {
+      await updateOrderAddress(order.orderId, address)
+      purchaseMessage.value = '구매가 완료되었습니다.'
+    } catch {
+      purchaseMessage.value =
+        '구매는 완료됐지만 배송지 등록에 실패했습니다. 구매 내역에서 다시 입력해 주세요.'
+    }
+
+    await refreshPurchasePointBalance(userId)
+  } catch (error) {
+    const apiError = normalizeApiError(error)
+    purchaseErrorMessage.value =
+      apiError.code === 'W001'
+        ? '포인트가 부족합니다. 충전 후 다시 시도해 주세요.'
+        : apiError.message
+
+    if (apiError.code === 'W001') {
+      await refreshPurchasePointBalance(userId)
+    }
+  } finally {
+    isPurchaseSubmitting.value = false
+  }
 }
 
 const loadProductWishState = async (productIds: number[]) => {
@@ -513,7 +686,9 @@ const applyStatusMessage = (message: LiveStatusMessage) => {
   }
 }
 
-// 현재 소개 상품 ID만 갱신 → 상품 큐 NOW 배지가 이동한다. 사용자의 선택은 바꾸지 않는다.
+// 판매자가 소개 상품을 바꾸면 시청자가 아직 아무 상품도 고르지 않은 동안에는 선택도 따라간다
+// — 방송이 소개 중인 상품이 그대로 선택 상품 정보·구매 패널에 뜬다(-430 QA).
+// 시청자가 큐에서 직접 상품을 고른 뒤에는 그 선택을 유지한다(구매 패널도 그 상품 기준).
 const applyCurrentProductMessage = (message: CurrentProductMessage) => {
   if (!live.value || message.liveId !== live.value.id) return
 
@@ -521,22 +696,24 @@ const applyCurrentProductMessage = (message: CurrentProductMessage) => {
     ...live.value,
     currentProductId: message.currentProductId,
   }
+
+  if (!hasViewerSelectedProduct.value && message.currentProductId !== null) {
+    selectedProductId.value = message.currentProductId
+  }
 }
 
 function isLiveStatusMessage(body: unknown): body is LiveStatusMessage {
   return Boolean(
     body &&
-      typeof body === 'object' &&
-      'liveId' in body &&
-      'status' in body &&
-      typeof (body as LiveStatusMessage).status === 'string',
+    typeof body === 'object' &&
+    'liveId' in body &&
+    'status' in body &&
+    typeof (body as LiveStatusMessage).status === 'string',
   )
 }
 
 function isCurrentProductMessage(body: unknown): body is CurrentProductMessage {
-  return Boolean(
-    body && typeof body === 'object' && 'liveId' in body && 'currentProductId' in body,
-  )
+  return Boolean(body && typeof body === 'object' && 'liveId' in body && 'currentProductId' in body)
 }
 
 watch(
@@ -555,6 +732,7 @@ watch(isTryOnAvailable, (isAvailable) => {
 
 watch(selectedProductId, () => {
   wishMessage.value = ''
+  purchaseMessage.value = ''
 })
 
 const elapsedTimer = window.setInterval(() => {
@@ -618,7 +796,7 @@ onBeforeUnmount(() => {
           :products="live.products"
           :current-product-id="live.currentProductId"
           :selected-product-id="selectedProductId"
-          @select="selectedProductId = $event"
+          @select="selectQueueProduct"
         />
 
         <main class="live-watch-page__content">
@@ -682,7 +860,16 @@ onBeforeUnmount(() => {
               @view-product="goToProduct"
               @toggle-wish="toggleWish"
             />
+            <LiveDirectSalePanel
+              v-if="selectedProduct && isDirectSaleSelected"
+              :product="selectedProduct"
+              :live-status="live.status"
+              :is-host="live.isHost"
+              :message="purchaseMessage"
+              @purchase="openDirectPurchase"
+            />
             <LiveAuctionPanel
+              v-else
               :snapshot="auctionSnapshot"
               :live-status="live.status"
               :is-loading="isAuctionLoading"
@@ -694,11 +881,21 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div
-      v-if="showLeaveConfirm"
-      class="live-watch-page__modal-backdrop"
-      @click.self="cancelLeave"
-    >
+    <PurchaseConfirmDialog
+      v-if="isPurchaseDialogOpen && purchaseProduct && purchaseProduct.price !== null"
+      :product-title="purchaseProduct.title"
+      :product-price="purchaseProduct.price"
+      :product-thumbnail-url="purchaseProduct.thumbnailUrl ?? ''"
+      :point-balance="purchasePointBalance"
+      :is-balance-loading="isPurchaseBalanceLoading"
+      :is-submitting="isPurchaseSubmitting"
+      :error-message="purchaseErrorMessage"
+      :initial-address="purchaseInitialAddress"
+      @close="closePurchaseDialog"
+      @submit="handlePurchaseSubmit"
+    />
+
+    <div v-if="showLeaveConfirm" class="live-watch-page__modal-backdrop" @click.self="cancelLeave">
       <div
         class="live-watch-page__modal"
         role="dialog"
@@ -854,12 +1051,7 @@ onBeforeUnmount(() => {
   height: var(--button-height-major);
   border-bottom: 1px solid var(--color-live-border);
   background:
-    linear-gradient(
-      90deg,
-      transparent 20%,
-      rgba(255, 255, 255, 0.06) 40%,
-      transparent 60%
-    ),
+    linear-gradient(90deg, transparent 20%, rgba(255, 255, 255, 0.06) 40%, transparent 60%),
     var(--color-live-surface);
   background-size: 200% 100%;
   animation: live-watch-shimmer 1.6s infinite linear;
@@ -883,12 +1075,7 @@ onBeforeUnmount(() => {
 
 .live-watch-loading__body > main > div {
   background:
-    linear-gradient(
-      105deg,
-      transparent 25%,
-      rgba(255, 255, 255, 0.05) 42%,
-      transparent 58%
-    ),
+    linear-gradient(105deg, transparent 25%, rgba(255, 255, 255, 0.05) 42%, transparent 58%),
     #151918;
   background-size: 200% 100%;
   animation: live-watch-shimmer 1.6s infinite linear;

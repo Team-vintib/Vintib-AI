@@ -5,23 +5,13 @@ export type LiveWatchStatus = LiveBroadcastStatus | 'CANCELED'
 export type LiveWatchLoadState = 'loading' | 'success' | 'error' | 'not-found'
 
 export type LiveWatchMockScenario =
-  | 'default'
-  | 'loading'
-  | 'error'
-  | 'not-found'
-  | 'empty-products'
-  | 'scheduled'
-  | 'ended'
+  'default' | 'loading' | 'error' | 'not-found' | 'empty-products' | 'scheduled' | 'ended'
 
 export type LiveProductSaleType = 'AUCTION' | 'DIRECT_SALE'
 
 // BE SaleStatus (docs/requests/FE/035 §3-1) — 라이브 상품 응답에도 이 값이 실려 온다.
 export type LiveProductSaleStatus =
-  | 'DRAFT'
-  | 'ON_SALE'
-  | 'AUCTION_SCHEDULED'
-  | 'AUCTION_IN_PROGRESS'
-  | 'SOLD'
+  'DRAFT' | 'ON_SALE' | 'AUCTION_SCHEDULED' | 'AUCTION_IN_PROGRESS' | 'SOLD'
 
 export interface LiveWatchProduct {
   id: number
@@ -78,6 +68,9 @@ export interface LiveProductDto {
   saleType?: LiveProductSaleType | null
   saleStatus?: LiveProductSaleStatus | null
   conditionGrade?: string | null
+  material?: string | null
+  measurements?: Record<string, number> | null
+  defectSummary?: string | null
   thumbnailUrl?: string | null
   sortOrder: number
   addedAt: string

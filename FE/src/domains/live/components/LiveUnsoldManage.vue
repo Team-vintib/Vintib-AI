@@ -9,15 +9,24 @@ const props = defineProps<{
   products: LiveUnsoldProduct[]
 }>()
 
+type HandledResult = {
+  productId: number
+  saleType: 'DIRECT_SALE' | 'AUCTION'
+  price: number | null
+}
+
 const emit = defineEmits<{
   back: []
   'to-list': []
+  handled: [result: HandledResult]
 }>()
 
 const handledIds = ref<Set<number>>(new Set())
 
-const onHandled = (productId: number) => {
-  handledIds.value = new Set(handledIds.value).add(productId)
+// 처리 결과는 방송 화면까지 올려 보낸다 — 대시보드의 상품별 결과가 같이 갱신돼야 한다.
+const onHandled = (result: HandledResult) => {
+  handledIds.value = new Set(handledIds.value).add(result.productId)
+  emit('handled', result)
 }
 
 const handledCount = computed(
@@ -35,7 +44,7 @@ const allHandled = computed(
       <button type="button" class="unsold-manage__back" @click="emit('back')">← 대시보드</button>
       <h1 id="unsold-manage-title" class="unsold-manage__title">남은 상품 관리</h1>
       <p class="unsold-manage__desc">
-        유찰 상품을 상시 판매로 전환하거나 경매 예정 상태로 유지하세요.
+        방송에서 팔리지 않은 상품을 상시 판매로 전환하거나 지금 상태로 두세요.
       </p>
       <p class="unsold-manage__progress">{{ handledCount }} / {{ products.length }} 처리됨</p>
     </header>

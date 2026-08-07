@@ -134,12 +134,7 @@ const stageMessage = computed(() => {
       autoplay
       playsinline
     ></video>
-    <img
-      v-if="posterUrl"
-      v-show="!isStreaming"
-      :src="posterUrl"
-      :alt="`${title} 방송 미리보기`"
-    />
+    <img v-if="posterUrl" v-show="!isStreaming" :src="posterUrl" :alt="`${title} 방송 미리보기`" />
     <div v-else v-show="!isStreaming" class="live-video-stage__fallback" aria-hidden="true">
       <svg viewBox="0 0 24 24">
         <path d="m15 10 5-3v10l-5-3v-4Z" />
@@ -171,19 +166,6 @@ const stageMessage = computed(() => {
       </svg>
       {{ reminderActive ? '알림 받는 중' : '시작 알림 받기' }}
     </button>
-
-    <div class="live-video-stage__controls" aria-hidden="true">
-      <span>
-        <svg viewBox="0 0 24 24">
-          <path d="M11 5 6 9H3v6h3l5 4V5ZM15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12" />
-        </svg>
-      </span>
-      <span>
-        <svg viewBox="0 0 24 24">
-          <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" />
-        </svg>
-      </span>
-    </div>
 
     <button
       v-if="showTryOn && !tryOnOpen"
@@ -331,36 +313,6 @@ const stageMessage = computed(() => {
 .live-video-stage__reminder:focus-visible {
   outline: 1px solid var(--color-primary-strong);
   outline-offset: 2px;
-}
-
-.live-video-stage__controls {
-  display: flex;
-  position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
-  align-items: center;
-  gap: var(--space-2);
-  color: rgba(255, 255, 255, 0.88);
-  z-index: var(--z-layer-2);
-}
-
-.live-video-stage__controls > span {
-  display: grid;
-  width: 30px;
-  height: var(--badge-height-lg);
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
-  place-items: center;
-}
-
-.live-video-stage__controls svg {
-  width: 17px;
-  height: 17px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
 }
 
 .live-video-stage__try-on {
