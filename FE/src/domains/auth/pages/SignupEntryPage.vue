@@ -1,7 +1,13 @@
 <script setup lang="ts">
+import googleLogoImage from '@/assets/images/google-logo.png'
 import logoImage from '@/assets/images/logo-white.png'
+import { startGoogleOAuth } from '@/domains/auth/utils/googleOAuth'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
+
+const handleGoogleSignup = () => {
+  startGoogleOAuth('signup')
+}
 </script>
 
 <template>
@@ -34,12 +40,14 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
           이메일로 가입하기
         </RouterLink>
 
-        <RouterLink
-          class="signup-entry-secondary-link"
-          :to="{ name: ROUTE_NAMES.AUTH_SSAFY_SIGNUP }"
+        <button
+          class="signup-entry-secondary-link signup-entry-google"
+          type="button"
+          @click="handleGoogleSignup"
         >
-          싸피어스로 가입하기
-        </RouterLink>
+          <img class="signup-entry-google__icon" :src="googleLogoImage" alt="" aria-hidden="true" />
+          Google로 가입하기
+        </button>
       </section>
 
       <footer class="signup-entry-footer">
@@ -133,6 +141,17 @@ import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 
 .signup-entry-secondary-link:hover {
   background: var(--color-surface-secondary);
+}
+
+.signup-entry-google {
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.signup-entry-google__icon {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-control);
 }
 
 .signup-entry-primary-link:focus-visible,

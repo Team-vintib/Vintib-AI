@@ -39,30 +39,9 @@ export const routes: RouteRecordRaw[] = [
     meta: { guestOnly: true },
   },
   {
-    path: ROUTE_PATHS.AUTH_SSAFY,
-    name: ROUTE_NAMES.AUTH_SSAFY,
-    redirect: (to) => ({
-      name:
-        to.query.from === 'login' ? ROUTE_NAMES.AUTH_SSAFY_LOGIN : ROUTE_NAMES.AUTH_SSAFY_SIGNUP,
-    }),
-    meta: { guestOnly: true },
-  },
-  {
-    path: ROUTE_PATHS.AUTH_SSAFY_LOGIN,
-    name: ROUTE_NAMES.AUTH_SSAFY_LOGIN,
-    component: () => import('@/domains/auth/pages/SsafyLoginPage.vue'),
-    meta: { guestOnly: true },
-  },
-  {
-    path: ROUTE_PATHS.AUTH_SSAFY_SIGNUP,
-    name: ROUTE_NAMES.AUTH_SSAFY_SIGNUP,
-    component: () => import('@/domains/auth/pages/SsafySignupPage.vue'),
-    meta: { guestOnly: true },
-  },
-  {
-    path: ROUTE_PATHS.AUTH_SSAFY_CALLBACK,
-    name: ROUTE_NAMES.AUTH_SSAFY_CALLBACK,
-    component: () => import('@/domains/auth/pages/SsafySsoCallbackPage.vue'),
+    path: ROUTE_PATHS.AUTH_GOOGLE_CALLBACK,
+    name: ROUTE_NAMES.AUTH_GOOGLE_CALLBACK,
+    component: () => import('@/domains/auth/pages/GoogleSsoCallbackPage.vue'),
   },
   {
     path: ROUTE_PATHS.AUTH_LINK_ACCOUNT,
