@@ -15,7 +15,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 // 데모/테스트용 고정 계정 시드. 이메일이 이미 존재하면 건너뛰어
-// 재기동·재배포(ddl-auto: create) 시에도 중복 삽입 없이 항상 로그인 가능한 상태를 유지한다.
+// 재기동·재배포 시에도 중복 삽입 없이 항상 로그인 가능한 상태를 유지한다.
+// (운영이 ddl-auto: update 라 데이터가 살아남는다 — 이 멱등성이 실제로 필요하다.)
 // ProductSeeder(@Order(2))가 이 시드에 의존하므로 @Order(1)로 먼저 실행되게 한다.
 @Slf4j
 @Component
