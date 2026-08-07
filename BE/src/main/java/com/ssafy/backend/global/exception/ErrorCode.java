@@ -118,6 +118,7 @@ public enum ErrorCode {
     CATEGORY_NOT_FOUND(HttpStatus.BAD_REQUEST, "P008", "존재하지 않는 카테고리입니다."),
     BRAND_NOT_FOUND(HttpStatus.BAD_REQUEST, "P009", "존재하지 않는 브랜드입니다."),
     AI_MODEL_GENDER_REQUIRED(HttpStatus.BAD_REQUEST, "P010", "AI 착용컷을 사용하려면 모델 성별을 지정해야 합니다."),
+    PRODUCT_CLASSIFY_JOB_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "P011", "AI 분류 요청에 실패했습니다. 잠시 후 다시 시도해주세요."),
 
     // [소셜(팔로우/찜)]
     WISH_ALREADY_EXISTS(HttpStatus.CONFLICT, "S001", "이미 찜한 상품입니다."),
