@@ -340,3 +340,25 @@ def test_api_404_for_unknown_ticket():
         assert client.get("/chat/answers/a_12_ffffff").status_code == 404
     finally:
         app.dependency_overrides.clear()
+
+
+def test_api_seed_document_saves_as_seed_source(monkeypatch):
+    # STT 없이 반복질문 근거 문서를 채우는 경로(-571, CH024) — 실제 postgres-vector엔 안 붙는다.
+    saved = []
+    monkeypatch.setattr(
+        rag_store,
+        "save_document",
+        lambda live_id, source_type, content, embedding=None: saved.append(
+            (live_id, source_type, content)
+        ),
+    )
+    client = _override(_service())
+    try:
+        resp = client.post(
+            "/chat/lives/12/documents",
+            json={"content": "빈티지 데님 재킷, 브랜드 리바이스, 가격은 89000원입니다."},
+        )
+        assert resp.status_code == 204
+        assert saved == [(12, "seed", "빈티지 데님 재킷, 브랜드 리바이스, 가격은 89000원입니다.")]
+    finally:
+        app.dependency_overrides.clear()
