@@ -10,15 +10,17 @@
 
 ```bash
 python product_classifier_worker_example.py  # 기본값: 둘 다 mock
-PRODUCT_CLASSIFIER_CATEGORY_BACKEND=mock PRODUCT_CLASSIFIER_COLOR_BACKEND=mock \\
-    python product_classifier_worker_example.py
+PRODUCT_CLASSIFIER_CATEGORY_BACKEND=clip_finetuned PRODUCT_CLASSIFIER_COLOR_BACKEND=clip_finetuned \\
+    python product_classifier_worker_example.py  # 실백엔드(파인튜닝된 CLIP)로 돌리려면
 ```
 
-**실백엔드가 아직 없다.** 카테고리(CLIP 파인튜닝)·색상(방식 미정)은
-`AI/validation/CLASS/product-info-check/`에서 검증이 끝난 뒤
-`worker/models/product_classifier/registry.py`에 추가된다(2026-08-02 판단 — 검증 안 된 걸
-프로덕션에 먼저 심지 않는다). 그 전까지 이 워커는 mock 결과만 반환한다(`score=0.0`,
-`action="none"` — 폼에 아무것도 자동 채워지지 않는다).
+**실백엔드(`clip_finetuned`)가 `registry.py`에 등록돼 있지만 커밋된 기본값은 여전히
+`mock`이다** — 위 명령처럼 환경변수로 켜야 실제로 분류가 돈다. 꺼둔 채로 실행하면 이 워커는
+mock 결과만 반환한다(`score=0.0`, `action="none"` — 폼에 아무것도 자동 채워지지 않는다).
+**전처리 미연결**: 체크포인트가 AI-Hub 정답 polygon으로 배경을 제거한 크롭(`variant="masked"`)
+으로 학습됐는데, 이 워커는 `download_image()`가 받아온 원본 사진을 크롭/마스킹 없이 그대로
+분류기에 넣는다 — 하자검수(`quality_check`)의 SAM3 크롭을 재사용하도록 연결하는 작업은 아직
+안 됐다(별도 설계 필요, 보류 중).
 
 **실패 격리**: 카테고리·색상은 서로 독립적으로 실패할 수 있다 — 하나가 실패해도 다른 필드는
 채워서 `success`로 반환한다. **둘 다 실패하면 예외를 그대로 올려 job을 `failed`로 만든다**
