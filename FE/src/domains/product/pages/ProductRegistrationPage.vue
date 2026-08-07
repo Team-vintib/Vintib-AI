@@ -4,19 +4,23 @@ import { useRouter } from 'vue-router'
 
 import {
   createDraftProduct,
+  createProductPreUploadUrl,
   getBrands,
   getCategories,
   getCategoryCode,
   getProductAiModelCutStatus,
+  getProductClassifyStatus,
   getProductQualityInspectionStatus,
+  mapClassifyResultToSuggestions,
   mapQualityInspectionResultToPhotoResults,
+  triggerProductClassify,
   uploadProductImages,
+  uploadToPreUploadUrl,
   type BrandDto,
   type CategoryDto,
   type ProductAiModelCutStatusDto,
 } from '@/domains/product/api/productApi'
 import {
-  analyzeRegistrationPhotos,
   estimateRegistrationPrice,
   type ProductAiPriceEstimate,
   type ProductRegistrationPriceGrade,
@@ -93,6 +97,10 @@ const isQualityCategoryUnsupported = ref(false)
 const QUALITY_INSPECTION_POLL_INTERVAL_MS = 5_000
 const QUALITY_INSPECTION_POLL_TIMEOUT_MS = 600_000
 let qualityInspectionPollToken = 0
+// 카테고리/색상 자동 분류(사전업로드, docs/requests/FE/042) 폴링 상태.
+const CLASSIFY_POLL_INTERVAL_MS = 3_000
+const CLASSIFY_POLL_TIMEOUT_MS = 120_000
+let classifyPollToken = 0
 const isSubmittingRegistration = ref(false)
 const registrationSubmitError = ref('')
 const isCompletenessPromptOpen = ref(false)
@@ -1010,6 +1018,9 @@ const resetAiAnalysis = () => {
   draft.aiColorSuggestion = null
   currentAiResultIndex.value = 0
   isQualityCategoryUnsupported.value = false
+  // 사진이 없어져 트리거 요건이 깨졌으면, 아직 도는 분류 폴링이 있어도 그 결과를 더는
+  // 반영하지 않는다(토큰 불일치로 무시됨).
+  classifyPollToken += 1
 }
 
 // AI가 채운 값을 사용자가 이미 직접 고른 뒤라면 덮어쓰지 않는다.
@@ -1044,10 +1055,11 @@ const applyAiColorSuggestion = (color: { colorId: string } | null) => {
   draft.color = color.colorId
 }
 
-// front/back 사진이 모두 갖춰지면(또는 다시 바뀌면) 카테고리/색상 자동 제안만 mock으로
-// 채운다 — 실제 판별 AI(docs/requests/AI/006)가 아직 워커 mock 스텁이라 참고용일 뿐이다.
-// 품질 검증 자체는 더 이상 이 함수가 채우지 않는다 — '상태/하자' 스텝 진입 시 실 job으로
-// 대체됐다(SY043, beginQualityInspection 참고).
+// front/back 사진이 모두 갖춰지면(또는 다시 바뀌면) front 사진 1장을 사전업로드해 카테고리/색상
+// 자동 분류 job을 돌린다(docs/requests/FE/042-product-classify-preupload-integration.md).
+// 상품이 아직 생성되기 전이라 SY043의 draft 상품과는 별개 — 완전 무상태 API라 jobId는 FE가
+// 직접 들고 폴링한다(BE에 저장 안 됨). 품질 검증은 이 함수와 무관 — '상태/하자' 스텝 진입 시
+// 실 job으로 대체됐다(SY043, beginQualityInspection 참고).
 const triggerAiCategoryColorSuggestion = async () => {
   const frontPhoto = frontPhotos.value[0]
   const backPhoto = backPhotos.value[0]
@@ -1058,15 +1070,54 @@ const triggerAiCategoryColorSuggestion = async () => {
     return
   }
 
-  try {
-    const result = await analyzeRegistrationPhotos(frontPhoto.file, backPhoto.file)
+  const token = ++classifyPollToken
+  const frontFile = frontPhoto.file
 
-    applyAiCategorySuggestion(result.category)
-    applyAiColorSuggestion(result.color)
+  try {
+    const upload = await createProductPreUploadUrl(frontFile)
+    await uploadToPreUploadUrl(upload.uploadUrl, frontFile)
+    if (token !== classifyPollToken) return
+
+    const jobId = await triggerProductClassify(upload.key)
+    if (token !== classifyPollToken) return
+
+    await pollProductClassify(jobId, token)
   } catch (error) {
-    console.error('[ProductRegistrationPage] 카테고리/색상 자동 제안 실패', error)
+    if (token !== classifyPollToken) return
+
+    console.error('[ProductRegistrationPage] 카테고리/색상 자동 분류 실패', error)
     draft.aiCategorySuggestion = null
     draft.aiColorSuggestion = null
+  }
+}
+
+const pollProductClassify = async (jobId: string, token: number) => {
+  const deadline = Date.now() + CLASSIFY_POLL_TIMEOUT_MS
+
+  while (Date.now() < deadline) {
+    if (token !== classifyPollToken) return
+
+    try {
+      const status = await getProductClassifyStatus(jobId)
+      if (token !== classifyPollToken) return
+
+      if (status.status === 'COMPLETED' && status.result) {
+        const { category, color } = mapClassifyResultToSuggestions(status.result)
+        applyAiCategorySuggestion(category)
+        applyAiColorSuggestion(color)
+        return
+      }
+
+      if (status.status === 'FAILED') {
+        draft.aiCategorySuggestion = null
+        draft.aiColorSuggestion = null
+        return
+      }
+    } catch {
+      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도.
+    }
+
+    await sleep(CLASSIFY_POLL_INTERVAL_MS)
   }
 }
 
@@ -1457,6 +1508,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   aiModelCutPollToken += 1
+  classifyPollToken += 1
   draft.photos.forEach((photo) => {
     revokePhotoPreviewUrl(photo)
   })
