@@ -19,6 +19,7 @@ import com.ssafy.backend.live.entity.LiveStatus;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -70,7 +71,11 @@ class ChatAnswerPollingSchedulerTest {
         when(liveRepository.findByStatusOrderByStartedAtDesc(eq(LiveStatus.LIVE), any(Pageable.class)))
                 .thenReturn(List.of(liveWithId(liveId)));
         when(chatMessageService.lastAiAnswerCursor(liveId)).thenReturn(STARTED_AT);
-        ChatAnswer answer = new ChatAnswer("ticket-1", "프리사이즈인가요?", "네, 프리사이즈입니다.", STARTED_AT.plusMinutes(1));
+        ChatAnswer answer = new ChatAnswer(
+                "ticket-1",
+                "프리사이즈인가요?",
+                "네, 프리사이즈입니다.",
+                STARTED_AT.plusMinutes(1).atZone(ZoneId.systemDefault()).toInstant());
         when(aiClient.getLiveAnswers(liveId, STARTED_AT)).thenReturn(List.of(answer));
         ChatMessageResponse response = new ChatMessageResponse(
                 100L, null, null, null, SenderType.AI, "네, 프리사이즈입니다.", STARTED_AT.plusMinutes(1), null);
