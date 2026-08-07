@@ -36,10 +36,18 @@
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
 | 002 | `002-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
-| 003 | `003-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 필드(필수+선택 전부: brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId/hostProfileImageUrl/description/material/measurements/defectSummary) 연결 완료 | AI 시착 생성만 남음(서윤/AI 파트) |
 | 019 | `019-product-quality-multi-image.md` | Product | 미반영 | 서윤 파트 |
-| 020 | `020-tryon-result-category.md` | TryOn | 미반영 | 서윤/AI 파트 |
-| 025 | `025-product-same-price-chart.md` | Product | 미반영 | 서윤 파트 |
+| 020 | `020-tryon-result-category.md` | TryOn | 미반영(순수 BE, AI 무관) | 서윤 파트 |
+| 025 | `025-product-same-price-chart.md` | Product | 미반영 — 계획 `SY042` 검토 중 | 서윤 파트 |
+| 030 | `030-order-settled-at-field.md` | Order | 미반영 | 서윤 파트 |
+| 041 | `041-quality-inspection-integration.md` | Product | 미반영 | 서윤 파트 |
+| 041 | `041-refund-notification-dashboard.md` | Refund/Notification | 미반영 | 서윤 파트 |
+| 042 | `042-product-registration-ai-pipeline.md` | Product | 미반영 — 사전 업로드(B안) 방향 확정, 계획 미작성 | 서윤 파트 |
+| 043 | `043-registration-price-chart-source.md` | Product | 미반영, 우선순위 낮음(044로 대체 가능) | 서윤 파트 |
+| 044 | `044-pricing-estimate-trigger.md` | Product | 미반영 | 서윤 파트 |
+
+`003`(Live/TryOn)·`038`·`039`·`040`(전부 TryOn)은 코드 전수 대조 결과 이미 반영 완료돼 삭제했다
+— 상세는 위 "2026-08-07 시착(TRYON) 관련 요청 4건 정리" 참고.
 
 **정윤(라이브·경매·채팅·홈·검색) 담당 요청은 전부 반영돼 이 표에 남은 것이 없다.** 위 목록은
 모두 서윤·AI 파트다.
@@ -225,6 +233,31 @@
   이 엔드포인트를 그대로 쓰거나 자체 규칙으로 갈 필요가 없어졌다 — 통합 방식(BE가 AI 엔드포인트를
   호출/캐시할지, AI가 결과를 직접 BE로 push할지)은 별도 논의.
 - FE `getSimilarProducts`(mock)를 실제로 붙일 대상이 필요해지면 그때 새 요청 문서로 정리한다.
+
+## 2026-08-07 시착(TRYON) 관련 요청 4건 정리 — 전부 이미 코드로 반영돼 있었다
+
+요청 문서 자체엔 "미해결"로 적혀 있었지만, 실제 코드(`TryOnController`, `TryOnResultService`,
+`TryOnResult` 엔티티, `AiClient`, `ProductController`/`ProductImageService`)를 전수 대조해보니
+넷 다 이미 구현이 끝나 있어 삭제했다.
+
+- `003-live-tryon-contract.md`(§3.3/3.6 AI 시착 생성) — `POST /api/users/{userId}/tryons?
+  productId=`(`TryOnController.createResult`)가 라이브·상품상세 두 화면 모두를 커버한다.
+  FE가 제안한 `POST /api/products/{productId}/tryons`/`POST /api/lives/{liveId}/products/
+  {productId}/tryons` 경로 대신 기존 컨벤션(`/users/{userId}/tryons`)으로 반영됐다 — 이
+  문서에서 이미 여러 번 반복된 "이름/모양은 다르지만 반영됨" 패턴 그대로다. 라이브 컨텍스트
+  전용 제약은 없어 같은 엔드포인트를 그대로 쓸 수 있다.
+- `040-tryon-job-contract.md`(AI 시착 job 계약) — `TryOnResultService.createResult`/`getResult`가
+  `AiClient.createTryOnJob`으로 job을 생성하고 `image_url`/`fit_title`/`fit_description`을
+  그대로 저장한다.
+- `038-tryon-fit-summary-fields.md`(`fit_title`/`fit_description`) — `TryOnResult.complete()`,
+  `TryOnResultResponse.fitTitle`/`fitDescription`까지 전부 반영.
+- `039-registration-ai-model-tryon.md`(등록 시 AI 착용컷) — `Product.aiModelEnabled`/
+  `aiModelGender`(등록 시 검증 포함), `ProductImageService.triggerAiModelCutJob`,
+  `GET /api/products/{id}/ai-model-cut`(`ProductController.getAiModelCutStatus`)까지 요청한
+  3개 항목 전부 구현 완료.
+
+남은 시착 관련 요청은 `020-tryon-result-category.md`(목록 응답에 카테고리 필드, 순수 BE
+작업, 미착수)뿐이다 — 이것만 표에 남긴다.
 
 ## 2026-08-07 상품 목록 관련 정리
 
