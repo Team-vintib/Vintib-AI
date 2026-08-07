@@ -224,6 +224,16 @@ class ChatModerationService:
         """`chat_rag` job 결과가 근거 부족(`grounded=false`)일 때 대기 상태만 해제한다."""
         self._pending.discard(ticket)
 
+    # -- 근거 문서 seed(-571, CH024) ----------------------------------------
+    def seed_document(self, live_id: int, content: str) -> None:
+        """STT 없이 반복질문 근거 문서를 채운다 — BE가 상품 편성 시점에 호출한다.
+
+        STT 워커와 달리 임베딩을 미리 계산하지 않는다(게이트웨이엔 torch가 없다) — `chat_rag`
+        워커가 어차피 검색 시점에 `doc["content"]`를 직접 재임베딩하므로 지금 당장은 필요
+        없다(`rag_store.py` 모듈 docstring 참고).
+        """
+        rag_store.save_document(live_id, source_type="seed", content=content)
+
     # -- 답변 조회 --------------------------------------------------------
     def list_answers(self, live_id: int, since: datetime | None = None) -> AnswerListResponse:
         return AnswerListResponse(

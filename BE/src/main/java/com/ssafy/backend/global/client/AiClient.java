@@ -7,6 +7,7 @@ import com.ssafy.backend.global.client.dto.ChatAnswerListResponse;
 import com.ssafy.backend.global.client.dto.ModerateChatRequest;
 import com.ssafy.backend.global.client.dto.ModerateChatResponse;
 import com.ssafy.backend.global.client.dto.RegistrationModelCutJobRequest;
+import com.ssafy.backend.global.client.dto.SeedChatDocumentRequest;
 import com.ssafy.backend.global.client.dto.TryOnJobRequest;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -99,5 +100,17 @@ public class AiClient {
                 .retrieve()
                 .body(ChatAnswerListResponse.class);
         return response.answers();
+    }
+
+    /**
+     * {@code POST /chat/lives/{liveId}/documents} — STT 없이 반복질문 근거 문서를 채운다
+     * (-571, CH024). 상품이 라이브에 편성될 때 호출한다.
+     */
+    public void seedChatRagDocument(Long liveId, String content) {
+        aiRestClient.post()
+                .uri("/chat/lives/{liveId}/documents", liveId)
+                .body(new SeedChatDocumentRequest(content))
+                .retrieve()
+                .toBodilessEntity();
     }
 }
