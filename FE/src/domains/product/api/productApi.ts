@@ -159,6 +159,21 @@ interface ProductCreateResponse extends Partial<ProductListDto> {
   productId?: number | string | null
 }
 
+// PATCH /products/{id}(부분 수정)이 실제로 받는 필드 — BE의 ProductUpdateRequest.java 그대로.
+// aiModelEnabled/aiModelGender/aiQualityFindings는 이 엔드포인트에 없다(docs/requests/BE/046 참고).
+interface ProductUpdateRequest {
+  title: string
+  description: string
+  categoryId: number | null
+  brandId: number | null
+  conditionGrade: ProductConditionGrade | ''
+  sizeLabel: string
+  color: string | null
+  material: string | null
+  measurements: Record<string, number> | null
+  defects: string[] | null
+}
+
 interface ProductImageUploadUrlResponse {
   key: string
   uploadUrl: string
@@ -498,10 +513,12 @@ export const getWishProductIds = async (userId: number) => {
   return productIds
 }
 
-export const submitProduct = async (
+// AI 품질 검증(SY043)이 '상태/하자' 스텝 진입 시 미리 만들어두는 DRAFT 상품 생성 호출.
+// submitProduct의 신규 분기와 로직을 공유한다 — 상품 생성 시점만 앞당겨졌을 뿐 필드는 동일하다.
+export const createDraftProduct = async (
   draft: ProductRegistrationDraft,
   { brands = [], categories = [] }: ProductSubmitOptions = {},
-): Promise<ProductRegistrationSubmitResult> => {
+): Promise<number> => {
   const createResponse = await http.post<ApiResponse<ProductCreateResponse>>('/products', {
     title: draft.name.trim(),
     description: draft.description.trim(),
@@ -517,14 +534,45 @@ export const submitProduct = async (
     aiModelGender: draft.aiModelEnabled ? draft.aiModelGender : null,
     aiQualityFindings: resolveRegistrationAiQualityFindings(draft),
   } satisfies ProductCreateRequest)
-  const createdProduct = unwrapApiData(createResponse.data)
-  const createdProductId = getCreatedProductId(createdProduct)
 
-  await publishProduct(createdProductId, draft)
-  await uploadProductImages(createdProductId, draft.photos)
+  return getCreatedProductId(unwrapApiData(createResponse.data))
+}
+
+export const submitProduct = async (
+  draft: ProductRegistrationDraft,
+  options: ProductSubmitOptions = {},
+): Promise<ProductRegistrationSubmitResult> => {
+  let productId: number
+
+  if (draft.draftProductId) {
+    // SY043: '상태/하자' 스텝 진입 시 이미 DRAFT 상품+이미지가 만들어져 있다 — 나머지
+    // 필드만 부분 수정하고 이미지는 재업로드하지 않는다. PATCH가 aiModelEnabled/aiModelGender를
+    // 안 받지만, 이 값들은 '기본 정보' 스텝을 나갈 때 이미 확정돼 draft 생성 시점에
+    // 실려 갔으므로 다시 보낼 필요가 없다(docs/requests/BE/046 참고).
+    productId = draft.draftProductId
+    const { brands = [], categories = [] } = options
+
+    await http.patch<ApiResponse<ProductCreateResponse>>(`/products/${productId}`, {
+      title: draft.name.trim(),
+      description: draft.description.trim(),
+      categoryId: findCategoryId(draft, categories),
+      brandId: findBrandId(draft.brand, brands),
+      conditionGrade: draft.conditionGrade,
+      sizeLabel: draft.size,
+      color: resolveRegistrationColor(draft),
+      material: draft.material.trim() || null,
+      measurements: resolveRegistrationMeasurements(draft),
+      defects: resolveRegistrationDefects(draft),
+    } satisfies ProductUpdateRequest)
+  } else {
+    productId = await createDraftProduct(draft, options)
+    await uploadProductImages(productId, draft.photos)
+  }
+
+  await publishProduct(productId, draft)
 
   return {
-    productId: String(createdProductId),
+    productId: String(productId),
     submittedAt: new Date().toISOString(),
   }
 }
@@ -552,7 +600,10 @@ const getCreatedProductId = (product: ProductCreateResponse) => {
   return productId
 }
 
-const uploadProductImages = async (productId: number, photos: ProductRegistrationPhotoDraft[]) => {
+export const uploadProductImages = async (
+  productId: number,
+  photos: ProductRegistrationPhotoDraft[],
+) => {
   const orderedPhotos = [...photos].sort((left, right) => {
     if (left.isRepresentative !== right.isRepresentative) {
       return left.isRepresentative ? -1 : 1
