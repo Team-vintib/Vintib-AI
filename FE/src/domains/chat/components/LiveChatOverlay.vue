@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import {
+  type BackendChatBlockedNotice,
   type BackendChatMessage,
   type BackendReaction,
   type BackendReactionType,
@@ -167,6 +168,15 @@ const subscribeRealtime = () => {
   })
 
   realtimeClient.subscribe('/user/queue/errors', (body) => {
+    // AI 판정(HIDE/BLOCK)으로 브로드캐스트가 생략된 내 메시지는, 브로드캐스트로 오는 "진짜
+    // 메시지 치환" 신호를 영영 못 받는다 — 낙관적 렌더로 먼저 그려둔 말풍선이 내 화면에만
+    // 유령처럼 계속 남아있던 문제(실측으로 확인, -571 후속)를 여기서 지워서 해소한다.
+    if (isBackendChatBlockedNotice(body)) {
+      messages.value = messages.value.filter((message) => message.id !== body.clientMessageId)
+      errorMessage.value = '메시지가 차단되었습니다.'
+      return
+    }
+
     // 반응을 너무 빠르게 눌렀을 때(L011)는 사용자에게 표시하지 않고 조용히 무시한다.
     if (isSuppressedRealtimeError(body)) return
     errorMessage.value = getRealtimeErrorMessage(body)
@@ -347,6 +357,16 @@ function isBackendViewerCount(body: unknown): body is BackendViewerCount {
       typeof body === 'object' &&
       'viewerCount' in body &&
       typeof (body as BackendViewerCount).viewerCount === 'number',
+  )
+}
+
+function isBackendChatBlockedNotice(body: unknown): body is BackendChatBlockedNotice {
+  return Boolean(
+    body &&
+      typeof body === 'object' &&
+      'clientMessageId' in body &&
+      typeof (body as BackendChatBlockedNotice).clientMessageId === 'string' &&
+      !('error' in body),
   )
 }
 
