@@ -88,7 +88,19 @@ def test_taxonomy_version_defaults_before_enqueue(client, fake_redis):
     client.post("/product-classifier/classify", json=_payload())
 
     payload = json.loads(fake_redis.pushed[0][1])["payload"]
-    assert payload["taxonomy_version"] == "v1"
+    assert payload["taxonomy_version"] == "v2-be-seed-2026-08-03"
+
+
+def test_product_id_is_optional_for_pre_upload_trigger(client, fake_redis):
+    """상품 생성 전 사전업로드 단계(방향 B)는 아직 진짜 상품 id가 없다 — 생략해도 접수돼야 한다."""
+    payload = {"image_url": "https://example.test/front.jpg"}
+
+    response = client.post("/product-classifier/classify", json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["product_id"] is None
+    assert body["job_id"]
 
 
 def test_job_status_is_seeded_as_queued(client, fake_redis):
