@@ -134,6 +134,15 @@ class InspectionRequest(BaseModel):
             "description은 계속 None"
         ),
     )
+    include_annotated_images: bool = Field(
+        default=False,
+        description=(
+            "넘버링 bbox 오버레이 PNG(annotated_images) 생성 여부. 기본 off — FE가 좌표"
+            "(finding.bbox)로 직접 그리는 쪽으로 정해져 정적 이미지를 안 쓰게 됐다(CH007 당시엔"
+            " 기본 산출물이었으나 2026-08-08 옵트인으로 전환). 이미지마다 PNG 생성·업로드가"
+            " 추가돼 켜면 응답이 느려진다"
+        ),
+    )
 
 
 # --- 접수 응답 --------------------------------------------------------------

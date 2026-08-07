@@ -152,13 +152,15 @@ class QualityCheckWorker(BaseWorker):
                 results, extracted.kept_instances_by_image, extracted.findings, upload_image
             )
 
-        # 넘버링 bbox 이미지(CH007)는 attention_maps와 달리 옵션이 아니다 — FE/BE에 넘길
-        # 기본 산출물로 취급해 항상 만든다(플래그 없음, CH007 미결정 사항 참고).
-        annotated_images = build_annotated_images(results, extracted.findings, upload_image)
+        # 넘버링 bbox 이미지(CH007)는 2026-08-08부터 옵트인이다 — FE가 finding.bbox 좌표로
+        # 직접 그리는 쪽으로 정해져(하자 제외 토글 시 정적 PNG는 재생성이 안 돼 못 씀) 기본
+        # 산출물일 필요가 없어졌다. include_attention_maps와 같은 방식.
+        annotated_images = []
+        if payload.get("include_annotated_images"):
+            annotated_images = build_annotated_images(results, extracted.findings, upload_image)
 
         # 하자 한 줄 설명(sVLM, CH011) — 지연시간이 커서(finding당 수 초, 이미지당 수십 건
-        # 가능) include_attention_maps와 같은 방식의 옵트인 플래그로 뒀다. bbox 오버레이
-        # (필수 산출물)가 VLM 실패로 절대 막히면 안 되므로 그 뒤에 둔다.
+        # 가능) include_attention_maps와 같은 방식의 옵트인 플래그로 뒀다.
         findings = extracted.findings
         if payload.get("include_descriptions"):
             self._ensure_vlm_loaded()

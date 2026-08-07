@@ -96,6 +96,7 @@ def test_payload_carries_everything_the_worker_needs(client, fake_redis):
         "base_color",
         "include_attention_maps",
         "include_descriptions",
+        "include_annotated_images",
     }
     # enum이 객체가 아니라 문자열로 직렬화돼야 워커가 그대로 파싱한다.
     assert payload["category"] == "TOP_KNIT"
