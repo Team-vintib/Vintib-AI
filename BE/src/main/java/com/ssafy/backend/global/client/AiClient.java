@@ -6,6 +6,7 @@ import com.ssafy.backend.global.client.dto.ChatAnswer;
 import com.ssafy.backend.global.client.dto.ChatAnswerListResponse;
 import com.ssafy.backend.global.client.dto.ModerateChatRequest;
 import com.ssafy.backend.global.client.dto.ModerateChatResponse;
+import com.ssafy.backend.global.client.dto.QualityInspectionJobRequest;
 import com.ssafy.backend.global.client.dto.RegistrationModelCutJobRequest;
 import com.ssafy.backend.global.client.dto.SeedChatDocumentRequest;
 import com.ssafy.backend.global.client.dto.TryOnJobRequest;
@@ -64,6 +65,16 @@ public class AiClient {
         AiJobCreatedResponse response = aiRestClient.post()
                 .uri("/ai/tryon/registration-model-cut")
                 .body(new RegistrationModelCutJobRequest(productImageUrl, gender, maskType))
+                .retrieve()
+                .body(AiJobCreatedResponse.class);
+        return response.jobId();
+    }
+
+    /** {@code POST /quality/inspections} — 앞/뒤 사진이 갖춰지면 하자 검수 job 생성. */
+    public String createQualityInspectionJob(Long productId, List<String> imageUrls, String category) {
+        AiJobCreatedResponse response = aiRestClient.post()
+                .uri("/quality/inspections")
+                .body(new QualityInspectionJobRequest(productId, imageUrls, category, false))
                 .retrieve()
                 .body(AiJobCreatedResponse.class);
         return response.jobId();
