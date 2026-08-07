@@ -6,6 +6,7 @@ import com.ssafy.backend.global.client.dto.ChatAnswer;
 import com.ssafy.backend.global.client.dto.ChatAnswerListResponse;
 import com.ssafy.backend.global.client.dto.ModerateChatRequest;
 import com.ssafy.backend.global.client.dto.ModerateChatResponse;
+import com.ssafy.backend.global.client.dto.ProductClassifyJobRequest;
 import com.ssafy.backend.global.client.dto.QualityInspectionJobRequest;
 import com.ssafy.backend.global.client.dto.RegistrationModelCutJobRequest;
 import com.ssafy.backend.global.client.dto.SeedChatDocumentRequest;
@@ -75,6 +76,20 @@ public class AiClient {
         AiJobCreatedResponse response = aiRestClient.post()
                 .uri("/quality/inspections")
                 .body(new QualityInspectionJobRequest(productId, imageUrls, category, false))
+                .retrieve()
+                .body(AiJobCreatedResponse.class);
+        return response.jobId();
+    }
+
+    /**
+     * {@code POST /product-classifier/classify} — 상품 생성 전 사진 1장으로 카테고리·색상 분류
+     * job 생성(`docs/requests/BE/045-classify-pre-upload-integration.md`). 아직 상품이 없는
+     * 시점에 호출하므로 {@code product_id}는 보내지 않는다.
+     */
+    public String createClassifyJob(String imageUrl) {
+        AiJobCreatedResponse response = aiRestClient.post()
+                .uri("/product-classifier/classify")
+                .body(new ProductClassifyJobRequest(imageUrl))
                 .retrieve()
                 .body(AiJobCreatedResponse.class);
         return response.jobId();
