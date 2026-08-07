@@ -84,4 +84,13 @@ public class BusinessInfo {
         this.submittedAt = LocalDateTime.now();
         this.verifiedAt = null;
     }
+
+    /**
+     * 관리자 승인. 관리자 승인 API가 아직 없어(클래스 설명 참고) 지금은 시드 데이터 전용으로만
+     * 호출된다 — 실제 승인 플로우가 생기면 그 서비스가 이 메서드를 그대로 재사용하면 된다.
+     */
+    public void approve() {
+        this.verificationStatus = BusinessVerificationStatus.APPROVED;
+        this.verifiedAt = LocalDateTime.now();
+    }
 }
