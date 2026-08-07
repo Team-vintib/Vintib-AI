@@ -14,6 +14,7 @@ import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.notification.port.NotificationCommandPort;
 import com.ssafy.backend.order.dto.request.OrderCreateRequest;
 import com.ssafy.backend.order.dto.request.OrderRole;
 import com.ssafy.backend.order.dto.request.OrderShipmentAddressRequest;
@@ -72,6 +73,9 @@ class OrderServiceTest {
     private DeliveryTrackingClient deliveryTrackingClient;
 
     @Mock
+    private NotificationCommandPort notificationCommandPort;
+
+    @Mock
     private Order order;
 
     @Mock
@@ -89,7 +93,7 @@ class OrderServiceTest {
     void setUp() {
         orderService = new OrderService(
                 orderRepository, orderShipmentRepository, productRepository, memberRepository, liveRepository,
-                pointService, deliveryTrackingClient);
+                pointService, deliveryTrackingClient, notificationCommandPort);
     }
 
     private Product realDirectSaleProduct() {
@@ -199,6 +203,8 @@ class OrderServiceTest {
         assertThat(response.status()).isEqualTo("PAID");
         assertThat(realProduct.getSaleStatus().name()).isEqualTo("SOLD");
         verify(pointService).pay(eq(BUYER_ID), eq(50_000L), any());
+        verify(notificationCommandPort).notify(
+                eq(seller), eq("ORDER_PAID"), any(), any(), eq("ORDER"), any());
     }
 
     @Test
@@ -249,6 +255,10 @@ class OrderServiceTest {
         assertThat(response.courierCode()).isEqualTo(CourierCode.CJ);
         assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.SHIPPING);
         assertThat(realOrder.getAutoConfirmAt()).isNull();
+        verify(notificationCommandPort).notify(
+                eq(buyer), eq("SHIPMENT_STARTED"), any(), any(), eq("ORDER"), any());
+        verify(notificationCommandPort, org.mockito.Mockito.never()).notify(
+                eq(buyer), eq("SHIPMENT_COMPLETED"), any(), any(), any(), any());
     }
 
     @Test
@@ -265,6 +275,10 @@ class OrderServiceTest {
 
         assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
         assertThat(realOrder.getAutoConfirmAt()).isAfter(LocalDateTime.now().plusDays(2));
+        verify(notificationCommandPort).notify(
+                eq(buyer), eq("SHIPMENT_STARTED"), any(), any(), eq("ORDER"), any());
+        verify(notificationCommandPort).notify(
+                eq(buyer), eq("SHIPMENT_COMPLETED"), any(), any(), eq("ORDER"), any());
     }
 
     @Test
@@ -308,6 +322,8 @@ class OrderServiceTest {
         assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
         assertThat(shipment.getDeliveredAt()).isNotNull();
         assertThat(shipment.getTrackingStatus()).isEqualTo(TrackingStatus.DELIVERED);
+        verify(notificationCommandPort).notify(
+                eq(buyer), eq("SHIPMENT_COMPLETED"), any(), any(), eq("ORDER"), any());
     }
 
     @Test

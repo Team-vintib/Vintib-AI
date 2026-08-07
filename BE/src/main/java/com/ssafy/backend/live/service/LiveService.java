@@ -15,7 +15,7 @@ import com.ssafy.backend.live.dto.response.LiveListItemResponse;
 import com.ssafy.backend.live.dto.response.LiveResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveStatus;
-import com.ssafy.backend.live.port.NotificationCommandPort;
+import com.ssafy.backend.notification.port.NotificationCommandPort;
 import com.ssafy.backend.live.port.ProductQueryPort.CategorySummary;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;

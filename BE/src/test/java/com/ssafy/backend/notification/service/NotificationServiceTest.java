@@ -15,8 +15,11 @@ import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.notification.dto.response.NotificationItemResponse;
 import com.ssafy.backend.notification.dto.response.NotificationReadAllResponse;
 import com.ssafy.backend.notification.dto.response.NotificationResponse;
+import com.ssafy.backend.notification.dto.response.NotificationUnreadCountResponse;
 import com.ssafy.backend.notification.entity.Notification;
+import com.ssafy.backend.notification.entity.NotificationCategory;
 import com.ssafy.backend.notification.repository.NotificationRepository;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,7 +111,7 @@ class NotificationServiceTest {
                 .thenReturn(new PageImpl<>(List.of(notification), requested, 1));
 
         PageResponse<NotificationItemResponse> response =
-                notificationService.getNotifications(MEMBER_ID, false, requested);
+                notificationService.getNotifications(MEMBER_ID, false, null, requested);
 
         assertThat(response.content()).hasSize(1);
         assertThat(response.content().get(0).id()).isEqualTo(NOTIFICATION_ID);
@@ -126,7 +129,7 @@ class NotificationServiceTest {
         when(notificationRepository.findByMember_IdAndReadFalse(eq(MEMBER_ID), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(notification), requested, 1));
 
-        notificationService.getNotifications(MEMBER_ID, true, requested);
+        notificationService.getNotifications(MEMBER_ID, true, null, requested);
 
         verify(notificationRepository).findByMember_IdAndReadFalse(eq(MEMBER_ID), any(Pageable.class));
         verify(notificationRepository, never()).findByMember_Id(eq(MEMBER_ID), any(Pageable.class));
@@ -139,7 +142,7 @@ class NotificationServiceTest {
                 .thenReturn(new PageImpl<>(List.of(), requested, 0));
 
         PageResponse<NotificationItemResponse> response =
-                notificationService.getNotifications(MEMBER_ID, false, requested);
+                notificationService.getNotifications(MEMBER_ID, false, null, requested);
 
         assertThat(response.content()).isEmpty();
     }
@@ -148,7 +151,7 @@ class NotificationServiceTest {
     void 읽지_않은_알림이_있으면_전부_읽음_처리하고_처리_건수를_반환한다() {
         when(notificationRepository.markAllAsReadByMemberId(MEMBER_ID)).thenReturn(3);
 
-        NotificationReadAllResponse response = notificationService.markAllAsRead(MEMBER_ID);
+        NotificationReadAllResponse response = notificationService.markAllAsRead(MEMBER_ID, null);
 
         assertThat(response.updatedCount()).isEqualTo(3);
         verify(notificationRepository).markAllAsReadByMemberId(MEMBER_ID);
@@ -158,8 +161,85 @@ class NotificationServiceTest {
     void 이미_모두_읽은_상태면_0건을_반환한다() {
         when(notificationRepository.markAllAsReadByMemberId(MEMBER_ID)).thenReturn(0);
 
-        NotificationReadAllResponse response = notificationService.markAllAsRead(MEMBER_ID);
+        NotificationReadAllResponse response = notificationService.markAllAsRead(MEMBER_ID, null);
 
         assertThat(response.updatedCount()).isEqualTo(0);
+    }
+
+    @Test
+    void category가_LIVE이면_LIVE_계열_type만_IN_조건으로_조회한다() {
+        Pageable requested = PageRequest.of(0, 20);
+        when(notificationRepository.findByMember_IdAndTypeIn(eq(MEMBER_ID), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(notification), requested, 1));
+
+        notificationService.getNotifications(MEMBER_ID, false, NotificationCategory.LIVE, requested);
+
+        ArgumentCaptor<Collection<String>> typesCaptor = ArgumentCaptor.forClass(Collection.class);
+        verify(notificationRepository)
+                .findByMember_IdAndTypeIn(eq(MEMBER_ID), typesCaptor.capture(), any(Pageable.class));
+        assertThat(typesCaptor.getValue()).containsExactlyInAnyOrder("LIVE_REMINDER", "LIVE_STARTED");
+    }
+
+    @Test
+    void category가_TRADE이면_나머지_카테고리_type을_NOT_IN_조건으로_조회한다() {
+        Pageable requested = PageRequest.of(0, 20);
+        when(notificationRepository.findByMember_IdAndTypeNotIn(eq(MEMBER_ID), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), requested, 0));
+
+        notificationService.getNotifications(MEMBER_ID, false, NotificationCategory.TRADE, requested);
+
+        verify(notificationRepository)
+                .findByMember_IdAndTypeNotIn(
+                        eq(MEMBER_ID), eq(NotificationCategory.excludedTypesForCatchAll()), any(Pageable.class));
+    }
+
+    @Test
+    void category가_POINT이면_POINT_type만_읽음_처리한다() {
+        when(notificationRepository.markAllAsReadByMemberIdAndTypeIn(eq(MEMBER_ID), any())).thenReturn(2);
+
+        NotificationReadAllResponse response =
+                notificationService.markAllAsRead(MEMBER_ID, NotificationCategory.POINT);
+
+        assertThat(response.updatedCount()).isEqualTo(2);
+        verify(notificationRepository)
+                .markAllAsReadByMemberIdAndTypeIn(eq(MEMBER_ID), eq(NotificationCategory.POINT.types()));
+        verify(notificationRepository, never()).markAllAsReadByMemberId(any());
+    }
+
+    @Test
+    void category가_없으면_전체_안읽음_수를_반환한다() {
+        when(notificationRepository.countByMember_IdAndReadFalse(MEMBER_ID)).thenReturn(4L);
+
+        NotificationUnreadCountResponse response = notificationService.getUnreadCount(MEMBER_ID, null);
+
+        assertThat(response.unreadCount()).isEqualTo(4L);
+        verify(notificationRepository, never()).countByMember_IdAndReadFalseAndTypeIn(any(), any());
+        verify(notificationRepository, never()).countByMember_IdAndReadFalseAndTypeNotIn(any(), any());
+    }
+
+    @Test
+    void category가_SHIPPING이면_SHIPPING_type만_IN_조건으로_안읽음_수를_센다() {
+        when(notificationRepository.countByMember_IdAndReadFalseAndTypeIn(eq(MEMBER_ID), any())).thenReturn(1L);
+
+        NotificationUnreadCountResponse response =
+                notificationService.getUnreadCount(MEMBER_ID, NotificationCategory.SHIPPING);
+
+        assertThat(response.unreadCount()).isEqualTo(1L);
+        verify(notificationRepository)
+                .countByMember_IdAndReadFalseAndTypeIn(eq(MEMBER_ID), eq(NotificationCategory.SHIPPING.types()));
+    }
+
+    @Test
+    void category가_TRADE이면_나머지_카테고리_type을_제외하고_안읽음_수를_센다() {
+        when(notificationRepository.countByMember_IdAndReadFalseAndTypeNotIn(eq(MEMBER_ID), any()))
+                .thenReturn(0L);
+
+        NotificationUnreadCountResponse response =
+                notificationService.getUnreadCount(MEMBER_ID, NotificationCategory.TRADE);
+
+        assertThat(response.unreadCount()).isEqualTo(0L);
+        verify(notificationRepository)
+                .countByMember_IdAndReadFalseAndTypeNotIn(
+                        eq(MEMBER_ID), eq(NotificationCategory.excludedTypesForCatchAll()));
     }
 }
