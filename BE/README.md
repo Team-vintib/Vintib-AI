@@ -208,8 +208,9 @@ BE/
 │   │   ├── repository/           # RefundRequestRepository
 │   │   └── dto/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
-│       ├── client/              # AiClient(Spring → FastAPI), DeliveryTrackingClient(deliveryapi.co.kr 배송 조회 웹훅), TossPaymentsClient(결제위젯 승인)
-│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig, SchedulingConfig, DeliveryApiConfig, TossPaymentsConfig
+│       ├── client/              # AiClient(Spring → FastAPI), DeliveryTrackingClient(deliveryapi.co.kr 배송 조회 웹훅), TossPaymentsClient(결제위젯 승인), GoogleOAuthClient(구글 로그인)
+│       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig, SchedulingConfig, DeliveryApiConfig, TossPaymentsConfig, GoogleOAuthConfig
+│       ├── delivery/            # DeliveryWebhookSetupController(웹훅 엔드포인트 등록, 수동 트리거 전용)
 │       ├── entity/              # BaseTimeEntity 등 공통 베이스 엔티티
 │       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
 │       ├── health/              # HealthController

@@ -24,6 +24,7 @@ import com.ssafy.backend.order.entity.CourierCode;
 import com.ssafy.backend.order.entity.Order;
 import com.ssafy.backend.order.entity.OrderShipment;
 import com.ssafy.backend.order.entity.OrderStatus;
+import com.ssafy.backend.order.entity.TrackingStatus;
 import com.ssafy.backend.order.repository.OrderRepository;
 import com.ssafy.backend.order.repository.OrderShipmentRepository;
 import com.ssafy.backend.point.service.PointService;
@@ -302,10 +303,11 @@ class OrderServiceTest {
         when(orderShipmentRepository.findByCourierAndTrackingNumber(CourierCode.CJ, "123456789012"))
                 .thenReturn(Optional.of(shipment));
 
-        orderService.markShipmentDelivered(CourierCode.CJ, "123456789012");
+        orderService.updateShipmentTracking(CourierCode.CJ, "123456789012", TrackingStatus.DELIVERED);
 
         assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
         assertThat(shipment.getDeliveredAt()).isNotNull();
+        assertThat(shipment.getTrackingStatus()).isEqualTo(TrackingStatus.DELIVERED);
     }
 
     @Test
@@ -317,9 +319,24 @@ class OrderServiceTest {
         when(orderShipmentRepository.findByCourierAndTrackingNumber(CourierCode.CJ, "123456789012"))
                 .thenReturn(Optional.of(shipment));
 
-        orderService.markShipmentDelivered(CourierCode.CJ, "123456789012");
+        orderService.updateShipmentTracking(CourierCode.CJ, "123456789012", TrackingStatus.DELIVERED);
 
         assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
+    }
+
+    @Test
+    void 중간_배송상태_웹훅은_진행상태만_갱신하고_주문을_확정하지_않는다() {
+        Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
+        realOrder.markShipping();
+        OrderShipment shipment = newShipmentFor(realOrder);
+        when(orderShipmentRepository.findByCourierAndTrackingNumber(CourierCode.CJ, "123456789012"))
+                .thenReturn(Optional.of(shipment));
+
+        orderService.updateShipmentTracking(CourierCode.CJ, "123456789012", TrackingStatus.IN_TRANSIT);
+
+        assertThat(shipment.getTrackingStatus()).isEqualTo(TrackingStatus.IN_TRANSIT);
+        assertThat(shipment.getDeliveredAt()).isNull();
+        assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.SHIPPING);
     }
 
     @Test
