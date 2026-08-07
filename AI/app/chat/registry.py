@@ -80,10 +80,14 @@ STATE_STORE_BACKENDS: dict[str, str] = {
 ACTIVE_STATE_STORE = "memory"  # <- 여기 키만 바꾸면 스왑
 
 # --- 판정 임계치 (모델과 무관한 규칙 파라미터) -----------------------------
+# "10초에 10개"로 조정(-571 후속) — 기존 4개는 반복질문 테스트하려고 같은 문구를 빠르게
+# 3번만 보내도(근접중복 2개 이상) 도배로 막혀서 테스트 자체가 안 됐다.
 SPAM_WINDOW_SECONDS = 10.0  # 슬라이딩 윈도우 길이
-SPAM_MAX_MESSAGES = 4  # 윈도우 내 이 개수 이상이면 도배
+SPAM_MAX_MESSAGES = 10  # 윈도우 내 이 개수 이상이면 도배
 SPAM_SIMILARITY = 0.85  # 근접중복 판정 하한(SequenceMatcher ratio)
-SPAM_DUPLICATE_COUNT = 2  # 윈도우 내 근접중복이 이 개수 이상이면 도배
+SPAM_DUPLICATE_COUNT = (
+    10  # 윈도우 내 근접중복이 이 개수 이상이면 도배 — 위와 같은 이유로 동일하게 맞춤
+)
 ABUSE_THRESHOLD = 0.5  # 악성 판정 하한
 
 MIN_CLUSTER_SIZE = 2  # 같은 질문이 이 횟수 이상 들어와야 답변 생성
