@@ -1,7 +1,7 @@
 package com.ssafy.backend.chat.controller;
 
 import com.ssafy.backend.chat.dto.request.ChatSendRequest;
-import com.ssafy.backend.chat.dto.response.ChatMessageBlockedNotice;
+import com.ssafy.backend.chat.dto.response.ChatSendOutcome;
 import com.ssafy.backend.chat.service.ChatMessageService;
 import com.ssafy.backend.global.websocket.StompPrincipal;
 import java.security.Principal;
@@ -42,18 +42,18 @@ public class ChatStompController {
         Long senderId = memberIdOf(principal);
 
         // 저장이 커밋된 뒤에 나간다 — send()의 트랜잭션이 이 시점에 이미 끝나 있다.
-        // 커밋 전에 쏘면 롤백 시 유령 메시지가 모든 시청자 화면에 남는다. AI가 HIDE/BLOCK을
-        // 권고한 메시지는 빈 Optional로 와서 브로드캐스트를 건너뛴다(-571). 이때 발신자에게는
-        // 따로 알려야 한다 — 안 그러면 낙관적 렌더로 이미 그려둔 말풍선이 "진짜 메시지로
-        // 치환" 신호를 영영 못 받아 발신자 화면에만 유령처럼 남는다(실측으로 확인, -571 후속).
-        chatMessageService.send(senderId, liveId, request.content(), request.clientMessageId())
-                .ifPresentOrElse(
-                        response -> messagingTemplate.convertAndSend(
-                                "/topic/lives/" + liveId + "/chat", response),
-                        () -> messagingTemplate.convertAndSendToUser(
-                                String.valueOf(senderId),
-                                "/queue/errors",
-                                new ChatMessageBlockedNotice(request.clientMessageId())));
+        // 커밋 전에 쏘면 롤백 시 유령 메시지가 모든 시청자 화면에 남는다. AI가 HIDE/BLOCK/
+        // TIMED_OUT을 권고한 메시지는 브로드캐스트를 건너뛴다(-571). 이때 발신자에게는 따로
+        // 알려야 한다 — 안 그러면 낙관적 렌더로 이미 그려둔 말풍선이 "진짜 메시지로 치환"
+        // 신호를 영영 못 받아 발신자 화면에만 유령처럼 남는다(실측으로 확인, -571 후속).
+        ChatSendOutcome outcome =
+                chatMessageService.send(senderId, liveId, request.content(), request.clientMessageId());
+        if (outcome.isBlocked()) {
+            messagingTemplate.convertAndSendToUser(
+                    String.valueOf(senderId), "/queue/errors", outcome.blockedNotice());
+        } else {
+            messagingTemplate.convertAndSend("/topic/lives/" + liveId + "/chat", outcome.broadcastMessage());
+        }
     }
 
     /** 토큰 없이 붙은 세션은 principal 이 없다 — 그것이 곧 비회원이다. */

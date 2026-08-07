@@ -4,9 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.chat.dto.response.ChatMessageResponse;
+import com.ssafy.backend.chat.dto.response.ChatSendOutcome;
 import com.ssafy.backend.chat.entity.ChatMessage;
 import com.ssafy.backend.chat.entity.SenderType;
 import com.ssafy.backend.chat.repository.ChatMessageRepository;
@@ -17,7 +21,9 @@ import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -35,6 +41,7 @@ class ChatMessageServiceTest {
 
     private static final Long LIVE_ID = 1L;
     private static final Long SENDER_ID = 2L;
+    private static final Long HOST_ID = 3L;
     private static final LocalDateTime STARTED_AT = LocalDateTime.of(2026, 8, 7, 20, 0);
 
     @Mock
@@ -49,13 +56,24 @@ class ChatMessageServiceTest {
     @Mock
     private AiClient aiClient;
 
+    @Mock
+    private HostChatRagSeeder hostChatRagSeeder;
+
     private ChatMessageService chatMessageService;
 
     private Live live() {
         Member host = Member.builder().email("host@example.com").password("encoded").name("호스트").build();
+        ReflectionTestUtils.setField(host, "id", HOST_ID);
         Live live = Live.openNow(host, "빈티지 데님 라이브", null, null, STARTED_AT);
         ReflectionTestUtils.setField(live, "id", LIVE_ID);
         return live;
+    }
+
+    private Member hostMember() {
+        Member member =
+                Member.builder().email("host@example.com").password("encoded").name("호스트").build();
+        ReflectionTestUtils.setField(member, "id", HOST_ID);
+        return member;
     }
 
     private Member viewer() {
@@ -68,7 +86,8 @@ class ChatMessageServiceTest {
 
     private void setUpChatMessageService() {
         chatMessageService =
-                new ChatMessageService(chatMessageRepository, liveRepository, memberRepository, aiClient);
+                new ChatMessageService(
+                        chatMessageRepository, liveRepository, memberRepository, aiClient, hostChatRagSeeder);
     }
 
     private void stubSaveReturnsArgumentWithId(Long messageId) {
@@ -89,11 +108,57 @@ class ChatMessageServiceTest {
         when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
                 .thenReturn(new ModerateChatResponse("NORMAL", "PASS", "clean"));
 
-        Optional<ChatMessageResponse> result =
-                chatMessageService.send(SENDER_ID, LIVE_ID, "사이즈 M 맞나요?", "tmp-1");
+        ChatSendOutcome result = chatMessageService.send(SENDER_ID, LIVE_ID, "사이즈 M 맞나요?", "tmp-1");
 
-        assertThat(result).isPresent();
-        assertThat(result.get().content()).isEqualTo("사이즈 M 맞나요?");
+        assertThat(result.isBlocked()).isFalse();
+        assertThat(result.broadcastMessage().content()).isEqualTo("사이즈 M 맞나요?");
+    }
+
+    @Test
+    void 시청자가_채팅해도_RAG_문서로_seed되지_않는다() {
+        setUpChatMessageService();
+        Live live = live();
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        when(memberRepository.findById(SENDER_ID)).thenReturn(Optional.of(viewer()));
+        stubSaveReturnsArgumentWithId(13L);
+        when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
+                .thenReturn(new ModerateChatResponse("NORMAL", "PASS", "clean"));
+
+        chatMessageService.send(SENDER_ID, LIVE_ID, "사이즈 M 맞나요?", "tmp-viewer");
+
+        verify(hostChatRagSeeder, never()).seed(any(), any());
+    }
+
+    @Test
+    void 호스트가_채팅하면_RAG_문서로_seed된다() {
+        // 실측치·네고 가능 여부처럼 상품 DB에 없는 정보를 판매자가 채팅으로 알려줄 때가
+        // 있다(CH026) — STT가 아직 없어 이 텍스트라도 근거로 쌓는다.
+        setUpChatMessageService();
+        Live live = live();
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        when(memberRepository.findById(HOST_ID)).thenReturn(Optional.of(hostMember()));
+        stubSaveReturnsArgumentWithId(14L);
+        when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
+                .thenReturn(new ModerateChatResponse("NORMAL", "PASS", "clean"));
+
+        chatMessageService.send(HOST_ID, LIVE_ID, "실측 어깨너비 50입니다", "tmp-host");
+
+        verify(hostChatRagSeeder).seed(eq(LIVE_ID), eq("실측 어깨너비 50입니다"));
+    }
+
+    @Test
+    void 호스트_채팅이_차단되면_RAG_문서로_seed되지_않는다() {
+        setUpChatMessageService();
+        Live live = live();
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        when(memberRepository.findById(HOST_ID)).thenReturn(Optional.of(hostMember()));
+        stubSaveReturnsArgumentWithId(15L);
+        when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
+                .thenReturn(new ModerateChatResponse("ABUSIVE", "BLOCK", "abuse:term"));
+
+        chatMessageService.send(HOST_ID, LIVE_ID, "욕설성 발언", "tmp-host-blocked");
+
+        verify(hostChatRagSeeder, never()).seed(any(), any());
     }
 
     @Test
@@ -106,10 +171,27 @@ class ChatMessageServiceTest {
         when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
                 .thenReturn(new ModerateChatResponse("ABUSIVE", "BLOCK", "abuse:term"));
 
-        Optional<ChatMessageResponse> result =
-                chatMessageService.send(SENDER_ID, LIVE_ID, "욕설성 발언", "tmp-2");
+        ChatSendOutcome result = chatMessageService.send(SENDER_ID, LIVE_ID, "욕설성 발언", "tmp-2");
 
-        assertThat(result).isEmpty();
+        assertThat(result.isBlocked()).isTrue();
+        assertThat(result.blockedNotice().clientMessageId()).isEqualTo("tmp-2");
+        assertThat(result.blockedNotice().muteRemainingSeconds()).isNull();
+    }
+
+    @Test
+    void TIMED_OUT_판정이면_음소거_잔여시간과_함께_차단된다() {
+        setUpChatMessageService();
+        Live live = live();
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        when(memberRepository.findById(SENDER_ID)).thenReturn(Optional.of(viewer()));
+        stubSaveReturnsArgumentWithId(13L);
+        when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
+                .thenReturn(new ModerateChatResponse("TIMED_OUT", "BLOCK", "user_timed_out", 15.0));
+
+        ChatSendOutcome result = chatMessageService.send(SENDER_ID, LIVE_ID, "아무 메시지", "tmp-mute");
+
+        assertThat(result.isBlocked()).isTrue();
+        assertThat(result.blockedNotice().muteRemainingSeconds()).isEqualTo(15.0);
     }
 
     @Test
@@ -122,10 +204,9 @@ class ChatMessageServiceTest {
         when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
                 .thenThrow(new RestClientException("connection refused"));
 
-        Optional<ChatMessageResponse> result =
-                chatMessageService.send(SENDER_ID, LIVE_ID, "안녕하세요", "tmp-3");
+        ChatSendOutcome result = chatMessageService.send(SENDER_ID, LIVE_ID, "안녕하세요", "tmp-3");
 
-        assertThat(result).isPresent();
+        assertThat(result.isBlocked()).isFalse();
     }
 
     @Test
@@ -158,7 +239,7 @@ class ChatMessageServiceTest {
         setUpChatMessageService();
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live()));
         stubSaveReturnsArgumentWithId(20L);
-        LocalDateTime answeredAt = STARTED_AT.plusMinutes(3);
+        Instant answeredAt = Instant.parse("2026-08-07T05:26:00Z");
         List<ChatAnswer> answers = List.of(
                 new ChatAnswer("ticket-1", "프리사이즈인가요?", "네, 프리사이즈입니다.", answeredAt));
 
@@ -167,5 +248,23 @@ class ChatMessageServiceTest {
         assertThat(saved).hasSize(1);
         assertThat(saved.get(0).content()).isEqualTo("네, 프리사이즈입니다.");
         assertThat(saved.get(0).senderType()).isEqualTo(SenderType.AI);
+    }
+
+    @Test
+    void AI_답변_시각은_이_서버_타임존으로_변환돼_저장된다() {
+        // AI가 보내는 created_at은 UTC 절대 시각(Instant)이다. 이걸 그대로 LocalDateTime
+        // 숫자로 읽어버리면(과거 버그) 이 서버(KST) 기준 다른 시각들과 9시간 어긋나서, 다음
+        // 폴링 커서가 꼬여 같은 답변이 계속 재조회·중복 저장됐다(실측으로 발견, -571 후속).
+        setUpChatMessageService();
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live()));
+        stubSaveReturnsArgumentWithId(21L);
+        Instant answeredAt = Instant.parse("2026-08-07T05:26:00Z");
+        List<ChatAnswer> answers = List.of(
+                new ChatAnswer("ticket-1", "프리사이즈인가요?", "네, 프리사이즈입니다.", answeredAt));
+
+        List<ChatMessageResponse> saved = chatMessageService.saveAiAnswers(LIVE_ID, answers);
+
+        assertThat(saved.get(0).createdAt())
+                .isEqualTo(LocalDateTime.ofInstant(answeredAt, ZoneId.systemDefault()));
     }
 }

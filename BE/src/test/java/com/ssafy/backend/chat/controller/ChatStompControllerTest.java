@@ -259,4 +259,21 @@ class ChatStompControllerTest {
         assertThat(chatMessageRepository.count()).isEqualTo(before + 1);
         assertThat(broadcast.isDone()).isFalse();
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void AI가_음소거를_권고하면_남은_시간과_함께_알림이_간다() throws Exception {
+        // 반복 위반으로 방송 내 임시 음소거된 경우(CH025) — 단순 차단과 달리 잔여 시간이 함께 온다.
+        given(aiClient.moderateChatMessage(any(), any(), any(), any(), any()))
+                .willReturn(new ModerateChatResponse("TIMED_OUT", "BLOCK", "user_timed_out", 15.0));
+
+        StompSession sender = connect(viewerToken);
+        CompletableFuture<Map<String, Object>> notice = subscribe(sender, "/user/queue/errors");
+
+        sender.send("/app/lives/" + liveId + "/chat", chatPayload("아무 메시지", "tmp-7"));
+
+        Map<String, Object> received = notice.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        assertThat(received.get("clientMessageId")).isEqualTo("tmp-7");
+        assertThat(((Number) received.get("muteRemainingSeconds")).doubleValue()).isEqualTo(15.0);
+    }
 }

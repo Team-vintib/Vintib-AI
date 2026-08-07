@@ -90,6 +90,21 @@ def save_document(
         return row.id
 
 
+def delete_for_live(live_id: int) -> int:
+    """이 방송의 문서를 전부 지우고 지운 개수를 돌려준다.
+
+    방송이 끝나면 그 라이브로는 더 이상 채팅을 못 쳐서(BE가 `INVALID_LIVE_STATE`로 막음)
+    반복질문 자체가 다시 트리거될 일이 없다 — seed 문서가 그 시점부터 영구히 안 쓰이므로
+    방송 종료 훅(BE `LiveCleanupHook`)에서 호출해 지운다(CH026 후속).
+    """
+    with Session(get_vector_engine()) as session:
+        result = session.execute(
+            ChatRagDocument.__table__.delete().where(ChatRagDocument.live_id == live_id)
+        )
+        session.commit()
+        return result.rowcount
+
+
 def fetch_documents(live_id: int, limit: int = 200) -> list[RagDocument]:
     """이 방송(`live_id`)의 문서 후보를 최신순으로 가져온다. 벡터 연산 없음 — 랭킹은 호출부(워커) 몫."""
     with Session(get_vector_engine()) as session:

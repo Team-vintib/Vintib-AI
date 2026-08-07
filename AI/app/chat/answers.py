@@ -13,18 +13,26 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import UTC, datetime
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from app.chat import registry
 from app.chat.schemas import FaqAnswer
 
+# BE가 naive(오프셋 없음)로 보내는 시각은 BE 서버 타임존(KST) 벽시계 시각이다 — UTC가 아니다.
+# 이 프로젝트는 단일 지역(한국) 서비스라 BE 전체가 LocalDateTime(KST)로 일관되게 짜여 있고,
+# AI만 내부적으로 UTC(datetime.now(UTC))를 쓴다. 예전엔 naive를 UTC로 잘못 간주해서, 방송
+# 시작 시각(KST)이 실제보다 9시간 앞선 것으로 취급돼 그 뒤에 생성된 답변이 전부 "since 이전"
+# 으로 잘려나가 영원히 조회되지 않는 버그가 있었다(S15P11A108-571 후속, 실측으로 발견).
+_NAIVE_TIMEZONE = ZoneInfo("Asia/Seoul")
 
-def _as_aware_utc(moment: datetime) -> datetime:
+
+def _as_aware(moment: datetime) -> datetime:
     """`created_at`은 항상 `datetime.now(UTC)`(offset-aware)로 만든다(`gateway/router.py`).
-    `since` 쿼리 파라미터는 호출부가 오프셋 없이 보낼 수 있어(-571 BE 연동에서 실측) naive면
-    UTC로 간주해 맞춰준다 — 안 그러면 "can't compare offset-naive and offset-aware
-    datetimes"로 500이 난다."""
-    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+    `since` 쿼리 파라미터는 BE가 오프셋 없이 보낸다(-571 BE 연동에서 실측) — naive면 BE 서버
+    타임존(KST)으로 간주해 맞춰준다. 서로 다른 타임존이라도 둘 다 aware이기만 하면 비교
+    연산자가 알아서 절대 시각으로 정규화해 비교한다."""
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=_NAIVE_TIMEZONE)
 
 
 class AnswerNotFound(Exception):
@@ -71,7 +79,7 @@ class InMemoryAnswerStore(AnswerStore):
     def list_for_live(self, live_id: int, since: datetime | None = None) -> list[FaqAnswer]:
         found = [a for a in self._by_ticket.values() if a.live_id == live_id]
         if since is not None:
-            cutoff = _as_aware_utc(since)
+            cutoff = _as_aware(since)
             found = [a for a in found if a.created_at > cutoff]
         found.sort(key=lambda a: a.created_at)
         return found
