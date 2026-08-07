@@ -170,6 +170,16 @@ public class Product extends BaseTimeEntity {
         this.saleStatus = SaleStatus.AUCTION_SCHEDULED;
     }
 
+    /** 이미 상시 판매로 전환된 상품의 가격을 조정한다. 호출 전 {@link #isDirectSale()}을 확인해야 한다 —
+     * 경매 상품은 가격 개념이 없다({@code price}는 항상 null, 시작가는 {@code Auction}이 따로 갖는다). */
+    public void updatePrice(Long price) {
+        this.price = price;
+    }
+
+    public boolean isDirectSale() {
+        return saleType == SaleType.DIRECT_SALE;
+    }
+
     public void update(
             String title,
             String description,

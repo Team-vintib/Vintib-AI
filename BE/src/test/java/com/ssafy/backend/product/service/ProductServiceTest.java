@@ -499,7 +499,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request =
-                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null);
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null, null);
         ProductResponse response = productService.updateProduct(SELLER_ID, 1L, request);
 
         assertThat(response.title()).isEqualTo("수정된 제목");
@@ -514,7 +514,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                null, null, null, null, null, null, "블랙", "데님", Map.of("총장", 70), null);
+                null, null, null, null, null, null, "블랙", "데님", Map.of("총장", 70), null, null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         assertThat(product.getColor()).isEqualTo("블랙");
@@ -529,7 +529,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                null, null, null, null, null, null, null, null, null, List.of("얼룩"));
+                null, null, null, null, null, null, null, null, null, List.of("얼룩"), null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         verify(productDefectRepository).deleteAllByProductId(1L);
@@ -548,7 +548,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request =
-                new ProductUpdateRequest(null, null, null, null, null, null, null, null, null, List.of());
+                new ProductUpdateRequest(null, null, null, null, null, null, null, null, null, List.of(), null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         verify(productDefectRepository).deleteAllByProductId(1L);
@@ -562,7 +562,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request =
-                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null);
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null, null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         verify(productDefectRepository, never()).deleteAllByProductId(any());
@@ -576,7 +576,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request =
-                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null);
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.updateProduct(2L, 1L, request))
                 .isInstanceOf(CustomException.class);
@@ -590,7 +590,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request =
-                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null);
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.updateProduct(SELLER_ID, 1L, request))
                 .isInstanceOf(CustomException.class);
@@ -639,11 +639,56 @@ class ProductServiceTest {
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(false);
 
         ProductUpdateRequest request =
-                new ProductUpdateRequest(null, null, CATEGORY_ID, null, null, null, null, null, null, null);
+                new ProductUpdateRequest(null, null, CATEGORY_ID, null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.updateProduct(SELLER_ID, 1L, request))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CATEGORY_NOT_FOUND);
+    }
+
+    @Test
+    void 상시_판매_상품은_가격을_수정할_수_있다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        product.registerDirectSale(50_000L);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductUpdateRequest request = new ProductUpdateRequest(
+                null, null, null, null, null, null, null, null, null, null, 45_000L);
+        ProductResponse response = productService.updateProduct(SELLER_ID, 1L, request);
+
+        assertThat(response.price()).isEqualTo(45_000L);
+    }
+
+    @Test
+    void 경매_상품은_가격을_수정할_수_없다() {
+        // price가 요청에 담기면 saleType 무관하게 그냥 통과시키는 게 아니라 400으로 막는다 —
+        // 경매 상품의 price는 항상 null이고 시작가는 Auction 엔티티가 별도로 갖는다.
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        product.scheduleAuction();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductUpdateRequest request = new ProductUpdateRequest(
+                null, null, null, null, null, null, null, null, null, null, 45_000L);
+
+        assertThatThrownBy(() -> productService.updateProduct(SELLER_ID, 1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_PRODUCT_STATE);
+    }
+
+    @Test
+    void 가격이_없으면_기존_가격을_건드리지_않는다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        product.registerDirectSale(50_000L);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductUpdateRequest request =
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null, null);
+        ProductResponse response = productService.updateProduct(SELLER_ID, 1L, request);
+
+        assertThat(response.price()).isEqualTo(50_000L);
     }
 
     // -----------------------------------------------------------------------

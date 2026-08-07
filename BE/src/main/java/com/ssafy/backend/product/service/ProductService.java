@@ -264,6 +264,15 @@ public class ProductService {
             saveDefects(product, request.defects());
         }
 
+        // 가격은 상시 판매 상품에만 의미가 있다 — 경매 상품은 price가 항상 null이고
+        // 시작가는 AUCT 쪽 Auction 엔티티가 별도로 갖는다.
+        if (request.price() != null) {
+            if (!product.isDirectSale()) {
+                throw new CustomException(ErrorCode.INVALID_PRODUCT_STATE);
+            }
+            product.updatePrice(request.price());
+        }
+
         return ProductResponse.from(product);
     }
 
