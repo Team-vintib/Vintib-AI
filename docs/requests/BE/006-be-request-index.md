@@ -226,6 +226,33 @@
   호출/캐시할지, AI가 결과를 직접 BE로 push할지)은 별도 논의.
 - FE `getSimilarProducts`(mock)를 실제로 붙일 대상이 필요해지면 그때 새 요청 문서로 정리한다.
 
+## 2026-08-07 상품 목록 관련 정리
+
+상품 목록에 걸린 요청 2건을 코드와 대조해 반영·삭제했다.
+
+- `028-home-category-products-empty.md` — 원인 두 가지를 그대로 고쳤다: 탭 기준을
+  `parentId == null`(depth=1, 성별)이 아니라 `depth == 2`(옷 종류 대분류)로 바꾸고, 카테고리 id
+  수집을 직계 자식 한 단계가 아니라 하위 소분류(depth=3)까지 재귀적으로 모으게 했다
+  (`HomeService.categoryProductSections()`). `HomeControllerTest`에 소분류 상품이 탭 섹션에
+  재귀적으로 묶이는지 검증하는 테스트를 추가했다.
+- `029-product-detail-intermittent-500.md` — 코드 분석으로 원인을 확인했다: 상품을 라이브에
+  거는 두 경로(`linkProduct`/`linkProductsOnCreate`) 모두 **다른 라이브에 이미 걸려 있는지는
+  검사하지 않고** 같은 라이브 중복만 막고 있었다. 그래서 한 상품이 종료되지 않은 라이브
+  두 곳에 동시에 걸리면(`removed_at IS NULL`인 `live_product` 행이 2건), 상품 상세의 "연결된
+  라이브" 조회(`LiveProductRepository.findByProductIdAndRemovedAtIsNull`, 단일 결과 기대)가
+  `IncorrectResultSizeDataAccessException`으로 500을 냈다 — saleType/conditionGrade와 무관하고
+  ENDED 라이브 연결(성공 사례로 보고된 2번 행)은 정상인 보고 패턴과 정확히 들어맞는다.
+  - 읽기 경로: 단일 결과를 기대하지 않고 최신 연결 1건만 뽑도록 방어적으로 바꿨다
+    (`findFirstByProductIdAndRemovedAtIsNullOrderByIdDesc`) — 과거에 이미 생긴 중복 데이터가
+    남아 있어도 더는 500을 내지 않는다.
+  - 쓰기 경로: 아직 끝나지 않은(SCHEDULED/LIVE) 다른 라이브에 이미 걸린 상품은 연결 시점에
+    `PRODUCT_ALREADY_LINKED`(409)로 막는다. 종료/취소된 라이브의 연결은 재사용을 막지 않는다
+    (같은 상품을 다음 방송에 다시 걸 수 있어야 하므로).
+  - 문서가 전제한 "목록 응답에 대표 이미지 URL이 없다"(req 009 기준)는 이미 낡은 전제였다 —
+    009는 그 전에 반영 완료돼 `ProductResponse.primaryImageUrl`이 이미 존재한다.
+  - 로컬 재현은 못 했지만(보고서의 실제 원인 데이터가 배포 환경에만 있음), 코드상 결함은
+    명확해 반영했다. 배포 후에도 500이 재현되면 서버 로그로 재오픈 요청.
+
 ## 2026-08-06 정리 (브랜치 이동 후 재정리)
 
 세션 중간에 `fix/213-delivery` → `develop-BE`(pull) → `feat/190-google-signup`로 브랜치가
