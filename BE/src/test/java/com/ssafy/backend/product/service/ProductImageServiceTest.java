@@ -20,6 +20,7 @@ import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductImage;
+import com.ssafy.backend.product.entity.ProductImageRole;
 import com.ssafy.backend.product.repository.ProductImageRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.Optional;
@@ -117,11 +118,46 @@ class ProductImageServiceTest {
         when(s3StorageService.publicUrl(PUBLIC_BUCKET, key)).thenReturn("https://s3.example/" + key);
 
         ProductImageResponse response = productImageService.registerImage(
-                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true));
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true, ProductImageRole.ADDITIONAL));
 
         assertThat(response.url()).isEqualTo("https://s3.example/" + key);
         assertThat(response.isPrimary()).isTrue();
         verify(aiClient, org.mockito.Mockito.never()).createRegistrationModelCutJob(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void FRONT_사진을_등록하면_role이_그대로_저장된다() {
+        String key = "product-images/%d/front.jpg".formatted(PRODUCT_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(0);
+        when(productImageRepository.existsByProductIdAndRole(PRODUCT_ID, ProductImageRole.FRONT))
+                .thenReturn(false);
+        when(s3StorageService.headObject(PUBLIC_BUCKET, key))
+                .thenReturn(HeadObjectResponse.builder().contentLength(1024L).build());
+        when(s3StorageService.publicUrl(PUBLIC_BUCKET, key)).thenReturn("https://s3.example/" + key);
+
+        ProductImageResponse response = productImageService.registerImage(
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, false, ProductImageRole.FRONT));
+
+        assertThat(response.role()).isEqualTo(ProductImageRole.FRONT);
+    }
+
+    @Test
+    void 이미_등록된_FRONT_사진이_있으면_중복_등록을_거부한다() {
+        String key = "product-images/%d/front2.jpg".formatted(PRODUCT_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(1);
+        when(productImageRepository.existsByProductIdAndRole(PRODUCT_ID, ProductImageRole.FRONT))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> productImageService.registerImage(
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 1, false, ProductImageRole.FRONT)))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue(
+                        "errorCode", com.ssafy.backend.global.exception.ErrorCode.PRODUCT_IMAGE_ROLE_ALREADY_EXISTS);
+        verify(productImageRepository, org.mockito.Mockito.never()).save(any());
     }
 
     @Test
@@ -142,7 +178,7 @@ class ProductImageServiceTest {
         when(aiClient.createRegistrationModelCutJob("https://s3.example/" + key, "MALE", "upper"))
                 .thenReturn("job-456");
 
-        productImageService.registerImage(SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true));
+        productImageService.registerImage(SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true, ProductImageRole.ADDITIONAL));
 
         assertThat(aiProduct.getAiModelCutStatus())
                 .isEqualTo(com.ssafy.backend.product.entity.AiModelCutStatus.PENDING);
@@ -168,7 +204,7 @@ class ProductImageServiceTest {
                 .thenThrow(new org.springframework.web.client.RestClientException("connection refused"));
 
         ProductImageResponse response = productImageService.registerImage(
-                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true));
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true, ProductImageRole.ADDITIONAL));
 
         assertThat(response.url()).isEqualTo("https://s3.example/" + key);
         assertThat(aiProduct.getAiModelCutStatus())
@@ -185,7 +221,7 @@ class ProductImageServiceTest {
                 .thenThrow(NoSuchKeyException.builder().message("no such key").build());
 
         assertThatThrownBy(() -> productImageService.registerImage(
-                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, false)))
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, false, ProductImageRole.ADDITIONAL)))
                 .isInstanceOf(CustomException.class);
     }
 
@@ -197,7 +233,7 @@ class ProductImageServiceTest {
         when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(10);
 
         assertThatThrownBy(() -> productImageService.registerImage(
-                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 10, false)))
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 10, false, ProductImageRole.ADDITIONAL)))
                 .isInstanceOf(CustomException.class);
     }
 

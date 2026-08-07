@@ -13,6 +13,7 @@ import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
 import com.ssafy.backend.product.entity.AiModelCutStatus;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductImage;
+import com.ssafy.backend.product.entity.ProductImageRole;
 import com.ssafy.backend.product.repository.ProductImageRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.Collection;
@@ -39,8 +40,6 @@ public class ProductImageService {
     private static final Map<String, String> ALLOWED_CONTENT_TYPE_EXTENSIONS =
             Map.of("image/jpeg", "jpg", "image/png", "png", "image/webp", "webp");
 
-    // 상품 카테고리 -> mask_type 자동 판별은 아직 없다(docs/requests/BE/035-tryon-product-category.md
-    // 미해결). 정확도보다 파이프라인이 실제로 도는지가 이번 목적이라 상의 고정으로 간다.
     private static final String DEFAULT_AI_MODEL_CUT_MASK_TYPE = "upper";
 
     private final ProductRepository productRepository;
@@ -76,6 +75,11 @@ public class ProductImageService {
         if (!request.key().startsWith("product-images/%d/".formatted(productId))) {
             throw new CustomException(ErrorCode.PRODUCT_IMAGE_UPLOAD_NOT_CONFIRMED);
         }
+        // FRONT/BACK은 AI 품질 검수의 앞/뒤 사진 자리라 상품당 한 장씩만 허용한다(SY043).
+        if (request.role() != ProductImageRole.ADDITIONAL
+                && productImageRepository.existsByProductIdAndRole(productId, request.role())) {
+            throw new CustomException(ErrorCode.PRODUCT_IMAGE_ROLE_ALREADY_EXISTS);
+        }
 
         String bucket = awsProperties.s3().publicBucket();
         verifyUploaded(bucket, request.key());
@@ -90,6 +94,7 @@ public class ProductImageService {
                 .imageKey(request.key())
                 .sortOrder(request.sortOrder())
                 .primary(request.isPrimary())
+                .role(request.role())
                 .build();
         productImageRepository.save(image);
 
@@ -102,9 +107,8 @@ public class ProductImageService {
     }
 
     /**
-     * 대표 이미지가 등록되면 AI 착용컷 job을 접수한다(`docs/requests/BE/
-     * 039-registration-ai-model-tryon.md`). 보조 기능이라 실패해도 이미지 등록 자체는
-     * 그대로 성공시킨다 — 로그만 남기고 상태는 NONE으로 둔다(재시도는 이번 범위 밖).
+     * 대표 이미지가 등록되면 AI 착용컷 job을 접수.
+     * 보조 기능이라 실패해도 이미지 등록 자체는 그대로 성공 — 로그만 남기고 상태는 NONE.
      */
     private void triggerAiModelCutJob(Product product, String productImageUrl) {
         if (!product.isAiModelEnabled() || product.getAiModelCutStatus() != AiModelCutStatus.NONE) {
