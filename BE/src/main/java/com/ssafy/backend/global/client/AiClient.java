@@ -90,7 +90,15 @@ public class AiClient {
                 .body(ModerateChatResponse.class);
     }
 
-    /** {@code GET /chat/lives/{liveId}/answers} — 반복질문 자동답변 폴링(-571). */
+    /**
+     * {@code GET /chat/lives/{liveId}/answers} — 반복질문 자동답변 폴링(-571).
+     *
+     * <p>{@code since}는 오프셋 없이 그대로 보낸다(이 서버 타임존 KST의 벽시계 시각) — AI
+     * 쪽이 "오프셋 없으면 KST로 간주"하고 해석한다(`app/chat/answers.py`의 {@code
+     * _as_aware}). 예전엔 AI가 "오프셋 없으면 UTC로 간주"했는데, 실제로는 KST값이라
+     * 9시간 앞선 것으로 잘못 취급돼 그 뒤에 생성된 답변이 전부 "since 이전"으로 잘려나가
+     * 영원히 조회되지 않는 버그가 있었다(실측으로 발견, S15P11A108-571 후속).
+     */
     public List<ChatAnswer> getLiveAnswers(Long liveId, LocalDateTime since) {
         ChatAnswerListResponse response = aiRestClient.get()
                 .uri(uriBuilder -> uriBuilder

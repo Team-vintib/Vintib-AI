@@ -17,6 +17,7 @@ import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -170,8 +171,13 @@ public class ChatMessageService {
     public List<ChatMessageResponse> saveAiAnswers(Long liveId, List<ChatAnswer> answers) {
         Live live = findLive(liveId);
         return answers.stream()
-                .map(answer -> chatMessageRepository.save(
-                        ChatMessage.aiMessage(live, answer.answer(), answer.createdAt())))
+                .map(answer -> chatMessageRepository.save(ChatMessage.aiMessage(
+                        live,
+                        answer.answer(),
+                        // Instant(절대 시각) -> 이 서버 타임존(KST) 벽시계로 변환한다. 나머지
+                        // chat_message.created_at이 전부 KST LocalDateTime.now()라, 여기만
+                        // 다른 기준으로 저장하면 다음 폴링 커서(lastAiAnswerCursor)가 어긋난다.
+                        LocalDateTime.ofInstant(answer.createdAt(), ZoneId.systemDefault()))))
                 .map(ChatMessageResponse::from)
                 .toList();
     }

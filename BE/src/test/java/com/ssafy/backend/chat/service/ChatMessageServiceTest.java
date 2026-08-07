@@ -18,7 +18,9 @@ import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -174,7 +176,7 @@ class ChatMessageServiceTest {
         setUpChatMessageService();
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live()));
         stubSaveReturnsArgumentWithId(20L);
-        LocalDateTime answeredAt = STARTED_AT.plusMinutes(3);
+        Instant answeredAt = Instant.parse("2026-08-07T05:26:00Z");
         List<ChatAnswer> answers = List.of(
                 new ChatAnswer("ticket-1", "프리사이즈인가요?", "네, 프리사이즈입니다.", answeredAt));
 
@@ -183,5 +185,23 @@ class ChatMessageServiceTest {
         assertThat(saved).hasSize(1);
         assertThat(saved.get(0).content()).isEqualTo("네, 프리사이즈입니다.");
         assertThat(saved.get(0).senderType()).isEqualTo(SenderType.AI);
+    }
+
+    @Test
+    void AI_답변_시각은_이_서버_타임존으로_변환돼_저장된다() {
+        // AI가 보내는 created_at은 UTC 절대 시각(Instant)이다. 이걸 그대로 LocalDateTime
+        // 숫자로 읽어버리면(과거 버그) 이 서버(KST) 기준 다른 시각들과 9시간 어긋나서, 다음
+        // 폴링 커서가 꼬여 같은 답변이 계속 재조회·중복 저장됐다(실측으로 발견, -571 후속).
+        setUpChatMessageService();
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live()));
+        stubSaveReturnsArgumentWithId(21L);
+        Instant answeredAt = Instant.parse("2026-08-07T05:26:00Z");
+        List<ChatAnswer> answers = List.of(
+                new ChatAnswer("ticket-1", "프리사이즈인가요?", "네, 프리사이즈입니다.", answeredAt));
+
+        List<ChatMessageResponse> saved = chatMessageService.saveAiAnswers(LIVE_ID, answers);
+
+        assertThat(saved.get(0).createdAt())
+                .isEqualTo(LocalDateTime.ofInstant(answeredAt, ZoneId.systemDefault()));
     }
 }
