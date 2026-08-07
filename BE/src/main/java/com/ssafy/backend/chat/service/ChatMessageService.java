@@ -1,6 +1,8 @@
 package com.ssafy.backend.chat.service;
 
+import com.ssafy.backend.chat.dto.response.ChatMessageBlockedNotice;
 import com.ssafy.backend.chat.dto.response.ChatMessageResponse;
+import com.ssafy.backend.chat.dto.response.ChatSendOutcome;
 import com.ssafy.backend.chat.entity.ChatMessage;
 import com.ssafy.backend.chat.entity.SenderType;
 import com.ssafy.backend.chat.repository.ChatMessageRepository;
@@ -16,7 +18,6 @@ import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -40,14 +41,14 @@ public class ChatMessageService {
     private final AiClient aiClient;
 
     /**
-     * 회원 발언을 저장한다. AI 판정에서 HIDE/BLOCK을 권고하면 메시지는 저장은 되지만(관리용
-     * 흔적) 빈 Optional을 돌려준다 — 호출부(STOMP 컨트롤러)는 이때 브로드캐스트를 생략한다.
+     * 회원 발언을 저장한다. AI 판정에서 HIDE/BLOCK/TIMED_OUT을 권고하면 메시지는 저장은
+     * 되지만(관리용 흔적) 발신자 전용 알림만 돌려준다 — 호출부(STOMP 컨트롤러)는 이때
+     * 브로드캐스트를 생략한다.
      *
      * @param senderId STOMP principal에서 꺼낸 회원 ID. <b>{@code null}이면 비회원이다.</b>
      */
     @Transactional
-    public Optional<ChatMessageResponse> send(
-            Long senderId, Long liveId, String content, String clientMessageId) {
+    public ChatSendOutcome send(Long senderId, Long liveId, String content, String clientMessageId) {
         // 비회원은 읽기만 가능하다. DB 의 ck_chat_user_has_member 가 최후 방어선이지만, 거기까지
         // 가면 500 이 되므로 여기서 401 로 돌려준다.
         if (senderId == null) {
@@ -71,20 +72,22 @@ public class ChatMessageService {
         ChatMessage saved = chatMessageRepository.save(
                 ChatMessage.userMessage(live, sender, trimmed, sentAt));
 
-        if (moderateAndBlockIfNeeded(saved, senderId, trimmed, sentAt)) {
-            return Optional.empty();
+        ModerationOutcome moderation = moderateAndBlockIfNeeded(saved, senderId, trimmed, sentAt);
+        if (moderation.blocked()) {
+            ChatMessageBlockedNotice notice = moderation.muteRemainingSeconds() != null
+                    ? ChatMessageBlockedNotice.muted(clientMessageId, moderation.muteRemainingSeconds())
+                    : ChatMessageBlockedNotice.blocked(clientMessageId);
+            return ChatSendOutcome.blocked(notice);
         }
 
-        return Optional.of(ChatMessageResponse.of(saved, clientMessageId));
+        return ChatSendOutcome.broadcast(ChatMessageResponse.of(saved, clientMessageId));
     }
 
     /**
      * AI 게이트웨이에 동기 판정을 요청한다(-571). 실패해도(타임아웃 등) 판정 없이 통과시킨다 —
      * 채팅은 AI 장애와 무관하게 동작해야 하는 핵심 기능이라 보조 기능 실패로 막으면 안 된다.
-     *
-     * @return HIDE/BLOCK 권고를 받아 이 메시지를 차단했으면 {@code true}
      */
-    private boolean moderateAndBlockIfNeeded(
+    private ModerationOutcome moderateAndBlockIfNeeded(
             ChatMessage message, Long userId, String content, LocalDateTime sentAt) {
         try {
             ModerateChatResponse moderation = aiClient.moderateChatMessage(
@@ -92,12 +95,23 @@ public class ChatMessageService {
             if (moderation.isBlocked()) {
                 message.block();
                 log.info("채팅 메시지 차단(messageId={}, reason={})", message.getId(), moderation.reason());
-                return true;
+                return ModerationOutcome.blocked(moderation.muteRemainingSeconds());
             }
-            return false;
+            return ModerationOutcome.passed();
         } catch (RestClientException e) {
             log.warn("채팅 AI 판정 실패, 판정 없이 통과시킴(messageId={}): {}", message.getId(), e.getMessage());
-            return false;
+            return ModerationOutcome.passed();
+        }
+    }
+
+    /** AI 판정 결과 중 컨트롤러가 알 필요가 있는 것만 추린 내부 표현. */
+    private record ModerationOutcome(boolean blocked, Double muteRemainingSeconds) {
+        static ModerationOutcome passed() {
+            return new ModerationOutcome(false, null);
+        }
+
+        static ModerationOutcome blocked(Double muteRemainingSeconds) {
+            return new ModerationOutcome(true, muteRemainingSeconds);
         }
     }
 

@@ -90,6 +90,12 @@ SPAM_DUPLICATE_COUNT = (
 )
 ABUSE_THRESHOLD = 0.5  # 악성 판정 하한
 
+# --- 반복 위반 시 임시 채팅 차단(-571 후속, CH025) --------------------------
+# 방송(live_id) 단위로 격리한다 — 채팅 자체가 방송 단위 공간이라 다른 방송 위반과 섞이면 안 됨.
+TIMEOUT_VIOLATION_WINDOW_SECONDS = 10.0  # 이 안에서 반복 위반해야 카운트된다
+TIMEOUT_VIOLATION_THRESHOLD = 3  # 윈도우 내 이 횟수 이상 차단되면 음소거
+TIMEOUT_MUTE_SECONDS = 15.0  # 음소거 지속 시간
+
 MIN_CLUSTER_SIZE = 2  # 같은 질문이 이 횟수 이상 들어와야 답변 생성
 RETRIEVE_TOP_K = 3  # 평가 파이프라인(MockRetriever) 전용 — 이미 순위 매겨진 결과 중 상위 k개.
 

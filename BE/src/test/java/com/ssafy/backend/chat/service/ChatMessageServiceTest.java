@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.chat.dto.response.ChatMessageResponse;
+import com.ssafy.backend.chat.dto.response.ChatSendOutcome;
 import com.ssafy.backend.chat.entity.ChatMessage;
 import com.ssafy.backend.chat.entity.SenderType;
 import com.ssafy.backend.chat.repository.ChatMessageRepository;
@@ -89,11 +90,10 @@ class ChatMessageServiceTest {
         when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
                 .thenReturn(new ModerateChatResponse("NORMAL", "PASS", "clean"));
 
-        Optional<ChatMessageResponse> result =
-                chatMessageService.send(SENDER_ID, LIVE_ID, "사이즈 M 맞나요?", "tmp-1");
+        ChatSendOutcome result = chatMessageService.send(SENDER_ID, LIVE_ID, "사이즈 M 맞나요?", "tmp-1");
 
-        assertThat(result).isPresent();
-        assertThat(result.get().content()).isEqualTo("사이즈 M 맞나요?");
+        assertThat(result.isBlocked()).isFalse();
+        assertThat(result.broadcastMessage().content()).isEqualTo("사이즈 M 맞나요?");
     }
 
     @Test
@@ -106,10 +106,27 @@ class ChatMessageServiceTest {
         when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
                 .thenReturn(new ModerateChatResponse("ABUSIVE", "BLOCK", "abuse:term"));
 
-        Optional<ChatMessageResponse> result =
-                chatMessageService.send(SENDER_ID, LIVE_ID, "욕설성 발언", "tmp-2");
+        ChatSendOutcome result = chatMessageService.send(SENDER_ID, LIVE_ID, "욕설성 발언", "tmp-2");
 
-        assertThat(result).isEmpty();
+        assertThat(result.isBlocked()).isTrue();
+        assertThat(result.blockedNotice().clientMessageId()).isEqualTo("tmp-2");
+        assertThat(result.blockedNotice().muteRemainingSeconds()).isNull();
+    }
+
+    @Test
+    void TIMED_OUT_판정이면_음소거_잔여시간과_함께_차단된다() {
+        setUpChatMessageService();
+        Live live = live();
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        when(memberRepository.findById(SENDER_ID)).thenReturn(Optional.of(viewer()));
+        stubSaveReturnsArgumentWithId(13L);
+        when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
+                .thenReturn(new ModerateChatResponse("TIMED_OUT", "BLOCK", "user_timed_out", 15.0));
+
+        ChatSendOutcome result = chatMessageService.send(SENDER_ID, LIVE_ID, "아무 메시지", "tmp-mute");
+
+        assertThat(result.isBlocked()).isTrue();
+        assertThat(result.blockedNotice().muteRemainingSeconds()).isEqualTo(15.0);
     }
 
     @Test
@@ -122,10 +139,9 @@ class ChatMessageServiceTest {
         when(aiClient.moderateChatMessage(anyLong(), anyLong(), anyLong(), anyString(), any()))
                 .thenThrow(new RestClientException("connection refused"));
 
-        Optional<ChatMessageResponse> result =
-                chatMessageService.send(SENDER_ID, LIVE_ID, "안녕하세요", "tmp-3");
+        ChatSendOutcome result = chatMessageService.send(SENDER_ID, LIVE_ID, "안녕하세요", "tmp-3");
 
-        assertThat(result).isPresent();
+        assertThat(result.isBlocked()).isFalse();
     }
 
     @Test

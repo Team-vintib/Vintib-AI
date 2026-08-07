@@ -41,6 +41,7 @@ from app.chat.schemas import (
     Verdict,
 )
 from app.chat.spam import SpamDetector, build_state_store
+from app.chat.timeout import UserTimeoutTracker
 from app.gateway.router import enqueue_job
 
 # 라우터가 import하기 쉽도록 재노출(404 매핑용).
@@ -64,6 +65,7 @@ class ChatModerationService:
         clusterer: QuestionClusterer,
         answer_store: AnswerStore,
         *,
+        timeout_tracker: UserTimeoutTracker | None = None,
         abuse_threshold: float = registry.ABUSE_THRESHOLD,
         min_cluster_size: int = registry.MIN_CLUSTER_SIZE,
         candidate_limit: int = registry.CHAT_RAG_CANDIDATE_LIMIT,
@@ -73,6 +75,7 @@ class ChatModerationService:
         self._questions = question_detector
         self._clusterer = clusterer
         self._answers = answer_store
+        self._timeouts = timeout_tracker or UserTimeoutTracker()
         self._abuse_threshold = abuse_threshold
         self._min_cluster_size = min_cluster_size
         self._candidate_limit = candidate_limit
@@ -88,8 +91,25 @@ class ChatModerationService:
         started = time.perf_counter()
         moment = request.sent_at.timestamp() if request.sent_at else time.time()
 
+        timeout_status = self._timeouts.status(request.live_id, request.user_id, now=moment)
+        if timeout_status.muted:
+            return (
+                self._response(
+                    request,
+                    Verdict.timed_out,
+                    ModerationAction.block,
+                    "user_timed_out",
+                    abuse=0.0,
+                    spam_score=0.0,
+                    started=started,
+                    mute_remaining_seconds=timeout_status.remaining_seconds,
+                ),
+                None,
+            )
+
         spam = self._spam.check(request.user_id, request.content, now=moment)
         if spam.is_spam:
+            self._timeouts.record_violation(request.live_id, request.user_id, now=moment)
             return (
                 self._response(
                     request,
@@ -105,6 +125,7 @@ class ChatModerationService:
 
         abuse = self._classifier.score(request.content)
         if abuse.score >= self._abuse_threshold:
+            self._timeouts.record_violation(request.live_id, request.user_id, now=moment)
             return (
                 self._response(
                     request,
@@ -161,6 +182,7 @@ class ChatModerationService:
         spam_score: float,
         started: float,
         ticket: str | None = None,
+        mute_remaining_seconds: float | None = None,
     ) -> ModerateResponse:
         return ModerateResponse(
             message_id=request.message_id,
@@ -169,6 +191,7 @@ class ChatModerationService:
             reason=reason,
             scores=Scores(abuse=round(abuse, 4), spam=round(spam_score, 4)),
             answer_ticket=ticket,
+            mute_remaining_seconds=mute_remaining_seconds,
             latency_ms=round((time.perf_counter() - started) * 1000, 3),
         )
 
