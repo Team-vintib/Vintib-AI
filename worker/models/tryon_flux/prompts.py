@@ -56,6 +56,20 @@ def fit_descriptor(ratio: float) -> tuple[str, bool]:
     return f"{base}, about {pct:.0f}% {direction}", emphasize
 
 
+# 두 프롬프트가 공유하는 보존 지시문. §10.3(아우터 확대 프레이밍 버그)의 프레이밍 문구를
+# "확대/재구성 금지"까지 명시하도록 강화하고, §10.5 "다음 단계"에 남아있던 "하의 색상
+# 유지 문구"를 실제로 추가했다 — 둘 다 프롬프트만으로 강제하는 소프트 제약이라 100%
+# 보장은 아니지만(실측 검증 필요), 모델이 지금 참조하는 유일한 신호이므로 명시할수록
+# 지켜질 확률이 올라간다.
+_PRESERVE_SUFFIX = (
+    " Keep the exact same person, face, pose, camera distance, framing, and "
+    "background as the reference photo -- do not zoom in, crop tighter, or "
+    "recompose the shot in any way. Keep every other garment the person is "
+    "already wearing (pants, shoes, etc.) exactly the same color, fabric, and "
+    "fit as in the reference photo -- change only the garment described above."
+)
+
+
 def build_dress_prompt(garment_caption: str, fit_phrase: str, needs_emphasis: bool) -> str:
     """§10.3에서 검증한 "원본 사진 참조 편집" 프롬프트 형태. `image=[고객 사진]`과 함께
     쓰면 포즈/스케일/프레이밍은 참조 사진에서 그대로 상속되고 옷만 바뀐다."""
@@ -70,9 +84,7 @@ def build_dress_prompt(garment_caption: str, fit_phrase: str, needs_emphasis: bo
 
     return (
         f"{emphasis_lead}dress the person in the reference photo in a "
-        f"{garment_caption} that is {fit_phrase}. Keep the same person, face, "
-        "pose, camera angle, framing, and background as the reference photo -- "
-        "change only the clothing."
+        f"{garment_caption} that is {fit_phrase}.{_PRESERVE_SUFFIX}"
     )
 
 
@@ -81,7 +93,5 @@ def build_regular_dress_prompt(garment_caption: str) -> str:
     핏 계산 없이 "이 옷을 그대로 입혀라"만 지시한다."""
     return (
         f"dress the person in the reference photo in a {garment_caption}, worn in "
-        "a regular, well-fitting cut. Keep the same person, face, pose, camera "
-        "angle, framing, and background as the reference photo -- change only the "
-        "clothing."
+        f"a regular, well-fitting cut.{_PRESERVE_SUFFIX}"
     )
