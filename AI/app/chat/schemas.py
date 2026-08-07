@@ -80,3 +80,9 @@ class FaqAnswer(BaseModel):
 class AnswerListResponse(BaseModel):
     live_id: int
     answers: list[FaqAnswer]
+
+
+class SeedDocumentRequest(BaseModel):
+    """STT 없이 반복질문 근거 문서를 채우는 경로(-571, CH024). BE가 상품 편성 시점에 호출한다."""
+
+    content: str = Field(min_length=1, max_length=1000)
