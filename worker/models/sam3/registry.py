@@ -32,6 +32,8 @@ class SegmenterConfig(TypedDict):
     benign_containment: float  # 하자가 양성에 이만큼 잠기면 억제 후보로 본다
     dedupe_cross_type: bool  # 서로 다른 defect_type이 같은 실물 부위를 중복 검출했을 때 병합 on/off
     cross_type_iou_min: float  # 이 이상 겹치면 confidence 낮은 쪽을 버린다(findings.py 참고)
+    dedupe_same_type: bool  # 같은 defect_type이 "박스 안에 박스"로 겹칠 때 병합 on/off
+    same_type_containment_min: float  # 포함 비율(둘 중 큰 쪽)이 이 이상이면 병합(findings.py 참고)
     min_area_ratio: float  # 이 면적 비율 미달 인스턴스는 노이즈로 폐기
     max_defect_area_ratio: float  # 이 비율 초과 인스턴스는 세그멘테이션 실패로 보고 폐기
 
@@ -56,6 +58,12 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         # 잘못 합칠 위험을 줄인다.
         "dedupe_cross_type": True,
         "cross_type_iou_min": 0.7,
+        # ⚠️ 라벨링된 검증셋 없이 잡은 값 — 스윕 대상. 실측 중복(small_pro.jpg)은 작은
+        # STAIN 박스가 큰 STAIN 박스에 97~100% 포함돼 있었다(IoU는 낮아도 포함 비율은
+        # 매우 높음) — 그래서 IoU가 아니라 포함 비율을 쓴다(findings.py 참고). 0.8로
+        # 여유를 둬서 부분적으로만 겹치는 "진짜 다른 두 하자"까지 합치는 위험을 줄인다.
+        "dedupe_same_type": True,
+        "same_type_containment_min": 0.8,
         "min_area_ratio": 0.0015,
         "max_defect_area_ratio": 0.35,
     },
@@ -84,6 +92,12 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         # 잘못 합칠 위험을 줄인다.
         "dedupe_cross_type": True,
         "cross_type_iou_min": 0.7,
+        # ⚠️ 라벨링된 검증셋 없이 잡은 값 — 스윕 대상. 실측 중복(small_pro.jpg)은 작은
+        # STAIN 박스가 큰 STAIN 박스에 97~100% 포함돼 있었다(IoU는 낮아도 포함 비율은
+        # 매우 높음) — 그래서 IoU가 아니라 포함 비율을 쓴다(findings.py 참고). 0.8로
+        # 여유를 둬서 부분적으로만 겹치는 "진짜 다른 두 하자"까지 합치는 위험을 줄인다.
+        "dedupe_same_type": True,
+        "same_type_containment_min": 0.8,
         "min_area_ratio": 0.0015,
         "max_defect_area_ratio": 0.35,
     },

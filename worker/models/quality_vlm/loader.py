@@ -80,7 +80,13 @@ def load_qwen_vl(model_id: str, quantization: str = "4bit") -> VLMBundle:
 def generate_from_image(
     bundle: VLMBundle, image, prompt_text: str, max_new_tokens: int = 80
 ) -> str:
-    """이미지 1장 + 프롬프트 텍스트로 한 문장 생성."""
+    """이미지 1장 + 프롬프트 텍스트로 한 문장 생성.
+
+    2026-08-06(`AI/validation/QUAL/vlm-description-check/` 실측): `do_sample`을 안
+    정해주면 체크포인트 내장 `generation_config.json`의 샘플링 기본값이 적용돼서, 같은
+    입력이어도 호출마다 다른 문장이 나온다(배치 방식 검증 중 같은 코드·같은 입력으로
+    재현됨). 검수 결과 재현성을 위해 결정적(greedy) 디코딩으로 고정한다.
+    """
     import torch
 
     messages = [
@@ -101,6 +107,8 @@ def generate_from_image(
     ).to(bundle.model.device)
 
     with torch.no_grad():
-        generated_ids = bundle.model.generate(**inputs, max_new_tokens=max_new_tokens)
+        generated_ids = bundle.model.generate(
+            **inputs, max_new_tokens=max_new_tokens, do_sample=False
+        )
     trimmed = generated_ids[0][inputs["input_ids"].shape[-1] :]
     return bundle.processor.decode(trimmed, skip_special_tokens=True).strip()
