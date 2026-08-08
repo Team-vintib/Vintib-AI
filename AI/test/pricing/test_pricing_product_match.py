@@ -55,52 +55,37 @@ def test_resolve_brand_id_none_when_no_alias_found():
 
 
 # --- build_match_keys ---------------------------------------------------------
+# CH031: 1단계(추출)와 분리됐다 — 이미 추출된 tokens/brand_id를 받아 키만 조합한다.
 
 
 def test_build_match_keys_strict_includes_brand_and_tokens():
-    keys = build_match_keys(
-        product_name="리바이스 501 빈티지",
-        brand_id=None,
-        category="BOTTOM_PANTS",
-        brand_alias_map=_ALIAS_MAP,
-    )
+    keys = build_match_keys(tokens=["501", "빈티지"], brand_id=1, category="BOTTOM_PANTS")
     assert keys.strict.startswith("1:")
     assert "BOTTOM_PANTS" in keys.strict
     assert "501" in keys.strict
 
 
 def test_build_match_keys_relaxed_drops_title_tokens():
-    keys = build_match_keys(
-        product_name="리바이스 501 빈티지",
-        brand_id=None,
-        category="BOTTOM_PANTS",
-        brand_alias_map=_ALIAS_MAP,
-    )
+    keys = build_match_keys(tokens=["501", "빈티지"], brand_id=1, category="BOTTOM_PANTS")
     assert keys.relaxed == "1:BOTTOM_PANTS"
 
 
 def test_build_match_keys_is_deterministic_regardless_of_token_order():
     first = build_match_keys(
-        product_name="리바이스 슬림핏 501",
-        brand_id=None,
-        category="BOTTOM_PANTS",
-        brand_alias_map=_ALIAS_MAP,
+        tokens=["리바이스", "슬림핏", "501"], brand_id=1, category="BOTTOM_PANTS"
     )
     second = build_match_keys(
-        product_name="501 슬림핏 리바이스",
-        brand_id=None,
-        category="BOTTOM_PANTS",
-        brand_alias_map=_ALIAS_MAP,
+        tokens=["501", "슬림핏", "리바이스"], brand_id=1, category="BOTTOM_PANTS"
     )
     assert first.strict == second.strict
 
 
+def test_build_match_keys_dedupes_tokens():
+    keys = build_match_keys(tokens=["501", "501", "빈티지"], brand_id=1, category="BOTTOM_PANTS")
+    assert keys.strict.count("501") == 1
+
+
 def test_build_match_keys_unknown_brand_uses_placeholder():
-    keys = build_match_keys(
-        product_name="이름없는 브랜드 자켓",
-        brand_id=None,
-        category="OUTER_JACKET",
-        brand_alias_map=_ALIAS_MAP,
-    )
+    keys = build_match_keys(tokens=["자켓"], brand_id=None, category="OUTER_JACKET")
     assert keys.strict.startswith("unknown:")
     assert keys.relaxed == "unknown:OUTER_JACKET"

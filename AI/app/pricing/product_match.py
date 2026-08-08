@@ -1,14 +1,18 @@
 """동일 상품(브랜드+상품명+카테고리) 텍스트 매칭 — 순수 함수(CH030).
 
 이미지 임베딩(CH024 `internal` 백엔드)이 아니라 텍스트만으로 "동일 상품"을 판정한다.
-정규화된 제목 토큰 + 브랜드로 1차 키(엄격), 표본이 부족하면 브랜드+카테고리만의 2차 키
-(완화)로 재조회한다 — 사용자가 지정한 폴백 순서 그대로다.
+당근마켓 사례로 보면 이 파일은 2단계(정규화된 속성을 정확 키로 집계)만 다룬다 — 1단계
+(자유텍스트 → 브랜드+핵심 토큰 추출)는 `app/pricing/attribute_extraction.py`가 맡는다
+(CH031, regex 기본값/llm 옵트인). `build_match_keys()`는 그 결과(토큰·브랜드id)를 받아
+1차(엄격)·2차(완화, 표본 부족 시 폴백) 키만 조합한다 — 순환 임포트를 피하려고 이 파일은
+`attribute_extraction.py`를 모른다(반대로 그쪽이 `normalize_title`/`resolve_brand_id`를
+가져다 쓴다).
 
-브랜드 별칭 사전(`GET /api/brands` 캐시)은 이 모듈이 직접 조회하지 않는다 — 네트워크 호출이
-섞이면 순수 함수로 테스트할 수 없다. 호출부(`product_corpus.py`)가 사전을 만들어 인자로
-넘긴다.
+`normalize_title`/`resolve_brand_id`는 정규식 기반 1단계(`RegexAttributeExtractor`)가
+쓰는 순수 함수라 여전히 여기 남아 있다. 브랜드 별칭 사전(`GET /api/brands` 캐시)은 이
+파일이 직접 조회하지 않는다 — 네트워크 호출이 섞이면 순수 함수로 테스트할 수 없다.
 
-설계: docs/plans/AI/CH030-pricing-text-match.md
+설계: docs/plans/AI/CH030-pricing-text-match.md, docs/plans/AI/CH031-pricing-llm-attribute-extraction.md
 """
 
 from __future__ import annotations
@@ -92,14 +96,12 @@ class MatchKeys:
     relaxed: str
 
 
-def build_match_keys(
-    *,
-    product_name: str,
-    brand_id: int | None,
-    category: str,
-    brand_alias_map: dict[str, int],
-) -> MatchKeys:
-    """1차(브랜드+정규화 토큰+카테고리)·2차(브랜드+카테고리) 매칭 키를 만든다.
+def build_match_keys(*, tokens: list[str], brand_id: int | None, category: str) -> MatchKeys:
+    """1차(브랜드+토큰+카테고리)·2차(브랜드+카테고리) 매칭 키를 만든다(당근마켓 2단계).
+
+    `tokens`/`brand_id`는 호출부가 1단계(`attribute_extraction.AttributeExtractor` —
+    regex 기본값 또는 llm 옵트인, CH031)로 이미 추출해 넘긴 값이다. 이 함수는 그 결과를
+    정확 키로 조합만 한다 — 어떻게 추출됐는지는 몰라도 된다.
 
     호출부(`comps.py`)는 `strict`로 먼저 조회하고, 표본이 `min_comps` 미만이면 `relaxed`로
     재조회한다(사용자가 지정한 순서). `product.match_key` 컬럼에는 `strict`를 저장한다 —
@@ -109,11 +111,8 @@ def build_match_keys(
     이름을 가질 수 있음, 126개 taxonomy)와 AI의 `GarmentCategory`(6종, 성별 무관) 사이의
     변환은 이 함수의 책임이 아니다(`product_corpus.py`가 캐시 적재 시 통일해서 넣는다).
     """
-    resolved_brand = resolve_brand_id(
-        brand_id=brand_id, product_name=product_name, brand_alias_map=brand_alias_map
-    )
-    brand_token = str(resolved_brand) if resolved_brand is not None else "unknown"
-    tokens = sorted(set(normalize_title(product_name)))
-    strict = f"{brand_token}:{'-'.join(tokens)}:{category}"
+    brand_token = str(brand_id) if brand_id is not None else "unknown"
+    sorted_tokens = sorted(set(tokens))
+    strict = f"{brand_token}:{'-'.join(sorted_tokens)}:{category}"
     relaxed = f"{brand_token}:{category}"
     return MatchKeys(strict=strict, relaxed=relaxed)

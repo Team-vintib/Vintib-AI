@@ -401,6 +401,10 @@ class InternalTextCompsSource(CompsSource):
     product_match_key`로 돌려준다 — BE가 상품 저장 시 `product.match_key`에 그대로
     반영하면, 구매자 화면은 이 값으로 DB 조회만 해서 동일 상품 시세를 보여줄 수 있다
     (RAG/AI 호출 없음, CH030 §5).
+
+    자유텍스트(상품명) → 브랜드+핵심 토큰 추출(당근마켓 1단계, CH031)은
+    `attribute_extraction.build_attribute_extractor()`가 만드는 구현체(regex 기본값/llm
+    옵트인)에 위임한다 — 이 클래스는 그 결과로 매칭 키만 조합한다.
     """
 
     key = "internal_text"
@@ -420,7 +424,7 @@ class InternalTextCompsSource(CompsSource):
 
         from datetime import UTC, datetime
 
-        from app.pricing import hedge, product_corpus
+        from app.pricing import attribute_extraction, hedge, product_corpus
         from app.pricing.product_match import build_match_keys
         from app.shared import be_client
 
@@ -432,11 +436,16 @@ class InternalTextCompsSource(CompsSource):
                 reason=ReasonCode.insufficient_comps,
             )
 
-        keys = build_match_keys(
+        extractor = attribute_extraction.build_attribute_extractor()
+        extracted = extractor.extract(
             product_name=product.title,
             brand_id=product.brand_id,
-            category=str(product.category_id),
             brand_alias_map=product_corpus.get_brand_alias_map(),
+        )
+        keys = build_match_keys(
+            tokens=extracted.tokens,
+            brand_id=extracted.brand_id,
+            category=str(product.category_id),
         )
 
         candidates = product_corpus.find_by_match_key(

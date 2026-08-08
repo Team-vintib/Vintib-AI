@@ -27,6 +27,7 @@ from sqlalchemy import DateTime, Integer, String, func, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from app.core.db import get_vector_engine
+from app.pricing.attribute_extraction import build_attribute_extractor
 from app.pricing.product_match import build_match_keys
 from app.shared import be_client
 
@@ -112,8 +113,14 @@ def refresh_category(category_id: int, *, page_size: int = 100) -> int:
 
     BE 조회가 실패하면(네트워크 오류 등) 0을 돌려주고 아무것도 갱신하지 않는다 — 호출부는
     다른 카테고리 갱신을 계속하면 된다(`be_client.fetch_products_page()`와 같은 관용 원칙).
+
+    **1단계(속성 추출) 백엔드는 조회 시점(`comps.InternalTextCompsSource`)과 항상 같아야
+    한다**(CH031) — 코퍼스가 regex 키로 채워져 있는데 조회는 llm 키로 하면(또는 반대) 같은
+    상품이어도 `strict` 문자열이 달라져 절대 매칭되지 않는다. 둘 다
+    `registry.ACTIVE_ATTRIBUTE_EXTRACTOR` 하나를 그대로 따르므로 저절로 일치한다.
     """
     alias_map = get_brand_alias_map()
+    extractor = build_attribute_extractor()
     page = 0
     updated = 0
     while True:
@@ -121,11 +128,13 @@ def refresh_category(category_id: int, *, page_size: int = 100) -> int:
         if fetched is None:
             break
         for item in fetched.items:
+            extracted = extractor.extract(
+                product_name=item.title, brand_id=item.brand_id, brand_alias_map=alias_map
+            )
             keys = build_match_keys(
-                product_name=item.title,
-                brand_id=item.brand_id,
+                tokens=extracted.tokens,
+                brand_id=extracted.brand_id,
                 category=str(item.category_id),
-                brand_alias_map=alias_map,
             )
             _upsert(item, keys.strict, keys.relaxed)
             updated += 1
