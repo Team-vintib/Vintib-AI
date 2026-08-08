@@ -61,8 +61,10 @@ public class Product extends BaseTimeEntity {
     @Column(name = "category_id", nullable = false)
     private Long categoryId;
 
-    @Column(name = "brand_id")
-    private Long brandId;
+    // FE가 브랜드 마스터에서 고르게 하지 않고 자유 텍스트로 받는다(브랜드 FK 제거) — 미등록
+    // 브랜드·오탈자·병기 표기까지 그대로 받아야 해서 브랜드 마스터로는 표현할 수 없다.
+    @Column(name = "brand", length = 100)
+    private String brand;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -155,7 +157,7 @@ public class Product extends BaseTimeEntity {
     private Product(
             Member seller,
             Long categoryId,
-            Long brandId,
+            String brand,
             String title,
             String description,
             String conditionGrade,
@@ -168,7 +170,7 @@ public class Product extends BaseTimeEntity {
             AiModelGender aiModelGender) {
         this.seller = seller;
         this.categoryId = categoryId;
-        this.brandId = brandId;
+        this.brand = brand;
         this.title = title;
         this.description = description;
         this.conditionGrade = conditionGrade;
@@ -208,7 +210,7 @@ public class Product extends BaseTimeEntity {
             String title,
             String description,
             Long categoryId,
-            Long brandId,
+            String brand,
             String conditionGrade,
             String sizeLabel,
             String color,
@@ -223,8 +225,8 @@ public class Product extends BaseTimeEntity {
         if (categoryId != null) {
             this.categoryId = categoryId;
         }
-        if (brandId != null) {
-            this.brandId = brandId;
+        if (brand != null) {
+            this.brand = brand;
         }
         if (conditionGrade != null) {
             this.conditionGrade = conditionGrade;

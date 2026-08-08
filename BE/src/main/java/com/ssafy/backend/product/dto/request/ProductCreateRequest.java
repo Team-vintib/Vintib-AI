@@ -21,8 +21,8 @@ public record ProductCreateRequest(
         @NotNull
         Long categoryId,
 
-        @Schema(example = "1")
-        Long brandId,
+        @Schema(description = "브랜드명. 마스터에서 고르지 않고 자유 텍스트로 받는다", example = "Maison Kitsuné")
+        String brand,
 
         @Schema(example = "A")
         String conditionGrade,

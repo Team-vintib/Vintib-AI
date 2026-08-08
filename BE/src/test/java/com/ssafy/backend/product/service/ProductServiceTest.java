@@ -25,7 +25,6 @@ import com.ssafy.backend.product.dto.response.AiQualityAnalysisStatus;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
-import com.ssafy.backend.product.entity.Brand;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductDefect;
@@ -36,7 +35,6 @@ import com.ssafy.backend.product.entity.SaleType;
 import com.ssafy.backend.product.port.LiveQueryPort;
 import com.ssafy.backend.product.port.SocialQueryPort;
 import com.ssafy.backend.product.port.dto.LinkedLiveSummary;
-import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductDefectRepository;
 import com.ssafy.backend.product.repository.ProductQualityFindingRepository;
@@ -77,9 +75,6 @@ class ProductServiceTest {
     private CategoryRepository categoryRepository;
 
     @Mock
-    private BrandRepository brandRepository;
-
-    @Mock
     private ProductDefectRepository productDefectRepository;
 
     @Mock
@@ -103,7 +98,7 @@ class ProductServiceTest {
     void setUp() {
         productService = new ProductService(
                 productRepository, memberRepository, productImageService, categoryRepository,
-                brandRepository, productDefectRepository, productQualityFindingRepository,
+                productDefectRepository, productQualityFindingRepository,
                 socialQueryPort, liveQueryPort, aiClient);
     }
 
@@ -115,7 +110,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", null, "M", null, null, null, null, null, false, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, null, false, null);
 
         ProductResponse response = productService.createProduct(SELLER_ID, request);
 
@@ -137,7 +132,7 @@ class ProductServiceTest {
                 "빈티지 자켓",
                 "설명",
                 CATEGORY_ID,
-                2L,
+                "리바이스",
                 "A급",
                 null,
                 "M",
@@ -172,7 +167,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", null, "M", null, null, null, null, null, false, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, null, false, null);
 
         productService.createProduct(SELLER_ID, request);
 
@@ -198,7 +193,7 @@ class ProductServiceTest {
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(false);
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", null, "M", null, null, null, null, null, false, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, null, false, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class)
@@ -212,7 +207,7 @@ class ProductServiceTest {
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", null, "M", null, null, null, null, null, true, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, null, true, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class)
@@ -228,7 +223,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", null, "M", null, null, null, null, null,
+                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, null,
                 true, com.ssafy.backend.product.entity.AiModelGender.FEMALE);
 
         ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
@@ -248,7 +243,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", 78.0, "M", null, null, null, null,
+                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", 78.0, "M", null, null, null, null,
                 List.of(new AiQualityFindingRequest(
                         ProductImageRole.FRONT, "소매 끝단 마모 의심",
                         new AiQualityFindingRequest.Box(58, 18, 24, 18))),
@@ -273,7 +268,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, 2L, "A급", null, "M", null, null, null, null,
+                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null,
                 List.of(new AiQualityFindingRequest(ProductImageRole.ADDITIONAL, "얼룩", null)),
                 false, null);
 
@@ -989,7 +984,7 @@ class ProductServiceTest {
         Product product = Product.builder()
                 .seller(seller)
                 .categoryId(CATEGORY_ID)
-                .brandId(2L)
+                .brand("리바이스")
                 .title("빈티지 자켓")
                 .build();
         product.registerDirectSale(50000L);
@@ -1002,10 +997,6 @@ class ProductServiceTest {
         when(category.getName()).thenReturn("자켓");
         when(categoryRepository.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
 
-        Brand brand = org.mockito.Mockito.mock(Brand.class);
-        when(brand.getName()).thenReturn("리바이스");
-        when(brandRepository.findById(2L)).thenReturn(Optional.of(brand));
-
         LinkedLiveSummary liveSummary = LinkedLiveSummary.builder()
                 .liveId(10L).title("빈티지 특가").status("SCHEDULED").build();
         when(liveQueryPort.findLinkedLive(1L)).thenReturn(Optional.of(liveSummary));
@@ -1013,7 +1004,7 @@ class ProductServiceTest {
         ProductDetailResponse response = productService.getProductDetail(2L, 1L);
 
         assertThat(response.categoryName()).isEqualTo("자켓");
-        assertThat(response.brandName()).isEqualTo("리바이스");
+        assertThat(response.brand()).isEqualTo("리바이스");
         assertThat(response.isWished()).isTrue();
         assertThat(response.sellerFollowerCount()).isEqualTo(120L);
         assertThat(response.sellerProductCount()).isEqualTo(45L);
@@ -1030,7 +1021,7 @@ class ProductServiceTest {
         Product product = Product.builder()
                 .seller(seller)
                 .categoryId(CATEGORY_ID)
-                .brandId(2L)
+                .brand("리바이스")
                 .title("빈티지 자켓")
                 .build();
         product.registerDirectSale(50000L);
@@ -1038,11 +1029,11 @@ class ProductServiceTest {
 
         Member otherSeller = org.mockito.Mockito.mock(Member.class);
         Product sameBrand = Product.builder()
-                .seller(otherSeller).categoryId(CATEGORY_ID).brandId(2L).title("같은 브랜드 상품").build();
+                .seller(otherSeller).categoryId(CATEGORY_ID).brand("리바이스").title("같은 브랜드 상품").build();
         ReflectionTestUtils.setField(sameBrand, "id", 2L);
         sameBrand.registerDirectSale(70000L);
         when(productRepository.findSimilarProducts(
-                eq(CATEGORY_ID), eq(1L), eq(2L), any(Pageable.class)))
+                eq(CATEGORY_ID), eq(1L), eq("리바이스"), any(Pageable.class)))
                 .thenReturn(List.of(sameBrand));
 
         ProductDetailResponse response = productService.getProductDetail(2L, 1L);

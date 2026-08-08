@@ -1,9 +1,10 @@
 -- 상품 데모 시드 101건 (DemoMemberSeeder @Order(1) 이후 실행).
 -- seller는 시드 계정 6명에게 배분
--- 브랜드 마스터에 없는 경우 brand_id = NULL, ai_model_enabled 기본값 false.
+-- brand는 브랜드 마스터 FK가 아니라 자유 텍스트다(BE 결정) — 브랜드가 없으면 NULL,
+-- ai_model_enabled 기본값 false.
 
 INSERT INTO product (
-    seller_id, category_id, brand_id, title, description,
+    seller_id, category_id, brand, title, description,
     condition_grade, size_label, color, material,
     sale_type, sale_status, price, ai_model_enabled, ai_model_gender,
     created_at, updated_at
@@ -42,7 +43,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintibb2@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'DENIM' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Maison Margiela'),
+          'Maison Margiela',
           'Maison Margiela 18FW PVC 패치 데님팬츠', '18FW 라인 10 남성. 뒷허리 PVC 밴딩·패치 디테일. 중청 워싱, 레귤러 핏. 밑단 수선(자연스럽게 작업됨). 오른다리 미세 오염 있음. Made in Italy.',
           'B', 'M', 'BLUE', 'Cotton 100%',
           'DIRECT_SALE', 'ON_SALE', 320000, false, NULL,
@@ -112,7 +113,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintibb1@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'DENIM' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BOTTOM' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Levi''s'),
+          'Levi''s',
           '리메이크 Levi''s 데님', '리메이크 된 리바이스 데님입니다. 일본 빈티지샵 ''matakiso''에서 구매하였습니다. 손이 잘 가지 않아 판매합니다. 실착은 1회이고, 정확한 사이즈는 문의 부탁드립니다. 편하게 문의 주세요.',
           'S', 'FREE', 'BLUE', 'Cotton 100%',
           'DIRECT_SALE', 'ON_SALE', 80000, false, NULL,
@@ -162,7 +163,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintibb2@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'JEWELRY' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'ACCESSORY' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Nike'),
+          'Nike',
           '나이키 슈프림 14k 골드 링 반지 박효신', '박효신님도 애착하셨던 19시즌 나이키 슈프림 14k 링입니다! 매물 없는 희귀한 제품이며, 사진보다 실물이 더 깔끔하고 예쁩니다. 주머니(파우치)와 함께 보내드립니다.',
           'A', 'FREE', 'YELLOW', '14k 금',
           'DIRECT_SALE', 'ON_SALE', 800000, false, NULL,
@@ -192,7 +193,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'HAT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'ACCESSORY' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Harley Davidson'),
+          'Harley Davidson',
           'Harley Davidson Cap', '할리데이비슨(Harley Davidson) 캡 모자입니다.',
           'A', 'FREE', 'BLACK', 'Cotton 100%',
           'DIRECT_SALE', 'ON_SALE', 80100, false, NULL,
@@ -252,7 +253,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'JACKET' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'OUTER' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name = '남성' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Polo Ralph Lauren'),
+          'Polo Ralph Lauren',
           '[M] 폴로랄프로렌 릴렉스 플리스 라인 트러커 자켓 새상품', '택 달린 새상품입니다. 실측 사이즈: 가슴 56 / 총장 62 / 어깨 17 / 소매 64 (단위: cm).',
           'S', 'M', NULL, NULL,
           'DIRECT_SALE', 'ON_SALE', 250000, false, NULL,
@@ -332,7 +333,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'SNEAKERS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'SHOES' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Adidas'),
+          'Adidas',
           '[280] 아디다스 x 스포티 앤 리치 삼바 버건디', '아디다스 x 스포티 앤 리치 삼바 OG 클라우드 화이트 컬리지에이트 버건디 280 사이즈입니다. 실착 2번 하여 상태 깨끗하고 좋습니다. 배송비는 판매자가 부담합니다.',
           'A', 'XL', 'RED', '가죽/스웨이드',
           'DIRECT_SALE', 'ON_SALE', 98000, false, NULL,
@@ -342,7 +343,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'SNEAKERS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'SHOES' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Nike'),
+          'Nike',
           '나이키 x 슈프림 에어포스 1 로우 블랙', '나이키 에어포스 1 로우 블랙 슈프림 콜라보 제품입니다. 전체적으로 사용감은 있지만 눈에 띄는 큰 흠집이나 오염 없이 상태 양호합니다. 박스 포함 풀 구성이며, 판매하는 상품은 모두 정품입니다. 실측 사이즈 및 착용샷 문의는 받지 않습니다.',
           'B', 'L', 'BLACK', 'Leather',
           'DIRECT_SALE', 'ON_SALE', 130000, false, NULL,
@@ -352,7 +353,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'SNEAKERS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'SHOES' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Nike'),
+          'Nike',
           'aa 나이키 에어조던 와이낫제로5 농구화 285', '약간의 사용감이 있지만 상태가 좋습니다. 관심 있으신 분은 자세히 보시고 구매 부탁드립니다. (제주/도서산간 추가 배송비 있습니다) ※ 묶음배송 할인: 2개 구매 시 배송비 무료, 4개 구매 시 20% 할인 + 배송비 무료',
           'A', 'XL', 'MIXED', 'Synthetic / Mesh',
           'DIRECT_SALE', 'ON_SALE', 28500, false, NULL,
@@ -362,7 +363,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'SNEAKERS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'SHOES' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Converse'),
+          'Converse',
           '290.컨버스 x 스투시 척70 하이 플루메리아 핑크', '컨버스 x 스투시 척70 핑크 (품번: A02052C) 제품입니다. 290 사이즈, 미시착 새상품입니다.',
           'S', 'XL', 'PINK', '캔버스',
           'DIRECT_SALE', 'ON_SALE', 175000, false, NULL,
@@ -372,7 +373,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'SNEAKERS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'SHOES' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Adidas'),
+          'Adidas',
           '아디다스 베이프 포럼84 로우 그린 카모', '크림(KREAM)에서 구매 후 2~3회 착용했습니다. 신발 소재 특성상 뒤쪽에 보풀이 있으니 참고 부탁드립니다. (구성품: 박스, 더스트백, 신발끈)',
           'A', 'S', 'GREEN', 'Leather / Suede',
           'DIRECT_SALE', 'ON_SALE', 150000, false, NULL,
@@ -922,7 +923,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintib2@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'SLEEVELESS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Issey Miyake'),
+          'Issey Miyake',
           'me ISSEY MIYAKE sleeveless 3', 'me Issey Miyake sleeveless 3. Size F 총장 57.5 어깨 27 가슴 30.5 (cm). Product Note: 45% Nylon 45% Polyester 10% Polyurethane',
           'A', 'FREE', 'PURPLE', '45% Nylon 45% Polyester 10% Polyurethane',
           'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
@@ -932,7 +933,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintib3@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'SLEEVELESS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Issey Miyake'),
+          'Issey Miyake',
           'me ISSEY MIYAKE sleeveless', 'me Issey Miyake sleeveless. Size F 총장 57.5 어깨 27 가슴 30.5 (cm). Product Note: 45% Nylon 45% Polyester 10% Polyurethane',
           'A', 'FREE', 'PINK', '45% Nylon 45% Polyester 10% Polyurethane',
           'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
@@ -942,7 +943,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintib4@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'SLEEVELESS' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Issey Miyake'),
+          'Issey Miyake',
           'me ISSEY MIYAKE 슬리브', 'me Issey Miyake 슬리브. Size F 총장 57.5 어깨 27 가슴 30.5 (cm). Product Note: 45% Nylon 45% Polyester 10% Polyurethane',
           'A', 'FREE', 'GREEN', '45% Nylon 45% Polyester 10% Polyurethane',
           'AUCTION', 'AUCTION_SCHEDULED', NULL, false, NULL,
@@ -952,7 +953,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintib3@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'SHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Issey Miyake'),
+          'Issey Miyake',
           'Odds On Issey Miyake dot shirt 2', 'Odds On Issey Miyake dot shirt 2. Size Free 총장 75 어깨 52 가슴 59 소매 56(cm). Product Note: 100% Cotton',
           'A', 'FREE', NULL, '면 100%',
           'DIRECT_SALE', 'ON_SALE', 170000, false, NULL,
@@ -962,7 +963,7 @@ INSERT INTO product (
       (
           (SELECT id FROM member WHERE email = 'vintib4@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'TOTE_BAG' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BAG' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'WOMEN' AND depth = 1))),
-          (SELECT id FROM brand WHERE name_en = 'Issey Miyake'),
+          'Issey Miyake',
           'Plantation Issey Miyake tote bag', 'Plantation Issey Miyake tote bag. Size OS 30x35(cm).',
           'A', 'FREE', NULL, NULL,
           'DIRECT_SALE', 'ON_SALE', 140000, false, NULL,

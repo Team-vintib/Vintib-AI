@@ -24,7 +24,6 @@ import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.product.dto.response.LinkedLiveSummaryResponse;
 import com.ssafy.backend.product.dto.response.SimilarProductResponse;
 import com.ssafy.backend.product.entity.AiModelCutStatus;
-import com.ssafy.backend.product.entity.Brand;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductDefect;
@@ -32,7 +31,6 @@ import com.ssafy.backend.product.entity.ProductImageRole;
 import com.ssafy.backend.product.entity.ProductQualityFinding;
 import com.ssafy.backend.product.entity.QualityInspectionStatus;
 import com.ssafy.backend.product.entity.SaleStatus;
-import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductDefectRepository;
 import com.ssafy.backend.product.repository.ProductQualityFindingRepository;
@@ -66,7 +64,6 @@ public class ProductService {
     private final MemberRepository memberRepository;
     private final ProductImageService productImageService;
     private final CategoryRepository categoryRepository;
-    private final BrandRepository brandRepository;
     private final ProductDefectRepository productDefectRepository;
     private final ProductQualityFindingRepository productQualityFindingRepository;
     private final SocialQueryPort socialQueryPort;
@@ -91,7 +88,7 @@ public class ProductService {
         Product product = Product.builder()
                 .seller(seller)
                 .categoryId(request.categoryId())
-                .brandId(request.brandId())
+                .brand(request.brand())
                 .title(request.title())
                 .description(request.description())
                 .conditionGrade(request.conditionGrade())
@@ -245,9 +242,6 @@ public class ProductService {
         String categoryName = product.getCategoryId() == null ? null : categoryRepository.findById(product.getCategoryId())
                 .map(Category::getName)
                 .orElse(null);
-        String brandName = product.getBrandId() == null ? null : brandRepository.findById(product.getBrandId())
-                .map(Brand::getName)
-                .orElse(null);
 
         Long sellerId = product.getSeller().getId();
         long sellerProductCount = productRepository.countBySeller_IdAndSaleStatusNot(sellerId, SaleStatus.DRAFT);
@@ -261,7 +255,7 @@ public class ProductService {
         List<SimilarProductResponse> similarProducts = productRepository.findSimilarProducts(
                         product.getCategoryId(),
                         productId,
-                        product.getBrandId(),
+                        product.getBrand(),
                         PageRequest.of(0, SIMILAR_PRODUCT_LIMIT))
                 .stream()
                 .map(SimilarProductResponse::from)
@@ -272,7 +266,6 @@ public class ProductService {
         return ProductDetailResponse.from(
                 product,
                 categoryName,
-                brandName,
                 images,
                 defects,
                 isWished,
@@ -333,7 +326,7 @@ public class ProductService {
                 request.title(),
                 request.description(),
                 request.categoryId(),
-                request.brandId(),
+                request.brand(),
                 request.conditionGrade(),
                 request.sizeLabel(),
                 request.color(),
