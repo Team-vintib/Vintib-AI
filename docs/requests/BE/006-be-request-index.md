@@ -35,10 +35,7 @@
 
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
-| 020 | `020-tryon-result-category.md` | TryOn | 미반영(순수 BE, AI 무관) | 서윤 파트 |
 | 041 | `041-refund-notification-dashboard.md` | Refund/Notification | 미반영 | 서윤 파트 |
-| 045 | `045-broadcast-summary-sale-type.md` | Live/Auction | 미반영 | 정윤 파트 |
-| 045 | `045-shipment-fallback-tracking-status-gap.md` | Order | 미반영, 참고용(FE 보정 완료, 블로킹 아님) | 서윤 파트 |
 
 `003`(Live/TryOn)·`038`·`039`·`040`(전부 TryOn)은 코드 전수 대조 결과 이미 반영 완료돼 삭제했다
 — 상세는 위 "2026-08-07 시착(TRYON) 관련 요청 4건 정리" 참고.
@@ -385,3 +382,27 @@ finding 전체 교체 — 빈 배열이면 전부 삭제)으로 동작하며, �
 "자체 통계 인프라가 급하지 않으면 044만으로 당분간 충분"하다는 조건이 이번 044 구현으로 충족돼
 같이 정리한다. 043이 원했던 "우리 플랫폼 자체 통계" 기반 히스토그램은 만든 게 아니다 — 실사용
 데이터가 쌓이면 그때 별도로 다시 논의한다.
+
+## 2026-08-08 정리 (020 반영 — 시착 결과 카테고리)
+
+`020-tryon-result-category.md` 반영·삭제 — `GET /users/{userId}/tryons`(목록)·`/{id}`(상세) 응답에
+`categoryId`/`categoryName`을 추가했다. 상품의 소분류(leaf) 카테고리를 카테고리 마스터
+depth=2(대분류, `HomeService.CATEGORY_TAB_DEPTH`와 동일 기준)까지 한 단계 올려서 낸다. 카테고리를
+못 찾으면 둘 다 `null`이다. 겸사겸사 확인해보니 "가상 시착 생성"(`POST /users/{id}/tryons`)이
+`docs/APIs.md`에 미구현으로 표시돼 있었는데(2026-08-07에 이미 구현 확인·반영된 상태였음) 갱신을
+안 해뒀던 것이라 체크 표시도 같이 바로잡았다.
+
+## 2026-08-08 정리 (045 두 건 반영)
+
+`045-broadcast-summary-sale-type.md` 반영·삭제 — `LiveBroadcastSummaryResponse.Result`에
+`saleType`/`registeredPrice`(편성 시점 상품의 판매 방식·가격)를 추가했다. `soldVia`/`finalPrice`
+(팔린 경로·가격)와 달리 안 팔린 상품에도 채워진다. 데이터는 이미 `ProductQueryPort.ProductCard`가
+갖고 있어 새 쿼리 없이 그대로 실었다. 겸사겸사 `LiveBroadcastResultController`의 Swagger 설명이
+"즉시구매는 아직 집계 안 함"이라고 낡게 남아 있던 것도 바로잡았다(실제 코드는 이미 즉시구매까지
+`soldVia=DIRECT_SALE`로 집계하고 있었다). `docs/APIs.md`에도 이 두 엔드포인트 자체가 통째로
+누락돼 있어 행을 새로 추가했다.
+
+`045-shipment-fallback-tracking-status-gap.md`도 반영·삭제 — `OrderService.deliver()`에서
+`shipment.updateTrackingStatus(TrackingStatus.DELIVERED)`를 함께 호출해, 웹훅 구독 실패 시
+즉시-확정 폴백 경로를 탄 주문도 `trackingStatus`가 정상적으로 채워지게 했다(웹훅 경로는 이미
+채워진 값을 멱등하게 덮어쓸 뿐이다).

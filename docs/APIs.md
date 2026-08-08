@@ -40,18 +40,9 @@
 | 마이페이지 요약 조회 | GET | `/users/{id}/mypage` | ✓ | MY-001~009 | ✓ |
 | 공개 회원/판매자 프로필 조회 | GET | `/users/{id}/profile` |  | MY-010 | ✓ |
 
-> 공개 프로필은 비회원도 조회 가능하며
-> `id/nickname/profileImageUrl/description/coverImageUrl/followerCount/followingCount/productCount/
-> liveCount/isFollowing/businessVerified`를 내려준다. 소개글은 `PATCH /users/{id}/bio`(선택 입력,
-> 부분 수정 아님 — 값을 안 보내면 지워짐)로 등록·수정한다.
+> 공개 프로필은 비회원도 조회 가능(`businessVerified` 포함). 소개글(`PATCH /users/{id}/bio`)은 부분 수정이 아니라 미입력 시 삭제된다.
 >
-> 프로필/커버 이미지는 상품 이미지·시착 프로필 사진과 동일한 presigned 2단계로 업로드한다:
-> 1) `POST .../profile-image/upload-url`(또는 `cover-image/upload-url`)로 key·업로드용 URL을 발급받는다(jpeg/png/webp만, 5분 만료)
-> 2) 받은 `uploadUrl`로 브라우저가 파일을 직접 PUT한다.
-> 3) `PUT .../profile-image`(또는 `cover-image`)에 `{key}`를 보내 확정하면 최종 공개 URL이
-> 저장된다(업로드 미확인·10MB 초과면 400). `DELETE .../profile-image`(또는 `cover-image`)로
-> 지울 수 있다 — 단 S3의 이전 객체 자체는 지우지 않고 참조만 비운다(공개 버킷의 비민감 이미지라
-> orphan을 남겨도 된다고 판단).
+> 프로필/커버 이미지는 presigned 2단계: `upload-url` 발급 → 클라이언트가 S3에 직접 PUT → `PUT .../profile-image`(또는 `cover-image`)에 `{key}` 전달해 확정. `DELETE`는 참조만 비우고 S3 객체는 남긴다.
 
 ## 사업자 (Businesses)
 
@@ -63,14 +54,13 @@
 | 세금계산서 발행 요청 | POST | `/orders/{orderId}/invoices` | ✓ | BIZ-002 | ✓ |
 | 세금계산서 조회 | GET | `/orders/{orderId}/invoices` | ✓ | BIZ-002 | ✓ |
 
-> 사업자 정보 수정(PATCH)은 구현하지 않는다 — 제출은 등록(POST)이 재제출까지 겸한다(REJECTED 상태에서만).
+> 사업자 정보 수정(PATCH)은 없다 — 등록(POST)이 재제출까지 겸한다(REJECTED 상태에서만 재제출 가능).
 
 ## 검색 / 추천 (Discovery)
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
-| 통합 검색 (상품, 라이브, 회원) | GET | `/search` |  | SEARCH-001, SEARCH-002 |  |
-| 개인화 추천 조회 | GET | `/users/{id}/picks` |  | REC-001 |  |
+| 통합 검색 (상품, 라이브, 회원) | GET | `/search` |  | SEARCH-001, SEARCH-002 | ✓ |
 
 ## 팔로우 / 찜 (Socials)
 
@@ -112,16 +102,15 @@
 | 카테고리 전체 목록 조회 | GET | `/categories` |  | PROD-001 | ✓ |
 | 브랜드 전체 목록 조회 | GET | `/brands` |  | PROD-001 | ✓ |
 
-> 상품 목록 조회(`GET /products`)는 `sellerId` 쿼리 파라미터로 특정 판매자의 상품만 필터링할 수 있다(공개 프로필 판매 상품 목록). 비회원도 조회 가능하다.
-> 상품 목록 조회 필터: `categoryIds`(복수), `conditionGrade`(복수), `saleType`(`DIRECT_SALE`/`AUCTION`), `minPrice`, `maxPrice`, `sort`(`LATEST`(기본값)/`PRICE_ASC`/`PRICE_DESC`).
+> `GET /products`는 `sellerId`로 판매자별 필터링 가능(비회원 조회 가능). 필터: `categoryIds`, `conditionGrade`, `saleType`, `minPrice`/`maxPrice`, `sort`.
 >
-> 상품 이미지는 `role`(`FRONT`/`BACK`/`ADDITIONAL`, 등록 시 필수)로 구분한다. 상품당 `FRONT`·`BACK`은 각 1장만 허용하며 중복 등록 시 400(`PRODUCT_IMAGE_ROLE_ALREADY_EXISTS`)이다. `ADDITIONAL`을 포함한 전체 이미지 상한은 여전히 10장이다. 이 컬럼이 생기기 전에 등록된 기존 이미지는 전부 `ADDITIONAL`로 채워져 있다.
+> 이미지 `role`(`FRONT`/`BACK`/`ADDITIONAL`, 등록 시 필수)은 상품당 `FRONT`·`BACK` 각 1장만 허용(중복 시 400). 전체 상한 10장.
 >
-> 상품 상세 조회(`GET /products/{id}`) 응답에는 `aiQualityAnalysis`(AI 품질 분석) 객체가 포함된다. 등록(`POST /products`)·수정(`PATCH /products/{id}`) 요청의 `aiQualityFindings`(판매자가 "하자로 인정"으로 확정한 후보 목록 — `photoRole`/`description`/`box`, `FRONT`·`BACK` 사진에만 등록 가능)를 저장했다가 사진별로 묶어 그대로 돌려준다. `status`는 `NOT_REQUESTED`(등록 시 findings 없음)/`NO_FINDINGS`(요청은 있었으나 0건)/`COMPLETED`(1건 이상) 세 가지뿐이다 — AI 분석이 진행 중이거나 실패한 상태는 BE로 전달되지 않는 시점의 데이터라 관측할 수 없다(FE가 AI 게이트웨이를 직접 폴링해 그 상태를 판단한다). `PATCH`의 `aiQualityFindings`는 `defects`와 같은 규칙이다 — null이면 미반영, 값을 보내면 기존 목록 전체 교체(빈 배열이면 전부 삭제). DRAFT 우선 생성 후 PATCH로 최종 제출하는 상품은 이 경로로 finding을 보낸다.
+> 상세 응답의 `aiQualityAnalysis`는 등록/수정 시 보낸 `aiQualityFindings`(사용자가 인정한 하자 — `photoRole`/`description`/`box`)를 사진별로 묶어 그대로 반환한다. `status`는 `NOT_REQUESTED`/`NO_FINDINGS`/`COMPLETED` 3종뿐(진행 중·실패는 BE가 관측 불가). `aiQualityFindings`는 `defects`처럼 null=미반영, 값 전달 시 전체 교체.
 >
-> 상품 정보 수정(`PATCH /products/{id}`)의 `price`(선택)로 상시 판매(`ON_SALE`) 중인 상품의 가격을 바로 바꿀 수 있다. 경매 상품(`saleType=AUCTION`)에 보내면 400(`INVALID_PRODUCT_STATE`) — 경매 시작가는 별도 API(`/products/{id}/auction-schedule`)로 다룬다.
+> `PATCH /products/{id}`의 `price`는 상시 판매(`ON_SALE`)에만 적용된다(경매 상품은 400 — 경매 시작가는 `/auction-schedule`에서 다룬다).
 >
-> `POST /products/price-estimates`는 등록 화면 "AI 가격 추천" 섹션용 경량 트리거다(044). 실제로 생성된 상품 없이도 `productName`/`categoryId`(선택)/`brand`(선택)/`conditionScore`/`conditionGrade`(`S`/`A`/`B`/`C`)만으로 호출할 수 있다 — FE는 등급 4개 각각에 대해 호출해 등급별 추천가를 만든다. BE는 AI 게이트웨이(`POST /pricing/estimates`, 컨테이너 내부망이라 외부에서 직접 호출 불가)를 그대로 프록시해 `jobId`만 돌려주고, `categoryId`는 BE 6종 `GarmentCategory` 매핑(하자 검수와 동일 테이블)으로 변환해 보낸다. 결과 폴링(`GET /ai/jobs/{jobId}`)은 FE가 외부 경로로 직접 한다 — BE는 재조회하지 않는다. AI 쪽 동시 처리 상한(2건)을 넘으면 503을 그대로 되돌려준다.
+> `POST /products/price-estimates`는 AI 가격 추천 트리거. 상품 생성 전에도 호출 가능하며 `jobId`만 반환한다 — 결과는 FE가 `GET /ai/jobs/{jobId}`로 직접 폴링한다.
 
 ## 라이브 / 채팅 (Lives)
 
@@ -138,26 +127,31 @@
 | 라이브 상품 해제 | DELETE | `/lives/{liveId}/products/{productId}` | ✓ | LIVE-003 | ✓ |
 | 영상 접속 토큰 발급 | POST | `/lives/{liveId}/video-token` |  | LIVE-004 | ✓ |
 | 채팅 메시지 목록 조회 | GET | `/lives/{liveId}/chat-messages` |  | CHAT-001 | ✓ |
+| 방송 종료 요약 조회 | GET | `/lives/{liveId}/summary` | ✓ | LIVE-006 | ✓ |
+| 방송별 유찰 상품 목록 조회 | GET | `/lives/{liveId}/unsold-products` | ✓ | LIVE-006 | ✓ |
 
-> 라이브 목록 조회는 `hostId` 쿼리 파라미터로 특정 호스트만 필터링할 수 있다(MY-005, 마이페이지 라이브 관리). 인증된 본인의 `hostId`를 넘기면 종료·취소된 방송까지 포함해 전체 상태를 볼 수 있고, 그 외에는 예정·진행 중만 보인다.
+> `GET /lives`는 `hostId`로 필터링 가능 — 본인이면 종료·취소 포함 전체, 아니면 예정·진행 중만.
 >
-> 채팅 메시지 전송은 REST API가 아닌 **STOMP WebSocket**으로 처리한다(`001-live-stomp-contract.md` 참고).
-> 라이브 상태 변경에서 방송을 종료할 때는 body `{ "status": "ENDED" }`를 전달한다. 호스트 본인만 허용(아니면 403), 이미 종료·취소된 방송은 400(멱등 아님).
+> 채팅 전송은 REST가 아닌 **STOMP WebSocket**. 방송 종료는 `PATCH .../status` body `{ "status": "ENDED" }`(호스트만, 멱등 아님).
+>
+> `summary`/`unsold-products`는 **호스트 본인만** 조회(판매 실적이라 비공개). `summary.results`는 편성 상품 전체 기준 — 낙찰(`AUCTION`)과 방송 중 정찰가 즉시구매(`DIRECT_SALE`)를 함께 집계하며, 안 팔린 상품에도 편성 시점 `saleType`/`registeredPrice`가 채워진다.
 
 ## 경매 / 입찰 (Auctions)
 
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
 | 경매 조건 설정 | POST | `/lives/{liveId}/auctions` | ✓ | AUCT-001 | ✓ |
-| 경매 시작 | POST | `/lives/{liveId}/auctions/{auctionId}/start` | ✓ | AUCT-002 |  |
-| 경매 조건 조회 | GET | `/products/{id}/auction` |  | AUCT-001 |  |
-| 경매 상세 조회 | GET | `/auctions/{id}` |  | AUCT-011 |  |
-| 입찰 내역 조회 | GET | `/auctions/{id}/bids` |  | AUCT-003~006 |  |
-| 입찰 | POST | `/auctions/{id}/bids` | ✓ | AUCT-003~010 |  |
-| 낙찰 결과 조회 | GET | `/auctions/{id}/winner` |  | AUCT-012, AUCT-013 |  |
+| 현재 경매 현황 조회 | GET | `/lives/{liveId}/auctions/current` |  | AUCT-001, AUCT-011 | ✓ |
+| 경매 시작 | POST | `/auctions/{auctionId}/start` | ✓ | AUCT-002 | ✓ |
+| 입찰 | POST | `/auctions/{auctionId}/bids` | ✓ | AUCT-003~010 | ✓ |
+| 입찰 내역 조회 | GET | `/auctions/{auctionId}/bids` |  | AUCT-003~006 | ✓ |
+| 낙찰 결과 조회 | GET | `/auctions/{auctionId}/winner` |  | AUCT-012, AUCT-013 | ✓ |
 
-> 경매 조건 설정 요청 바디: `{ productId, startPrice, bidUnit, durationSeconds }` → 생성된 경매(`status: "READY"`) 반환.
-> 생성(조건 설정)과 시작(`/start`)은 별개 API로 분리한다. 경매 시작 API는 아직 미구현.
+> 조건 설정 요청 바디: `{ productId, startPrice, bidUnit, durationSeconds }` → `status: "READY"` 반환. 진행 동작(시작/입찰/입찰내역/결과)은 `liveId` 없이 `/auctions/{auctionId}/...`로 처리한다.
+>
+> `current`는 라이브 진입 시 경매 패널 초기화용(RUNNING이 READY보다 우선, 둘 다 없으면 `data: null`). 변화는 `/topic/lives/{liveId}/auctions` STOMP 구독으로 받는다.
+>
+> **미구현**: `/products/{id}/auction`, `/auctions/{id}`(auctionId 단독 상세) — 상품 상세 페이지처럼 라이브 밖에서 경매 중인 상품의 현재가·종료 시각을 볼 방법이 없다.
 
 ## 포인트 / 출금 (Point)
 
@@ -170,7 +164,7 @@
 | 출금 신청 | POST | `/users/{id}/withdrawals` | ✓ | POINT-004, MY-007 | ✓ |
 | 출금 내역 조회 | GET | `/users/{id}/withdrawals` | ✓ | POINT-004, MY-007 | ✓ |
 
-> 포인트 충전은 토스페이먼츠 결제위젯(테스트 키) 연동이다. `ready`로 주문번호(`orderId`)와 위젯 클라이언트 키를 발급받아 FE가 위젯을 띄우고, 결제 성공 리다이렉트에서 받은 `paymentKey`/`orderId`/`amount`로 `confirm`을 호출하면 토스 승인 후 포인트가 적립된다. 계약은 `docs/requests/FE/026-toss-payments-charge-widget.md` 참고. 출금은 신청까지만 처리하며(관리자 승인 체계 없음), 완료 처리는 DB 직접 조작으로만 가능하다.
+> 포인트 충전은 토스페이먼츠 결제위젯 연동 — `ready`로 주문정보 발급, 결제 성공 후 `paymentKey`/`orderId`/`amount`로 `confirm` 호출 시 적립. 출금은 신청까지만 처리(완료는 DB 직접 조작).
 
 ## 주문 / 배송 / 환불 (Orders)
 
@@ -189,11 +183,11 @@
 | 환불 요청 등록 | POST | `/orders/{id}/refunds` | ✓ | REFUND-001 | ✓ |
 | 환불 승인, 거절 처리 | PATCH | `/refunds/{id}` | ✓ | REFUND-002 | ✓ |
 
-> 주문 목록 조회는 `role` 쿼리 파라미터(`BUYER`/`SELLER`, 필수)로 구매 내역(MY-003)/판매·정산 내역(MY-004)을 구분한다. 정산 완료 여부는 주문 상태가 `SETTLED`인지로 판단하며, 정산액은 수수료 없이 주문 금액 그대로다. 목록·상세 응답(`OrderListItemResponse`) 모두 `settledAt`(정산 완료 시각, `SETTLED`가 아니면 `null`)을 함께 낸다.
+> `role`(`BUYER`/`SELLER`, 필수)로 구매/판매 내역을 구분한다. `settledAt`은 `SETTLED`가 아니면 `null`.
 >
-> 상시 판매 즉시구매(`POST /orders`)로 주문을 생성하면 결제 금액이 구매자 포인트 `available`에서 `tradeEscrow`(거래 대금 보관)로 옮겨진다. 송장 등록(`POST /orders/{orderId}/shipment`)은 택배사 코드를 고정 목록(`CourierCode`)에서만 받으며, `deliveryapi.co.kr` 웹훅 구독에 성공하면 배송완료(`DELIVERED`)는 그 웹훅(`POST /webhooks/delivery`, 내부용·JWT 인증 아님·서명 검증)이 왔을 때만 반영된다. 구독에 실패하면(자격증명 미설정 등) 등록 즉시 배송완료로 처리하는 폴백을 쓴다. 배송완료 3일 뒤로 자동 구매 확정 시각을 계산해 둔다. 구매 확정(`POST /orders/{orderId}/confirmation`)은 수동 호출 또는 3일 경과 시 스케줄러가 자동으로 처리하며, `tradeEscrow`를 판매자 `available`로 정산하고 주문 상태를 `SETTLED`로 바꾼다(거래 완료). 경매 낙찰 주문(AUCT 연동)은 아직 범위 밖이다.
+> 즉시구매 시 결제액은 구매자 `available` → `tradeEscrow`로 이동한다. 배송완료는 `deliveryapi.co.kr` 웹훅 수신 시 반영(구독 실패 시 등록 즉시 반영 폴백). 배송완료 3일 후 자동 구매확정 → `tradeEscrow`를 판매자 `available`로 정산(`SETTLED`). 경매 낙찰 주문은 범위 밖.
 >
-> 환불(REFUND-001/002)은 **판매자**가 승인/거절한다(이 프로젝트엔 운영자 역할이 없어 사용자 지시로 결정 — `docs/plans/BE/SY037-refund.md` 참고). 구매자가 `PAID`/`SHIPPING`/`DELIVERED` 상태의 주문에 사유(`NOT_AS_DESCRIBED`/`UNDISCLOSED_DEFECT`/`NOT_SHIPPED`/`DUPLICATE_PAYMENT`/`SYSTEM_ERROR`)와 상세 사유를 담아 요청하면, 판매자가 승인/거절한다. 승인되면 보관 중이던 대금이 판매자에게 정산되지 않고 구매자 `available` 포인트로 바로 환급되며 주문이 `REFUNDED`로 바뀐다. 거절되면 주문은 요청 이전 상태 그대로 이어간다(재요청 가능). 이미 구매 확정·정산된 주문(`CONFIRMED`/`SETTLED`)은 환불 대상이 아니다.
+> 환불은 **판매자**가 승인/거절한다(운영자 없음). 승인 시 대금이 구매자 `available`로 즉시 환급, 거절 시 이전 상태 유지. `CONFIRMED`/`SETTLED` 이후는 환불 불가.
 
 ## AI 가상 시착 (TryOns)
 
@@ -203,10 +197,12 @@
 | 시착 프로필 조회 | GET | `/users/{userId}/tryon` | ✓ | TRYON-001, TRYON-002 | ✓ |
 | 시착 프로필 등록, 수정 | PUT | `/users/{userId}/tryon` | ✓ | TRYON-001, TRYON-002 | ✓ |
 | 시착 프로필 삭제 | DELETE | `/users/{userId}/tryon` | ✓ | TRYON-001 | ✓ |
-| 가상 시착 생성 | POST | `/users/{id}/tryons` | ✓ | TRYON-003, TRYON-004 |  |
+| 가상 시착 생성 | POST | `/users/{id}/tryons` | ✓ | TRYON-003, TRYON-004 | ✓ |
 | 시착 결과 목록 조회 | GET | `/users/{userId}/tryons` | ✓ | TRYON-005 | ✓ |
 | 시착 결과 상세 조회 | GET | `/users/{userId}/tryons/{id}` | ✓ | TRYON-005 | ✓ |
 | 시착 결과 삭제 | DELETE | `/users/{userId}/tryons/{id}` | ✓ | TRYON-005 | ✓ |
+
+> 시착 결과 응답에는 상품의 대분류 카테고리(`categoryId`/`categoryName`, depth=2 기준)가 포함된다. 못 찾으면 둘 다 `null`.
 
 ## 홈 (Home)
 
