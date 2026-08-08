@@ -1,0 +1,45 @@
+# [레거시] tryon_worker_catvton_legacy.py를 VLM(qwen3_vl)+FLUX(flux2_klein)+CatVTON 전부
+# 실백엔드로 돌리기 위한 통합 의존성 목록. CH027부터 기본 파이프라인(tryon_worker_example.py)
+# 은 CatVTON을 안 쓰므로 훨씬 가벼운 `requirements-tryon.txt`만 있으면 된다 -- 이 파일은
+# 레거시 파이프라인을 비교/롤백 목적으로 돌려볼 때만 필요하다.
+#
+# worker/models/catvton/requirements_catvton.txt(torch 2.4.1/diffusers 0.30.0/
+# transformers 4.46.3 pin)는 CatVTON 단독 검증 당시 버전이라 qwen3_vl(transformers>=5.0)/
+# flux2_klein(diffusers>=0.35)과 충돌한다 -- 이 파일을 대신 쓴다. 실제로 세 백엔드가 한
+# 프로세스에서 순차 로드/언로드하며 정상 동작하는 걸 확인한 조합을 그대로 고정했다(2026-08-07
+# 로컬 검증).
+#
+# 설치 순서(레거시 전용 환경, 기본 `tryon` 환경과 이름 겹치지 않게 별도로 만들 것):
+#   1) conda create -n tryon-catvton-legacy python=3.10 -y && conda activate tryon-catvton-legacy
+#   2) pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
+#   3) pip install -r requirements.txt -r requirements-tryon-full.txt   (둘 다, worker/ 기준)
+#
+# CUDA 12.4 wheel 기준. `nvidia-smi`의 Driver Version이 550 이상이면 CUDA 12.4를 지원한다
+# (RTX 4050 등 최신 드라이버면 대부분 문제 없음).
+
+accelerate==1.14.0
+av==17.1.0
+bitsandbytes==0.50.0
+diffusers==0.39.0
+fvcore==0.1.5.post20221221
+gguf==0.19.0
+huggingface_hub==1.26.0
+ImageIO==2.37.4
+numpy==2.2.6
+omegaconf==2.3.1
+opencv-python-headless==5.0.0.93
+packaging==26.2
+pillow==12.2.0
+portalocker==3.2.0
+pycocotools==2.0.11
+python-dateutil==2.9.0.post0
+python-dotenv==1.0.1
+pywin32==312
+PyYAML==6.0.3
+requests==2.34.2
+safetensors==0.8.0
+scikit-image==0.25.2
+scipy==1.15.3
+sentencepiece==0.2.2
+tokenizers==0.22.2
+transformers==5.14.1

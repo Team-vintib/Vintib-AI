@@ -1,0 +1,32 @@
+# tryon_worker_example.py(CH027: VLM + FLUX만, CatVTON 없음) 전용 의존성.
+#
+# 설치 순서:
+#   1) conda create -n tryon python=3.10 -y && conda activate tryon
+#   2) pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
+#   3) pip install requests==2.32.3 python-dotenv==1.0.1 -r requirements-tryon.txt   (worker/ 기준)
+#
+# ⚠️ worker/requirements.txt를 그대로 같이 설치하지 말 것 -- 그 파일의 numpy==1.26.4/
+# opencv-python-headless(다른 워커인 garment_measurement용)가 여기 numpy==2.2.6/
+# pillow==12.2.0과 버전 충돌한다(실측 확인). tryon 워커는 opencv가 필요 없으므로 위처럼
+# requests/python-dotenv만 따로 설치한다.
+#
+# CUDA 12.4 wheel 기준(nvidia-smi Driver Version 550 이상이면 지원).
+#
+# CatVTON을 쓰던 이전 파이프라인(`tryon_worker_catvton_legacy.py`)은 opencv/pycocotools/
+# fvcore 등 훨씬 무거운 세트가 필요했다(`requirements-tryon-full.txt` 참고) — CH027로
+# CatVTON 합성 단계 자체가 빠지면서 이 파일만으로 충분해졌다. `resize_and_crop`/
+# `resize_and_padding`(worker/models/catvton/utils.py)은 계속 쓰지만 그 파일 자체는
+# torch/accelerate/diffusers만 있으면 되고 cv2 계열은 필요 없다.
+
+accelerate==1.14.0
+bitsandbytes==0.50.0
+diffusers==0.39.0
+gguf==0.19.0
+huggingface_hub==1.26.0
+numpy==2.2.6
+packaging==26.2
+pillow==12.2.0
+safetensors==0.8.0
+sentencepiece==0.2.2
+tokenizers==0.22.2
+transformers==5.14.1
