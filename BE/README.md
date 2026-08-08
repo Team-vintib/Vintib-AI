@@ -190,8 +190,8 @@ BE/
 │   │   ├── repository/
 │   │   └── dto/
 │   ├── order/                    # 주문 생성(SALE-002)·배송지/송장(ORDER-001, SHIP-001/002)·구매확정/정산(ORDER-002/003)·세금계산서(BIZ-002)·구매/판매 내역(MY-003/004) — 서윤
-│   │   ├── controller/           # InvoiceController, OrderController(생성/조회/배송지/송장/확정), MyOrderController(구매/판매 내역)
-│   │   ├── service/              # InvoiceService, OrderService
+│   │   ├── controller/           # InvoiceController, OrderController(생성/조회/배송지/송장/확정), MyOrderController(구매/판매 내역), DeliveryWebhookController(배송 조회 웹훅 수신 + deliveryapi.co.kr 엔드포인트 등록, 수동 트리거 전용)
+│   │   ├── service/              # InvoiceService, OrderService, DeliveryWebhookService
 │   │   ├── entity/               # Order(낙찰 주문은 auction, 라이브 발생 주문은 live 를 가리킨다 — 방송 종료 요약이 이 값으로 집계), OrderStatus, OrderShipment(배송지+송장, 공유 PK 1:1), Invoice
 │   │   ├── repository/           # OrderRepository, OrderShipmentRepository, InvoiceRepository
 │   │   ├── scheduler/            # OrderAutoConfirmScheduler(ORDER-003, 배송완료 3일 후 자동 구매확정)
@@ -211,7 +211,6 @@ BE/
 │   └── global/                  # 도메인 무관 공통 — BE 2인 공유
 │       ├── client/              # AiClient(Spring → FastAPI), DeliveryTrackingClient(deliveryapi.co.kr 배송 조회 웹훅), TossPaymentsClient(결제위젯 승인), GoogleOAuthClient(구글 로그인)
 │       ├── config/              # SecurityConfig, JpaAuditingConfig, AiClientConfig, S3Config, WebSocketConfig, SchedulingConfig, DeliveryApiConfig, TossPaymentsConfig, GoogleOAuthConfig
-│       ├── delivery/            # DeliveryWebhookSetupController(웹훅 엔드포인트 등록, 수동 트리거 전용)
 │       ├── entity/              # BaseTimeEntity 등 공통 베이스 엔티티
 │       ├── exception/           # ErrorCode, CustomException, GlobalExceptionHandler
 │       ├── health/              # HealthController
