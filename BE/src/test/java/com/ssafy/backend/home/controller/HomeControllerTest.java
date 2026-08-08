@@ -83,15 +83,15 @@ class HomeControllerTest {
         // 실제 상품은 탭(depth=2)이 아니라 그 아래 소분류(depth=3)에 걸린다 — 탭 자신의
         // id를 쓰면 카테고리 탭 섹션 재귀 수집 버그를 테스트가 가려버린다.
         Long categoryId = 첫_번째_탭의_소분류().getId();
-        Product 상시판매 = Product.builder()
+        Product 정찰제 = Product.builder()
                 .seller(seller)
                 .categoryId(categoryId)
                 .title("리바이스 501 빈티지")
                 .build();
         // 빌더는 DRAFT 로 만든다 — 판매 방식을 정해야 홈에 나온다.
         // 상태를 바꾼 뒤 다시 save 해야 반영된다(save 가 돌려준 엔티티는 이미 준영속이다).
-        상시판매.registerDirectSale(45_000L);
-        productRepository.save(상시판매);
+        정찰제.registerDirectSale(45_000L);
+        productRepository.save(정찰제);
 
         Product 경매예정 = Product.builder()
                 .seller(seller)

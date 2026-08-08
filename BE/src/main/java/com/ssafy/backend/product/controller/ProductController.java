@@ -59,7 +59,7 @@ public class ProductController {
             summary = "상품 기본 정보 저장",
             description = "카테고리/브랜드/제목/설명/상태등급/사이즈/색상/소재/실측/하자를 입력해 DRAFT 상태의 상품 생성. "
                     + "실측(measurements)과 하자(defects)는 선택 입력. "
-                    + "판매 방식(상시 판매/경매)과 가격은 이 API에서 다루지 않고 이후 별도 API에서 설정.")
+                    + "판매 방식(정찰제/경매)과 가격은 이 API에서 다루지 않고 이후 별도 API에서 설정.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "등록 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
@@ -75,9 +75,9 @@ public class ProductController {
     }
 
     @Operation(
-            summary = "판매 가격 설정 및 상시 판매 등록",
-            description = "DRAFT(최초 등록) 또는 AUCTION_SCHEDULED(경매 예정 상품의 상시 판매 전환, "
-                    + "상태 상품에 가격을 설정해 상시 판매(ON_SALE) 상태로 전환.")
+            summary = "판매 가격 설정 및 정찰제 등록",
+            description = "DRAFT(최초 등록) 또는 AUCTION_SCHEDULED(경매 예정 상품의 정찰제 전환, "
+                    + "상태 상품에 가격을 설정해 정찰제(ON_SALE) 상태로 전환.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "전환 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -100,7 +100,7 @@ public class ProductController {
 
     @Operation(
             summary = "경매 상품 등록 및 경매 전환",
-            description = "DRAFT(최초 등록) 또는 ON_SALE(상시 판매 상품의 경매 전환) 상태 상품을 "
+            description = "DRAFT(최초 등록) 또는 ON_SALE(정찰제 상품의 경매 전환) 상태 상품을 "
                     + "경매 예정(AUCTION_SCHEDULED) 상태로 전환. "
                     + "시작가·증액 단위·경매 시간은 경매 시작 전 별도 API로 설정한다.")
     @ApiResponses({
@@ -220,7 +220,7 @@ public class ProductController {
             description = "제목/설명/카테고리/브랜드/상태등급/사이즈/색상/소재/실측/가격 부분 수정. 요청에 포함된 필드만 반영. "
                     + "하자(defects)·AI 품질 검수 finding(aiQualityFindings)은 둘 다 null이면 미반영, "
                     + "값을 보내면 기존 목록 전체 교체(빈 배열이면 전부 삭제). "
-                    + "가격(price)은 상시 판매(saleType=DIRECT_SALE) 상품만 수정 가능. — 경매 상품에 보내면 400. "
+                    + "가격(price)은 정찰제(saleType=DIRECT_SALE) 상품만 수정 가능. — 경매 상품에 보내면 400. "
                     + "DRAFT/ON_SALE/AUCTION_SCHEDULED 상태의 상품만 수정 가능.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),

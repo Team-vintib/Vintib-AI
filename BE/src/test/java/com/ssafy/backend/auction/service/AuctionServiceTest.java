@@ -190,7 +190,7 @@ class AuctionServiceTest {
 
     @Test
     void 조건을_설정하면_상품이_경매_예정으로_바뀐다() {
-        // 이게 빠져 있어서 조건을 걸어도 상품은 DRAFT·ON_SALE 에 머물렀고 홈에 상시 판매처럼 보였다.
+        // 이게 빠져 있어서 조건을 걸어도 상품은 DRAFT·ON_SALE 에 머물렀고 홈에 정찰제처럼 보였다.
         Live live = 진행중인_라이브();
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
         연결된_상품이다();

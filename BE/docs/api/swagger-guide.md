@@ -32,7 +32,7 @@
 | 홈 | `GET /api/home` | 홈 콘텐츠 조회 (현재 Mock) | 불필요 |
 | 홈 | `GET /api/home/following` | 팔로잉 콘텐츠 조회 (현재 Mock) | **필요** |
 | 상품 | `POST /api/products` | 상품 기본 정보 등록 | **필요** |
-| 상품 | `PATCH /api/products/{id}/status` | 판매 가격 설정·상시 판매 등록 | **필요** |
+| 상품 | `PATCH /api/products/{id}/status` | 판매 가격 설정·정찰제 등록 | **필요** |
 
 > 홈 API 두 개는 아직 **Mock 데이터**를 반환합니다. 응답 형태는 확정된 것이라 화면 개발을 시작하셔도 되지만, 값은 실제 데이터가 아닙니다.
 

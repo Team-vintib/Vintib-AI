@@ -18,7 +18,7 @@ public record HomeContentResponse(
         @Schema(description = "예약 라이브")
         List<LiveCardResponse> scheduledLives,
 
-        @Schema(description = "상시 판매 상품")
+        @Schema(description = "정찰제 상품")
         List<ProductCardResponse> onSaleProducts,
 
         @Schema(description = "경매 예정 상품")

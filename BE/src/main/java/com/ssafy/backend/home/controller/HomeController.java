@@ -22,7 +22,7 @@ public class HomeController {
     private final HomeService homeService;
 
     @Operation(summary = "홈 콘텐츠 조회",
-            description = "진행 중/예약 라이브, 상시 판매/경매 예정 상품, 카테고리별 상품 탭을 섹션별로 반환한다. "
+            description = "진행 중/예약 라이브, 정찰제/경매 예정 상품, 카테고리별 상품 탭을 섹션별로 반환한다. "
                     + "**비회원도 조회할 수 있다.** 다만 토큰을 함께 보내면 상품 카드의 `isWished`가 채워지고, "
                     + "비회원 요청이면 `isWished`는 null로 내려간다. 모든 섹션은 빈 배열일 수 있다. "
                     + "(현재 Mock 응답 — 상품 도메인 + 라이브 조회 질의가 준비되면 실데이터로 교체 예정)")

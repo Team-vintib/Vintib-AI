@@ -126,10 +126,10 @@ erDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> DRAFT : 상품 등록
-    DRAFT --> ON_SALE : 상시 판매 등록
+    DRAFT --> ON_SALE : 정찰제 등록
     DRAFT --> AUCTION_SCHEDULED : 경매 예정 설정
     ON_SALE --> AUCTION_SCHEDULED : 경매 전환 (PROD-004)
-    AUCTION_SCHEDULED --> ON_SALE : 상시 판매 전환 (PROD-004/PROD-005)
+    AUCTION_SCHEDULED --> ON_SALE : 정찰제 전환 (PROD-004/PROD-005)
     AUCTION_SCHEDULED --> AUCTION_IN_PROGRESS : 경매 시작 (AUCT-002)
     AUCTION_IN_PROGRESS --> AUCTION_SCHEDULED : 입찰자 없이 종료 (AUCT-014)
     ON_SALE --> SOLD : 상시 구매
@@ -140,7 +140,7 @@ stateDiagram-v2
 | 값 | 의미 |
 | --- | --- |
 | `DRAFT` | 등록 중(미공개) |
-| `ON_SALE` | 상시 판매 중 |
+| `ON_SALE` | 정찰제 중 |
 | `AUCTION_SCHEDULED` | 경매 예정 — 가격 없음, 홈에서 '경매 예정'으로 표시. 입찰자 없이 경매가 끝나도 다시 이 상태로 남는다 |
 | `AUCTION_IN_PROGRESS` | 경매 진행 중 — 상시 구매 즉시 중단 (LIVE-006) |
 | `SOLD` | 판매 완료(낙찰 포함) |
@@ -213,7 +213,7 @@ stateDiagram-v2
 | 보류 해제 후 재입찰은 가능 (AUCT-008) | 부분 인덱스라 `RELEASED`는 제외됨 | ✅ 성공 |
 | 낙찰인데 낙찰자·낙찰가 누락 방지 (AUCT-012) | `ck_auction_success_fields` | ✅ 거부됨 |
 | 포인트 잔액 음수 방지 | `ck_point_non_negative` | ✅ 거부됨 |
-| 상시 판매는 가격 필수 | `ck_product_price_by_type` | ✅ 거부됨 |
+| 정찰제는 가격 필수 | `ck_product_price_by_type` | ✅ 거부됨 |
 | 자기 자신에게 주문 방지 | `ck_order_not_self` | ✅ 거부됨 |
 | 회원 발언은 작성자 필수 (CHAT-001) | `ck_chat_user_has_member` | ✅ 거부됨 |
 | 자기 자신 팔로우 방지 | `ck_follow_not_self` | ✅ 거부됨 |
@@ -229,11 +229,11 @@ stateDiagram-v2
 
 **단, 애플리케이션이 이 성질을 깨뜨릴 수 있다.** 같은 회원의 재입찰을 처리하면서 기존 보류를 먼저 `RELEASED`로 바꾸면 제약이 통과해 버린다. 입찰 서비스 구현 시 **"같은 회원이 자기 자신을 상위 입찰하는 경로"를 명시적으로 막아야 한다.** DB 제약은 실수를 잡아주는 그물이지, 이 순서를 강제하지는 못한다.
 
-### 상시 판매 가격 제약의 실제 범위
+### 정찰제 가격 제약의 실제 범위
 
-`ck_product_price_by_type`은 **"상시 판매(`DIRECT_SALE`)에는 가격이 있어야 한다"만 강제한다.** 경매 상품에 가격이 들어가는 것은 막지 않는다.
+`ck_product_price_by_type`은 **"정찰제(`DIRECT_SALE`)에는 가격이 있어야 한다"만 강제한다.** 경매 상품에 가격이 들어가는 것은 막지 않는다.
 
-미낙찰 상품을 상시 판매로 전환할 때(`PROD-005`) `sale_type`과 `price`를 어느 순서로 갱신하든 통과해야 하기 때문이다. 양방향으로 조이면 전환 로직이 갱신 순서에 묶인다. "경매 예정 상품은 가격이 없다"는 **표시 규칙**(SEARCH-002에서 가격대 필터를 별도 처리)이지 저장 제약이 아니다.
+미낙찰 상품을 정찰제로 전환할 때(`PROD-005`) `sale_type`과 `price`를 어느 순서로 갱신하든 통과해야 하기 때문이다. 양방향으로 조이면 전환 로직이 갱신 순서에 묶인다. "경매 예정 상품은 가격이 없다"는 **표시 규칙**(SEARCH-002에서 가격대 필터를 별도 처리)이지 저장 제약이 아니다.
 
 ---
 
