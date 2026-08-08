@@ -2,11 +2,9 @@ package com.ssafy.backend.live.port;
 
 import com.ssafy.backend.global.config.S3Config.AwsProperties;
 import com.ssafy.backend.global.storage.S3StorageService;
-import com.ssafy.backend.product.entity.Brand;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductDefect;
-import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.Collection;
@@ -14,7 +12,6 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -33,7 +30,6 @@ public class ProductQueryAdapter implements ProductQueryPort {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
-    private final BrandRepository brandRepository;
     private final ProductImageQueryRepository productImageQueryRepository;
     private final ProductDefectQueryRepository productDefectQueryRepository;
     private final S3StorageService s3StorageService;
@@ -50,7 +46,6 @@ public class ProductQueryAdapter implements ProductQueryPort {
             return Map.of();
         }
 
-        Map<Long, String> brandNameById = brandNames(products);
         Map<Long, String> thumbnailByProductId = thumbnails(products);
         Map<Long, String> defectSummaryByProductId = defectSummaries(products);
 
@@ -59,7 +54,7 @@ public class ProductQueryAdapter implements ProductQueryPort {
                 product -> new ProductCard(
                         product.getId(),
                         product.getTitle(),
-                        product.getBrandId() == null ? null : brandNameById.get(product.getBrandId()),
+                        product.getBrand(),
                         product.getPrice(),
                         product.getSaleType() == null ? null : product.getSaleType().name(),
                         product.getSaleStatus() == null ? null : product.getSaleStatus().name(),
@@ -80,19 +75,6 @@ public class ProductQueryAdapter implements ProductQueryPort {
                 .collect(Collectors.groupingBy(
                         defect -> defect.getProduct().getId(),
                         Collectors.mapping(ProductDefect::getContent, Collectors.joining(", "))));
-    }
-
-    private Map<Long, String> brandNames(List<Product> products) {
-        List<Long> brandIds = products.stream()
-                .map(Product::getBrandId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-        if (brandIds.isEmpty()) {
-            return Map.of();
-        }
-        return brandRepository.findAllById(brandIds).stream()
-                .collect(Collectors.toMap(Brand::getId, Brand::getName));
     }
 
     /**

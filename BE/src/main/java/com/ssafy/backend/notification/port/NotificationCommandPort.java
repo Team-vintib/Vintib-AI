@@ -25,7 +25,13 @@ import com.ssafy.backend.member.entity.Member;
  *   <li>{@code POINT_CHARGED} — {@code PointCharge.status == DONE}이면 {@code confirmCharge}가
  *       실제 적립 로직(및 notify) 없이 바로 반환한다(토스 confirm 중복 호출 대비).</li>
  *   <li>{@code POINT_REFUNDED} — {@code RefundRequest}가 {@code REQUESTED}일 때만 승인할 수
- *       있고, 승인되면 상태가 바뀐다. 같은 요청을 두 번 승인할 수 없다.</li>
+ *       있고, 승인되면 상태가 바뀐다. 같은 요청을 두 번 승인할 수 없다. 환불 승인 결과 알림은
+ *       이걸로 충족한다 — {@code RefundService}가 별도로 {@code REFUND_APPROVED}를 만들지 않는다
+ *       (같은 이벤트에 알림이 두 번 생기지 않게).</li>
+ *   <li>{@code REFUND_REQUESTED} — 환불 요청(REFUND-001)은 {@code order.refundRequested}가 이미
+ *       {@code true}이거나 진행 중인 요청이 있으면 애초에 막힌다({@code RefundService#requestRefund}).</li>
+ *   <li>{@code REFUND_REJECTED} — 거절(REFUND-002)은 {@code RefundRequest.status ==
+ *       REQUESTED}일 때만 가능하고, 처리되면 상태가 바뀐다. 같은 요청을 두 번 거절할 수 없다.</li>
  *   <li>{@code LIVE_REMINDER} — 발송 표시(reminder.markNotified)와 알림 생성이 한 트랜잭션이라
  *       다음 스케줄러 주기가 같은 대상을 다시 집어내지 않는다({@code LiveReminderService#dispatchDue}).</li>
  * </ul>

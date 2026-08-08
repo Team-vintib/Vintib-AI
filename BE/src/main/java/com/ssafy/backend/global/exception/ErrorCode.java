@@ -118,6 +118,9 @@ public enum ErrorCode {
     CATEGORY_NOT_FOUND(HttpStatus.BAD_REQUEST, "P008", "존재하지 않는 카테고리입니다."),
     BRAND_NOT_FOUND(HttpStatus.BAD_REQUEST, "P009", "존재하지 않는 브랜드입니다."),
     AI_MODEL_GENDER_REQUIRED(HttpStatus.BAD_REQUEST, "P010", "AI 착용컷을 사용하려면 모델 성별을 지정해야 합니다."),
+    PRODUCT_IMAGE_ROLE_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "P011", "앞/뒤 사진은 각각 한 장씩만 등록할 수 있습니다."),
+    AI_QUALITY_FINDING_INVALID_PHOTO_ROLE(
+            HttpStatus.BAD_REQUEST, "P012", "AI 품질 검수 결과는 앞/뒤 사진에만 등록할 수 있습니다."),
 
     // [소셜(팔로우/찜)]
     WISH_ALREADY_EXISTS(HttpStatus.CONFLICT, "S001", "이미 찜한 상품입니다."),

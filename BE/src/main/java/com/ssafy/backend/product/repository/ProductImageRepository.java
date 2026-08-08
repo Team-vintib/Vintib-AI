@@ -1,8 +1,10 @@
 package com.ssafy.backend.product.repository;
 
 import com.ssafy.backend.product.entity.ProductImage;
+import com.ssafy.backend.product.entity.ProductImageRole;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -13,6 +15,12 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Long
     List<ProductImage> findAllByProductIdOrderBySortOrderAsc(Long productId);
 
     int countByProductId(Long productId);
+
+    // FRONT/BACK 중복 등록 방지 — 상품당 각각 한 장씩만 허용.
+    boolean existsByProductIdAndRole(Long productId, ProductImageRole role);
+
+    // AI 품질 검수 탭(aiQualityAnalysis)이 앞/뒤 사진의 원본 URL을 role로 찾을 때 쓴다.
+    Optional<ProductImage> findByProductIdAndRole(Long productId, ProductImageRole role);
 
     /** 여러 상품의 대표 이미지를 한 번에 가져온다 — 홈 팔로잉 콘텐츠의 상품 카드 썸네일용(N+1 방지). */
     List<ProductImage> findByProduct_IdInAndPrimaryTrue(Collection<Long> productIds);

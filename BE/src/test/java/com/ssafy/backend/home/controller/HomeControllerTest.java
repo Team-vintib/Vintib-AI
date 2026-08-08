@@ -18,6 +18,7 @@ import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ import org.springframework.web.context.WebApplicationContext;
  *
  * <p><b>홈이 Mock을 벗고 실데이터가 되면서 테스트도 실제 행을 심는다.</b> 예전에는 아무것도
  * 심지 않아도 하드코딩된 카드가 나왔는데, 바로 그 탓에 존재하지 않는 라이브가 홈에 뜨는
- * 정합성 버그가 있었다(FE 요청 004 §3.3). 이제는 <b>심은 것만 나오는지</b>를 본다.
+ * 정합성 버그가 있었다. 이제는 <b>심은 것만 나오는지</b>를 본다.
  */
 @SpringBootTest
 class HomeControllerTest {
@@ -79,7 +80,9 @@ class HomeControllerTest {
         seller = memberRepository.save(회원("빈티지장인"));
 
         // 홈은 "최신순 앞에서 N개"라, 테스트마다 새로 심은 것이 반드시 앞에 오게 된다.
-        Long categoryId = 최상위_카테고리().getId();
+        // 실제 상품은 탭(depth=2)이 아니라 그 아래 소분류(depth=3)에 걸린다 — 탭 자신의
+        // id를 쓰면 카테고리 탭 섹션 재귀 수집 버그를 테스트가 가려버린다.
+        Long categoryId = 첫_번째_탭의_소분류().getId();
         Product 상시판매 = Product.builder()
                 .seller(seller)
                 .categoryId(categoryId)
@@ -108,12 +111,21 @@ class HomeControllerTest {
     }
 
     /**
-     * 카테고리 탭은 대분류(부모 없는 카테고리)를 따른다. 시드 순서가 바뀌어도 깨지지 않게
-     * 이름을 박지 않고 마스터에서 첫 대분류를 가져온다.
+     * 카테고리 탭은 옷 종류 대분류(depth=2, 아우터/상의/... )를 따른다. 시드 순서가
+     * 바뀌어도 깨지지 않게 이름을 박지 않고 마스터에서 첫 탭을 가져온다.
      */
-    private Category 최상위_카테고리() {
+    private Category 첫_번째_탭() {
         return categoryRepository.findAllByOrderByIdAsc().stream()
-                .filter(category -> category.getParentId() == null)
+                .filter(category -> category.getDepth() == 2)
+                .findFirst()
+                .orElseThrow();
+    }
+
+    /** 첫 탭 바로 아래 소분류(depth=3) 하나 — 실제 상품이 걸리는 자리다. */
+    private Category 첫_번째_탭의_소분류() {
+        Long tabId = 첫_번째_탭().getId();
+        return categoryRepository.findAllByOrderByIdAsc().stream()
+                .filter(category -> Objects.equals(category.getParentId(), tabId))
                 .findFirst()
                 .orElseThrow();
     }
@@ -146,7 +158,7 @@ class HomeControllerTest {
 
     @Test
     void 진행_중_라이브_카드에_방송_상태와_호스트_ID가_담긴다() throws Exception {
-        // hostId 는 카드에서 판매자 프로필로 이동하는 데 쓴다(FE 요청 004 §3.1).
+        // hostId 는 카드에서 판매자 프로필로 이동하는 데 쓴다.
         mockMvc.perform(get("/api/home"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.liveNow[0].broadcastStatus").value("LIVE"))
@@ -155,7 +167,7 @@ class HomeControllerTest {
 
     @Test
     void 종료된_방송은_홈에_노출되지_않는다() throws Exception {
-        // FE 요청 004 §3.3 — 홈만 종료 라이브를 "진행 중"으로 내려 카드를 누르면 404가 났다.
+        // 홈만 종료 라이브를 "진행 중"으로 내려 카드를 누르면 404가 났다.
         Live 종료된_방송 = liveRepository.save(
                 Live.openNow(seller, "이미 끝난 방송", null, null, LocalDateTime.now()));
         종료된_방송.transitionTo(com.ssafy.backend.live.entity.LiveStatus.ENDED, LocalDateTime.now());
@@ -186,7 +198,7 @@ class HomeControllerTest {
 
     @Test
     void 상품_카드에_판매자명과_카테고리명이_담긴다() throws Exception {
-        // FE 가 "판매자 정보 확인 중" 으로 때우던 자리(FE 요청 009-home-card-response-fields).
+        // FE 가 "판매자 정보 확인 중" 으로 때우던 자리.
         mockMvc.perform(get("/api/home"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.onSaleProducts[0].sellerName").isNotEmpty())
@@ -230,18 +242,28 @@ class HomeControllerTest {
 
     @Test
     void 카테고리별_상품_탭_섹션이_카테고리_마스터를_따른다() throws Exception {
-        // 탭 구성은 카테고리 마스터(SY007)의 최상위 6개. 이름은 마스터를 그대로 따라가므로
-        // 하드코딩하지 않고 실제 첫 대분류와 맞는지만 본다.
-        List<Category> roots = categoryRepository.findAllByOrderByIdAsc().stream()
-                .filter(category -> category.getParentId() == null)
+        // 탭 구성은 카테고리 마스터(SY007)의 옷 종류 대분류(depth=2) 6개. 이름은 마스터를
+        // 그대로 따라가므로 하드코딩하지 않고 실제 첫 탭과 맞는지만 본다.
+        List<Category> tabs = categoryRepository.findAllByOrderByIdAsc().stream()
+                .filter(category -> category.getDepth() == 2)
                 .toList();
 
         mockMvc.perform(get("/api/home"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.categoryProductSections").isArray())
                 .andExpect(jsonPath("$.data.categoryProductSections.length()")
-                        .value(Math.min(6, roots.size())))
+                        .value(Math.min(6, tabs.size())))
                 .andExpect(jsonPath("$.data.categoryProductSections[0].title")
-                        .value(roots.get(0).getName()));
+                        .value(tabs.get(0).getName()));
+    }
+
+    @Test
+    void 소분류에_걸린_상품도_탭_섹션에_재귀적으로_묶인다() throws Exception {
+        // 028 — 상품은 탭 자신(depth=2)이 아니라 그 아래 소분류(depth=3)에 걸린다. 탭의 직계
+        // 자식만 모으면 이 상품이 어느 섹션에도 잡히지 않아 항상 빈 배열이 됐다.
+        mockMvc.perform(get("/api/home"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.categoryProductSections[0].products[?(@.name == '리바이스 501 빈티지')]")
+                        .isNotEmpty());
     }
 }
