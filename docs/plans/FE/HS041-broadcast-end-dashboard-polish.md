@@ -74,7 +74,7 @@ FE에서 **BE 유찰 목록 + 요약의 미판매 결과**를 `productId`로 합
 돌아갔을 때 상품별 결과의 가격과 배지가 방금 바꾼 값으로 보여야 하기 때문이다.
 
 **가격 수정은 BE 대기 중이다.** `PATCH /products/{id}/status`가 `ON_SALE`을 허용하지 않아
-정찰제 상품의 가격만 바꾸는 경로가 없다(요청 046). BE가 그 상태를 허용해 주면 지금 호출이 그대로
+정찰제 상품의 가격만 바꾸는 경로가 없다(요청 048). BE가 그 상태를 허용해 주면 지금 호출이 그대로
 통하므로 FE는 손댈 게 없다. 그때까지는 `P003` 응답을 "가격 수정은 아직 준비 중"으로 안내한다.
 
 ## 구현 파일
@@ -84,8 +84,8 @@ FE에서 **BE 유찰 목록 + 요약의 미판매 결과**를 `productId`로 합
 - `FE/src/domains/live/components/LiveUnsoldProductItem.vue`
 - `FE/src/domains/live/components/LiveUnsoldManage.vue`
 - `FE/src/domains/auction/types/liveAuction.types.ts`
-- `docs/requests/BE/045-broadcast-summary-sale-type.md`(별도 커밋, main 대상)
-- `docs/requests/BE/046-direct-sale-price-update.md`(별도 커밋, main 대상)
+- `docs/requests/BE/047-broadcast-summary-sale-type.md`(별도 커밋, main 대상)
+- `docs/requests/BE/048-direct-sale-price-update.md`(별도 커밋, main 대상)
 
 ## 확인 사항
 

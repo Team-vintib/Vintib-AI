@@ -111,7 +111,7 @@ const confirmDirectSale = async () => {
   } catch (error) {
     const apiError = normalizeApiError(error)
 
-    // 이미 상시 판매 중인 상품의 가격 수정은 아직 BE에 엔드포인트가 없다(P003, 요청 046).
+    // 이미 상시 판매 중인 상품의 가격 수정은 아직 BE에 엔드포인트가 없다(P003, 요청 048).
     // 지원되면 같은 호출이 그대로 통하므로 FE는 손댈 게 없다.
     errorMessage.value =
       wasDirectSale && apiError.code === 'P003'
