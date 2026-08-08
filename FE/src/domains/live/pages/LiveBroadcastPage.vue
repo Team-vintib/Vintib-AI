@@ -22,6 +22,7 @@ import LiveBroadcastEndDashboard from '@/domains/live/components/LiveBroadcastEn
 import LiveBroadcastHeader from '@/domains/live/components/LiveBroadcastHeader.vue'
 import LiveBroadcastInfo from '@/domains/live/components/LiveBroadcastInfo.vue'
 import LiveProductQueue from '@/domains/live/components/LiveProductQueue.vue'
+import { LIVE_TOPICS } from '@/domains/live/constants/liveRealtimeTopics'
 import LiveUnsoldManage from '@/domains/live/components/LiveUnsoldManage.vue'
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchState from '@/domains/live/components/LiveWatchState.vue'
@@ -34,6 +35,7 @@ import type {
   LiveWatchLoadState,
   LiveWatchMockScenario,
   LiveWatchViewData,
+  ProductSoldMessage,
 } from '@/domains/live/types/liveWatch.types'
 import type {
   AuctionSnapshot,
@@ -83,6 +85,7 @@ const now = ref(Date.now())
 const apiEnabled = isLiveWatchApiEnabled()
 let loadRequestId = 0
 let auctionSubscription: ReturnType<LiveRealtimeClient['subscribe']> | null = null
+let productSoldSubscription: ReturnType<LiveRealtimeClient['subscribe']> | null = null
 
 const getRouteLiveId = () => {
   const routeValue = Array.isArray(route.params.liveId)
@@ -501,18 +504,50 @@ const applyAuctionSnapshot = (snapshot: AuctionSnapshot) => {
 
 const clearAuctionSubscription = () => {
   auctionSubscription?.unsubscribe()
+  productSoldSubscription?.unsubscribe()
   auctionSubscription = null
+  productSoldSubscription = null
 }
 
 const handleRealtimeReady = (client: LiveRealtimeClient) => {
   if (!live.value || !client.connected()) return
 
+  const liveId = live.value.id
+
   clearAuctionSubscription()
-  auctionSubscription = client.subscribe(`/topic/lives/${live.value.id}/auctions`, (body) => {
+  auctionSubscription = client.subscribe(LIVE_TOPICS.auctions(liveId), (body) => {
     if (isAuctionEventMessage(body) && body.auction.liveId === live.value?.id) {
       applyAuctionSnapshot(body.auction)
     }
   })
+
+  // 시청 화면과 같은 구독 — 판매자도 정찰제로 팔린 상품을 바로 알아야 한다. 모르면 이미 팔린
+  // 상품에 경매를 걸려다 뒤늦게 거절당한다(BE 계약: 경매 낙찰은 이 토픽으로 오지 않는다).
+  productSoldSubscription = client.subscribe(LIVE_TOPICS.productSold(liveId), (body) => {
+    if (isProductSoldMessage(body)) {
+      applyProductSoldMessage(body)
+    }
+  })
+}
+
+const applyProductSoldMessage = (message: ProductSoldMessage) => {
+  if (!live.value || message.liveId !== live.value.id) return
+
+  const soldProduct = live.value.products.find((product) => product.id === message.productId)
+
+  if (soldProduct) {
+    soldProduct.saleStatus = 'SOLD'
+  }
+}
+
+function isProductSoldMessage(body: unknown): body is ProductSoldMessage {
+  return Boolean(
+    body &&
+    typeof body === 'object' &&
+    'liveId' in body &&
+    'productId' in body &&
+    Number.isInteger((body as ProductSoldMessage).productId),
+  )
 }
 
 const closeAuctionWin = () => {

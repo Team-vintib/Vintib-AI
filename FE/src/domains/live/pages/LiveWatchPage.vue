@@ -21,6 +21,7 @@ import {
 } from '@/domains/live/api/liveWatchApi'
 import LiveDirectSalePanel from '@/domains/live/components/LiveDirectSalePanel.vue'
 import LiveProductQueue from '@/domains/live/components/LiveProductQueue.vue'
+import { LIVE_TOPICS } from '@/domains/live/constants/liveRealtimeTopics'
 import LiveSelectedProduct from '@/domains/live/components/LiveSelectedProduct.vue'
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchHeader from '@/domains/live/components/LiveWatchHeader.vue'
@@ -46,6 +47,7 @@ import type {
   LiveWatchMockScenario,
   LiveWatchProduct,
   LiveWatchViewData,
+  ProductSoldMessage,
 } from '@/domains/live/types/liveWatch.types'
 import type { LiveTryOnMockScenario } from '@/domains/tryon/types/liveTryOn.types'
 
@@ -67,9 +69,6 @@ const live = ref<LiveWatchViewData | null>(null)
 const loadState = ref<LiveWatchLoadState>('loading')
 const errorMessage = ref('')
 const selectedProductId = ref<number | null>(null)
-// 시청자가 큐에서 직접 상품을 고른 적이 있는지 — 고른 뒤에는 판매자의 소개 상품 전환을 따라가지
-// 않고 시청자의 선택(과 그 상품 기준 구매 패널)을 유지한다.
-const hasViewerSelectedProduct = ref(false)
 const followStore = useFollowStore()
 const isFollowingHost = computed(() =>
   live.value
@@ -94,7 +93,8 @@ const isAuctionLoading = ref(false)
 const auctionLoadError = ref('')
 const dismissedAuctionResultId = ref<number | null>(null)
 const announcedAuctionId = ref<number | null>(null)
-const startedAuctionTitle = ref<string | null>(null)
+// 경매 시작 알림 — 확인 시 그 상품으로 이동해야 해서 제목만이 아니라 productId도 들고 있는다.
+const startedAuction = ref<{ productId: number; title: string } | null>(null)
 let startNoticeTimer: number | undefined
 const apiEnabled = isLiveWatchApiEnabled()
 
@@ -164,6 +164,7 @@ const handleToggleReminder = async () => {
 let loadRequestId = 0
 let statusSubscription: ReturnType<LiveRealtimeClient['subscribe']> | null = null
 let currentProductSubscription: ReturnType<LiveRealtimeClient['subscribe']> | null = null
+let productSoldSubscription: ReturnType<LiveRealtimeClient['subscribe']> | null = null
 let auctionSubscription: ReturnType<LiveRealtimeClient['subscribe']> | null = null
 
 const getRouteLiveId = () => {
@@ -288,7 +289,6 @@ const loadLiveWatch = async () => {
   clearRealtimeSubscriptions()
   live.value = null
   selectedProductId.value = null
-  hasViewerSelectedProduct.value = false
   purchaseProductId.value = null
   isPurchaseDialogOpen.value = false
   purchaseMessage.value = ''
@@ -387,10 +387,13 @@ const applyAuctionSnapshot = (snapshot: AuctionSnapshot | null) => {
     snapshot.auctionId !== announcedAuctionId.value
   ) {
     announcedAuctionId.value = snapshot.auctionId
-    startedAuctionTitle.value = snapshot.productTitle || '상품'
+    startedAuction.value = {
+      productId: snapshot.productId,
+      title: snapshot.productTitle || '상품',
+    }
     window.clearTimeout(startNoticeTimer)
     startNoticeTimer = window.setTimeout(() => {
-      startedAuctionTitle.value = null
+      startedAuction.value = null
     }, 4000)
   }
 
@@ -407,9 +410,18 @@ const closeAuctionResult = () => {
   dismissedAuctionResultId.value = auctionSnapshot.value?.auctionId ?? null
 }
 
-const dismissAuctionStart = () => {
+// 시작 알림의 확인을 누르면 그 경매 상품으로 바로 들어간다 — 상품이 선택되면 아래 패널도
+// 경매로 전환된다(isDirectSaleSelected가 경매 상품을 걸러낸다).
+// 알림이 저절로 사라지는 경우(4초 타임아웃)에는 선택을 건드리지 않는다.
+const enterStartedAuction = () => {
+  const started = startedAuction.value
+
   window.clearTimeout(startNoticeTimer)
-  startedAuctionTitle.value = null
+  startedAuction.value = null
+
+  if (started) {
+    selectedProductId.value = started.productId
+  }
 }
 
 const showLeaveConfirm = ref(false)
@@ -436,8 +448,8 @@ const leaveEndedLive = () => {
 }
 
 // 시청자가 큐에서 상품을 고르면 그 선택을 기준으로 상세 정보와 구매·경매 패널이 바뀐다.
+// 판매자가 다음 상품으로 넘어가면 다시 그쪽으로 맞춰진다(applyCurrentProductMessage).
 const selectQueueProduct = (productId: number) => {
-  hasViewerSelectedProduct.value = true
   selectedProductId.value = productId
 }
 
@@ -643,19 +655,25 @@ const handleRealtimeReady = (client: LiveRealtimeClient) => {
   const liveId = live.value?.id
   if (liveId === undefined) return
 
-  statusSubscription = client.subscribe(`/topic/lives/${liveId}/status`, (body) => {
+  statusSubscription = client.subscribe(LIVE_TOPICS.status(liveId), (body) => {
     if (isLiveStatusMessage(body)) {
       applyStatusMessage(body)
     }
   })
 
-  currentProductSubscription = client.subscribe(`/topic/lives/${liveId}/product`, (body) => {
+  currentProductSubscription = client.subscribe(LIVE_TOPICS.currentProduct(liveId), (body) => {
     if (isCurrentProductMessage(body)) {
       applyCurrentProductMessage(body)
     }
   })
 
-  auctionSubscription = client.subscribe(`/topic/lives/${liveId}/auctions`, (body) => {
+  productSoldSubscription = client.subscribe(LIVE_TOPICS.productSold(liveId), (body) => {
+    if (isProductSoldMessage(body)) {
+      applyProductSoldMessage(body)
+    }
+  })
+
+  auctionSubscription = client.subscribe(LIVE_TOPICS.auctions(liveId), (body) => {
     if (isAuctionEventMessage(body) && body.auction.liveId === liveId) {
       applyAuctionSnapshot(body.auction)
     }
@@ -665,9 +683,11 @@ const handleRealtimeReady = (client: LiveRealtimeClient) => {
 const clearRealtimeSubscriptions = () => {
   statusSubscription?.unsubscribe()
   currentProductSubscription?.unsubscribe()
+  productSoldSubscription?.unsubscribe()
   auctionSubscription?.unsubscribe()
   statusSubscription = null
   currentProductSubscription = null
+  productSoldSubscription = null
   auctionSubscription = null
 }
 
@@ -686,9 +706,9 @@ const applyStatusMessage = (message: LiveStatusMessage) => {
   }
 }
 
-// 판매자가 소개 상품을 바꾸면 시청자가 아직 아무 상품도 고르지 않은 동안에는 선택도 따라간다
-// — 방송이 소개 중인 상품이 그대로 선택 상품 정보·구매 패널에 뜬다(-430 QA).
-// 시청자가 큐에서 직접 상품을 고른 뒤에는 그 선택을 유지한다(구매 패널도 그 상품 기준).
+// 판매자가 소개 상품을 바꾸면 시청자 선택도 그 상품으로 맞춘다 — 방송이 지금 다루는 상품이
+// 선택 상품 정보·구매/경매 패널에 그대로 떠야 한다. 시청자가 다른 상품을 눌러 보고 있었더라도
+// 다음 전환 때 방송을 따라간다(-430 QA).
 const applyCurrentProductMessage = (message: CurrentProductMessage) => {
   if (!live.value || message.liveId !== live.value.id) return
 
@@ -697,8 +717,20 @@ const applyCurrentProductMessage = (message: CurrentProductMessage) => {
     currentProductId: message.currentProductId,
   }
 
-  if (!hasViewerSelectedProduct.value && message.currentProductId !== null) {
+  if (message.currentProductId !== null) {
     selectedProductId.value = message.currentProductId
+  }
+}
+
+// 정찰제 즉시구매로 팔린 상품을 큐에서 판매완료로 바꾼다. 구매 당사자도 같은 이벤트를 받지만
+// 이미 로컬에서 SOLD로 바꾼 뒤라 같은 값을 다시 넣는 것뿐이다(멱등) — 자기 이벤트를 거르지 않는다.
+const applyProductSoldMessage = (message: ProductSoldMessage) => {
+  if (!live.value || message.liveId !== live.value.id) return
+
+  const soldProduct = live.value.products.find((product) => product.id === message.productId)
+
+  if (soldProduct) {
+    soldProduct.saleStatus = 'SOLD'
   }
 }
 
@@ -709,6 +741,16 @@ function isLiveStatusMessage(body: unknown): body is LiveStatusMessage {
     'liveId' in body &&
     'status' in body &&
     typeof (body as LiveStatusMessage).status === 'string',
+  )
+}
+
+function isProductSoldMessage(body: unknown): body is ProductSoldMessage {
+  return Boolean(
+    body &&
+    typeof body === 'object' &&
+    'liveId' in body &&
+    'productId' in body &&
+    Number.isInteger((body as ProductSoldMessage).productId),
   )
 }
 
@@ -845,9 +887,9 @@ onBeforeUnmount(() => {
             />
 
             <LiveAuctionStartOverlay
-              v-if="startedAuctionTitle"
-              :product-title="startedAuctionTitle"
-              @close="dismissAuctionStart"
+              v-if="startedAuction"
+              :product-title="startedAuction.title"
+              @close="enterStartedAuction"
             />
           </div>
 
