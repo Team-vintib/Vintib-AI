@@ -291,7 +291,7 @@ def _load_qwen_vl_bundle(model_id: str, quantization: str):
     로더(`quality_vlm/loader.py`)는 dense 전용으로 그대로 두고 건드리지 않는다."""
     import re
 
-    from loader import VLMBundle, load_qwen_vl, select_device  # quality_vlm/loader.py
+    from quality_vlm.loader import VLMBundle, load_qwen_vl, select_device
 
     if not re.search(r"-A\d+B", model_id):
         return load_qwen_vl(model_id, quantization=quantization)
@@ -346,7 +346,7 @@ def label_with_qwen3_vl(
     model_id: str,
     quantization: str,
 ) -> list[dict[str, Any]]:
-    from loader import generate_from_image  # quality_vlm/loader.py
+    from quality_vlm.loader import generate_from_image
     from PIL import Image
 
     bundle = _load_qwen_vl_bundle(model_id, quantization)
