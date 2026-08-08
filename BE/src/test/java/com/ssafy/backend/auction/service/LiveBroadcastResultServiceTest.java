@@ -188,6 +188,26 @@ class LiveBroadcastResultServiceTest {
     }
 
     @Test
+    void 안_팔린_상품도_판매_방식과_등록가가_함께_담긴다() {
+        // soldVia/finalPrice(팔린 경로·가격)와 달리 saleType/registeredPrice(편성 시점 정보)는
+        // 안 팔린 상품에도 채워져야 대시보드가 "정찰제인데 안 팔림"을 구분할 수 있다(045).
+        호스트_확인_통과();
+        편성_상품이다(NO_AUCTION_PRODUCT_ID);
+        when(auctionRepository.findByLiveIdAndStatusInOrderByIdAsc(eq(LIVE_ID), anyCollection()))
+                .thenReturn(List.of());
+        즉시구매_주문이_없다();
+        ProductCard card = new ProductCard(
+                NO_AUCTION_PRODUCT_ID, "니트", null, 45_000L, "DIRECT_SALE", null, null, null, null, null, null);
+        when(productQueryPort.findCards(any())).thenReturn(Map.of(NO_AUCTION_PRODUCT_ID, card));
+
+        LiveBroadcastSummaryResponse.Result result = service.getSummary(LIVE_ID, HOST_ID).results().get(0);
+
+        assertThat(result.status()).isEqualTo("UNSOLD");
+        assertThat(result.saleType()).isEqualTo("DIRECT_SALE");
+        assertThat(result.registeredPrice()).isEqualTo(45_000L);
+    }
+
+    @Test
     void 낙찰과_즉시구매가_섞이면_총_판매액에_함께_더해진다() {
         호스트_확인_통과();
         편성_상품이다(SOLD_PRODUCT_ID, NO_AUCTION_PRODUCT_ID);

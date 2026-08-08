@@ -17,7 +17,6 @@ import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.port.SocialQueryPort;
-import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductImageRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
@@ -54,9 +53,6 @@ class FollowingServiceTest {
     private CategoryRepository categoryRepository;
 
     @Mock
-    private BrandRepository brandRepository;
-
-    @Mock
     private SocialQueryPort socialQueryPort;
 
     @Mock
@@ -85,7 +81,6 @@ class FollowingServiceTest {
                 productRepository,
                 productImageRepository,
                 categoryRepository,
-                brandRepository,
                 socialQueryPort,
                 s3StorageService,
                 awsProperties,
@@ -132,7 +127,6 @@ class FollowingServiceTest {
                 .thenReturn(List.of(product));
         when(productImageRepository.findByProduct_IdInAndPrimaryTrue(anyCollection())).thenReturn(List.of());
         when(categoryRepository.findAllById(anyCollection())).thenReturn(List.of());
-        when(brandRepository.findAllById(anyCollection())).thenReturn(List.of());
         when(socialQueryPort.isWishedBy(eq(100L), eq(VIEWER_ID))).thenReturn(true);
 
         FollowingContentResponse response = followingService.getFollowingContent(VIEWER_ID);

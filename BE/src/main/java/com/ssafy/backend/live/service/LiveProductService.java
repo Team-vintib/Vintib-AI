@@ -7,6 +7,7 @@ import com.ssafy.backend.live.dto.request.LiveProductLinkRequest;
 import com.ssafy.backend.live.dto.response.LiveProductResponse;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveProduct;
+import com.ssafy.backend.live.entity.LiveStatus;
 import com.ssafy.backend.live.port.ProductQueryPort;
 import com.ssafy.backend.live.port.ProductQueryPort.CategorySummary;
 import com.ssafy.backend.live.port.ProductQueryPort.ProductCard;
@@ -38,6 +39,9 @@ import org.springframework.web.client.RestClientException;
 @Transactional(readOnly = true)
 public class LiveProductService {
 
+    // 아직 끝나지 않은 방송 상태 — 이 상태의 방송에 상품이 걸려 있으면 다른 방송에 또 걸 수 없다.
+    private static final Set<LiveStatus> OPEN_LIVE_STATUSES = Set.of(LiveStatus.SCHEDULED, LiveStatus.LIVE);
+
     private final LiveRepository liveRepository;
     private final LiveProductRepository liveProductRepository;
     private final ProductQueryPort productQueryPort;
@@ -66,6 +70,13 @@ public class LiveProductService {
             if (!product.sellerId().equals(hostId)) {
                 throw new CustomException(ErrorCode.NOT_PRODUCT_OWNER);
             }
+            // 아직 끝나지 않은 다른 라이브에 이미 걸려 있는 상품을 또 걸면 상품 상세의
+            // "연결된 라이브" 조회가 라이브 무관 유일성을 전제하고 있어 깨진다 — 여기서
+            // 400/409로 막는다. 종료/취소된 라이브의 연결은 재사용을 막지 않는다.
+            if (liveProductRepository.existsByProductIdAndRemovedAtIsNullAndLive_StatusIn(
+                    productId, OPEN_LIVE_STATUSES)) {
+                throw new CustomException(ErrorCode.PRODUCT_ALREADY_LINKED);
+            }
             liveProductRepository.save(LiveProduct.link(live, product.id(), sortOrder++, now));
             seedChatRagDocument(live.getId(), cards.get(productId));
         }
@@ -85,7 +96,11 @@ public class LiveProductService {
         if (!product.sellerId().equals(hostId)) {
             throw new CustomException(ErrorCode.NOT_PRODUCT_OWNER);
         }
-        if (liveProductRepository.existsByLiveIdAndProductIdAndRemovedAtIsNull(liveId, product.id())) {
+        // 같은 라이브 중복뿐 아니라, 아직 끝나지 않은 다른 라이브에 이미 걸려 있는 경우도
+        // 막는다 — 상품 상세의 "연결된 라이브" 조회가 라이브 무관 유일성을 전제한다.
+        // 종료/취소된 라이브의 연결은 재사용을 막지 않는다.
+        if (liveProductRepository.existsByProductIdAndRemovedAtIsNullAndLive_StatusIn(
+                product.id(), OPEN_LIVE_STATUSES)) {
             throw new CustomException(ErrorCode.PRODUCT_ALREADY_LINKED);
         }
 

@@ -10,12 +10,10 @@ import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveStatus;
 import com.ssafy.backend.live.repository.LiveRepository;
 import com.ssafy.backend.member.entity.Member;
-import com.ssafy.backend.product.entity.Brand;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.port.SocialQueryPort;
-import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductImageRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
@@ -62,7 +60,6 @@ public class FollowingService {
     private final ProductRepository productRepository;
     private final ProductImageRepository productImageRepository;
     private final CategoryRepository categoryRepository;
-    private final BrandRepository brandRepository;
     private final SocialQueryPort socialQueryPort;
     private final S3StorageService s3StorageService;
     private final AwsProperties awsProperties;
@@ -177,16 +174,11 @@ public class FollowingService {
         Map<Long, String> categoryNameById = categoryRepository.findAllById(categoryIds).stream()
                 .collect(Collectors.toMap(Category::getId, Category::getName));
 
-        List<Long> brandIds =
-                products.stream().map(Product::getBrandId).filter(Objects::nonNull).distinct().toList();
-        Map<Long, String> brandNameById = brandRepository.findAllById(brandIds).stream()
-                .collect(Collectors.toMap(Brand::getId, Brand::getName));
-
         return products.stream()
                 .map(product -> new ProductCardResponse(
                         product.getId(),
                         product.getTitle(),
-                        brandNameById.get(product.getBrandId()),
+                        product.getBrand(),
                         thumbnailByProductId.get(product.getId()),
                         "NORMAL",
                         "ON_SALE",

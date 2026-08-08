@@ -9,18 +9,27 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.storage.S3StorageService;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import com.ssafy.backend.product.service.ProductImageService;
 import com.ssafy.backend.tryon.dto.response.TryOnResultResponse;
+import com.ssafy.backend.tryon.dto.response.TryOnResultResponse.TopCategory;
 import com.ssafy.backend.tryon.entity.MemberBodyProfile;
 import com.ssafy.backend.tryon.entity.TryOnResult;
 import com.ssafy.backend.tryon.entity.TryOnResultStatus;
 import com.ssafy.backend.tryon.repository.MemberBodyProfileRepository;
 import com.ssafy.backend.tryon.repository.TryOnResultRepository;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,6 +53,10 @@ public class TryOnResultService {
     private static final String DEFAULT_MASK_TYPE = "upper";
     private static final String DEFAULT_FIT_TYPE = "regular";
 
+    // 카테고리 마스터의 대분류 depth(HomeService.CATEGORY_TAB_DEPTH와 동일 기준 —
+    // 1=성별, 2=옷 종류(상의/하의/아우터/원피스/신발/가방/액세서리...), 3=소분류).
+    private static final short TOP_CATEGORY_DEPTH = 2;
+
     private final TryOnResultRepository tryOnResultRepository;
     private final MemberRepository memberRepository;
     private final ProductRepository productRepository;
@@ -52,6 +65,7 @@ public class TryOnResultService {
     private final S3StorageService s3StorageService;
     private final AwsProperties awsProperties;
     private final AiClient aiClient;
+    private final CategoryRepository categoryRepository;
 
     /**
      * <b>쓰기 트랜잭션이어야 한다.</b> 클래스 기본({@code readOnly = true})을 그대로 쓰면
@@ -64,8 +78,11 @@ public class TryOnResultService {
         List<TryOnResult> results =
                 tryOnResultRepository.findAllByMemberIdAndDeletedAtIsNullOrderByCreatedAtDesc(memberId);
         results.stream().filter(TryOnResult::isPending).forEach(this::refreshStatus);
+        Map<Long, TopCategory> topCategories = resolveTopCategories(
+                results.stream().map(result -> result.getProduct().getCategoryId()).toList());
         return results.stream()
-                .map(result -> TryOnResultResponse.of(result, resultImageUrl(result)))
+                .map(result -> TryOnResultResponse.of(
+                        result, resultImageUrl(result), topCategories.get(result.getProduct().getCategoryId())))
                 .toList();
     }
 
@@ -76,7 +93,48 @@ public class TryOnResultService {
         if (result.isPending()) {
             refreshStatus(result);
         }
-        return TryOnResultResponse.of(result, resultImageUrl(result));
+        TopCategory topCategory = resolveTopCategories(List.of(result.getProduct().getCategoryId()))
+                .get(result.getProduct().getCategoryId());
+        return TryOnResultResponse.of(result, resultImageUrl(result), topCategory);
+    }
+
+    /**
+     * 상품(leaf, 보통 depth=3) 카테고리 id들을 대분류(depth=2)로 올려서 묶는다
+     * (`docs/requests/BE/020-tryon-result-category.md`). 카테고리 트리가 3단계뿐이라 최대
+     * 2단계(리프 조회 → 부모 조회)면 끝난다 — 재귀 대신 배치 조회 두 번으로 처리한다.
+     */
+    private Map<Long, TopCategory> resolveTopCategories(Collection<Long> productCategoryIds) {
+        Set<Long> leafIds = new HashSet<>(productCategoryIds);
+        leafIds.remove(null);
+        if (leafIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, Category> leafById = new HashMap<>();
+        categoryRepository.findAllById(leafIds).forEach(category -> leafById.put(category.getId(), category));
+
+        Set<Long> parentIdsNeeded = leafById.values().stream()
+                .filter(category -> category.getDepth() != TOP_CATEGORY_DEPTH)
+                .map(Category::getParentId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, Category> parentById = new HashMap<>();
+        if (!parentIdsNeeded.isEmpty()) {
+            categoryRepository.findAllById(parentIdsNeeded).forEach(category -> parentById.put(category.getId(), category));
+        }
+
+        Map<Long, TopCategory> result = new HashMap<>();
+        for (Long leafId : leafIds) {
+            Category leaf = leafById.get(leafId);
+            if (leaf == null) {
+                continue;
+            }
+            Category top = leaf.getDepth() == TOP_CATEGORY_DEPTH ? leaf : parentById.get(leaf.getParentId());
+            if (top != null) {
+                result.put(leafId, new TopCategory(top.getId(), top.getName()));
+            }
+        }
+        return result;
     }
 
     @Transactional
@@ -137,7 +195,8 @@ public class TryOnResultService {
                 .build();
         tryOnResultRepository.save(result);
 
-        return TryOnResultResponse.of(result, null);
+        TopCategory topCategory = resolveTopCategories(List.of(product.getCategoryId())).get(product.getCategoryId());
+        return TryOnResultResponse.of(result, null, topCategory);
     }
 
     @Transactional
@@ -164,7 +223,8 @@ public class TryOnResultService {
                 .build();
         tryOnResultRepository.save(result);
 
-        return TryOnResultResponse.of(result, resultImageUrl(result));
+        TopCategory topCategory = resolveTopCategories(List.of(product.getCategoryId())).get(product.getCategoryId());
+        return TryOnResultResponse.of(result, resultImageUrl(result), topCategory);
     }
 
     private void refreshStatus(TryOnResult result) {
