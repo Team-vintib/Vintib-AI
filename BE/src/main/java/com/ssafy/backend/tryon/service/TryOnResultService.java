@@ -53,12 +53,24 @@ public class TryOnResultService {
     private final AwsProperties awsProperties;
     private final AiClient aiClient;
 
+    /**
+     * <b>쓰기 트랜잭션이어야 한다.</b> 클래스 기본({@code readOnly = true})을 그대로 쓰면
+     * {@link #refreshStatus}가 건드린 엔티티 변경이 커밋 시점에 플러시되지 않고 조용히
+     * 버려진다(Hibernate가 read-only 트랜잭션에서 flush mode를 MANUAL로 돌린다) — 목록을
+     * 아무리 다시 불러도 완료된 job이 영원히 PENDING으로 남던 원인이었다(실측으로 발견).
+     */
+    @Transactional
     public List<TryOnResultResponse> getResults(Long memberId) {
-        return tryOnResultRepository.findAllByMemberIdAndDeletedAtIsNullOrderByCreatedAtDesc(memberId).stream()
+        List<TryOnResult> results =
+                tryOnResultRepository.findAllByMemberIdAndDeletedAtIsNullOrderByCreatedAtDesc(memberId);
+        results.stream().filter(TryOnResult::isPending).forEach(this::refreshStatus);
+        return results.stream()
                 .map(result -> TryOnResultResponse.of(result, resultImageUrl(result)))
                 .toList();
     }
 
+    /** {@link #getResults}와 같은 이유로 쓰기 트랜잭션이어야 한다. */
+    @Transactional
     public TryOnResultResponse getResult(Long memberId, Long resultId) {
         TryOnResult result = getOwnedResult(memberId, resultId);
         if (result.isPending()) {

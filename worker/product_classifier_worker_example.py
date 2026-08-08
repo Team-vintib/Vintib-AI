@@ -93,6 +93,7 @@ class ProductClassifierWorker(BaseWorker):
         """
         self._ensure_loaded()
         started = time.perf_counter()
+        print(f"[{self.worker_id}] payload 수신: {payload}")
 
         raw_product_id = payload.get("product_id")
         product_id = int(raw_product_id) if raw_product_id is not None else None
@@ -127,7 +128,7 @@ class ProductClassifierWorker(BaseWorker):
                 f"카테고리·색상 모두 실패: category={category_error}, color={color_error}"
             )
 
-        return {
+        result = {
             "product_id": product_id,
             "fields": fields,
             "model": {
@@ -142,6 +143,8 @@ class ProductClassifierWorker(BaseWorker):
             "taxonomy_version": TAXONOMY_VERSION,
             "latency_ms": round((time.perf_counter() - started) * 1000, 3),
         }
+        print(f"[{self.worker_id}] 결과 전송: {result}")
+        return result
 
 
 if __name__ == "__main__":

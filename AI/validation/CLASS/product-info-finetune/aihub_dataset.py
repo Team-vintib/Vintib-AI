@@ -292,12 +292,20 @@ def map_subcategory(
     *,
     short_pants_max_cm: float | None = None,
     derive_from_excluded_tops: bool = DERIVE_FROM_EXCLUDED_TOPS,
+    bottom_pseudo_labels: dict[str, str] | None = None,
 ) -> tuple[str | None, str]:
     """AI-Hub 라벨 → 우리 소분류 코드. 반환은 `(코드 또는 None, 사유)`.
 
-    브리핑 §5의 우선순위 그대로: 후드 → 민소매 → 숏팬츠 → 직접 매핑표. 앞의 규칙이 이긴다.
-    매핑 못 한 이유를 문자열로 같이 돌려주는 건 scan이 "왜 몇 건이 빠졌는지"를 집계하기
-    위해서다(조용히 버리면 커버리지를 오판한다).
+    브리핑 §5의 우선순위 그대로: 후드 → 민소매 → 숏팬츠 → (하의 재라벨링) → 직접 매핑표.
+    앞의 규칙이 이긴다. 매핑 못 한 이유를 문자열로 같이 돌려주는 건 scan이 "왜 몇 건이
+    빠졌는지"를 집계하기 위해서다(조용히 버리면 커버리지를 오판한다).
+
+    `bottom_pseudo_labels`: `aihub_bottom_label.py`가 만든 `{label_path: 소분류코드}` 맵
+    (호출부가 이미 accepted/confidence로 걸러 넘긴다). AI-Hub 메타데이터에는 팬츠 소재
+    컬럼이 없어(`EXCLUDED_CATEGORY_TYPES["04bottom_01pants"]`) `04bottom_01pants`를 직접
+    매핑할 방법이 없었는데, 이미지 자체를 fashion_clip/VLM으로 재라벨링해 이 한계를
+    우회한다 — 단 **길이 기반 SHORT_PANTS 판정이 항상 먼저다**(반바지는 소재와 무관하게
+    SHORT_PANTS여야 한다).
     """
     source_type = label.source_type
     if source_type is None:
@@ -312,13 +320,21 @@ def map_subcategory(
         return "SLEEVELESS", "파생: sleeve=sleeveless"
 
     if source_type == "04bottom_01pants":
-        if short_pants_max_cm is None:
-            return None, "제외: pants (SHORT_PANTS 임계 미정)"
-        if label.pants_length is None:
-            return None, "제외: pants (pants_length 없음)"
-        if label.pants_length < short_pants_max_cm:
+        is_short = (
+            short_pants_max_cm is not None
+            and label.pants_length is not None
+            and label.pants_length < short_pants_max_cm
+        )
+        if is_short:
             return "SHORT_PANTS", f"파생: pants_length<{short_pants_max_cm}"
-        return None, "제외: pants (임계 이상 — 하위 5종 구분 불가)"
+        pseudo = bottom_pseudo_labels.get(label.label_path) if bottom_pseudo_labels else None
+        if pseudo is not None:
+            return pseudo, "파생: 하의 소재 재라벨링(aihub_bottom_label.py)"
+        if short_pants_max_cm is None:
+            return None, "제외: pants (SHORT_PANTS 임계 미정, 재라벨링도 없음)"
+        if label.pants_length is None:
+            return None, "제외: pants (pants_length 없음, 재라벨링도 없음)"
+        return None, "제외: pants (임계 이상, 재라벨링도 없음)"
 
     direct = DIRECT_CATEGORY_MAP.get(source_type)
     if direct is not None:
@@ -335,6 +351,33 @@ def map_color(raw_color: str | None) -> str | None:
     if raw_color is None:
         return None
     return COLOR_MAP.get(raw_color.strip().casefold())
+
+
+def load_bottom_pseudo_labels(path: Path, *, min_confidence: float | None = None) -> dict[str, str]:
+    """`aihub_bottom_label.py` 출력 JSONL → `{label_path: 소분류코드}`.
+
+    라벨링 스크립트가 이미 계산해 둔 `accepted`(신뢰도 임계 통과 여부)를 그대로 믿는 게
+    기본이다. `min_confidence`를 주면 라벨링을 다시 안 돌리고 여기서 임계치만 다르게
+    재적용할 수 있다(예: 처음엔 보수적으로 써 보고, 결과가 괜찮으면 임계치를 낮춰 더 많은
+    행을 포함시키는 식).
+    """
+    labels: dict[str, str] = {}
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            code = row.get("subcategory")
+            if not code:
+                continue
+            if min_confidence is not None:
+                if row.get("confidence", 0.0) < min_confidence:
+                    continue
+            elif not row.get("accepted", False):
+                continue
+            labels[row["label_path"]] = code
+    return labels
 
 
 # 그룹 키로 인정할 숫자 토큰의 최소 길이. `01_sou_000834_004168_wear_...`에서 선두 `01`을
@@ -394,12 +437,14 @@ def to_record(
     *,
     short_pants_max_cm: float | None = None,
     derive_from_excluded_tops: bool = DERIVE_FROM_EXCLUDED_TOPS,
+    bottom_pseudo_labels: dict[str, str] | None = None,
 ) -> tuple[Record, str]:
     """`RawLabel` → `(Record, 카테고리 매핑 사유)`."""
     subcategory, reason = map_subcategory(
         label,
         short_pants_max_cm=short_pants_max_cm,
         derive_from_excluded_tops=derive_from_excluded_tops,
+        bottom_pseudo_labels=bottom_pseudo_labels,
     )
     group_key, _matched = group_key_from_name(label.name)
     record = Record(
@@ -653,6 +698,7 @@ def run_scan(
     short_pants_max_cm: float | None,
     progress_every: int,
     color_top: int = 20,
+    bottom_pseudo_labels: dict[str, str] | None = None,
 ) -> str:
     """라벨 JSON을 훑어 게이트 2개와 분포를 텍스트로 만든다. 이미지는 열지 않는다."""
     stats = LoadStats()
@@ -673,7 +719,11 @@ def run_scan(
     excluded_top_gain: Counter[str] = Counter()
 
     for label in load_labels(root, limit=limit, progress_every=progress_every, stats=stats):
-        record, reason = to_record(label, short_pants_max_cm=short_pants_max_cm)
+        record, reason = to_record(
+            label,
+            short_pants_max_cm=short_pants_max_cm,
+            bottom_pseudo_labels=bottom_pseudo_labels,
+        )
         reason_counts[reason] += 1
         group_sizes[record.group_key] += 1
 
@@ -805,6 +855,18 @@ def run_scan(
     else:
         out.append("(pants_length 값이 하나도 없다 — SHORT_PANTS 파생 불가)")
 
+    if bottom_pseudo_labels is not None:
+        section("하의 소재 재라벨링 반영 결과 (--bottom-pseudo-labels)")
+        out.append(f"로드된 재라벨링 건수: {len(bottom_pseudo_labels):,}")
+        pants_codes = ("DENIM", "SLACKS", "CARGO_PANTS", "JOGGER_PANTS", "COTTON_PANTS")
+        rows = [(code, f"{mapped_counts.get(code, 0):,}") for code in pants_codes]
+        out.append(_table(rows, ("코드", "매핑된 건수(전체 실행 기준)")))
+        out.append("")
+        out.append(
+            ">>> 위 표가 전부 0이면 --bottom-pseudo-labels 경로/키(label_path)가 "
+            "실제 라벨과 안 맞는지 확인할 것."
+        )
+
     section("topneck_color_design 분포 ((B) 폴로 헤드 학습량)")
     rows = [
         (value, f"{count:,}", _pct(count, total)) for value, count in neck_counts.most_common(30)
@@ -864,13 +926,18 @@ def run_index(
     accessory_cap: int | None = None,
     allow_cap_overflow: bool = False,
     accessory_shot_type: str | None = None,
+    bottom_pseudo_labels: dict[str, str] | None = None,
 ) -> str:
     stats = LoadStats()
     records: list[Record] = []
     dropped_no_image_shot_type = 0
     if root is not None:
         for label in load_labels(root, limit=limit, progress_every=progress_every, stats=stats):
-            record, _reason = to_record(label, short_pants_max_cm=short_pants_max_cm)
+            record, _reason = to_record(
+                label,
+                short_pants_max_cm=short_pants_max_cm,
+                bottom_pseudo_labels=bottom_pseudo_labels,
+            )
             if record.subcategory is None and record.color is None:
                 continue  # 카테고리도 색상도 못 뽑으면 학습에 쓸 데가 없다
             records.append(record)
@@ -1128,6 +1195,22 @@ def build_parser() -> argparse.ArgumentParser:
             help="이 값 미만의 pants_length를 SHORT_PANTS로 본다(미지정이면 파생하지 않음)",
         )
         target.add_argument("--progress-every", type=int, default=50000)
+        target.add_argument(
+            "--bottom-pseudo-labels",
+            type=Path,
+            default=None,
+            help="aihub_bottom_label.py가 만든 하의(04bottom_01pants) 재라벨링 JSONL. 주면 "
+            "SHORT_PANTS로 못 뺀 통짜 팬츠를 DENIM/SLACKS/CARGO_PANTS/JOGGER_PANTS/"
+            "COTTON_PANTS로 승격한다(accepted=true인 행만, --bottom-pseudo-min-confidence로 "
+            "재조정 가능). 생략하면 기존과 동일하게 전부 제외된다",
+        )
+        target.add_argument(
+            "--bottom-pseudo-min-confidence",
+            type=float,
+            default=None,
+            help="재라벨링 JSONL의 confidence 재임계치. 생략하면 라벨링 스크립트가 이미 매긴 "
+            "accepted 값을 그대로 믿는다",
+        )
 
     scan = sub.add_parser("scan", help="착수 게이트 2개 + 분포를 텍스트 표로 출력")
     add_common(scan)
@@ -1190,6 +1273,19 @@ def main(argv: list[str] | None = None) -> int:
         if path is not None and not path.exists():
             print(f"{label} 경로가 없다: {path}", file=sys.stderr)
             return 2
+    if args.bottom_pseudo_labels is not None and not args.bottom_pseudo_labels.exists():
+        print(f"--bottom-pseudo-labels 경로가 없다: {args.bottom_pseudo_labels}", file=sys.stderr)
+        return 2
+
+    bottom_pseudo_labels = None
+    if args.bottom_pseudo_labels is not None:
+        bottom_pseudo_labels = load_bottom_pseudo_labels(
+            args.bottom_pseudo_labels, min_confidence=args.bottom_pseudo_min_confidence
+        )
+        print(
+            f"하의 재라벨링 {len(bottom_pseudo_labels):,}건 로드: {args.bottom_pseudo_labels}",
+            file=sys.stderr,
+        )
 
     if args.mode == "scan":
         parts: list[str] = []
@@ -1202,6 +1298,7 @@ def main(argv: list[str] | None = None) -> int:
                     short_pants_max_cm=args.short_pants_max_cm,
                     progress_every=args.progress_every,
                     color_top=args.color_top,
+                    bottom_pseudo_labels=bottom_pseudo_labels,
                 )
             )
         if args.accessory_root is not None:
@@ -1231,6 +1328,7 @@ def main(argv: list[str] | None = None) -> int:
         accessory_shot_type=args.accessory_shot_type,
         accessory_cap=args.accessory_cap,
         allow_cap_overflow=args.allow_cap_overflow,
+        bottom_pseudo_labels=bottom_pseudo_labels,
     )
     print(report)
     return 0

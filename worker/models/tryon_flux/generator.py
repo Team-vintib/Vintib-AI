@@ -18,28 +18,29 @@ class WornReferenceGenerator(ABC):
     name: str
 
     @abstractmethod
-    def generate(self, reference_image: Image.Image, prompt: str) -> Image.Image:
+    def generate(self, person_image: Image.Image, cloth_image: Image.Image, prompt: str) -> Image.Image:
         ...
 
 
 class MockWornReferenceGenerator(WornReferenceGenerator):
-    """참조 이미지를 그대로 반환한다. torch 불필요 — 잡 왕복/CatVTON 합성 단계까지
-    GPU 없이 전 경로를 검증하려는 용도다."""
+    """참조 이미지를 그대로 반환한다. torch 불필요 — 잡 왕복 전 경로를 GPU 없이
+    검증하려는 용도다."""
 
     name = "mock"
 
-    def generate(self, reference_image: Image.Image, prompt: str) -> Image.Image:
-        return reference_image.copy()
+    def generate(self, person_image: Image.Image, cloth_image: Image.Image, prompt: str) -> Image.Image:
+        return person_image.copy()
 
 
 class Flux2KleinGenerator(WornReferenceGenerator):
     """FLUX.2-Klein-4B, GGUF Q4_0 양자화. `__init__`에서 즉시 로드(워커 프로세스당 1회) —
     `generate()` 호출마다 다시 로드하면 너무 느리다.
 
-    AI/validation/TRYON/AI_tryon/CatVTON/generate_worn_reference_outer_fitaware.py에서
-    검증한 "image=" 참조 편집 모드를 그대로 쓴다: 원본(고객) 사진을 참조로 주고 "이 사람에게
-    이 옷을 이 핏으로 입혀라"는 프롬프트로 생성하면, 포즈/스케일/프레이밍은 참조 사진에서
-    그대로 상속되고 옷만 바뀐다(§10.3).
+    `image=[person_image, cloth_image]`로 두 장을 함께 참조 이미지로 준다(FLUX.2 계열이
+    여러 참조 이미지를 조합하는 편집을 지원 — `Flux2KleinPipeline.__call__`의 `image`
+    파라미터가 원래 리스트를 받게 설계돼 있음). 사람 사진 한 장만 주고 옷은 텍스트 캡션으로만
+    설명하던 이전 방식(`tryon_worker_catvton_legacy.py`)보다 색상·로고·질감 재현이 훨씬
+    정확하다 — CatVTON 없이도 이 결과를 그대로 최종본으로 쓸 수 있는 이유(`CH027`).
     """
 
     name = "flux2_klein"
@@ -91,12 +92,12 @@ class Flux2KleinGenerator(WornReferenceGenerator):
         )
         self._pipe.enable_model_cpu_offload()
 
-    def generate(self, reference_image: Image.Image, prompt: str) -> Image.Image:
+    def generate(self, person_image: Image.Image, cloth_image: Image.Image, prompt: str) -> Image.Image:
         import torch
 
         generator = torch.Generator(device="cpu").manual_seed(1)
         image = self._pipe(
-            image=[reference_image],
+            image=[person_image, cloth_image],
             prompt=prompt,
             height=HEIGHT,
             width=WIDTH,
