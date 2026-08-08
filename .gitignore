@@ -16,6 +16,9 @@ Thumbs.db
 # 품질검수 e2e 검증 노트북용 실제 상품 사진 — 로컬 전용 테스트 픽스처, 저장소에 올리지 않는다.
 /worker/validation/sample_images/
 
+# sam3_masking_defect_check.ipynb 산출물(실제 상품 사진 기반 bbox·JSON) — 로컬 전용.
+/worker/validation/outputs/
+
 .idea/
 .vscode/*
 !.vscode/extensions.json
