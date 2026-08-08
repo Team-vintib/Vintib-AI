@@ -19,7 +19,7 @@ export interface LiveCreateMethodOption {
 export interface LiveCreateProduct {
   id: number
   name: string
-  brand: string
+  brand: string | null
   category: string
   condition: string
   price: number

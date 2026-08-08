@@ -65,8 +65,7 @@ interface ProductListDto {
   sellerId: number
   categoryId: number
   categoryName?: string | null
-  brandId: number | null
-  brandName?: string | null
+  brand: string | null
   title: string
   description: string | null
   conditionGrade: ProductConditionGrade | null
@@ -867,7 +866,7 @@ const toProductListItem = async (product: ProductListDto): Promise<ProductListIt
 
   return {
     id: product.id,
-    brand: product.brandName || fallbackBrandLabel(product.brandId),
+    brand: product.brand || '',
     name: product.title,
     price: product.price ?? 0,
     conditionGrade: normalizeConditionGrade(product.conditionGrade),
@@ -894,7 +893,7 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
 
   return {
     id: product.id,
-    brand: product.brandName?.trim() || '',
+    brand: product.brand?.trim() || '',
     title: product.title,
     description: product.description?.trim() || '',
     category: product.categoryName?.trim() || '',
@@ -993,8 +992,6 @@ const getSortedProductImages = (product: Pick<ProductDetailDto, 'images'>) =>
 
     return left.sortOrder - right.sortOrder
   })
-
-const fallbackBrandLabel = (brandId: number | null) => (brandId ? `브랜드 #${brandId}` : '')
 
 const fallbackCategoryLabel = (categoryId: number | null) =>
   categoryId ? `카테고리 #${categoryId}` : ''
