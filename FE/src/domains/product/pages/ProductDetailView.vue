@@ -456,7 +456,7 @@ onBeforeUnmount(() => {
 
       <ProductPriceDistribution
         :current-product-id="product.id"
-        :current-price="product.price"
+        :current-price="product.saleType === 'AUCTION' ? null : product.price"
         :products="product.similarProducts"
         @view-product="handleViewSimilarProduct"
       />
@@ -481,7 +481,11 @@ onBeforeUnmount(() => {
         v-if="product.aiQualityAnalysis"
         :analysis="product.aiQualityAnalysis"
       />
-      <ProductSimilarRecommendation :product-id="product.id" />
+      <ProductSimilarRecommendation
+        :product-id="product.id"
+        :category-id="product.categoryId"
+        :brand="product.brand"
+      />
 
       <section
         v-if="aiModelCutStatus !== 'NONE'"
@@ -520,7 +524,9 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="product-try-on-popup__expand"
-          :aria-label="isTryOnExpanded ? 'AI 시착 팝업 작게 보기' : 'AI 시착 팝업 전체 화면으로 보기'"
+          :aria-label="
+            isTryOnExpanded ? 'AI 시착 팝업 작게 보기' : 'AI 시착 팝업 전체 화면으로 보기'
+          "
           @click="toggleTryOnExpanded"
         >
           <svg v-if="!isTryOnExpanded" viewBox="0 0 24 24" aria-hidden="true">

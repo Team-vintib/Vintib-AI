@@ -1,19 +1,10 @@
 export type ProductDetailSaleType = 'DIRECT_SALE' | 'AUCTION'
 
 export type ProductDetailSaleStatus =
-  | 'DRAFT'
-  | 'ON_SALE'
-  | 'AUCTION_SCHEDULED'
-  | 'AUCTION_IN_PROGRESS'
-  | 'AUCTION_FAILED'
-  | 'SOLD'
+  'DRAFT' | 'ON_SALE' | 'AUCTION_SCHEDULED' | 'AUCTION_IN_PROGRESS' | 'AUCTION_FAILED' | 'SOLD'
 
 export type AiQualityAnalysisStatus =
-  | 'NOT_REQUESTED'
-  | 'ANALYZING'
-  | 'COMPLETED'
-  | 'NO_FINDINGS'
-  | 'FAILED'
+  'NOT_REQUESTED' | 'ANALYZING' | 'COMPLETED' | 'NO_FINDINGS' | 'FAILED'
 
 export interface ProductDetailImage {
   id: string
@@ -95,6 +86,8 @@ export interface ProductDetailViewData {
   title: string
   description: string
   category: string
+  // 유사 상품 추천을 같은 카테고리로 좁힐 때 쓴다(BE 상세 응답의 categoryId).
+  categoryId: number | null
   conditionLabel: string
   sizeLabel: string
   material: string
