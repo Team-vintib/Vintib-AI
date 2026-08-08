@@ -9,6 +9,8 @@ import pytest
 from app.pricing.comps import (
     CompsUnavailable,
     InternalClipCompsSource,
+    InternalCompsSource,
+    InternalTextCompsSource,
     LlmWebSearchCompsSource,
     MockCompsSource,
     _extract_json_array,
@@ -222,6 +224,139 @@ def test_internal_clip_converts_matches_to_comp_items(monkeypatch):
     assert result.notes  # 합성 데이터라는 경고가 있어야 한다
 
 
+# --- internal 백엔드 (CH024, 실데이터 — pgvector/BE API 전부 monkeypatch로 격리) ----------
+
+
+def test_internal_without_product_id_reports_no_image():
+    result = InternalCompsSource().fetch("아무 쿼리")
+    assert result.items == []
+    assert result.reason == ReasonCode.no_image_provided
+
+
+def test_internal_reports_no_image_when_embedding_missing(monkeypatch):
+    from app.recommend.personalize import embedding_store
+
+    monkeypatch.setattr(embedding_store, "fetch_garment_embedding", lambda product_id: None)
+
+    result = InternalCompsSource().fetch("q", product_id=1042)
+
+    assert result.items == []
+    assert result.reason == ReasonCode.no_image_provided
+
+
+def test_internal_reports_insufficient_when_no_matches(monkeypatch):
+    from app.recommend.personalize import embedding_store
+
+    monkeypatch.setattr(embedding_store, "fetch_garment_embedding", lambda product_id: object())
+    monkeypatch.setattr(embedding_store, "find_similar", lambda *a, **k: [])
+
+    result = InternalCompsSource().fetch("q", product_id=1042)
+
+    assert result.items == []
+    assert result.reason == ReasonCode.insufficient_comps
+
+
+def _fake_match(product_id: int):
+    from app.recommend.personalize.embedding_store import SimilarGarmentMatch
+
+    return SimilarGarmentMatch(product_id=product_id, score=0.9)
+
+
+def _fake_be_product(product_id: int, **overrides):
+    from app.shared.be_client import BeProduct
+
+    base = {
+        "product_id": product_id,
+        "title": f"상품{product_id}",
+        "brand_id": 1,
+        "category_id": 97,
+        "condition_grade": "A",
+        "sale_type": "DIRECT_SALE",
+        "sale_status": "ON_SALE",
+        "price": 50_000,
+        "created_at": "2026-08-01T00:00:00",
+    }
+    base.update(overrides)
+    return BeProduct(**base)
+
+
+def test_internal_converts_matches_using_be_data(monkeypatch):
+    from app.recommend.personalize import embedding_store
+    from app.shared import be_client
+
+    monkeypatch.setattr(embedding_store, "fetch_garment_embedding", lambda product_id: object())
+    monkeypatch.setattr(embedding_store, "find_similar", lambda *a, **k: [_fake_match(2)])
+    monkeypatch.setattr(be_client, "fetch_product", lambda product_id, **k: _fake_be_product(2))
+
+    result = InternalCompsSource().fetch("q", product_id=1042)
+
+    assert result.reason is None
+    assert len(result.items) == 1
+    assert result.items[0].price == 50_000
+    assert result.items[0].source == "internal"
+    assert result.items[0].is_used is True
+
+
+def test_internal_excludes_candidates_be_cannot_fetch(monkeypatch):
+    """BE 조회 실패(다운·삭제된 상품 등)한 후보는 조용히 빠진다."""
+    from app.recommend.personalize import embedding_store
+    from app.shared import be_client
+
+    monkeypatch.setattr(embedding_store, "fetch_garment_embedding", lambda product_id: object())
+    monkeypatch.setattr(
+        embedding_store, "find_similar", lambda *a, **k: [_fake_match(2), _fake_match(3)]
+    )
+    monkeypatch.setattr(
+        be_client,
+        "fetch_product",
+        lambda product_id, **k: _fake_be_product(3) if product_id == 3 else None,
+    )
+
+    result = InternalCompsSource().fetch("q", product_id=1042)
+
+    assert len(result.items) == 1
+
+
+def test_internal_reports_insufficient_when_all_candidates_fail_hedge(monkeypatch):
+    """확정 가격이 없는 진행 중 경매만 후보로 잡히면(CH030 `filter_by_sale_status`) 정제 후
+    0건이 된다. 호가(ON_SALE)·완료거래(SOLD)는 CH030부터 sale_type과 무관하게 통과한다 —
+    ON_SALE인 AUCTION 매물이 걸러지던 CH024 시절 동작과는 다르다."""
+    from app.recommend.personalize import embedding_store
+    from app.shared import be_client
+
+    monkeypatch.setattr(embedding_store, "fetch_garment_embedding", lambda product_id: object())
+    monkeypatch.setattr(embedding_store, "find_similar", lambda *a, **k: [_fake_match(2)])
+    monkeypatch.setattr(
+        be_client,
+        "fetch_product",
+        lambda product_id, **k: _fake_be_product(2, sale_status="AUCTION_IN_PROGRESS"),
+    )
+
+    result = InternalCompsSource().fetch("q", product_id=1042)
+
+    assert result.items == []
+    assert result.reason == ReasonCode.insufficient_comps
+    assert result.notes
+
+
+def test_internal_keeps_completed_auction_sale(monkeypatch):
+    """완료된 경매 낙찰(SOLD+AUCTION)도 CH030부터는 포함된다(사용자 결정 4번)."""
+    from app.recommend.personalize import embedding_store
+    from app.shared import be_client
+
+    monkeypatch.setattr(embedding_store, "fetch_garment_embedding", lambda product_id: object())
+    monkeypatch.setattr(embedding_store, "find_similar", lambda *a, **k: [_fake_match(2)])
+    monkeypatch.setattr(
+        be_client,
+        "fetch_product",
+        lambda product_id, **k: _fake_be_product(2, sale_type="AUCTION", sale_status="SOLD"),
+    )
+
+    result = InternalCompsSource().fetch("q", product_id=1042)
+
+    assert len(result.items) == 1
+
+
 # --- LLM 백엔드 (네트워크 미접촉) ---------------------------------------------
 
 
@@ -325,3 +460,137 @@ def test_parse_salvages_items_when_response_is_truncated():
     assert result.truncated is True
     assert result.finish_reason == "MAX_TOKENS"
     assert result.notes  # 잘렸다는 사실을 밝힌다
+
+
+# --- internal_text 백엔드 (CH030, 텍스트 매칭) ---------------------------------
+
+
+def _fake_corpus_candidate(product_id: int, **overrides):
+    from app.pricing.product_corpus import CorpusCandidate
+
+    base = {
+        "product_id": product_id,
+        "title": f"상품{product_id}",
+        "price": 45_000,
+        "sale_type": "DIRECT_SALE",
+        "sale_status": "ON_SALE",
+        "created_at": "2026-08-01T00:00:00",
+    }
+    base.update(overrides)
+    return CorpusCandidate(**base)
+
+
+def test_internal_text_without_product_id_reports_no_image():
+    result = InternalTextCompsSource().fetch("아무 쿼리")
+    assert result.reason == ReasonCode.no_image_provided
+
+
+def test_internal_text_reports_insufficient_when_be_product_missing(monkeypatch):
+    from app.shared import be_client
+
+    monkeypatch.setattr(be_client, "fetch_product", lambda product_id, **k: None)
+
+    result = InternalTextCompsSource().fetch("q", product_id=1042)
+
+    assert result.items == []
+    assert result.reason == ReasonCode.insufficient_comps
+
+
+def test_internal_text_uses_strict_key_first(monkeypatch):
+    from app.pricing import product_corpus
+    from app.shared import be_client
+
+    monkeypatch.setattr(be_client, "fetch_product", lambda product_id, **k: _fake_be_product(1042))
+    monkeypatch.setattr(product_corpus, "get_brand_alias_map", lambda: {})
+    seen_keys = []
+
+    def _fake_find(match_key, *, exclude_product_id, limit):
+        seen_keys.append(match_key)
+        return [_fake_corpus_candidate(2), _fake_corpus_candidate(3), _fake_corpus_candidate(4)]
+
+    monkeypatch.setattr(product_corpus, "find_by_match_key", _fake_find)
+
+    result = InternalTextCompsSource().fetch("q", product_id=1042)
+
+    assert len(seen_keys) == 1  # 1차 키만으로 min_comps_for_pricing(3)를 채웠다 — 2차 조회 없음
+    assert len(result.items) == 3
+    assert result.product_match_key == seen_keys[0]
+
+
+def test_internal_text_falls_back_to_relaxed_key_when_strict_insufficient(monkeypatch):
+    from app.pricing import product_corpus
+    from app.shared import be_client
+
+    monkeypatch.setattr(be_client, "fetch_product", lambda product_id, **k: _fake_be_product(1042))
+    monkeypatch.setattr(product_corpus, "get_brand_alias_map", lambda: {})
+    calls = []
+
+    def _fake_find(match_key, *, exclude_product_id, limit):
+        calls.append(match_key)
+        if len(calls) == 1:
+            return [_fake_corpus_candidate(2)]  # min_comps_for_pricing(3) 미달
+        return [_fake_corpus_candidate(2), _fake_corpus_candidate(3), _fake_corpus_candidate(4)]
+
+    monkeypatch.setattr(product_corpus, "find_by_match_key", _fake_find)
+
+    result = InternalTextCompsSource().fetch("q", product_id=1042)
+
+    assert len(calls) == 2  # 1차 부족 → 2차(완화)로 재조회
+    assert len(result.items) == 3
+    assert result.product_match_key == calls[0]  # 응답 키는 항상 1차(엄격)
+
+
+def test_internal_text_reports_insufficient_when_no_candidates(monkeypatch):
+    from app.pricing import product_corpus
+    from app.shared import be_client
+
+    monkeypatch.setattr(be_client, "fetch_product", lambda product_id, **k: _fake_be_product(1042))
+    monkeypatch.setattr(product_corpus, "get_brand_alias_map", lambda: {})
+    monkeypatch.setattr(product_corpus, "find_by_match_key", lambda *a, **k: [])
+
+    result = InternalTextCompsSource().fetch("q", product_id=1042)
+
+    assert result.items == []
+    assert result.reason == ReasonCode.insufficient_comps
+    assert result.product_match_key  # 빈 결과여도 키는 돌려준다 — BE가 match_key를 저장해야 하므로
+
+
+def test_internal_text_converts_candidates_with_price_kind(monkeypatch):
+    from app.pricing import product_corpus
+    from app.shared import be_client
+
+    monkeypatch.setattr(be_client, "fetch_product", lambda product_id, **k: _fake_be_product(1042))
+    monkeypatch.setattr(product_corpus, "get_brand_alias_map", lambda: {})
+    monkeypatch.setattr(
+        product_corpus,
+        "find_by_match_key",
+        lambda *a, **k: [
+            _fake_corpus_candidate(2, sale_status="ON_SALE"),
+            _fake_corpus_candidate(3, sale_status="SOLD", sale_type="DIRECT_SALE"),
+            _fake_corpus_candidate(4, sale_status="SOLD", sale_type="AUCTION"),
+        ],
+    )
+
+    result = InternalTextCompsSource().fetch("q", product_id=1042)
+
+    price_kinds = {item.price_kind for item in result.items}
+    assert price_kinds == {"ASKING", "SOLD_DIRECT", "SOLD_AUCTION"}
+    assert all(item.source == "internal_text" for item in result.items)
+
+
+def test_internal_text_excludes_candidates_failing_hedge(monkeypatch):
+    from app.pricing import product_corpus
+    from app.shared import be_client
+
+    monkeypatch.setattr(be_client, "fetch_product", lambda product_id, **k: _fake_be_product(1042))
+    monkeypatch.setattr(product_corpus, "get_brand_alias_map", lambda: {})
+    monkeypatch.setattr(
+        product_corpus,
+        "find_by_match_key",
+        lambda *a, **k: [_fake_corpus_candidate(2, sale_status="AUCTION_IN_PROGRESS")],
+    )
+
+    result = InternalTextCompsSource().fetch("q", product_id=1042)
+
+    assert result.items == []
+    assert result.reason == ReasonCode.insufficient_comps

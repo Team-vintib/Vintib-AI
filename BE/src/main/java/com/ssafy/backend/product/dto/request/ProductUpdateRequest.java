@@ -23,5 +23,11 @@ public record ProductUpdateRequest(
         @Schema(
                 description = "하자 목록 전체 교체. null이면 미반영, 빈 배열이면 기존 하자를 전부 삭제한다.",
                 example = "[\"소매 끝 실밥 풀림\"]")
-        List<String> defects) {
+        List<String> defects,
+
+        @Schema(
+                description = "AI 시세 조회가 계산한 '동일 상품' 판정 키. FE가 GET /ai/jobs/{jobId} "
+                        + "폴링 결과(product_match_key)를 그대로 전달한다. null이면 미반영",
+                example = "1:501-리바이스:97")
+        String matchKey) {
 }

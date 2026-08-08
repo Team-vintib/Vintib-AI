@@ -3,6 +3,7 @@ package com.ssafy.backend.order.repository;
 import com.ssafy.backend.order.entity.Order;
 import com.ssafy.backend.order.entity.OrderStatus;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -48,4 +49,22 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
               AND o.status <> com.ssafy.backend.order.entity.OrderStatus.CANCELED
             """)
     List<Order> findLiveDirectSaleOrders(@Param("liveId") Long liveId);
+
+    /**
+     * "동일 상품 시세"(CH001, 047)의 완료거래가 배치 조회 — 여러 상품 id를 한 번에 조회해
+     * {@code AuctionRepository.findByProductIdIn}과 같은 이유로 N+1을 피한다.
+     *
+     * <p>재고 1개짜리 세컨핸드 상품이라 정상적으로는 상품당 완료 주문이 최대 1건이지만,
+     * 환불 후 재판매 등 예외적으로 여러 건이 남을 수 있어 List로 받는다 — 호출부가 상품
+     * id별로 필요한 걸 고른다. 환불·취소된 주문은 뺀다({@code findLiveDirectSaleOrders}와
+     * 같은 이유 — 완결되지 않은 거래를 시세 근거로 쓰면 안 된다). {@code auction IS NULL}
+     * 여부로 직접판매/경매낙찰을 구분한다.
+     */
+    @Query("""
+            SELECT o FROM Order o
+            WHERE o.product.id IN :productIds
+              AND o.status <> com.ssafy.backend.order.entity.OrderStatus.REFUNDED
+              AND o.status <> com.ssafy.backend.order.entity.OrderStatus.CANCELED
+            """)
+    List<Order> findByProductIdIn(@Param("productIds") Collection<Long> productIds);
 }

@@ -83,6 +83,12 @@ public class Product extends BaseTimeEntity {
     @Column(length = 50)
     private String material;
 
+    // "동일 상품" 판정 키(AI 시세 조회, CH030). 상품명+브랜드+카테고리 텍스트로 AI가 계산해
+    // 돌려준 값을 FE가 폴링해서 그대로 넘겨준다 — BE는 저장·조회만 한다(직접 계산 안 함).
+    // 같은 값을 가진 상품끼리 GET /api/products/{id}/market-price에서 "동일 상품"으로 묶인다.
+    @Column(name = "match_key", length = 300)
+    private String matchKey;
+
     // 치수 항목(총장/어깨너비/가슴단면/소매길이 등)이 상품마다 달라 고정 컬럼 대신 JSONB로 담는다.
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
@@ -195,7 +201,8 @@ public class Product extends BaseTimeEntity {
             String sizeLabel,
             String color,
             String material,
-            Map<String, Integer> measurements) {
+            Map<String, Integer> measurements,
+            String matchKey) {
         if (title != null) {
             this.title = title;
         }
@@ -222,6 +229,9 @@ public class Product extends BaseTimeEntity {
         }
         if (measurements != null) {
             this.measurements = measurements;
+        }
+        if (matchKey != null) {
+            this.matchKey = matchKey;
         }
     }
 

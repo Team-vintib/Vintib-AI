@@ -70,6 +70,27 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             Pageable pageable);
 
     /**
+     * "동일 상품 시세"(CH001, 047) — 같은 {@code match_key}를 가진 다른 상품들.
+     *
+     * <p>{@code ON_SALE}(호가)·{@code SOLD}(완료거래)만 대상이다 — {@code DRAFT}/
+     * {@code AUCTION_SCHEDULED}/{@code AUCTION_IN_PROGRESS}는 아직 확정된 가격이 없어
+     * 시세 근거로 쓰지 않는다. {@code findSimilarProducts}와 같은 형태이지만 카테고리 exact
+     * match 대신 {@code match_key} exact match를 쓴다 — match_key 자체가 이미 브랜드+
+     * 상품명+카테고리를 합친 판정 키라 브랜드 타이브레이크가 필요 없다.
+     */
+    @Query("""
+            SELECT p FROM Product p
+            WHERE p.matchKey = :matchKey
+              AND p.id <> :excludeProductId
+              AND p.saleStatus IN ('ON_SALE', 'SOLD')
+            ORDER BY p.createdAt DESC
+            """)
+    List<Product> findByMatchKeyAndIdNot(
+            @Param("matchKey") String matchKey,
+            @Param("excludeProductId") Long excludeProductId,
+            Pageable pageable);
+
+    /**
      * 선택적 필터·정렬을 지원하는 상품 목록 조회 (PROD-008).
      *
      * <p>각 boolean 플래그가 false 이면 대응하는 WHERE 절을 건너뛴다
