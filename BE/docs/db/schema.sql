@@ -456,6 +456,8 @@ CREATE TABLE orders (
     -- 배송 완료 후 3일 경과 시 자동 구매 확정. 스케줄러가 이 컬럼으로 대상을 찾는다.
     -- 배송 완료 시점(delivered_at)에 계산해 채운다.
     auto_confirm_at   TIMESTAMPTZ,
+    -- 정산 완료(SETTLED 전이) 시각. SETTLED가 아닌 주문은 NULL.
+    settled_at        TIMESTAMPTZ,
     -- 진행 중인(REQUESTED) 환불 요청이 있는 동안 true. 송장 등록·구매 확정(수동/자동)을 막는 용도로만
     -- 쓴다 — 요청 중에도 status는 바꾸지 않는다.
     refund_requested  BOOLEAN     NOT NULL DEFAULT FALSE,

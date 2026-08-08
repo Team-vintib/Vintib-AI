@@ -279,7 +279,7 @@ public class OrderService {
         }
         pointService.settleOrder(
                 order.getBuyer().getId(), order.getSeller().getId(), order.getOrderPrice(), order.getId());
-        order.confirmAndSettle();
+        order.confirmAndSettle(LocalDateTime.now());
     }
 
     private Order findOrder(Long orderId, Long memberId) {

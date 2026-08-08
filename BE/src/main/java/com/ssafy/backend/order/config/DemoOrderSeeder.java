@@ -163,7 +163,7 @@ public class DemoOrderSeeder implements ApplicationRunner {
                 shipment.markDelivered(deliveredAt);
             }
             if (stage == DemoOrderStage.SETTLED) {
-                order.confirmAndSettle();
+                order.confirmAndSettle(LocalDateTime.now().minusDays(6));
             }
 
             orderShipmentRepository.save(shipment);

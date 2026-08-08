@@ -186,7 +186,7 @@
 | 환불 요청 등록 | POST | `/orders/{id}/refunds` | ✓ | REFUND-001 | ✓ |
 | 환불 승인, 거절 처리 | PATCH | `/refunds/{id}` | ✓ | REFUND-002 | ✓ |
 
-> 주문 목록 조회는 `role` 쿼리 파라미터(`BUYER`/`SELLER`, 필수)로 구매 내역(MY-003)/판매·정산 내역(MY-004)을 구분한다. 정산 완료 여부는 주문 상태가 `SETTLED`인지로 판단하며, 정산액은 수수료 없이 주문 금액 그대로다.
+> 주문 목록 조회는 `role` 쿼리 파라미터(`BUYER`/`SELLER`, 필수)로 구매 내역(MY-003)/판매·정산 내역(MY-004)을 구분한다. 정산 완료 여부는 주문 상태가 `SETTLED`인지로 판단하며, 정산액은 수수료 없이 주문 금액 그대로다. 목록·상세 응답(`OrderListItemResponse`) 모두 `settledAt`(정산 완료 시각, `SETTLED`가 아니면 `null`)을 함께 낸다.
 >
 > 상시 판매 즉시구매(`POST /orders`)로 주문을 생성하면 결제 금액이 구매자 포인트 `available`에서 `tradeEscrow`(거래 대금 보관)로 옮겨진다. 송장 등록(`POST /orders/{orderId}/shipment`)은 택배사 코드를 고정 목록(`CourierCode`)에서만 받으며, `deliveryapi.co.kr` 웹훅 구독에 성공하면 배송완료(`DELIVERED`)는 그 웹훅(`POST /webhooks/delivery`, 내부용·JWT 인증 아님·서명 검증)이 왔을 때만 반영된다. 구독에 실패하면(자격증명 미설정 등) 등록 즉시 배송완료로 처리하는 폴백을 쓴다. 배송완료 3일 뒤로 자동 구매 확정 시각을 계산해 둔다. 구매 확정(`POST /orders/{orderId}/confirmation`)은 수동 호출 또는 3일 경과 시 스케줄러가 자동으로 처리하며, `tradeEscrow`를 판매자 `available`로 정산하고 주문 상태를 `SETTLED`로 바꾼다(거래 완료). 경매 낙찰 주문(AUCT 연동)은 아직 범위 밖이다.
 >

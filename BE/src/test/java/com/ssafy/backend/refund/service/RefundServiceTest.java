@@ -23,6 +23,7 @@ import com.ssafy.backend.refund.entity.RefundReason;
 import com.ssafy.backend.refund.entity.RefundRequest;
 import com.ssafy.backend.refund.entity.RefundStatus;
 import com.ssafy.backend.refund.repository.RefundRequestRepository;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -94,7 +95,7 @@ class RefundServiceTest {
     @Test
     void 정산완료된_주문은_환불을_요청할_수_없다() {
         Order order = orderWith(OrderStatus.DELIVERED);
-        order.confirmAndSettle();
+        order.confirmAndSettle(LocalDateTime.now());
         when(buyer.getId()).thenReturn(BUYER_ID);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
 

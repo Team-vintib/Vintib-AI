@@ -18,7 +18,9 @@ public record OrderListItemResponse(
         @Schema(example = "판매자닉네임") String sellerNickname,
         @Schema(example = "110000") Long orderPrice,
         @Schema(example = "PAID") String status,
-        @Schema(example = "2026-08-03T12:00:00") LocalDateTime createdAt) {
+        @Schema(example = "2026-08-03T12:00:00") LocalDateTime createdAt,
+        @Schema(description = "정산 완료 시각. status가 SETTLED가 아니면 null.", example = "2026-08-06T12:00:00")
+                LocalDateTime settledAt) {
 
     public static OrderListItemResponse from(Order order) {
         return new OrderListItemResponse(
@@ -30,6 +32,7 @@ public record OrderListItemResponse(
                 order.getSeller().getNickname(),
                 order.getOrderPrice(),
                 order.getStatus().name(),
-                order.getCreatedAt());
+                order.getCreatedAt(),
+                order.getSettledAt());
     }
 }

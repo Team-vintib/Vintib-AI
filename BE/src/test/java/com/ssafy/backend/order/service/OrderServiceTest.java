@@ -372,6 +372,7 @@ class OrderServiceTest {
         OrderListItemResponse response = orderService.confirmOrder(ORDER_ID, BUYER_ID);
 
         assertThat(response.status()).isEqualTo(OrderStatus.SETTLED.name());
+        assertThat(response.settledAt()).isNotNull();
         verify(pointService).settleOrder(BUYER_ID, SELLER_ID, 50_000L, realOrder.getId());
     }
 
@@ -414,6 +415,7 @@ class OrderServiceTest {
         orderService.autoConfirmDueOrders();
 
         assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.SETTLED);
+        assertThat(realOrder.getSettledAt()).isNotNull();
         verify(pointService).settleOrder(BUYER_ID, SELLER_ID, 50_000L, realOrder.getId());
     }
 

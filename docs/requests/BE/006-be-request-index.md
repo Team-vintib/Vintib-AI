@@ -35,10 +35,8 @@
 
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
-| 002 | `002-product-contract.md` | Product | 목록/상세/등록/이미지/AI 분석 연결 완료 | AI 가격 추천 |
 | 020 | `020-tryon-result-category.md` | TryOn | 미반영(순수 BE, AI 무관) | 서윤 파트 |
 | 025 | `025-product-same-price-chart.md` | Product | 미반영 — 계획 `SY042` 검토 중 | 서윤 파트 |
-| 030 | `030-order-settled-at-field.md` | Order | 미반영 | 서윤 파트 |
 | 041 | `041-refund-notification-dashboard.md` | Refund/Notification | 미반영 | 서윤 파트 |
 | 043 | `043-registration-price-chart-source.md` | Product | 미반영, 우선순위 낮음(044로 대체 가능) | 서윤 파트 |
 | 044 | `044-pricing-estimate-trigger.md` | Product | 미반영 | 서윤 파트 |
@@ -349,3 +347,12 @@
 남아 있는 `046-product-update-quality-findings.md`(PATCH에도 `aiQualityFindings` 추가 요청)는
 이번 작업 범위 밖이라 그대로 열어 뒀다 — 저장 형식은 이제 확정됐으니(위 041 항목 참고) 착수하면
 POST와 동일하게 반영하면 된다.
+
+**`002-product-contract.md`도 삭제했다(사용자 판단)** — 이 문서에 남아 있던 마지막 항목(AI 가격
+추천)이 이미 `043-registration-price-chart-source.md`/`044-pricing-estimate-trigger.md`가 각각
+더 구체적으로 추적하고 있어 중복이었다. 그 외 항목은 전부 위에서 해소된 것들이라 표에서도 뺐다.
+
+**`030-order-settled-at-field.md`도 반영·삭제했다** — `Order`에 `settled_at`(정산 완료 시각)
+컬럼을 추가하고 `confirmAndSettle()` 호출 시점(수동/자동 확정 공용)에 채운다.
+`OrderListItemResponse`(`GET /users/{id}/orders`, `GET /orders/{orderId}` 공용)에 `settledAt`
+필드로 노출한다 — 요청이 제안한 두 옵션 중 별도 필드 신설 쪽을 택했다.
