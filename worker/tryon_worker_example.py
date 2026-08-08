@@ -98,7 +98,16 @@ class TryonWorker(BaseWorker):
             return
         config = vlm_registry.vlm_config(TRYON_VLM_BACKEND)
         print(f"[{self.worker_id}] VLM 로딩 중... (backend={TRYON_VLM_BACKEND})")
-        self._vlm_bundle = load_qwen_vl(config["model_id"], quantization=config["quantization"])
+        try:
+            self._vlm_bundle = load_qwen_vl(config["model_id"], quantization=config["quantization"])
+        except Exception:
+            # 로딩 도중 죽으면(네트워크 순단 등) 그 시점까지 GPU에 올라간 텐서가
+            # empty_cache() 없이 그대로 남는다 -- 다음 job이 그 자리를 못 찾고 "CPU/disk로
+            # 분산" 에러로 연쇄 실패하는 걸 실측으로 확인했다. 재시도가 최소한 깨끗한 VRAM
+            # 상태에서 시작하도록 여기서 반드시 정리한다.
+            gc.collect()
+            torch.cuda.empty_cache()
+            raise
         print(f"[{self.worker_id}] VLM 로딩 완료")
 
     def _unload_vlm(self):
@@ -126,14 +135,25 @@ class TryonWorker(BaseWorker):
     ) -> Image.Image:
         if self._flux_generator is None:
             print(f"[{self.worker_id}] FLUX 로딩 중... (backend={TRYON_FLUX_BACKEND})")
-            self._flux_generator = build_generator(TRYON_FLUX_BACKEND)
+            try:
+                self._flux_generator = build_generator(TRYON_FLUX_BACKEND)
+            except Exception:
+                # VLM과 같은 이유 -- 로딩 도중 죽어도(네트워크 순단 등) GPU에 이미 올라간
+                # 만큼은 empty_cache()로 반드시 비운다. 안 그러면 다음 job(VLM 로딩)이
+                # 그 자리를 못 찾고 연쇄로 계속 실패한다(실측 확인).
+                gc.collect()
+                torch.cuda.empty_cache()
+                raise
             print(f"[{self.worker_id}] FLUX 로딩 완료")
 
-        worn_reference = self._flux_generator.generate(person_image, cloth_image, prompt)
-
-        if hasattr(self._flux_generator, "unload"):
-            self._flux_generator.unload()
-        self._flux_generator = None
+        try:
+            worn_reference = self._flux_generator.generate(person_image, cloth_image, prompt)
+        finally:
+            # generate() 자체가 실패해도(예: 생성 도중 OOM) unload는 반드시 실행 -- 예전엔
+            # try/finally가 없어서 실패 시 _flux_generator가 언로드 안 된 채 남았다.
+            if hasattr(self._flux_generator, "unload"):
+                self._flux_generator.unload()
+            self._flux_generator = None
 
         return worn_reference
 
