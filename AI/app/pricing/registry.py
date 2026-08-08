@@ -105,7 +105,7 @@ COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
         "max_output_tokens": 0,
     },
 }
-ACTIVE_COMPS_SOURCE = "mock"  # <- 여기 키만 바꾸면 스왑. llm_web_search 전환은 사용자만
+ACTIVE_COMPS_SOURCE = "internal_text"  # <- 여기 키만 바꾸면 스왑. llm_web_search 전환은 사용자만
 # (하드 룰). internal/internal_text는 GMS가 아니라 하드 룰 대상은 아니지만, 백엔드 스왑은
 # 신중해야 하니 기본값 전환은 별도 확인 후 진행한다(CH024/CH030).
 # llm_web_search / mock / internal_clip / internal / internal_text
