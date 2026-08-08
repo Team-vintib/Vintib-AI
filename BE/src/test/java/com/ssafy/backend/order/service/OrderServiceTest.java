@@ -439,7 +439,7 @@ class OrderServiceTest {
 
     @Test
     void 진행_중_방송에_편성되지_않은_상품은_전파하지_않는다() {
-        // 라이브와 무관한 일반 상시 판매 구매 — 쏠 방송이 없다.
+        // 라이브와 무관한 일반 정찰제 구매 — 쏠 방송이 없다.
         when(liveProductRepository.findRunningLiveIdsByProductId(PRODUCT_ID)).thenReturn(List.of());
 
         assertThat(orderService.resolveDirectSaleSoldEvent(PRODUCT_ID)).isEmpty();

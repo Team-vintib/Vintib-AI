@@ -36,7 +36,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<SellerProductCount> countBySellerIdsAndSaleStatusNot(
             @Param("sellerIds") Collection<Long> sellerIds, @Param("excludedStatus") SaleStatus excludedStatus);
 
-    /** 여러 판매자의 상시 판매(ON_SALE) 상품을 최신순으로 가져온다(홈 팔로잉 콘텐츠) — {@code pageable}로 상위 N개만 캡. */
+    /** 여러 판매자의 정찰제(ON_SALE) 상품을 최신순으로 가져온다(홈 팔로잉 콘텐츠) — {@code pageable}로 상위 N개만 캡. */
     List<Product> findBySeller_IdInAndSaleStatusOrderByCreatedAtDesc(
             Collection<Long> sellerIds, SaleStatus saleStatus, Pageable pageable);
 

@@ -95,7 +95,7 @@ public class AuctionService {
         Auction saved = auctionRepository.save(auction);
 
         // 상품도 "경매 예정"이 돼야 한다. 이게 빠져 있어서 조건을 걸어도 상품은 DRAFT·ON_SALE에
-        // 머물렀고, 홈·상품 목록에 상시 판매처럼 보였다(-394 보완).
+        // 머물렀고, 홈·상품 목록에 정찰제처럼 보였다(-394 보완).
         productCommandPort.markAuctionScheduled(request.productId());
 
         return AuctionResponse.from(saved);

@@ -5,7 +5,7 @@ package com.ssafy.backend.auction.port;
  *
  * <p>경매와 상품 상태는 <b>짝을 이루지만 별개 축</b>이다 — 경매가 {@code READY}면 상품은
  * {@code AUCTION_SCHEDULED}, 경매가 {@code RUNNING}이면 상품은 {@code AUCTION_IN_PROGRESS}다.
- * 이 짝을 맞추지 않으면 홈·상품 목록에서 "경매 중인데 상시 판매로 보이는" 상품이 생긴다
+ * 이 짝을 맞추지 않으면 홈·상품 목록에서 "경매 중인데 정찰제로 보이는" 상품이 생긴다
  * (실제로 조건 설정 시 전이가 빠져 있어 상품이 {@code DRAFT}·{@code ON_SALE}에 머물렀다).
  *
  * <p><b>포트로 격리하는 이유.</b> {@code product}는 서윤 담당 영역이다. 경매 서비스가

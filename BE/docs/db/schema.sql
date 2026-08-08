@@ -128,11 +128,11 @@ CREATE TABLE product (
     color           VARCHAR(50),
     material        VARCHAR(50),
     measurements    JSONB,                           -- 실측 치수(cm). 항목이 상품마다 달라 고정 컬럼 대신 JSONB
-    sale_type       VARCHAR(20),                     -- 상시 판매 / 경매. 기본 정보 저장 시점에는 NULL,
+    sale_type       VARCHAR(20),                     -- 정찰제 / 경매. 기본 정보 저장 시점에는 NULL,
                                                        -- 판매 채널을 정하는 API(판매 가격 설정/경매 조건 설정)
                                                        -- 호출 시 확정.
     sale_status     VARCHAR(30)  NOT NULL DEFAULT 'DRAFT',
-    price           BIGINT,                          -- 상시 판매가. 경매 예정 상품은 NULL.
+    price           BIGINT,                          -- 정찰제가. 경매 예정 상품은 NULL.
     view_count      INTEGER      NOT NULL DEFAULT 0,
     ai_model_enabled BOOLEAN     NOT NULL DEFAULT FALSE, -- 마네킹 사진 기반 AI 착용컷 사용 여부.
     ai_model_gender VARCHAR(10),                     -- MALE|FEMALE. ai_model_enabled=true면 필수.
@@ -142,13 +142,13 @@ CREATE TABLE product (
     CONSTRAINT ck_product_sale_type CHECK (sale_type IN ('DIRECT_SALE', 'AUCTION')),
     CONSTRAINT ck_product_sale_status CHECK (sale_status IN (
         'DRAFT',              -- 등록 중(미공개)
-        'ON_SALE',            -- 상시 판매 중
+        'ON_SALE',            -- 정찰제 중
         'AUCTION_SCHEDULED',  -- 경매 예정
         'AUCTION_IN_PROGRESS',-- 경매 진행 중 (상시 구매 즉시 중단, LIVE-006)
         'SOLD'                -- 판매 완료(낙찰 포함)
     )),
-    -- 상시 판매 상품은 가격이 반드시 있어야 한다.
-    -- 경매 상품의 가격은 강제하지 않는다 — 미낙찰 후 상시 판매로 전환할 때
+    -- 정찰제 상품은 가격이 반드시 있어야 한다.
+    -- 경매 상품의 가격은 강제하지 않는다 — 미낙찰 후 정찰제로 전환할 때
     -- sale_type 과 price 갱신 순서를 애플리케이션이 자유롭게 잡을 수 있어야 한다.
     CONSTRAINT ck_product_price_by_type CHECK (
         sale_type <> 'DIRECT_SALE' OR price IS NOT NULL
@@ -426,7 +426,7 @@ CREATE TABLE point_hold (
 
 -- 한 회원은 동시에 하나의 HELD 보류만 가질 수 있다. 정책 두 개를 동시에 구현한다.
 --   * AUCT-009 최고 입찰자인 동안 타 경매 입찰 차단
---     — 상시 판매 구매는 보류를 만들지 않으므로 이 제약에 걸리지 않는다.
+--     — 정찰제 구매는 보류를 만들지 않으므로 이 제약에 걸리지 않는다.
 --   * AUCT-006 직전 성공 입찰자는 바로 다음 단계 입찰 불가
 --     — 최고 입찰자는 이미 HELD 를 쥐고 있어 두 번째 보류를 만들 수 없다.
 --       ⚠️ 따라서 애플리케이션은 '같은 회원의 연속 입찰'에서 기존 보류를 먼저
@@ -447,7 +447,7 @@ CREATE TABLE orders (
     buyer_id        BIGINT      NOT NULL REFERENCES member (id),
     seller_id       BIGINT      NOT NULL REFERENCES member (id),
     product_id      BIGINT      NOT NULL REFERENCES product (id),
-    auction_id      BIGINT      REFERENCES auction (id),  -- 상시 판매 주문은 NULL
+    auction_id      BIGINT      REFERENCES auction (id),  -- 정찰제 주문은 NULL
     -- 이 주문이 발생한 방송(LIVE-006 방송 종료 요약). 라이브 밖에서 산 주문은 NULL.
     -- 낙찰이면 auction_id 로도 방송을 알 수 있지만, 방송 중 즉시구매는 경매를 거치지 않아
     -- 이 컬럼 없이는 방송과 이을 근거가 없다. 두 경로를 한 컬럼으로 묶어 "이 방송에서
@@ -607,7 +607,7 @@ CREATE INDEX ix_notification_member
 -- HOME-001: 진행 중/예약 라이브
 CREATE INDEX ix_live_status_scheduled ON live (status, scheduled_at DESC);
 
--- HOME-001: 상시 판매 / 경매 예정 상품 목록
+-- HOME-001: 정찰제 / 경매 예정 상품 목록
 CREATE INDEX ix_product_status_created
     ON product (sale_status, created_at DESC) WHERE deleted_at IS NULL;
 

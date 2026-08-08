@@ -2,7 +2,7 @@
 
 - **요청자 파트**: BE
 - **대상 파트**: AI
-- **원본 요청**: AI가 전달한 "가격 책정: 상시판매 호가를 시세 근거로 쓰기 위한 확인·요청"
+- **원본 요청**: AI가 전달한 "가격 책정: 정찰제 호가를 시세 근거로 쓰기 위한 확인·요청"
   (`S15P11A108-494`, 설계 `CH016-internal-comps-hedge.md`)에 대한 답변.
 - **요약**: §1-A는 코드로 전부 확인됨(아래). §1-B는 로컬 DB를 직접 조회했고, **의미 있는 실사용
   데이터는 사실상 0건**이다(이유는 §1-B 참고). §2는 BE 의견을 냄 — **뷰 + 읽기 전용 계정**(직접
@@ -14,7 +14,7 @@
 
 ## §1-A 코드로 답할 수 있는 것
 
-### 1. 상시판매 상품 엔티티 컬럼
+### 1. 정찰제 상품 엔티티 컬럼
 
 `Product` 엔티티(`BE/src/main/java/com/ssafy/backend/product/entity/Product.java`), 테이블명 `product`:
 
@@ -35,7 +35,7 @@ public class Product extends BaseTimeEntity {   // createdAt, updatedAt 포함 (
     Map<String,Integer> measurements; // JSONB, nullable
     SaleType saleType;           // DIRECT_SALE | AUCTION, nullable(DRAFT일 땐 미정)
     SaleStatus saleStatus;       // NOT NULL — 아래 2번
-    Long price;                  // 상시판매가(원). AUCTION이면 null
+    Long price;                  // 정찰제가(원). AUCTION이면 null
     boolean aiModelEnabled;      // 이번 라운드에 추가된 필드, pricing과 무관
     AiModelGender aiModelGender; // 위와 동일
     LocalDateTime deletedAt;     // soft delete, NOT NULL이면 삭제된 상품
@@ -60,16 +60,16 @@ public class Product extends BaseTimeEntity {   // createdAt, updatedAt 포함 (
 ```java
 public enum SaleStatus {
     DRAFT,                 // 등록 중(미공개) — 목록/검색/가격조회 전부에서 제외해야 함
-    ON_SALE,                // 상시 판매 중 — "안 팔린 호가"
-    AUCTION_SCHEDULED,      // 경매 예정 — 상시판매 대상 아님(price가 null일 수 있음)
-    AUCTION_IN_PROGRESS,    // 경매 진행 중 — 상시판매 대상 아님
+    ON_SALE,                // 정찰제 중 — "안 팔린 호가"
+    AUCTION_SCHEDULED,      // 경매 예정 — 정찰제 대상 아님(price가 null일 수 있음)
+    AUCTION_IN_PROGRESS,    // 경매 진행 중 — 정찰제 대상 아님
     SOLD                    // 판매 완료(낙찰 포함) — "체결된 호가"
 }
 ```
 
-`SaleType`은 별도 enum: `DIRECT_SALE | AUCTION`. **CH016이 원하는 "상시판매 호가"는
+`SaleType`은 별도 enum: `DIRECT_SALE | AUCTION`. **CH016이 원하는 "정찰제 호가"는
 `sale_type = 'DIRECT_SALE'`인 행 전체**(ON_SALE=안 팔림, SOLD=팔림 둘 다 포함)를 뜻한다.
-`sale_status`만으로는 상시판매/경매를 못 가른다 — 반드시 `sale_type`과 함께 필터해야 한다
+`sale_status`만으로는 정찰제/경매를 못 가른다 — 반드시 `sale_type`과 함께 필터해야 한다
 (경매 낙찰도 `SOLD`라서, `sale_status='SOLD'`만 보면 경매 낙찰가가 섞여 들어간다).
 
 ### 3. 품질검수 등급(condition_grade) 저장 위치 — ⚠️ 두 가지를 구분해야 함
@@ -96,8 +96,8 @@ AI 쪽 기록("검수 결과는 Redis에 TTL 1시간")은 **다른 개념과 혼
 @LastModifiedDate private LocalDateTime updatedAt; // 마지막 수정 시각(가격 변경 포함)
 ```
 
-"가격 확정 시점"(상시판매 등록 API 호출 시점) 전용 컬럼은 없다 — `createdAt`은 DRAFT 생성
-시각이라 상시판매 전환 이전일 수 있다. 정확한 가격 확정 시점이 필요하면 `updatedAt`을 근사치로
+"가격 확정 시점"(정찰제 등록 API 호출 시점) 전용 컬럼은 없다 — `createdAt`은 DRAFT 생성
+시각이라 정찰제 전환 이전일 수 있다. 정확한 가격 확정 시점이 필요하면 `updatedAt`을 근사치로
 쓰거나, 별도 컬럼 추가를 요청해야 한다(이번 답변에 포함 안 함).
 
 ### 5. 카테고리 체계 — 3-depth, 성별×대분류×소분류
@@ -162,7 +162,7 @@ BE에서 미구현 상태다(`docs/requests/BE/002-product-contract.md` §3.3, "
 
 ## §1-B DB를 실제로 조회해야 아는 것
 
-로컬 dev DB(`vintib-postgres`)를 직접 조회했다. **결론부터: 상시판매(`DIRECT_SALE`) 상품은
+로컬 dev DB(`vintib-postgres`)를 직접 조회했다. **결론부터: 정찰제(`DIRECT_SALE`) 상품은
 72건 있지만, 전부 통합 테스트가 남긴 데이터로 보이고 실사용 데이터로 볼 수 없다.**
 
 ### 근거
@@ -192,7 +192,7 @@ SELECT count(DISTINCT title), count(*) FROM product WHERE sale_type='DIRECT_SALE
 - **`brand_id`가 903건 전부 NULL.** §1-A-1에서 말했듯 구조화 필드는 있는데 실제로 하나도
   안 채워졌다.
 - **`condition_grade`도 903건 전부 NULL.**
-- 상시판매 72건의 상품명 샘플(최근 10건, `title`은 마스킹 없이 원문 그대로 — 이미 테스트
+- 정찰제 72건의 상품명 샘플(최근 10건, `title`은 마스킹 없이 원문 그대로 — 이미 테스트
   데이터라 개인정보 없음):
 
   ```

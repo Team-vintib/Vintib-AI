@@ -36,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 팔로잉 콘텐츠 조회(HOME-002) 서비스.
  *
  * <p><b>{@code followedSellers}·{@code products}는 실데이터다</b>(SY024). {@code products}는
- * 팔로우한 판매자의 상시 판매(ON_SALE) 상품만 채운다 — {@code ProductCardResponse}의
+ * 팔로우한 판매자의 정찰제(ON_SALE) 상품만 채운다 — {@code ProductCardResponse}의
  * sellType/sellStatus 허용값이 아직 경매 도메인과 1:1로 매핑 확정되지 않았고, 경매 예정 상품은
  * {@code auction} 패키지 조회가 별도로 필요해 이번 범위를 벗어난다.
  *

@@ -115,14 +115,14 @@ BEGIN
         passed := passed + 1;
     END;
 
-    -- 8. 상시 판매인데 가격 없음
+    -- 8. 정찰제인데 가격 없음
     BEGIN
         INSERT INTO product (seller_id, category_id, title, sale_type, sale_status, price)
-        VALUES (1, 1, '가격없는 상시판매', 'DIRECT_SALE', 'ON_SALE', NULL);
-        RAISE NOTICE '[FAIL] PROD     가격 없는 상시 판매가 허용됨';
+        VALUES (1, 1, '가격없는 정찰제', 'DIRECT_SALE', 'ON_SALE', NULL);
+        RAISE NOTICE '[FAIL] PROD     가격 없는 정찰제가 허용됨';
         failed := failed + 1;
     EXCEPTION WHEN check_violation THEN
-        RAISE NOTICE '[PASS] PROD     가격 없는 상시 판매 거부';
+        RAISE NOTICE '[PASS] PROD     가격 없는 정찰제 거부';
         passed := passed + 1;
     END;
 
