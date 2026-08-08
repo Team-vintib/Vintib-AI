@@ -13,13 +13,6 @@ const currentIndex = ref(0)
 
 const currentImage = computed(() => images.value[currentIndex.value] ?? images.value[0])
 
-// 검수 이미지 위에 얹는 빨간 네모(탐지 위치) 좌표만 추린다.
-const currentBoxes = computed(() =>
-  (currentImage.value?.findings ?? [])
-    .map((finding) => finding.box)
-    .filter((box): box is NonNullable<typeof box> => Boolean(box)),
-)
-
 // 상품(=분석 대상)이 바뀌면 첫 장으로 되돌린다.
 watch(
   () => props.analysis,
@@ -137,16 +130,21 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
           <div class="ai-analysis__image-frame">
             <img :src="currentImage.analyzedImageUrl" :alt="currentImage.analyzedImageAlt" />
             <span
-              v-for="(box, boxIndex) in currentBoxes"
-              :key="boxIndex"
+              v-for="(finding, findingIndex) in currentImage.findings"
+              v-show="finding.box"
+              :key="finding.id"
               class="ai-analysis__box"
-              :style="{
-                left: `${box.x}%`,
-                top: `${box.y}%`,
-                width: `${box.width}%`,
-                height: `${box.height}%`,
-              }"
-            />
+              :style="
+                finding.box && {
+                  left: `${finding.box.x}%`,
+                  top: `${finding.box.y}%`,
+                  width: `${finding.box.width}%`,
+                  height: `${finding.box.height}%`,
+                }
+              "
+            >
+              <span class="ai-analysis__box-badge">{{ findingIndex + 1 }}</span>
+            </span>
           </div>
         </figure>
       </div>
@@ -175,7 +173,7 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 
         <ul v-if="currentImage.findings.length">
           <li v-for="(finding, index) in currentImage.findings" :key="finding.id">
-            <span>{{ index + 1 }}</span>
+            <span class="ai-analysis__box-badge">{{ index + 1 }}</span>
             <div>
               <strong>{{ finding.type }} · {{ finding.location }}</strong>
               <p>{{ finding.description }}</p>
@@ -398,26 +396,53 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 }
 
 .ai-analysis__image-frame {
+  // bbox %가 원본 이미지 전체 기준이라, aspect-ratio 고정 + object-fit:cover로 잘라 보여주면
+  // 잘리기 전 좌표와 화면에 보이는 이미지가 어긋난다(등록 화면과 동일하게 원본 비율 그대로
+  // 표시해야 좌표가 맞는다).
   position: relative;
-  overflow: hidden;
-  aspect-ratio: 4 / 5;
+  overflow: visible;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-media);
   background: var(--color-surface-secondary);
 }
 
 .ai-analysis__image-frame img {
+  display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  border-radius: var(--radius-media);
 }
 
 .ai-analysis__box {
   position: absolute;
   border: 2px solid var(--color-error);
-  border-radius: 4px;
-  box-shadow: var(--shadow-ring);
+  border-radius: 2px;
+  background: rgb(196 61 70 / 12%);
   pointer-events: none;
+}
+
+.ai-analysis__box-badge {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-error);
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+// 검수 이미지 위 마커일 때만 네모 밖 좌상단 모서리에 겹쳐 띄운다(등록 화면과 동일한 배치).
+.ai-analysis__box .ai-analysis__box-badge {
+  position: absolute;
+  right: 100%;
+  bottom: 100%;
+  margin-right: 1px;
+  margin-bottom: 1px;
 }
 
 .ai-analysis__dots {
@@ -482,20 +507,6 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
   padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-}
-
-.ai-analysis__description li > span {
-  display: grid;
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--color-error);
-  color: var(--color-text-inverse);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-extrabold);
-  line-height: var(--line-height-snug);
-  place-items: center;
 }
 
 .ai-analysis__description li strong {
