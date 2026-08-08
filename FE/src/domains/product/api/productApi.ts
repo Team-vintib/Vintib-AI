@@ -181,6 +181,8 @@ interface ProductImageUploadUrlResponse {
   expiresInSeconds: number
 }
 
+// 이미지 용도(BE `ProductImageRole`, -310). FRONT/BACK은 AI 품질 검수용 앞·뒤 사진이고
+// 상품당 한 장씩만 등록된다. **필수 필드라 빠지면 등록이 400으로 거절된다.**
 type ProductImageRoleDto = 'FRONT' | 'BACK' | 'ADDITIONAL'
 
 interface ProductImageRegisterRequest {
@@ -694,11 +696,17 @@ export const submitProduct = async (
 
   if (draft.draftProductId) {
     // SY043: '상태/하자' 스텝 진입 시 이미 DRAFT 상품+이미지가 만들어져 있다 — 나머지
-    // 필드만 부분 수정하고 이미지는 재업로드하지 않는다. PATCH가 aiModelEnabled/aiModelGender를
-    // 안 받지만, 이 값들은 '기본 정보' 스텝을 나갈 때 이미 확정돼 draft 생성 시점에
-    // 실려 갔으므로 다시 보낼 필요가 없다(docs/requests/BE/046 참고).
+    // 필드만 부분 수정한다. PATCH가 aiModelEnabled/aiModelGender를 안 받지만, 이 값들은
+    // '기본 정보' 스텝을 나갈 때 이미 확정돼 draft 생성 시점에 실려 갔으므로 다시 보낼
+    // 필요가 없다(docs/requests/BE/046 참고).
+    //
+    // 다만 "이미 올라가 있겠지"라고 믿지는 않는다 — 사전 업로드가 실패해도 draftProductId는
+    // 남아 있어서, 사진 0장인 상품이 그대로 등록 완료되던 문제가 있었다. 실제 상태를 확인하고
+    // 비어 있으면 여기서 올린다.
     productId = draft.draftProductId
     const { categories = [] } = options
+
+    await ensureProductImages(productId, draft.photos)
 
     await http.patch<ApiResponse<ProductCreateResponse>>(`/products/${productId}`, {
       title: draft.name.trim(),
@@ -749,22 +757,56 @@ const getCreatedProductId = (product: ProductCreateResponse) => {
   return productId
 }
 
+/**
+ * 상품에 이미지가 붙어 있는지 확인하고, 없으면 지금 올린다.
+ *
+ * 등록 마지막 단계에서 부르는 안전망이다. 사전 업로드(검수 스텝)가 실패한 채로 등록이 끝나면
+ * 사진 없는 상품이 만들어지는데, 사용자는 그 사실을 알 방법이 없다.
+ */
+const ensureProductImages = async (productId: number, photos: ProductRegistrationPhotoDraft[]) => {
+  let hasImages: boolean
+
+  try {
+    hasImages = (await getProductDetail(productId)).images.length > 0
+  } catch {
+    // 상세 조회가 실패하면(간헐적 500 — docs/requests/BE/029) 붙어 있는지 알 수 없다.
+    // 이때 무작정 다시 올리면 이미지가 중복되므로 그대로 둔다. 사전 업로드가 실패한 경우는
+    // draftProductId가 남지 않아 애초에 이 경로로 오지 않는다.
+    return
+  }
+
+  if (hasImages) return
+
+  await uploadProductImages(productId, photos)
+}
+
+/**
+ * 등록 화면의 사진을 상품에 붙인다. 사진 한 장마다 세 단계를 돈다.
+ *   ① presigned URL 발급 → ② S3에 PUT → ③ 서버에 "이 key가 이 상품 이미지"라고 등록
+ *
+ * **올릴 파일이 하나도 없으면 예외를 던진다.** 예전에는 조용히 건너뛰어서, 사진이 한 장도 없는
+ * 상품이 등록 완료까지 가버렸다(실제로 106·109번 상품이 그렇게 만들어졌다).
+ */
 export const uploadProductImages = async (
   productId: number,
   photos: ProductRegistrationPhotoDraft[],
 ) => {
-  const orderedPhotos = [...photos].sort((left, right) => {
-    if (left.isRepresentative !== right.isRepresentative) {
-      return left.isRepresentative ? -1 : 1
-    }
+  const orderedPhotos = [...photos]
+    .filter((photo) => Boolean(photo.file))
+    .sort((left, right) => {
+      if (left.isRepresentative !== right.isRepresentative) {
+        return left.isRepresentative ? -1 : 1
+      }
 
-    return photos.indexOf(left) - photos.indexOf(right)
-  })
+      return photos.indexOf(left) - photos.indexOf(right)
+    })
+
+  if (orderedPhotos.length === 0) {
+    throw new Error('업로드할 상품 사진이 없습니다. 사진을 다시 선택해 주세요.')
+  }
 
   for (const [index, photo] of orderedPhotos.entries()) {
-    if (!photo.file) {
-      continue
-    }
+    if (!photo.file) continue
 
     const uploadUrlResponse = await http.post<ApiResponse<ProductImageUploadUrlResponse>>(
       `/products/${productId}/images/upload-url`,
