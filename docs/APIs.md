@@ -113,6 +113,12 @@
 
 > 상품 목록 조회(`GET /products`)는 `sellerId` 쿼리 파라미터로 특정 판매자의 상품만 필터링할 수 있다(공개 프로필 판매 상품 목록). 비회원도 조회 가능하다.
 > 상품 목록 조회 필터: `categoryIds`(복수), `conditionGrade`(복수), `saleType`(`DIRECT_SALE`/`AUCTION`), `minPrice`, `maxPrice`, `sort`(`LATEST`(기본값)/`PRICE_ASC`/`PRICE_DESC`).
+>
+> 상품 이미지는 `role`(`FRONT`/`BACK`/`ADDITIONAL`, 등록 시 필수)로 구분한다. 상품당 `FRONT`·`BACK`은 각 1장만 허용하며 중복 등록 시 400(`PRODUCT_IMAGE_ROLE_ALREADY_EXISTS`)이다. `ADDITIONAL`을 포함한 전체 이미지 상한은 여전히 10장이다. 이 컬럼이 생기기 전에 등록된 기존 이미지는 전부 `ADDITIONAL`로 채워져 있다.
+>
+> 상품 상세 조회(`GET /products/{id}`) 응답에는 `aiQualityAnalysis`(AI 품질 분석) 객체가 포함된다. 등록(`POST /products`) 요청의 `aiQualityFindings`(판매자가 "하자로 인정"으로 확정한 후보 목록 — `photoRole`/`description`/`box`, `FRONT`·`BACK` 사진에만 등록 가능)를 저장했다가 사진별로 묶어 그대로 돌려준다. `status`는 `NOT_REQUESTED`(등록 시 findings 없음)/`NO_FINDINGS`(요청은 있었으나 0건)/`COMPLETED`(1건 이상) 세 가지뿐이다 — AI 분석이 진행 중이거나 실패한 상태는 BE로 전달되지 않는 시점의 데이터라 관측할 수 없다(FE가 AI 게이트웨이를 직접 폴링해 그 상태를 판단한다). 수정(`PATCH /products/{id}`)에는 아직 `aiQualityFindings`가 없다 — DRAFT 우선 생성 후 PATCH로 최종 제출하는 상품은 이 값이 저장되지 않는다(`docs/requests/BE/046-product-update-quality-findings.md`).
+>
+> 상품 정보 수정(`PATCH /products/{id}`)의 `price`(선택)로 상시 판매(`ON_SALE`) 중인 상품의 가격을 바로 바꿀 수 있다. 경매 상품(`saleType=AUCTION`)에 보내면 400(`INVALID_PRODUCT_STATE`) — 경매 시작가는 별도 API(`/products/{id}/auction-schedule`)로 다룬다.
 
 ## 라이브 / 채팅 (Lives)
 

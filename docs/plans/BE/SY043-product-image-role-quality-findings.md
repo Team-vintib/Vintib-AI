@@ -68,22 +68,40 @@
 
 ## 구현 목록
 
-- [ ] `ProductImageRole` enum 추가
-- [ ] `ProductImage.role` 컬럼 추가 + `ProductImageRegisterRequest`/`ProductImageResponse` 반영
-- [ ] 상품당 FRONT/BACK 중복 등록 방지 검증
-- [ ] `ProductQualityFinding` 엔티티/리포지토리 추가
-- [ ] `Product.conditionScore` 컬럼 추가
-- [ ] `ProductCreateRequest`에 `conditionScore`/`aiQualityFindings` 추가, 등록 시 저장
-- [ ] `GET /products/{id}` 응답에 `aiQualityAnalysis` 추가(상태 파생 로직 포함)
-- [ ] 테스트: FRONT/BACK 중복 등록 거부, findings 저장, `aiQualityAnalysis` 상태 파생
+- [x] `ProductImageRole` enum 추가
+- [x] `ProductImage.role` 컬럼 추가 + `ProductImageRegisterRequest`/`ProductImageResponse` 반영
+- [x] 상품당 FRONT/BACK 중복 등록 방지 검증
+- [x] `ProductQualityFinding` 엔티티/리포지토리 추가
+- [x] `Product.conditionScore` 컬럼 추가
+- [x] `ProductCreateRequest`에 `conditionScore`/`aiQualityFindings` 추가, 등록 시 저장
+- [x] `GET /products/{id}` 응답에 `aiQualityAnalysis` 추가(상태 파생 로직 포함)
+- [x] 테스트: FRONT/BACK 중복 등록 거부, findings 저장, `aiQualityAnalysis` 상태 파생
       (NOT_REQUESTED/NO_FINDINGS/COMPLETED) 3케이스
-- [ ] Swagger 갱신
+- [x] Swagger 갱신
 
-## 확인이 필요한 미결정 사항
+## 구현 결과 (2026-08-08)
 
-- 기존에 이미 등록된 이미지들의 `role`을 어떻게 채울지(마이그레이션 없이 `role IS NULL` 허용 +
-  기존 데이터는 전부 `ADDITIONAL` 취급 정도가 무난해 보임 — 확정 필요).
-- FRONT/BACK 중복 등록을 막을 에러 코드 — 기존 `PRODUCT_IMAGE_*`(P004~P007)에 이어 새 코드
-  (`P008` 등) 신설 예정.
-- `conditionScore` 타입 — AI 원본이 `condition_score: 78.0`(실수)라 `Double`로 잡음, 이견 없으면
-  그대로 진행.
+계획대로 구현 완료했다. 아래는 초안과 달라진 부분만 남긴다.
+
+- **기존 이미지 `role`**: 마이그레이션 없이 `@ColumnDefault("'ADDITIONAL'")`로 채웠다(사용자
+  결정 그대로) — `ddl-auto: update`가 컬럼을 추가할 때 기존 행에 기본값을 채워 넣는 기존
+  프로젝트 패턴(`Product.aiModelEnabled` 등)과 동일.
+- **에러 코드**: 초안이 추정한 `P008`은 이미 `CATEGORY_NOT_FOUND`가 쓰고 있어서, 실제로는
+  `PRODUCT_IMAGE_ROLE_ALREADY_EXISTS`=`P011`, `AI_QUALITY_FINDING_INVALID_PHOTO_ROLE`=`P012`로
+  배정했다.
+- **`PATCH /products/{id}`는 계획대로 이번 범위에서 뺐다.** 등록(`POST`) 시점에만
+  `aiQualityFindings`를 받는다 — 그 결과 FE가 `docs/requests/BE/046-product-update-quality-findings.md`로
+  "PATCH에도 넣어달라"는 후속 요청을 남겼다(아직 미착수, 별도 작업 필요).
+- `019-product-quality-multi-image.md`/`041-quality-inspection-integration.md`/
+  `042-product-registration-ai-pipeline.md`는 이번 구현으로 요청 사항이 전부 해소돼 삭제했다.
+  `041` §6("findings를 `key` 목록만 저장할지, 원본 전체를 저장할지")의 답은 **원본 일부
+  (`photoRole`/`description`/`box`)를 저장하는 쪽**으로 결정됐다 — AI의 raw 스키마
+  (`confidence`/`severity`/`section` 등)는 저장하지 않는다(등록 화면에서 사용자가 이미
+  인정/제외를 확정한 결과만 필요하기 때문).
+
+## 확인이 필요한 미결정 사항 (해소됨)
+
+- ~~기존에 이미 등록된 이미지들의 `role`을 어떻게 채울지~~ → 위 "구현 결과" 참고, `ADDITIONAL`로
+  확정.
+- ~~FRONT/BACK 중복 등록을 막을 에러 코드~~ → `P011`/`P012`로 확정.
+- ~~`conditionScore` 타입~~ → `Double` 그대로 진행.

@@ -35,16 +35,16 @@
 
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
-| 002 | `002-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
-| 019 | `019-product-quality-multi-image.md` | Product | 미반영 | 서윤 파트 |
+| 002 | `002-product-contract.md` | Product | 목록/상세/등록/이미지/AI 분석 연결 완료 | AI 가격 추천 |
 | 020 | `020-tryon-result-category.md` | TryOn | 미반영(순수 BE, AI 무관) | 서윤 파트 |
 | 025 | `025-product-same-price-chart.md` | Product | 미반영 — 계획 `SY042` 검토 중 | 서윤 파트 |
 | 030 | `030-order-settled-at-field.md` | Order | 미반영 | 서윤 파트 |
-| 041 | `041-quality-inspection-integration.md` | Product | 미반영 | 서윤 파트 |
 | 041 | `041-refund-notification-dashboard.md` | Refund/Notification | 미반영 | 서윤 파트 |
-| 042 | `042-product-registration-ai-pipeline.md` | Product | 미반영 — 사전 업로드(B안) 방향 확정, 계획 미작성 | 서윤 파트 |
 | 043 | `043-registration-price-chart-source.md` | Product | 미반영, 우선순위 낮음(044로 대체 가능) | 서윤 파트 |
 | 044 | `044-pricing-estimate-trigger.md` | Product | 미반영 | 서윤 파트 |
+| 045 | `045-broadcast-summary-sale-type.md` | Live/Auction | 미반영 | 정윤 파트 |
+| 045 | `045-shipment-fallback-tracking-status-gap.md` | Order | 미반영, 참고용(FE 보정 완료, 블로킹 아님) | 서윤 파트 |
+| 046 | `046-product-update-quality-findings.md` | Product | 미반영 — `SY043` 이후 실제 데이터 누락 발생 중 | 서윤 파트 |
 
 `003`(Live/TryOn)·`038`·`039`·`040`(전부 TryOn)은 코드 전수 대조 결과 이미 반영 완료돼 삭제했다
 — 상세는 위 "2026-08-07 시착(TRYON) 관련 요청 4건 정리" 참고.
@@ -323,3 +323,29 @@
   로그인 응답에 중첩하거나 `nextStep`을 신설하지 않는다. §6의 나머지 협의 사항(자동 로그인
   여부, memberType 기본값 등)도 전부 "지금 구현대로 유지"로 결정돼 더 이상 대기 항목이
   없다. 계약은 `docs/requests/FE/037-signin-response-id-field.md` 참고.
+
+## 2026-08-08 정리 (이미지 role + AI 품질 검수 저장 반영)
+
+`docs/plans/BE/SY043-product-image-role-quality-findings.md`로 상품 이미지 `role`
+(`FRONT`/`BACK`/`ADDITIONAL`) 저장과 등록 시점 확정 AI 품질 검수 결과(`aiQualityFindings`) 저장을
+구현했다. 이 작업으로 요청 3건이 전부 해소돼 삭제했다.
+
+- `019-product-quality-multi-image.md` — `GET /products/{id}` 응답에 `aiQualityAnalysis.images[]`
+  (`label`/`originalImageUrl`/`analyzedImageUrl`/`findings`)를 채워 반영. `summary`는 이 흐름으로는
+  못 채우는 값이라 계속 `null`이고(019도 이미 유보를 인정한 부분), `analyzedImageUrl`은 주석
+  이미지가 없어 `originalImageUrl`과 동일하게 낸다 — 둘 다 019가 허용한 대안 그대로다.
+- `041-quality-inspection-integration.md` — §6("findings를 `key` 목록만 저장할지, 원본 전체를
+  저장할지")의 답을 `photoRole`/`description`/`box`만 저장하는 쪽으로 확정해 해소했다. 이 문서
+  자체의 "처리 결과"에 이미 기록돼 있던 AI 검수 job 트리거/폴링 프록시(`triggerQualityInspectionJob`,
+  `GET /products/{id}/quality-inspection`)는 이번 세션 이전에 별도로 반영되어 있었다.
+- `042-product-registration-ai-pipeline.md` — §1/§2(상품 생성 전 이미지 URL 확보, 방향 A/B)는
+  041과 같은 시점에 방향 A(상품을 먼저 만들고 이미지를 붙이는 기존 흐름 그대로)로 이미 반영돼
+  있었다. §3(등록 시 확정한 `aiQualityFindings` 저장)이 이번 작업으로 해소되며 문서 전체가 닫혔다.
+
+**`046-direct-sale-price-update.md`도 같은 배치에서 반영·삭제했다** — `PATCH /products/{id}`
+요청에 `price`(선택) 필드를 추가해, 상시 판매(`ON_SALE`) 중인 상품의 가격을 바꿀 수 있게 했다
+(요청 옵션 2 그대로 채택). 경매 상품·`SOLD` 상품은 그대로 거절한다(`INVALID_PRODUCT_STATE`).
+
+남아 있는 `046-product-update-quality-findings.md`(PATCH에도 `aiQualityFindings` 추가 요청)는
+이번 작업 범위 밖이라 그대로 열어 뒀다 — 저장 형식은 이제 확정됐으니(위 041 항목 참고) 착수하면
+POST와 동일하게 반영하면 된다.
