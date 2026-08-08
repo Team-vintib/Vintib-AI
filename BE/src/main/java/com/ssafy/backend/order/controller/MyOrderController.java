@@ -36,7 +36,7 @@ public class MyOrderController {
 
     @Operation(summary = "주문 목록 조회",
             description = "본인 주문 목록을 최신순으로 조회한다. role=BUYER면 구매/낙찰 내역(MY-003), "
-                    + "role=SELLER면 판매/정산 내역(MY-004)이다. 정산 완료 여부는 status가 SETTLED인지로 판단하며, "
+                    + "role=SELLER면 판매/정산 내역이다. 정산 완료 여부는 status가 SETTLED인지로 판단하며, "
                     + "정산액은 수수료 없이 orderPrice 그대로다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),

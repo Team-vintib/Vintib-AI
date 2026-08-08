@@ -241,6 +241,10 @@ public class OrderService {
     private void deliver(Order order, OrderShipment shipment, LocalDateTime deliveredAt) {
         order.markDelivered(deliveredAt);
         shipment.markDelivered(deliveredAt);
+        // 즉시-확정 폴백 경로(구독 실패)는 웹훅이 없어 trackingStatus를 아무도 안 채운다 —
+        // 여기서 맞춰준다. 웹훅 경로는 updateShipmentTracking()이 이미 DELIVERED로 채워둔
+        // 뒤라 멱등하게 덮어쓸 뿐이다(045).
+        shipment.updateTrackingStatus(TrackingStatus.DELIVERED);
         notificationCommandPort.notify(
                 order.getBuyer(),
                 "SHIPMENT_COMPLETED",
@@ -279,7 +283,7 @@ public class OrderService {
         }
         pointService.settleOrder(
                 order.getBuyer().getId(), order.getSeller().getId(), order.getOrderPrice(), order.getId());
-        order.confirmAndSettle();
+        order.confirmAndSettle(LocalDateTime.now());
     }
 
     private Order findOrder(Long orderId, Long memberId) {

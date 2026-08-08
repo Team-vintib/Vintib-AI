@@ -62,7 +62,7 @@ public class LiveBroadcastResultService {
     private final ProductQueryPort productQueryPort;
 
     /**
-     * 방송 종료 요약(FE 요청 018). <b>호스트 본인만.</b>
+     * 방송 종료 요약. <b>호스트 본인만.</b>
      *
      * <p>편성 상품 전체를 편성 순서대로 훑으며 각 상품의 마지막 경매 결과를 붙인다.
      */
@@ -156,18 +156,22 @@ public class LiveBroadcastResultService {
             Long productId, ProductCard card, Auction auction, Long directSalePrice) {
         String title = card == null ? null : card.title();
         String thumbnailUrl = card == null ? null : card.thumbnailUrl();
+        // 편성 시점 상품의 판매 방식·등록가 — soldVia/finalPrice(팔린 경로·가격)와는 다른
+        // 축이라, 안 팔린 상품에도 채워야 대시보드가 "정찰제인데 안 팔림"을 구분할 수 있다.
+        String saleType = card == null ? null : card.saleType();
+        Long registeredPrice = card == null ? null : card.price();
 
         if (auction != null && auction.getStatus() == AuctionStatus.SUCCESS) {
             return LiveBroadcastSummaryResponse.Result.wonAtAuction(
-                    productId, title, thumbnailUrl, auction.getFinalPrice());
+                    productId, title, thumbnailUrl, auction.getFinalPrice(), saleType, registeredPrice);
         }
         if (directSalePrice != null) {
             return LiveBroadcastSummaryResponse.Result.soldDirectly(
-                    productId, title, thumbnailUrl, directSalePrice);
+                    productId, title, thumbnailUrl, directSalePrice, saleType, registeredPrice);
         }
         // 유찰됐거나, 경매를 아예 걸지 않았거나, 걸었지만 아직 안 끝났다.
         // 셋 다 "이 방송에서 안 팔렸다"이므로 UNSOLD 다 — 대시보드는 방송 전체를 보여 줘야 한다.
-        return LiveBroadcastSummaryResponse.Result.unsold(productId, title, thumbnailUrl);
+        return LiveBroadcastSummaryResponse.Result.unsold(productId, title, thumbnailUrl, saleType, registeredPrice);
     }
 
     private boolean isFailed(Auction auction) {

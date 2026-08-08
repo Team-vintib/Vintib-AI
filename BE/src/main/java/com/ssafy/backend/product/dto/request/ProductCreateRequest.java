@@ -2,6 +2,7 @@ package com.ssafy.backend.product.dto.request;
 
 import com.ssafy.backend.product.entity.AiModelGender;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
@@ -20,11 +21,17 @@ public record ProductCreateRequest(
         @NotNull
         Long categoryId,
 
-        @Schema(example = "1")
-        Long brandId,
+        @Schema(description = "브랜드명. 마스터에서 고르지 않고 자유 텍스트로 받는다", example = "Maison Kitsuné")
+        String brand,
 
         @Schema(example = "A")
         String conditionGrade,
+
+        @Schema(
+                description = "AI 품질 검수가 매긴 상태 원점수(0~100). 선택 입력 — 참고용일 뿐 다른 로직이"
+                        + " 신뢰해 쓰지 않는다.",
+                example = "78.0")
+        Double conditionScore,
 
         @Schema(example = "M")
         String sizeLabel,
@@ -40,6 +47,10 @@ public record ProductCreateRequest(
 
         @Schema(description = "판매자가 직접 입력한 하자 목록. 선택 입력", example = "[\"소매 끝 실밥 풀림\"]")
         List<String> defects,
+
+        @Schema(description = "AI 품질 검수에서 사용자가 하자로 인정하고 확정한 finding 목록. 선택 입력")
+        @Valid
+        List<AiQualityFindingRequest> aiQualityFindings,
 
         @Schema(description = "마네킹 사진 기반 AI 착용컷 사용 여부", example = "true")
         boolean aiModelEnabled,

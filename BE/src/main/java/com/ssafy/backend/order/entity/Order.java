@@ -80,6 +80,10 @@ public class Order extends BaseTimeEntity {
     @Column(name = "auto_confirm_at")
     private LocalDateTime autoConfirmAt;
 
+    /** 정산 완료 시각(SETTLED로 전이한 시점) — {@code SETTLED}가 아닌 주문은 항상 {@code null}이다. */
+    @Column(name = "settled_at")
+    private LocalDateTime settledAt;
+
     @Column(name = "refund_requested", nullable = false)
     private boolean refundRequested;
 
@@ -148,9 +152,10 @@ public class Order extends BaseTimeEntity {
      * 구매 확정 처리(ORDER-002/003). 전제조건(DELIVERED 상태)은 서비스가 검증한다.
      * 정산 대기 절차가 없어 CONFIRMED를 거쳐 곧바로 SETTLED로 끝난다.
      */
-    public void confirmAndSettle() {
+    public void confirmAndSettle(LocalDateTime settledAt) {
         this.status = OrderStatus.CONFIRMED;
         this.status = OrderStatus.SETTLED;
+        this.settledAt = settledAt;
     }
 
     /** 환불 요청(REFUND-001) — 전제조건(PAID/SHIPPING/DELIVERED, 중복 요청 아님)은 서비스가 검증한다. */

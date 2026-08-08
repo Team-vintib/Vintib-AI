@@ -61,8 +61,10 @@ public class Product extends BaseTimeEntity {
     @Column(name = "category_id", nullable = false)
     private Long categoryId;
 
-    @Column(name = "brand_id")
-    private Long brandId;
+    // FE가 브랜드 마스터에서 고르게 하지 않고 자유 텍스트로 받는다(브랜드 FK 제거) — 미등록
+    // 브랜드·오탈자·병기 표기까지 그대로 받아야 해서 브랜드 마스터로는 표현할 수 없다.
+    @Column(name = "brand", length = 100)
+    private String brand;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -73,6 +75,12 @@ public class Product extends BaseTimeEntity {
     // 중고 상태 등급 체계 미확정 — 자유 문자열 (docs/db/erd.md 확인 필요 가정 #3)
     @Column(name = "condition_grade", length = 20)
     private String conditionGrade;
+
+    // AI 품질 검수가 매긴 원점수(0~100, SY043). 041-quality-inspection-integration.md 경고 그대로:
+    // 가중치·등급 경계가 근거 없는 임의값이라 가격책정 등 다른 로직이 이 값을 신뢰해 쓰면 안 된다
+    // — 상품 상세에 참고용으로 보여주는 것 외 용도로 참조하지 않는다.
+    @Column(name = "condition_score")
+    private Double conditionScore;
 
     @Column(name = "size_label", length = 50)
     private String sizeLabel;
@@ -149,10 +157,11 @@ public class Product extends BaseTimeEntity {
     private Product(
             Member seller,
             Long categoryId,
-            Long brandId,
+            String brand,
             String title,
             String description,
             String conditionGrade,
+            Double conditionScore,
             String sizeLabel,
             String color,
             String material,
@@ -161,10 +170,11 @@ public class Product extends BaseTimeEntity {
             AiModelGender aiModelGender) {
         this.seller = seller;
         this.categoryId = categoryId;
-        this.brandId = brandId;
+        this.brand = brand;
         this.title = title;
         this.description = description;
         this.conditionGrade = conditionGrade;
+        this.conditionScore = conditionScore;
         this.sizeLabel = sizeLabel;
         this.color = color;
         this.material = material;
@@ -186,11 +196,21 @@ public class Product extends BaseTimeEntity {
         this.saleStatus = SaleStatus.AUCTION_SCHEDULED;
     }
 
+    /** 이미 상시 판매로 전환된 상품의 가격을 조정한다. 호출 전 {@link #isDirectSale()}을 확인해야 한다 —
+     * 경매 상품은 가격 개념이 없다({@code price}는 항상 null, 시작가는 {@code Auction}이 따로 갖는다). */
+    public void updatePrice(Long price) {
+        this.price = price;
+    }
+
+    public boolean isDirectSale() {
+        return saleType == SaleType.DIRECT_SALE;
+    }
+
     public void update(
             String title,
             String description,
             Long categoryId,
-            Long brandId,
+            String brand,
             String conditionGrade,
             String sizeLabel,
             String color,
@@ -205,8 +225,8 @@ public class Product extends BaseTimeEntity {
         if (categoryId != null) {
             this.categoryId = categoryId;
         }
-        if (brandId != null) {
-            this.brandId = brandId;
+        if (brand != null) {
+            this.brand = brand;
         }
         if (conditionGrade != null) {
             this.conditionGrade = conditionGrade;

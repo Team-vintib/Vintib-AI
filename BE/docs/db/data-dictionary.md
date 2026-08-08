@@ -554,7 +554,7 @@
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `seller_id` | `bigint` | NOT NULL |  | FK→member | 판매자. |
 | `category_id` | `bigint` | NOT NULL |  | FK→category | 카테고리. |
-| `brand_id` | `bigint` |  |  | FK→brand | 브랜드. |
+| `brand` | `varchar(100)` |  |  |  | 브랜드명. 마스터 FK가 아니라 자유 텍스트(판매자 직접 입력). |
 | `title` | `varchar(200)` | NOT NULL |  |  | 상품명. 통합 검색 대상이며 pg_trgm GIN 인덱스가 걸려 있다 (SEARCH-001). |
 | `description` | `text` |  |  |  | 상품 상세 설명. |
 | `condition_grade` | `varchar(20)` |  |  |  | 중고 상태 등급. ⚠️ 등급 체계 미확정이라 자유 문자열. |
@@ -581,7 +581,7 @@
 
 **인덱스**
 
-- `ix_product_brand` — `CREATE INDEX ix_product_brand ON public.product USING btree (brand_id, sale_status)`
+- `ix_product_brand` — `CREATE INDEX ix_product_brand ON public.product USING btree (brand, sale_status)`
 - `ix_product_category` — `CREATE INDEX ix_product_category ON public.product USING btree (category_id, sale_status)`
 - `ix_product_price` — `CREATE INDEX ix_product_price ON public.product USING btree (price) WHERE (price IS NOT NULL)`
 - `ix_product_seller` — `CREATE INDEX ix_product_seller ON public.product USING btree (seller_id, created_at DESC)`
