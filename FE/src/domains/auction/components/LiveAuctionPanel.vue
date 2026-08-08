@@ -75,6 +75,15 @@ const isHighestBidder = computed(
   () => Boolean(authStore.user?.id) && props.snapshot?.highestBidderId === authStore.user?.id,
 )
 
+// 최고 입찰자가 나면 닉네임 옆에 (나)를 붙인다 — 슬라이더가 왜 잠겼는지 지표에서 바로 읽힌다.
+const highestBidderLabel = computed(() => {
+  const nickname = props.snapshot?.highestBidderNickname
+
+  if (!nickname) return '입찰 대기 중'
+
+  return isHighestBidder.value ? `${nickname} (나)` : nickname
+})
+
 const hasEnoughPoints = computed(
   () =>
     availablePoints.value !== null &&
@@ -357,7 +366,9 @@ onBeforeUnmount(() => {
           :class="{ 'live-auction-panel__bidder--active': snapshot.highestBidderNickname }"
         >
           <span>최고 입찰자</span>
-          <strong>{{ snapshot.highestBidderNickname || '입찰 대기 중' }}</strong>
+          <strong :class="{ 'live-auction-panel__bidder-me': isHighestBidder }">
+            {{ highestBidderLabel }}
+          </strong>
         </div>
         <div>
           <span>입찰 수</span>
@@ -371,7 +382,13 @@ onBeforeUnmount(() => {
 
       <div class="live-auction-panel__next">
         <span>다음 입찰가</span>
-        <strong>{{ snapshot.nextBidPrice.toLocaleString('ko-KR') }}P</strong>
+        <span class="live-auction-panel__next-value">
+          <strong>{{ snapshot.nextBidPrice.toLocaleString('ko-KR') }}P</strong>
+          <!-- 증액 단위가 없으면 다음 입찰가가 어떻게 나온 숫자인지 알 수 없다(bidUnit은 계약에 이미 있음). -->
+          <span v-if="snapshot.bidUnit > 0" class="live-auction-panel__unit">
+            +{{ snapshot.bidUnit.toLocaleString('ko-KR') }}P
+          </span>
+        </span>
       </div>
 
       <div
@@ -559,6 +576,23 @@ onBeforeUnmount(() => {
   color: var(--color-auction) !important;
 }
 
+/* 다음 입찰가와 증액 단위는 한 덩어리로 묶어 오른쪽에 붙인다 — 바깥 __next는 이미
+   space-between이라, 단위를 형제로 두면 라벨·가격·단위가 3등분으로 벌어진다. */
+/* `.live-auction-panel__next span`(display:block)이 더 구체적이라 클래스 하나로는 안 눌린다. */
+.live-auction-panel__next .live-auction-panel__next-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.live-auction-panel__next .live-auction-panel__unit {
+  color: var(--color-live-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
 .live-auction-panel__bidder--active span,
 .live-auction-panel__bidder--active strong {
   color: var(--color-auction);
@@ -566,6 +600,11 @@ onBeforeUnmount(() => {
 
 .live-auction-panel__bidder--active strong {
   font-weight: var(--font-weight-bold);
+}
+
+/* 최고 입찰자가 나일 때 — 밝게 빼서 "지금 내가 이기고 있다"가 한눈에 보이게 한다. */
+.live-auction-panel__bidder-me {
+  color: var(--color-live-text-primary) !important;
 }
 
 .live-auction-panel__extension {
