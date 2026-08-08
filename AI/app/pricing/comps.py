@@ -66,6 +66,9 @@ class CompsFetch:
     # 응답 스키마에 노출하려면 별도 승인이 필요하다.
     finish_reason: str | None = None  # Gemini candidates[0].finishReason. 네트워크 미접촉이면 None
     truncated: bool = False  # finish_reason이 MAX_TOKENS라 부분 복구했으면 True
+    # CH030: 텍스트 매칭 백엔드가 계산한 "동일 상품" 1차(엄격) 매칭 키. `PricingResult.
+    # product_match_key`로 그대로 노출된다 — BE 계약 필드라 다른 백엔드는 None으로 둔다.
+    product_match_key: str | None = None
 
 
 def build_query(
@@ -375,6 +378,7 @@ class InternalCompsSource(CompsSource):
                 price=c.price,
                 source=self.key,
                 is_used=True,  # 세컨핸드 플랫폼 등록 매물이라 기본적으로 중고다
+                price_kind=c.price_kind,
             )
             for c in kept
             if c.price is not None

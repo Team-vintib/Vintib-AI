@@ -4,12 +4,14 @@
 위로 부풀고 시간이 지날수록 심해진다. 상태 enum이 `sale_type`(거래방식)·`sale_status`
 (진행상태) 둘로 나뉘어 있어 필터를 하나만 걸면 경매 낙찰가가 상시판매 시세에 섞인다.
 
-**이번 라운드(CH024)는 CH016 §3.3만 다룬다.** §3.4~3.6(자릿수 게이트·구간 겹침·연속 감쇠)은
-외부 검색(`llm_web_search`)과 내부 결과를 비교(hedge)하는 로직이라 `internal` 단일 백엔드
-배선 범위 밖이다 — 두 소스를 함께 쓰는 다음 라운드에서 다룬다. 이름은 `hedge.py`를 그대로
-쓰되(CH016 설계 문서와의 연결을 위해), 지금 들어있는 건 정제(필터)뿐이다.
+**CH024는 CH016 §3.3만 다뤘고(경매 낙찰가를 아예 제외), CH030은 이 결정을 뒤집는다** —
+사용자 결정: 완료거래(SOLD, 직접판매+경매낙찰)와 현재 호가(ON_SALE)를 **둘 다 포함하되
+`price_kind`로 태그**한다(완료거래 실데이터가 사실상 0건이라 완료거래만 쓰면 항상 "근거
+없음"이 된다). §3.4~3.6(자릿수 게이트·구간 겹침·연속 감쇠)은 외부 검색(`llm_web_search`)과
+내부 결과를 비교(hedge)하는 로직이라 여전히 범위 밖이다.
 
-설계: docs/plans/AI/CH016-internal-comps-hedge.md §3.3, docs/plans/AI/CH024-*.md
+설계: docs/plans/AI/CH016-internal-comps-hedge.md §3.3, docs/plans/AI/CH024-*.md,
+docs/plans/AI/CH030-pricing-text-match.md
 """
 
 from __future__ import annotations
@@ -23,7 +25,7 @@ __all__ = [
     "MIN_SANE_PRICE",
     "InternalCandidate",
     "apply_hedge_filters",
-    "filter_by_sale_type",
+    "filter_by_sale_status",
     "filter_sane_price",
     "filter_stale_listings",
 ]
@@ -33,6 +35,9 @@ __all__ = [
 MAX_LISTING_AGE_DAYS = 180
 MIN_SANE_PRICE = 1_000
 MAX_SANE_PRICE = 100_000_000
+
+_ASKING_STATUS = "ON_SALE"
+_SOLD_STATUS = "SOLD"
 
 
 @dataclass(frozen=True)
@@ -50,18 +55,37 @@ class InternalCandidate:
     sale_status: str | None
     created_at: str | None  # ISO8601 문자열, BE `createdAt`
 
+    @property
+    def price_kind(self) -> str | None:
+        """CH030 — 호가/완료거래 태그. `filter_by_sale_status`를 통과한 뒤에만 의미가 있다.
 
-def filter_by_sale_type(
-    candidates: list[InternalCandidate], *, allowed: str = "DIRECT_SALE"
+        ⚠️ 지금은 `price`(BE `product.price`) 하나만 본다 — 완료거래의 실제 낙찰/거래가
+        (`orders.order_price`/`auction.final_price`)를 BE가 별도로 노출하기 전까지는
+        (CH030 §4, BE 요청 대기) 경매로 완료된 매물은 `price`가 BE 스키마상 항상 null이라
+        `filter_sane_price`에서 사실상 걸러진다.
+        """
+        if self.sale_status == _ASKING_STATUS:
+            return "ASKING"
+        if self.sale_status == _SOLD_STATUS:
+            if self.sale_type == "DIRECT_SALE":
+                return "SOLD_DIRECT"
+            if self.sale_type == "AUCTION":
+                return "SOLD_AUCTION"
+        return None
+
+
+def filter_by_sale_status(
+    candidates: list[InternalCandidate],
 ) -> tuple[list[InternalCandidate], list[str]]:
-    """`sale_type`이 `allowed`가 아니면 제외한다(CH016 §3.3-1, 전제조건).
+    """호가(`ON_SALE`)·완료거래(`SOLD`)만 남긴다(CH030, 사용자 결정 4번).
 
-    경매 낙찰가가 상시판매 시세에 섞이는 걸 막는다. `sale_type`을 알 수 없는 후보(BE 조회
-    실패 등)도 제외한다 — 판정 근거가 없으면 시세 근거로 쓰지 않는다.
+    경매 진행 중(`AUCTION_SCHEDULED`/`AUCTION_IN_PROGRESS`)·`DRAFT`·상태를 알 수 없는
+    후보는 뺀다 — 아직 확정된 가격이 없다. `sale_type`은 여기서 걸러내지 않는다(직접판매·
+    경매낙찰 둘 다 포함, `price_kind`로 구분해서 보여준다).
     """
-    kept = [c for c in candidates if c.sale_type == allowed]
+    kept = [c for c in candidates if c.sale_status in {_ASKING_STATUS, _SOLD_STATUS}]
     dropped = len(candidates) - len(kept)
-    notes = [f"상시판매가 아니거나 판매방식을 확인할 수 없는 매물 {dropped}건을 제외했습니다."]
+    notes = [f"판매 진행 상태를 확인할 수 없는 매물 {dropped}건을 제외했습니다."]
     return kept, notes if dropped else []
 
 
@@ -103,11 +127,11 @@ def filter_sane_price(
 def apply_hedge_filters(
     candidates: list[InternalCandidate], *, now: datetime
 ) -> tuple[list[InternalCandidate], list[str]]:
-    """CH016 §3.3 필터를 순서대로 적용한다: 판매방식 → 최신성 → 가격 절대 방어."""
-    kept, notes_sale_type = filter_by_sale_type(candidates)
+    """CH016 §3.3 필터를 순서대로 적용한다: 판매상태 → 최신성 → 가격 절대 방어."""
+    kept, notes_sale_status = filter_by_sale_status(candidates)
     kept, notes_stale = filter_stale_listings(kept, now=now)
     kept, notes_price = filter_sane_price(kept)
-    return kept, [*notes_sale_type, *notes_stale, *notes_price]
+    return kept, [*notes_sale_status, *notes_stale, *notes_price]
 
 
 def _age_days(created_at: str | None, now: datetime) -> float | None:

@@ -1,11 +1,11 @@
-"""내부 호가 편향 완화 필터(CH016 §3.3) — 전부 순수 함수, 네트워크·DB 없음."""
+"""내부 호가 편향 완화 필터(CH016 §3.3, CH030) — 전부 순수 함수, 네트워크·DB 없음."""
 
 from datetime import UTC, datetime
 
 from app.pricing.hedge import (
     InternalCandidate,
     apply_hedge_filters,
-    filter_by_sale_type,
+    filter_by_sale_status,
     filter_sane_price,
     filter_stale_listings,
 )
@@ -26,33 +26,62 @@ def _candidate(**overrides) -> InternalCandidate:
     return InternalCandidate(**base)
 
 
-# --- 판매방식 필터 ------------------------------------------------------------
+# --- 판매상태 필터 (CH030) -----------------------------------------------------
 
 
-def test_keeps_direct_sale_only():
-    candidates = [_candidate(sale_type="DIRECT_SALE"), _candidate(sale_type="AUCTION")]
-    kept, notes = filter_by_sale_type(candidates)
+def test_keeps_asking_and_sold_both():
+    """호가(ON_SALE)·완료거래(SOLD) 둘 다 남긴다 — 사용자 결정 4번."""
+    candidates = [
+        _candidate(sale_status="ON_SALE"),
+        _candidate(sale_status="SOLD", sale_type="DIRECT_SALE"),
+        _candidate(sale_status="SOLD", sale_type="AUCTION"),
+    ]
+    kept, notes = filter_by_sale_status(candidates)
 
-    assert len(kept) == 1
-    assert kept[0].sale_type == "DIRECT_SALE"
-    assert notes
+    assert len(kept) == 3
+    assert notes == []
 
 
-def test_drops_unknown_sale_type():
-    """판정 근거가 없으면 시세 근거로 쓰지 않는다."""
-    candidates = [_candidate(sale_type=None)]
-    kept, notes = filter_by_sale_type(candidates)
+def test_drops_auction_in_progress_and_unknown_status():
+    """확정 가격이 없는 진행 중 경매·상태 불명 매물은 뺀다."""
+    candidates = [
+        _candidate(sale_status="AUCTION_IN_PROGRESS"),
+        _candidate(sale_status=None),
+    ]
+    kept, notes = filter_by_sale_status(candidates)
 
     assert kept == []
     assert notes
 
 
 def test_no_notes_when_nothing_dropped():
-    candidates = [_candidate(sale_type="DIRECT_SALE")]
-    kept, notes = filter_by_sale_type(candidates)
+    candidates = [_candidate(sale_status="ON_SALE")]
+    kept, notes = filter_by_sale_status(candidates)
 
     assert len(kept) == 1
     assert notes == []
+
+
+# --- price_kind 태그 (CH030) ---------------------------------------------------
+
+
+def test_price_kind_tags_asking():
+    assert _candidate(sale_status="ON_SALE").price_kind == "ASKING"
+
+
+def test_price_kind_tags_sold_direct():
+    candidate = _candidate(sale_status="SOLD", sale_type="DIRECT_SALE")
+    assert candidate.price_kind == "SOLD_DIRECT"
+
+
+def test_price_kind_tags_sold_auction():
+    candidate = _candidate(sale_status="SOLD", sale_type="AUCTION")
+    assert candidate.price_kind == "SOLD_AUCTION"
+
+
+def test_price_kind_none_for_unresolvable_state():
+    candidate = _candidate(sale_status="AUCTION_IN_PROGRESS")
+    assert candidate.price_kind is None
 
 
 # --- 최신성 필터 --------------------------------------------------------------
@@ -110,12 +139,12 @@ def test_drops_missing_price():
 
 
 def test_apply_hedge_filters_chains_all_three():
-    auction = _candidate(product_id=1, sale_type="AUCTION")
+    bad_status = _candidate(product_id=1, sale_status="AUCTION_IN_PROGRESS")
     stale = _candidate(product_id=2, created_at="2020-01-01T00:00:00")
     insane_price = _candidate(product_id=3, price=100)
     good = _candidate(product_id=4)
 
-    kept, notes = apply_hedge_filters([auction, stale, insane_price, good], now=_NOW)
+    kept, notes = apply_hedge_filters([bad_status, stale, insane_price, good], now=_NOW)
 
     assert [c.product_id for c in kept] == [4]
     assert len(notes) == 3  # 세 필터 각각 최소 1건씩 걸렀다

@@ -317,7 +317,9 @@ def test_internal_excludes_candidates_be_cannot_fetch(monkeypatch):
 
 
 def test_internal_reports_insufficient_when_all_candidates_fail_hedge(monkeypatch):
-    """경매 매물만 후보로 잡히면(CH016 §3.3 전제조건 위반) 정제 후 0건이 된다."""
+    """확정 가격이 없는 진행 중 경매만 후보로 잡히면(CH030 `filter_by_sale_status`) 정제 후
+    0건이 된다. 호가(ON_SALE)·완료거래(SOLD)는 CH030부터 sale_type과 무관하게 통과한다 —
+    ON_SALE인 AUCTION 매물이 걸러지던 CH024 시절 동작과는 다르다."""
     from app.recommend.personalize import embedding_store
     from app.shared import be_client
 
@@ -326,7 +328,7 @@ def test_internal_reports_insufficient_when_all_candidates_fail_hedge(monkeypatc
     monkeypatch.setattr(
         be_client,
         "fetch_product",
-        lambda product_id, **k: _fake_be_product(2, sale_type="AUCTION"),
+        lambda product_id, **k: _fake_be_product(2, sale_status="AUCTION_IN_PROGRESS"),
     )
 
     result = InternalCompsSource().fetch("q", product_id=1042)
@@ -334,6 +336,24 @@ def test_internal_reports_insufficient_when_all_candidates_fail_hedge(monkeypatc
     assert result.items == []
     assert result.reason == ReasonCode.insufficient_comps
     assert result.notes
+
+
+def test_internal_keeps_completed_auction_sale(monkeypatch):
+    """완료된 경매 낙찰(SOLD+AUCTION)도 CH030부터는 포함된다(사용자 결정 4번)."""
+    from app.recommend.personalize import embedding_store
+    from app.shared import be_client
+
+    monkeypatch.setattr(embedding_store, "fetch_garment_embedding", lambda product_id: object())
+    monkeypatch.setattr(embedding_store, "find_similar", lambda *a, **k: [_fake_match(2)])
+    monkeypatch.setattr(
+        be_client,
+        "fetch_product",
+        lambda product_id, **k: _fake_be_product(2, sale_type="AUCTION", sale_status="SOLD"),
+    )
+
+    result = InternalCompsSource().fetch("q", product_id=1042)
+
+    assert len(result.items) == 1
 
 
 # --- LLM 백엔드 (네트워크 미접촉) ---------------------------------------------
