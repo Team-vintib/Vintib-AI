@@ -8,9 +8,18 @@ import { useWishStore } from '@/domains/product/stores/wishStore'
 
 import type { ProductListItem } from '@/domains/product/types/productList.types'
 
-const props = defineProps<{
-  productId: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    productId: number
+    // 같은 카테고리로 좁혀 추천한다. 없으면 추천을 띄우지 않는다(getSimilarProducts 참고).
+    categoryId?: number | null
+    brand?: string
+  }>(),
+  {
+    categoryId: null,
+    brand: '',
+  },
+)
 
 const authStore = useAuthStore()
 const wishStore = useWishStore()
@@ -41,7 +50,10 @@ const load = async (productId: number) => {
   currentPage.value = 0
 
   try {
-    const list = await getSimilarProducts(productId)
+    const list = await getSimilarProducts(productId, {
+      categoryId: props.categoryId,
+      brand: props.brand,
+    })
     products.value = list
     wishStore.hydrateProducts(list)
     loadState.value = 'loaded'
@@ -59,8 +71,7 @@ const movePage = (direction: 1 | -1) => {
   currentPage.value = nextPage
 }
 
-const isLiked = (product: ProductListItem) =>
-  wishStore.isProductWished(product.id, product.isLiked)
+const isLiked = (product: ProductListItem) => wishStore.isProductWished(product.id, product.isLiked)
 
 const handleToggleLike = async (productId: number) => {
   const target = products.value.find((product) => product.id === productId)
@@ -83,10 +94,11 @@ const handleToggleLike = async (productId: number) => {
   }
 }
 
+// 상세를 불러오는 동안에는 categoryId가 아직 없다 — 그 값이 채워지는 시점에도 다시 부른다.
 watch(
-  () => props.productId,
-  (id) => {
-    void load(id)
+  () => [props.productId, props.categoryId],
+  () => {
+    void load(props.productId)
   },
   { immediate: true },
 )
@@ -118,11 +130,7 @@ watch(
       </button>
 
       <ul class="similar-recommend__track" :style="trackStyle">
-        <li
-          v-for="product in visibleProducts"
-          :key="product.id"
-          class="similar-recommend__item"
-        >
+        <li v-for="product in visibleProducts" :key="product.id" class="similar-recommend__item">
           <ProductCard
             :product="product"
             :is-liked="isLiked(product)"
@@ -171,26 +179,30 @@ watch(
   gap: var(--space-3);
 }
 
+/* 좌우 이동이 있다는 걸 먼저 알아채야 해서, 배경·테두리·글자를 한 단계씩 올린다. */
 .similar-recommend__arrow {
   display: grid;
-  width: var(--button-height-small);
-  height: var(--button-height-small);
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid var(--color-border-strong);
   border-radius: 50%;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-lg-plus);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-medium);
   line-height: 1;
   place-items: center;
   transition:
     border-color var(--transition-base),
+    background-color var(--transition-base),
     color var(--transition-base);
 }
 
 .similar-recommend__arrow:not(:disabled):hover {
   border-color: var(--color-primary);
-  color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
 }
 
 .similar-recommend__arrow:disabled {
@@ -210,16 +222,25 @@ watch(
   text-align: center;
 }
 
+/* 카드 수가 5개 미만이면 남는 가로를 나눠 갖게 해 여백이 뜨지 않게 한다(5개일 때는 자동으로
+   좁아져 넘치지 않는다). 카드가 지나치게 커지지 않도록 항목에 상한만 둔다. */
 .similar-recommend__track {
   display: grid;
-  grid-template-columns: repeat(var(--visible-card-count), minmax(0, 200px));
-  justify-content: center;
+  grid-template-columns: repeat(var(--visible-card-count), minmax(0, 1fr));
   gap: var(--space-4);
   list-style: none;
 }
 
 .similar-recommend__item {
+  width: 100%;
+  max-width: 210px;
   min-width: 0;
+  margin: 0 auto;
+}
+
+/* 상세 하단 추천은 훑어보는 자리라 목록 페이지(4:5)보다 세로를 줄인다. */
+.similar-recommend__item :deep(.product-card__media) {
+  aspect-ratio: 1 / 1;
 }
 
 @media (max-width: 720px) {
