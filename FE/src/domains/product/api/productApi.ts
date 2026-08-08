@@ -20,6 +20,7 @@ import type {
   ProductRegistrationAiPhotoResult,
   ProductRegistrationDraft,
   ProductRegistrationPhotoDraft,
+  ProductRegistrationPhotoRole,
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
 import { mapAiColorKeyToOptionId } from '@/domains/product/constants/aiColorPalette'
@@ -177,10 +178,22 @@ interface ProductImageUploadUrlResponse {
   expiresInSeconds: number
 }
 
+type ProductImageRoleDto = 'FRONT' | 'BACK' | 'ADDITIONAL'
+
 interface ProductImageRegisterRequest {
   key: string
   sortOrder: number
   isPrimary: boolean
+  role: ProductImageRoleDto
+}
+
+const PRODUCT_IMAGE_ROLE_DTO_BY_DRAFT_ROLE: Record<
+  ProductRegistrationPhotoRole,
+  ProductImageRoleDto
+> = {
+  front: 'FRONT',
+  back: 'BACK',
+  additional: 'ADDITIONAL',
 }
 
 interface ProductListParams {
@@ -771,6 +784,7 @@ export const uploadProductImages = async (
         key: uploadData.key,
         sortOrder: index,
         isPrimary: photo.isRepresentative,
+        role: PRODUCT_IMAGE_ROLE_DTO_BY_DRAFT_ROLE[photo.role],
       },
     )
   }

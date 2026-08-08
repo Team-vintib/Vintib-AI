@@ -18,6 +18,7 @@ LLM 백엔드가 **항상** `INSUFFICIENT_COMPS`가 된다. 그래서 `min_comps
 from pathlib import Path
 from typing import TypedDict
 
+from app.core.config import settings
 from app.pricing.schemas import ConditionGrade, ConfidenceLevel
 
 
@@ -75,9 +76,86 @@ COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
         "min_comps_for_pricing": 3,
         "max_output_tokens": 0,
     },
+    # CH024: 실데이터 CLIP 임베딩 매칭(`app/recommend/similar/`가 쓰는 실 pgvector 코퍼스
+    # 재사용) + BE 공개 API 조회. 요청 시점에 임베딩을 새로 계산하지 않는다(이미 저장된
+    # 임베딩만 조회) — `model_id`는 그 저장된 임베딩을 만든 모델을 응답에 밝히는 용도일
+    # 뿐, 이 백엔드가 직접 호출하지 않는다. `timeout_seconds`는 후보별 BE REST 조회
+    # (`be_client.fetch_product`)에 쓴다. 코퍼스가 아직 작아서(백필 대상 60건, 브랜드 있는
+    # 것만) internal_clip과 같은 최소 표본 기준을 쓴다.
+    "internal": {
+        "model_id": "patrickjohncyh/fashion-clip",
+        "tool_types": (),
+        "timeout_seconds": 5.0,
+        "max_comps": 8,
+        "min_comps_for_pricing": 3,
+        "max_output_tokens": 0,
+    },
+    # CH030: 이미지 임베딩 없이 상품명+브랜드+카테고리 텍스트만으로 "동일 상품"을 판정한다
+    # (`app/pricing/product_match.py` + `app/pricing/product_corpus.py`). `model_id`는 이
+    # 백엔드가 직접 호출하는 모델이 없어 None — 순수 텍스트 정규화 로직이다.
+    # `timeout_seconds`는 후보 상품별 BE REST 조회(`be_client.fetch_product`)에 쓴다.
+    # `min_comps_for_pricing`은 1차(엄격) 키 표본이 이 값 미만이면 2차(완화) 키로 재조회하는
+    # 기준이기도 하다(`InternalTextCompsSource.fetch()`) — `internal`과 같은 최소 표본 기준을
+    # 재사용한다(둘 다 코퍼스가 아직 작다).
+    "internal_text": {
+        "model_id": None,
+        "tool_types": (),
+        "timeout_seconds": 5.0,
+        "max_comps": 8,
+        "min_comps_for_pricing": 3,
+        "max_output_tokens": 0,
+    },
 }
-ACTIVE_COMPS_SOURCE = "mock"  # <- 여기 키만 바꾸면 스왑. llm_web_search/internal_clip 전환은
-# 사용자만(하드 룰). llm_web_search / mock / internal_clip
+# CH030: 코드를 커밋해서 스왑하지 않는다 — `PRICING_COMPS_SOURCE` 배포 환경변수로 바꾼다
+# (기본값 mock, `app/core/config.py` 참고). llm_web_search는 GMS 하드 룰 대상이라 이
+# 방식으로도 절대 켜지 않는다(사용자가 직접 실행). internal/internal_text는 하드 룰
+# 대상은 아니지만 실백엔드 전환이라 커밋 기본값은 항상 mock이어야 한다
+# (test_pricing_registry.py::test_committed_defaults_are_mock가 강제).
+ACTIVE_COMPS_SOURCE = settings.pricing_comps_source
+# llm_web_search / mock / internal_clip / internal / internal_text
+
+
+class AttributeExtractorConfig(TypedDict):
+    """동일 상품 매칭 1단계(속성 추출, CH031) 백엔드 하나의 모델 ID + 호출 파라미터."""
+
+    model_id: str | None
+    timeout_seconds: float
+    max_output_tokens: int
+
+
+# CH031: 당근마켓 사례 참고 — 자유텍스트 상품명을 "브랜드+핵심 모델/식별 키워드"로 뽑는
+# 1단계만 다룬다(2단계 정확 키 집계·3단계 키워드 매칭은 CH030에 이미 있음, 임베딩 아님).
+ATTRIBUTE_EXTRACTOR_BACKENDS: dict[str, AttributeExtractorConfig] = {
+    # 기본 — 정규식 토큰화 + 브랜드 별칭 부분일치(CH030). 네트워크 없음, 항상 성공한다.
+    "regex": {
+        "model_id": None,
+        "timeout_seconds": 0.0,
+        "max_output_tokens": 0,
+    },
+    # llm_web_search와 같은 모델을 재사용한다 — 새 모델을 추가하지 않는다(하드 룰).
+    # 웹검색 그라운딩이 필요 없어(`gms.generate_content(use_search=False)`) 응답이 훨씬
+    # 짧다 — timeout·max_output_tokens을 comps 웹검색보다 낮게 잡는다.
+    "llm": {
+        "model_id": "gemini-3.5-flash",
+        "timeout_seconds": 15.0,
+        "max_output_tokens": 256,
+    },
+}
+# 코드를 커밋해서 스왑하지 않는다 — `PRICING_ATTRIBUTE_EXTRACTOR` 배포 환경변수로 바꾼다
+# (기본값 regex). llm은 GMS 하드 룰 대상이라 이 방식으로도 절대 켜지 않는다(사용자가 직접
+# 실행). 커밋 기본값은 항상 regex여야 한다
+# (test_pricing_registry.py::test_committed_defaults_are_regex가 강제).
+ACTIVE_ATTRIBUTE_EXTRACTOR = settings.pricing_attribute_extractor
+# regex / llm
+
+
+def attribute_extractor_config(key: str | None = None) -> AttributeExtractorConfig:
+    """활성 속성 추출기 백엔드의 설정(모델 ID + 호출 파라미터)을 돌려준다."""
+    resolved = key or ACTIVE_ATTRIBUTE_EXTRACTOR
+    try:
+        return ATTRIBUTE_EXTRACTOR_BACKENDS[resolved]
+    except KeyError as exc:
+        raise ValueError(f"등록되지 않은 속성 추출기입니다: {resolved!r}") from exc
 
 
 class RetailSourceConfig(TypedDict):

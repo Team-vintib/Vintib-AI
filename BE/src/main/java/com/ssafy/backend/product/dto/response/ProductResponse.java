@@ -19,7 +19,11 @@ public record ProductResponse(
         @Schema(example = "ON_SALE") SaleStatus saleStatus,
         @Schema(example = "85000") Long price,
         @Schema(example = "2026-07-29T12:00:00") LocalDateTime createdAt,
-        @Schema(description = "대표 이미지 URL. 등록된 이미지가 없으면 null") String primaryImageUrl) {
+        @Schema(description = "대표 이미지 URL. 등록된 이미지가 없으면 null") String primaryImageUrl,
+        @Schema(
+                description = "AI 시세 조회의 '동일 상품' 판정 키. 아직 계산되지 않았으면 null",
+                example = "1:501-리바이스:97")
+        String matchKey) {
 
     public static ProductResponse from(Product product) {
         return from(product, null);
@@ -39,6 +43,7 @@ public record ProductResponse(
                 product.getSaleStatus(),
                 product.getPrice(),
                 product.getCreatedAt(),
-                primaryImageUrl);
+                primaryImageUrl,
+                product.getMatchKey());
     }
 }

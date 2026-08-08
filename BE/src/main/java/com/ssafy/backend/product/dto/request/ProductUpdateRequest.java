@@ -42,5 +42,11 @@ public record ProductUpdateRequest(
                         + " 없어 반영하지 않고 400을 반환한다 — 경매 시작가는 별도 API(AUCT)에서 다룬다.",
                 example = "89000")
         @Positive
-        Long price) {
+        Long price,
+
+        @Schema(
+                description = "AI 시세 조회가 계산한 '동일 상품' 판정 키. FE가 GET /ai/jobs/{jobId} "
+                        + "폴링 결과(product_match_key)를 그대로 전달한다. null이면 미반영",
+                example = "1:501-리바이스:97")
+        String matchKey) {
 }

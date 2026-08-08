@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.gateway.schemas import FeatureType, Job, JobResult, new_job
 from app.quality import attention_map_store
 from app.recommend.personalize import embedding_store
+from app.shared import be_client
 
 # app.chat.service가 이 모듈의 enqueue_job()을 가져다 쓰므로(순환 import 방지를 위해
 # 여기서는 최상단에서 app.chat.service를 import하지 않는다 — 아래 _ingest_chat_rag_result()
@@ -112,6 +113,24 @@ def _ingest_stt_result(result: dict) -> None:
         print(f"[gateway] STT 결과 저장 실패(live_id={result.get('live_id')}): {exc}")
 
 
+def _resolve_be_category(product_id: int) -> str | None:
+    """`product_garment_embedding.category`에 남길 값 — **BE가 지정한 categoryId 그대로**다
+    (CH024 Q4).
+
+    예전엔 품질검수 요청의 `category`(`GarmentCategory`, SAM3 하자-탐지 프롬프트 선택용
+    6종)를 그대로 저장했는데, 이건 BE 카테고리 체계와 무관한 값이라 BE/FE가 이 컬럼으로
+    필터링할 근거가 될 수 없었다. BE `categoryId`를 그대로 쓰면 AI 쪽에서 별도 taxonomy를
+    복제하지 않고도(배포 이미지가 `worker/models/`를 갖고 있지 않다) BE 지정값과 항상
+    일치한다.
+
+    조회 실패(BE 다운·상품 없음 등)는 `None` — 카테고리 없이도 임베딩 저장 자체는 유효하다.
+    """
+    product = be_client.fetch_product(product_id)
+    if product is None or product.category_id is None:
+        return None
+    return str(product.category_id)
+
+
 def _ingest_quality_embedding_result(result: dict) -> None:
     """품질검수 워커가 실어 보낸 의류 임베딩(`garment_embedding`)을 pgvector에 upsert한다.
 
@@ -125,12 +144,13 @@ def _ingest_quality_embedding_result(result: dict) -> None:
     embedding = result.get("garment_embedding")
     if not embedding:
         return
+    product_id = int(result["product_id"])
     try:
         embedding_store.save_garment_embedding(
-            product_id=int(result["product_id"]),
+            product_id=product_id,
             embedding=embedding,
             model_id=result.get("garment_embedding_model_id", "unknown"),
-            category=result.get("garment_category"),
+            category=_resolve_be_category(product_id),
         )
     except Exception as exc:  # noqa: BLE001
         print(f"[gateway] 의류 임베딩 저장 실패(product_id={result.get('product_id')}): {exc}")

@@ -18,6 +18,7 @@ import com.ssafy.backend.product.dto.response.AiQualityFindingResponse;
 import com.ssafy.backend.product.dto.response.ProductAiModelCutResponse;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
+import com.ssafy.backend.product.dto.response.ProductMarketPriceResponse;
 import com.ssafy.backend.product.dto.response.ProductQualityInspectionResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.global.response.PageResponse;
@@ -31,6 +32,8 @@ import com.ssafy.backend.product.entity.ProductImageRole;
 import com.ssafy.backend.product.entity.ProductQualityFinding;
 import com.ssafy.backend.product.entity.QualityInspectionStatus;
 import com.ssafy.backend.product.entity.SaleStatus;
+import com.ssafy.backend.product.port.OrderQueryPort;
+import com.ssafy.backend.product.port.dto.CompletedOrderSummary;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductDefectRepository;
 import com.ssafy.backend.product.repository.ProductQualityFindingRepository;
@@ -40,6 +43,8 @@ import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +65,9 @@ public class ProductService {
     // 그래프용 표본으로 충분한 개수. 상세 조회 왕복마다 전수 조회하지 않도록 상한을 둔다.
     private static final int SIMILAR_PRODUCT_LIMIT = 20;
 
+    // "동일 상품 시세"(CH001) 매물 수 상한 — findSimilarProducts와 같은 기준.
+    private static final int MARKET_PRICE_LIMIT = 20;
+
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
     private final ProductImageService productImageService;
@@ -68,6 +76,7 @@ public class ProductService {
     private final ProductQualityFindingRepository productQualityFindingRepository;
     private final SocialQueryPort socialQueryPort;
     private final LiveQueryPort liveQueryPort;
+    private final OrderQueryPort orderQueryPort;
     private final AiClient aiClient;
 
     @Transactional
@@ -312,6 +321,58 @@ public class ProductService {
         return AiQualityAnalysisResponse.completed(imageResponses);
     }
 
+    /**
+     * "동일 상품 시세"(CH001, 047·025 반영) — 같은 {@code matchKey}를 가진 다른 상품들의
+     * 호가/완료거래가. {@code matchKey}가 아직 없으면(가격 책정 전 상품) 빈 목록을 준다 —
+     * 404가 아니라 "판정 근거 없음"으로 다룬다(AI 쪽 comps 없음과 같은 원칙).
+     */
+    public ProductMarketPriceResponse getMarketPrice(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        List<Product> listingProducts = product.getMatchKey() == null
+                ? List.of()
+                : productRepository.findByMatchKeyAndIdNot(
+                        product.getMatchKey(), productId, PageRequest.of(0, MARKET_PRICE_LIMIT));
+
+        List<Long> orderLookupIds = new ArrayList<>(listingProducts.stream().map(Product::getId).toList());
+        orderLookupIds.add(productId);
+        Map<Long, CompletedOrderSummary> completedOrderByProductId = orderQueryPort
+                .findCompletedOrders(orderLookupIds).stream()
+                .collect(Collectors.toMap(
+                        CompletedOrderSummary::productId, Function.identity(), (first, second) -> first));
+
+        List<ProductMarketPriceResponse.Item> listings = listingProducts.stream()
+                .map(p -> toMarketPriceItem(p, completedOrderByProductId))
+                .filter(Objects::nonNull)
+                .toList();
+
+        return new ProductMarketPriceResponse(
+                productId,
+                product.getMatchKey(),
+                toMarketPriceItem(product, completedOrderByProductId),
+                listings);
+    }
+
+    /** ON_SALE(호가)/SOLD(완료거래)가 아니면 아직 시세로 쓸 가격이 없다 — null을 돌려준다. */
+    private ProductMarketPriceResponse.Item toMarketPriceItem(
+            Product product, Map<Long, CompletedOrderSummary> completedOrderByProductId) {
+        if (product.getSaleStatus() == SaleStatus.ON_SALE) {
+            return new ProductMarketPriceResponse.Item(
+                    product.getId(), product.getTitle(), product.getPrice(), "ASKING");
+        }
+        if (product.getSaleStatus() == SaleStatus.SOLD) {
+            CompletedOrderSummary order = completedOrderByProductId.get(product.getId());
+            if (order == null) {
+                return null; // 완료거래 근거를 못 찾음 — 시세로 안 쓴다
+            }
+            String priceKind = order.auctionWin() ? "SOLD_AUCTION" : "SOLD_DIRECT";
+            return new ProductMarketPriceResponse.Item(
+                    product.getId(), product.getTitle(), order.orderPrice(), priceKind);
+        }
+        return null;
+    }
+
     @Transactional
     public ProductResponse updateProduct(Long sellerId, Long productId, ProductUpdateRequest request) {
         Product product = getOwnedEditableProduct(sellerId, productId);
@@ -331,7 +392,8 @@ public class ProductService {
                 request.sizeLabel(),
                 request.color(),
                 request.material(),
-                request.measurements());
+                request.measurements(),
+                request.matchKey());
 
         // defects는 null이면 미반영, non-null이면 전체 교체(빈 리스트면 전부 삭제).
         if (request.defects() != null) {
