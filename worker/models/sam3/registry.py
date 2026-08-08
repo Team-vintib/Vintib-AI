@@ -136,13 +136,14 @@ DEFECT_TAXONOMY: dict[DefectType, DefectPolicy] = {
         "evidence": "LAB-12 실측 양호 — stain과 같은 프롬프트 계열",
     },
     DefectType.hole_tear: {
-        "trusted": False,
+        "trusted": True,
         "needs_seller_review": True,
         "statement_required": True,
         "weight": 15.0,
         "evidence": (
             "LAB-46 실측 — SAM3가 뚜렷한 손상은 잘 잡지만 애매한 손상에서 구조적 개구부"
-            "(암홀·넥라인·밑단·소매끝)를 구멍으로 오인하는 비유계 오탐이 반복 확인됨. 항상 SUSPECTED"
+            "(암홀·넥라인·밑단·소매끝)를 구멍으로 오인하는 비유계 오탐이 반복 확인됨. 원래 항상"
+            "SUSPECTED였으나, STAIN/DIRT_MARK와 같은 confident_threshold(0.55) 비교로 전환(CH032)"
         ),
     },
     DefectType.discoloration: {

@@ -19,11 +19,10 @@ from collections.abc import Sequence
 
 from PIL import Image
 from sam3.contracts import Finding, FindingStatus
-from sam3.prompts import SECTION_LABELS_KO
 from sam3.segmenter import SegmentationResult
 
 from . import registry
-from .prompts import build_defect_prompt, compose_finding_bullet
+from .prompts import build_defect_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -84,11 +83,9 @@ class Qwen3VlDescriber(DefectDescriber):
         self._ensure_loaded()
         label = finding.label or finding.defect_type.value
         prompt_text = build_defect_prompt(label)
-        description = generate_from_image(
+        return generate_from_image(
             self._bundle, image, prompt_text, self._config["max_new_tokens"]
         )
-        position = SECTION_LABELS_KO[finding.section]
-        return compose_finding_bullet(position, description)
 
 
 def build_describer(key: str | None = None) -> DefectDescriber:

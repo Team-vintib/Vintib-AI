@@ -38,15 +38,16 @@ def test_untrusted_types_always_need_seller_review(defect_type):
         assert policy["needs_seller_review"] is True
 
 
-def test_only_stain_family_is_trusted():
+def test_only_stain_family_and_hole_tear_are_trusted():
     trusted = {t for t, p in registry.DEFECT_TAXONOMY.items() if p["trusted"]}
-    assert trusted == {DefectType.stain, DefectType.dirt_mark}
+    assert trusted == {DefectType.stain, DefectType.dirt_mark, DefectType.hole_tear}
 
 
-def test_hole_tear_is_untrusted_and_cites_the_sam3_specific_false_positive():
-    """찢어짐은 LAB-46이 SAM3 기준으로 재검증해 구조적 개구부 오탐을 확인한 유형이다."""
+def test_hole_tear_is_trusted_via_confidence_and_still_cites_the_sam3_false_positive():
+    """CH032 — confidence 비교(confident_threshold)로 DETECTED 승격이 가능해졌지만,
+    LAB-46이 확인한 구조적 개구부 오탐 이력 때문에 판매자 확인은 여전히 필수다."""
     policy = registry.defect_policy(DefectType.hole_tear)
-    assert policy["trusted"] is False
+    assert policy["trusted"] is True
     assert policy["needs_seller_review"] is True
     assert "LAB-46" in policy["evidence"]
 
