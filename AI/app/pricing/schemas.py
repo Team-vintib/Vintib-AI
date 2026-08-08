@@ -64,6 +64,7 @@ class CompsSourceKey(str, Enum):
     llm_web_search = "llm_web_search"
     internal_clip = "internal_clip"
     internal = "internal"
+    internal_text = "internal_text"
 
 
 class RetailSourceKey(str, Enum):
@@ -151,6 +152,13 @@ class CompItem(BaseModel):
         default=None,
         description="중고 여부. **판별 불가면 None이다** — False로 뭉개면 신품과 구별이 사라진다",
     )
+    price_kind: str | None = Field(
+        default=None,
+        description=(
+            "CH030: 호가/완료거래 태그(ASKING/SOLD_DIRECT/SOLD_AUCTION). `internal`/"
+            "`internal_text` 백엔드만 채운다 — 나머지는 이 구분이 없어 None"
+        ),
+    )
 
 
 class PriceRange(BaseModel):
@@ -221,3 +229,12 @@ class PricingResult(BaseModel):
         default_factory=list, description="신상품가 조회 한계·주의 문구. notes(comps용)와 분리"
     )
     latency_ms: float = Field(description="comps 수집 + 산정 소요 시간")
+    product_match_key: str | None = Field(
+        default=None,
+        description=(
+            "CH030: `internal_text` 백엔드가 계산한 '동일 상품' 판정 키(1차/엄격). BE가 상품"
+            "저장 시 `product.match_key` 컬럼에 그대로 반영하면, 구매자 화면은 이 값으로 DB "
+            "조회만 해서 동일 상품 시세를 보여줄 수 있다(RAG/AI 호출 없음). `internal_text`가 "
+            "아니면 None"
+        ),
+    )
