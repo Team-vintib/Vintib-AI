@@ -90,8 +90,10 @@
   `PRODUCT_IMAGE_ROLE_ALREADY_EXISTS`=`P011`, `AI_QUALITY_FINDING_INVALID_PHOTO_ROLE`=`P012`로
   배정했다.
 - **`PATCH /products/{id}`는 계획대로 이번 범위에서 뺐다.** 등록(`POST`) 시점에만
-  `aiQualityFindings`를 받는다 — 그 결과 FE가 `docs/requests/BE/046-product-update-quality-findings.md`로
-  "PATCH에도 넣어달라"는 후속 요청을 남겼다(아직 미착수, 별도 작업 필요).
+  `aiQualityFindings`를 받는다 — 그 결과 FE가 `046-product-update-quality-findings.md`로
+  "PATCH에도 넣어달라"는 후속 요청을 남겼고, **2026-08-08 별도로 반영·삭제했다** — `PATCH`도
+  `aiQualityFindings`를 받아 `defects`와 같은 규칙(null=미반영, 값을 보내면 전체 교체)으로
+  저장한다.
 - `019-product-quality-multi-image.md`/`041-quality-inspection-integration.md`/
   `042-product-registration-ai-pipeline.md`는 이번 구현으로 요청 사항이 전부 해소돼 삭제했다.
   `041` §6("findings를 `key` 목록만 저장할지, 원본 전체를 저장할지")의 답은 **원본 일부

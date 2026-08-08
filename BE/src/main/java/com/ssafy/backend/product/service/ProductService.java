@@ -346,6 +346,12 @@ public class ProductService {
             saveDefects(product, request.defects());
         }
 
+        // aiQualityFindings도 같은 규칙 — DRAFT 우선 생성 상품은 확정 시점(PATCH)에만 값이 온다(046).
+        if (request.aiQualityFindings() != null) {
+            productQualityFindingRepository.deleteAllByProductId(productId);
+            saveQualityFindings(product, request.aiQualityFindings());
+        }
+
         // 가격은 상시 판매 상품에만 의미가 있다 — 경매 상품은 price가 항상 null이고
         // 시작가는 AUCT 쪽 Auction 엔티티가 별도로 갖는다.
         if (request.price() != null) {

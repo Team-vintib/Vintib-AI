@@ -41,7 +41,6 @@
 | 044 | `044-pricing-estimate-trigger.md` | Product | 미반영 | 서윤 파트 |
 | 045 | `045-broadcast-summary-sale-type.md` | Live/Auction | 미반영 | 정윤 파트 |
 | 045 | `045-shipment-fallback-tracking-status-gap.md` | Order | 미반영, 참고용(FE 보정 완료, 블로킹 아님) | 서윤 파트 |
-| 046 | `046-product-update-quality-findings.md` | Product | 미반영 — `SY043` 이후 실제 데이터 누락 발생 중 | 서윤 파트 |
 
 `003`(Live/TryOn)·`038`·`039`·`040`(전부 TryOn)은 코드 전수 대조 결과 이미 반영 완료돼 삭제했다
 — 상세는 위 "2026-08-07 시착(TRYON) 관련 요청 4건 정리" 참고.
@@ -367,3 +366,11 @@ POST와 동일하게 반영하면 된다.
 `docs/plans/AI/CH016`/`CH020`은 오히려 반대 결론 — "브랜드+상품명 텍스트 매칭이 CLIP보다
 정확하다", CH020은 미승인·미구현 — 을 담고 있어 이번 구두 결정과 별개다). **지금 BE가 할 일은
 없다** — AI 쪽에서 클러스터링 결과를 넘기는 형태가 확정되면 그때 BE 요청 문서로 다시 받는다.
+
+## 2026-08-08 정리 (046 반영 — PATCH에도 aiQualityFindings 추가)
+
+`046-product-update-quality-findings.md` 반영·삭제 — `ProductUpdateRequest`(`PATCH /products/{id}`)에
+`aiQualityFindings` 필드를 추가했다. `defects`와 같은 규칙(null이면 미반영, 값을 보내면 기존
+finding 전체 교체 — 빈 배열이면 전부 삭제)으로 동작하며, 저장 로직(`photoRole`/`description`/`box`,
+`FRONT`/`BACK`만 허용)은 `POST`가 쓰는 것을 그대로 재사용한다. DRAFT를 먼저 만들고 PATCH로 최종
+제출하는 상품도 이제 확정된 하자 판정이 저장된다.

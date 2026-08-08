@@ -194,7 +194,8 @@ public class ProductController {
     @Operation(
             summary = "상품 정보 수정",
             description = "제목/설명/카테고리/브랜드/상태등급/사이즈/색상/소재/실측/가격 부분 수정. 요청에 포함된 필드만 반영. "
-                    + "하자(defects)는 null이면 미반영, 값을 보내면 기존 목록 전체 교체(빈 배열이면 전부 삭제). "
+                    + "하자(defects)·AI 품질 검수 finding(aiQualityFindings)은 둘 다 null이면 미반영, "
+                    + "값을 보내면 기존 목록 전체 교체(빈 배열이면 전부 삭제). "
                     + "가격(price)은 상시 판매(saleType=DIRECT_SALE) 상품만 수정 가능. — 경매 상품에 보내면 400. "
                     + "DRAFT/ON_SALE/AUCTION_SCHEDULED 상태의 상품만 수정 가능.")
     @ApiResponses({

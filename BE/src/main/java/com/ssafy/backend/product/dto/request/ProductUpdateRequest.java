@@ -1,6 +1,7 @@
 package com.ssafy.backend.product.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.util.List;
@@ -25,6 +26,14 @@ public record ProductUpdateRequest(
                 description = "하자 목록 전체 교체. null이면 미반영, 빈 배열이면 기존 하자를 전부 삭제한다.",
                 example = "[\"소매 끝 실밥 풀림\"]")
         List<String> defects,
+
+        @Schema(
+                description = "AI 품질 검수에서 사용자가 하자로 인정하고 확정한 finding 목록 전체 교체."
+                        + " null이면 미반영, 빈 배열이면 기존 finding을 전부 삭제한다. DRAFT로 먼저 만든"
+                        + " 상품처럼 등록(POST) 시점에는 확정 전이라 못 보낸 finding을 최종 제출(PATCH)"
+                        + " 시점에 보낼 때 쓴다.")
+        @Valid
+        List<AiQualityFindingRequest> aiQualityFindings,
 
         @Schema(
                 description = "상시 판매 가격 조정. null이면 미반영. 경매 상품(saleType=AUCTION)은 가격 개념이"
