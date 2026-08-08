@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppInlineNotice from '@/shared/components/AppInlineNotice.vue'
+
 import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
 
 defineProps<{
@@ -65,14 +67,16 @@ defineEmits<{
             @click="$emit('toggleWish')"
           >
             <svg v-if="!isWishPending" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M20.3 5.7a5.1 5.1 0 0 0-7.2 0L12 6.8l-1.1-1.1a5.1 5.1 0 0 0-7.2 7.2L12 21l8.3-8.1a5.1 5.1 0 0 0 0-7.2Z" />
+              <path
+                d="M20.3 5.7a5.1 5.1 0 0 0-7.2 0L12 6.8l-1.1-1.1a5.1 5.1 0 0 0-7.2 7.2L12 21l8.3-8.1a5.1 5.1 0 0 0 0-7.2Z"
+              />
             </svg>
             {{ isWishPending ? '처리 중' : isWished ? '찜함' : '찜' }}
           </button>
         </div>
-        <p v-if="wishMessage" class="live-selected-product__wish-message" role="status">
+        <AppInlineNotice v-if="wishMessage" class="live-selected-product__wish-message">
           {{ wishMessage }}
-        </p>
+        </AppInlineNotice>
       </div>
     </div>
 
@@ -222,9 +226,6 @@ defineEmits<{
 
 .live-selected-product__wish-message {
   margin-top: 5px;
-  color: var(--color-accent);
-  font-size: var(--font-size-badge);
-  line-height: var(--line-height-tight);
 }
 
 .live-selected-product__wish svg {
@@ -270,6 +271,5 @@ defineEmits<{
   .live-selected-product__body {
     grid-template-columns: 1fr;
   }
-
 }
 </style>
