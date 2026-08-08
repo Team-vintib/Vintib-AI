@@ -124,6 +124,7 @@ class PricingService:
             notes=list(fetched.notes),
             retail_items=retail_items,
             retail_notes=retail_notes,
+            product_match_key=fetched.product_match_key,
             latency_ms=round((time.perf_counter() - started) * 1000, 3),
         )
 

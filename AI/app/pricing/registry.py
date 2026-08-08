@@ -89,10 +89,26 @@ COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
         "min_comps_for_pricing": 3,
         "max_output_tokens": 0,
     },
+    # CH030: 이미지 임베딩 없이 상품명+브랜드+카테고리 텍스트만으로 "동일 상품"을 판정한다
+    # (`app/pricing/product_match.py` + `app/pricing/product_corpus.py`). `model_id`는 이
+    # 백엔드가 직접 호출하는 모델이 없어 None — 순수 텍스트 정규화 로직이다.
+    # `timeout_seconds`는 후보 상품별 BE REST 조회(`be_client.fetch_product`)에 쓴다.
+    # `min_comps_for_pricing`은 1차(엄격) 키 표본이 이 값 미만이면 2차(완화) 키로 재조회하는
+    # 기준이기도 하다(`InternalTextCompsSource.fetch()`) — `internal`과 같은 최소 표본 기준을
+    # 재사용한다(둘 다 코퍼스가 아직 작다).
+    "internal_text": {
+        "model_id": None,
+        "tool_types": (),
+        "timeout_seconds": 5.0,
+        "max_comps": 8,
+        "min_comps_for_pricing": 3,
+        "max_output_tokens": 0,
+    },
 }
 ACTIVE_COMPS_SOURCE = "mock"  # <- 여기 키만 바꾸면 스왑. llm_web_search 전환은 사용자만
-# (하드 룰). internal은 GMS가 아니라 하드 룰 대상은 아니지만, 백엔드 스왑은 신중해야 하니
-# 기본값 전환은 별도 확인 후 진행한다(CH024). llm_web_search / mock / internal_clip / internal
+# (하드 룰). internal/internal_text는 GMS가 아니라 하드 룰 대상은 아니지만, 백엔드 스왑은
+# 신중해야 하니 기본값 전환은 별도 확인 후 진행한다(CH024/CH030).
+# llm_web_search / mock / internal_clip / internal / internal_text
 
 
 class RetailSourceConfig(TypedDict):

@@ -29,6 +29,7 @@ __all__ = [
     "CompsUnavailable",
     "InternalClipCompsSource",
     "InternalCompsSource",
+    "InternalTextCompsSource",
     "LlmWebSearchCompsSource",
     "MockCompsSource",
     "build_comps_source",
@@ -66,7 +67,7 @@ class CompsFetch:
     # 응답 스키마에 노출하려면 별도 승인이 필요하다.
     finish_reason: str | None = None  # Gemini candidates[0].finishReason. 네트워크 미접촉이면 None
     truncated: bool = False  # finish_reason이 MAX_TOKENS라 부분 복구했으면 True
-    # CH030: 텍스트 매칭 백엔드가 계산한 "동일 상품" 1차(엄격) 매칭 키. `PricingResult.
+    # CH030: `internal_text`가 계산한 "동일 상품" 1차(엄격) 매칭 키. `PricingResult.
     # product_match_key`로 그대로 노출된다 — BE 계약 필드라 다른 백엔드는 None으로 둔다.
     product_match_key: str | None = None
 
@@ -386,6 +387,107 @@ class InternalCompsSource(CompsSource):
         return CompsFetch(items=items, notes=notes)
 
 
+class InternalTextCompsSource(CompsSource):
+    """이미지 임베딩 없이 텍스트(상품명+브랜드+카테고리)만으로 "동일 상품"을 판정하는 내부
+    조회(CH030).
+
+    `InternalCompsSource`(CH024)와 하단 파이프라인(hedge 필터·BE 조회·CompItem 조립)은
+    같다 — 다른 건 후보를 찾는 방식뿐이다. CLIP 임베딩 유사도 대신 `app/pricing/
+    product_match.py`의 정규화 매칭 키로 `app/pricing/product_corpus.py` 코퍼스(BE 목록
+    API를 pull해 만든 자체 캐시)를 조회한다.
+
+    1차(엄격) 키로 먼저 찾고, 표본이 `min_comps_for_pricing` 미만이면 2차(완화, 브랜드+
+    카테고리만)로 재조회한다 — 사용자가 지정한 폴백 순서. 1차 키는 `CompsFetch.
+    product_match_key`로 돌려준다 — BE가 상품 저장 시 `product.match_key`에 그대로
+    반영하면, 구매자 화면은 이 값으로 DB 조회만 해서 동일 상품 시세를 보여줄 수 있다
+    (RAG/AI 호출 없음, CH030 §5).
+    """
+
+    key = "internal_text"
+
+    def __init__(self, config: registry.CompsSourceConfig | None = None) -> None:
+        self._config = config or registry.comps_config(self.key)
+
+    def fetch(
+        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+    ) -> CompsFetch:
+        if product_id is None:
+            return CompsFetch(
+                items=[],
+                notes=["상품 id가 없어 내부 시세 비교를 할 수 없습니다."],
+                reason=ReasonCode.no_image_provided,
+            )
+
+        from datetime import UTC, datetime
+
+        from app.pricing import hedge, product_corpus
+        from app.pricing.product_match import build_match_keys
+        from app.shared import be_client
+
+        product = be_client.fetch_product(product_id, timeout=self._config["timeout_seconds"])
+        if product is None:
+            return CompsFetch(
+                items=[],
+                notes=["상품 정보를 조회할 수 없어 내부 시세 비교를 할 수 없습니다."],
+                reason=ReasonCode.insufficient_comps,
+            )
+
+        keys = build_match_keys(
+            product_name=product.title,
+            brand_id=product.brand_id,
+            category=str(product.category_id),
+            brand_alias_map=product_corpus.get_brand_alias_map(),
+        )
+
+        candidates = product_corpus.find_by_match_key(
+            keys.strict, exclude_product_id=product_id, limit=self._config["max_comps"]
+        )
+        if len(candidates) < self._config["min_comps_for_pricing"]:
+            candidates = product_corpus.find_by_match_key(
+                keys.relaxed, exclude_product_id=product_id, limit=self._config["max_comps"]
+            )
+        if not candidates:
+            return CompsFetch(
+                items=[],
+                notes=["동일 상품으로 판정되는 다른 매물이 없습니다."],
+                reason=ReasonCode.insufficient_comps,
+                product_match_key=keys.strict,
+            )
+
+        internal_candidates = [
+            hedge.InternalCandidate(
+                product_id=c.product_id,
+                title=c.title,
+                price=c.price,
+                sale_type=c.sale_type,
+                sale_status=c.sale_status,
+                created_at=c.created_at,
+            )
+            for c in candidates
+        ]
+        kept, notes = hedge.apply_hedge_filters(internal_candidates, now=datetime.now(UTC))
+        if not kept:
+            return CompsFetch(
+                items=[],
+                notes=[*notes, "정제 후 남은 내부 매물이 없습니다."],
+                reason=ReasonCode.insufficient_comps,
+                product_match_key=keys.strict,
+            )
+
+        items = [
+            CompItem(
+                title=c.title,
+                price=c.price,
+                source=self.key,
+                is_used=True,  # 세컨핸드 플랫폼 등록 매물이라 기본적으로 중고다
+                price_kind=c.price_kind,
+            )
+            for c in kept
+            if c.price is not None
+        ]
+        return CompsFetch(items=items, notes=notes, product_match_key=keys.strict)
+
+
 def build_comps_source(key: str | None = None) -> CompsSource:
     """활성 comps 백엔드 구현체를 만든다."""
     resolved = key or registry.ACTIVE_COMPS_SOURCE
@@ -397,6 +499,8 @@ def build_comps_source(key: str | None = None) -> CompsSource:
         return InternalClipCompsSource()
     if resolved == "internal":
         return InternalCompsSource()
+    if resolved == "internal_text":
+        return InternalTextCompsSource()
     raise ValueError(f"등록되지 않은 comps 백엔드입니다: {resolved!r}")
 
 
