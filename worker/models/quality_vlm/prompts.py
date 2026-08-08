@@ -49,8 +49,3 @@ def build_defect_prompt(defect_label: str) -> str:
         "설명해 주세요. 색상, 모양, 크기, 질감을 전부 나열하지 마세요 — 예시들도 그중 하나만 "
         "말합니다. 보이지 않는 내용은 지어내지 마세요."
     )
-
-
-def compose_finding_bullet(section_label_ko: str, description: str) -> str:
-    """부위(신뢰 가능 — `Finding.section` 기반) + VLM 시각 설명을 한 줄로 합친다."""
-    return f"{section_label_ko} 부분 — {description}"
