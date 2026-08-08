@@ -241,6 +241,10 @@ services:
       # mock 백엔드로 떨어지므로 컨테이너는 정상 기동한다.
       NAVER_CLIENT_ID: ${NAVER_CLIENT_ID:-}
       NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET:-}
+      # 가격 책정 comps 백엔드 스왑(CH030). 커밋 기본값은 mock — 실전환은 이 배포 환경변수로만
+      # 한다(코드 커밋 금지, test_committed_defaults_are_mock가 강제). mock / internal_text /
+      # internal / internal_clip 중 하나. llm_web_search는 GMS 하드 룰 대상이라 여기서도 켜지 않는다.
+      PRICING_COMPS_SOURCE: ${PRICING_COMPS_SOURCE:-mock}
     volumes:
       - results-data:/app/results
     depends_on:

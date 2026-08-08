@@ -18,6 +18,7 @@ LLM 백엔드가 **항상** `INSUFFICIENT_COMPS`가 된다. 그래서 `min_comps
 from pathlib import Path
 from typing import TypedDict
 
+from app.core.config import settings
 from app.pricing.schemas import ConditionGrade, ConfidenceLevel
 
 
@@ -105,9 +106,12 @@ COMPS_BACKENDS: dict[str, CompsSourceConfig] = {
         "max_output_tokens": 0,
     },
 }
-ACTIVE_COMPS_SOURCE = "internal_text"  # <- 여기 키만 바꾸면 스왑. llm_web_search 전환은 사용자만
-# (하드 룰). internal/internal_text는 GMS가 아니라 하드 룰 대상은 아니지만, 백엔드 스왑은
-# 신중해야 하니 기본값 전환은 별도 확인 후 진행한다(CH024/CH030).
+# CH030: 코드를 커밋해서 스왑하지 않는다 — `PRICING_COMPS_SOURCE` 배포 환경변수로 바꾼다
+# (기본값 mock, `app/core/config.py` 참고). llm_web_search는 GMS 하드 룰 대상이라 이
+# 방식으로도 절대 켜지 않는다(사용자가 직접 실행). internal/internal_text는 하드 룰
+# 대상은 아니지만 실백엔드 전환이라 커밋 기본값은 항상 mock이어야 한다
+# (test_pricing_registry.py::test_committed_defaults_are_mock가 강제).
+ACTIVE_COMPS_SOURCE = settings.pricing_comps_source
 # llm_web_search / mock / internal_clip / internal / internal_text
 
 

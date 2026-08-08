@@ -49,5 +49,11 @@ class Settings(BaseSettings):
     # app/recommend/artifacts/ 를 기본값으로 사용한다.
     recommend_artifact_dir: str = ""
 
+    # 가격 책정(app/pricing/) comps 백엔드 스왑(CH030). **커밋 기본값은 항상 mock이어야
+    # 한다**(test/pricing/test_pricing_registry.py::test_committed_defaults_are_mock가
+    # 강제한다) — 실백엔드 전환은 배포 환경변수로만 한다(코드 커밋 X). GMS를 쓰는
+    # llm_web_search는 이 방식으로도 켜지 않는다(AI/CLAUDE.md 하드 룰, 사용자만 직접 실행).
+    pricing_comps_source: str = "mock"
+
 
 settings = Settings()  # 추가 필요
