@@ -114,7 +114,8 @@ class LiveProductServiceTest {
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
         when(productQueryPort.findById(PRODUCT_ID))
                 .thenReturn(Optional.of(new ProductSummary(PRODUCT_ID, HOST_ID, "리바이스 501 빈티지")));
-        when(liveProductRepository.existsByLiveIdAndProductIdAndRemovedAtIsNull(LIVE_ID, PRODUCT_ID))
+        when(liveProductRepository.existsByProductIdAndRemovedAtIsNullAndLive_StatusIn(
+                        PRODUCT_ID, Set.of(LiveStatus.SCHEDULED, LiveStatus.LIVE)))
                 .thenReturn(false);
         when(liveProductRepository.save(any(LiveProduct.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -138,7 +139,8 @@ class LiveProductServiceTest {
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
         when(productQueryPort.findById(PRODUCT_ID))
                 .thenReturn(Optional.of(new ProductSummary(PRODUCT_ID, HOST_ID, "리바이스 501 빈티지")));
-        when(liveProductRepository.existsByLiveIdAndProductIdAndRemovedAtIsNull(LIVE_ID, PRODUCT_ID))
+        when(liveProductRepository.existsByProductIdAndRemovedAtIsNullAndLive_StatusIn(
+                        PRODUCT_ID, Set.of(LiveStatus.SCHEDULED, LiveStatus.LIVE)))
                 .thenReturn(false);
         when(liveProductRepository.save(any(LiveProduct.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));

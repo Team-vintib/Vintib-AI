@@ -251,7 +251,7 @@ class ProductImageServiceTest {
                 .thenReturn("job-quality-1");
 
         productImageService.registerImage(
-                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(backKey, (short) 1, false));
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(backKey, (short) 1, false, ProductImageRole.BACK));
 
         assertThat(qualityProduct.getQualityInspectionStatus())
                 .isEqualTo(com.ssafy.backend.product.entity.QualityInspectionStatus.PENDING);
@@ -285,7 +285,7 @@ class ProductImageServiceTest {
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(sneakersCategory));
 
         productImageService.registerImage(
-                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(backKey, (short) 1, false));
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(backKey, (short) 1, false, ProductImageRole.BACK));
 
         assertThat(shoeProduct.getQualityInspectionStatus())
                 .isEqualTo(com.ssafy.backend.product.entity.QualityInspectionStatus.NONE);
