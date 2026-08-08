@@ -38,12 +38,7 @@ const PRODUCT_API_ENABLED = import.meta.env.VITE_PRODUCT_API_ENABLED !== 'false'
 
 type ProductSaleTypeDto = 'DIRECT_SALE' | 'AUCTION'
 type ProductSaleStatusDto =
-  | 'DRAFT'
-  | 'ON_SALE'
-  | 'AUCTION_SCHEDULED'
-  | 'AUCTION_IN_PROGRESS'
-  | 'AUCTION_FAILED'
-  | 'SOLD'
+  'DRAFT' | 'ON_SALE' | 'AUCTION_SCHEDULED' | 'AUCTION_IN_PROGRESS' | 'AUCTION_FAILED' | 'SOLD'
 
 export interface BrandDto {
   id: number
@@ -269,7 +264,9 @@ export const getProductList = async ({
     }
   }
 
-  const response = await http.get<ApiResponse<PageResponse<ProductListDto> | BackendPageResponse<ProductListDto>>>('/products', {
+  const response = await http.get<
+    ApiResponse<PageResponse<ProductListDto> | BackendPageResponse<ProductListDto>>
+  >('/products', {
     params: {
       page: Math.max(page - 1, 0),
       size,
@@ -292,14 +289,51 @@ export const getProductList = async ({
   }
 }
 
-// 유사 상품 추천 목록. 실제 유사 판정·목록 API는 미구현(유사 기준도 BE 소관, docs/requests/BE 참고) →
-// 현재는 mock(목록 mock에서 현재 상품 제외). BE 엔드포인트가 확정되면 이 자리를 실제 호출로 교체한다.
-export const getSimilarProducts = async (productId: number): Promise<ProductListItem[]> => {
-  if (PRODUCT_API_ENABLED) {
+const SIMILAR_PRODUCT_LIMIT = 8
+
+/**
+ * 상품 상세 하단 유사 상품 추천 목록.
+ *
+ * 유사 상품 전용 엔드포인트는 없다. 상품 상세 응답의 `similarProducts`는 `id/title/price`뿐이라
+ * 카드(브랜드·이미지·등급·판매방식·찜)를 못 채우므로, **같은 카테고리로 좁힌 상품 목록 API**를
+ * 쓴다. BE의 유사 판정 기준(같은 카테고리 + 같은 브랜드 우선)을 그대로 따라 정렬한다.
+ *
+ * 카테고리를 모르면(상세에 categoryId가 없는 예전 응답 등) 빈 목록을 돌려준다 — 카테고리 없이
+ * 전체 목록을 긁어오면 "유사"라고 부를 수 없는 결과가 섞인다.
+ */
+export const getSimilarProducts = async (
+  productId: number,
+  options: { categoryId?: number | null; brand?: string } = {},
+): Promise<ProductListItem[]> => {
+  if (!PRODUCT_API_ENABLED) {
+    return PRODUCT_LIST_MOCK_DATA.filter((product) => product.id !== productId).slice(
+      0,
+      SIMILAR_PRODUCT_LIMIT,
+    )
+  }
+
+  const { categoryId, brand } = options
+
+  if (categoryId === null || categoryId === undefined) {
     return []
   }
 
-  return PRODUCT_LIST_MOCK_DATA.filter((product) => product.id !== productId).slice(0, 8)
+  const { items } = await getProductList({
+    categoryIds: [categoryId],
+    size: 20,
+    sort: 'LATEST',
+  })
+
+  return items
+    .filter((product) => product.id !== productId && product.saleStatus !== 'SOLD')
+    .sort((first, second) => {
+      // 같은 브랜드를 앞으로. 그 외에는 목록 API가 준 최신순을 유지한다.
+      const firstIsSameBrand = Boolean(brand) && first.brand === brand
+      const secondIsSameBrand = Boolean(brand) && second.brand === brand
+
+      return Number(secondIsSameBrand) - Number(firstIsSameBrand)
+    })
+    .slice(0, SIMILAR_PRODUCT_LIMIT)
 }
 
 export const getProductDetail = async (productId: number): Promise<ProductDetailViewData> => {
@@ -819,6 +853,7 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
     title: product.title,
     description: product.description?.trim() || '',
     category: product.categoryName?.trim() || '',
+    categoryId: product.categoryId ?? null,
     conditionLabel: toConditionLabel(product.conditionGrade),
     sizeLabel: product.sizeLabel?.trim() || '',
     material: product.material?.trim() || '',
@@ -894,9 +929,7 @@ const toProductSaleType = (saleType: ProductSaleTypeDto): ProductSaleType =>
 
 // 목록 필터 탭 id(FE 표시용 'DIRECT')를 BE 계약(010)의 saleType 값으로 변환한다.
 // 'ALL'은 전체 조회라 파라미터를 보내지 않는다.
-const toSaleTypeParam = (
-  saleType: ProductSaleTypeTab['id'],
-): ProductSaleTypeDto | undefined => {
+const toSaleTypeParam = (saleType: ProductSaleTypeTab['id']): ProductSaleTypeDto | undefined => {
   if (saleType === 'ALL') {
     return undefined
   }
@@ -916,8 +949,7 @@ const getSortedProductImages = (product: Pick<ProductDetailDto, 'images'>) =>
     return left.sortOrder - right.sortOrder
   })
 
-const fallbackBrandLabel = (brandId: number | null) =>
-  brandId ? `브랜드 #${brandId}` : ''
+const fallbackBrandLabel = (brandId: number | null) => (brandId ? `브랜드 #${brandId}` : '')
 
 const fallbackCategoryLabel = (categoryId: number | null) =>
   categoryId ? `카테고리 #${categoryId}` : ''
@@ -940,8 +972,8 @@ const findCategoryId = (draft: ProductRegistrationDraft, categories: CategoryDto
     return numericCategoryId
   }
 
-  const matchedCategory = categories.find((category) =>
-    getCategoryCode(category.name) === draft.categoryId,
+  const matchedCategory = categories.find(
+    (category) => getCategoryCode(category.name) === draft.categoryId,
   )
 
   return matchedCategory?.id ?? null

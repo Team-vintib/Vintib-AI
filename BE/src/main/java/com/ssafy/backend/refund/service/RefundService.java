@@ -2,6 +2,7 @@ package com.ssafy.backend.refund.service;
 
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
+import com.ssafy.backend.notification.port.NotificationCommandPort;
 import com.ssafy.backend.order.entity.Order;
 import com.ssafy.backend.order.entity.OrderStatus;
 import com.ssafy.backend.order.repository.OrderRepository;
@@ -33,6 +34,7 @@ public class RefundService {
     private final RefundRequestRepository refundRequestRepository;
     private final OrderRepository orderRepository;
     private final PointService pointService;
+    private final NotificationCommandPort notificationCommandPort;
 
     /** 환불 요청(REFUND-001) — 구매자만, 환불 가능한 상태이고 진행 중인 요청이 없어야 한다. */
     @Transactional
@@ -55,6 +57,13 @@ public class RefundService {
                 .reason(request.reason())
                 .detailReason(request.detailReason())
                 .build());
+        notificationCommandPort.notify(
+                order.getSeller(),
+                "REFUND_REQUESTED",
+                "환불 요청이 접수되었습니다",
+                "구매자가 환불을 요청했어요. 주문을 확인해주세요.",
+                "ORDER",
+                order.getId());
         return RefundResponse.from(refund);
     }
 
@@ -88,6 +97,9 @@ public class RefundService {
 
         LocalDateTime now = LocalDateTime.now();
         if (request.decision() == RefundDecision.APPROVED) {
+            // 승인 결과 알림은 여기서 따로 만들지 않는다 — pointService.refundOrder()가 이미
+            // 구매자에게 POINT_REFUNDED("환불이 완료되었습니다")를 보낸다(041 §3.1-1 승인 케이스는
+            // 이걸로 충족). 같은 이벤트에 알림을 두 번 만들지 않기 위함이다.
             pointService.refundOrder(order.getBuyer().getId(), order.getOrderPrice(), order.getId());
             order.markRefunded();
             refund.approve(now);
@@ -97,6 +109,13 @@ public class RefundService {
             }
             order.clearRefundRequested();
             refund.reject(request.rejectionReason(), now);
+            notificationCommandPort.notify(
+                    order.getBuyer(),
+                    "REFUND_REJECTED",
+                    "환불 요청이 거절되었습니다",
+                    request.rejectionReason(),
+                    "ORDER",
+                    order.getId());
         }
         return RefundResponse.from(refund);
     }

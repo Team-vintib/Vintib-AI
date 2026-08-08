@@ -22,6 +22,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     /** 마이페이지 요약 — 구매 건수. */
     long countByBuyer_Id(Long buyerId);
 
+    /** 데모 주문 시드(DemoOrderSeeder) — 구매자 기준 상태별 건수. 상태 버킷별 목표치를 채울 때 쓴다. */
+    long countByBuyer_IdAndStatus(Long buyerId, OrderStatus status);
+
     /** 마이페이지 요약 — 판매 건수. */
     long countBySeller_Id(Long sellerId);
 

@@ -3,6 +3,7 @@ package com.ssafy.backend.refund.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.entity.Member;
+import com.ssafy.backend.notification.port.NotificationCommandPort;
 import com.ssafy.backend.order.entity.Order;
 import com.ssafy.backend.order.entity.OrderStatus;
 import com.ssafy.backend.order.repository.OrderRepository;
@@ -23,6 +25,7 @@ import com.ssafy.backend.refund.entity.RefundReason;
 import com.ssafy.backend.refund.entity.RefundRequest;
 import com.ssafy.backend.refund.entity.RefundStatus;
 import com.ssafy.backend.refund.repository.RefundRequestRepository;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +51,9 @@ class RefundServiceTest {
     private PointService pointService;
 
     @Mock
+    private NotificationCommandPort notificationCommandPort;
+
+    @Mock
     private Member buyer;
 
     @Mock
@@ -60,7 +66,8 @@ class RefundServiceTest {
 
     @BeforeEach
     void setUp() {
-        refundService = new RefundService(refundRequestRepository, orderRepository, pointService);
+        refundService =
+                new RefundService(refundRequestRepository, orderRepository, pointService, notificationCommandPort);
     }
 
     private Order orderWith(OrderStatus status) {
@@ -89,12 +96,14 @@ class RefundServiceTest {
         assertThat(order.isRefundRequested()).isTrue();
         assertThat(response.status()).isEqualTo(RefundStatus.REQUESTED.name());
         assertThat(response.reason()).isEqualTo(RefundReason.NOT_SHIPPED.name());
+        verify(notificationCommandPort).notify(
+                eq(seller), eq("REFUND_REQUESTED"), any(), any(), eq("ORDER"), eq(order.getId()));
     }
 
     @Test
     void 정산완료된_주문은_환불을_요청할_수_없다() {
         Order order = orderWith(OrderStatus.DELIVERED);
-        order.confirmAndSettle();
+        order.confirmAndSettle(LocalDateTime.now());
         when(buyer.getId()).thenReturn(BUYER_ID);
         when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
 
@@ -148,6 +157,9 @@ class RefundServiceTest {
         assertThat(order.isRefundRequested()).isFalse();
         assertThat(response.status()).isEqualTo(RefundStatus.APPROVED.name());
         verify(pointService).refundOrder(BUYER_ID, 50_000L, order.getId());
+        // 승인 결과 알림은 pointService.refundOrder()(POINT_REFUNDED)가 이미 보낸다 — RefundService가
+        // 직접 또 만들면 같은 이벤트에 알림이 두 번 생긴다.
+        verify(notificationCommandPort, never()).notify(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -167,6 +179,8 @@ class RefundServiceTest {
         assertThat(response.status()).isEqualTo(RefundStatus.REJECTED.name());
         assertThat(response.rejectionReason()).isEqualTo("하자를 확인할 수 없습니다.");
         verify(pointService, never()).refundOrder(any(), any(), any());
+        verify(notificationCommandPort).notify(
+                eq(buyer), eq("REFUND_REJECTED"), any(), eq("하자를 확인할 수 없습니다."), eq("ORDER"), eq(order.getId()));
     }
 
     @Test

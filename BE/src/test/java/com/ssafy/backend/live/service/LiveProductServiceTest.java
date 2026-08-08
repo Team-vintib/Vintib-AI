@@ -19,6 +19,7 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.live.dto.request.LiveProductLinkRequest;
 import com.ssafy.backend.live.entity.Live;
 import com.ssafy.backend.live.entity.LiveProduct;
+import com.ssafy.backend.live.entity.LiveStatus;
 import com.ssafy.backend.live.port.ProductQueryPort;
 import com.ssafy.backend.live.port.ProductQueryPort.ProductCard;
 import com.ssafy.backend.live.port.ProductQueryPort.ProductSummary;
@@ -29,6 +30,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -83,8 +85,6 @@ class LiveProductServiceTest {
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
         when(productQueryPort.findById(PRODUCT_ID))
                 .thenReturn(Optional.of(new ProductSummary(PRODUCT_ID, HOST_ID, "리바이스 501 빈티지")));
-        when(liveProductRepository.existsByLiveIdAndProductIdAndRemovedAtIsNull(LIVE_ID, PRODUCT_ID))
-                .thenReturn(false);
         when(liveProductRepository.save(any(LiveProduct.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         // 응답에 상품 카드(브랜드·가격·썸네일)까지 실리므로 연결 직후에도 카드를 조회한다.
@@ -114,7 +114,8 @@ class LiveProductServiceTest {
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
         when(productQueryPort.findById(PRODUCT_ID))
                 .thenReturn(Optional.of(new ProductSummary(PRODUCT_ID, HOST_ID, "리바이스 501 빈티지")));
-        when(liveProductRepository.existsByLiveIdAndProductIdAndRemovedAtIsNull(LIVE_ID, PRODUCT_ID))
+        when(liveProductRepository.existsByProductIdAndRemovedAtIsNullAndLive_StatusIn(
+                        PRODUCT_ID, Set.of(LiveStatus.SCHEDULED, LiveStatus.LIVE)))
                 .thenReturn(false);
         when(liveProductRepository.save(any(LiveProduct.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -138,7 +139,8 @@ class LiveProductServiceTest {
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
         when(productQueryPort.findById(PRODUCT_ID))
                 .thenReturn(Optional.of(new ProductSummary(PRODUCT_ID, HOST_ID, "리바이스 501 빈티지")));
-        when(liveProductRepository.existsByLiveIdAndProductIdAndRemovedAtIsNull(LIVE_ID, PRODUCT_ID))
+        when(liveProductRepository.existsByProductIdAndRemovedAtIsNullAndLive_StatusIn(
+                        PRODUCT_ID, Set.of(LiveStatus.SCHEDULED, LiveStatus.LIVE)))
                 .thenReturn(false);
         when(liveProductRepository.save(any(LiveProduct.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -201,15 +203,58 @@ class LiveProductServiceTest {
 
     @Test
     void 이미_연결된_상품은_중복_연결되지_않는다() {
+        // 같은 라이브에 이미 걸려 있는 상품도 "아직 끝나지 않은 라이브에 걸림"에 해당한다 —
+        // 지금 편집 중인 라이브 자신도 SCHEDULED라 이 라이브 무관 조회에 그대로 잡힌다.
         Live live = 예약된_라이브();
         when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
         when(productQueryPort.findById(PRODUCT_ID))
                 .thenReturn(Optional.of(new ProductSummary(PRODUCT_ID, HOST_ID, "리바이스 501 빈티지")));
-        when(liveProductRepository.existsByLiveIdAndProductIdAndRemovedAtIsNull(LIVE_ID, PRODUCT_ID))
+        when(liveProductRepository.existsByProductIdAndRemovedAtIsNullAndLive_StatusIn(
+                        PRODUCT_ID, Set.of(LiveStatus.SCHEDULED, LiveStatus.LIVE)))
                 .thenReturn(true);
         LiveProductLinkRequest request = 연결_요청();
 
         assertThatThrownBy(() -> liveProductService.linkProduct(HOST_ID, LIVE_ID, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PRODUCT_ALREADY_LINKED);
+        verify(liveProductRepository, never()).save(any());
+    }
+
+    @Test
+    void 종료된_라이브에만_걸려있던_상품은_다시_연결할_수_있다() {
+        // 방송 종료 후에는 편성을 바꿀 수 없어 removedAt이 끝내 채워지지 않는다 — 그걸
+        // "여전히 활성"으로 치면 이미 방송했던 상품을 다음 라이브에 다시 걸 수 없게 된다.
+        Live live = 예약된_라이브();
+        when(liveRepository.findById(LIVE_ID)).thenReturn(Optional.of(live));
+        when(productQueryPort.findById(PRODUCT_ID))
+                .thenReturn(Optional.of(new ProductSummary(PRODUCT_ID, HOST_ID, "리바이스 501 빈티지")));
+        when(liveProductRepository.existsByProductIdAndRemovedAtIsNullAndLive_StatusIn(
+                        PRODUCT_ID, Set.of(LiveStatus.SCHEDULED, LiveStatus.LIVE)))
+                .thenReturn(false);
+        when(liveProductRepository.save(any(LiveProduct.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(productQueryPort.findCards(List.of(PRODUCT_ID))).thenReturn(Map.of(
+                PRODUCT_ID,
+                new ProductCard(PRODUCT_ID, "리바이스 501 빈티지", "Levi's", 45000L,
+                        "DIRECT_SALE", "ON_SALE", "A", "https://cdn.example.com/p/2001.jpg",
+                        null, null, null)));
+
+        var response = liveProductService.linkProduct(HOST_ID, LIVE_ID, 연결_요청());
+
+        assertThat(response.productId()).isEqualTo(PRODUCT_ID);
+    }
+
+    @Test
+    void 개설_시_아직_끝나지_않은_다른_라이브에_걸린_상품은_편성할_수_없다() {
+        Live live = Live.schedule(host, "빈티지 데님 라이브", null, null, LocalDateTime.now().plusDays(1));
+        when(productQueryPort.findById(PRODUCT_ID))
+                .thenReturn(Optional.of(new ProductSummary(PRODUCT_ID, HOST_ID, "리바이스 501 빈티지")));
+        when(liveProductRepository.existsByProductIdAndRemovedAtIsNullAndLive_StatusIn(
+                        PRODUCT_ID, Set.of(LiveStatus.SCHEDULED, LiveStatus.LIVE)))
+                .thenReturn(true);
+        List<Long> 편성 = List.of(PRODUCT_ID);
+
+        assertThatThrownBy(() -> liveProductService.linkProductsOnCreate(HOST_ID, live, 편성))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.PRODUCT_ALREADY_LINKED);
         verify(liveProductRepository, never()).save(any());

@@ -15,7 +15,7 @@ public class LiveQueryAdapter implements LiveQueryPort {
 
     @Override
     public Optional<LinkedLiveSummary> findLinkedLive(Long productId) {
-        return liveProductRepository.findByProductIdAndRemovedAtIsNull(productId)
+        return liveProductRepository.findFirstByProductIdAndRemovedAtIsNullOrderByIdDesc(productId)
             .map(liveProduct -> {
                 var live = liveProduct.getLive();
                 return LinkedLiveSummary.builder()

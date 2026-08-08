@@ -37,9 +37,9 @@ public class LiveBroadcastResultController {
                     + "판매 실적이라 시청자에게 공개하지 않는다.\n\n"
                     + "`results`는 **편성 상품 전체**가 기준이며 편성 순서를 따른다. 경매를 걸지 않은 "
                     + "편성 상품도 `UNSOLD`로 포함된다.\n\n"
-                    + "**집계는 경매 낙찰 기준이다.** 라이브 중 즉시구매는 주문에 방송을 가리키는 값이 "
-                    + "없어 아직 집계에 넣지 않는다 — 나중에 추가되면 `soldVia`가 `DIRECT_SALE`로 "
-                    + "늘어날 뿐 응답 구조는 그대로다.\n\n"
+                    + "**경매 낙찰과 방송 중 정찰가 즉시구매를 함께 센다** — `soldVia`로 구분한다"
+                    + "(`AUCTION`/`DIRECT_SALE`). 안 팔린 상품에도 편성 시점의 `saleType`/"
+                    + "`registeredPrice`가 채워진다.\n\n"
                     + "방송이 끝나기 전에 불러도 200이며, 그 시점까지의 결과를 준다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),

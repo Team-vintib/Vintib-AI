@@ -11,11 +11,10 @@ import com.ssafy.backend.product.dto.request.ProductImageUploadUrlRequest;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
 import com.ssafy.backend.product.entity.AiModelCutStatus;
-import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductImage;
+import com.ssafy.backend.product.entity.ProductImageRole;
 import com.ssafy.backend.product.entity.QualityInspectionStatus;
-import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductImageRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.Collection;
@@ -43,42 +42,14 @@ public class ProductImageService {
     private static final Map<String, String> ALLOWED_CONTENT_TYPE_EXTENSIONS =
             Map.of("image/jpeg", "jpg", "image/png", "png", "image/webp", "webp");
 
-    // 상품 카테고리 -> mask_type 자동 판별은 아직 없다(docs/requests/BE/035-tryon-product-category.md
-    // 미해결). 정확도보다 파이프라인이 실제로 도는지가 이번 목적이라 상의 고정으로 간다.
     private static final String DEFAULT_AI_MODEL_CUT_MASK_TYPE = "upper";
-
-    // 카테고리(leaf, Category.nameEn) -> AI SAM3 GarmentCategory(6종, `worker/models/sam3/
-    // contracts.py`) 매핑. SAM3는 의류(상/하의·아우터) 전용이라 신발/가방/액세서리/원피스·
-    // 점프슈트는 대응값이 없다 — 이 맵에 없으면 하자 검수를 트리거하지 않는다.
-    // ⚠️ 라벨링된 기준 없이 잡은 매핑(특히 TSHIRT/SLEEVELESS→TOP_SHIRT, HOODIE/SWEATSHIRT→
-    // TOP_KNIT, JACKET/CARDIGAN/HOOD_ZIPUP→OUTER_JACKET, COAT/PADDED_JACKET→OUTER_COAT 경계는
-    // 판단 근거가 약하다) — AI/BE가 함께 다시 검토할 대상.
-    private static final Map<String, String> GARMENT_CATEGORY_BY_LEAF_NAME = Map.ofEntries(
-            Map.entry("TSHIRT", "TOP_SHIRT"),
-            Map.entry("SHIRT", "TOP_SHIRT"),
-            Map.entry("SLEEVELESS", "TOP_SHIRT"),
-            Map.entry("KNIT", "TOP_KNIT"),
-            Map.entry("HOODIE", "TOP_KNIT"),
-            Map.entry("SWEATSHIRT", "TOP_KNIT"),
-            Map.entry("JACKET", "OUTER_JACKET"),
-            Map.entry("CARDIGAN", "OUTER_JACKET"),
-            Map.entry("HOOD_ZIPUP", "OUTER_JACKET"),
-            Map.entry("COAT", "OUTER_COAT"),
-            Map.entry("PADDED_JACKET", "OUTER_COAT"),
-            Map.entry("DENIM", "BOTTOM_PANTS"),
-            Map.entry("SLACKS", "BOTTOM_PANTS"),
-            Map.entry("CARGO_PANTS", "BOTTOM_PANTS"),
-            Map.entry("SHORT_PANTS", "BOTTOM_PANTS"),
-            Map.entry("JOGGER_PANTS", "BOTTOM_PANTS"),
-            Map.entry("COTTON_PANTS", "BOTTOM_PANTS"),
-            Map.entry("SKIRT", "BOTTOM_SKIRT"));
 
     private final ProductRepository productRepository;
     private final ProductImageRepository productImageRepository;
-    private final CategoryRepository categoryRepository;
     private final S3StorageService s3StorageService;
     private final AwsProperties awsProperties;
     private final AiClient aiClient;
+    private final GarmentCategoryMapper garmentCategoryMapper;
 
     @Transactional
     public ProductImageUploadUrlResponse createUploadUrl(
@@ -107,6 +78,11 @@ public class ProductImageService {
         if (!request.key().startsWith("product-images/%d/".formatted(productId))) {
             throw new CustomException(ErrorCode.PRODUCT_IMAGE_UPLOAD_NOT_CONFIRMED);
         }
+        // FRONT/BACK은 AI 품질 검수의 앞/뒤 사진 자리라 상품당 한 장씩만 허용한다.
+        if (request.role() != ProductImageRole.ADDITIONAL
+                && productImageRepository.existsByProductIdAndRole(productId, request.role())) {
+            throw new CustomException(ErrorCode.PRODUCT_IMAGE_ROLE_ALREADY_EXISTS);
+        }
 
         String bucket = awsProperties.s3().publicBucket();
         verifyUploaded(bucket, request.key());
@@ -121,6 +97,7 @@ public class ProductImageService {
                 .imageKey(request.key())
                 .sortOrder(request.sortOrder())
                 .primary(request.isPrimary())
+                .role(request.role())
                 .build();
         productImageRepository.save(image);
 
@@ -134,9 +111,8 @@ public class ProductImageService {
     }
 
     /**
-     * 대표 이미지가 등록되면 AI 착용컷 job을 접수한다(`docs/requests/BE/
-     * 039-registration-ai-model-tryon.md`). 보조 기능이라 실패해도 이미지 등록 자체는
-     * 그대로 성공시킨다 — 로그만 남기고 상태는 NONE으로 둔다(재시도는 이번 범위 밖).
+     * 대표 이미지가 등록되면 AI 착용컷 job을 접수.
+     * 보조 기능이라 실패해도 이미지 등록 자체는 그대로 성공 — 로그만 남기고 상태는 NONE.
      */
     private void triggerAiModelCutJob(Product product, String productImageUrl) {
         if (!product.isAiModelEnabled() || product.getAiModelCutStatus() != AiModelCutStatus.NONE) {
@@ -153,8 +129,7 @@ public class ProductImageService {
 
     /**
      * 앞/뒤 사진(sortOrder 0/1)이 둘 다 등록된 시점에 하자 검수 job을 접수한다
-     * (`docs/requests/BE/041-quality-inspection-integration.md`). 모델컷과 같은 이유로
-     * 실패해도 이미지 등록 자체는 그대로 성공시킨다 — 로그만 남기고 상태는 NONE으로 둔다.
+     * 모델컷과 같은 이유로 실패해도 이미지 등록 자체는 그대로 성공시킨다 — 로그만 남기고 상태는 NONE으로 둔다.
      *
      * <p>카테고리가 SAM3 GarmentCategory(6종)에 대응되지 않으면(신발/가방/액세서리/원피스 등)
      * 조용히 건너뛴다 — 검수 자체를 지원하지 않는 카테고리다.
@@ -172,7 +147,7 @@ public class ProductImageService {
             return;
         }
 
-        Optional<String> category = resolveGarmentCategory(product.getCategoryId());
+        Optional<String> category = garmentCategoryMapper.resolve(product.getCategoryId());
         if (category.isEmpty()) {
             return;
         }
@@ -194,12 +169,6 @@ public class ProductImageService {
                 .findFirst()
                 .map(ProductImage::getImageKey)
                 .orElse(null);
-    }
-
-    private Optional<String> resolveGarmentCategory(Long categoryId) {
-        return categoryRepository.findById(categoryId)
-                .map(Category::getNameEn)
-                .map(GARMENT_CATEGORY_BY_LEAF_NAME::get);
     }
 
     @Transactional

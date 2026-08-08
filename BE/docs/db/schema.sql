@@ -118,7 +118,9 @@ CREATE TABLE product (
     -- 카테고리 필수. 상품이 어느 카테고리에도 속하지 않으면 검색·필터,
     -- 라이브 카테고리(편성 상품에서 유도)에서 통째로 누락.
     category_id     BIGINT       NOT NULL REFERENCES category (id),
-    brand_id        BIGINT       REFERENCES brand (id),
+    -- 브랜드 마스터 FK가 아니라 자유 텍스트다 — FE가 브랜드 마스터에서 고르게 하지 않고
+    -- 판매자가 직접 입력한 텍스트를 그대로 받는다(BE 결정).
+    brand           VARCHAR(100),
     title           VARCHAR(200) NOT NULL,
     description     TEXT,
     condition_grade VARCHAR(20),                     -- 중고 상태 등급 (체계 미확정)
@@ -459,6 +461,8 @@ CREATE TABLE orders (
     -- 배송 완료 후 3일 경과 시 자동 구매 확정. 스케줄러가 이 컬럼으로 대상을 찾는다.
     -- 배송 완료 시점(delivered_at)에 계산해 채운다.
     auto_confirm_at   TIMESTAMPTZ,
+    -- 정산 완료(SETTLED 전이) 시각. SETTLED가 아닌 주문은 NULL.
+    settled_at        TIMESTAMPTZ,
     -- 진행 중인(REQUESTED) 환불 요청이 있는 동안 true. 송장 등록·구매 확정(수동/자동)을 막는 용도로만
     -- 쓴다 — 요청 중에도 status는 바꾸지 않는다.
     refund_requested  BOOLEAN     NOT NULL DEFAULT FALSE,
@@ -616,7 +620,7 @@ CREATE INDEX ix_live_host      ON live (host_id, created_at DESC);
 
 -- SEARCH-002: 카테고리·브랜드·가격대 필터
 CREATE INDEX ix_product_category ON product (category_id, sale_status);
-CREATE INDEX ix_product_brand    ON product (brand_id, sale_status);
+CREATE INDEX ix_product_brand    ON product (brand, sale_status);
 CREATE INDEX ix_product_price    ON product (price) WHERE price IS NOT NULL;
 
 -- SEARCH-001: 상품명·닉네임·방송명 부분 일치.

@@ -58,10 +58,14 @@ FE에서 **BE 유찰 목록 + 요약의 미판매 결과**를 `productId`로 합
 이미 정찰제로 걸려 있던 상품에 `상시 판매로 전환`은 의미가 없다. 항목이 이미 호출하는 상품
 상세의 `saleType`으로 갈라, 선택지 자체를 바꾼다.
 
-| 상품                 | 왼쪽 선택                                                       | 오른쪽 선택                                                           |
-| -------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------- |
-| 경매 예정(가격 없음) | `상시 판매로 전환` → 가격 입력 → `PATCH /products/{id}/status`  | `경매 예정 유지` → 확인만(서버 호출 없음)                             |
-| 정찰제(가격 있음)    | `가격 수정하기` → 현재가 프리필 → `PATCH /products/{id}/status` | `경매 예정으로 전환` → 확인 → `PATCH /products/{id}/auction-schedule` |
+| 상품                 | 선택지                                                                                                                                               |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 경매 예정(가격 없음) | `상시 판매로 전환`(가격 입력 → `PATCH /products/{id}/status`) · `경매 예정 유지`(확인만)                                                             |
+| 정찰제(가격 있음)    | `가격 수정하기`(현재가 프리필 → `PATCH .../status`) · `경매 예정으로 전환`(확인 → `PATCH .../auction-schedule`) · `유지하기`(확인만, 서버 호출 없음) |
+
+정찰제 상품에 `유지하기`가 없으면 가격을 고치거나 경매로 돌리는 것 말고는 처리할 방법이 없어,
+"남은 상품을 모두 처리해 주세요" 게이트를 통과하지 못한다. 경매 상품의 `경매 예정 유지`와
+같은 성격이라 서버 호출 없이 화면에서만 처리 완료로 표시한다(완료 배지: `상시 판매 유지`).
 
 두 엔드포인트 모두 상품 등록의 판매 방식 설정에서 쓰던 것을 그대로 재사용한다
 (`convertProductToDirectSale`, `scheduleProductAuction`).
@@ -74,7 +78,7 @@ FE에서 **BE 유찰 목록 + 요약의 미판매 결과**를 `productId`로 합
 돌아갔을 때 상품별 결과의 가격과 배지가 방금 바꾼 값으로 보여야 하기 때문이다.
 
 **가격 수정은 BE 대기 중이다.** `PATCH /products/{id}/status`가 `ON_SALE`을 허용하지 않아
-정찰제 상품의 가격만 바꾸는 경로가 없다(요청 046). BE가 그 상태를 허용해 주면 지금 호출이 그대로
+정찰제 상품의 가격만 바꾸는 경로가 없다(요청 048). BE가 그 상태를 허용해 주면 지금 호출이 그대로
 통하므로 FE는 손댈 게 없다. 그때까지는 `P003` 응답을 "가격 수정은 아직 준비 중"으로 안내한다.
 
 ## 구현 파일
@@ -84,8 +88,8 @@ FE에서 **BE 유찰 목록 + 요약의 미판매 결과**를 `productId`로 합
 - `FE/src/domains/live/components/LiveUnsoldProductItem.vue`
 - `FE/src/domains/live/components/LiveUnsoldManage.vue`
 - `FE/src/domains/auction/types/liveAuction.types.ts`
-- `docs/requests/BE/045-broadcast-summary-sale-type.md`(별도 커밋, main 대상)
-- `docs/requests/BE/046-direct-sale-price-update.md`(별도 커밋, main 대상)
+- `docs/requests/BE/047-broadcast-summary-sale-type.md`(별도 커밋, main 대상)
+- `docs/requests/BE/048-direct-sale-price-update.md`(별도 커밋, main 대상)
 
 ## 확인 사항
 

@@ -56,7 +56,17 @@ public record LiveBroadcastSummaryResponse(
                             + "안 팔렸으면 null",
                     example = "AUCTION",
                     allowableValues = {"AUCTION", "DIRECT_SALE"})
-            String soldVia
+            String soldVia,
+
+            @Schema(
+                    description = "편성 시점 상품의 판매 방식(`DIRECT_SALE`/`AUCTION`). `soldVia`(어느 경로로"
+                            + " 팔렸는지)와 달리 안 팔린 상품에도 채워진다. 상품 행을 못 찾으면 null",
+                    example = "DIRECT_SALE",
+                    allowableValues = {"DIRECT_SALE", "AUCTION"})
+            String saleType,
+
+            @Schema(description = "상품에 매겨진 가격(원). 경매 예정이라 가격이 없으면 null", example = "89000")
+            Long registeredPrice
     ) {
 
         private static final String SOLD = "SOLD";
@@ -65,17 +75,20 @@ public record LiveBroadcastSummaryResponse(
         private static final String VIA_DIRECT_SALE = "DIRECT_SALE";
 
         /** 경매 낙찰로 팔렸다. */
-        public static Result wonAtAuction(Long productId, String title, String thumbnailUrl, Long finalPrice) {
-            return new Result(productId, title, thumbnailUrl, SOLD, finalPrice, VIA_AUCTION);
+        public static Result wonAtAuction(
+                Long productId, String title, String thumbnailUrl, Long finalPrice, String saleType, Long registeredPrice) {
+            return new Result(productId, title, thumbnailUrl, SOLD, finalPrice, VIA_AUCTION, saleType, registeredPrice);
         }
 
         /** 방송 중 정찰가로 팔렸다(경매를 거치지 않음). */
-        public static Result soldDirectly(Long productId, String title, String thumbnailUrl, Long orderPrice) {
-            return new Result(productId, title, thumbnailUrl, SOLD, orderPrice, VIA_DIRECT_SALE);
+        public static Result soldDirectly(
+                Long productId, String title, String thumbnailUrl, Long orderPrice, String saleType, Long registeredPrice) {
+            return new Result(productId, title, thumbnailUrl, SOLD, orderPrice, VIA_DIRECT_SALE, saleType, registeredPrice);
         }
 
-        public static Result unsold(Long productId, String title, String thumbnailUrl) {
-            return new Result(productId, title, thumbnailUrl, UNSOLD, null, null);
+        public static Result unsold(
+                Long productId, String title, String thumbnailUrl, String saleType, Long registeredPrice) {
+            return new Result(productId, title, thumbnailUrl, UNSOLD, null, null, saleType, registeredPrice);
         }
 
         public boolean isSold() {

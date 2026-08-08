@@ -52,21 +52,23 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     /**
      * 상품 상세의 유사 상품 목록(PROD-006, 011). 같은 카테고리 상품 중 같은 브랜드를 우선 노출한다.
      *
-     * <p>{@code brandId}가 null(비지정 상품)이면 브랜드 일치 조건이 아무 행과도 매칭되지 않아
+     * <p>{@code brand}가 null(비지정 상품)이면 브랜드 일치 조건이 아무 행과도 매칭되지 않아
      * 전부 후순위로 취급되고, 결과적으로 최신순 정렬만 적용된다 — SQL의 {@code NULL = NULL}이
-     * false인 동작을 그대로 이용한다.
+     * false인 동작을 그대로 이용한다. 브랜드가 FK가 아니라 자유 텍스트라 표기가 다르면
+     * (대소문자·띄어쓰기 등) 같은 브랜드여도 일치하지 않을 수 있다 — 정확한 매칭이 아니라
+     * "우선 노출" 힌트로만 쓴다.
      */
     @Query("""
             SELECT p FROM Product p
             WHERE p.categoryId = :categoryId
               AND p.id <> :excludeProductId
               AND p.saleStatus <> 'DRAFT'
-            ORDER BY CASE WHEN p.brandId = :brandId THEN 0 ELSE 1 END, p.createdAt DESC
+            ORDER BY CASE WHEN p.brand = :brand THEN 0 ELSE 1 END, p.createdAt DESC
             """)
     List<Product> findSimilarProducts(
             @Param("categoryId") Long categoryId,
             @Param("excludeProductId") Long excludeProductId,
-            @Param("brandId") Long brandId,
+            @Param("brand") String brand,
             Pageable pageable);
 
     /**

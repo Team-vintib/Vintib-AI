@@ -35,11 +35,13 @@
 
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
-| 002 | `002-product-contract.md` | Product | 목록/상세/등록/이미지/찜 연결 완료 | AI 분석/가격 추천 |
-| 003 | `003-live-tryon-contract.md` | Live/TryOn | 라이브 목록/상세/생성, 시착 프로필, 영상 토큰, 시청 화면 필드(필수+선택 전부: brandName/price/thumbnailUrl/saleType/conditionGrade/currentProductId/hostProfileImageUrl/description/material/measurements/defectSummary) 연결 완료 | AI 시착 생성만 남음(서윤/AI 파트) |
-| 019 | `019-product-quality-multi-image.md` | Product | 미반영 | 서윤 파트 |
-| 020 | `020-tryon-result-category.md` | TryOn | 미반영 | 서윤/AI 파트 |
-| 025 | `025-product-same-price-chart.md` | Product | 미반영 | 서윤 파트 |
+| (없음) | — | — | — | — |
+
+**2026-08-08 기준 이 표에 남은 요청이 없다** — 041(환불 알림/대시보드)까지 반영·삭제되면서 폴더에
+이 인덱스 문서만 남았다. 새 요청이 들어오면 이 표를 다시 채운다.
+
+`003`(Live/TryOn)·`038`·`039`·`040`(전부 TryOn)은 코드 전수 대조 결과 이미 반영 완료돼 삭제했다
+— 상세는 위 "2026-08-07 시착(TRYON) 관련 요청 4건 정리" 참고.
 
 **정윤(라이브·경매·채팅·홈·검색) 담당 요청은 전부 반영돼 이 표에 남은 것이 없다.** 위 목록은
 모두 서윤·AI 파트다.
@@ -226,6 +228,58 @@
   호출/캐시할지, AI가 결과를 직접 BE로 push할지)은 별도 논의.
 - FE `getSimilarProducts`(mock)를 실제로 붙일 대상이 필요해지면 그때 새 요청 문서로 정리한다.
 
+## 2026-08-07 시착(TRYON) 관련 요청 4건 정리 — 전부 이미 코드로 반영돼 있었다
+
+요청 문서 자체엔 "미해결"로 적혀 있었지만, 실제 코드(`TryOnController`, `TryOnResultService`,
+`TryOnResult` 엔티티, `AiClient`, `ProductController`/`ProductImageService`)를 전수 대조해보니
+넷 다 이미 구현이 끝나 있어 삭제했다.
+
+- `003-live-tryon-contract.md`(§3.3/3.6 AI 시착 생성) — `POST /api/users/{userId}/tryons?
+  productId=`(`TryOnController.createResult`)가 라이브·상품상세 두 화면 모두를 커버한다.
+  FE가 제안한 `POST /api/products/{productId}/tryons`/`POST /api/lives/{liveId}/products/
+  {productId}/tryons` 경로 대신 기존 컨벤션(`/users/{userId}/tryons`)으로 반영됐다 — 이
+  문서에서 이미 여러 번 반복된 "이름/모양은 다르지만 반영됨" 패턴 그대로다. 라이브 컨텍스트
+  전용 제약은 없어 같은 엔드포인트를 그대로 쓸 수 있다.
+- `040-tryon-job-contract.md`(AI 시착 job 계약) — `TryOnResultService.createResult`/`getResult`가
+  `AiClient.createTryOnJob`으로 job을 생성하고 `image_url`/`fit_title`/`fit_description`을
+  그대로 저장한다.
+- `038-tryon-fit-summary-fields.md`(`fit_title`/`fit_description`) — `TryOnResult.complete()`,
+  `TryOnResultResponse.fitTitle`/`fitDescription`까지 전부 반영.
+- `039-registration-ai-model-tryon.md`(등록 시 AI 착용컷) — `Product.aiModelEnabled`/
+  `aiModelGender`(등록 시 검증 포함), `ProductImageService.triggerAiModelCutJob`,
+  `GET /api/products/{id}/ai-model-cut`(`ProductController.getAiModelCutStatus`)까지 요청한
+  3개 항목 전부 구현 완료.
+
+남은 시착 관련 요청은 `020-tryon-result-category.md`(목록 응답에 카테고리 필드, 순수 BE
+작업, 미착수)뿐이다 — 이것만 표에 남긴다.
+
+## 2026-08-07 상품 목록 관련 정리
+
+상품 목록에 걸린 요청 2건을 코드와 대조해 반영·삭제했다.
+
+- `028-home-category-products-empty.md` — 원인 두 가지를 그대로 고쳤다: 탭 기준을
+  `parentId == null`(depth=1, 성별)이 아니라 `depth == 2`(옷 종류 대분류)로 바꾸고, 카테고리 id
+  수집을 직계 자식 한 단계가 아니라 하위 소분류(depth=3)까지 재귀적으로 모으게 했다
+  (`HomeService.categoryProductSections()`). `HomeControllerTest`에 소분류 상품이 탭 섹션에
+  재귀적으로 묶이는지 검증하는 테스트를 추가했다.
+- `029-product-detail-intermittent-500.md` — 코드 분석으로 원인을 확인했다: 상품을 라이브에
+  거는 두 경로(`linkProduct`/`linkProductsOnCreate`) 모두 **다른 라이브에 이미 걸려 있는지는
+  검사하지 않고** 같은 라이브 중복만 막고 있었다. 그래서 한 상품이 종료되지 않은 라이브
+  두 곳에 동시에 걸리면(`removed_at IS NULL`인 `live_product` 행이 2건), 상품 상세의 "연결된
+  라이브" 조회(`LiveProductRepository.findByProductIdAndRemovedAtIsNull`, 단일 결과 기대)가
+  `IncorrectResultSizeDataAccessException`으로 500을 냈다 — saleType/conditionGrade와 무관하고
+  ENDED 라이브 연결(성공 사례로 보고된 2번 행)은 정상인 보고 패턴과 정확히 들어맞는다.
+  - 읽기 경로: 단일 결과를 기대하지 않고 최신 연결 1건만 뽑도록 방어적으로 바꿨다
+    (`findFirstByProductIdAndRemovedAtIsNullOrderByIdDesc`) — 과거에 이미 생긴 중복 데이터가
+    남아 있어도 더는 500을 내지 않는다.
+  - 쓰기 경로: 아직 끝나지 않은(SCHEDULED/LIVE) 다른 라이브에 이미 걸린 상품은 연결 시점에
+    `PRODUCT_ALREADY_LINKED`(409)로 막는다. 종료/취소된 라이브의 연결은 재사용을 막지 않는다
+    (같은 상품을 다음 방송에 다시 걸 수 있어야 하므로).
+  - 문서가 전제한 "목록 응답에 대표 이미지 URL이 없다"(req 009 기준)는 이미 낡은 전제였다 —
+    009는 그 전에 반영 완료돼 `ProductResponse.primaryImageUrl`이 이미 존재한다.
+  - 로컬 재현은 못 했지만(보고서의 실제 원인 데이터가 배포 환경에만 있음), 코드상 결함은
+    명확해 반영했다. 배포 후에도 500이 재현되면 서버 로그로 재오픈 요청.
+
 ## 2026-08-06 정리 (브랜치 이동 후 재정리)
 
 세션 중간에 `fix/213-delivery` → `develop-BE`(pull) → `feat/190-google-signup`로 브랜치가
@@ -263,3 +317,108 @@
   로그인 응답에 중첩하거나 `nextStep`을 신설하지 않는다. §6의 나머지 협의 사항(자동 로그인
   여부, memberType 기본값 등)도 전부 "지금 구현대로 유지"로 결정돼 더 이상 대기 항목이
   없다. 계약은 `docs/requests/FE/037-signin-response-id-field.md` 참고.
+
+## 2026-08-08 정리 (이미지 role + AI 품질 검수 저장 반영)
+
+`docs/plans/BE/SY043-product-image-role-quality-findings.md`로 상품 이미지 `role`
+(`FRONT`/`BACK`/`ADDITIONAL`) 저장과 등록 시점 확정 AI 품질 검수 결과(`aiQualityFindings`) 저장을
+구현했다. 이 작업으로 요청 3건이 전부 해소돼 삭제했다.
+
+- `019-product-quality-multi-image.md` — `GET /products/{id}` 응답에 `aiQualityAnalysis.images[]`
+  (`label`/`originalImageUrl`/`analyzedImageUrl`/`findings`)를 채워 반영. `summary`는 이 흐름으로는
+  못 채우는 값이라 계속 `null`이고(019도 이미 유보를 인정한 부분), `analyzedImageUrl`은 주석
+  이미지가 없어 `originalImageUrl`과 동일하게 낸다 — 둘 다 019가 허용한 대안 그대로다.
+- `041-quality-inspection-integration.md` — §6("findings를 `key` 목록만 저장할지, 원본 전체를
+  저장할지")의 답을 `photoRole`/`description`/`box`만 저장하는 쪽으로 확정해 해소했다. 이 문서
+  자체의 "처리 결과"에 이미 기록돼 있던 AI 검수 job 트리거/폴링 프록시(`triggerQualityInspectionJob`,
+  `GET /products/{id}/quality-inspection`)는 이번 세션 이전에 별도로 반영되어 있었다.
+- `042-product-registration-ai-pipeline.md` — §1/§2(상품 생성 전 이미지 URL 확보, 방향 A/B)는
+  041과 같은 시점에 방향 A(상품을 먼저 만들고 이미지를 붙이는 기존 흐름 그대로)로 이미 반영돼
+  있었다. §3(등록 시 확정한 `aiQualityFindings` 저장)이 이번 작업으로 해소되며 문서 전체가 닫혔다.
+
+**`046-direct-sale-price-update.md`도 같은 배치에서 반영·삭제했다** — `PATCH /products/{id}`
+요청에 `price`(선택) 필드를 추가해, 상시 판매(`ON_SALE`) 중인 상품의 가격을 바꿀 수 있게 했다
+(요청 옵션 2 그대로 채택). 경매 상품·`SOLD` 상품은 그대로 거절한다(`INVALID_PRODUCT_STATE`).
+
+남아 있는 `046-product-update-quality-findings.md`(PATCH에도 `aiQualityFindings` 추가 요청)는
+이번 작업 범위 밖이라 그대로 열어 뒀다 — 저장 형식은 이제 확정됐으니(위 041 항목 참고) 착수하면
+POST와 동일하게 반영하면 된다.
+
+**`002-product-contract.md`도 삭제했다(사용자 판단)** — 이 문서에 남아 있던 마지막 항목(AI 가격
+추천)이 이미 `043-registration-price-chart-source.md`/`044-pricing-estimate-trigger.md`가 각각
+더 구체적으로 추적하고 있어 중복이었다. 그 외 항목은 전부 위에서 해소된 것들이라 표에서도 뺐다.
+
+**`030-order-settled-at-field.md`도 반영·삭제했다** — `Order`에 `settled_at`(정산 완료 시각)
+컬럼을 추가하고 `confirmAndSettle()` 호출 시점(수동/자동 확정 공용)에 채운다.
+`OrderListItemResponse`(`GET /users/{id}/orders`, `GET /orders/{orderId}` 공용)에 `settledAt`
+필드로 노출한다 — 요청이 제안한 두 옵션 중 별도 필드 신설 쪽을 택했다.
+
+## 2026-08-08 정리 (002/025 삭제 — 방향 재확인)
+
+**`002-product-contract.md` 삭제** — 마지막 남은 항목(AI 가격 추천)이 `043`/`044`와 중복이라
+정리했다(사용자 판단).
+
+**`025-product-same-price-chart.md`와 그 구현 계획 `docs/plans/BE/SY042-product-market-price.md`도
+삭제했다.** "동일 상품" 판정을 BE가 직접 만들지 않는다 — **AI가 클러스터링해서 결과를 넘겨주는
+방향으로 구두 결정됐다(사용자 확인).** BE 쪽에는 이 결정을 반영한 문서가 없었다(코드 조사로 찾은
+`docs/plans/AI/CH016`/`CH020`은 오히려 반대 결론 — "브랜드+상품명 텍스트 매칭이 CLIP보다
+정확하다", CH020은 미승인·미구현 — 을 담고 있어 이번 구두 결정과 별개다). **지금 BE가 할 일은
+없다** — AI 쪽에서 클러스터링 결과를 넘기는 형태가 확정되면 그때 BE 요청 문서로 다시 받는다.
+
+## 2026-08-08 정리 (046 반영 — PATCH에도 aiQualityFindings 추가)
+
+`046-product-update-quality-findings.md` 반영·삭제 — `ProductUpdateRequest`(`PATCH /products/{id}`)에
+`aiQualityFindings` 필드를 추가했다. `defects`와 같은 규칙(null이면 미반영, 값을 보내면 기존
+finding 전체 교체 — 빈 배열이면 전부 삭제)으로 동작하며, 저장 로직(`photoRole`/`description`/`box`,
+`FRONT`/`BACK`만 허용)은 `POST`가 쓰는 것을 그대로 재사용한다. DRAFT를 먼저 만들고 PATCH로 최종
+제출하는 상품도 이제 확정된 하자 판정이 저장된다.
+
+## 2026-08-08 정리 (043/044 반영 — AI 가격 추천 트리거)
+
+`044-pricing-estimate-trigger.md` 반영·삭제 — `POST /products/price-estimates` 신설. 실제 상품
+생성 여부와 무관하게 `productName`/`categoryId`(선택)/`brand`(선택)/`conditionScore`/
+`conditionGrade`(S/A/B/C)만으로 호출하면 AI `POST /pricing/estimates`를 그대로 프록시해
+`jobId`를 돌려준다. 결과 폴링은 FE가 `GET /ai/jobs/{jobId}`로 직접 한다(BE는 재조회 안 함).
+설계는 `docs/plans/BE/SY044-pricing-estimate-trigger.md` 참고.
+
+`043-registration-price-chart-source.md`도 같은 배치에서 삭제했다 — 문서 자체가 명시한 대로
+"자체 통계 인프라가 급하지 않으면 044만으로 당분간 충분"하다는 조건이 이번 044 구현으로 충족돼
+같이 정리한다. 043이 원했던 "우리 플랫폼 자체 통계" 기반 히스토그램은 만든 게 아니다 — 실사용
+데이터가 쌓이면 그때 별도로 다시 논의한다.
+
+## 2026-08-08 정리 (020 반영 — 시착 결과 카테고리)
+
+`020-tryon-result-category.md` 반영·삭제 — `GET /users/{userId}/tryons`(목록)·`/{id}`(상세) 응답에
+`categoryId`/`categoryName`을 추가했다. 상품의 소분류(leaf) 카테고리를 카테고리 마스터
+depth=2(대분류, `HomeService.CATEGORY_TAB_DEPTH`와 동일 기준)까지 한 단계 올려서 낸다. 카테고리를
+못 찾으면 둘 다 `null`이다. 겸사겸사 확인해보니 "가상 시착 생성"(`POST /users/{id}/tryons`)이
+`docs/APIs.md`에 미구현으로 표시돼 있었는데(2026-08-07에 이미 구현 확인·반영된 상태였음) 갱신을
+안 해뒀던 것이라 체크 표시도 같이 바로잡았다.
+
+## 2026-08-08 정리 (045 두 건 반영)
+
+`045-broadcast-summary-sale-type.md` 반영·삭제 — `LiveBroadcastSummaryResponse.Result`에
+`saleType`/`registeredPrice`(편성 시점 상품의 판매 방식·가격)를 추가했다. `soldVia`/`finalPrice`
+(팔린 경로·가격)와 달리 안 팔린 상품에도 채워진다. 데이터는 이미 `ProductQueryPort.ProductCard`가
+갖고 있어 새 쿼리 없이 그대로 실었다. 겸사겸사 `LiveBroadcastResultController`의 Swagger 설명이
+"즉시구매는 아직 집계 안 함"이라고 낡게 남아 있던 것도 바로잡았다(실제 코드는 이미 즉시구매까지
+`soldVia=DIRECT_SALE`로 집계하고 있었다). `docs/APIs.md`에도 이 두 엔드포인트 자체가 통째로
+누락돼 있어 행을 새로 추가했다.
+
+`045-shipment-fallback-tracking-status-gap.md`도 반영·삭제 — `OrderService.deliver()`에서
+`shipment.updateTrackingStatus(TrackingStatus.DELIVERED)`를 함께 호출해, 웹훅 구독 실패 시
+즉시-확정 폴백 경로를 탄 주문도 `trackingStatus`가 정상적으로 채워지게 했다(웹훅 경로는 이미
+채워진 값을 멱등하게 덮어쓸 뿐이다).
+
+## 2026-08-08 정리 (041 반영 — 마지막 남은 요청)
+
+`041-refund-notification-dashboard.md` 반영·삭제 — `RefundService.requestRefund()`가 판매자에게
+`REFUND_REQUESTED`, `reviewRefund()` 거절 시 구매자에게 `REFUND_REJECTED` 알림을 보낸다.
+**승인(`REFUND_APPROVED`)은 따로 만들지 않았다** — `PointService.refundOrder()`가 승인 시점에
+이미 `POINT_REFUNDED`("환불이 완료되었습니다")를 구매자에게 보내고 있어서(문서 작성 시점엔
+반영 안 된 사실), 같은 이벤트에 알림이 두 번 생기지 않게 그대로 뒀다. `refType`/`refId`는 041이
+제안한 신설 `REFUND` 대신 기존 `ORDER`/`orderId`를 그대로 썼다(041 §4가 허용한 대안, 이미
+`ORDER_PAID` 등이 같은 방식). `OrderListItemResponse.refundRequested`도 추가했다. 설계는
+`docs/plans/BE/SY045-refund-notification-dashboard.md` 참고.
+
+**이 인덱스에 남은 BE 요청이 없다.**

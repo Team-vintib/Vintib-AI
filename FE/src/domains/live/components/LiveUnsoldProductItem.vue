@@ -7,6 +7,7 @@ import {
   scheduleProductAuction,
 } from '@/domains/product/api/productApi'
 import { normalizeApiError } from '@/shared/api/http'
+import AppInlineNotice from '@/shared/components/AppInlineNotice.vue'
 
 import type { LiveUnsoldProduct } from '@/domains/auction/types/liveAuction.types'
 
@@ -22,7 +23,7 @@ const emit = defineEmits<{
   ]
 }>()
 
-type Mode = 'idle' | 'direct-form' | 'auction-confirm' | 'processing' | 'done'
+type Mode = 'idle' | 'direct-form' | 'auction-confirm' | 'keep-confirm' | 'processing' | 'done'
 
 const mode = ref<Mode>('idle')
 const doneLabel = ref('')
@@ -37,8 +38,8 @@ const registeredPrice = ref<number | null>(props.product.startPrice)
 const priceInput = ref('')
 // 경매를 건 적 없는 미판매 상품도 이 화면에 온다. 이미 정찰제로 걸려 있던 상품에
 // "상시 판매로 전환"은 의미가 없으므로, 판매 방식에 따라 선택지 자체를 다르게 준다.
-//   경매 예정 상품 → 상시 판매로 전환 / 경매 예정 유지(변경 없음)
-//   정찰제 상품    → 가격 수정하기 / 경매 예정으로 전환(PATCH auction-schedule)
+//   경매 예정 상품 → 상시 판매로 전환 / 경매 예정 유지
+//   정찰제 상품    → 가격 수정하기 / 경매 예정으로 전환(PATCH auction-schedule) / 유지하기
 // 편성 상품 목록에서 받은 판매 방식을 기준으로 둔다. 상품 상세(GET /products/{id})는 상품에
 // 따라 500이 나서(요청 029) 그것만 믿으면 문구가 경매용으로 굳어버린다.
 const isDirectSale = ref(props.product.saleType === 'DIRECT_SALE')
@@ -47,10 +48,12 @@ const priceChoiceLabel = computed(() => (isDirectSale.value ? '가격 수정하�
 const priceFormLabel = computed(() => (isDirectSale.value ? '판매 가격' : '상시 판매 가격'))
 const priceSubmitLabel = computed(() => (isDirectSale.value ? '가격 저장' : '상시 판매로 전환'))
 
-const keepLabel = computed(() => (isDirectSale.value ? '경매 예정으로 전환' : '경매 예정 유지'))
+// 아무것도 바꾸지 않고 지금 상태로 두는 선택. 정찰제 상품은 이 선택이 없으면 가격을 고치거나
+// 경매로 돌리는 것 말고는 처리할 방법이 없어, 완료 게이트('모두 처리해 주세요')에 걸린다.
+const keepLabel = computed(() => (isDirectSale.value ? '유지하기' : '경매 예정 유지'))
 const keepConfirmText = computed(() =>
   isDirectSale.value
-    ? '이 상품을 경매 예정으로 되돌릴까요? 지정된 가격이 사라지고 다음 방송에서 경매로 올릴 수 있어요.'
+    ? '이 상품을 지금 가격 그대로 둘까요? 상품 목록에서 계속 판매됩니다.'
     : '이 상품을 경매 예정 상태로 두시겠어요? 다음 방송에서 다시 경매로 올릴 수 있어요.',
 )
 
@@ -110,7 +113,7 @@ const confirmDirectSale = async () => {
   } catch (error) {
     const apiError = normalizeApiError(error)
 
-    // 이미 상시 판매 중인 상품의 가격 수정은 아직 BE에 엔드포인트가 없다(P003, 요청 046).
+    // 이미 상시 판매 중인 상품의 가격 수정은 아직 BE에 엔드포인트가 없다(P003, 요청 048).
     // 지원되면 같은 호출이 그대로 통하므로 FE는 손댈 게 없다.
     errorMessage.value =
       wasDirectSale && apiError.code === 'P003'
@@ -126,25 +129,30 @@ const openAuctionConfirm = () => {
   mode.value = 'auction-confirm'
 }
 
-const cancelAuctionConfirm = () => {
+const openKeepConfirm = () => {
+  errorMessage.value = ''
+  mode.value = 'keep-confirm'
+}
+
+const cancelConfirm = () => {
   mode.value = 'idle'
 }
 
-const keepAuctionScheduled = async () => {
+// 지금 상태 그대로 두기 — 서버에 바꿀 게 없어 화면에서만 처리 완료로 표시한다.
+const keepAsIs = () => {
   errorMessage.value = ''
+  doneLabel.value = isDirectSale.value ? '상시 판매 유지' : '경매 예정 유지'
+  mode.value = 'done'
+  emit('handled', {
+    productId: props.product.productId,
+    saleType: isDirectSale.value ? 'DIRECT_SALE' : 'AUCTION',
+    price: registeredPrice.value,
+  })
+}
 
-  // 경매 예정 상품은 상태를 바꿀 게 없어 화면에서만 처리 완료로 표시한다.
-  if (!isDirectSale.value) {
-    doneLabel.value = '경매 예정 유지'
-    mode.value = 'done'
-    emit('handled', {
-      productId: props.product.productId,
-      saleType: 'AUCTION',
-      price: registeredPrice.value,
-    })
-    return
-  }
-
+// 정찰제 상품을 경매 예정으로 되돌린다(서버 상태가 실제로 바뀐다).
+const convertToAuction = async () => {
+  errorMessage.value = ''
   mode.value = 'processing'
 
   try {
@@ -200,7 +208,7 @@ const keepAuctionScheduled = async () => {
         />
         <span>P</span>
       </div>
-      <p v-if="errorMessage" class="unsold-item__error">{{ errorMessage }}</p>
+      <AppInlineNotice v-if="errorMessage" variant="error">{{ errorMessage }}</AppInlineNotice>
       <div class="unsold-item__direct-actions">
         <button type="button" class="unsold-item__ghost" @click="cancelDirectForm">취소</button>
         <button type="button" class="unsold-item__primary" @click="confirmDirectSale">
@@ -209,12 +217,26 @@ const keepAuctionScheduled = async () => {
       </div>
     </div>
 
-    <!-- 그대로 두기 확인 -->
+    <!-- 경매 예정으로 전환 확인 (정찰제 상품 전용, 서버 상태가 바뀐다) -->
     <div v-else-if="mode === 'auction-confirm'" class="unsold-item__confirm">
+      <p class="unsold-item__confirm-text">
+        이 상품을 경매 예정으로 되돌릴까요? 지정된 가격이 사라지고 다음 방송에서 경매로 올릴 수
+        있어요.
+      </p>
+      <div class="unsold-item__direct-actions">
+        <button type="button" class="unsold-item__ghost" @click="cancelConfirm">취소</button>
+        <button type="button" class="unsold-item__primary" @click="convertToAuction">
+          경매 예정으로 전환
+        </button>
+      </div>
+    </div>
+
+    <!-- 그대로 두기 확인 -->
+    <div v-else-if="mode === 'keep-confirm'" class="unsold-item__confirm">
       <p class="unsold-item__confirm-text">{{ keepConfirmText }}</p>
       <div class="unsold-item__direct-actions">
-        <button type="button" class="unsold-item__ghost" @click="cancelAuctionConfirm">취소</button>
-        <button type="button" class="unsold-item__primary" @click="keepAuctionScheduled">
+        <button type="button" class="unsold-item__ghost" @click="cancelConfirm">취소</button>
+        <button type="button" class="unsold-item__primary" @click="keepAsIs">
           {{ keepLabel }}
         </button>
       </div>
@@ -230,19 +252,29 @@ const keepAuctionScheduled = async () => {
       >
         {{ priceChoiceLabel }}
       </button>
+      <!-- 정찰제 상품만 경매 예정으로 되돌리는 선택이 따로 있다(경매 상품은 이미 경매 예정이다). -->
       <button
+        v-if="isDirectSale"
         type="button"
         class="unsold-item__choice unsold-item__choice--auction"
         :disabled="mode === 'processing'"
         @click="openAuctionConfirm"
       >
+        경매 예정으로 전환
+      </button>
+      <button
+        type="button"
+        class="unsold-item__choice unsold-item__choice--keep"
+        :disabled="mode === 'processing'"
+        @click="openKeepConfirm"
+      >
         {{ keepLabel }}
       </button>
     </div>
 
-    <p v-if="errorMessage && mode !== 'direct-form'" class="unsold-item__error">
+    <AppInlineNotice v-if="errorMessage && mode !== 'direct-form'" variant="error">
       {{ errorMessage }}
-    </p>
+    </AppInlineNotice>
   </article>
 </template>
 
@@ -332,10 +364,11 @@ const keepAuctionScheduled = async () => {
   font-size: var(--font-size-xs);
 }
 
+/* 정찰제 상품은 선택지가 3개(가격 수정·경매 예정 전환·유지)라 개수에 맞게 열이 늘어난다. */
 .unsold-item__actions {
   display: grid;
   gap: var(--space-2);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
 }
 
 .unsold-item__choice {
@@ -352,10 +385,18 @@ const keepAuctionScheduled = async () => {
   background: color-mix(in srgb, var(--color-live) 28%, transparent);
 }
 
-.unsold-item__choice--auction {
+/* 바꾸지 않는 선택(전환·유지)은 한 단계 약하게 — 기본 동작인 가격 지정이 먼저 읽혀야 한다. */
+.unsold-item__choice--auction,
+.unsold-item__choice--keep {
   border-color: var(--color-live-border);
   background: var(--color-live-surface-raised);
   color: var(--color-live-text-secondary);
+}
+
+.unsold-item__choice--auction:hover:not(:disabled),
+.unsold-item__choice--keep:hover:not(:disabled) {
+  border-color: var(--color-live-text-secondary);
+  background: var(--color-live-surface-raised);
 }
 
 .unsold-item__choice:disabled {
@@ -432,10 +473,5 @@ const keepAuctionScheduled = async () => {
 
 .unsold-item__primary:hover {
   opacity: 0.92;
-}
-
-.unsold-item__error {
-  color: var(--color-error);
-  font-size: var(--font-size-xs);
 }
 </style>

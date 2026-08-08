@@ -6,13 +6,18 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.product.dto.request.AiQualityFindingRequest;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductListFilterParams;
 import com.ssafy.backend.product.dto.request.ProductSortType;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
+import com.ssafy.backend.product.dto.response.AiQualityAnalysisImageResponse;
+import com.ssafy.backend.product.dto.response.AiQualityAnalysisResponse;
+import com.ssafy.backend.product.dto.response.AiQualityFindingResponse;
 import com.ssafy.backend.product.dto.response.ProductAiModelCutResponse;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
+import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductMarketPriceResponse;
 import com.ssafy.backend.product.dto.response.ProductQualityInspectionResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
@@ -20,17 +25,18 @@ import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.product.dto.response.LinkedLiveSummaryResponse;
 import com.ssafy.backend.product.dto.response.SimilarProductResponse;
 import com.ssafy.backend.product.entity.AiModelCutStatus;
-import com.ssafy.backend.product.entity.Brand;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductDefect;
+import com.ssafy.backend.product.entity.ProductImageRole;
+import com.ssafy.backend.product.entity.ProductQualityFinding;
 import com.ssafy.backend.product.entity.QualityInspectionStatus;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.port.OrderQueryPort;
 import com.ssafy.backend.product.port.dto.CompletedOrderSummary;
-import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductDefectRepository;
+import com.ssafy.backend.product.repository.ProductQualityFindingRepository;
 import com.ssafy.backend.product.port.LiveQueryPort;
 import com.ssafy.backend.product.port.SocialQueryPort;
 import com.ssafy.backend.product.repository.ProductRepository;
@@ -56,7 +62,7 @@ import org.springframework.web.client.RestClientException;
 @Transactional(readOnly = true)
 public class ProductService {
 
-    // 그래프용 표본으로 충분한 개수(011). 상세 조회 왕복마다 전수 조회하지 않도록 상한을 둔다.
+    // 그래프용 표본으로 충분한 개수. 상세 조회 왕복마다 전수 조회하지 않도록 상한을 둔다.
     private static final int SIMILAR_PRODUCT_LIMIT = 20;
 
     // "동일 상품 시세"(CH001) 매물 수 상한 — findSimilarProducts와 같은 기준.
@@ -66,8 +72,8 @@ public class ProductService {
     private final MemberRepository memberRepository;
     private final ProductImageService productImageService;
     private final CategoryRepository categoryRepository;
-    private final BrandRepository brandRepository;
     private final ProductDefectRepository productDefectRepository;
+    private final ProductQualityFindingRepository productQualityFindingRepository;
     private final SocialQueryPort socialQueryPort;
     private final LiveQueryPort liveQueryPort;
     private final OrderQueryPort orderQueryPort;
@@ -78,7 +84,7 @@ public class ProductService {
         Member seller = memberRepository.findById(sellerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        // 카테고리는 필수이며 실제로 존재해야 한다. DTO의 @NotNull 은 "값이 있는지"만 보므로
+        // 카테고리는 필수이며 실제로 존재해야 함. DTO의 @NotNull 은 "값이 있는지"만 보므로
         // 없는 ID 를 그대로 넣으면 FK 위반이 500 으로 새어 나간다.
         if (!categoryRepository.existsById(request.categoryId())) {
             throw new CustomException(ErrorCode.CATEGORY_NOT_FOUND);
@@ -91,10 +97,11 @@ public class ProductService {
         Product product = Product.builder()
                 .seller(seller)
                 .categoryId(request.categoryId())
-                .brandId(request.brandId())
+                .brand(request.brand())
                 .title(request.title())
                 .description(request.description())
                 .conditionGrade(request.conditionGrade())
+                .conditionScore(request.conditionScore())
                 .sizeLabel(request.sizeLabel())
                 .color(request.color())
                 .material(request.material())
@@ -105,11 +112,41 @@ public class ProductService {
 
         Product saved = productRepository.save(product);
         saveDefects(saved, request.defects());
+        saveQualityFindings(saved, request.aiQualityFindings());
 
         return ProductResponse.from(saved);
     }
 
-    // 등록 시점에 판매자가 입력한 하자 목록을 순서대로 저장한다.
+    // 등록 시 사용자가 인정·확정한 AI 품질 검수 finding을 순서대로 저장.
+    private void saveQualityFindings(Product product, List<AiQualityFindingRequest> findings) {
+        if (findings == null || findings.isEmpty()) {
+            return;
+        }
+        List<ProductQualityFinding> entities = new ArrayList<>();
+        for (int i = 0; i < findings.size(); i++) {
+            AiQualityFindingRequest finding = findings.get(i);
+            if (finding.photoRole() != ProductImageRole.FRONT && finding.photoRole() != ProductImageRole.BACK) {
+                throw new CustomException(ErrorCode.AI_QUALITY_FINDING_INVALID_PHOTO_ROLE);
+            }
+            entities.add(ProductQualityFinding.builder()
+                    .product(product)
+                    .photoRole(finding.photoRole())
+                    .description(finding.description())
+                    .box(toBoxMap(finding.box()))
+                    .sortOrder((short) i)
+                    .build());
+        }
+        productQualityFindingRepository.saveAll(entities);
+    }
+
+    private Map<String, Integer> toBoxMap(AiQualityFindingRequest.Box box) {
+        if (box == null) {
+            return null;
+        }
+        return Map.of("x", box.x(), "y", box.y(), "width", box.width(), "height", box.height());
+    }
+
+    // 등록 시점에 판매자가 입력한 하자 목록 순서대로 저장.
     private void saveDefects(Product product, List<String> defects) {
         if (defects == null || defects.isEmpty()) {
             return;
@@ -125,7 +162,7 @@ public class ProductService {
         productDefectRepository.saveAll(entities);
     }
 
-    // DRAFT(최초 등록) 또는 AUCTION_SCHEDULED(경매 예정 상품의 상시 판매 전환, PROD-004/PROD-005/AUCT-014)에서 호출된다.
+    // DRAFT(최초 등록) 또는 AUCTION_SCHEDULED(경매 예정 상품의 상시 판매 전환)에서 호출.
     @Transactional
     public ProductResponse registerDirectSale(Long sellerId, Long productId, ProductStatusUpdateRequest request) {
         Product product = productRepository.findById(productId)
@@ -143,9 +180,8 @@ public class ProductService {
         return ProductResponse.from(product);
     }
 
-    // DRAFT(최초 등록, PROD-003) 또는 ON_SALE(상시 판매 상품의 경매 전환, PROD-004)에서 호출된다.
-    // 시작가/증액 단위/경매 시간은 여기서 다루지 않는다 — "경매 시작 전에 설정한다"고 명시돼 있고,
-    // 그건 AUCT-001(경매 조건 설정) 영역이다.
+    // DRAFT(최초 등록) 또는 ON_SALE(상시 판매 상품의 경매 전환)에서 호출.
+    // 시작가/증액 단위/경매 시간은 경매 조건 설정에서 함.
     @Transactional
     public ProductResponse scheduleAuction(Long sellerId, Long productId) {
         Product product = productRepository.findById(productId)
@@ -184,7 +220,7 @@ public class ProductService {
         return PageResponse.from(products.map(ProductResponse::from));
     }
 
-    /** 마이페이지 판매 상품 관리(MY-002) — 본인 소유 상품을 등록일 최신순으로 전부 반환한다(DRAFT 등 비공개 상태 포함). */
+    /** 마이페이지 판매 상품 관리 — 본인 소유 상품을 등록일 최신순으로 전부 반환(DRAFT 등 비공개 상태 포함). */
     public PageResponse<ProductResponse> getMyProducts(Long sellerId, Pageable pageable) {
         Page<Product> products = productRepository.findBySeller_IdOrderByCreatedAtDesc(sellerId, pageable);
         return PageResponse.from(products.map(ProductResponse::from));
@@ -215,9 +251,6 @@ public class ProductService {
         String categoryName = product.getCategoryId() == null ? null : categoryRepository.findById(product.getCategoryId())
                 .map(Category::getName)
                 .orElse(null);
-        String brandName = product.getBrandId() == null ? null : brandRepository.findById(product.getBrandId())
-                .map(Brand::getName)
-                .orElse(null);
 
         Long sellerId = product.getSeller().getId();
         long sellerProductCount = productRepository.countBySeller_IdAndSaleStatusNot(sellerId, SaleStatus.DRAFT);
@@ -231,23 +264,61 @@ public class ProductService {
         List<SimilarProductResponse> similarProducts = productRepository.findSimilarProducts(
                         product.getCategoryId(),
                         productId,
-                        product.getBrandId(),
+                        product.getBrand(),
                         PageRequest.of(0, SIMILAR_PRODUCT_LIMIT))
                 .stream()
                 .map(SimilarProductResponse::from)
                 .toList();
 
+        List<ProductImageResponse> images = productImageService.getImages(productId);
+
         return ProductDetailResponse.from(
                 product,
                 categoryName,
-                brandName,
-                productImageService.getImages(productId),
+                images,
                 defects,
                 isWished,
                 sellerFollowerCount,
                 sellerProductCount,
                 linkedLive,
-                similarProducts);
+                similarProducts,
+                buildAiQualityAnalysis(productId, images));
+    }
+
+    /**
+     * 상품 상세 "AI 분석" 탭. 등록 시 저장해둔 finding을 사진(FRONT/BACK)별로 묶어 낸다.
+     *
+     * <p><b>{@code NOT_REQUESTED}와 {@code NO_FINDINGS}를 구분하지 않는다.</b> "요청 자체가
+     * 없었다"와 "요청은 했는데 인정된 하자가 0건"은 저장 형태(finding row 0개)가 똑같아서
+     * 구분할 수 없다 — 둘 다 FE에서 캐러셀을 안 그리는 결과는 같으므로 구분 없이
+     * {@code NOT_REQUESTED}로 합친다.
+     */
+    private AiQualityAnalysisResponse buildAiQualityAnalysis(Long productId, List<ProductImageResponse> images) {
+        List<ProductQualityFinding> findings =
+                productQualityFindingRepository.findAllByProductIdOrderBySortOrderAsc(productId);
+        if (findings.isEmpty()) {
+            return AiQualityAnalysisResponse.notRequested();
+        }
+
+        Map<ProductImageRole, String> imageUrlByRole = images.stream()
+                .filter(image -> image.role() == ProductImageRole.FRONT || image.role() == ProductImageRole.BACK)
+                .collect(Collectors.toMap(ProductImageResponse::role, ProductImageResponse::url, (a, b) -> a));
+
+        List<AiQualityAnalysisImageResponse> imageResponses = new ArrayList<>();
+        for (ProductImageRole role : List.of(ProductImageRole.FRONT, ProductImageRole.BACK)) {
+            List<AiQualityFindingResponse> roleFindings = findings.stream()
+                    .filter(finding -> finding.getPhotoRole() == role)
+                    .map(AiQualityFindingResponse::from)
+                    .toList();
+            if (roleFindings.isEmpty()) {
+                continue;
+            }
+            String url = imageUrlByRole.get(role);
+            imageResponses.add(new AiQualityAnalysisImageResponse(
+                    role == ProductImageRole.FRONT ? "앞면" : "뒷면", url, url, null, roleFindings));
+        }
+
+        return AiQualityAnalysisResponse.completed(imageResponses);
     }
 
     /**
@@ -306,7 +377,7 @@ public class ProductService {
     public ProductResponse updateProduct(Long sellerId, Long productId, ProductUpdateRequest request) {
         Product product = getOwnedEditableProduct(sellerId, productId);
 
-        // 등록과 같은 이유로 존재 여부를 본다 — product.category_id 에 FK 가 걸려 있어
+        // 등록과 같은 이유로 존재 여부 확인 — product.category_id 에 FK 가 걸려 있어
         // 없는 ID 를 그대로 넣으면 제약 위반이 500 으로 새어 나간다.
         if (request.categoryId() != null && !categoryRepository.existsById(request.categoryId())) {
             throw new CustomException(ErrorCode.CATEGORY_NOT_FOUND);
@@ -316,7 +387,7 @@ public class ProductService {
                 request.title(),
                 request.description(),
                 request.categoryId(),
-                request.brandId(),
+                request.brand(),
                 request.conditionGrade(),
                 request.sizeLabel(),
                 request.color(),
@@ -330,11 +401,26 @@ public class ProductService {
             saveDefects(product, request.defects());
         }
 
+        // aiQualityFindings도 같은 규칙 — DRAFT 우선 생성 상품은 확정 시점(PATCH)에만 값이 온다(046).
+        if (request.aiQualityFindings() != null) {
+            productQualityFindingRepository.deleteAllByProductId(productId);
+            saveQualityFindings(product, request.aiQualityFindings());
+        }
+
+        // 가격은 상시 판매 상품에만 의미가 있다 — 경매 상품은 price가 항상 null이고
+        // 시작가는 AUCT 쪽 Auction 엔티티가 별도로 갖는다.
+        if (request.price() != null) {
+            if (!product.isDirectSale()) {
+                throw new CustomException(ErrorCode.INVALID_PRODUCT_STATE);
+            }
+            product.updatePrice(request.price());
+        }
+
         return ProductResponse.from(product);
     }
 
     /**
-     * AI 착용컷 생성 상태/결과를 조회한다(`docs/requests/BE/039-registration-ai-model-tryon.md` §3-②).
+     * AI 착용컷 생성 상태/결과 조회.
      *
      * <p>백그라운드 스케줄러 없이, 아직 안 끝난 job이면 조회하는 이 시점에 AI를 다시 찔러
      * 최신 상태를 반영하는 "지연 폴링" 방식이다 — 구조가 가장 단순해서 MVP로 채택했다

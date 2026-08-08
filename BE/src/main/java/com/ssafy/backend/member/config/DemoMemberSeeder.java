@@ -26,25 +26,25 @@ public class DemoMemberSeeder implements ApplicationRunner {
 
     // 개인 사용자 4명 (GENERAL)
     private static final String[][] GENERAL_USERS = {
-        {"vintib1@gmail.com", "qwer1234", "한서윤", "빈티지흙깜자", "FEMALE", "01012321232",
+        {"vintib1@gmail.com", "qwer1234", "김현수", "빈티지흙깜자", "FEMALE", "01012321232",
          "서울 강남구 테헤란로 212", "멀티캠퍼스 801호", "06220"},
 
-        {"vintib2@gmail.com", "qwer1234", "김현수", "마좀깎아주라", "FEMALE", "01032123212",
+        {"vintib2@gmail.com", "qwer1234", "김서연", "마좀깎아주라", "FEMALE", "01032123212",
          "부산 동래구 사직로 45", "1층", "47874"},
 
-        {"vintib3@gmail.com","qwer1234", "최형수", "헌옷수거함털이범", "MALE", "01045654565",
+        {"vintib3@gmail.com","qwer1234", "김정윤", "헌옷수거함털이범", "MALE", "01045654565",
          "대전 중구 대종로480번길 15", "2층", "34921"},
 
-        {"vintib4@gmail.com", "qwer1234", "김정윤", "KING받는classic", "MALE", "01078987898",
+        {"vintib4@gmail.com", "qwer1234", "최형수", "동묘바닥쓸개", "MALE", "01078987898",
          "경기 화성시 동탄구 동탄대로9나길 14", "1004호", "18488"},
     };
 
     // 사업자 2명 (BUSINESS)
     private static final String[][] BUSINESS_USERS = {
-        {"vintibb1@gmail.com", "qwer1234", "정인웅", "파는이유살쪄서", "MALE", "01015951595",
+        {"vintibb1@gmail.com", "qwer1234", "한서윤", "쓱털어온옷장", "FEMALE", "01015951595",
          "서울 용산구 녹사평대로 150", "1층", "04390"},
 
-        {"vintibb2@gmail.com", "qwer1234", "김서연", "구제불능", "FEMALE", "01042324232",
+        {"vintibb2@gmail.com", "qwer1234", "정인웅", "구제불능", "MALE", "01042324232",
          "제주 제주시 첨단로 242", "202호", "63309"},
     };
 
