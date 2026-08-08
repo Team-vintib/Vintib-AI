@@ -280,7 +280,7 @@ class OrderServiceTest {
 
         assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
         assertThat(realOrder.getAutoConfirmAt()).isAfter(LocalDateTime.now().plusDays(2));
-        // 웹훅이 없는 폴백 경로라 trackingStatus를 채워줄 이가 없었다 — deliver()가 직접 맞춘다(045).
+        // 웹훅이 없는 폴백 경로라 trackingStatus를 채워줄 이가 없었다 — deliver()가 직접 맞춘다.
         assertThat(shipment.getTrackingStatus()).isEqualTo(TrackingStatus.DELIVERED);
         verify(notificationCommandPort).notify(
                 eq(buyer), eq("SHIPMENT_STARTED"), any(), any(), eq("ORDER"), any());

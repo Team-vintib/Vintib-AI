@@ -37,19 +37,19 @@ sudo docker exec vintib-minio sh -c \
 **1. 로컬에서 압축**
 
 **반드시 `products` 폴더 안으로 들어가서** 압축한다. 폴더 밖에서 압축하면 압축 해제 시
-`products-export/products/...`처럼 한 겹 더 중첩돼 업로드 경로가 틀어진다.
+`tmp/products/...`처럼 한 겹 더 중첩돼 업로드 경로가 틀어진다.
 
 ```bash
 cd "/c/Users/SSAFY/Desktop/products"
-tar -czf "/c/Users/SSAFY/Desktop/products-export.tar.gz" .
+tar -czf "/c/Users/SSAFY/Desktop/tmp.tar.gz" .
 ```
 
 **2. EC2로 전송**
 
 ```bash
 scp -i "/c/Users/SSAFY/Desktop/I15A108T.pem" \
-  "/c/Users/SSAFY/Desktop/products-export.tar.gz" \
-  ubuntu@i15a108.p.ssafy.io:/home/ubuntu/products-export.tar.gz
+  "/c/Users/SSAFY/Desktop/tmp.tar.gz" \
+  ubuntu@i15a108.p.ssafy.io:/home/ubuntu/tmp.tar.gz
 ```
 
 ### 방법 B — MobaXterm (GUI, 압축 불필요)
@@ -59,11 +59,11 @@ MobaXterm은 SSH로 접속하면 왼쪽에 SFTP 파일 탐색기가 자동으로
 
 1. **Session → SSH** — Remote host `i15a108.p.ssafy.io`, username `ubuntu`, Advanced SSH
    Settings에서 `I15A108T.pem` 지정 후 접속.
-2. 접속되면 왼쪽 SFTP 패널이 뜬다. 원격 쪽 경로를 `/home/ubuntu/products-export/`로 만들고
+2. 접속되면 왼쪽 SFTP 패널이 뜬다. 원격 쪽 경로를 `/home/ubuntu/tmp/`로 만들고
    (없으면 패널 안에서 새 폴더 생성), **로컬 `C:\Users\SSAFY\Desktop\products\` 안의 파일들을
    그 폴더 안으로 드래그&드롭**한다 — `products` 폴더 자체가 아니라 **그 안의 파일들**을
    옮겨야 한다(방법 A의 "폴더 밖에서 압축하면 한 겹 중첩" 문제와 같은 이유 — 여기서는
-   `products-export/products/...`가 아니라 `products-export/1.jpg...`가 되게).
+   `tmp/products/...`가 아니라 `tmp/1.jpg...`가 되게).
 3. 전송이 끝나면 오른쪽 터미널(같은 세션)에서 바로 3번으로 넘어간다 — **tar 압축을 안
    했으므로 아래 `tar -xzf` 줄은 건너뛴다.**
 
@@ -80,9 +80,9 @@ ssh -i "/c/Users/SSAFY/Desktop/I15A108T.pem" ubuntu@i15a108.p.ssafy.io
 ```bash
 cd /home/ubuntu
 
-# 방법 A(tar로 옮겼을 때)만 실행 — 방법 B는 이미 products-export/ 에 파일이 그대로 있으므로 건너뛴다
-mkdir -p products-export
-tar -xzf products-export.tar.gz -C products-export
+# 방법 A(tar로 옮겼을 때)만 실행 — 방법 B는 이미 tmp/ 에 파일이 그대로 있으므로 건너뛴다
+mkdir -p tmp
+tar -xzf tmp.tar.gz -C tmp
 
 # ⚠️ /home/ubuntu/vintib/.env는 권한 600 + GitLab 러너 소유라 sudo 없이는 ubuntu 계정으로
 #    못 읽는다(docs/infra/ec2.md 참고). sudo 빠뜨리면 MINIO_USER/PASS가 빈 문자열이 되고,
@@ -92,13 +92,13 @@ MINIO_USER=$(sudo grep '^MINIO_ROOT_USER=' /home/ubuntu/vintib/.env | cut -d= -f
 MINIO_PASS=$(sudo grep '^MINIO_ROOT_PASSWORD=' /home/ubuntu/vintib/.env | cut -d= -f2)
 echo "USER=[$MINIO_USER]"   # 빈 값이 아닌지 먼저 확인하고 다음으로 넘어간다
 
-docker cp products-export vintib-minio:/tmp/products-export
+docker cp tmp vintib-minio:/tmp/tmp
 
 # 컨테이너 안에서 mc로 vintib-public/products 아래에 업로드(이미 있는 파일은 건드리지 않음)
 sudo docker exec vintib-minio sh -c \
   "mc alias set self http://localhost:9000 '$MINIO_USER' '$MINIO_PASS' && \
-   mc mirror /tmp/products-export self/vintib-public/products && \
-   rm -rf /tmp/products-export"
+   mc mirror /tmp/tmp self/vintib-public/products && \
+   rm -rf /tmp/tmp"
 
 # 확인은 개수(mc ls | wc -l)가 아니라 stat으로 — 실제 객체 존재를 직접 본다
   sudo docker exec vintib-minio sh -c \
@@ -111,7 +111,7 @@ sudo docker exec vintib-minio sh -c \
 에러를 내지 않는다).
 
 ```bash
-rm -rf /home/ubuntu/products-export.tar.gz /home/ubuntu/products-export
+rm -rf /home/ubuntu/tmp.tar.gz /home/ubuntu/tmp
 exit   # SSH 세션 종료
 ```
 
@@ -122,6 +122,52 @@ exit   # SSH 세션 종료
 ```bash
 curl -o /dev/null -s -w "%{http_code}\n" "https://i15a108.p.ssafy.io/vintib-public/products/1.jpg"
 ```
+
+## 6. 전체 교체 — 기존 이미지를 지우고 로컬 것으로 통째로 바꾸기
+
+지금까지의 1~5번은 **없는 파일만 추가**하는 절차다(`mc mirror`가 이미 있는 파일은 건드리지
+않음). 로컬에서 기존 파일을 같은 이름인 채로 내용만 고쳤다면(예: 잘못 올라간 사진 교체)
+`mc mirror`로는 반영되지 않는다 — 이미 그 경로에 파일이 "있다"고 보기 때문이다. 이럴 땐
+운영에 올라간 걸 먼저 지우고 다시 올려야 한다.
+
+전송(1~2번, 방법 A/B 아무거나)까지는 그대로 하고, 3번의 `mc mirror` 자리를 아래로
+바꿔서 실행한다.
+
+```bash
+cd /home/ubuntu
+
+# 방법 A(tar)만 실행 — 방법 B는 이미 tmp/ 에 파일이 있으므로 건너뛴다
+mkdir -p tmp
+tar -xzf tmp.tar.gz -C tmp
+
+# ⚠️ 삭제 전에 먼저 옮긴 파일 개수가 말이 되는지 확인한다 — tmp가 비어있거나
+#    일부만 온 상태로 다음 줄(전체 삭제)을 실행하면 운영 이미지가 통째로 사라진 채
+#    복구할 방법이 없다.
+ls tmp | wc -l
+ls tmp | head -5
+
+MINIO_USER=$(sudo grep '^MINIO_ROOT_USER=' /home/ubuntu/vintib/.env | cut -d= -f2)
+MINIO_PASS=$(sudo grep '^MINIO_ROOT_PASSWORD=' /home/ubuntu/vintib/.env | cut -d= -f2)
+echo "USER=[$MINIO_USER]"   # 빈 값이 아닌지 먼저 확인
+
+docker cp tmp vintib-minio:/tmp/tmp
+
+# mc rm --recursive --force 는 되돌릴 수 없다 — 위에서 개수 확인을 건너뛰지 않는다.
+sudo docker exec vintib-minio sh -c \
+  "mc alias set self http://localhost:9000 '$MINIO_USER' '$MINIO_PASS' && \
+   mc rm --recursive --force self/vintib-public/products/ && \
+   mc mirror /tmp/tmp self/vintib-public/products && \
+   rm -rf /tmp/tmp"
+
+# 개수 확인(대략적인 sanity check) + 실제 객체 존재 확인
+sudo docker exec vintib-minio sh -c \
+  "mc alias set self http://localhost:9000 '$MINIO_USER' '$MINIO_PASS' && \
+   mc ls self/vintib-public/products/ | wc -l && \
+   mc stat self/vintib-public/products/1.jpg"
+```
+
+버킷 정책(익명 읽기)은 객체 삭제와 무관하게 유지되므로 따로 손댈 필요 없다. 정리(4번)와
+최종 확인(5번)은 그대로 이어서 하면 된다.
 
 ## 참고
 
