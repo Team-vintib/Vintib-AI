@@ -1,12 +1,30 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+
 import googleLogoImage from '@/assets/images/google-logo.png'
 import logoImage from '@/assets/images/logo-white.png'
 import { startGoogleOAuth } from '@/domains/auth/utils/googleOAuth'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 import AuthLayout from '@/shared/layouts/AuthLayout.vue'
 
-const handleGoogleSignup = () => {
-  startGoogleOAuth('signup')
+const isRedirecting = ref(false)
+const errorMessage = ref('')
+
+const handleGoogleSignup = async () => {
+  if (isRedirecting.value) {
+    return
+  }
+
+  errorMessage.value = ''
+  isRedirecting.value = true
+
+  try {
+    await startGoogleOAuth('signup')
+  } catch (error: unknown) {
+    errorMessage.value =
+      error instanceof Error ? error.message : '네트워크 연결을 확인한 뒤 다시 시도해 주세요.'
+    isRedirecting.value = false
+  }
 }
 </script>
 
@@ -43,12 +61,17 @@ const handleGoogleSignup = () => {
         <button
           class="signup-entry-secondary-link signup-entry-google"
           type="button"
+          :disabled="isRedirecting"
           @click="handleGoogleSignup"
         >
           <img class="signup-entry-google__icon" :src="googleLogoImage" alt="" aria-hidden="true" />
           Google로 가입하기
         </button>
       </section>
+
+      <p v-if="errorMessage" class="signup-entry-error" role="alert">
+        {{ errorMessage }}
+      </p>
 
       <footer class="signup-entry-footer">
         이미 계정이 있나요?
@@ -165,6 +188,14 @@ const handleGoogleSignup = () => {
 .signup-entry-primary-link:active,
 .signup-entry-secondary-link:active {
   transform: translateY(1px);
+}
+
+.signup-entry-error {
+  margin-top: var(--space-4);
+  color: var(--color-error);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
+  text-align: center;
 }
 
 .signup-entry-footer {
