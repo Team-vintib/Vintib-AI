@@ -13,12 +13,12 @@ export const LIVE_CREATE_METHOD_OPTIONS: LiveCreateMethodOption[] = [
   {
     id: 'IMMEDIATE',
     title: '즉시 시작',
-    description: '장비 테스트를 마치면 별도 예약 없이 바로 라이브를 시작합니다.',
+    description: '지금 바로 라이브를 시작합니다.',
   },
   {
     id: 'SCHEDULED',
     title: '예약 시작',
-    description: '방송 날짜와 시간을 정해 라이브를 미리 예약합니다.',
+    description: '날짜와 시간을 정해 라이브를 예약합니다.',
   },
 ]
 
