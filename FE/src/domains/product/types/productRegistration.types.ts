@@ -67,6 +67,9 @@ export interface ProductRegistrationAiFinding {
   statementRequired: boolean
   needsSellerReview: boolean
   description: string | null
+  // AI 원본 부위 코드(예: "SHOULDER_RIGHT")와, aiSectionLabels.ts로 변환한 한글 라벨.
+  section: string
+  sectionLabel: string
   // AI가 주는 값이 아니다 — 판매자가 직접 인정/제외한 로컬 상태(기본 true).
   isActualDefect: boolean
 }
@@ -76,6 +79,8 @@ export interface ProductRegistrationAiPhotoResult {
   findings: ProductRegistrationAiFinding[]
   // 사용자가 이 사진의 하자 판정을 다 확인하고 "결과 저장"을 눌렀는지 여부.
   confirmed: boolean
+  // 이 사진(image_index) 기준 AI 한 줄 요약. 없을 수 있다(웹훅 전이거나 하자 없음 등).
+  summary: string | null
 }
 
 export interface ProductRegistrationAiCategorySuggestion {

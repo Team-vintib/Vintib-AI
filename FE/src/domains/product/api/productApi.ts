@@ -23,6 +23,7 @@ import type {
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
 import { mapAiColorKeyToOptionId } from '@/domains/product/constants/aiColorPalette'
+import { mapAiSectionToLabel } from '@/domains/product/constants/aiSectionLabels'
 import { buildMockProductDetail } from '@/domains/product/constants/productDetailMockData'
 import {
   PRODUCT_CATEGORY_MOCK_DATA,
@@ -350,6 +351,8 @@ export interface ProductQualityInspectionResultDto {
     statement_required: boolean
     needs_seller_review: boolean
     description: string | null
+    section: string
+    section_no: number
   }[]
 }
 
@@ -399,10 +402,15 @@ export const mapQualityInspectionResultToPhotoResults = (
         statementRequired: finding.statement_required,
         needsSellerReview: finding.needs_seller_review,
         description: finding.description,
+        section: finding.section,
+        sectionLabel: mapAiSectionToLabel(finding.section),
         isActualDefect: true,
       }))
+    const summary =
+      result.image_summaries.find((imageSummary) => imageSummary.image_index === imageIndex)
+        ?.summary ?? null
 
-    return { photoId, findings, confirmed: false }
+    return { photoId, findings, confirmed: false, summary }
   })
 }
 

@@ -17,7 +17,7 @@ BE(`S15P11A108-591`)가 하자 검수 파이프라인을 실제로 배포했다 
 - 카테고리/색상 자동판별(`docs/requests/AI/006`)은 코드로 재확인한 결과 AI 워커(`worker/models/product_classifier/registry.py`)가 여전히 mock이고 BE(`AiClient.java`)에 트리거 코드 자체가 없다 — 이번 범위에서 실연동하지 않는다. 기존 사진 기반 카테고리/색상 자동 제안(mock)은 유지하되, 이제 품질 검증과는 분리된 별도 함수(`triggerAiCategoryColorSuggestion`)로 갈라졌다.
 - 상품 생성 시점이 앞당겨지므로 최종 제출(`submitProduct`)은 분기: `draft.draftProductId`가 있으면 `PATCH /products/{id}`로 나머지 필드(제목/설명/카테고리/브랜드/상태등급/사이즈/색상/소재/실측/하자)만 갱신하고 이미지는 재업로드하지 않는다. 없으면(카테고리가 SAM3 미지원이라 애초에 조기 생성이 트리거 안 된 경우 등) 기존처럼 `POST` 플로우 그대로.
 - **새로 발견한 잔여 갭**: `aiQualityFindings`(하자 인정/제외 확정 결과)는 `ProductUpdateRequest`에 필드 자체가 없다 — PATCH 경로로는 절대 못 보낸다. `docs/requests/BE/046`으로 남김(BE가 이 필드를 아직 저장 처리하지 않고 있어 당장 사용자에게 보이는 회귀는 아니지만, 041 §6이 정리되면 조기 생성 경로만 조용히 데이터가 누락될 것).
-- **범위 제한**: draft 생성 이후 사진을 교체하는 케이스는 이번 범위에서 다루지 않는다(이미 등록된 이미지와 어긋나는 문제 — 필요하면 후속 작업). mock 데이터/함수(`analyzeRegistrationPhotos`)는 삭제하지 않고 카테고리/색상 자동 제안 용도로 계속 쓴다.
+- **범위 제한(추후 수정됨)**: 처음엔 draft 생성 이후 사진을 교체하는 케이스를 다루지 않았다(이미 등록된 이미지와 어긋나는 문제). 실제로 문제가 되는 걸 확인해 이후 수정 — 사진이 바뀔 때마다(`aiTriggerPhotoKey` watch) `resetAiAnalysis()`가 `draft.draftProductId`까지 초기화하도록 바꿔서, 다음 '상태/하자' 진입 시 새 사진으로 처음부터 다시 검수(=새 draft 상품)하게 됐다. 옛 draft 상품은 BE에 DRAFT 상태로 고아처럼 남지만 목록엔 안 보여서 정리 대상은 아니다. mock 데이터/함수(`analyzeRegistrationPhotos`)는 이후 카테고리/색상도 실연동되며 완전히 제거됨(SY45 계열 작업).
 
 ## 작업 내용
 
