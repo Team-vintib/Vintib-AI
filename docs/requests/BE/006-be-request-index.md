@@ -36,7 +36,6 @@
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
 | 020 | `020-tryon-result-category.md` | TryOn | 미반영(순수 BE, AI 무관) | 서윤 파트 |
-| 025 | `025-product-same-price-chart.md` | Product | 미반영 — 계획 `SY042` 검토 중 | 서윤 파트 |
 | 041 | `041-refund-notification-dashboard.md` | Refund/Notification | 미반영 | 서윤 파트 |
 | 043 | `043-registration-price-chart-source.md` | Product | 미반영, 우선순위 낮음(044로 대체 가능) | 서윤 파트 |
 | 044 | `044-pricing-estimate-trigger.md` | Product | 미반영 | 서윤 파트 |
@@ -356,3 +355,15 @@ POST와 동일하게 반영하면 된다.
 컬럼을 추가하고 `confirmAndSettle()` 호출 시점(수동/자동 확정 공용)에 채운다.
 `OrderListItemResponse`(`GET /users/{id}/orders`, `GET /orders/{orderId}` 공용)에 `settledAt`
 필드로 노출한다 — 요청이 제안한 두 옵션 중 별도 필드 신설 쪽을 택했다.
+
+## 2026-08-08 정리 (002/025 삭제 — 방향 재확인)
+
+**`002-product-contract.md` 삭제** — 마지막 남은 항목(AI 가격 추천)이 `043`/`044`와 중복이라
+정리했다(사용자 판단).
+
+**`025-product-same-price-chart.md`와 그 구현 계획 `docs/plans/BE/SY042-product-market-price.md`도
+삭제했다.** "동일 상품" 판정을 BE가 직접 만들지 않는다 — **AI가 클러스터링해서 결과를 넘겨주는
+방향으로 구두 결정됐다(사용자 확인).** BE 쪽에는 이 결정을 반영한 문서가 없었다(코드 조사로 찾은
+`docs/plans/AI/CH016`/`CH020`은 오히려 반대 결론 — "브랜드+상품명 텍스트 매칭이 CLIP보다
+정확하다", CH020은 미승인·미구현 — 을 담고 있어 이번 구두 결정과 별개다). **지금 BE가 할 일은
+없다** — AI 쪽에서 클러스터링 결과를 넘기는 형태가 확정되면 그때 BE 요청 문서로 다시 받는다.
