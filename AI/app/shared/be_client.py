@@ -2,7 +2,7 @@
 
 CH016은 이 정보를 얻으려고 BE에 DB 뷰 + 읽기 전용 계정을 요청했는데(`docs/requests/BE/034`),
 BE 공개 API(`GET /api/products/{id}`)가 이미 필요한 필드를 전부 응답으로 낸다
-(`BE/.../product/dto/response/ProductResponse.java`: brandId/title/conditionGrade/saleType/
+(`BE/.../product/dto/response/ProductResponse.java`: brand/title/conditionGrade/saleType/
 saleStatus/price/createdAt/categoryId) — `AI/scripts/backfill_garment_embeddings.py`가 같은
 API로 상품 목록·이미지를 이미 가져오고 있다. DB 접근이 전혀 필요 없다(CH024).
 
@@ -20,9 +20,12 @@ product_corpus.py`)이 카테고리별 후보 코퍼스를 만드는 데 쓴다.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "BeBrand",
@@ -34,13 +37,29 @@ __all__ = [
 ]
 
 
+def _warn_if_brand_field_missing(body: dict, *, context: str) -> None:
+    """`brand` 키 자체가 없으면(값이 null인 것과 다르다) 경고를 남긴다.
+
+    2026-08-08 `c07ed500`(S15P11A108-327)에서 BE가 `brandId`(Long)를 `brand`(String)로
+    바꿨는데, 이 클라이언트가 계속 `brandId`를 읽어서 브랜드를 조용히 못 읽고 있었다
+    (2026-08-09 발견). 같은 종류의 계약 변경이 또 생기면 로그로 바로 원인을 찾을 수 있게,
+    키 자체가 없는 경우만 경고한다 — 값이 null인 건 판매자가 브랜드를 안 적은 정상 케이스다.
+    """
+    if "brand" not in body:
+        logger.warning(
+            "BE 상품 응답에 'brand' 필드가 없습니다(%s) — 응답 계약이 바뀌었을 수 있습니다: %s",
+            context,
+            sorted(body.keys()),
+        )
+
+
 @dataclass(frozen=True)
 class BeProduct:
     """`GET /api/products/{id}` 응답 중 가격책정·임베딩 태깅에 쓰는 필드만 뽑은 사본."""
 
     product_id: int
     title: str
-    brand_id: int | None
+    brand: str | None
     category_id: int | None
     condition_grade: str | None
     sale_type: str | None
@@ -66,10 +85,11 @@ def fetch_product(product_id: int, *, timeout: float = 5.0) -> BeProduct | None:
 
     try:
         body = response.json()["data"]
+        _warn_if_brand_field_missing(body, context=f"fetch_product product_id={product_id}")
         return BeProduct(
             product_id=int(body["id"]),
             title=str(body.get("title", "")),
-            brand_id=body.get("brandId"),
+            brand=body.get("brand"),
             category_id=body.get("categoryId"),
             condition_grade=body.get("conditionGrade"),
             sale_type=body.get("saleType"),
@@ -113,11 +133,16 @@ def fetch_products_page(
 
     try:
         data = response.json()["data"]
+        content = data.get("content", [])
+        if content:
+            _warn_if_brand_field_missing(
+                content[0], context=f"fetch_products_page category_id={category_id}"
+            )
         items = [
             BeProduct(
                 product_id=int(row["id"]),
                 title=str(row.get("title", "")),
-                brand_id=row.get("brandId"),
+                brand=row.get("brand"),
                 category_id=row.get("categoryId"),
                 condition_grade=row.get("conditionGrade"),
                 sale_type=row.get("saleType"),
@@ -125,7 +150,7 @@ def fetch_products_page(
                 price=row.get("price"),
                 created_at=row.get("createdAt"),
             )
-            for row in data.get("content", [])
+            for row in content
         ]
         return BeProductPage(items=items, has_next=bool(data.get("hasNext")))
     except Exception:  # noqa: BLE001 — 응답 형태가 계약과 어긋나도 None으로 흡수

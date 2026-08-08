@@ -268,7 +268,7 @@ def _fake_be_product(product_id: int, **overrides):
     base = {
         "product_id": product_id,
         "title": f"상품{product_id}",
-        "brand_id": 1,
+        "brand": "테스트브랜드",
         "category_id": 97,
         "condition_grade": "A",
         "sale_type": "DIRECT_SALE",

@@ -26,30 +26,38 @@ def test_normalize_title_lowercases_and_splits_punctuation():
 # --- resolve_brand_id ---------------------------------------------------------
 
 
-def test_resolve_brand_id_prefers_explicit_brand_id():
+def test_resolve_brand_id_prefers_brand_name_over_title():
+    """brand_name(BE의 자유 텍스트 필드)이 있으면 title 검색 없이 그걸로 찾는다."""
     resolved = resolve_brand_id(
-        brand_id=99, product_name="리바이스 501", brand_alias_map=_ALIAS_MAP
+        brand_name="메종키츠네", product_name="아무 상품명", brand_alias_map=_ALIAS_MAP
     )
-    assert resolved == 99
+    assert resolved == 2
 
 
 def test_resolve_brand_id_falls_back_to_title_alias():
     resolved = resolve_brand_id(
-        brand_id=None, product_name="리바이스 501 빈티지", brand_alias_map=_ALIAS_MAP
+        brand_name=None, product_name="리바이스 501 빈티지", brand_alias_map=_ALIAS_MAP
+    )
+    assert resolved == 1
+
+
+def test_resolve_brand_id_falls_back_to_title_when_brand_name_unmatched():
+    resolved = resolve_brand_id(
+        brand_name="이름없는 브랜드", product_name="리바이스 501 빈티지", brand_alias_map=_ALIAS_MAP
     )
     assert resolved == 1
 
 
 def test_resolve_brand_id_matches_english_alias_too():
     resolved = resolve_brand_id(
-        brand_id=None, product_name="Levi's 501 vintage", brand_alias_map=_ALIAS_MAP
+        brand_name=None, product_name="Levi's 501 vintage", brand_alias_map=_ALIAS_MAP
     )
     assert resolved == 1
 
 
 def test_resolve_brand_id_none_when_no_alias_found():
     resolved = resolve_brand_id(
-        brand_id=None, product_name="이름없는 브랜드 자켓", brand_alias_map=_ALIAS_MAP
+        brand_name=None, product_name="이름없는 브랜드 자켓", brand_alias_map=_ALIAS_MAP
     )
     assert resolved is None
 

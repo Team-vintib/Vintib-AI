@@ -46,7 +46,7 @@ class AttributeExtractor(ABC):
 
     @abstractmethod
     def extract(
-        self, *, product_name: str, brand_id: int | None, brand_alias_map: dict[str, int]
+        self, *, product_name: str, brand_name: str | None, brand_alias_map: dict[str, int]
     ) -> ExtractedAttributes:
         raise NotImplementedError
 
@@ -61,10 +61,10 @@ class RegexAttributeExtractor(AttributeExtractor):
     key = "regex"
 
     def extract(
-        self, *, product_name: str, brand_id: int | None, brand_alias_map: dict[str, int]
+        self, *, product_name: str, brand_name: str | None, brand_alias_map: dict[str, int]
     ) -> ExtractedAttributes:
         resolved_brand = resolve_brand_id(
-            brand_id=brand_id, product_name=product_name, brand_alias_map=brand_alias_map
+            brand_name=brand_name, product_name=product_name, brand_alias_map=brand_alias_map
         )
         tokens = sorted(set(normalize_title(product_name)))
         return ExtractedAttributes(tokens=tokens, brand_id=resolved_brand)
@@ -89,7 +89,7 @@ class LlmAttributeExtractor(AttributeExtractor):
         self._fallback = RegexAttributeExtractor()
 
     def extract(
-        self, *, product_name: str, brand_id: int | None, brand_alias_map: dict[str, int]
+        self, *, product_name: str, brand_name: str | None, brand_alias_map: dict[str, int]
     ) -> ExtractedAttributes:
         from app.core.config import settings
         from app.pricing import gms
@@ -97,7 +97,7 @@ class LlmAttributeExtractor(AttributeExtractor):
         api_key = settings.gms_api_key.strip()
         if not api_key:
             return self._fallback.extract(
-                product_name=product_name, brand_id=brand_id, brand_alias_map=brand_alias_map
+                product_name=product_name, brand_name=brand_name, brand_alias_map=brand_alias_map
             )
 
         try:
@@ -111,25 +111,29 @@ class LlmAttributeExtractor(AttributeExtractor):
             )
         except gms.GmsError:
             return self._fallback.extract(
-                product_name=product_name, brand_id=brand_id, brand_alias_map=brand_alias_map
+                product_name=product_name, brand_name=brand_name, brand_alias_map=brand_alias_map
             )
 
         parsed = _parse_response(response)
         if parsed is None:
             return self._fallback.extract(
-                product_name=product_name, brand_id=brand_id, brand_alias_map=brand_alias_map
+                product_name=product_name, brand_name=brand_name, brand_alias_map=brand_alias_map
             )
 
-        resolved_brand = brand_id
+        # BE의 brand(자유 텍스트, 판매자 직접 입력)를 LLM의 브랜드 추측보다 우선한다 —
+        # 더 신뢰도 높은 소스다. 거기서 못 찾을 때만 LLM이 텍스트에서 뽑은 브랜드로 재시도한다.
+        resolved_brand = resolve_brand_id(
+            brand_name=brand_name, product_name=product_name, brand_alias_map=brand_alias_map
+        )
         if resolved_brand is None and parsed.get("brand"):
             resolved_brand = resolve_brand_id(
-                brand_id=None, product_name=str(parsed["brand"]), brand_alias_map=brand_alias_map
+                brand_name=str(parsed["brand"]), product_name="", brand_alias_map=brand_alias_map
             )
 
         tokens = [str(t).strip().lower() for t in parsed.get("keywords", []) if str(t).strip()]
         if not tokens:
             return self._fallback.extract(
-                product_name=product_name, brand_id=brand_id, brand_alias_map=brand_alias_map
+                product_name=product_name, brand_name=brand_name, brand_alias_map=brand_alias_map
             )
         return ExtractedAttributes(tokens=sorted(set(tokens)), brand_id=resolved_brand)
 

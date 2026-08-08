@@ -68,23 +68,25 @@ def normalize_title(title: str) -> list[str]:
 
 
 def resolve_brand_id(
-    *, brand_id: int | None, product_name: str, brand_alias_map: dict[str, int]
+    *, brand_name: str | None, product_name: str, brand_alias_map: dict[str, int]
 ) -> int | None:
-    """브랜드 id를 결정한다. 요청에 이미 `brand_id`가 있으면 그대로 쓴다(가장 신뢰도 높음).
+    """브랜드 id를 결정한다. BE 상품의 `brand`(자유 텍스트) 필드를 브랜드 별칭
+    (`brand_alias_map` — `GET /api/brands`의 name/nameEn을 소문자로 정규화한 키)과 먼저
+    맞춰보고, 못 찾으면 상품명(제목)에서 같은 방식으로 한 번 더 찾는다.
 
-    없으면 상품명에서 브랜드 별칭(`brand_alias_map` — `GET /api/brands`의 name/nameEn을
-    소문자로 정규화한 키)이 부분 문자열로 등장하는지 검사한다. 실데이터의 `brand_id`가
-    거의 항상 비어 있어서(CH030 조사) 이 폴백이 없으면 브랜드 매칭 자체가 거의 항상 실패한다.
+    두 소스 다 부분 문자열 검사다 — `brand_name`은 자유 텍스트라 철자가 마스터와 완전히
+    같지 않을 수 있고, 판매자가 브랜드 칸을 비워도 제목에 브랜드명을 쓰는 경우가 많다.
     긴 별칭부터 검사한다 — 짧은 별칭이 다른 브랜드명 안에 부분 문자열로 우연히 섞여 있을 때
     오매칭을 줄이기 위해서다.
     """
-    if brand_id is not None:
-        return brand_id
-
-    lowered = product_name.strip().lower()
-    for alias in sorted(brand_alias_map, key=len, reverse=True):
-        if alias and alias in lowered:
-            return brand_alias_map[alias]
+    sorted_aliases = sorted(brand_alias_map, key=len, reverse=True)
+    for haystack in (brand_name, product_name):
+        if not haystack:
+            continue
+        lowered = haystack.strip().lower()
+        for alias in sorted_aliases:
+            if alias and alias in lowered:
+                return brand_alias_map[alias]
     return None
 
 

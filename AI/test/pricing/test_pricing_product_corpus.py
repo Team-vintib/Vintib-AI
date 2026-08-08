@@ -27,7 +27,7 @@ def _product(**overrides) -> be_client.BeProduct:
     base = {
         "product_id": 1,
         "title": "리바이스 501 빈티지",
-        "brand_id": None,
+        "brand": None,
         "category_id": 40,
         "condition_grade": "A",
         "sale_type": "DIRECT_SALE",
