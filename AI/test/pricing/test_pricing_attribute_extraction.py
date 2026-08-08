@@ -19,16 +19,17 @@ _ALIAS_MAP = {"리바이스": 1, "levi's": 1}
 # --- RegexAttributeExtractor --------------------------------------------------
 
 
-def test_regex_extractor_prefers_explicit_brand_id():
+def test_regex_extractor_resolves_brand_name_without_title_search():
+    """brand_name(BE brand 필드)이 있으면 title에 브랜드명이 없어도 바로 찾는다."""
     result = RegexAttributeExtractor().extract(
-        product_name="리바이스 501", brand_id=99, brand_alias_map=_ALIAS_MAP
+        product_name="501 데님 팬츠", brand_name="리바이스", brand_alias_map=_ALIAS_MAP
     )
-    assert result.brand_id == 99
+    assert result.brand_id == 1
 
 
 def test_regex_extractor_falls_back_to_title_alias():
     result = RegexAttributeExtractor().extract(
-        product_name="리바이스 501 빈티지", brand_id=None, brand_alias_map=_ALIAS_MAP
+        product_name="리바이스 501 빈티지", brand_name=None, brand_alias_map=_ALIAS_MAP
     )
     assert result.brand_id == 1
     assert "501" in result.tokens
@@ -37,7 +38,7 @@ def test_regex_extractor_falls_back_to_title_alias():
 
 def test_regex_extractor_returns_extracted_attributes():
     result = RegexAttributeExtractor().extract(
-        product_name="아무 상품", brand_id=None, brand_alias_map={}
+        product_name="아무 상품", brand_name=None, brand_alias_map={}
     )
     assert isinstance(result, ExtractedAttributes)
     assert result.brand_id is None
@@ -52,7 +53,7 @@ def test_llm_extractor_falls_back_when_no_api_key(monkeypatch):
     monkeypatch.setattr(settings, "gms_api_key", "")
 
     result = LlmAttributeExtractor().extract(
-        product_name="리바이스 501 빈티지", brand_id=None, brand_alias_map=_ALIAS_MAP
+        product_name="리바이스 501 빈티지", brand_name=None, brand_alias_map=_ALIAS_MAP
     )
 
     assert result.brand_id == 1
@@ -71,7 +72,7 @@ def test_llm_extractor_falls_back_on_gms_error(monkeypatch):
     monkeypatch.setattr(gms, "generate_content", _explode)
 
     result = LlmAttributeExtractor().extract(
-        product_name="리바이스 501 빈티지", brand_id=None, brand_alias_map=_ALIAS_MAP
+        product_name="리바이스 501 빈티지", brand_name=None, brand_alias_map=_ALIAS_MAP
     )
 
     assert result.brand_id == 1
@@ -97,7 +98,7 @@ def test_llm_extractor_calls_gms_without_search_tool(monkeypatch):
     monkeypatch.setattr(gms, "generate_content", _fake_generate_content)
 
     LlmAttributeExtractor().extract(
-        product_name="리바이스 501 빈티지", brand_id=None, brand_alias_map=_ALIAS_MAP
+        product_name="리바이스 501 빈티지", brand_name=None, brand_alias_map=_ALIAS_MAP
     )
 
     assert captured["use_search"] is False
@@ -123,7 +124,7 @@ def test_llm_extractor_parses_brand_and_keywords(monkeypatch):
     )
 
     result = LlmAttributeExtractor().extract(
-        product_name="리바이스 501 빅E 진청", brand_id=None, brand_alias_map=_ALIAS_MAP
+        product_name="리바이스 501 빅E 진청", brand_name=None, brand_alias_map=_ALIAS_MAP
     )
 
     assert result.brand_id == 1
@@ -138,7 +139,7 @@ def test_llm_extractor_falls_back_when_response_has_no_candidates(monkeypatch):
     monkeypatch.setattr(gms, "generate_content", lambda **k: {"candidates": []})
 
     result = LlmAttributeExtractor().extract(
-        product_name="리바이스 501 빈티지", brand_id=None, brand_alias_map=_ALIAS_MAP
+        product_name="리바이스 501 빈티지", brand_name=None, brand_alias_map=_ALIAS_MAP
     )
 
     assert result.brand_id == 1  # regex 폴백
@@ -157,7 +158,7 @@ def test_llm_extractor_falls_back_when_json_is_unparseable(monkeypatch):
     )
 
     result = LlmAttributeExtractor().extract(
-        product_name="리바이스 501 빈티지", brand_id=None, brand_alias_map=_ALIAS_MAP
+        product_name="리바이스 501 빈티지", brand_name=None, brand_alias_map=_ALIAS_MAP
     )
 
     assert result.brand_id == 1  # regex 폴백
@@ -179,15 +180,15 @@ def test_llm_extractor_falls_back_when_keywords_are_empty(monkeypatch):
     )
 
     result = LlmAttributeExtractor().extract(
-        product_name="리바이스 501 빈티지", brand_id=None, brand_alias_map=_ALIAS_MAP
+        product_name="리바이스 501 빈티지", brand_name=None, brand_alias_map=_ALIAS_MAP
     )
 
     assert result.brand_id == 1
     assert "501" in result.tokens  # regex 폴백 토큰
 
 
-def test_llm_extractor_keeps_explicit_brand_id_over_llm_guess(monkeypatch):
-    """요청에 brand_id가 이미 있으면 LLM이 다른 브랜드를 말해도 무시한다."""
+def test_llm_extractor_keeps_be_brand_name_over_llm_guess(monkeypatch):
+    """BE의 brand 필드(판매자 직접 입력)가 있으면 LLM이 다른 브랜드를 말해도 무시한다."""
     from app.core.config import settings
     from app.pricing import gms
 
@@ -203,10 +204,10 @@ def test_llm_extractor_keeps_explicit_brand_id_over_llm_guess(monkeypatch):
     )
 
     result = LlmAttributeExtractor().extract(
-        product_name="리바이스 501", brand_id=42, brand_alias_map=_ALIAS_MAP
+        product_name="리바이스 501", brand_name="리바이스", brand_alias_map=_ALIAS_MAP
     )
 
-    assert result.brand_id == 42
+    assert result.brand_id == 1
 
 
 # --- build_attribute_extractor ------------------------------------------------

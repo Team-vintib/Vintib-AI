@@ -141,7 +141,7 @@ interface ProductCreateRequest {
   title: string
   description: string
   categoryId: number | null
-  brandId: number | null
+  brand: string | null
   conditionGrade: ProductConditionGrade | ''
   sizeLabel: string
   color: string | null
@@ -163,13 +163,16 @@ interface ProductUpdateRequest {
   title: string
   description: string
   categoryId: number | null
-  brandId: number | null
+  brand: string | null
   conditionGrade: ProductConditionGrade | ''
   sizeLabel: string
   color: string | null
   material: string | null
   measurements: Record<string, number> | null
   defects: string[] | null
+  // CH001/042: pricing 스텝의 AI 가격 추천 폴링 결과(product_match_key). 계산 전이면
+  // null — BE는 null이면 미반영(기존 값 유지, null로 덮어쓰지 않음)한다.
+  matchKey: string | null
 }
 
 interface ProductImageUploadUrlResponse {
@@ -209,7 +212,6 @@ interface ProductListParams {
 }
 
 interface ProductSubmitOptions {
-  brands?: BrandDto[]
   categories?: CategoryDto[]
 }
 
@@ -663,13 +665,13 @@ export const getWishProductIds = async (userId: number) => {
 // submitProduct의 신규 분기와 로직을 공유한다 — 상품 생성 시점만 앞당겨졌을 뿐 필드는 동일하다.
 export const createDraftProduct = async (
   draft: ProductRegistrationDraft,
-  { brands = [], categories = [] }: ProductSubmitOptions = {},
+  { categories = [] }: ProductSubmitOptions = {},
 ): Promise<number> => {
   const createResponse = await http.post<ApiResponse<ProductCreateResponse>>('/products', {
     title: draft.name.trim(),
     description: draft.description.trim(),
     categoryId: findCategoryId(draft, categories),
-    brandId: findBrandId(draft.brand, brands),
+    brand: draft.brand.trim() || null,
     conditionGrade: draft.conditionGrade,
     sizeLabel: draft.size,
     color: resolveRegistrationColor(draft),
@@ -696,19 +698,20 @@ export const submitProduct = async (
     // 안 받지만, 이 값들은 '기본 정보' 스텝을 나갈 때 이미 확정돼 draft 생성 시점에
     // 실려 갔으므로 다시 보낼 필요가 없다(docs/requests/BE/046 참고).
     productId = draft.draftProductId
-    const { brands = [], categories = [] } = options
+    const { categories = [] } = options
 
     await http.patch<ApiResponse<ProductCreateResponse>>(`/products/${productId}`, {
       title: draft.name.trim(),
       description: draft.description.trim(),
       categoryId: findCategoryId(draft, categories),
-      brandId: findBrandId(draft.brand, brands),
+      brand: draft.brand.trim() || null,
       conditionGrade: draft.conditionGrade,
       sizeLabel: draft.size,
       color: resolveRegistrationColor(draft),
       material: draft.material.trim() || null,
       measurements: resolveRegistrationMeasurements(draft),
       defects: resolveRegistrationDefects(draft),
+      matchKey: draft.priceMatchKey,
     } satisfies ProductUpdateRequest)
   } else {
     productId = await createDraftProduct(draft, options)
@@ -953,17 +956,6 @@ const fallbackBrandLabel = (brandId: number | null) => (brandId ? `브랜드 #${
 
 const fallbackCategoryLabel = (categoryId: number | null) =>
   categoryId ? `카테고리 #${categoryId}` : ''
-
-const findBrandId = (brandName: string, brands: BrandDto[]) => {
-  const normalizedBrandName = brandName.trim().toLowerCase()
-  const matchedBrand = brands.find(
-    (brand) =>
-      brand.name.toLowerCase() === normalizedBrandName ||
-      brand.nameEn?.toLowerCase() === normalizedBrandName,
-  )
-
-  return matchedBrand?.id ?? null
-}
 
 const findCategoryId = (draft: ProductRegistrationDraft, categories: CategoryDto[]) => {
   const numericCategoryId = Number(draft.categoryId)

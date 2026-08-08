@@ -23,7 +23,7 @@ def test_parses_successful_response(monkeypatch):
         "data": {
             "id": 42,
             "title": "리메이크 Levi's 데님",
-            "brandId": 3,
+            "brand": "Levi's",
             "categoryId": 97,
             "conditionGrade": "A",
             "saleType": "DIRECT_SALE",
@@ -38,7 +38,7 @@ def test_parses_successful_response(monkeypatch):
 
     assert product is not None
     assert product.product_id == 42
-    assert product.brand_id == 3
+    assert product.brand == "Levi's"
     assert product.category_id == 97
     assert product.sale_type == "DIRECT_SALE"
     assert product.sale_status == "ON_SALE"
@@ -75,12 +75,44 @@ def test_returns_none_on_malformed_body(monkeypatch):
 def test_missing_optional_fields_become_none(monkeypatch):
     import httpx
 
-    body = {"data": {"id": 1, "title": "제목"}}
+    body = {"data": {"id": 1, "title": "제목", "brand": None}}
     monkeypatch.setattr(httpx, "get", lambda *a, **k: _FakeResponse(200, body))
 
     product = fetch_product(1)
 
     assert product is not None
-    assert product.brand_id is None
+    assert product.brand is None
     assert product.category_id is None
     assert product.sale_type is None
+
+
+def test_warns_when_brand_field_missing_from_response(monkeypatch, caplog):
+    """`brand` 키 자체가 없으면(값이 null인 것과 다르다) BE 계약 변경을 의심할 수 있게 경고한다."""
+    import logging
+
+    import httpx
+
+    body = {"data": {"id": 1, "title": "제목"}}
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: _FakeResponse(200, body))
+
+    with caplog.at_level(logging.WARNING):
+        product = fetch_product(1)
+
+    assert product is not None
+    assert product.brand is None
+    assert any("brand" in record.message for record in caplog.records)
+
+
+def test_no_warning_when_brand_field_present_but_null(monkeypatch, caplog):
+    """브랜드를 안 적은 정상 케이스(키는 있고 값만 null)는 경고하지 않는다."""
+    import logging
+
+    import httpx
+
+    body = {"data": {"id": 1, "title": "제목", "brand": None}}
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: _FakeResponse(200, body))
+
+    with caplog.at_level(logging.WARNING):
+        fetch_product(1)
+
+    assert not caplog.records

@@ -439,7 +439,7 @@ class InternalTextCompsSource(CompsSource):
         extractor = attribute_extraction.build_attribute_extractor()
         extracted = extractor.extract(
             product_name=product.title,
-            brand_id=product.brand_id,
+            brand_name=product.brand,
             brand_alias_map=product_corpus.get_brand_alias_map(),
         )
         keys = build_match_keys(

@@ -18,7 +18,7 @@ def _be_product(category_id: int | None) -> BeProduct:
     return BeProduct(
         product_id=42,
         title="t",
-        brand_id=1,
+        brand="테스트브랜드",
         category_id=category_id,
         condition_grade="A",
         sale_type="DIRECT_SALE",
