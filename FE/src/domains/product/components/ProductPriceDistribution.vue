@@ -5,7 +5,9 @@ import type { SimilarProductPricePoint } from '@/domains/product/types/productDe
 
 const props = defineProps<{
   currentProductId: number
-  currentPrice: number
+  // 경매 상품은 아직 가격이 없다(BE가 null로 준다) — 0원으로 취급하면 가격대 계산이 0부터
+  // 시작해 그래프가 통째로 왜곡된다. 그래서 null을 그대로 받아 계산에서 뺀다.
+  currentPrice: number | null
   products: SimilarProductPricePoint[]
 }>()
 
@@ -28,11 +30,13 @@ const availableProducts = computed(() =>
 )
 
 const bandStep = computed(() => {
-  const prices = [...availableProducts.value.map((product) => product.price), props.currentPrice]
+  const prices = [
+    ...availableProducts.value.map((product) => product.price),
+    ...(props.currentPrice === null ? [] : [props.currentPrice]),
+  ]
   const minimum = Math.min(...prices)
   const maximum = Math.max(...prices)
-  const tenThousandBandCount =
-    Math.floor(maximum / 10000) - Math.floor(minimum / 10000) + 1
+  const tenThousandBandCount = Math.floor(maximum / 10000) - Math.floor(minimum / 10000) + 1
 
   return tenThousandBandCount > 6 ? Math.ceil(tenThousandBandCount / 6) * 10000 : 10000
 })
@@ -47,7 +51,10 @@ const formatBandLabel = (start: number, step: number) => {
 }
 
 const priceBands = computed<ProductPriceBand[]>(() => {
-  const prices = [...availableProducts.value.map((product) => product.price), props.currentPrice]
+  const prices = [
+    ...availableProducts.value.map((product) => product.price),
+    ...(props.currentPrice === null ? [] : [props.currentPrice]),
+  ]
   const step = bandStep.value
   const minimum = Math.floor(Math.min(...prices) / step) * step
   const maximum = Math.floor(Math.max(...prices) / step) * step
@@ -80,11 +87,16 @@ const visibleSelectedProducts = computed(
 )
 
 const getBarHeight = (productCount: number) => {
-  if (productCount === 0) return '8%'
+  if (productCount === 0) return '0%'
   return `${Math.max(24, (productCount / maximumProductCount.value) * 100)}%`
 }
 
 const formatPrice = (price: number) => `${price.toLocaleString('ko-KR')}P`
+
+// 경매 상품은 확정 가격이 없어 금액 대신 상태를 보여 준다.
+const currentPriceLabel = computed(() =>
+  props.currentPrice === null ? '경매 예정' : formatPrice(props.currentPrice),
+)
 
 const selectBand = (band: ProductPriceBand) => {
   if (band.products.length === 0) return
@@ -115,19 +127,13 @@ watch(
       <div class="price-distribution__chart">
         <div class="price-distribution__heading">
           <div>
-            <h2 id="price-distribution-title">유사 상품 가격대</h2>
-            <p>비슷한 상품이 많이 등록된 가격대를 확인해 보세요.</p>
+            <h2 id="price-distribution-title">시세 조회</h2>
+            <p>같은 카테고리 상품이 어느 가격대에 많이 올라와 있는지 확인해 보세요.</p>
           </div>
-          <span class="price-distribution__current-price">
-            현재 상품 {{ formatPrice(currentPrice) }}
-          </span>
+          <span class="price-distribution__current-price"> 현재 상품 {{ currentPriceLabel }} </span>
         </div>
 
-        <div
-          class="price-distribution__histogram"
-          role="group"
-          aria-label="가격대별 유사 상품 수"
-        >
+        <div class="price-distribution__histogram" role="group" aria-label="가격대별 등록 상품 수">
           <button
             v-for="band in priceBands"
             :key="band.start"
@@ -135,7 +141,7 @@ watch(
             :class="{ 'price-distribution__column--selected': selectedBandStart === band.start }"
             type="button"
             :disabled="band.products.length === 0"
-            :aria-label="`${band.label}, 유사 상품 ${band.products.length}개`"
+            :aria-label="`${band.label}, 등록 상품 ${band.products.length}개`"
             :aria-pressed="selectedBandStart === band.start"
             @click="selectBand(band)"
           >
@@ -155,7 +161,7 @@ watch(
         <div class="price-distribution__products-heading">
           <div>
             <span>선택한 가격대</span>
-            <strong>{{ selectedBand.label }} 유사 상품</strong>
+            <strong>{{ selectedBand.label }} 등록 상품</strong>
           </div>
           <span>{{ visibleSelectedProducts.length }}개</span>
         </div>
@@ -271,10 +277,10 @@ watch(
   justify-content: center;
 }
 
+/* 등록 상품이 없는 구간은 막대를 아예 그리지 않는다(min-height가 있으면 0개인데도 얇게 남는다). */
 .price-distribution__bar {
   display: block;
   width: min(100%, 44px);
-  min-height: 3px;
   border-radius: 0;
   background: var(--color-border-strong);
   transition:
@@ -451,7 +457,6 @@ watch(
     grid-template-columns: 1fr;
     gap: var(--space-6);
   }
-
 }
 
 @media (prefers-reduced-motion: reduce) {
