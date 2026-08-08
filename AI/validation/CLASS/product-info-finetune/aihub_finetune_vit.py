@@ -249,6 +249,10 @@ def train_finetune(
             label_batch = torch.from_numpy(y_train_arr[batch_idx]).to(device)
 
             features = model.get_image_features(pixel_values=pixel_batch)
+            # transformers>=5.0부터 get_image_features()가 tensor 대신
+            # BaseModelOutputWithPooling을 반환한다 — .pooler_output이 기존과 동일한,
+            # projection 적용 후 임베딩이다(aihub_embed.py의 flush()와 동일 근거).
+            features = features.pooler_output
             features = features / features.norm(dim=-1, keepdim=True)
             logits = head(features)
             loss = loss_fn(logits, label_batch)
@@ -293,6 +297,10 @@ def evaluate_finetune(
             end = start + batch_size
             pixel_batch = torch.from_numpy(x[start:end]).to(device=device, dtype=torch.float32)
             features = model.get_image_features(pixel_values=pixel_batch)
+            # transformers>=5.0부터 get_image_features()가 tensor 대신
+            # BaseModelOutputWithPooling을 반환한다 — .pooler_output이 기존과 동일한,
+            # projection 적용 후 임베딩이다(aihub_embed.py의 flush()와 동일 근거).
+            features = features.pooler_output
             features = features / features.norm(dim=-1, keepdim=True)
             logits = head(features)
             predicted = logits.argmax(dim=-1).cpu().numpy()

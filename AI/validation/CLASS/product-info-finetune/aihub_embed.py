@@ -143,6 +143,11 @@ def embed_rows(
         inputs = processor(images=batch_images, return_tensors="pt")
         inputs = {key: value.to(device) for key, value in inputs.items()}
         features = model.get_image_features(**inputs)
+        # transformers>=5.0부터 get_image_features()가 tensor 대신
+        # BaseModelOutputWithPooling을 반환한다 — .pooler_output이 기존과 동일한, projection
+        # 적용 후 임베딩이다(HF v5.1.0 modeling_clip.py 실측:
+        # vision_outputs.pooler_output = self.visual_projection(pooled_output)).
+        features = features.pooler_output
         features = features / features.norm(dim=-1, keepdim=True)  # L2 정규화
         vectors.append(features.cpu().float().numpy())
         kept.extend(batch_rows)
