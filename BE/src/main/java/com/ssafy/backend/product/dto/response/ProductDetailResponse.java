@@ -15,11 +15,12 @@ public record ProductDetailResponse(
         @Schema(example = "vintagelover") String sellerNickname,
         @Schema(example = "1") Long categoryId,
         @Schema(example = "티셔츠") String categoryName,
-        @Schema(example = "1") Long brandId,
-        @Schema(example = "Maison Kitsuné") String brandName,
+        @Schema(example = "Maison Kitsuné") String brand,
         @Schema(example = "Maison Kitsuné 더블 폭스 헤드 패치 클래식 티셔츠 블랙") String title,
         @Schema(example = "시착 0회. 더블 폭스 헤드 자수 패치. Maison Kitsuné Paris 정품.") String description,
         @Schema(example = "A") String conditionGrade,
+        @Schema(description = "AI 품질 검수가 매긴 상태 원점수(0~100). 참고용", example = "78.0")
+                Double conditionScore,
         @Schema(example = "M") String sizeLabel,
         @Schema(example = "BLACK") String color,
         @Schema(example = "Cotton 100%") String material,
@@ -39,31 +40,32 @@ public record ProductDetailResponse(
         @Schema(description = "AI 착용컷 생성 상태/결과") ProductAiModelCutResponse aiModelCut,
         @Schema(description = "같은 카테고리 유사 상품 목록. 같은 브랜드 상품이 앞쪽에 온다")
                 List<SimilarProductResponse> similarProducts,
+        @Schema(description = "AI 품질 검수 결과(등록 시점에 확정된 값)") AiQualityAnalysisResponse aiQualityAnalysis,
         @Schema(example = "2026-07-29T12:00:00") LocalDateTime createdAt,
         @Schema(example = "2026-07-29T12:00:00") LocalDateTime updatedAt) {
 
     public static ProductDetailResponse from(
             Product product,
             String categoryName,
-            String brandName,
             List<ProductImageResponse> images,
             List<String> defects,
             Boolean isWished,
             Long sellerFollowerCount,
             Long sellerProductCount,
             LinkedLiveSummaryResponse linkedLive,
-            List<SimilarProductResponse> similarProducts) {
+            List<SimilarProductResponse> similarProducts,
+            AiQualityAnalysisResponse aiQualityAnalysis) {
         return new ProductDetailResponse(
                 product.getId(),
                 product.getSeller().getId(),
                 product.getSeller().getNickname(),
                 product.getCategoryId(),
                 categoryName,
-                product.getBrandId(),
-                brandName,
+                product.getBrand(),
                 product.getTitle(),
                 product.getDescription(),
                 product.getConditionGrade(),
+                product.getConditionScore(),
                 product.getSizeLabel(),
                 product.getColor(),
                 product.getMaterial(),
@@ -81,6 +83,7 @@ public record ProductDetailResponse(
                 product.getAiModelGender(),
                 ProductAiModelCutResponse.from(product),
                 similarProducts,
+                aiQualityAnalysis,
                 product.getCreatedAt(),
                 product.getUpdatedAt());
     }

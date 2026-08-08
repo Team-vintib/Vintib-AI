@@ -55,7 +55,9 @@ public class TryOnController {
 
     @Operation(
             summary = "시착 결과 목록 조회",
-            description = "본인의 시착 결과 목록을 최신순으로 조회한다. 각 항목의 이미지 URL은 짧은 만료시간의 presigned GET URL이다.")
+            description = "본인의 시착 결과 목록을 최신순으로 조회한다. 각 항목의 이미지 URL은 짧은 만료시간의 presigned GET URL이다. "
+                    + "결과 상품의 대분류 카테고리(categoryId/categoryName, 상의/하의/아우터/원피스/신발/가방/액세서리 등)도 함께 낸다 — "
+                    + "카테고리를 못 찾으면 둘 다 null.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
@@ -69,7 +71,10 @@ public class TryOnController {
         return ResponseEntity.ok(ApiResponse.success(tryOnResultService.getResults(userId)));
     }
 
-    @Operation(summary = "시착 결과 상세 조회", description = "본인의 시착 결과 하나를 조회한다.")
+    @Operation(
+            summary = "시착 결과 상세 조회",
+            description = "본인의 시착 결과 하나를 조회한다. 목록 조회와 동일하게 결과 상품의 대분류 카테고리"
+                    + "(categoryId/categoryName)를 함께 낸다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),

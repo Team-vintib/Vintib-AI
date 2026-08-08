@@ -20,7 +20,7 @@ import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductImage;
-import com.ssafy.backend.product.repository.CategoryRepository;
+import com.ssafy.backend.product.entity.ProductImageRole;
 import com.ssafy.backend.product.repository.ProductImageRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.Optional;
@@ -46,9 +46,6 @@ class ProductImageServiceTest {
     private ProductImageRepository productImageRepository;
 
     @Mock
-    private CategoryRepository categoryRepository;
-
-    @Mock
     private S3StorageService s3StorageService;
 
     @Mock
@@ -59,6 +56,9 @@ class ProductImageServiceTest {
 
     @Mock
     private AiClient aiClient;
+
+    @Mock
+    private GarmentCategoryMapper garmentCategoryMapper;
 
     private AwsProperties awsProperties;
     private ProductImageService productImageService;
@@ -72,8 +72,8 @@ class ProductImageServiceTest {
                 "test-secret",
                 new AwsProperties.S3("", "", PUBLIC_BUCKET, "private-bucket"));
         productImageService = new ProductImageService(
-                productRepository, productImageRepository, categoryRepository, s3StorageService, awsProperties,
-                aiClient);
+                productRepository, productImageRepository, s3StorageService, awsProperties,
+                aiClient, garmentCategoryMapper);
         product = Product.builder().seller(seller).title("빈티지 자켓").build();
     }
 
@@ -122,11 +122,46 @@ class ProductImageServiceTest {
         when(s3StorageService.publicUrl(PUBLIC_BUCKET, key)).thenReturn("https://s3.example/" + key);
 
         ProductImageResponse response = productImageService.registerImage(
-                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true));
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true, ProductImageRole.ADDITIONAL));
 
         assertThat(response.url()).isEqualTo("https://s3.example/" + key);
         assertThat(response.isPrimary()).isTrue();
         verify(aiClient, org.mockito.Mockito.never()).createRegistrationModelCutJob(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void FRONT_사진을_등록하면_role이_그대로_저장된다() {
+        String key = "product-images/%d/front.jpg".formatted(PRODUCT_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(0);
+        when(productImageRepository.existsByProductIdAndRole(PRODUCT_ID, ProductImageRole.FRONT))
+                .thenReturn(false);
+        when(s3StorageService.headObject(PUBLIC_BUCKET, key))
+                .thenReturn(HeadObjectResponse.builder().contentLength(1024L).build());
+        when(s3StorageService.publicUrl(PUBLIC_BUCKET, key)).thenReturn("https://s3.example/" + key);
+
+        ProductImageResponse response = productImageService.registerImage(
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, false, ProductImageRole.FRONT));
+
+        assertThat(response.role()).isEqualTo(ProductImageRole.FRONT);
+    }
+
+    @Test
+    void 이미_등록된_FRONT_사진이_있으면_중복_등록을_거부한다() {
+        String key = "product-images/%d/front2.jpg".formatted(PRODUCT_ID);
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(1);
+        when(productImageRepository.existsByProductIdAndRole(PRODUCT_ID, ProductImageRole.FRONT))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> productImageService.registerImage(
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 1, false, ProductImageRole.FRONT)))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue(
+                        "errorCode", com.ssafy.backend.global.exception.ErrorCode.PRODUCT_IMAGE_ROLE_ALREADY_EXISTS);
+        verify(productImageRepository, org.mockito.Mockito.never()).save(any());
     }
 
     @Test
@@ -147,7 +182,7 @@ class ProductImageServiceTest {
         when(aiClient.createRegistrationModelCutJob("https://s3.example/" + key, "MALE", "upper"))
                 .thenReturn("job-456");
 
-        productImageService.registerImage(SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true));
+        productImageService.registerImage(SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true, ProductImageRole.ADDITIONAL));
 
         assertThat(aiProduct.getAiModelCutStatus())
                 .isEqualTo(com.ssafy.backend.product.entity.AiModelCutStatus.PENDING);
@@ -173,7 +208,7 @@ class ProductImageServiceTest {
                 .thenThrow(new org.springframework.web.client.RestClientException("connection refused"));
 
         ProductImageResponse response = productImageService.registerImage(
-                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true));
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, true, ProductImageRole.ADDITIONAL));
 
         assertThat(response.url()).isEqualTo("https://s3.example/" + key);
         assertThat(aiProduct.getAiModelCutStatus())
@@ -191,10 +226,6 @@ class ProductImageServiceTest {
                         .categoryId(categoryId)
                         .title("빈티지 니트")
                         .build();
-        com.ssafy.backend.product.entity.Category knitCategory =
-                org.mockito.Mockito.mock(com.ssafy.backend.product.entity.Category.class);
-        when(knitCategory.getNameEn()).thenReturn("KNIT");
-
         when(seller.getId()).thenReturn(SELLER_ID);
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(qualityProduct));
         when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(1);
@@ -205,7 +236,7 @@ class ProductImageServiceTest {
         when(productImageRepository.findAllByProductIdOrderBySortOrderAsc(any())).thenReturn(java.util.List.of(
                 ProductImage.builder().imageKey(frontKey).sortOrder((short) 0).primary(true).build(),
                 ProductImage.builder().imageKey(backKey).sortOrder((short) 1).primary(false).build()));
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(knitCategory));
+        when(garmentCategoryMapper.resolve(categoryId)).thenReturn(Optional.of("TOP_KNIT"));
         // qualityProduct는 실제로 저장된 적 없는 순수 builder 인스턴스라 getId()는 null이다
         // (production에서는 productRepository.findById로 가져온 실제 엔티티라 ID가 있다).
         when(aiClient.createQualityInspectionJob(
@@ -215,7 +246,7 @@ class ProductImageServiceTest {
                 .thenReturn("job-quality-1");
 
         productImageService.registerImage(
-                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(backKey, (short) 1, false));
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(backKey, (short) 1, false, ProductImageRole.BACK));
 
         assertThat(qualityProduct.getQualityInspectionStatus())
                 .isEqualTo(com.ssafy.backend.product.entity.QualityInspectionStatus.PENDING);
@@ -233,10 +264,6 @@ class ProductImageServiceTest {
                         .categoryId(categoryId)
                         .title("운동화")
                         .build();
-        com.ssafy.backend.product.entity.Category sneakersCategory =
-                org.mockito.Mockito.mock(com.ssafy.backend.product.entity.Category.class);
-        when(sneakersCategory.getNameEn()).thenReturn("SNEAKERS");
-
         when(seller.getId()).thenReturn(SELLER_ID);
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(shoeProduct));
         when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(1);
@@ -246,10 +273,10 @@ class ProductImageServiceTest {
         when(productImageRepository.findAllByProductIdOrderBySortOrderAsc(any())).thenReturn(java.util.List.of(
                 ProductImage.builder().imageKey(frontKey).sortOrder((short) 0).primary(true).build(),
                 ProductImage.builder().imageKey(backKey).sortOrder((short) 1).primary(false).build()));
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(sneakersCategory));
+        when(garmentCategoryMapper.resolve(categoryId)).thenReturn(Optional.empty());
 
         productImageService.registerImage(
-                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(backKey, (short) 1, false));
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(backKey, (short) 1, false, ProductImageRole.BACK));
 
         assertThat(shoeProduct.getQualityInspectionStatus())
                 .isEqualTo(com.ssafy.backend.product.entity.QualityInspectionStatus.NONE);
@@ -267,7 +294,7 @@ class ProductImageServiceTest {
                 .thenThrow(NoSuchKeyException.builder().message("no such key").build());
 
         assertThatThrownBy(() -> productImageService.registerImage(
-                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, false)))
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 0, false, ProductImageRole.ADDITIONAL)))
                 .isInstanceOf(CustomException.class);
     }
 
@@ -279,7 +306,7 @@ class ProductImageServiceTest {
         when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(10);
 
         assertThatThrownBy(() -> productImageService.registerImage(
-                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 10, false)))
+                SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(key, (short) 10, false, ProductImageRole.ADDITIONAL)))
                 .isInstanceOf(CustomException.class);
     }
 

@@ -280,6 +280,8 @@ class OrderServiceTest {
 
         assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
         assertThat(realOrder.getAutoConfirmAt()).isAfter(LocalDateTime.now().plusDays(2));
+        // 웹훅이 없는 폴백 경로라 trackingStatus를 채워줄 이가 없었다 — deliver()가 직접 맞춘다.
+        assertThat(shipment.getTrackingStatus()).isEqualTo(TrackingStatus.DELIVERED);
         verify(notificationCommandPort).notify(
                 eq(buyer), eq("SHIPMENT_STARTED"), any(), any(), eq("ORDER"), any());
         verify(notificationCommandPort).notify(
@@ -372,6 +374,7 @@ class OrderServiceTest {
         OrderListItemResponse response = orderService.confirmOrder(ORDER_ID, BUYER_ID);
 
         assertThat(response.status()).isEqualTo(OrderStatus.SETTLED.name());
+        assertThat(response.settledAt()).isNotNull();
         verify(pointService).settleOrder(BUYER_ID, SELLER_ID, 50_000L, realOrder.getId());
     }
 
@@ -414,6 +417,7 @@ class OrderServiceTest {
         orderService.autoConfirmDueOrders();
 
         assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.SETTLED);
+        assertThat(realOrder.getSettledAt()).isNotNull();
         verify(pointService).settleOrder(BUYER_ID, SELLER_ID, 50_000L, realOrder.getId());
     }
 

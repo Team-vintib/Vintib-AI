@@ -5,12 +5,10 @@ import com.ssafy.backend.auction.repository.AuctionRepository;
 import com.ssafy.backend.global.config.S3Config.AwsProperties;
 import com.ssafy.backend.global.storage.S3StorageService;
 import com.ssafy.backend.home.dto.response.ProductCardResponse;
-import com.ssafy.backend.product.entity.Brand;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.port.SocialQueryPort;
-import com.ssafy.backend.product.repository.BrandRepository;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductImageRepository;
 import java.time.LocalDateTime;
@@ -37,7 +35,6 @@ public class ProductCardAssembler {
 
     private final ProductImageRepository productImageRepository;
     private final CategoryRepository categoryRepository;
-    private final BrandRepository brandRepository;
     private final AuctionRepository auctionRepository;
     private final SocialQueryPort socialQueryPort;
     private final S3StorageService s3StorageService;
@@ -59,14 +56,11 @@ public class ProductCardAssembler {
         Map<Long, String> categoryNameById = categoryRepository.findAllById(distinct(products, Product::getCategoryId))
                 .stream()
                 .collect(Collectors.toMap(Category::getId, Category::getName));
-        Map<Long, String> brandNameById = brandRepository.findAllById(distinct(products, Product::getBrandId))
-                .stream()
-                .collect(Collectors.toMap(Brand::getId, Brand::getName));
 
         return products.stream()
                 .map(product -> toCard(
                         product,
-                        brandNameById.get(product.getBrandId()),
+                        product.getBrand(),
                         categoryNameById.get(product.getCategoryId()),
                         thumbnailByProductId.get(product.getId()),
                         auctionByProductId.get(product.getId()),

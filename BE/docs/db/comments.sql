@@ -54,6 +54,7 @@ COMMENT ON TABLE member_interest_category IS '온보딩 관심 카테고리 (ONB
 -- ---------- 상품 ----------
 COMMENT ON TABLE product IS '판매 상품. 라이브·경매·주문이 모두 이 테이블을 FK 로 문다.';
 COMMENT ON COLUMN product.seller_id       IS '판매자.';
+COMMENT ON COLUMN product.brand            IS '브랜드명. 마스터 FK가 아니라 자유 텍스트(판매자 직접 입력).';
 COMMENT ON COLUMN product.condition_grade IS '중고 상태 등급. ⚠️ 등급 체계 미확정이라 자유 문자열.';
 COMMENT ON COLUMN product.size_label      IS '사이즈 표기(S/M/L, 95/100 등). 브랜드마다 달라 문자열로 둔다.';
 COMMENT ON COLUMN product.color           IS '색상(자유 문자열).';

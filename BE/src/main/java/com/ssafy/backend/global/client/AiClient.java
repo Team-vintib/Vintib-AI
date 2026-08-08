@@ -6,6 +6,7 @@ import com.ssafy.backend.global.client.dto.ChatAnswer;
 import com.ssafy.backend.global.client.dto.ChatAnswerListResponse;
 import com.ssafy.backend.global.client.dto.ModerateChatRequest;
 import com.ssafy.backend.global.client.dto.ModerateChatResponse;
+import com.ssafy.backend.global.client.dto.PricingEstimateJobRequest;
 import com.ssafy.backend.global.client.dto.ProductClassifyJobRequest;
 import com.ssafy.backend.global.client.dto.QualityInspectionJobRequest;
 import com.ssafy.backend.global.client.dto.RegistrationModelCutJobRequest;
@@ -21,8 +22,7 @@ import org.springframework.web.client.RestClientException;
 
 /**
  * FastAPI AI 게이트웨이 호출 클라이언트. job 생성·폴링 엔드포인트는 워커 전용이 아니라
- * BE가 호출하는 쪽이라 인증 헤더가 필요 없다(`AI/docs/infra-architecture.md` §3.2,
- * `docs/requests/BE/040-tryon-job-contract.md`).
+ * BE가 호출하는 쪽이라 인증 헤더가 필요 없다(`AI/docs/infra-architecture.md`)
  */
 @Slf4j
 @Component
@@ -98,6 +98,20 @@ public class AiClient {
         AiJobCreatedResponse response = aiRestClient.post()
                 .uri("/product-classifier/classify")
                 .body(new ProductClassifyJobRequest(imageUrl))
+                .retrieve()
+                .body(AiJobCreatedResponse.class);
+        return response.jobId();
+    }
+
+    /**
+     * {@code POST /pricing/estimates} — 상품 등록 화면 "AI 가격 추천" 트리거. 동시 처리
+     * 상한을 넘으면 AI가 503을 낸다 — 그대로 {@link RestClientException}으로 던져서 호출부가
+     * 처리하게 한다(재시도는 하지 않는다, FE가 등급별로 나눠 호출하는 쪽에서 책임진다).
+     */
+    public String createPricingEstimateJob(PricingEstimateJobRequest request) {
+        AiJobCreatedResponse response = aiRestClient.post()
+                .uri("/pricing/estimates")
+                .body(request)
                 .retrieve()
                 .body(AiJobCreatedResponse.class);
         return response.jobId();

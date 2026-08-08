@@ -17,7 +17,9 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.storage.S3StorageService;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
+import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
+import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import com.ssafy.backend.product.service.ProductImageService;
 import com.ssafy.backend.tryon.dto.response.TryOnResultResponse;
@@ -66,6 +68,9 @@ class TryOnResultServiceTest {
     private AiClient aiClient;
 
     @Mock
+    private CategoryRepository categoryRepository;
+
+    @Mock
     private Member member;
 
     @Mock
@@ -89,7 +94,8 @@ class TryOnResultServiceTest {
                 productImageService,
                 s3StorageService,
                 awsProperties,
-                aiClient);
+                aiClient,
+                categoryRepository);
     }
 
     @Test
@@ -111,6 +117,60 @@ class TryOnResultServiceTest {
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).imageUrl()).isEqualTo("https://s3.example/presigned");
         assertThat(responses.get(0).productId()).isEqualTo(PRODUCT_ID);
+    }
+
+    @Test
+    void 목록_조회시_상품의_대분류_카테고리를_함께_반환한다() {
+        Long leafCategoryId = 31L;
+        Long topCategoryId = 5L;
+        when(product.getId()).thenReturn(PRODUCT_ID);
+        when(product.getCategoryId()).thenReturn(leafCategoryId);
+        Category leaf = org.mockito.Mockito.mock(Category.class);
+        when(leaf.getId()).thenReturn(leafCategoryId);
+        when(leaf.getDepth()).thenReturn((short) 3);
+        when(leaf.getParentId()).thenReturn(topCategoryId);
+        Category top = org.mockito.Mockito.mock(Category.class);
+        when(top.getId()).thenReturn(topCategoryId);
+        when(top.getName()).thenReturn("아우터");
+        when(categoryRepository.findAllById(java.util.Set.of(leafCategoryId))).thenReturn(List.of(leaf));
+        when(categoryRepository.findAllById(java.util.Set.of(topCategoryId))).thenReturn(List.of(top));
+        TryOnResult result = TryOnResult.builder()
+                .member(member)
+                .product(product)
+                .imageKey("tryon-results/1/a.jpg")
+                .status(TryOnResultStatus.SUCCESS)
+                .build();
+        when(tryOnResultRepository.findAllByMemberIdAndDeletedAtIsNullOrderByCreatedAtDesc(MEMBER_ID))
+                .thenReturn(List.of(result));
+        when(s3StorageService.presignedGetUrl(PRIVATE_BUCKET, "tryon-results/1/a.jpg"))
+                .thenReturn("https://s3.example/presigned");
+
+        List<TryOnResultResponse> responses = tryOnResultService.getResults(MEMBER_ID);
+
+        assertThat(responses.get(0).categoryId()).isEqualTo(topCategoryId);
+        assertThat(responses.get(0).categoryName()).isEqualTo("아우터");
+    }
+
+    @Test
+    void 카테고리를_찾을_수_없으면_카테고리_필드는_null이다() {
+        when(product.getId()).thenReturn(PRODUCT_ID);
+        when(product.getCategoryId()).thenReturn(999L);
+        when(categoryRepository.findAllById(java.util.Set.of(999L))).thenReturn(List.of());
+        TryOnResult result = TryOnResult.builder()
+                .member(member)
+                .product(product)
+                .imageKey("tryon-results/1/a.jpg")
+                .status(TryOnResultStatus.SUCCESS)
+                .build();
+        when(tryOnResultRepository.findAllByMemberIdAndDeletedAtIsNullOrderByCreatedAtDesc(MEMBER_ID))
+                .thenReturn(List.of(result));
+        when(s3StorageService.presignedGetUrl(PRIVATE_BUCKET, "tryon-results/1/a.jpg"))
+                .thenReturn("https://s3.example/presigned");
+
+        List<TryOnResultResponse> responses = tryOnResultService.getResults(MEMBER_ID);
+
+        assertThat(responses.get(0).categoryId()).isNull();
+        assertThat(responses.get(0).categoryName()).isNull();
     }
 
     @Test

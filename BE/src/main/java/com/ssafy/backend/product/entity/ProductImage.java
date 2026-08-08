@@ -2,6 +2,8 @@ package com.ssafy.backend.product.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -13,6 +15,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "product_image")
@@ -37,12 +40,20 @@ public class ProductImage {
     @Column(name = "is_primary", nullable = false)
     private boolean primary;
 
+    // SY043 — 기존 이미지(이 컬럼이 생기기 전에 등록된 것)는 전부 ADDITIONAL로 채운다(사용자 결정).
+    // 새 이미지는 등록 요청에서 항상 명시적으로 받는다(ProductImageRegisterRequest.role, @NotNull).
+    @ColumnDefault("'ADDITIONAL'")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private ProductImageRole role;
+
     @Builder
-    private ProductImage(Product product, String imageKey, Short sortOrder, boolean primary) {
+    private ProductImage(Product product, String imageKey, Short sortOrder, boolean primary, ProductImageRole role) {
         this.product = product;
         this.imageKey = imageKey;
         this.sortOrder = sortOrder;
         this.primary = primary;
+        this.role = role;
     }
 
     public boolean belongsTo(Long productId) {
