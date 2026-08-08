@@ -975,7 +975,7 @@ onMounted(() => {
             </dl>
 
             <div v-if="selectedProducts.length" class="live-create__products">
-              <h3>판매 예정햣 상품</h3>
+              <h3>판매 예정 상품</h3>
               <div class="live-create__products-list">
                 <article v-for="product in selectedProducts" :key="product.id">
                   <img
