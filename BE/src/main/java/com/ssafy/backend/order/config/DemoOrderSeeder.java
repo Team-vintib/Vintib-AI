@@ -8,6 +8,7 @@ import com.ssafy.backend.order.entity.OrderShipment;
 import com.ssafy.backend.order.entity.OrderStatus;
 import com.ssafy.backend.order.repository.OrderRepository;
 import com.ssafy.backend.order.repository.OrderShipmentRepository;
+import com.ssafy.backend.product.config.DemoPriorityProducts;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.time.LocalDateTime;
@@ -33,9 +34,11 @@ import org.springframework.transaction.annotation.Transactional;
  * 화면을 다양한 상태로 채우는 것이라 포인트 원장 정합성보다 그 목적을 우선한다.
  *
  * <p><b>6개 데모 계정이 서로의 상품을 사고팔도록 얽는다.</b> 후보 상품은 항상 "본인 소유 제외 +
- * 판매 중 + id순"으로만 뽑아 순서대로 배분한다 — 상품 시드가 판매자를 상품마다 돌아가며
- * 배정해뒀기 때문에, 특정 두 계정끼리만 거래가 몰리지 않고 여섯 명 사이에 자연스럽게
- * 흩어진다(별도 매칭 테이블을 만들 필요가 없다).
+ * 판매 중 + 우선순위 상품 먼저 + id순"으로만 뽑아 순서대로 배분한다 — 상품 시드가 판매자를
+ * 상품마다 돌아가며 배정해뒀기 때문에, 특정 두 계정끼리만 거래가 몰리지 않고 여섯 명 사이에
+ * 자연스럽게 흩어진다(별도 매칭 테이블을 만들 필요가 없다). "우선순위 상품"은
+ * {@link com.ssafy.backend.product.config.DemoPriorityProducts} 참고 — product-seed.sql에서
+ * 주석 번호가 남아있는(검수 확정된) 상품이다.
  */
 @Slf4j
 @Component
@@ -84,10 +87,13 @@ public class DemoOrderSeeder implements ApplicationRunner {
             return;
         }
 
+        // 우선순위 상품(DemoPriorityProducts)을 먼저 소진하고, 모자라면 나머지 상품으로 채운다 —
+        // 각 그룹 안에서는 id 오름차순.
         List<Product> candidates = productRepository.findAll().stream()
                 .filter(Product::isAvailableForDirectPurchase)
                 .filter(product -> !product.isOwnedBy(buyer.getId()))
-                .sorted(Comparator.comparing(Product::getId))
+                .sorted(Comparator.<Product, Boolean>comparing(product -> !DemoPriorityProducts.IDS.contains(product.getId()))
+                        .thenComparing(Product::getId))
                 .limit(totalNeeded)
                 .toList();
         if (candidates.size() < totalNeeded) {
