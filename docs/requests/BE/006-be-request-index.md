@@ -35,7 +35,10 @@
 
 | 번호 | 문서 | 도메인 | FE 기준 상태 | 남은 BE 요청 |
 | --- | --- | --- | --- | --- |
-| 041 | `041-refund-notification-dashboard.md` | Refund/Notification | 미반영 | 서윤 파트 |
+| (없음) | — | — | — | — |
+
+**2026-08-08 기준 이 표에 남은 요청이 없다** — 041(환불 알림/대시보드)까지 반영·삭제되면서 폴더에
+이 인덱스 문서만 남았다. 새 요청이 들어오면 이 표를 다시 채운다.
 
 `003`(Live/TryOn)·`038`·`039`·`040`(전부 TryOn)은 코드 전수 대조 결과 이미 반영 완료돼 삭제했다
 — 상세는 위 "2026-08-07 시착(TRYON) 관련 요청 4건 정리" 참고.
@@ -406,3 +409,16 @@ depth=2(대분류, `HomeService.CATEGORY_TAB_DEPTH`와 동일 기준)까지 한 
 `shipment.updateTrackingStatus(TrackingStatus.DELIVERED)`를 함께 호출해, 웹훅 구독 실패 시
 즉시-확정 폴백 경로를 탄 주문도 `trackingStatus`가 정상적으로 채워지게 했다(웹훅 경로는 이미
 채워진 값을 멱등하게 덮어쓸 뿐이다).
+
+## 2026-08-08 정리 (041 반영 — 마지막 남은 요청)
+
+`041-refund-notification-dashboard.md` 반영·삭제 — `RefundService.requestRefund()`가 판매자에게
+`REFUND_REQUESTED`, `reviewRefund()` 거절 시 구매자에게 `REFUND_REJECTED` 알림을 보낸다.
+**승인(`REFUND_APPROVED`)은 따로 만들지 않았다** — `PointService.refundOrder()`가 승인 시점에
+이미 `POINT_REFUNDED`("환불이 완료되었습니다")를 구매자에게 보내고 있어서(문서 작성 시점엔
+반영 안 된 사실), 같은 이벤트에 알림이 두 번 생기지 않게 그대로 뒀다. `refType`/`refId`는 041이
+제안한 신설 `REFUND` 대신 기존 `ORDER`/`orderId`를 그대로 썼다(041 §4가 허용한 대안, 이미
+`ORDER_PAID` 등이 같은 방식). `OrderListItemResponse.refundRequested`도 추가했다. 설계는
+`docs/plans/BE/SY045-refund-notification-dashboard.md` 참고.
+
+**이 인덱스에 남은 BE 요청이 없다.**

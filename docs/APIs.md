@@ -183,7 +183,7 @@
 | 환불 요청 등록 | POST | `/orders/{id}/refunds` | ✓ | REFUND-001 | ✓ |
 | 환불 승인, 거절 처리 | PATCH | `/refunds/{id}` | ✓ | REFUND-002 | ✓ |
 
-> `role`(`BUYER`/`SELLER`, 필수)로 구매/판매 내역을 구분한다. `settledAt`은 `SETTLED`가 아니면 `null`.
+> `role`(`BUYER`/`SELLER`, 필수)로 구매/판매 내역을 구분한다. `settledAt`은 `SETTLED`가 아니면 `null`. `refundRequested`(진행 중인 환불 요청 여부)는 판매 대시보드 집계용.
 >
 > 즉시구매 시 결제액은 구매자 `available` → `tradeEscrow`로 이동한다. 배송완료는 `deliveryapi.co.kr` 웹훅 수신 시 반영(구독 실패 시 등록 즉시 반영 폴백). 배송완료 3일 후 자동 구매확정 → `tradeEscrow`를 판매자 `available`로 정산(`SETTLED`). 경매 낙찰 주문은 범위 밖.
 >
