@@ -81,6 +81,11 @@ PROD_TOSS_SECRET_KEY PROD_TOSS_CLIENT_KEY PROD_JWT_SECRET WORKER_API_KEY"
 #
 # 구글 로그인(SY039)도 필수가 아니다 — 비어 있으면 그 로그인 방법만 실패로 거절되고
 # 이메일/비밀번호 로그인 등 나머지 기능은 그대로 동작하므로 REQUIRED_VARS 에 넣지 않는다.
+#
+# REDIS_PASSWORD / GMS_API_KEY / PRICING_COMPS_SOURCE / PRICING_ATTRIBUTE_EXTRACTOR 도
+# REQUIRED_VARS 에 넣지 않는다 — 비어 있어도 각각 무인증 Redis, mock/regex 폴백(AI 쪽
+# 커밋 기본값)으로 안전하게 동작한다. 과거 이 네 개가 heredoc 자체에서 통째로 빠져 있어서,
+# 서버 .env 에 수동으로 값을 넣어도 다음 배포 때마다 흔적 없이 초기화되는 문제가 있었다.
 
 missing=""
 for name in $REQUIRED_VARS; do
@@ -125,6 +130,10 @@ TOSS_SECRET_KEY=${PROD_TOSS_SECRET_KEY}
 TOSS_CLIENT_KEY=${PROD_TOSS_CLIENT_KEY}
 GOOGLE_OAUTH_CLIENT_ID=${PROD_GOOGLE_OAUTH_CLIENT_ID:-}
 GOOGLE_OAUTH_CLIENT_SECRET=${PROD_GOOGLE_OAUTH_CLIENT_SECRET:-}
+REDIS_PASSWORD=${PROD_REDIS_PASSWORD:-}
+GMS_API_KEY=${PROD_GMS_API_KEY:-}
+PRICING_COMPS_SOURCE=${PROD_PRICING_COMPS_SOURCE:-mock}
+PRICING_ATTRIBUTE_EXTRACTOR=${PROD_PRICING_ATTRIBUTE_EXTRACTOR:-regex}
 ENV
 mv "$DEPLOY_DIR/.env.tmp" "$DEPLOY_DIR/.env"
 
