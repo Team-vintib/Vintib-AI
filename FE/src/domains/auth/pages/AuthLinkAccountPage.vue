@@ -43,9 +43,22 @@ onMounted(() => {
   accountInfo.value = payload
 })
 
-const handleRetrySso = () => {
+const handleRetrySso = async () => {
+  if (isSubmitting.value) {
+    return
+  }
+
+  submitError.value = ''
+  isSubmitting.value = true
   clearLinkAccountSession()
-  startGoogleOAuth('signup')
+
+  try {
+    await startGoogleOAuth('signup')
+  } catch (error: unknown) {
+    submitError.value =
+      error instanceof Error ? error.message : '네트워크 연결을 확인한 뒤 다시 시도해 주세요.'
+    isSubmitting.value = false
+  }
 }
 
 const handleMoveToLogin = async () => {
@@ -249,14 +262,24 @@ const moveAfterLink = async (onboardingCompleted: boolean | null) => {
 
       <template v-else>
         <p class="link-error" role="alert">
-          {{ pageError || '계정 연결 정보를 확인하지 못했습니다.' }}
+          {{ submitError || pageError || '계정 연결 정보를 확인하지 못했습니다.' }}
         </p>
 
         <section class="link-actions" aria-label="계정 연결 재시도">
-          <button class="link-primary" type="button" @click="handleRetrySso">
+          <button
+            class="link-primary"
+            type="button"
+            :disabled="isSubmitting"
+            @click="handleRetrySso"
+          >
             다시 인증하기
           </button>
-          <button class="link-secondary" type="button" @click="handleMoveToSignup">
+          <button
+            class="link-secondary"
+            type="button"
+            :disabled="isSubmitting"
+            @click="handleMoveToSignup"
+          >
             회원가입 선택으로 돌아가기
           </button>
         </section>

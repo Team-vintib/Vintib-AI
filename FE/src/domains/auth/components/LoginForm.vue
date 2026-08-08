@@ -144,12 +144,21 @@ const handleSubmit = async () => {
   }
 }
 
-const handleGoogleLogin = () => {
+const handleGoogleLogin = async () => {
   if (isSubmitting.value) {
     return
   }
 
-  startGoogleOAuth('login')
+  submitError.value = ''
+  isSubmitting.value = true
+
+  try {
+    await startGoogleOAuth('login')
+  } catch (error: unknown) {
+    submitError.value =
+      error instanceof Error ? error.message : '네트워크 연결을 확인한 뒤 다시 시도해 주세요.'
+    isSubmitting.value = false
+  }
 }
 
 const applyLoginError = (code?: string, message?: string) => {

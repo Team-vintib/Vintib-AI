@@ -11,11 +11,13 @@ import static org.mockito.Mockito.when;
 
 import com.ssafy.backend.auth.dto.request.SignUpRequest;
 import com.ssafy.backend.auth.dto.response.GoogleAuthResponse;
+import com.ssafy.backend.auth.dto.response.GoogleOAuthConfigResponse;
 import com.ssafy.backend.auth.dto.response.SignUpResponse;
 import com.ssafy.backend.auth.dto.response.TokenResponse;
 import com.ssafy.backend.auth.jwt.JwtTokenProvider;
 import com.ssafy.backend.global.client.GoogleIdentity;
 import com.ssafy.backend.global.client.GoogleOAuthClient;
+import com.ssafy.backend.global.config.GoogleOAuthConfig.GoogleOAuthProperties;
 import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.entity.Member;
@@ -44,6 +46,7 @@ class AuthServiceTest {
     private static final String REDIRECT_URI = "https://example.com/callback";
     private static final String LINK_TOKEN = "link-token";
     private static final String LINK_TOKEN_KEY = "auth:google-link:" + LINK_TOKEN;
+    private static final String GOOGLE_CLIENT_ID = "test-client-id.apps.googleusercontent.com";
 
     @Mock
     private MemberRepository memberRepository;
@@ -73,9 +76,11 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
+        GoogleOAuthProperties googleOAuthProperties = new GoogleOAuthProperties(
+                "https://oauth2.googleapis.com", GOOGLE_CLIENT_ID, "test-secret", null, null);
         authService = new AuthService(
                 memberRepository, passwordEncoder, emailVerificationService, jwtTokenProvider, redisTemplate,
-                googleOAuthClient);
+                googleOAuthClient, googleOAuthProperties);
     }
 
     @Test
@@ -221,6 +226,13 @@ class AuthServiceTest {
         authService.logout(MEMBER_ID);
 
         verify(redisTemplate).delete(REFRESH_TOKEN_KEY);
+    }
+
+    @Test
+    void 구글_client_id를_설정값_그대로_반환한다() {
+        GoogleOAuthConfigResponse response = authService.getGoogleOAuthConfig();
+
+        assertThat(response.clientId()).isEqualTo(GOOGLE_CLIENT_ID);
     }
 
     @Test

@@ -2,11 +2,13 @@ package com.ssafy.backend.auth.service;
 
 import com.ssafy.backend.auth.dto.request.SignUpRequest;
 import com.ssafy.backend.auth.dto.response.GoogleAuthResponse;
+import com.ssafy.backend.auth.dto.response.GoogleOAuthConfigResponse;
 import com.ssafy.backend.auth.dto.response.SignUpResponse;
 import com.ssafy.backend.auth.dto.response.TokenResponse;
 import com.ssafy.backend.auth.jwt.JwtTokenProvider;
 import com.ssafy.backend.global.client.GoogleIdentity;
 import com.ssafy.backend.global.client.GoogleOAuthClient;
+import com.ssafy.backend.global.config.GoogleOAuthConfig.GoogleOAuthProperties;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.global.exception.CustomException;
@@ -35,6 +37,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final StringRedisTemplate redisTemplate;
     private final GoogleOAuthClient googleOAuthClient;
+    private final GoogleOAuthProperties googleOAuthProperties;
 
     public void checkEmailDuplicate(String email) {
         if (memberRepository.existsByEmail(normalizeEmail(email))) {
@@ -108,7 +111,16 @@ public class AuthService {
     }
 
     /**
-     * 구글 로그인(SY039). 이메일이 없으면 바로 가입시키고, 있는데 구글 연동이 안 돼 있으면
+     * 구글 로그인 client_id 공개 조회. 비밀값이 아니라 BE 설정값을 그대로 내려준다 —
+     * FE가 별도 빌드 환경변수로 중복 관리하다 값 누락 사고가 났던 걸 계기로, BE 한 곳만 값의
+     * 출처가 되도록 뺐다.
+     */
+    public GoogleOAuthConfigResponse getGoogleOAuthConfig() {
+        return new GoogleOAuthConfigResponse(googleOAuthProperties.clientId());
+    }
+
+    /**
+     * 구글 로그인. 이메일이 없으면 바로 가입시키고, 있는데 구글 연동이 안 돼 있으면
      * 토큰을 내주지 않고 연동 확인을 먼저 받는다({@link #confirmGoogleLink}).
      */
     @Transactional
@@ -137,7 +149,7 @@ public class AuthService {
         return GoogleAuthResponse.linkRequired(linkToken, email);
     }
 
-    /** 연동 확인 응답(SY039). 사용자가 거부하면 대기 정보만 지우고 로그인시키지 않는다. */
+    /** 연동 확인 응답. 사용자가 거부하면 대기 정보만 지우고 로그인시키지 않는다. */
     @Transactional
     public GoogleAuthResponse confirmGoogleLink(String linkToken, boolean confirm) {
         String key = googleLinkKey(linkToken);
