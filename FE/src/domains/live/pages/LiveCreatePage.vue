@@ -968,14 +968,14 @@ onMounted(() => {
                 <dt>선택 상품</dt>
                 <dd>{{ selectedProductCountLabel }}</dd>
               </div>
-              <div>
+              <div v-if="form.mode === 'SCHEDULED'">
                 <dt>일정</dt>
                 <dd>{{ scheduleSummary }}</dd>
               </div>
             </dl>
 
             <div v-if="selectedProducts.length" class="live-create__products">
-              <h3>상품 선택 미리보기</h3>
+              <h3>판매 예정햣 상품</h3>
               <div class="live-create__products-list">
                 <article v-for="product in selectedProducts" :key="product.id">
                   <img
@@ -985,16 +985,9 @@ onMounted(() => {
                   />
                   <div>
                     <strong>{{ product.name }}</strong>
-                    <dl class="live-create__summary-product-meta">
-                      <div>
-                        <dt>브랜드</dt>
-                        <dd>{{ product.brand }}</dd>
-                      </div>
-                      <div>
-                        <dt>카테고리</dt>
-                        <dd>{{ product.category }}</dd>
-                      </div>
-                    </dl>
+                    <em>{{
+                      product.isAuctionScheduled ? '경매 예정' : `${product.price.toLocaleString('ko-KR')}P`
+                    }}</em>
                   </div>
                 </article>
               </div>
@@ -1228,7 +1221,7 @@ onMounted(() => {
 
 .live-create__method {
   display: grid;
-  min-height: 132px;
+  min-height: 100px;
   align-content: start;
   gap: var(--space-3);
   padding: var(--space-5);
@@ -1237,6 +1230,20 @@ onMounted(() => {
   background: var(--color-surface);
   color: var(--color-text-secondary);
   text-align: left;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    transform var(--transition-base);
+}
+
+.live-create__method:hover {
+  background: #f1f0ed;
+  transform: translateY(-3px) scale(1.03);
+}
+
+.live-create__method:hover strong,
+.live-create__method:hover span {
+  color: var(--color-text-inverse);
 }
 
 .live-create__method strong {
@@ -1248,7 +1255,13 @@ onMounted(() => {
 
 .live-create__method--selected {
   border-color: var(--color-live);
+  background: #f1f0ed;
   box-shadow: none;
+}
+
+.live-create__method--selected strong,
+.live-create__method--selected span {
+  color: var(--color-text-inverse);
 }
 
 .live-create__info-form {
@@ -1931,6 +1944,10 @@ onMounted(() => {
   align-items: center;
   gap: var(--space-3);
   grid-template-columns: 56px minmax(0, 1fr);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-secondary);
 }
 
 .live-create__products img {
@@ -1948,8 +1965,17 @@ onMounted(() => {
 
 .live-create__products strong {
   overflow: hidden;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.live-create__products em {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  font-style: normal;
+  font-weight: var(--font-weight-light);
 }
 
 @media (max-width: 960px) {
