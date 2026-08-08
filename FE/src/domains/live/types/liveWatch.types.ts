@@ -116,3 +116,20 @@ export interface CurrentProductMessage {
   liveId: number
   currentProductId: number | null
 }
+
+/**
+ * STOMP `/topic/lives/{liveId}/product-sold` payload — 정찰제 즉시구매로 상품이 팔렸다는 알림.
+ *
+ * 경매 낙찰은 이 토픽으로 오지 않는다(`/auctions`의 `AUCTION_CLOSED`가 그대로 담당). 양쪽에서
+ * 쏘면 같은 상품을 두 번 처리하게 돼 BE가 일부러 나눠 놓았다.
+ *
+ * 전파 대상 방송은 주문 요청의 `liveId`가 아니라 편성 정보로 정해진다 — 상품 상세에서 산
+ * 경우에도 그 상품이 진행 중 방송에 편성돼 있으면 시청자 큐에서 빠진다.
+ */
+export interface ProductSoldMessage {
+  liveId: number
+  productId: number
+  saleStatus: 'SOLD'
+  soldVia: 'DIRECT_SALE'
+  soldAt: string
+}

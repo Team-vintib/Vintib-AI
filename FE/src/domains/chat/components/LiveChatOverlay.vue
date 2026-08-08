@@ -13,6 +13,7 @@ import {
 import { LIVE_REACTION_EMOJIS } from '@/domains/chat/constants/liveChatMockData'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { isLiveRealtimeApiEnabled, LiveRealtimeClient } from '@/domains/live/api/liveRealtimeClient'
+import AppInlineNotice from '@/shared/components/AppInlineNotice.vue'
 
 import type { LiveChatMessage, LiveReactionEmoji } from '@/domains/chat/types/liveChat.types'
 import type { LiveWatchStatus } from '@/domains/live/types/liveWatch.types'
@@ -531,18 +532,17 @@ function isSuppressedRealtimeError(body: unknown) {
         </li>
       </ul>
 
-      <p
+      <AppInlineNotice
         v-if="errorMessage"
-        class="live-chat-overlay__error"
-        :class="{ 'live-chat-overlay__error--blocked': isBlockedMessage }"
-        role="status"
+        class="live-chat-overlay__notice"
+        :variant="isBlockedMessage ? 'error' : 'info'"
       >
         {{ errorMessage }}
-      </p>
+      </AppInlineNotice>
 
-      <p v-if="isMuted" class="live-chat-overlay__mute-notice" role="status">
+      <AppInlineNotice v-if="isMuted" class="live-chat-overlay__notice" variant="error">
         도배·욕설 반복으로 {{ muteRemainingSeconds }}초간 채팅이 제한됩니다
-      </p>
+      </AppInlineNotice>
 
       <form class="live-chat-overlay__composer" @submit.prevent="submitMessage">
         <input
@@ -804,37 +804,10 @@ function isSuppressedRealtimeError(body: unknown) {
   overflow-wrap: anywhere;
 }
 
-.live-chat-overlay__error {
+/* 차단·음소거·연결 안내 모두 공용 AppInlineNotice 규격을 쓴다(개별 크기·색 지정 없음). */
+.live-chat-overlay__notice {
   margin: 0 0 6px;
-  color: var(--color-accent);
-  font-size: var(--font-size-2xs);
-  line-height: var(--line-height-tight);
-}
-
-/* 단순 차단 배너(errorMessage, 2초 뒤 사라짐)와 달리 잠금이 풀릴 때까지 계속 보인다. */
-.live-chat-overlay__mute-notice {
-  margin: 0 0 6px;
-  padding: 4px 8px;
-  border-radius: var(--radius-badge);
-  background: rgba(242, 240, 237, 0.1);
-  color: var(--color-accent);
-  font-size: var(--font-size-2xs);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-tight);
   font-variant-numeric: tabular-nums;
-}
-
-.live-chat-overlay__error--blocked {
-  padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  font-size: var(--font-size-body);
-  /* 본문 웹폰트(IBM Plex Sans KR)가 700까지만 실려 있어 weight만으로는 더 굵어지지 않는다.
-     경고가 확실히 도드라지도록 획 두께를 조금 더 준다. */
-  font-weight: var(--font-weight-extrabold);
-  line-height: var(--line-height-snug);
-  -webkit-text-stroke: 0.4px currentColor;
 }
 
 .live-chat-overlay__composer {

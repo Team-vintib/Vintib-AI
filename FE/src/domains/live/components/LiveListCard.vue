@@ -356,6 +356,13 @@ const handleActionClick = () => {
   word-break: keep-all;
 }
 
+/* 목록에서 누구 방송인지가 방송 시각보다 먼저 읽혀야 한다 — 판매자만 한 단계 키우고 진하게. */
+.live-list-card__seller {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
 .live-list-card__viewer {
   display: inline-flex;
   align-items: center;

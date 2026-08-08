@@ -18,3 +18,5 @@ Thumbs.db
 !.vscode/extensions.json
 
 .claude/settings.local.json
+# 로컬 개발 서버 실행 설정(에이전트 미리보기용) — 사람마다 포트·명령이 달라 공유하지 않는다.
+.claude/launch.json
