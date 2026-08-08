@@ -21,7 +21,6 @@ import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductImage;
 import com.ssafy.backend.product.entity.ProductImageRole;
-import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductImageRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.Optional;
@@ -47,9 +46,6 @@ class ProductImageServiceTest {
     private ProductImageRepository productImageRepository;
 
     @Mock
-    private CategoryRepository categoryRepository;
-
-    @Mock
     private S3StorageService s3StorageService;
 
     @Mock
@@ -60,6 +56,9 @@ class ProductImageServiceTest {
 
     @Mock
     private AiClient aiClient;
+
+    @Mock
+    private GarmentCategoryMapper garmentCategoryMapper;
 
     private AwsProperties awsProperties;
     private ProductImageService productImageService;
@@ -73,8 +72,8 @@ class ProductImageServiceTest {
                 "test-secret",
                 new AwsProperties.S3("", "", PUBLIC_BUCKET, "private-bucket"));
         productImageService = new ProductImageService(
-                productRepository, productImageRepository, categoryRepository, s3StorageService, awsProperties,
-                aiClient);
+                productRepository, productImageRepository, s3StorageService, awsProperties,
+                aiClient, garmentCategoryMapper);
         product = Product.builder().seller(seller).title("빈티지 자켓").build();
     }
 
@@ -227,10 +226,6 @@ class ProductImageServiceTest {
                         .categoryId(categoryId)
                         .title("빈티지 니트")
                         .build();
-        com.ssafy.backend.product.entity.Category knitCategory =
-                org.mockito.Mockito.mock(com.ssafy.backend.product.entity.Category.class);
-        when(knitCategory.getNameEn()).thenReturn("KNIT");
-
         when(seller.getId()).thenReturn(SELLER_ID);
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(qualityProduct));
         when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(1);
@@ -241,7 +236,7 @@ class ProductImageServiceTest {
         when(productImageRepository.findAllByProductIdOrderBySortOrderAsc(any())).thenReturn(java.util.List.of(
                 ProductImage.builder().imageKey(frontKey).sortOrder((short) 0).primary(true).build(),
                 ProductImage.builder().imageKey(backKey).sortOrder((short) 1).primary(false).build()));
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(knitCategory));
+        when(garmentCategoryMapper.resolve(categoryId)).thenReturn(Optional.of("TOP_KNIT"));
         // qualityProduct는 실제로 저장된 적 없는 순수 builder 인스턴스라 getId()는 null이다
         // (production에서는 productRepository.findById로 가져온 실제 엔티티라 ID가 있다).
         when(aiClient.createQualityInspectionJob(
@@ -269,10 +264,6 @@ class ProductImageServiceTest {
                         .categoryId(categoryId)
                         .title("운동화")
                         .build();
-        com.ssafy.backend.product.entity.Category sneakersCategory =
-                org.mockito.Mockito.mock(com.ssafy.backend.product.entity.Category.class);
-        when(sneakersCategory.getNameEn()).thenReturn("SNEAKERS");
-
         when(seller.getId()).thenReturn(SELLER_ID);
         when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(shoeProduct));
         when(productImageRepository.countByProductId(PRODUCT_ID)).thenReturn(1);
@@ -282,7 +273,7 @@ class ProductImageServiceTest {
         when(productImageRepository.findAllByProductIdOrderBySortOrderAsc(any())).thenReturn(java.util.List.of(
                 ProductImage.builder().imageKey(frontKey).sortOrder((short) 0).primary(true).build(),
                 ProductImage.builder().imageKey(backKey).sortOrder((short) 1).primary(false).build()));
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(sneakersCategory));
+        when(garmentCategoryMapper.resolve(categoryId)).thenReturn(Optional.empty());
 
         productImageService.registerImage(
                 SELLER_ID, PRODUCT_ID, new ProductImageRegisterRequest(backKey, (short) 1, false, ProductImageRole.BACK));

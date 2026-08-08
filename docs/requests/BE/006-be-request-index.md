@@ -37,8 +37,6 @@
 | --- | --- | --- | --- | --- |
 | 020 | `020-tryon-result-category.md` | TryOn | 미반영(순수 BE, AI 무관) | 서윤 파트 |
 | 041 | `041-refund-notification-dashboard.md` | Refund/Notification | 미반영 | 서윤 파트 |
-| 043 | `043-registration-price-chart-source.md` | Product | 미반영, 우선순위 낮음(044로 대체 가능) | 서윤 파트 |
-| 044 | `044-pricing-estimate-trigger.md` | Product | 미반영 | 서윤 파트 |
 | 045 | `045-broadcast-summary-sale-type.md` | Live/Auction | 미반영 | 정윤 파트 |
 | 045 | `045-shipment-fallback-tracking-status-gap.md` | Order | 미반영, 참고용(FE 보정 완료, 블로킹 아님) | 서윤 파트 |
 
@@ -374,3 +372,16 @@ POST와 동일하게 반영하면 된다.
 finding 전체 교체 — 빈 배열이면 전부 삭제)으로 동작하며, 저장 로직(`photoRole`/`description`/`box`,
 `FRONT`/`BACK`만 허용)은 `POST`가 쓰는 것을 그대로 재사용한다. DRAFT를 먼저 만들고 PATCH로 최종
 제출하는 상품도 이제 확정된 하자 판정이 저장된다.
+
+## 2026-08-08 정리 (043/044 반영 — AI 가격 추천 트리거)
+
+`044-pricing-estimate-trigger.md` 반영·삭제 — `POST /products/price-estimates` 신설. 실제 상품
+생성 여부와 무관하게 `productName`/`categoryId`(선택)/`brand`(선택)/`conditionScore`/
+`conditionGrade`(S/A/B/C)만으로 호출하면 AI `POST /pricing/estimates`를 그대로 프록시해
+`jobId`를 돌려준다. 결과 폴링은 FE가 `GET /ai/jobs/{jobId}`로 직접 한다(BE는 재조회 안 함).
+설계는 `docs/plans/BE/SY044-pricing-estimate-trigger.md` 참고.
+
+`043-registration-price-chart-source.md`도 같은 배치에서 삭제했다 — 문서 자체가 명시한 대로
+"자체 통계 인프라가 급하지 않으면 044만으로 당분간 충분"하다는 조건이 이번 044 구현으로 충족돼
+같이 정리한다. 043이 원했던 "우리 플랫폼 자체 통계" 기반 히스토그램은 만든 게 아니다 — 실사용
+데이터가 쌓이면 그때 별도로 다시 논의한다.

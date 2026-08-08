@@ -108,6 +108,7 @@
 | 상품 상세 조회 | GET | `/products/{id}` |  | PROD-006 | ✓ |
 | 상품 정보 수정 | PATCH | `/products/{id}` | ✓ | PROD-007 | ✓ |
 | 상품 삭제 | DELETE | `/products/{id}` | ✓ | PROD-007 | ✓ |
+| AI 가격 추천 트리거 | POST | `/products/price-estimates` | ✓ | PROD-011, PROD-012 | ✓ |
 | 카테고리 전체 목록 조회 | GET | `/categories` |  | PROD-001 | ✓ |
 | 브랜드 전체 목록 조회 | GET | `/brands` |  | PROD-001 | ✓ |
 
@@ -119,6 +120,8 @@
 > 상품 상세 조회(`GET /products/{id}`) 응답에는 `aiQualityAnalysis`(AI 품질 분석) 객체가 포함된다. 등록(`POST /products`)·수정(`PATCH /products/{id}`) 요청의 `aiQualityFindings`(판매자가 "하자로 인정"으로 확정한 후보 목록 — `photoRole`/`description`/`box`, `FRONT`·`BACK` 사진에만 등록 가능)를 저장했다가 사진별로 묶어 그대로 돌려준다. `status`는 `NOT_REQUESTED`(등록 시 findings 없음)/`NO_FINDINGS`(요청은 있었으나 0건)/`COMPLETED`(1건 이상) 세 가지뿐이다 — AI 분석이 진행 중이거나 실패한 상태는 BE로 전달되지 않는 시점의 데이터라 관측할 수 없다(FE가 AI 게이트웨이를 직접 폴링해 그 상태를 판단한다). `PATCH`의 `aiQualityFindings`는 `defects`와 같은 규칙이다 — null이면 미반영, 값을 보내면 기존 목록 전체 교체(빈 배열이면 전부 삭제). DRAFT 우선 생성 후 PATCH로 최종 제출하는 상품은 이 경로로 finding을 보낸다.
 >
 > 상품 정보 수정(`PATCH /products/{id}`)의 `price`(선택)로 상시 판매(`ON_SALE`) 중인 상품의 가격을 바로 바꿀 수 있다. 경매 상품(`saleType=AUCTION`)에 보내면 400(`INVALID_PRODUCT_STATE`) — 경매 시작가는 별도 API(`/products/{id}/auction-schedule`)로 다룬다.
+>
+> `POST /products/price-estimates`는 등록 화면 "AI 가격 추천" 섹션용 경량 트리거다(044). 실제로 생성된 상품 없이도 `productName`/`categoryId`(선택)/`brand`(선택)/`conditionScore`/`conditionGrade`(`S`/`A`/`B`/`C`)만으로 호출할 수 있다 — FE는 등급 4개 각각에 대해 호출해 등급별 추천가를 만든다. BE는 AI 게이트웨이(`POST /pricing/estimates`, 컨테이너 내부망이라 외부에서 직접 호출 불가)를 그대로 프록시해 `jobId`만 돌려주고, `categoryId`는 BE 6종 `GarmentCategory` 매핑(하자 검수와 동일 테이블)으로 변환해 보낸다. 결과 폴링(`GET /ai/jobs/{jobId}`)은 FE가 외부 경로로 직접 한다 — BE는 재조회하지 않는다. AI 쪽 동시 처리 상한(2건)을 넘으면 503을 그대로 되돌려준다.
 
 ## 라이브 / 채팅 (Lives)
 

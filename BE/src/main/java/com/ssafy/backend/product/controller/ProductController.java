@@ -2,6 +2,7 @@ package com.ssafy.backend.product.controller;
 
 import com.ssafy.backend.global.response.ApiResponse;
 import com.ssafy.backend.global.response.PageResponse;
+import com.ssafy.backend.product.dto.request.PriceEstimateRequest;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductImageRegisterRequest;
 import com.ssafy.backend.product.dto.request.ProductImageUpdateRequest;
@@ -10,12 +11,14 @@ import com.ssafy.backend.product.dto.request.ProductListFilterParams;
 import com.ssafy.backend.product.dto.request.ProductSortType;
 import com.ssafy.backend.product.dto.request.ProductStatusUpdateRequest;
 import com.ssafy.backend.product.dto.request.ProductUpdateRequest;
+import com.ssafy.backend.product.dto.response.PriceEstimateJobResponse;
 import com.ssafy.backend.product.dto.response.ProductAiModelCutResponse;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
 import com.ssafy.backend.product.dto.response.ProductQualityInspectionResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
+import com.ssafy.backend.product.service.PriceEstimateService;
 import com.ssafy.backend.product.service.ProductImageService;
 import com.ssafy.backend.product.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -50,6 +53,7 @@ public class ProductController {
 
     private final ProductService productService;
     private final ProductImageService productImageService;
+    private final PriceEstimateService priceEstimateService;
 
     @Operation(
             summary = "상품 기본 정보 저장",
@@ -188,6 +192,26 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ProductQualityInspectionResponse>> getQualityInspectionStatus(
             @PathVariable Long id) {
         ProductQualityInspectionResponse response = productService.getQualityInspectionStatus(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "AI 가격 추천 트리거",
+            description = "상품 등록 화면 \"AI 가격 추천\" 섹션용 경량 트리거. 실제로 생성된 상품이 없어도"
+                    + " 호출할 수 있다 — product_id는 아직 없으면 BE가 내부적으로 임시값을 채워 보낸다."
+                    + " AI 게이트웨이(POST /pricing/estimates)에 그대로 접수하고 job id만 돌려준다."
+                    + " 결과는 FE가 GET /ai/jobs/{jobId}를 직접 폴링해서 받는다(BE는 재조회하지 않는다).")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "접수 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "503", description = "AI 쪽 동시 처리 상한 초과 — 잠시 후 재시도")
+    })
+    @PostMapping("/price-estimates")
+    public ResponseEntity<ApiResponse<PriceEstimateJobResponse>> createPriceEstimate(
+            @Valid @RequestBody PriceEstimateRequest request) {
+        PriceEstimateJobResponse response = priceEstimateService.createEstimateJob(request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
