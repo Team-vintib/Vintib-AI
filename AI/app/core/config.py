@@ -55,5 +55,10 @@ class Settings(BaseSettings):
     # llm_web_search는 이 방식으로도 켜지 않는다(AI/CLAUDE.md 하드 룰, 사용자만 직접 실행).
     pricing_comps_source: str = "mock"
 
+    # 동일 상품 매칭 1단계(속성 추출) 백엔드 스왑(CH031). **커밋 기본값은 항상 regex여야
+    # 한다**(test_pricing_registry.py::test_committed_defaults_are_regex가 강제) — llm
+    # 전환도 배포 환경변수로만 한다. GMS를 쓰므로 하드 룰 대상, 사용자만 직접 실행.
+    pricing_attribute_extractor: str = "regex"
+
 
 settings = Settings()  # 추가 필요

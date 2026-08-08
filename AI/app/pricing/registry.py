@@ -115,6 +115,49 @@ ACTIVE_COMPS_SOURCE = settings.pricing_comps_source
 # llm_web_search / mock / internal_clip / internal / internal_text
 
 
+class AttributeExtractorConfig(TypedDict):
+    """동일 상품 매칭 1단계(속성 추출, CH031) 백엔드 하나의 모델 ID + 호출 파라미터."""
+
+    model_id: str | None
+    timeout_seconds: float
+    max_output_tokens: int
+
+
+# CH031: 당근마켓 사례 참고 — 자유텍스트 상품명을 "브랜드+핵심 모델/식별 키워드"로 뽑는
+# 1단계만 다룬다(2단계 정확 키 집계·3단계 키워드 매칭은 CH030에 이미 있음, 임베딩 아님).
+ATTRIBUTE_EXTRACTOR_BACKENDS: dict[str, AttributeExtractorConfig] = {
+    # 기본 — 정규식 토큰화 + 브랜드 별칭 부분일치(CH030). 네트워크 없음, 항상 성공한다.
+    "regex": {
+        "model_id": None,
+        "timeout_seconds": 0.0,
+        "max_output_tokens": 0,
+    },
+    # llm_web_search와 같은 모델을 재사용한다 — 새 모델을 추가하지 않는다(하드 룰).
+    # 웹검색 그라운딩이 필요 없어(`gms.generate_content(use_search=False)`) 응답이 훨씬
+    # 짧다 — timeout·max_output_tokens을 comps 웹검색보다 낮게 잡는다.
+    "llm": {
+        "model_id": "gemini-3.5-flash",
+        "timeout_seconds": 15.0,
+        "max_output_tokens": 256,
+    },
+}
+# 코드를 커밋해서 스왑하지 않는다 — `PRICING_ATTRIBUTE_EXTRACTOR` 배포 환경변수로 바꾼다
+# (기본값 regex). llm은 GMS 하드 룰 대상이라 이 방식으로도 절대 켜지 않는다(사용자가 직접
+# 실행). 커밋 기본값은 항상 regex여야 한다
+# (test_pricing_registry.py::test_committed_defaults_are_regex가 강제).
+ACTIVE_ATTRIBUTE_EXTRACTOR = settings.pricing_attribute_extractor
+# regex / llm
+
+
+def attribute_extractor_config(key: str | None = None) -> AttributeExtractorConfig:
+    """활성 속성 추출기 백엔드의 설정(모델 ID + 호출 파라미터)을 돌려준다."""
+    resolved = key or ACTIVE_ATTRIBUTE_EXTRACTOR
+    try:
+        return ATTRIBUTE_EXTRACTOR_BACKENDS[resolved]
+    except KeyError as exc:
+        raise ValueError(f"등록되지 않은 속성 추출기입니다: {resolved!r}") from exc
+
+
 class RetailSourceConfig(TypedDict):
     """신상품(정가) 백엔드 하나의 표시 정보 + 수확 상한."""
 

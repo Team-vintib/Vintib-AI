@@ -53,3 +53,33 @@ def test_committed_defaults_are_mock():
     """실백엔드 전환은 사용자만 한다(AI/CLAUDE.md 하드 룰) — 커밋된 기본값은 항상 mock이어야 한다."""
     assert registry.ACTIVE_COMPS_SOURCE == "mock"
     assert registry.ACTIVE_RETAIL_SOURCE == "mock"
+
+
+def test_attribute_extractor_config_returns_active_backend_by_default():
+    assert (
+        registry.attribute_extractor_config()
+        == registry.ATTRIBUTE_EXTRACTOR_BACKENDS[registry.ACTIVE_ATTRIBUTE_EXTRACTOR]
+    )
+
+
+def test_attribute_extractor_config_accepts_explicit_key():
+    assert (
+        registry.attribute_extractor_config("regex")
+        == registry.ATTRIBUTE_EXTRACTOR_BACKENDS["regex"]
+    )
+
+
+def test_llm_attribute_extractor_is_registered():
+    """CH031 — llm은 등록만 돼 있고 기본 활성은 아니다(아래 committed_defaults 참고)."""
+    config = registry.attribute_extractor_config("llm")
+    assert config["model_id"] == "gemini-3.5-flash"
+
+
+def test_attribute_extractor_config_rejects_unknown_key():
+    with pytest.raises(ValueError, match="등록되지 않은"):
+        registry.attribute_extractor_config("없는백엔드")
+
+
+def test_committed_defaults_are_regex():
+    """CH031 — LLM 속성 추출은 GMS를 쓴다(하드 룰) — 커밋된 기본값은 항상 regex여야 한다."""
+    assert registry.ACTIVE_ATTRIBUTE_EXTRACTOR == "regex"
