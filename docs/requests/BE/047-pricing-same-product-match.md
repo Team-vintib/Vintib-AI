@@ -26,10 +26,13 @@ AI 쪽 매칭 로직·자체 코퍼스(`app/pricing/product_match.py`, `app/pric
    - `priceKind`: `"ASKING"`(`ON_SALE`) / `"SOLD_DIRECT"` / `"SOLD_AUCTION"` — 호가와
      완료거래를 화면에서 구분해 보여주기 위한 태그입니다(사용자 결정: 완료거래 실데이터가
      당장 거의 없어 호가도 같이 노출).
-2. **`product` 테이블에 `match_key` 컬럼 추가** (nullable 문자열): AI의 `POST
-   /pricing/estimates` 응답에 담기는 `product_match_key`를, 상품 저장/업데이트 시 그대로
-   이 컬럼에 반영해주시면 됩니다. AI가 두 번 계산하지 않고, 가격 책정 시점(등록 마지막
-   스텝)에 한 번 계산한 값을 그대로 재사용하는 구조입니다.
+2. **`product` 테이블에 `match_key` 컬럼 추가** (nullable 문자열): 값의 출처는 AI가 아니라
+   **FE**입니다 — `044`(가격 추정 트리거)와 같은 구조로, FE가 등록 마지막(가격) 스텝에서
+   `GET /ai/jobs/{job_id}`를 직접 폴링해 `PricingResult.product_match_key`를 이미 받아둔
+   상태입니다. BE가 AI 응답을 직접 조회할 필요 없이, **FE가 상품 등록/수정 API 호출 시
+   `matchKey` 필드로 같이 보내는 값을 그대로 이 컬럼에 저장**해주시면 됩니다(FE와 그 필드명
+   협의 필요). AI가 두 번 계산하지 않고 가격 책정 시점에 한 번 계산한 값을 그대로
+   재사용하는 구조입니다.
 3. **구매자 상세 화면의 "동일 상품 시세"를 `match_key` 기준 DB 쿼리로 구현**: 025가
    요청한 "같은 상품 지금 시세" 데이터를, AI 호출 없이 `SELECT ... FROM product WHERE
    match_key = :key AND sale_status IN ('ON_SALE', 'SOLD')` 형태의 순수 DB 쿼리로 제공할
@@ -49,4 +52,6 @@ AI 쪽 매칭 로직·자체 코퍼스(`app/pricing/product_match.py`, `app/pric
 - `docs/plans/AI/CH030-pricing-text-match.md` (이번 설계 전체)
 - `docs/plans/AI/CH016-internal-comps-hedge.md`, `docs/plans/AI/CH024-classifier-pricing-real-integration.md`
 - `docs/requests/BE/025-product-same-price-chart.md` (이 문서로 답변)
+- `docs/requests/BE/044-pricing-estimate-trigger.md` (FE가 `GET /ai/jobs/{job_id}`를 직접
+  폴링하는 것과 같은 패턴 — `match_key`도 같은 경로로 FE가 받아 BE에 전달)
 - `AI/app/pricing/product_match.py`, `AI/app/pricing/product_corpus.py`, `AI/app/pricing/comps.py`(`InternalTextCompsSource`)
