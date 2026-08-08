@@ -1,44 +1,47 @@
-"""가상 시착 워커 — VLM 캡션 → (신체 치수 근사 + 핏 계산) → FLUX worn-reference 생성 →
-CatVTON 합성.
+"""가상 시착 워커 — VLM 캡션 → (신체 치수 근사 + 핏 계산) → FLUX worn-reference 생성.
+
+**CH027: CatVTON 합성 단계 없음.** 예전엔 FLUX가 만든 worn-reference를 CatVTON이 다시
+마스크 영역만 실제 옷 사진 조건부로 재합성했는데(`tryon_worker_catvton_legacy.py`에 그대로
+보존), CatVTON이 마스크 영역을 항상 순수 노이즈에서부터 다시 그리는 구조라 FLUX가 이미
+정확하게 반영한 디테일(끈, 이너 티, 원단 질감)을 오히려 지워버리는 문제가 있었다. FLUX.2가
+`image=[사람 사진, 옷 사진]` 두 장을 함께 참조하도록 바꾸자 CatVTON 없이도 색상/로고/질감을
+충분히 정확하게 반영하면서 자연스러운 드레이프까지 얻어져(`docs/plans/AI/
+CH027-tryon-flux-final-pipeline.md`), FLUX 결과를 그대로 최종본으로 쓴다.
 
 **GPU 없이도 돌릴 수 있다.** `TRYON_VLM_BACKEND=mock`(기본값)/`TRYON_FLUX_BACKEND=mock`
-(기본값)이면 각각 정적 문구/참조 이미지 그대로 반환으로 대체되어, CatVTON까지 포함한
-전 경로(잡 폴링 → 결과 업로드)를 GPU 없이도 검증할 수 있다(`quality_check_worker_example.py`
-와 같은 컨벤션).
+(기본값)이면 각각 정적 문구/참조 이미지 그대로 반환으로 대체되어, 전 경로(잡 폴링 → 결과
+업로드)를 GPU 없이도 검증할 수 있다(`quality_check_worker_example.py`와 같은 컨벤션).
 
 ```bash
-python tryon_worker_example.py                                     # 전부 mock, CatVTON만 실제
+python tryon_worker_example.py                                     # 전부 mock
 TRYON_VLM_BACKEND=qwen3_vl TRYON_FLUX_BACKEND=flux2_klein python tryon_worker_example.py
 ```
 
-**세 모델(VLM/FLUX/CatVTON)은 동시에 상주하지 않는다.** 프로덕션엔 GPU 서버가 없고 팀원
-노트북(6GB급)이 워커로 붙는 구조라(`AI/docs/infra-architecture.md`), 한 단계가 끝나면
-명시적으로 `del`+`torch.cuda.empty_cache()`한 뒤 다음 단계를 로드한다 — 피크 VRAM은
-가장 큰 단일 스테이지(FLUX, ~5-6GB) 수준으로 억제된다.
+**두 모델(VLM/FLUX)은 동시에 상주하지 않는다.** 프로덕션엔 GPU 서버가 없고 팀원 노트북
+(6GB급)이 워커로 붙는 구조라(`AI/docs/infra-architecture.md`), VLM 캡션이 끝나면 명시적으로
+`del`+`torch.cuda.empty_cache()`한 뒤 FLUX를 로드한다.
 
 **최종 결과에는 실제 고객 사진(`user_image_url`)이 나온다.** FLUX worn-reference는 그
 고객 사진을 참조로 생성하므로 재사용/캐싱 대상이 아니다 — 매 요청마다 다시 생성한다
 (`AI/docs/tryon-advancement-strategy.md` §10 프로덕션 반영 절 참고).
 
-설계: `.claude/plans/ai/CH019-tryon-worker-promotion.md`
+설계: `.claude/plans/ai/CH019-tryon-worker-promotion.md`, `docs/plans/AI/
+CH027-tryon-flux-final-pipeline.md`
 """
 
 import gc
 import os
 import sys
 
-import numpy as np
 import torch
-from diffusers.image_processor import VaeImageProcessor
-from huggingface_hub import snapshot_download
 from PIL import Image
 
 from base_worker import BaseWorker
 from storage_utils import download_image, upload_image
 
-# 기존 검증 코드(worker/models/catvton)를 import 할 수 있도록 경로 추가.
-# (구 경로는 AI/test/ → AI/validation/ 이었다 — 추론 코드는 AI/에 두지 않는다는 원칙에 따라
-#  worker/models/ 로 옮겼다.)
+# body_estimate.py/model.adaptive_fit/model.fit_summary/utils.py는 순수 계산 + PIL 리사이즈
+# 유틸이라(무거운 CatVTON 모델 자체는 더 이상 안 씀) 가볍다. 실제 CatVTON 합성 로직은
+# `tryon_worker_catvton_legacy.py`가 필요할 때만 따로 import한다.
 CATVTON_CODE_PATH = os.getenv(
     "CATVTON_CODE_PATH",
     os.path.join(os.path.dirname(__file__), "models", "catvton"),
@@ -47,10 +50,8 @@ sys.path.insert(0, CATVTON_CODE_PATH)
 
 from body_estimate import estimate_body_measurements  # noqa: E402
 from model.adaptive_fit import compute_width_adjustment  # noqa: E402
-from model.cloth_masker import AutoMasker, vis_mask  # noqa: E402
 from model.fit_summary import fit_summary_ko  # noqa: E402
-from model.pipeline import CatVTONPipeline  # noqa: E402
-from utils import init_weight_dtype, resize_and_crop, resize_and_padding  # noqa: E402
+from utils import resize_and_crop, resize_and_padding  # noqa: E402
 
 # `tryon_flux`/`quality_vlm`은 `sam3`/`garment_measurement`와 같은 이유로 진짜
 # 서브패키지다 -- 부모 디렉터리(worker/models/)를 sys.path에 넣고 네임스페이스로만 접근한다.
@@ -82,86 +83,13 @@ CAPTION_PROMPT = (
 )
 
 
-def composite_with_original(
-    original_image: Image.Image,
-    generated_image: Image.Image,
-    mask: Image.Image,
-) -> Image.Image:
-    """마스크 안쪽은 생성된 이미지, 바깥쪽은 원본 이미지를 사용해 합성한다."""
-    original_np = np.array(original_image.resize(generated_image.size)).astype(np.float32)
-    generated_np = np.array(generated_image).astype(np.float32)
-
-    mask_np = np.array(mask.resize(generated_image.size).convert("L")).astype(np.float32) / 255.0
-    mask_np = np.expand_dims(mask_np, axis=-1)
-
-    composited = generated_np * mask_np + original_np * (1 - mask_np)
-    return Image.fromarray(composited.astype(np.uint8))
-
-
-def _bypass_safety_checker(self, image):
-    has_nsfw_concept = [False] * len(image) if isinstance(image, list) else [False]
-    return image, has_nsfw_concept
-
-
 class TryonWorker(BaseWorker):
     feature = "tryon"
 
     def __init__(self):
         super().__init__()
-        self._pipeline = None
-        self._automasker = None
-        self._mask_processor = None
         self._vlm_bundle = None
         self._flux_generator = None
-
-    def _ensure_catvton_loaded(self):
-        """CatVTON은 4단계(합성) 직전에만 로드하고, 그 job이 끝나면 `_unload_catvton()`으로
-        바로 내린다 -- VLM/FLUX 단계 동안은 GPU를 비워두기 위함이다.
-
-        예전엔 워커 프로세스당 한 번만 로드해 계속 상주시켰는데(재로드 비용 절감 목적),
-        그러면 이 파일 맨 위 설계 의도("세 모델은 동시에 상주하지 않는다")와 실제로
-        어긋난다 -- CatVTON이 상주한 채로 VLM/FLUX가 그 위에 얹히는 상태가 된다. 6GB급
-        GPU에서 VLM(4bit) 로딩이 그걸로 VRAM 부족에 걸려 실측으로 확인했다. 매 job마다
-        다시 로드하는 재로드 비용(수십 초)보다 VRAM 여유가 우선이라 이렇게 바꾼다.
-        """
-        if self._pipeline is not None:
-            return
-
-        print(f"[{self.worker_id}] CatVTON 파이프라인 로딩 중...")
-        repo_path = snapshot_download(repo_id="zhengchong/CatVTON")
-
-        pipeline = CatVTONPipeline(
-            base_ckpt="booksforcharlie/stable-diffusion-inpainting",
-            attn_ckpt=repo_path,
-            attn_ckpt_version="mix",
-            weight_dtype=init_weight_dtype("bf16"),
-            use_tf32=True,
-            device="cuda",
-        )
-        pipeline.safety_checker = None
-        pipeline.run_safety_checker = _bypass_safety_checker.__get__(pipeline)
-
-        self._pipeline = pipeline
-        self._mask_processor = VaeImageProcessor(
-            vae_scale_factor=8, do_normalize=False, do_binarize=True, do_convert_grayscale=True
-        )
-        self._automasker = AutoMasker(
-            densepose_ckpt=os.path.join(repo_path, "DensePose"),
-            schp_ckpt=os.path.join(repo_path, "SCHP"),
-            device="cuda",
-        )
-        print(f"[{self.worker_id}] CatVTON 파이프라인 로딩 완료")
-
-    def _unload_catvton(self):
-        if self._pipeline is None:
-            return
-        self._pipeline = None
-        self._automasker = None
-        self._mask_processor = None
-        # AutoMasker(DensePose/SCHP)와 diffusers 파이프라인이 참조 순환을 만들 수 있어
-        # gc.collect()로 먼저 끊어야 empty_cache()가 실제로 VRAM을 반환한다.
-        gc.collect()
-        torch.cuda.empty_cache()
 
     def _ensure_vlm_loaded(self):
         """describer와 달리 실패해도 mock으로 폴백하지 않는다 -- 캡션은 이 파이프라인의
@@ -170,7 +98,16 @@ class TryonWorker(BaseWorker):
             return
         config = vlm_registry.vlm_config(TRYON_VLM_BACKEND)
         print(f"[{self.worker_id}] VLM 로딩 중... (backend={TRYON_VLM_BACKEND})")
-        self._vlm_bundle = load_qwen_vl(config["model_id"], quantization=config["quantization"])
+        try:
+            self._vlm_bundle = load_qwen_vl(config["model_id"], quantization=config["quantization"])
+        except Exception:
+            # 로딩 도중 죽으면(네트워크 순단 등) 그 시점까지 GPU에 올라간 텐서가
+            # empty_cache() 없이 그대로 남는다 -- 다음 job이 그 자리를 못 찾고 "CPU/disk로
+            # 분산" 에러로 연쇄 실패하는 걸 실측으로 확인했다. 재시도가 최소한 깨끗한 VRAM
+            # 상태에서 시작하도록 여기서 반드시 정리한다.
+            gc.collect()
+            torch.cuda.empty_cache()
+            raise
         print(f"[{self.worker_id}] VLM 로딩 완료")
 
     def _unload_vlm(self):
@@ -193,17 +130,30 @@ class TryonWorker(BaseWorker):
         self._unload_vlm()
         return caption
 
-    def _generate_worn_reference(self, person_image: Image.Image, prompt: str) -> Image.Image:
+    def _generate_worn_reference(
+        self, person_image: Image.Image, cloth_image: Image.Image, prompt: str
+    ) -> Image.Image:
         if self._flux_generator is None:
             print(f"[{self.worker_id}] FLUX 로딩 중... (backend={TRYON_FLUX_BACKEND})")
-            self._flux_generator = build_generator(TRYON_FLUX_BACKEND)
+            try:
+                self._flux_generator = build_generator(TRYON_FLUX_BACKEND)
+            except Exception:
+                # VLM과 같은 이유 -- 로딩 도중 죽어도(네트워크 순단 등) GPU에 이미 올라간
+                # 만큼은 empty_cache()로 반드시 비운다. 안 그러면 다음 job(VLM 로딩)이
+                # 그 자리를 못 찾고 연쇄로 계속 실패한다(실측 확인).
+                gc.collect()
+                torch.cuda.empty_cache()
+                raise
             print(f"[{self.worker_id}] FLUX 로딩 완료")
 
-        worn_reference = self._flux_generator.generate(person_image, prompt)
-
-        if hasattr(self._flux_generator, "unload"):
-            self._flux_generator.unload()
-        self._flux_generator = None
+        try:
+            worn_reference = self._flux_generator.generate(person_image, cloth_image, prompt)
+        finally:
+            # generate() 자체가 실패해도(예: 생성 도중 OOM) unload는 반드시 실행 -- 예전엔
+            # try/finally가 없어서 실패 시 _flux_generator가 언로드 안 된 채 남았다.
+            if hasattr(self._flux_generator, "unload"):
+                self._flux_generator.unload()
+            self._flux_generator = None
 
         return worn_reference
 
@@ -213,10 +163,8 @@ class TryonWorker(BaseWorker):
         {
             "user_image_url": "https://.../person.jpg",
             "product_image_url": "https://.../cloth.jpg",
-            "mask_type": "upper",          # upper | lower — 기본값 upper(하위호환)
-            "fit_type": "regular",         # regular | oversized (cropped는 가드레일상 없음)
-            "num_inference_steps": 50,     # CatVTON 스텝 수, 선택
-            "guidance_scale": 3.0,         # CatVTON guidance, 선택
+            "mask_type": "upper",          # upper | lower — fit_title/description 라벨에만 씀
+            "fit_type": "regular",         # regular | oversized (cropped는 가드레일상 없음) — 프롬프트 강조 톤에만 씀
             "body_height_cm": 170.0,       # 선택, BE 확정 컬럼
             "body_weight_kg": 65.0,        # 선택, BE 확정 컬럼
             "body_waist_cm": 75.0,         # 선택, BE 컬럼 미확정 -- 있으면 근사보다 우선
@@ -226,9 +174,10 @@ class TryonWorker(BaseWorker):
         `body_waist_cm`이 있으면 그 실측값을, 없고 `body_height_cm`/`body_weight_kg`가
         있으면 `body_estimate.py`의 키/몸무게 기반 근사치를 쓴다. 그마저 없거나
         `garment_measurements["WAIST_WIDTH"]`가 없으면 핏 계산 없이 "regular fit"으로
-        FLUX worn-reference를 생성한다(`fit_type`은 이 경로에서도 CatVTON 마스크 자체엔
-        더 이상 안 쓰인다 -- worn-reference-as-person 방식은 마스크를 worn-reference에서
-        새로 계산하므로, 핏은 FLUX 프롬프트가 담당한다).
+        FLUX worn-reference를 생성한다.
+
+        `num_inference_steps`/`guidance_scale`는 CatVTON 전용이었던 필드라 CH027부터는
+        받아도 무시한다(계약 하위호환 — BE가 계속 보내도 에러 안 남).
 
         AI는 이 값들을 BE에 재조회하지 않고 payload로 받은 그대로 쓴다.
         """
@@ -238,8 +187,6 @@ class TryonWorker(BaseWorker):
         fit_type = payload.get("fit_type", "regular")
         if fit_type not in ("regular", "oversized"):
             raise ValueError(f"지원하지 않는 fit_type: {fit_type}")
-        num_inference_steps = payload.get("num_inference_steps", 50)
-        guidance_scale = payload.get("guidance_scale", 3.0)
 
         person_image = download_image(payload["user_image_url"]).convert("RGB")
         cloth_image = download_image(payload["product_image_url"]).convert("RGB")
@@ -279,47 +226,21 @@ class TryonWorker(BaseWorker):
         else:
             dress_prompt = build_regular_dress_prompt(garment_caption)
 
-        # --- 3단계: FLUX worn-reference 생성 ------------------------------------
-        worn_reference = self._generate_worn_reference(person_image, dress_prompt)
+        # --- 3단계: FLUX worn-reference 생성 (최종 결과) -------------------------
+        # image=[person_image, cloth_image] 두 장을 함께 참조로 준다 -- 옷의 실제 색상/
+        # 로고/질감은 cloth_image에서, 포즈/배경/기존 옷차림은 person_image에서 상속된다.
+        result_image = self._generate_worn_reference(person_image, cloth_image, dress_prompt)
 
-        # --- 4단계: CatVTON 합성 (worn-reference-as-person) ---------------------
-        # image=worn-reference, condition_image=실제 상품 사진 -- 마스크를
-        # worn-reference에서 새로 계산해 그래픽/색상 정확도를 확보한다(§10.2).
-        # VLM/FLUX가 끝난 지금에야 로드한다 -- 그 두 단계 동안은 GPU에 CatVTON이 없어야
-        # 6GB급 GPU에서도 VLM(4bit)이 온전히 들어간다. job이 끝나면(성공/실패 무관)
-        # 바로 언로드해서 다음 job의 VLM 단계에 다시 영향 주지 않는다.
-        try:
-            self._ensure_catvton_loaded()
-
-            generator = torch.Generator(device="cuda").manual_seed(42)
-
-            mask_result = self._automasker(worn_reference, mask_type=mask_type, fit_type=fit_type)
-            mask = mask_result["mask"]
-            mask = self._mask_processor.blur(mask, blur_factor=2)
-
-            result_image = self._pipeline(
-                image=worn_reference,
-                condition_image=cloth_image,
-                mask=mask,
-                num_inference_steps=num_inference_steps,
-                guidance_scale=guidance_scale,
-                generator=generator,
-            )[0]
-            result_image = composite_with_original(worn_reference, result_image, mask)
-
-            image_url = upload_image(result_image, prefix="tryon-results")
-
-            # 마스크 시각화도 참고용으로 같이 업로드 (디버깅에 유용)
-            masked_worn_reference = vis_mask(worn_reference, mask)
-            mask_url = upload_image(masked_worn_reference, prefix="tryon-masks")
-            worn_reference_url = upload_image(worn_reference, prefix="tryon-worn-references")
-        finally:
-            self._unload_catvton()
+        image_url = upload_image(result_image, prefix="tryon-results")
 
         return {
             "image_url": image_url,
-            "mask_preview_url": mask_url,
-            "worn_reference_url": worn_reference_url,
+            # CatVTON 없이 3단계 결과가 바로 최종본이라 별도 마스크/중간 산출물이 없다 --
+            # 계약(`docs/requests/BE/040-tryon-job-contract.md`)엔 "FE 노출 불필요, 디버깅용"
+            # 이라 명시돼 있어 null로 둬도 BE 파싱이 깨지지 않는다(BE는 image_url/fit_title/
+            # fit_description만 읽음, TryOnResultService.refreshStatus 확인).
+            "mask_preview_url": None,
+            "worn_reference_url": image_url,
             "fit_type": fit_type,
             "adaptive_masking_used": adaptive_masking_used,
             "fit_title": fit_summary["title"] if fit_summary else None,

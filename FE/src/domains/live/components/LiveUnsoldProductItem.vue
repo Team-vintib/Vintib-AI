@@ -7,6 +7,7 @@ import {
   scheduleProductAuction,
 } from '@/domains/product/api/productApi'
 import { normalizeApiError } from '@/shared/api/http'
+import AppInlineNotice from '@/shared/components/AppInlineNotice.vue'
 
 import type { LiveUnsoldProduct } from '@/domains/auction/types/liveAuction.types'
 
@@ -200,7 +201,7 @@ const keepAuctionScheduled = async () => {
         />
         <span>P</span>
       </div>
-      <p v-if="errorMessage" class="unsold-item__error">{{ errorMessage }}</p>
+      <AppInlineNotice v-if="errorMessage" variant="error">{{ errorMessage }}</AppInlineNotice>
       <div class="unsold-item__direct-actions">
         <button type="button" class="unsold-item__ghost" @click="cancelDirectForm">취소</button>
         <button type="button" class="unsold-item__primary" @click="confirmDirectSale">
@@ -240,9 +241,9 @@ const keepAuctionScheduled = async () => {
       </button>
     </div>
 
-    <p v-if="errorMessage && mode !== 'direct-form'" class="unsold-item__error">
+    <AppInlineNotice v-if="errorMessage && mode !== 'direct-form'" variant="error">
       {{ errorMessage }}
-    </p>
+    </AppInlineNotice>
   </article>
 </template>
 
@@ -432,10 +433,5 @@ const keepAuctionScheduled = async () => {
 
 .unsold-item__primary:hover {
   opacity: 0.92;
-}
-
-.unsold-item__error {
-  color: var(--color-error);
-  font-size: var(--font-size-xs);
 }
 </style>

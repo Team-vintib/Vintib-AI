@@ -14,5 +14,7 @@ public record QualityInspectionJobRequest(
         @JsonProperty("product_id") Long productId,
         @JsonProperty("image_urls") List<String> imageUrls,
         String category,
-        @JsonProperty("include_descriptions") boolean includeDescriptions) {
+        @JsonProperty("include_descriptions") boolean includeDescriptions,
+        @JsonProperty("include_attention_maps") boolean includeAttentionMaps,
+        @JsonProperty("include_annotated_images") boolean includeAnnotatedImages) {
 }

@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import AppInlineNotice from '@/shared/components/AppInlineNotice.vue'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 
 import type { LiveWatchProduct, LiveWatchStatus } from '@/domains/live/types/liveWatch.types'
@@ -129,9 +130,9 @@ watch(
       로그인
     </button>
 
-    <p v-if="message" class="live-direct-sale-panel__message" role="status">
+    <AppInlineNotice v-if="message" variant="success">
       {{ message }}
-    </p>
+    </AppInlineNotice>
     <p class="live-direct-sale-panel__guide">
       밀기 완료 후 배송지와 보유 포인트를 확인하고 결제합니다.
     </p>
@@ -284,12 +285,6 @@ watch(
   background: var(--color-live-background);
   color: var(--color-live-text-primary);
   font-size: var(--font-size-xs);
-}
-
-.live-direct-sale-panel__message {
-  color: var(--color-accent);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
 }
 
 .live-direct-sale-panel__guide {

@@ -10,6 +10,7 @@ import {
 } from '@/domains/auction/api/auctionApi'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { getPointBalance } from '@/domains/point/api/pointApi'
+import AppInlineNotice from '@/shared/components/AppInlineNotice.vue'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 
 import type {
@@ -424,7 +425,7 @@ onBeforeUnmount(() => {
           availablePoints === null ? '-' : `${availablePoints.toLocaleString('ko-KR')}P`
         }}</strong>
       </p>
-      <p v-if="bidError" class="live-auction-panel__error" role="alert">{{ bidError }}</p>
+      <AppInlineNotice v-if="bidError" variant="error">{{ bidError }}</AppInlineNotice>
     </template>
 
     <details v-if="snapshot && snapshot.status !== 'READY'" class="live-auction-panel__history">
@@ -706,12 +707,6 @@ onBeforeUnmount(() => {
 .live-auction-panel__balance strong {
   color: var(--color-live-text-primary);
   font-variant-numeric: tabular-nums;
-}
-
-.live-auction-panel__error {
-  color: var(--color-error);
-  font-size: var(--font-size-xs);
-  line-height: var(--line-height-snug);
 }
 
 .live-auction-panel__history {

@@ -15,6 +15,7 @@ import {
   saveTryOnResult,
 } from '@/domains/tryon/api/tryOnResultApi'
 import { normalizeApiError } from '@/shared/api/http'
+import AppInlineNotice from '@/shared/components/AppInlineNotice.vue'
 
 import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
 import type {
@@ -42,9 +43,7 @@ const authStore = useAuthStore()
 const fileInputElement = ref<HTMLInputElement | null>(null)
 const tryOnProfile = ref<TryOnProfile | null>(null)
 const selectedPhotoUrl = ref<string | null>(
-  props.mockScenario === 'empty' || authStore.user?.id
-    ? null
-    : LIVE_TRY_ON_REGISTERED_PHOTO_URL,
+  props.mockScenario === 'empty' || authStore.user?.id ? null : LIVE_TRY_ON_REGISTERED_PHOTO_URL,
 )
 const generationPhotoUrl = ref<string | null>(null)
 // 실 API 모드에서 생성이 끝나면 실제 결과(이미지·핏 문구)를 여기 담는다. mock 모드에서도
@@ -67,9 +66,7 @@ let previewObjectUrl: string | null = null
 let generationTimer: number | null = null
 let generationSequence = 0
 
-const displayedSourcePhoto = computed(
-  () => generationPhotoUrl.value ?? selectedPhotoUrl.value,
-)
+const displayedSourcePhoto = computed(() => generationPhotoUrl.value ?? selectedPhotoUrl.value)
 
 const clearGenerationTimer = () => {
   generationSequence += 1
@@ -113,7 +110,9 @@ const resetMockScenario = (scenario: LiveTryOnMockScenario) => {
   clearGenerationTimer()
   releasePreviewObjectUrl()
   selectedPhotoUrl.value =
-    scenario === 'empty' ? null : tryOnProfile.value?.bodyPhotoUrl ?? LIVE_TRY_ON_REGISTERED_PHOTO_URL
+    scenario === 'empty'
+      ? null
+      : (tryOnProfile.value?.bodyPhotoUrl ?? LIVE_TRY_ON_REGISTERED_PHOTO_URL)
   generationPhotoUrl.value = null
   panelState.value = scenario === 'empty' ? 'EMPTY' : 'READY'
   shouldFailNextGeneration.value = scenario === 'error'
@@ -436,12 +435,16 @@ onBeforeUnmount(() => {
           <p>AI 시착에 사용할 정면 전신 이미지 한 장이 필요합니다.</p>
         </div>
 
-        <p v-if="fileError" class="live-try-on-panel__error" role="alert">
+        <AppInlineNotice v-if="fileError" class="live-try-on-panel__notice" variant="error">
           {{ fileError }}
-        </p>
+        </AppInlineNotice>
 
         <div class="live-try-on-panel__actions">
-          <button type="button" class="live-try-on-panel__button--secondary" @click="openFilePicker">
+          <button
+            type="button"
+            class="live-try-on-panel__button--secondary"
+            @click="openFilePicker"
+          >
             이미지 등록
           </button>
           <button type="button" class="live-try-on-panel__button--primary" disabled>
@@ -466,19 +469,19 @@ onBeforeUnmount(() => {
           <figcaption>등록 이미지</figcaption>
         </figure>
 
-        <p v-if="fileError" class="live-try-on-panel__error" role="alert">
+        <AppInlineNotice v-if="fileError" class="live-try-on-panel__notice" variant="error">
           {{ fileError }}
-        </p>
+        </AppInlineNotice>
 
         <div class="live-try-on-panel__actions">
-          <button type="button" class="live-try-on-panel__button--secondary" @click="openFilePicker">
-            이미지 변경
-          </button>
           <button
             type="button"
-            class="live-try-on-panel__button--primary"
-            @click="startGeneration"
+            class="live-try-on-panel__button--secondary"
+            @click="openFilePicker"
           >
+            이미지 변경
+          </button>
+          <button type="button" class="live-try-on-panel__button--primary" @click="startGeneration">
             AI 시착 시작
           </button>
         </div>
@@ -507,9 +510,7 @@ onBeforeUnmount(() => {
           <button type="button" class="live-try-on-panel__button--secondary" disabled>
             이미지 변경
           </button>
-          <button type="button" class="live-try-on-panel__button--primary" disabled>
-            생성 중
-          </button>
+          <button type="button" class="live-try-on-panel__button--primary" disabled>생성 중</button>
         </div>
       </section>
 
@@ -531,12 +532,12 @@ onBeforeUnmount(() => {
             <strong>{{ generatedResult.fitTitle }}</strong>
             <p v-if="generatedResult.fitDescription">{{ generatedResult.fitDescription }}</p>
           </div>
-          <p v-if="isResultSaved" class="live-try-on-panel__saved" role="status">
+          <AppInlineNotice v-if="isResultSaved" class="live-try-on-panel__notice" variant="success">
             시착 결과를 저장했습니다.
-          </p>
-          <p v-if="fileError" class="live-try-on-panel__error" role="alert">
+          </AppInlineNotice>
+          <AppInlineNotice v-if="fileError" class="live-try-on-panel__notice" variant="error">
             {{ fileError }}
-          </p>
+          </AppInlineNotice>
         </div>
 
         <div class="live-try-on-panel__actions">
@@ -578,14 +579,14 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="live-try-on-panel__actions">
-          <button type="button" class="live-try-on-panel__button--secondary" @click="openFilePicker">
-            이미지 변경
-          </button>
           <button
             type="button"
-            class="live-try-on-panel__button--primary"
-            @click="startGeneration"
+            class="live-try-on-panel__button--secondary"
+            @click="openFilePicker"
           >
+            이미지 변경
+          </button>
+          <button type="button" class="live-try-on-panel__button--primary" @click="startGeneration">
             다시 시도
           </button>
         </div>
@@ -878,23 +879,8 @@ onBeforeUnmount(() => {
   opacity: 0.72;
 }
 
-.live-try-on-panel__error,
-.live-try-on-panel__saved {
-  padding: 8px 10px;
-  border-radius: var(--radius-control);
+.live-try-on-panel__notice {
   margin-top: var(--space-3);
-  font-size: 11px;
-  line-height: 17px;
-}
-
-.live-try-on-panel__error {
-  background: rgba(196, 61, 70, 0.14);
-  color: #f0a2a8;
-}
-
-.live-try-on-panel__saved {
-  background: rgba(77, 139, 98, 0.17);
-  color: #9bd0ac;
 }
 
 .live-try-on-panel__photo--processing::after {
