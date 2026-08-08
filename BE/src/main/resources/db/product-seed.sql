@@ -201,7 +201,7 @@ INSERT INTO product (
       -- 20. 국내 유일 y2k 야후 보스톤백 더플백
       (
           (SELECT id FROM member WHERE email = 'vintibb1@gmail.com'),
-          (SELECT id FROM category WHERE name_en = 'CROSS_BAG' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'ACCESSORY' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
+          (SELECT id FROM category WHERE name_en = 'CROSS_BAG' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'BAG' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
           NULL,
           '국내 유일 y2k 야후 보스톤백 더플백', '보스턴백(대략 가로 45cm x 세로 38cm) 입니다. 큰 오염이나 데미지는 없으나 약간의 사용감이 있는 상태(8.5/10)입니다. 교환 및 환불은 불가합니다.',
           'A', 'FREE', 'NAVY', 'Cotton / Poly',
