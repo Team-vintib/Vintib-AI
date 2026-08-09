@@ -26,9 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
  * 상품 편성은 각 계정이 API로 직접 하도록 비워 둔다.
  *
  * <p><b>썸네일은 전용 이미지를 쓴다.</b> 상품 이미지에서 유도하던 이전 방식 대신, 라이브
- * 전용으로 {@code vintib-public/live/live (1).png} ~ {@code live (4).png} 4장을 수동
+ * 전용으로 {@code vintib-public/lives/live (1).png} ~ {@code live (4).png} 4장을 수동
  * 업로드해 두고 그 키만 문자열로 채운다({@code docs/sync-images-to-prod.md}의 products 업로드
- * 절차와 같은 방식, 폴더만 {@code live/}). {@code LiveProduct} 레코드를 만들지 않으므로 위
+ * 절차와 같은 방식, 폴더만 {@code lives/}). {@code LiveProduct} 레코드를 만들지 않으므로 위
  * 편성 충돌과는 무관하다.
  */
 @Slf4j
@@ -40,7 +40,7 @@ public class DemoLiveSeeder implements ApplicationRunner {
     private record ScheduledLiveSeed(String title, String description, LocalDateTime scheduledAt) {
     }
 
-    private static final String THUMBNAIL_FOLDER = "live";
+    private static final String THUMBNAIL_FOLDER = "lives";
 
     // 예약 시각은 전부 지금부터 2일 이내로 잡는다 — "곧 열릴 방송"으로 보이게.
     private static final List<ScheduledLiveSeed> BUSINESS1_LIVES = List.of(
