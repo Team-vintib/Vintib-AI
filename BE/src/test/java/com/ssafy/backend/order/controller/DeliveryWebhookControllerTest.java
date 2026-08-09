@@ -32,4 +32,14 @@ class DeliveryWebhookControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         verify(deliveryWebhookService, never()).handle(any(), any(), any());
     }
+
+    @Test
+    void 도달_가능_여부_확인은_인증_없이_200을_반환한다() {
+        DeliveryWebhookController controller =
+                new DeliveryWebhookController(deliveryWebhookService, deliveryTrackingClient);
+
+        var response = controller.checkReachable();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
 }

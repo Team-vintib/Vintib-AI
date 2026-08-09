@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -27,6 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
  * URL로 검증용 테스트 POST를 1회 보내는데, 서명 헤더 없이 오는 경우가 있다. 헤더가 아예 없으면 서명 검증
  * 없이 200만 돌려준다(연결 확인용 ping으로 간주) — 헤더가 있는데 서명이 틀린 경우는 여전히
  * {@link DeliveryWebhookService}에서 400으로 거부한다.
+ *
+ * <p>{@link #checkReachable}: 등록 API 문서상으로는 POST로 검증한다고 돼 있지만, 실제로는 등록 전에
+ * GET(또는 HEAD)으로 먼저 도달 가능 여부를 찔러본다.
+ * ({@code WEBHOOK_ENDPOINT_UNREACHABLE: HTTP 405}). 이게 없으면 POST만 있는 컨트롤러라 405가 나서
+ * 등록 자체가 거부된다.
  *
  * <p>{@link #registerWebhookEndpoint}: deliveryapi.co.kr에 웹훅 수신 URL({@link #receive})을
  * 등록하는 수동 트리거 전용 내부 도구. 계정당 등록 가능한 엔드포인트가 최대 10개라 앱 시작 시 자동으로
@@ -58,6 +64,17 @@ public class DeliveryWebhookController {
             return ResponseEntity.ok(ApiResponse.<Void>success(null));
         }
         deliveryWebhookService.handle(rawBody, timestamp, signature);
+        return ResponseEntity.ok(ApiResponse.<Void>success(null));
+    }
+
+    @Operation(summary = "배송 조회 웹훅 도달 가능 여부 확인",
+            description = "deliveryapi.co.kr이 엔드포인트 등록 전에 GET/HEAD로 먼저 호출하는 도달 가능성 확인용. "
+                    + "인증·서명 없이 항상 200을 반환한다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "도달 가능")
+    })
+    @GetMapping("/api/webhooks/delivery")
+    public ResponseEntity<ApiResponse<Void>> checkReachable() {
         return ResponseEntity.ok(ApiResponse.<Void>success(null));
     }
 
