@@ -51,13 +51,12 @@ def test_prompt_defect_types_are_all_in_taxonomy():
 
 
 def test_prompt_set_covers_every_validated_defect_type():
-    """discoloration/pilling/fray는 hotfix/472로 미검증 상태라 프롬프트에서 뺐다. dirt_mark도
-    hotfix/472로 뺐다 — stain과 실물상 같은 얼룩을 거의 항상 같이 잡아 cross-type dedup으로도
-    못 거르는 중복이 반복돼, 프롬프트 자체를 stain/hole_tear 2종으로 줄였다."""
+    """discoloration/pilling/fray는 hotfix/472로 미검증 상태라 프롬프트에서 뺐다 —
+    `DefectType` 전체가 아니라 검증된 3종(stain/dirt_mark/hole_tear)만 커버하면 된다."""
     types = {
         t for _, t in select_prompt_set(GarmentCategory.top_knit, BaseColor.light).defect_prompts
     }
-    assert types == {DefectType.stain, DefectType.hole_tear}
+    assert types == {DefectType.stain, DefectType.dirt_mark, DefectType.hole_tear}
 
 
 def test_prompt_lookup_returns_matching_defect_type():
@@ -72,16 +71,13 @@ def test_unknown_prompt_has_no_defect_type():
 
 
 def test_lab_verified_short_noun_phrases_survive_in_the_prompts():
-    """LAB-12/LAB-46이 실측한 짧은 명사구 골격이 유지돼야 한다.
-
-    hotfix/472로 "a dirty mark"(dirt_mark)는 프롬프트에서 뺐다 — stain과 실물상 겹치는
-    중복을 계속 만들어서 이 골격에서도 제외한다.
-    """
+    """LAB-12/LAB-46이 실측한 짧은 명사구 골격이 유지돼야 한다."""
     prompts = [
         p for p, _ in select_prompt_set(GarmentCategory.top_knit, BaseColor.light).defect_prompts
     ]
     joined = " | ".join(prompts)
     assert "a stain on fabric" in joined
+    assert "a dirty mark" in joined
     assert "a hole or tear in fabric" in joined
 
 

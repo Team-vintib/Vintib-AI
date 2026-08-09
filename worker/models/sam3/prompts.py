@@ -112,13 +112,15 @@ BENIGN_PROMPTS: tuple[str, ...] = STRUCTURAL_BENIGN_PROMPTS + TEXTURE_BENIGN_PRO
 # `registry.py`/`scoring.py`의 대응 항목은 그대로 둔다 — 나중에 재검증되면 여기 한 줄만
 # 다시 추가하면 된다.
 #
-# hotfix/472: dirt_mark("a dirty mark")도 뺐다 — stain과 실물상 같은 얼룩을 거의 항상
-# 같이 잡아서(실측: 소매 STAIN bbox가 DIRT_MARK bbox에 크기만 다르게 포함) cross-type
-# dedup(IoU 기준)이 크기 차이가 크면 못 잡는 케이스가 반복됐다. 프롬프트 자체를 하나 줄여
-# 이 유형의 중복 발생을 원천 차단한다. `DefectType.dirt_mark`/`registry.py`/`scoring.py`의
-# 대응 항목은 그대로 둔다 — 재검증되면 이 줄만 다시 추가하면 된다.
+# hotfix/472: dirt_mark("a dirty mark")는 한 차례 뺐다가 다시 되살렸다 — stain과 실물상
+# 같은 얼룩을 거의 항상 같이 잡는 문제(실측: 소매 STAIN bbox가 DIRT_MARK bbox에 크기만
+# 다르게 포함) 자체는 여전하지만, 프롬프트를 줄여 유형 구분(설명 다양성)을 잃는 대신
+# `findings.dedupe_cross_type_overlap()`에 포함 비율(containment) 기준을 추가해 크기
+# 차이가 큰 중복도 병합되게 했다(`registry.cross_type_containment_min` 참고) — 원인을
+# 프롬프트가 아니라 dedup 로직 쪽에서 고치는 쪽으로 방향을 바꿨다.
 _DEFECT_PROMPTS: tuple[tuple[str, DefectType], ...] = (
     ("a stain on fabric", DefectType.stain),
+    ("a dirty mark", DefectType.dirt_mark),
     ("a hole or tear in fabric", DefectType.hole_tear),
 )
 

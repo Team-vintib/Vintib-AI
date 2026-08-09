@@ -31,7 +31,8 @@ class SegmenterConfig(TypedDict):
     suppress_benign: bool  # 양성(주름·그림자·구조적 개구부) 억제 로직 on/off
     benign_containment: float  # 하자가 양성에 이만큼 잠기면 억제 후보로 본다
     dedupe_cross_type: bool  # 서로 다른 defect_type이 같은 실물 부위를 중복 검출했을 때 병합 on/off
-    cross_type_iou_min: float  # 이 이상 겹치면 confidence 낮은 쪽을 버린다(findings.py 참고)
+    cross_type_iou_min: float  # 대칭 IoU가 이 이상이면 병합(findings.py 참고)
+    cross_type_containment_min: float  # 포함 비율(둘 중 큰 쪽)이 이 이상이어도 병합 — 크기 차이 큰 쌍용
     dedupe_same_type: bool  # 같은 defect_type이 "박스 안에 박스"로 겹칠 때 병합 on/off
     same_type_containment_min: float  # 포함 비율(둘 중 큰 쪽)이 이 이상이면 병합(findings.py 참고)
     min_area_ratio: float  # 이 면적 비율 미달 인스턴스는 노이즈로 폐기
@@ -68,6 +69,11 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         # 복귀할지 다시 판단할 것.
         "dedupe_cross_type": True,
         "cross_type_iou_min": 0.7,
+        # hotfix/472: dirt_mark 프롬프트를 되살리며 추가 — stain/dirt_mark처럼 크기 차이가
+        # 큰 서로 다른 유형 쌍은 IoU만으로 못 잡혀서(작은 쪽이 큰 쪽에 거의 다 포함돼도
+        # 합집합 기준 IoU는 낮게 나옴), same_type_containment_min과 같은 값(0.8)으로
+        # 포함 비율 기준도 같이 본다(findings.py의 dedupe_cross_type_overlap 참고).
+        "cross_type_containment_min": 0.8,
         # ⚠️ 라벨링된 검증셋 없이 잡은 값 — 스윕 대상. 실측 중복(small_pro.jpg)은 작은
         # STAIN 박스가 큰 STAIN 박스에 97~100% 포함돼 있었다(IoU는 낮아도 포함 비율은
         # 매우 높음) — 그래서 IoU가 아니라 포함 비율을 쓴다(findings.py 참고). 0.8로
@@ -118,6 +124,11 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         # 복귀할지 다시 판단할 것.
         "dedupe_cross_type": True,
         "cross_type_iou_min": 0.7,
+        # hotfix/472: dirt_mark 프롬프트를 되살리며 추가 — stain/dirt_mark처럼 크기 차이가
+        # 큰 서로 다른 유형 쌍은 IoU만으로 못 잡혀서(작은 쪽이 큰 쪽에 거의 다 포함돼도
+        # 합집합 기준 IoU는 낮게 나옴), same_type_containment_min과 같은 값(0.8)으로
+        # 포함 비율 기준도 같이 본다(findings.py의 dedupe_cross_type_overlap 참고).
+        "cross_type_containment_min": 0.8,
         # ⚠️ 라벨링된 검증셋 없이 잡은 값 — 스윕 대상. 실측 중복(small_pro.jpg)은 작은
         # STAIN 박스가 큰 STAIN 박스에 97~100% 포함돼 있었다(IoU는 낮아도 포함 비율은
         # 매우 높음) — 그래서 IoU가 아니라 포함 비율을 쓴다(findings.py 참고). 0.8로
