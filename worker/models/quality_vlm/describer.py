@@ -18,7 +18,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
 from PIL import Image
-from sam3.contracts import Finding, FindingStatus
+from sam3.contracts import Finding
 from sam3.segmenter import SegmentationResult
 
 from . import registry
@@ -139,20 +139,22 @@ def attach_descriptions(
     findings: Sequence[Finding],
     describer: DefectDescriber,
 ) -> list[Finding]:
-    """DETECTED finding에 crop + VLM 설명을 채운 새 리스트를 반환한다.
+    """DETECTED/SUSPECTED finding 전부에 crop + VLM 설명을 채운 새 리스트를 반환한다.
 
     `Finding`은 frozen dataclass라 `dataclasses.replace()`로 새 인스턴스를 만든다 — 원본
-    리스트는 바뀌지 않는다. SUSPECTED는 건너뛴다(호출 수를 줄이기 위한 v1 범위 제한,
-    CH011 계획 참고). **개별 실패는 그 finding만 `description=None`으로 남기고 계속
-    진행한다** — `inspection_logger`의 "best-effort, 응답을 막지 않는다" 원칙과 동일하다.
-    설명 하나 실패했다고 검수 결과 전체를 잃으면 안 된다.
+    리스트는 바뀌지 않는다.
+
+    hotfix/472: 원래는 SUSPECTED를 건너뛰었다(호출 수를 줄이기 위한 v1 범위 제한, CH011
+    계획 참고) — SUSPECTED도 설명이 나와야 한다는 요청으로 이 제한을 없앤다. finding 수만큼
+    VLM을 순차 호출하는 구조라 SUSPECTED가 많은 이미지는 레이턴시가 그만큼 늘어난다.
+
+    **개별 실패는 그 finding만 `description=None`으로 남기고 계속 진행한다** —
+    `inspection_logger`의 "best-effort, 응답을 막지 않는다" 원칙과 동일하다. 설명 하나
+    실패했다고 검수 결과 전체를 잃으면 안 된다.
     """
     by_image = {r.image_index: r for r in results}
     out: list[Finding] = []
     for finding in findings:
-        if finding.status is not FindingStatus.detected:
-            out.append(finding)
-            continue
         result = by_image.get(finding.image_index)
         if result is None:
             out.append(finding)

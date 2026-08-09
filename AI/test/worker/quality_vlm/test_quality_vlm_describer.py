@@ -136,17 +136,18 @@ class _FailingDescriber(DefectDescriber):
         raise RuntimeError("boom")
 
 
-def test_attach_descriptions_only_processes_detected_findings():
+def test_attach_descriptions_processes_detected_and_suspected_findings():
+    # hotfix/472: SUSPECTED도 설명을 채운다 — 원래 DETECTED만 처리하던 v1 범위 제한을 없앴다.
     detected = _finding("detected", status=FindingStatus.detected)
     suspected = _finding("suspected", status=FindingStatus.suspected)
     describer = _RecordingDescriber()
 
     out = attach_descriptions([_segmentation_result()], [detected, suspected], describer)
 
-    assert describer.calls == ["detected"]
+    assert describer.calls == ["detected", "suspected"]
     by_key = {f.key: f for f in out}
     assert by_key["detected"].description == "얼룩 설명"
-    assert by_key["suspected"].description is None
+    assert by_key["suspected"].description == "얼룩 설명"
 
 
 def test_attach_descriptions_leaves_original_findings_untouched():
