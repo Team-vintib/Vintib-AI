@@ -1,0 +1,116 @@
+{
+  "success": true,
+  "data": {
+    "status": "COMPLETED",
+    "result": {
+      "inspection_id": "insp_187_DESKTOP-MR7IIH9-quality_check",
+      "product_id": 187,
+      "model": {
+        "backend": "sam3_pcs",
+        "model_id": "facebook/sam3",
+        "prompt_set": "top_shirt/light"
+      },
+      "condition_score": 87.1,
+      "condition_grade": "A",
+      "summary": "[이미지 1]\n1. 왼쪽 어깨 얼룩\n2. 목깃 얼룩 (의심)\n3. 목깃 얼룩 (의심)\n\n[이미지 2]\n1. 목깃 구멍·찢어짐",
+      "image_summaries": [
+        { "image_index": 0, "summary": "1. 왼쪽 어깨 얼룩\n2. 목깃 얼룩 (의심)\n3. 목깃 얼룩 (의심)" },
+        { "image_index": 1, "summary": "1. 목깃 구멍·찢어짐" }
+      ],
+      "findings": [
+        {
+          "key": "dirt_mark_0_1_1",
+          "defect_type": "DIRT_MARK",
+          "status": "DETECTED",
+          "image_index": 0,
+          "section_no": 1,
+          "section": "SHOULDER_LEFT",
+          "confidence": 0.5088,
+          "area_ratio": 0.000066,
+          "bbox": [0.2996, 0.2983, 0.3098, 0.3059],
+          "severity": "MINOR",
+          "matched_prompt": "a dirty mark",
+          "statement_required": true,
+          "needs_seller_review": false,
+          "no": 1,
+          "label": "얼룩",
+          "description": "어깨 위쪽에 희미한 얼룩이 보입니다."
+        },
+        {
+          "key": "dirt_mark_0_2_1",
+          "defect_type": "DIRT_MARK",
+          "status": "SUSPECTED",
+          "image_index": 0,
+          "section_no": 2,
+          "section": "COLLAR",
+          "confidence": 0.3086,
+          "area_ratio": 0.000063,
+          "bbox": [0.3728, 0.2873, 0.3851, 0.2955],
+          "severity": "MINOR",
+          "matched_prompt": "a dirty mark",
+          "statement_required": false,
+          "needs_seller_review": false,
+          "no": 2,
+          "label": "얼룩",
+          "description": "목깃 안쪽에 작은 얼룩이 확인됩니다."
+        },
+        {
+          "key": "dirt_mark_0_2_2",
+          "defect_type": "DIRT_MARK",
+          "status": "SUSPECTED",
+          "image_index": 0,
+          "section_no": 2,
+          "section": "COLLAR",
+          "confidence": 0.3037,
+          "area_ratio": 0.002609,
+          "bbox": [0.3026, 0.2773, 0.4192, 0.3075],
+          "severity": "MINOR",
+          "matched_prompt": "a dirty mark",
+          "statement_required": false,
+          "needs_seller_review": false,
+          "no": 3,
+          "label": "얼룩",
+          "description": "목깃 안쪽에 작은 얼룩이 확인됩니다."
+        },
+        {
+          "key": "hole_tear_1_2_1",
+          "defect_type": "HOLE_TEAR",
+          "status": "DETECTED",
+          "image_index": 1,
+          "section_no": 2,
+          "section": "COLLAR",
+          "confidence": 0.9395,
+          "area_ratio": 0.002297,
+          "bbox": [0.6092, 0.2901, 0.709, 0.3399],
+          "severity": "MINOR",
+          "matched_prompt": "a hole or tear in fabric",
+          "statement_required": true,
+          "needs_seller_review": true,
+          "no": 1,
+          "label": "구멍·찢어짐",
+          "description": "흰색 티셔츠의 오른쪽 가슴 부근에 흰색 끝이 드러나는 작은 찢어짐이 확인됩니다."
+        }
+      ],
+      "section_scores": [
+        { "image_index": 0, "section_no": 1, "section": "SHOULDER_LEFT", "score": 0.5088 },
+        { "image_index": 0, "section_no": 2, "section": "COLLAR", "score": 0.3086 },
+        { "image_index": 0, "section_no": 3, "section": "SHOULDER_RIGHT", "score": 0.0 },
+        { "image_index": 0, "section_no": 4, "section": "SLEEVE_LEFT", "score": 0.0 },
+        { "image_index": 0, "section_no": 5, "section": "CHEST_CENTER", "score": 0.0 },
+        { "image_index": 0, "section_no": 6, "section": "SLEEVE_RIGHT", "score": 0.0 },
+        { "image_index": 0, "section_no": 7, "section": "HEM_LEFT", "score": 0.0 },
+        { "image_index": 0, "section_no": 8, "section": "HEM_CENTER", "score": 0.0 },
+        { "image_index": 0, "section_no": 9, "section": "HEM_RIGHT", "score": 0.0 },
+        { "image_index": 1, "section_no": 1, "section": "SHOULDER_LEFT", "score": 0.0 },
+        { "image_index": 1, "section_no": 2, "section": "COLLAR", "score": 0.9395 },
+        { "image_index": 1, "section_no": 3, "section": "SHOULDER_RIGHT", "score": 0.0 },
+        { "image_index": 1, "section_no": 4, "section": "SLEEVE_LEFT", "score": 0.0 },
+        { "image_index": 1, "section_no": 5, "section": "CHEST_CENTER", "score": 0.0 },
+        { "image_index": 1, "section_no": 6, "section": "SLEEVE_RIGHT", "score": 0.0 },
+        { "image_index": 1, "section_no": 7, "section": "HEM_LEFT", "score": 0.0 },
+        { "image_index": 1, "section_no": 8, "section": "HEM_CENTER", "score": 0.0 },
+        { "image_index": 1, "section_no": 9, "section": "HEM_RIGHT", "score": 0.0 }
+      ]
+    }
+  }
+}
