@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "라이브 / 채팅(Lives)", description = "라이브 채팅 이력 조회 API. 실시간 송수신은 STOMP로 처리한다")
+@Tag(name = "라이브 / 채팅(Lives)", description = "라이브 방송 개설/조회 API")
 @Validated
 @RestController
 @RequestMapping("/api/lives/{liveId}/chat-messages")
@@ -29,8 +29,9 @@ public class ChatMessageController {
     private final ChatMessageService chatMessageService;
 
     @Operation(
-            summary = "채팅 과거 메시지 조회",
+            summary = "채팅 메시지 목록 조회",
             description = "라이브의 대화 이력을 커서 페이징으로 반환한다. **비회원도 조회할 수 있다.** "
+                    + "**실시간 송수신은 이 API가 아니라 STOMP WebSocket으로 처리한다** — "
                     + "WebSocket은 접속 이후 메시지만 주므로 이력은 이 API로 채운다.\n\n"
                     + "**커서는 page 번호가 아니라 messageId다.** 채팅은 조회 중에도 계속 쌓여서 "
                     + "offset 방식이면 경계에서 메시지가 밀리거나 중복된다. 응답의 nextCursor를 "

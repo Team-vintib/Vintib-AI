@@ -1,9 +1,11 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.chat.router import router as chat_router
+from app.chat.service import get_chat_service
 from app.core.config import settings
 from app.gateway.router import RESULTS_DIR
 from app.gateway.router import router as gateway_router
@@ -16,7 +18,24 @@ from app.recommend.router import router as recommend_router
 from app.recommend.similar.router import router as similar_router
 from app.tryon.router import router as tryon_router
 
-app = FastAPI(title=settings.app_name)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 채팅 욕설 판정기(KcELECTRA-base-hate) 로딩이 130초대라(CH030), 배포 후 첫 채팅
+    # 메시지가 그 지연을 그대로 떠안지 않도록 기동 시점에 미리 로드해둔다.
+    # get_chat_service()는 @lru_cache 싱글턴이라 여기서 한 번 호출해두면 이후 요청은
+    # 캐시된 인스턴스를 그대로 재사용한다.
+    print("[startup] 채팅 욕설 판정기 로딩 중...")
+    service = get_chat_service()
+    # 생성만으론 모델이 실제로 로드되지 않는다(HuggingFaceClassifier가 지연 로드) --
+    # 여기서 빈 문자열로 한 번 실제 호출해서 로딩 자체를 강제한다. 실패하면 배포
+    # 직후 로그로 바로 보이도록 여기서 그대로 예외를 띄운다(삼키지 않음).
+    service._classifier.score("")
+    print("[startup] 채팅 욕설 판정기 로딩 완료")
+    yield
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 # similar_router가 recommend_router보다 먼저 등록돼야 한다 — 둘 다 3세그먼트 경로
 # (/products/{id}/similar vs /{entity}/{entity_id}/similar)라 순서가 매칭 우선순위를

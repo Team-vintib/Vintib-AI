@@ -18,6 +18,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     /** 카테고리로 상품을 찾는다. 라이브 목록의 카테고리 필터가 쓴다. */
     List<Product> findByCategoryIdIn(Collection<Long> categoryIds);
 
+    /**
+     * 유사 상품 캐시 배치({@code SimilarProductCacheScheduler}, CH034)가 갱신 대상을 고를 때
+     * 쓴다. id만 뽑는다 — 배치가 상품을 대량으로 순회할 수 있어 엔티티 전체를 로드하지 않는다.
+     */
+    @Query("select p.id from Product p where p.saleStatus in :statuses")
+    List<Long> findIdsBySaleStatusIn(@Param("statuses") Collection<SaleStatus> statuses);
+
     /** 판매자의 공개 상품 수(DRAFT 제외) — 상품 상세의 판매자 통계에 쓴다. */
     long countBySeller_IdAndSaleStatusNot(Long sellerId, SaleStatus excludedStatus);
 

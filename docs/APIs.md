@@ -123,19 +123,23 @@
 | 라이브 상세 조회 | GET | `/lives/{liveId}` |  | LIVE-005 | ✓ |
 | 현재 소개 상품 변경 | PATCH | `/lives/{liveId}/current-product` | ✓ | LIVE-004 | ✓ |
 | 라이브 상태 변경 (종료 등) | PATCH | `/lives/{liveId}/status` | ✓ | LIVE-002, LIVE-004 | ✓ |
-| 라이브 상품 목록 조회 | GET | `/lives/{liveId}/products` |  | LIVE-003 | ✓ |
+| 라이브 상품 목록 조회 | GET | `/lives/{liveId}/products` | ✓ | LIVE-003 | ✓ |
 | 라이브 상품 등록 | POST | `/lives/{liveId}/products` | ✓ | LIVE-003, LIVE-006 | ✓ |
 | 라이브 상품 해제 | DELETE | `/lives/{liveId}/products/{productId}` | ✓ | LIVE-003 | ✓ |
 | 영상 접속 토큰 발급 | POST | `/lives/{liveId}/video-token` |  | LIVE-004 | ✓ |
 | 채팅 메시지 목록 조회 | GET | `/lives/{liveId}/chat-messages` |  | CHAT-001 | ✓ |
 | 방송 종료 요약 조회 | GET | `/lives/{liveId}/summary` | ✓ | LIVE-006 | ✓ |
 | 방송별 유찰 상품 목록 조회 | GET | `/lives/{liveId}/unsold-products` | ✓ | LIVE-006 | ✓ |
+| 예약 라이브 시작 알림 신청 | POST | `/lives/{liveId}/reminders` | ✓ |  | ✓ |
+| 예약 라이브 시작 알림 취소 | DELETE | `/lives/{liveId}/reminders` | ✓ |  | ✓ |
 
 > `GET /lives`는 `hostId`로 필터링 가능 — 본인이면 종료·취소 포함 전체, 아니면 예정·진행 중만.
 >
 > 채팅 전송은 REST가 아닌 **STOMP WebSocket**. 방송 종료는 `PATCH .../status` body `{ "status": "ENDED" }`(호스트만, 멱등 아님).
 >
 > `summary`/`unsold-products`는 **호스트 본인만** 조회(판매 실적이라 비공개). `summary.results`는 편성 상품 전체 기준 — 낙찰(`AUCTION`)과 방송 중 정찰가 즉시구매(`DIRECT_SALE`)를 함께 집계하며, 안 팔린 상품에도 편성 시점 `saleType`/`registeredPrice`가 채워진다.
+>
+> `reminders`(FE 요청 008 §3.2.1)는 별도 기능 ID가 없다 — 예정(SCHEDULED) 방송에만 신청 가능, 중복 신청/미신청 취소 모두 200(멱등).
 
 ## 경매 / 입찰 (Auctions)
 

@@ -481,11 +481,7 @@ onBeforeUnmount(() => {
         v-if="product.aiQualityAnalysis"
         :analysis="product.aiQualityAnalysis"
       />
-      <ProductSimilarRecommendation
-        :product-id="product.id"
-        :category-id="product.categoryId"
-        :brand="product.brand"
-      />
+      <ProductSimilarRecommendation :product-id="product.id" />
 
       <section
         v-if="aiModelCutStatus !== 'NONE'"
