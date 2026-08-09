@@ -78,8 +78,14 @@ def test_result_label_names_the_matched_rule():
 # --- 백엔드 스왑 ----------------------------------------------------------
 
 
-def test_default_backend_is_dependency_free():
-    assert isinstance(build_classifier(), RuleBasedClassifier)
+def test_default_backend_is_kcelectra():
+    # CH030: recall이 너무 낮은 rule_based 대신 KcELECTRA-base-hate가 기본이다.
+    assert isinstance(build_classifier(), HuggingFaceClassifier)
+
+
+def test_rule_based_still_available_as_fallback():
+    # 원복은 registry.ACTIVE_CLASSIFIER를 "rule_based"로 되돌리는 것만으로 가능해야 한다.
+    assert isinstance(build_classifier("rule_based"), RuleBasedClassifier)
 
 
 def test_model_backed_key_builds_hf_adapter_without_loading():

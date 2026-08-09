@@ -28,7 +28,7 @@ CLASSIFIER_BACKENDS: dict[str, str | None] = {
     "kcelectra_base_hate": "beomi/beep-KcELECTRA-base-hate",  # acc 99.5%, 악성 recall 98.8%
     "kor_unsmile": "smilegate-ai/kor_unsmile",  # 기존 baseline, 악성 recall 58.3%
 }
-ACTIVE_CLASSIFIER = "rule_based"  # <- 여기 키만 바꾸면 스왑
+ACTIVE_CLASSIFIER = "kcelectra_base_hate"  # <- 여기 키만 바꾸면 스왑(CH030, rule_based recall 16.7%가 너무 낮아 교체)
 
 
 class EmbedderConfig(TypedDict):
