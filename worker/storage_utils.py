@@ -11,6 +11,7 @@
 
 import io
 import os
+import time
 
 import requests
 from PIL import Image
@@ -23,11 +24,25 @@ def _headers() -> dict[str, str]:
     return {"X-API-Key": _API_KEY} if _API_KEY else {}
 
 
-def download_image(url: str, timeout: float = 30.0) -> Image.Image:
-    """상품/사용자 이미지 URL을 내려받는다."""
-    resp = requests.get(url, timeout=timeout)
-    resp.raise_for_status()
-    return Image.open(io.BytesIO(resp.content))
+def download_image(url: str, timeout: float = 30.0, retries: int = 3, retry_delay: float = 2.0) -> Image.Image:
+    """상품/사용자 이미지 URL을 내려받는다.
+
+    최대 `retries`회, `retry_delay`초 간격으로 재시도한다. 등록 AI 착용컷·시착 워커 둘 다
+    "cannot identify image file"(순간적 네트워크 오류 또는 방금 올라간 이미지의 전파 지연
+    추정)로 가끔/자주 실패하는 걸 실측으로 확인했다 — 둘 다 이 함수를 공용으로 쓰므로
+    여기서 한 번만 고치면 된다. `PIL.UnidentifiedImageError`는 `OSError`의 서브클래스다.
+    """
+    last_error: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            resp = requests.get(url, timeout=timeout)
+            resp.raise_for_status()
+            return Image.open(io.BytesIO(resp.content))
+        except (requests.RequestException, OSError) as e:
+            last_error = e
+            if attempt < retries:
+                time.sleep(retry_delay)
+    raise last_error
 
 
 def download_bytes(url: str, timeout: float = 60.0) -> bytes:
