@@ -1,9 +1,4 @@
-import {
-  deleteMockDefaultTryOnImage,
-  readImageFileAsDataUrl,
-  readMockProfileMedia,
-  saveMockDefaultTryOnImage,
-} from '@/shared/api/mockProfileMediaStorage'
+import { readImageFileAsCompressedDataUrl } from '@/shared/api/mockProfileMediaStorage'
 import { http } from '@/shared/api/http'
 import axios from 'axios'
 
@@ -81,7 +76,6 @@ export const saveMyTryOnProfile = async (
 
 export const deleteMyTryOnProfile = async (userId?: number | null): Promise<TryOnProfile> => {
   if (!TRYON_API_ENABLED) {
-    deleteMockDefaultTryOnImage(userId)
     writeMockTryOnProfile(userId, { ...EMPTY_TRYON_PROFILE, updatedAt: new Date().toISOString() })
     return readMockTryOnProfile(userId)
   }
@@ -158,10 +152,11 @@ const saveMockTryOnProfile = async (
 
   if (request.removeBodyPhoto) {
     bodyPhotoUrl = null
-    deleteMockDefaultTryOnImage(userId)
   } else if (request.bodyPhoto) {
-    bodyPhotoUrl = await readImageFileAsDataUrl(request.bodyPhoto, 'AI 시착용 사진을 읽지 못했습니다.')
-    saveMockDefaultTryOnImage(userId, bodyPhotoUrl)
+    bodyPhotoUrl = await readImageFileAsCompressedDataUrl(
+      request.bodyPhoto,
+      'AI 시착용 사진을 읽지 못했습니다.',
+    )
   }
 
   const nextProfile: TryOnProfile = {
@@ -185,12 +180,11 @@ const readMockTryOnProfile = (userId?: number | null): TryOnProfile => {
     ...profileMap[FALLBACK_USER_KEY],
     ...profileMap[getUserKey(userId)],
   }
-  const media = readMockProfileMedia(userId)
 
   return {
     ...EMPTY_TRYON_PROFILE,
     ...storedProfile,
-    bodyPhotoUrl: storedProfile.bodyPhotoUrl ?? media.defaultTryOnImageUrl ?? null,
+    bodyPhotoUrl: storedProfile.bodyPhotoUrl ?? null,
   }
 }
 
