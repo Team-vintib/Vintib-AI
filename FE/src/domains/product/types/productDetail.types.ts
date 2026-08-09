@@ -47,22 +47,31 @@ export interface AiQualityFindingBox {
   height: number
 }
 
+// BE가 AI 검수 원본(quality_inspection_result)에서 조립해 내려주는 하자 1건(요청 043 §2).
 export interface AiQualityFinding {
-  id: string
+  // AI 원본의 고정 식별자. 판매자의 "하자 아님" 표시도 이 key로 주고받는다.
+  key: string
+  // 이미지 안에서의 순번(1부터). 등록 화면과 번호가 어긋나지 않게 BE가 원본 값을 그대로 준다.
+  no: number
+  // 하자 종류(한글). AI 원본 label.
   type: string
+  // 부위. BE는 원본 코드(COLLAR 등)를 그대로 주므로 aiSectionLabels로 변환해 담는다.
   location: string
-  description: string
-  box?: AiQualityFindingBox
+  // AI가 설명 문장을 만들지 못하면 null이다(AI 계약상 정상 케이스).
+  description: string | null
+  box: AiQualityFindingBox | null
+  // 판매자가 "하자 아님"으로 뒤집은 항목. 번호를 유지하려고 응답에는 포함되지만 하자로 세지 않는다.
+  isExcluded: boolean
 }
 
+// alt는 BE가 주지 않는다 — 표시 문구라 label로 FE가 만든다.
+// summary(사진별 요약)도 응답에 있지만 findings 목록과 내용이 겹쳐 화면에 쓰지 않는다.
 export interface AiQualityAnalysisImage {
-  id: string
   label: string
   originalImageUrl: string
   originalImageAlt: string
   analyzedImageUrl: string
   analyzedImageAlt: string
-  summary: string
   findings: AiQualityFinding[]
 }
 
