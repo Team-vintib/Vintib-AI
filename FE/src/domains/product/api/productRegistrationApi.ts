@@ -2,12 +2,11 @@ import type {
   ProductRegistrationDraft,
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
-import { submitProduct, type BrandDto, type CategoryDto } from '@/domains/product/api/productApi'
+import { submitProduct, type CategoryDto } from '@/domains/product/api/productApi'
 
 export const submitProductRegistrationDraft = async (
   draft: ProductRegistrationDraft,
   options: {
-    brands?: BrandDto[]
     categories?: CategoryDto[]
   } = {},
 ): Promise<ProductRegistrationSubmitResult> => {

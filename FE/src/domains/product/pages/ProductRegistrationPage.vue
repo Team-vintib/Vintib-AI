@@ -5,7 +5,6 @@ import { useRouter } from 'vue-router'
 import {
   createDraftProduct,
   createProductPreUploadUrl,
-  getBrands,
   getCategories,
   getCategoryCode,
   getProductAiModelCutStatus,
@@ -16,7 +15,6 @@ import {
   triggerProductClassify,
   uploadProductImages,
   uploadToPreUploadUrl,
-  type BrandDto,
   type CategoryDto,
   type ProductAiModelCutStatusDto,
 } from '@/domains/product/api/productApi'
@@ -104,7 +102,6 @@ let classifyPollToken = 0
 const isSubmittingRegistration = ref(false)
 const registrationSubmitError = ref('')
 const isCompletenessPromptOpen = ref(false)
-const brands = ref<BrandDto[]>([])
 const categories = ref<CategoryDto[]>([])
 const categoryMajorId = ref('')
 interface CategorySelectOption {
@@ -1177,7 +1174,6 @@ const beginQualityInspection = async () => {
 
   try {
     const productId = await createDraftProduct(draft, {
-      brands: brands.value,
       categories: categories.value,
     })
     draft.draftProductId = productId
@@ -1432,7 +1428,6 @@ const proceedToNextStep = async (skipCompletenessPrompt = false) => {
 
     try {
       const submitResult = await submitProductRegistrationDraft(draft, {
-        brands: brands.value,
         categories: categories.value,
       })
       registeredProductId.value = submitResult.productId
@@ -1519,12 +1514,8 @@ const moveToRegisteredProduct = () => {
 
 const loadProductMasterData = async () => {
   try {
-    const [brandResponse, categoryResponse] = await Promise.all([getBrands(), getCategories()])
-
-    brands.value = brandResponse
-    categories.value = categoryResponse
+    categories.value = await getCategories()
   } catch {
-    brands.value = []
     categories.value = []
   }
 }
