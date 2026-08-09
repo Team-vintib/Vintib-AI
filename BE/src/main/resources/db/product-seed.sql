@@ -181,7 +181,7 @@ INSERT INTO product (
       ),
       -- 90's mood grunge distressed tees (긴팔 포함)
       (
-          (SELECT id FROM member WHERE email = 'vintibb1@gmail.com'),
+          (SELECT id FROM member WHERE email = 'vintibb2@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'TSHIRT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'TOP' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
           NULL,
           '90''s mood grunge distressed tees (긴팔 포함)', '새상품에 데저트 컬러 무드로 디스트레스드 및 워싱 작업을 진행했습니다. 빈티지 무드가 좋아 데일리로 입기 좋고, 반팔 단품이나 FW 시즌 긴팔 레이어드용으로 모두 예쁩니다. 핏이 예쁘게 떨어지며, 긴팔 티셔츠 하나를 같이 보내드립니다! 수수료는 판매자가 부담합니다.',
@@ -991,7 +991,7 @@ INSERT INTO product (
       ),
       -- 스파이더맨 코스튬 세트
       (
-          (SELECT id FROM member WHERE email = 'vintib1@gmail.com'),
+          (SELECT id FROM member WHERE email = 'vintibb2@gmail.com'),
           (SELECT id FROM category WHERE name_en = 'JUMPSUIT' AND depth = 3 AND parent_id = (SELECT id FROM category WHERE name_en = 'DRESS_JUMPSUIT' AND depth = 2 AND parent_id = (SELECT id FROM category WHERE name_en = 'UNISEX' AND depth = 1))),
           NULL,
           '스파이더맨 코스튬 세트', '스파이더맨 코스튬 세트입니다. 마스크 포함 풀세트이며, 특별한 하자 없이 깨끗한 상태입니다. 키165~180 몸무게 60~75추천드리며 하자없습니다. 구성품은 스파이더맨 가면, 몸슈트, 턱 마스크 보호대 입니다. 친절한 이웃 스파이더맨이 되어보세요.',
