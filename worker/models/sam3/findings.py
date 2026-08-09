@@ -149,9 +149,10 @@ def suppress_benign(
 
 
 def dedupe_cross_type_overlap(
-    instances: Sequence[Instance], min_iou: float
+    instances: Sequence[Instance], min_iou: float, min_containment: float | None = None
 ) -> tuple[list[Instance], list[Instance]]:
-    """서로 다른 defect_type이 같은 실물 부위를 중복 검출했을 때 병합한다. (kept, dropped) 반환.
+    """서로 다른 defect_type이 같은 실물 부위를 중복 검출했을 때 하나로 합쳐 더 큰 박스로
+    만든다. (merged, absorbed) 반환 — `absorbed`는 병합되며 사라진 인스턴스들이다.
 
     SAM3는 defect_type마다 독립된 프롬프트로 탐지한다("a dirty mark" vs "a hole or tear in
     fabric" 등, `prompts.py`). 같은 자리가 두 프롬프트 모두에 걸리면 defect_type만 다른
@@ -160,28 +161,49 @@ def dedupe_cross_type_overlap(
     benign 카테고리 전용이라 defect끼리는 비교하지 않는다).
 
     confidence 내림차순(동률이면 `defect_type.value`로 결정적 tie-break — `_to_findings()`가
-    쓰는 정렬 키와 동일)으로 훑으며, **다른 타입**이면서 이미 kept에 들어간 인스턴스와
-    `_mask_iou`가 `min_iou` 이상이면 버린다. 같은 타입끼리는 비교하지 않는다 — 같은
-    프롬프트 안에서의 중복은 SAM3 자체 후처리가 이미 걸렀다고 본다.
+    쓰는 정렬 키와 동일)으로 훑으며, **다른 타입**이면서 이미 merged에 들어간 인스턴스와
+    같은 실물을 가리킨다고 판단되면 그 인스턴스에 흡수 병합한다(드롭하지 않는다). 같은
+    타입끼리는 비교하지 않는다 — 같은 프롬프트 안에서의 중복은 SAM3 자체 후처리가 이미
+    걸렀다고 본다.
 
-    ⚠️ 알려진 단순화: 이미 kept된 것과만 비교하는 그리디라, IoU가 전이적이지 않은 경우
-    (A-B 겹침, B-C 겹침, A-C는 안 겹침)를 이론상 놓칠 수 있다. 실측 중복은 IoU가 매우
-    높아(거의 동일 bbox) 이 케이스가 실제로 발생할 가능성은 낮다고 보고 1차로는 이 방식을
-    쓴다.
+    "같은 실물"의 판정 기준은 두 가지를 OR로 본다:
+    - `_mask_iou`(대칭)가 `min_iou` 이상 — 거의 같은 크기·위치로 겹치는 전형적인 중복.
+    - `min_containment`가 주어졌고, 두 마스크의 포함 비율(둘 중 큰 쪽)이 그 이상 — 크기가
+      크게 다른 STAIN/DIRT_MARK 쌍(작은 쪽이 큰 쪽 안에 거의 다 들어감)은 IoU만으로는 못
+      잡힌다(합집합 기준으로 계산해 낮게 나옴). hotfix/472: dirt_mark 프롬프트를 되살리며
+      이 조건과 병합(merge) 방식을 추가했다 — 원래는 드롭만 했는데, 크기가 큰 쪽이 낮은
+      confidence를 가진 채로 드롭당하면 실물 범위(큰 박스)가 사라지는 문제가 있었다.
+      `merge_same_type_containment()`가 같은 문제를 같은 방식(비대칭 containment + 합집합
+      병합)으로 푸는 것과 동일한 논리.
+
+    ⚠️ 알려진 단순화: 이미 merged에 있는 것과만 비교하는 그리디라, 겹침 관계가 전이적이지
+    않은 경우(A-B 겹침, B-C 겹침, A-C는 안 겹침)를 이론상 놓칠 수 있다. 실측 중복은 겹침이
+    매우 높아 이 케이스가 실제로 발생할 가능성은 낮다고 보고 1차로는 이 방식을 쓴다.
     """
     ordered = sorted(instances, key=lambda inst: (-inst.confidence, inst.defect_type.value))
-    kept: list[Instance] = []
-    dropped: list[Instance] = []
+    merged: list[Instance] = []
+    absorbed: list[Instance] = []
     for inst in ordered:
-        hit = None
-        for kept_inst in kept:
+        hit_index = None
+        for index, kept_inst in enumerate(merged):
             if kept_inst.defect_type == inst.defect_type:
                 continue
-            if _mask_iou(inst.mask, kept_inst.mask) >= min_iou:
-                hit = kept_inst
+            same_target = _mask_iou(inst.mask, kept_inst.mask) >= min_iou
+            if not same_target and min_containment is not None:
+                containment = max(
+                    _containment(inst.mask, kept_inst.mask),
+                    _containment(kept_inst.mask, inst.mask),
+                )
+                same_target = containment >= min_containment
+            if same_target:
+                hit_index = index
                 break
-        (dropped if hit is not None else kept).append(inst)
-    return kept, dropped
+        if hit_index is None:
+            merged.append(inst)
+        else:
+            merged[hit_index] = _merge_instances(merged[hit_index], inst)
+            absorbed.append(inst)
+    return merged, absorbed
 
 
 def _merge_instances(base: Instance, other: Instance) -> Instance:
@@ -357,16 +379,12 @@ def extract_findings(
 ) -> FindingsResult:
     """인스턴스들 → 하자 항목 리스트 + 부위별 확률 9개.
 
-    이미지별로 ⑴ 의류 겹침 필터 ⑵ 양성 억제 ⑶ **같은 유형 중복 병합**을 거친 뒤 `Finding`으로
-    승격한다. `merge_same_type_containment()`가 같은 defect_type의 "박스 안에 박스" 중복을
-    더 큰 박스 하나로 합친다(CH034 — 예전에는 드롭했다, 설계: `.claude/plans/ai/
-    CH010-sam3-cross-type-dedup.md`).
-
-    **다른 유형 간 중복은 기본적으로 드롭하지 않는다**(`dedupe_cross_type_overlap()`은
-    `config["dedupe_cross_type"]`가 켜져 있을 때만 도는데, 커밋 기본값은 `False`다 — CH034).
-    SAM3가 defect_type별 독립 프롬프트로 탐지하다 보니 동일 영역이 여러 프롬프트에 동시에
-    반응하는 경우가 실측(scratch.jpg)에서 확인됐지만, 이제는 그 중복도 각각 별도 finding·박스로
-    그대로 노출한다.
+    이미지별로 ⑴ 의류 겹침 필터 ⑵ 양성 억제 ⑶ **같은/다른 유형 중복 병합**을 거친 뒤
+    `Finding`으로 승격한다. `merge_same_type_containment()`가 같은 defect_type의 "박스 안에
+    박스" 중복을, `dedupe_cross_type_overlap()`이 서로 다른 defect_type의 중복(IoU 또는
+    포함 비율 기준)을 각각 더 큰 박스 하나로 합친다(설계: `.claude/plans/ai/
+    CH010-sam3-cross-type-dedup.md`). 둘 다 `config["dedupe_same_type"]`/
+    `config["dedupe_cross_type"]`로 독립적으로 on/off된다.
 
     `section_scores`는 이미지마다 독립적으로 9개씩 낸다(CH020) — 예전에는 이미지 간 `max()`로
     섞어서 앞/뒤 같은 섹션 번호의 확률이 서로를 덮어썼다.
@@ -395,8 +413,8 @@ def extract_findings(
                 final, config["same_type_containment_min"]
             )
         if config["dedupe_cross_type"]:
-            final, _cross_type_dupes = dedupe_cross_type_overlap(
-                final, config["cross_type_iou_min"]
+            final, _cross_type_merged = dedupe_cross_type_overlap(
+                final, config["cross_type_iou_min"], config["cross_type_containment_min"]
             )
 
         section_scores.extend(

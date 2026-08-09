@@ -167,41 +167,78 @@ def test_suppress_benign_passes_through_when_no_benign_instances():
 # 검출한 사례(bbox 1px 이내로 겹침, IoU 0.9대)에 대한 회귀 방지.
 
 
-def test_dedupe_cross_type_overlap_drops_lower_confidence_duplicate():
-    # 같은 자리, 다른 타입, IoU=1.0(완전 동일 마스크) — confidence 높은 쪽만 남는다.
+# hotfix/472부터는 IoU 매칭도 드롭이 아니라 병합이다(같은 이유로 dirt_mark를 되살리며
+# containment 기준도 추가했다) — 병합 결과는 새로 만들어진 Instance라 원본과 객체 동일성이
+# 없다. 그래서 병합이 실제로 일어난 케이스는 개별 필드를 검증하고, 병합이 안 일어나는
+# 케이스(겹침 미달·같은 타입)만 원본 객체 동일성(`in`)으로 검증한다 — merge_same_type_
+# containment 테스트들과 같은 패턴(그쪽 주석 참고).
+
+
+def test_dedupe_cross_type_overlap_merges_into_the_higher_confidence_instance():
+    # 같은 자리, 다른 타입, IoU=1.0(완전 동일 마스크) — 병합되고 confidence 높은 쪽이 base.
     higher = _instance(DefectType.dirt_mark, _mask_at(4, 4), confidence=0.91)
     lower = _instance(DefectType.hole_tear, _mask_at(4, 4), confidence=0.79)
-    kept, dropped = dedupe_cross_type_overlap([lower, higher], min_iou=0.7)
-    assert kept == [higher]
-    assert dropped == [lower]
+    merged, absorbed = dedupe_cross_type_overlap([lower, higher], min_iou=0.7)
+    assert len(merged) == 1
+    assert absorbed == [lower]
+    assert np.array_equal(merged[0].mask, higher.mask)
+    assert merged[0].confidence == higher.confidence
+    assert merged[0].defect_type == DefectType.dirt_mark
 
 
 def test_dedupe_cross_type_overlap_uses_defect_type_value_as_tiebreak():
     # confidence가 동률이면 defect_type.value 알파벳 순으로 결정적으로 정한다
-    # ("DIRT_MARK" < "HOLE_TEAR").
+    # ("DIRT_MARK" < "HOLE_TEAR") — 정렬상 먼저 오는 쪽이 병합의 base가 된다.
     dirt_mark = _instance(DefectType.dirt_mark, _mask_at(4, 4), confidence=0.80)
     hole_tear = _instance(DefectType.hole_tear, _mask_at(4, 4), confidence=0.80)
-    kept, dropped = dedupe_cross_type_overlap([hole_tear, dirt_mark], min_iou=0.7)
-    assert kept == [dirt_mark]
-    assert dropped == [hole_tear]
+    merged, absorbed = dedupe_cross_type_overlap([hole_tear, dirt_mark], min_iou=0.7)
+    assert len(merged) == 1
+    assert absorbed == [hole_tear]
+    assert merged[0].defect_type == DefectType.dirt_mark
+    assert merged[0].confidence == 0.80
 
 
 def test_dedupe_cross_type_overlap_keeps_both_when_overlap_is_below_threshold():
-    # 부분 겹침(IoU=0.2, 3x3 블록 두 개가 한 열만 공유)은 임계치(0.7) 미만이라 둘 다 생존.
+    # 부분 겹침(IoU=0.2, 3x3 블록 두 개가 한 열만 공유, 포함 비율도 0.33)은 두 임계치
+    # (min_iou=0.7, min_containment=0.7) 모두 미달이라 둘 다 생존.
     a = _instance(DefectType.dirt_mark, _mask_block(3, 6, 3, 6), confidence=0.90)
     b = _instance(DefectType.hole_tear, _mask_block(3, 6, 5, 8), confidence=0.80)
-    kept, dropped = dedupe_cross_type_overlap([a, b], min_iou=0.7)
-    assert len(kept) == 2 and a in kept and b in kept
-    assert dropped == []
+    merged, absorbed = dedupe_cross_type_overlap([a, b], min_iou=0.7, min_containment=0.7)
+    assert len(merged) == 2 and a in merged and b in merged
+    assert absorbed == []
 
 
 def test_dedupe_cross_type_overlap_ignores_same_type_overlap():
     # 같은 타입끼리는 비교 대상이 아니다(같은 프롬프트 내부 중복은 SAM3 자체가 처리한다고 가정).
     a = _instance(DefectType.stain, _mask_at(4, 4), confidence=0.90)
     b = _instance(DefectType.stain, _mask_at(4, 4), confidence=0.80)
-    kept, dropped = dedupe_cross_type_overlap([a, b], min_iou=0.7)
-    assert len(kept) == 2 and a in kept and b in kept
-    assert dropped == []
+    merged, absorbed = dedupe_cross_type_overlap([a, b], min_iou=0.7)
+    assert len(merged) == 2 and a in merged and b in merged
+    assert absorbed == []
+
+
+def test_dedupe_cross_type_overlap_merges_via_containment_when_sizes_differ():
+    # hotfix/472 실측 재현: 소매 STAIN(작은 박스)이 DIRT_MARK(큰 박스) 안에 거의 다
+    # 포함되지만 크기 차이가 커서 IoU는 낮다 — containment 기준으로 병합돼야 한다.
+    small_stain = _instance(DefectType.stain, _mask_block(1, 4, 1, 4), confidence=0.79)
+    big_dirt_mark = _instance(DefectType.dirt_mark, _mask_block(0, 7, 0, 7), confidence=0.91)
+    merged, absorbed = dedupe_cross_type_overlap(
+        [small_stain, big_dirt_mark], min_iou=0.7, min_containment=0.8
+    )
+    assert len(merged) == 1
+    assert absorbed == [small_stain]
+    assert np.array_equal(merged[0].mask, big_dirt_mark.mask)
+    assert merged[0].defect_type == DefectType.dirt_mark
+    assert merged[0].confidence == big_dirt_mark.confidence
+
+
+def test_dedupe_cross_type_overlap_without_containment_arg_only_checks_iou():
+    # min_containment를 안 주면(기본 None) 예전과 동일하게 IoU만 본다 — 하위 호환성.
+    small_stain = _instance(DefectType.stain, _mask_block(1, 4, 1, 4), confidence=0.79)
+    big_dirt_mark = _instance(DefectType.dirt_mark, _mask_block(0, 7, 0, 7), confidence=0.91)
+    merged, absorbed = dedupe_cross_type_overlap([small_stain, big_dirt_mark], min_iou=0.7)
+    assert len(merged) == 2 and small_stain in merged and big_dirt_mark in merged
+    assert absorbed == []
 
 
 # --- merge_same_type_containment ---------------------------------------------
@@ -316,10 +353,9 @@ def test_extract_findings_keeps_only_post_filter_instances_for_overlay():
     assert {f.defect_type for f in extracted.findings} == {DefectType.stain}
 
 
-def test_extract_findings_keeps_cross_type_duplicates_by_default():
-    # CH034: 다른 유형 간 중복은 커밋 기본값(dedupe_cross_type=False)에서 드롭하지 않는다 —
-    # scratch.jpg 실측(DIRT_MARK/HOLE_TEAR가 같은 자리를 중복 검출)이 이제는 findings 2개로
-    # 그대로 노출돼야 한다.
+def test_extract_findings_dedupes_cross_type_duplicates_by_default():
+    # hotfix/472: dedupe_cross_type이 기본 True다 — scratch.jpg 실측(DIRT_MARK/HOLE_TEAR가
+    # 같은 자리를 중복 검출) 같은 쌍은 기본 설정만으로 병합돼 finding 1개만 남아야 한다.
     higher = _instance(DefectType.dirt_mark, _mask_at(4, 4), confidence=0.91)
     lower = _instance(DefectType.hole_tear, _mask_at(4, 4), confidence=0.79)
     result = _segmentation_result(0, [lower, higher], garment_mask=_full_mask())
@@ -327,17 +363,15 @@ def test_extract_findings_keeps_cross_type_duplicates_by_default():
 
     extracted = extract_findings([result], prompt_set, segmenter_config("mock"))
 
-    assert {f.defect_type for f in extracted.findings} == {
-        DefectType.dirt_mark,
-        DefectType.hole_tear,
-    }
+    assert len(extracted.findings) == 1
+    assert extracted.findings[0].defect_type == DefectType.dirt_mark
     kept = extracted.kept_instances_by_image[0]
-    assert higher in kept and lower in kept
+    assert len(kept) == 1
+    assert np.array_equal(kept[0].mask, higher.mask)
 
 
 def test_extract_findings_dedupes_cross_type_duplicates_when_enabled():
-    # dedupe_cross_type을 명시적으로 켰을 때는 여전히 낮은 confidence 쪽이 드롭돼야 한다 —
-    # 함수 자체(dedupe_cross_type_overlap)는 CH034에서 안 바뀌었고 기본값만 꺼졌다.
+    # dedupe_cross_type을 명시적으로 켰을 때는 병합되어 finding 1개만 남아야 한다.
     higher = _instance(DefectType.dirt_mark, _mask_at(4, 4), confidence=0.91)
     lower = _instance(DefectType.hole_tear, _mask_at(4, 4), confidence=0.79)
     result = _segmentation_result(0, [lower, higher], garment_mask=_full_mask())
@@ -351,19 +385,24 @@ def test_extract_findings_dedupes_cross_type_duplicates_when_enabled():
     assert extracted.findings[0].defect_type == DefectType.dirt_mark
     assert extracted.findings[0].no == 1
     kept = extracted.kept_instances_by_image[0]
-    assert higher in kept
-    assert lower not in kept
+    assert len(kept) == 1
+    assert np.array_equal(kept[0].mask, higher.mask)
+    assert kept[0].confidence == higher.confidence
 
 
 def test_extract_findings_merges_same_type_containment_before_numbering():
     # small_pro.jpg 실측 재현: 같은 STAIN이 "박스 안에 박스"로 겹치면 병합된 finding 1개만
-    # 남아야 한다(CH034 — 예전에는 작은 쪽을 드롭했다).
+    # 남아야 한다(CH034). hotfix/472로 dedupe_same_type 기본값이 다시 False라(사용자 요청으로
+    # 명시적 되돌림), 여기서는 명시적으로 켜서 병합 로직 자체를 검증한다 — 기본값 자체의
+    # on/off 여부는 test_extract_findings_skips_same_type_dedup_when_disabled이 지킨다.
     big = _instance(DefectType.stain, _mask_block(0, 7, 0, 7), confidence=0.91)
     small = _instance(DefectType.stain, _mask_block(1, 4, 1, 4), confidence=0.79)
     result = _segmentation_result(0, [small, big], garment_mask=_full_mask())
     prompt_set = select_prompt_set(GarmentCategory.top_knit, BaseColor.light)
+    config = dict(segmenter_config("mock"))
+    config["dedupe_same_type"] = True
 
-    extracted = extract_findings([result], prompt_set, segmenter_config("mock"))
+    extracted = extract_findings([result], prompt_set, config)
 
     assert len(extracted.findings) == 1
     assert extracted.findings[0].no == 1
