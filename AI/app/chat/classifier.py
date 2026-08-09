@@ -210,6 +210,9 @@ class HuggingFaceClassifier(AbuseClassifier):
 # --- 하이브리드(사전 + 모델) -------------------------------------------------
 
 
+_MODEL_MIN_LENGTH = 5  # 이 미만이면(정규화 기준) 모델을 안 태운다 -- 아래 클래스독스트링 참고
+
+
 class HybridClassifier(AbuseClassifier):
     """사전(RuleBasedClassifier)과 모델(HuggingFaceClassifier)을 OR로 결합한다.
 
@@ -219,6 +222,13 @@ class HybridClassifier(AbuseClassifier):
     항상 확정적으로(0.9/0.75) 잡는다. 그래서 rule_based가 먼저 걸러보고(빠르고 확실한
     경우), 안 걸리면 모델로 넘겨서(사전에 없는 은근한 모욕/혐오까지) 서로의 약점을
     메운다. rule_based가 이미 걸렸으면 모델 호출(느림, ~30-250ms) 자체를 생략한다.
+
+    **추가 실측(같은 날): 모델이 짧은 입력에서 훨씬 심하게 오탐한다.** "ㅇ"(0.8482),
+    "ㅋㅋ"(0.7865), "넵"(0.8536) 전부 ABUSIVE로 잘못 판정했다 -- 실시간 채팅에서 가장
+    흔한 반응들이라 이대로면 채팅 자체가 못 쓰게 된다. 그래서 정규화 후 텍스트 길이가
+    `_MODEL_MIN_LENGTH` 미만이면 모델을 아예 안 태우고 clean으로 본다 -- 그만큼 짧은
+    욕설은 이미 rule_based 사전/초성체 목록이 커버한다(예: "씹"/"좆"은 1글자, "지랄"/
+    "닥쳐"/"꺼져"는 2글자로 전부 사전에 있음).
     """
 
     def __init__(self, rule_classifier: AbuseClassifier, model_classifier: AbuseClassifier) -> None:
@@ -228,6 +238,8 @@ class HybridClassifier(AbuseClassifier):
     def score(self, text: str) -> AbuseResult:
         rule_result = self._rule.score(text)
         if rule_result.score >= registry.ABUSE_THRESHOLD:
+            return rule_result
+        if len(normalize(text)) < _MODEL_MIN_LENGTH:
             return rule_result
         return self._model.score(text)
 
