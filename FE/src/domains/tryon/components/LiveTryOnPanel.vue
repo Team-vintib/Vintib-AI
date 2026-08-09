@@ -696,10 +696,6 @@ onBeforeUnmount(() => {
   object-fit: contain;
 }
 
-.live-try-on-panel__result-media img {
-  object-fit: cover;
-}
-
 .live-try-on-panel__photo figcaption,
 .live-try-on-panel__result-media figcaption {
   position: absolute;
