@@ -191,7 +191,8 @@ const updateMinorCategory = () => {
 const priceRecommendationBuckets = ref<ProductRegistrationPriceBucket[]>([])
 const recommendedPrices = ref<ProductRegistrationRecommendedPrice[]>([])
 const aiPriceStatus = ref<'idle' | 'loading' | 'completed' | 'failed'>('idle')
-const PRICE_GRADES: ProductRegistrationPriceGrade[] = ['S', 'A', 'B', 'C']
+// 낮은 등급→높은 등급 순으로 둬서, 가격 오름차순인 히스토그램 x축과 마커 위치가 맞도록 한다.
+const PRICE_GRADES: ProductRegistrationPriceGrade[] = ['C', 'B', 'A', 'S']
 
 const createInitialDraft = (): ProductRegistrationDraft => ({
   photos: [],
