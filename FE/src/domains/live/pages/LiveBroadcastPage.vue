@@ -330,6 +330,7 @@ const goBack = () => {
 const isEndConfirmOpen = ref(false)
 const isEndingBroadcast = ref(false)
 const endError = ref('')
+const isInfoCollapsed = ref(false)
 const transitionNotice = ref('')
 let transitionNoticeTimer: number | undefined
 
@@ -676,7 +677,10 @@ onBeforeUnmount(() => {
           </div>
         </aside>
 
-        <main class="live-broadcast-page__content">
+        <main
+          class="live-broadcast-page__content"
+          :class="{ 'live-broadcast-page__content--info-collapsed': isInfoCollapsed }"
+        >
           <div class="live-broadcast-page__stage">
             <LiveVideoStage
               :title="live.title"
@@ -716,18 +720,44 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="live-broadcast-page__details">
-            <SellerAuctionPanel
-              :live-id="live.id"
-              :product="selectedProduct"
-              :status="live.status"
-              :snapshot="auctionSnapshot"
-              :is-loading="auctionLoading"
-              :load-error="auctionError"
-              @snapshot-change="applyAuctionSnapshot"
-              @auction-closed="applyAuctionSnapshot"
-            />
+            <div v-show="!isInfoCollapsed" class="live-broadcast-page__details-body">
+              <button
+                type="button"
+                class="live-broadcast-page__details-close"
+                aria-label="정보 패널 접기"
+                title="정보 패널 접기"
+                @click="isInfoCollapsed = true"
+              >
+                ×
+              </button>
+              <SellerAuctionPanel
+                :live-id="live.id"
+                :product="selectedProduct"
+                :status="live.status"
+                :snapshot="auctionSnapshot"
+                :is-loading="auctionLoading"
+                :load-error="auctionError"
+                @snapshot-change="applyAuctionSnapshot"
+                @auction-closed="applyAuctionSnapshot"
+              />
 
-            <LiveBroadcastInfo :live="live" :elapsed-time="elapsedTime" />
+              <LiveBroadcastInfo :live="live" :elapsed-time="elapsedTime" />
+            </div>
+
+            <button
+              v-show="isInfoCollapsed"
+              type="button"
+              class="live-broadcast-page__details-reopen"
+              aria-label="정보 패널 펼치기"
+              title="정보 패널 펼치기"
+              @click="isInfoCollapsed = false"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 11v5" />
+                <circle cx="12" cy="7.8" r="0.9" fill="currentColor" stroke="none" />
+              </svg>
+            </button>
           </div>
         </main>
       </div>
@@ -791,6 +821,11 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
   grid-template-rows: minmax(340px, 1fr) 260px;
+  transition: grid-template-rows 0.2s ease;
+}
+
+.live-broadcast-page__content--info-collapsed {
+  grid-template-rows: minmax(340px, 1fr) 56px;
 }
 
 .live-broadcast-page__queue {
@@ -845,26 +880,83 @@ onBeforeUnmount(() => {
 }
 
 .live-broadcast-page__details {
-  display: grid;
+  position: relative;
   min-width: 0;
   min-height: 0;
-  grid-template-columns: minmax(0, 1fr) 300px;
   border-top: 1px solid var(--color-live-border);
   background: var(--color-live-background);
 }
 
-.live-broadcast-page__details > * {
+.live-broadcast-page__details-body {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  grid-template-columns: minmax(0, 1fr) 300px;
+}
+
+.live-broadcast-page__details-body > * {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
 }
 
-.live-broadcast-page__details > :last-child {
+.live-broadcast-page__details-body > :last-child {
   padding: var(--space-4);
 }
 
-.live-broadcast-page__details > * + * {
+.live-broadcast-page__details-body > * + * {
   border-left: 1px solid var(--color-live-border);
+}
+
+.live-broadcast-page__details-close {
+  display: grid;
+  position: absolute;
+  z-index: var(--z-layer-2);
+  top: 8px;
+  right: 8px;
+  width: var(--badge-height-lg);
+  height: var(--badge-height-lg);
+  border: 0;
+  border-radius: 50%;
+  background: rgba(8, 8, 8, 0.7);
+  color: var(--color-live-text-primary);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  place-items: center;
+  backdrop-filter: blur(8px);
+}
+
+.live-broadcast-page__details-reopen {
+  display: grid;
+  position: absolute;
+  z-index: var(--z-layer-2);
+  right: 12px;
+  bottom: 12px;
+  width: 48px;
+  height: 48px;
+  border: 2px solid var(--color-error);
+  border-radius: 50%;
+  background: rgba(8, 8, 8, 0.7);
+  color: var(--color-live-text-primary);
+  place-items: center;
+  backdrop-filter: blur(8px);
+}
+
+.live-broadcast-page__details-reopen svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.live-broadcast-page__details-close:focus-visible,
+.live-broadcast-page__details-reopen:focus-visible {
+  outline: 2px solid var(--color-primary-strong);
+  outline-offset: 2px;
 }
 
 .live-broadcast-page__slot-note {
@@ -1051,7 +1143,7 @@ onBeforeUnmount(() => {
     min-height: var(--surface-min-height-xl);
   }
 
-  .live-broadcast-page__details {
+  .live-broadcast-page__details-body {
     grid-template-columns: minmax(0, 1fr);
   }
 
