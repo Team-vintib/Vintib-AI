@@ -49,22 +49,25 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         "confident_threshold": 0.55,
         "garment_score_threshold": 0.05,
         "garment_crop_pad_ratio": 0.06,
-        "garment_overlap_min": 0.6,
+        # hotfix/472: 0.6 -> 0.7 — 검증 노트북(qc_shared.GARMENT_OVERLAP_MIN)과 맞춘다.
+        # CH034 이전 값으로 되돌린 것— 재검증 끝나면 0.6 복귀 여부를 다시 판단한다.
+        "garment_overlap_min": 0.7,
         "suppress_benign": True,
         "benign_containment": 0.6,
-        # CH034: 다른 유형끼리는 겹쳐도 드롭하지 않기로 정책 전환 — 각각 별도 finding·박스로
-        # 노출한다(사용자 결정, 2026-08-09). 실측 중복 쌍(scratch.jpg, DIRT_MARK/HOLE_TEAR가
-        # 거의 동일 위치를 중복 검출)이 다시 그대로 노출될 수 있다는 트레이드오프를 감수한다.
-        # `dedupe_cross_type_overlap()` 함수 자체는 남겨 뒀다 — 필요하면 이 값만 True로 되돌리면
-        # 된다(이전 임계치: cross_type_iou_min=0.7).
-        "dedupe_cross_type": False,
+        # hotfix/472: CH034가 오늘(2026-08-09) False로 껐던 걸 다시 True로 되돌렸다 — 검증
+        # 노트북(qc_shared.py)엔 same-type 병합이 아예 없고 cross-type dedup만 있어서, 노트북과
+        # 나란히 비교하려면 이 값이 켜져 있어야 한다. **CH034의 "사용자 결정"을 뒤집는 게
+        # 아니라 hotfix/472 비교 테스트 동안만 임시로 되돌린 것** — 비교 끝나면 False로
+        # 복귀할지 다시 판단할 것.
+        "dedupe_cross_type": True,
         "cross_type_iou_min": 0.7,
         # ⚠️ 라벨링된 검증셋 없이 잡은 값 — 스윕 대상. 실측 중복(small_pro.jpg)은 작은
         # STAIN 박스가 큰 STAIN 박스에 97~100% 포함돼 있었다(IoU는 낮아도 포함 비율은
         # 매우 높음) — 그래서 IoU가 아니라 포함 비율을 쓴다(findings.py 참고). 0.8로
         # 여유를 둬서 부분적으로만 겹치는 "진짜 다른 두 하자"까지 합치는 위험을 줄인다.
-        # CH034: 이 임계치를 넘으면 이제 드롭이 아니라 **병합**(더 큰 박스 하나로)한다.
-        "dedupe_same_type": True,
+        # hotfix/472: 검증 노트북엔 same-type 병합 자체가 없어서 비교를 위해 임시로 끈다
+        # (위 dedupe_cross_type과 같은 이유 — CH034 결정을 뒤집는 게 아니라 비교 테스트용).
+        "dedupe_same_type": False,
         "same_type_containment_min": 0.8,
         "min_area_ratio": 0.0015,
         "max_defect_area_ratio": 0.35,
@@ -85,22 +88,25 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         "confident_threshold": 0.55,
         "garment_score_threshold": 0.05,
         "garment_crop_pad_ratio": 0.06,
-        "garment_overlap_min": 0.6,
+        # hotfix/472: 0.6 -> 0.7 — 검증 노트북(qc_shared.GARMENT_OVERLAP_MIN)과 맞춘다.
+        # CH034 이전 값으로 되돌린 것 — 재검증 끝나면 0.6 복귀 여부를 다시 판단한다.
+        "garment_overlap_min": 0.7,
         "suppress_benign": True,
         "benign_containment": 0.6,
-        # CH034: 다른 유형끼리는 겹쳐도 드롭하지 않기로 정책 전환 — 각각 별도 finding·박스로
-        # 노출한다(사용자 결정, 2026-08-09). 실측 중복 쌍(scratch.jpg, DIRT_MARK/HOLE_TEAR가
-        # 거의 동일 위치를 중복 검출)이 다시 그대로 노출될 수 있다는 트레이드오프를 감수한다.
-        # `dedupe_cross_type_overlap()` 함수 자체는 남겨 뒀다 — 필요하면 이 값만 True로 되돌리면
-        # 된다(이전 임계치: cross_type_iou_min=0.7).
-        "dedupe_cross_type": False,
+        # hotfix/472: CH034가 오늘(2026-08-09) False로 껐던 걸 다시 True로 되돌렸다 — 검증
+        # 노트북(qc_shared.py)엔 same-type 병합이 아예 없고 cross-type dedup만 있어서, 노트북과
+        # 나란히 비교하려면 이 값이 켜져 있어야 한다. **CH034의 "사용자 결정"을 뒤집는 게
+        # 아니라 hotfix/472 비교 테스트 동안만 임시로 되돌린 것** — 비교 끝나면 False로
+        # 복귀할지 다시 판단할 것.
+        "dedupe_cross_type": True,
         "cross_type_iou_min": 0.7,
         # ⚠️ 라벨링된 검증셋 없이 잡은 값 — 스윕 대상. 실측 중복(small_pro.jpg)은 작은
         # STAIN 박스가 큰 STAIN 박스에 97~100% 포함돼 있었다(IoU는 낮아도 포함 비율은
         # 매우 높음) — 그래서 IoU가 아니라 포함 비율을 쓴다(findings.py 참고). 0.8로
         # 여유를 둬서 부분적으로만 겹치는 "진짜 다른 두 하자"까지 합치는 위험을 줄인다.
-        # CH034: 이 임계치를 넘으면 이제 드롭이 아니라 **병합**(더 큰 박스 하나로)한다.
-        "dedupe_same_type": True,
+        # hotfix/472: 검증 노트북엔 same-type 병합 자체가 없어서 비교를 위해 임시로 끈다
+        # (위 dedupe_cross_type과 같은 이유 — CH034 결정을 뒤집는 게 아니라 비교 테스트용).
+        "dedupe_same_type": False,
         "same_type_containment_min": 0.8,
         "min_area_ratio": 0.0015,
         "max_defect_area_ratio": 0.35,
