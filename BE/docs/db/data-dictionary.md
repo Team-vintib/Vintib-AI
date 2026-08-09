@@ -426,7 +426,7 @@
 | `buyer_id` | `bigint` | NOT NULL |  | FK→member | 구매자. 낙찰 주문이면 auction.winner_id 와 같다. |
 | `seller_id` | `bigint` | NOT NULL |  | FK→member | 판매자. 상품 등록자와 같다. |
 | `product_id` | `bigint` | NOT NULL |  | FK→product | 대상 상품. |
-| `auction_id` | `bigint` |  |  | FK→auction | 낙찰로 생성된 주문의 경매. 상시 판매 주문은 NULL. |
+| `auction_id` | `bigint` |  |  | FK→auction | 낙찰로 생성된 주문의 경매. 정찰제 주문은 NULL. |
 | `live_id` | `bigint` |  |  | FK→live | 대상 라이브. |
 | `order_price` | `bigint` | NOT NULL |  |  | 결제 금액(원). |
 | `status` | `varchar(30)` | NOT NULL | `'PAID'` |  | PAID → SHIPPING → DELIVERED → CONFIRMED → SETTLED (+ REFUNDED / CANCELED) |
@@ -562,9 +562,9 @@
 | `color` | `varchar(50)` |  |  |  | 색상(자유 문자열). |
 | `material` | `varchar(50)` |  |  |  | 소재(자유 문자열). |
 | `measurements` | `jsonb` |  |  |  | 실측 치수(cm). 항목(총장/어깨너비 등)이 상품마다 달라 JSONB로 저장. |
-| `sale_type` | `varchar(20)` |  |  |  | DIRECT_SALE(상시 판매) \| AUCTION(경매) |
+| `sale_type` | `varchar(20)` |  |  |  | DIRECT_SALE(정찰제) \| AUCTION(경매) |
 | `sale_status` | `varchar(30)` | NOT NULL | `'DRAFT'` |  | DRAFT \| ON_SALE \| AUCTION_SCHEDULED \| AUCTION_IN_PROGRESS \| SOLD |
-| `price` | `bigint` |  |  |  | 상시 판매가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002). |
+| `price` | `bigint` |  |  |  | 정찰제가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002). |
 | `view_count` | `integer` | NOT NULL | `0` |  | 누적 조회수(집계값). ⚠️ 회원별 조회 이력은 남지 않는다 — REC-001 착수 시 재검토 필요. |
 | `ai_model_enabled` | `boolean` | NOT NULL | `false` |  |  |
 | `ai_model_gender` | `varchar(10)` |  |  |  |  |

@@ -69,8 +69,7 @@ interface MyProductApiDto {
   sellerId: number
   categoryId: number
   categoryName?: string | null
-  brandId: number | null
-  brandName?: string | null
+  brand: string | null
   title: string
   conditionGrade: ProductConditionGrade
   saleType: ProductSaleTypeDto
@@ -732,7 +731,7 @@ const toProductListItem = async (product: MyProductApiDto): Promise<ProductListI
 
   return {
     id: product.id,
-    brand: product.brandName || fallbackBrandLabel(product.brandId),
+    brand: product.brand || '',
     name: product.title,
     price: product.price ?? 0,
     conditionGrade: product.conditionGrade,
@@ -767,9 +766,6 @@ const getProductStatusCounts = (products: MyProductItem[]) => ({
   auctionScheduled: products.filter((product) => product.status === 'AUCTION_SCHEDULED').length,
   sold: products.filter((product) => product.status === 'SOLD').length,
 })
-
-const fallbackBrandLabel = (brandId: number | null) =>
-  brandId ? `브랜드 #${brandId}` : ''
 
 const fallbackCategoryLabel = (categoryId: number | null) =>
   categoryId ? `카테고리 #${categoryId}` : ''

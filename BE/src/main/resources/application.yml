@@ -39,7 +39,7 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET:local-dev-only-secret-key-please-change-in-prod-0123456789}
-  access-token-validity: ${JWT_ACCESS_TOKEN_EXPIRATION:900000} # 15분(ms)
+  access-token-validity: ${JWT_ACCESS_TOKEN_EXPIRATION:10800000} # 3시간(ms)
   refresh-token-validity: ${JWT_REFRESH_TOKEN_EXPIRATION:1209600000} # 14일(ms)
 
 server:

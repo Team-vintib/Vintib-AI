@@ -1179,8 +1179,11 @@ const beginQualityInspection = async () => {
     const productId = await createDraftProduct(draft, {
       categories: categories.value,
     })
-    draft.draftProductId = productId
+    // 업로드가 끝난 뒤에 id를 기록한다. 먼저 기록하면 업로드가 실패해도 "이미 다 올렸다"는
+    // 표시만 남아, 최종 등록이 사진 업로드를 건너뛰고 0장짜리 상품을 만들어 버린다(-310에서
+    // role이 필수가 되면서 실제로 그렇게 등록된 상품이 있었다).
     await uploadProductImages(productId, draft.photos)
+    draft.draftProductId = productId
     void pollQualityInspectionStatus(productId)
   } catch (error) {
     console.error('[ProductRegistrationPage] AI 품질 검증 시작 실패', error)

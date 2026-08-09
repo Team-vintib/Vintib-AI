@@ -20,7 +20,7 @@ import org.springframework.data.repository.Repository;
  */
 public interface HomeProductQueryRepository extends Repository<Product, Long> {
 
-    /** 특정 판매 상태의 상품을 최신 등록순으로. 홈 "상시 판매"·"경매 예정" 섹션이 쓴다. */
+    /** 특정 판매 상태의 상품을 최신 등록순으로. 홈 "정찰제"·"경매 예정" 섹션이 쓴다. */
     List<Product> findBySaleStatusOrderByCreatedAtDesc(SaleStatus saleStatus, Pageable pageable);
 
     /**

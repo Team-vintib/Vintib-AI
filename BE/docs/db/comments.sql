@@ -61,9 +61,9 @@ COMMENT ON COLUMN product.color           IS '색상(자유 문자열).';
 COMMENT ON COLUMN product.material        IS '소재(자유 문자열).';
 COMMENT ON COLUMN product.match_key       IS '"동일 상품" 판정 키(AI 시세 조회). AI가 상품명+브랜드+카테고리로 계산해 FE 경유로 저장 — BE는 계산하지 않는다.';
 COMMENT ON COLUMN product.measurements    IS '실측 치수(cm). 항목(총장/어깨너비 등)이 상품마다 달라 JSONB로 저장.';
-COMMENT ON COLUMN product.sale_type       IS 'DIRECT_SALE(상시 판매) | AUCTION(경매)';
+COMMENT ON COLUMN product.sale_type       IS 'DIRECT_SALE(정찰제) | AUCTION(경매)';
 COMMENT ON COLUMN product.sale_status     IS 'DRAFT | ON_SALE | AUCTION_SCHEDULED | AUCTION_IN_PROGRESS | SOLD';
-COMMENT ON COLUMN product.price           IS '상시 판매가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002).';
+COMMENT ON COLUMN product.price           IS '정찰제가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002).';
 COMMENT ON COLUMN product.view_count      IS '누적 조회수(집계값). ⚠️ 회원별 조회 이력은 남지 않는다 — REC-001 착수 시 재검토 필요.';
 COMMENT ON COLUMN product.deleted_at      IS '삭제 시각. 주문 이력 보존을 위해 물리 삭제하지 않는다.';
 
@@ -134,7 +134,7 @@ COMMENT ON COLUMN point_hold.released_at IS '보류 해제 시각.';
 
 -- ---------- 주문·배송 ----------
 COMMENT ON TABLE orders IS '주문. 낙찰(AUCT-012) 또는 상시 구매로 생성된다. order 가 SQL 예약어라 테이블명이 orders 다.';
-COMMENT ON COLUMN orders.auction_id      IS '낙찰로 생성된 주문의 경매. 상시 판매 주문은 NULL.';
+COMMENT ON COLUMN orders.auction_id      IS '낙찰로 생성된 주문의 경매. 정찰제 주문은 NULL.';
 COMMENT ON COLUMN orders.order_price     IS '결제 금액(원).';
 COMMENT ON COLUMN orders.status          IS 'PAID → SHIPPING → DELIVERED → CONFIRMED → SETTLED (+ REFUNDED / CANCELED)';
 COMMENT ON COLUMN orders.auto_confirm_at IS '자동 구매 확정 예정 시각(배송 완료 + 3일). 배송 완료 시점에 채워 넣고 스케줄러가 이 컬럼으로 대상을 찾는다.';

@@ -24,7 +24,7 @@ public class FollowingController {
 
     @Operation(summary = "팔로잉 콘텐츠 조회",
             description = "로그인한 회원이 팔로우한 회원들의 라이브·상품을 반환한다. 팔로우가 없거나 노출할 콘텐츠가 없으면 empty=true. "
-                    + "products는 팔로우한 판매자의 상시 판매 상품이다(추천 상품 아님). lives는 라이브 도메인 실데이터 연동 전이라 "
+                    + "products는 팔로우한 판매자의 정찰제 상품이다(추천 상품 아님). lives는 라이브 도메인 실데이터 연동 전이라 "
                     + "현재 항상 빈 배열이다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({

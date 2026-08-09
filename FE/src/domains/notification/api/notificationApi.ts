@@ -3,6 +3,7 @@ import {
   getNotificationRoute,
 } from '@/domains/notification/constants/notificationOptions'
 import type {
+  NotificationCategory,
   NotificationItem,
   NotificationItemDto,
   NotificationListResult,
@@ -25,15 +26,23 @@ interface NotificationReadResponse {
   isRead: boolean
 }
 
+interface NotificationUnreadCountResponse {
+  unreadCount: number
+}
+
+/** 'ALL'은 BE가 모르는 값이다(생략 = 전체) — 쿼리 파라미터로 보낼 카테고리 타입은 그 값을 뺀다. */
+export type NotificationApiCategory = Exclude<NotificationCategory, 'ALL'>
+
 interface NotificationListParams {
   page?: number
   size?: number
   unreadOnly?: boolean
+  category?: NotificationApiCategory
 }
 
 export const getNotifications = async (
   userId: number,
-  { page = 1, size = 20, unreadOnly = false }: NotificationListParams = {},
+  { page = 1, size = 20, unreadOnly = false, category }: NotificationListParams = {},
 ): Promise<NotificationListResult> => {
   const response = await http.get<
     ApiResponse<PageResponse<NotificationItemDto> | BackendPageResponse<NotificationItemDto>>
@@ -42,6 +51,7 @@ export const getNotifications = async (
       page: Math.max(page - 1, 0),
       size,
       unreadOnly,
+      category,
     },
   })
   const pageResponse = normalizePageResponse(unwrapApiData(response.data))
@@ -55,14 +65,16 @@ export const getNotifications = async (
   }
 }
 
-export const getUnreadNotificationCount = async (userId: number) => {
-  const result = await getNotifications(userId, {
-    page: 1,
-    size: 1,
-    unreadOnly: true,
-  })
+export const getUnreadNotificationCount = async (
+  userId: number,
+  category?: NotificationApiCategory,
+) => {
+  const response = await http.get<ApiResponse<NotificationUnreadCountResponse>>(
+    `/users/${userId}/alerts/unread-count`,
+    { params: { category } },
+  )
 
-  return result.meta.totalElements
+  return unwrapApiData(response.data).unreadCount
 }
 
 export const markNotificationAsRead = async (userId: number, notificationId: number) => {
@@ -75,9 +87,12 @@ export const markNotificationAsRead = async (userId: number, notificationId: num
 
 export const markAllNotificationsAsRead = async (
   userId: number,
+  category?: NotificationApiCategory,
 ): Promise<NotificationReadAllResult> => {
   const response = await http.patch<ApiResponse<NotificationReadAllResult>>(
     `/users/${userId}/alerts/read-all`,
+    undefined,
+    { params: { category } },
   )
 
   return unwrapApiData(response.data)

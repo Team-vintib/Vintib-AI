@@ -174,7 +174,7 @@ const filteredProducts = computed(() => {
 
   return liveCreateProducts.value.filter((product) =>
     [product.name, product.brand, product.category, product.condition].some((value) =>
-      value.toLowerCase().includes(keyword),
+      value?.toLowerCase().includes(keyword),
     ),
   )
 })
@@ -713,7 +713,7 @@ onMounted(() => {
                 <div class="live-create__product-info">
                   <strong>{{ product.name }}</strong>
                   <dl class="live-create__product-meta">
-                    <div>
+                    <div v-if="product.brand">
                       <dt>브랜드</dt>
                       <dd>{{ product.brand }}</dd>
                     </div>
@@ -917,7 +917,7 @@ onMounted(() => {
                   <div>
                     <strong>{{ product.name }}</strong>
                     <dl class="live-create__summary-product-meta">
-                      <div>
+                      <div v-if="product.brand">
                         <dt>브랜드</dt>
                         <dd>{{ product.brand }}</dd>
                       </div>

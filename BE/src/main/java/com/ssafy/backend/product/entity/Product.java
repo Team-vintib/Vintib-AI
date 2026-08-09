@@ -102,7 +102,7 @@ public class Product extends BaseTimeEntity {
     @Column(columnDefinition = "jsonb")
     private Map<String, Integer> measurements;
 
-    // 판매 채널(상시 판매/경매)은 이번 단계에서 정하지 않는다 — 판매 가격 설정 또는
+    // 판매 채널(정찰제/경매)은 이번 단계에서 정하지 않는다 — 판매 가격 설정 또는
     // 경매 조건 설정 API를 호출하는 시점에 비로소 결정된다.
     @Enumerated(EnumType.STRING)
     @Column(name = "sale_type", length = 20)
@@ -202,7 +202,7 @@ public class Product extends BaseTimeEntity {
         this.saleStatus = SaleStatus.AUCTION_SCHEDULED;
     }
 
-    /** 이미 상시 판매로 전환된 상품의 가격을 조정한다. 호출 전 {@link #isDirectSale()}을 확인해야 한다 —
+    /** 이미 정찰제로 전환된 상품의 가격을 조정한다. 호출 전 {@link #isDirectSale()}을 확인해야 한다 —
      * 경매 상품은 가격 개념이 없다({@code price}는 항상 null, 시작가는 {@code Auction}이 따로 갖는다). */
     public void updatePrice(Long price) {
         this.price = price;
@@ -297,7 +297,7 @@ public class Product extends BaseTimeEntity {
         this.qualityInspectionStatus = QualityInspectionStatus.PROCESSING;
     }
 
-    /** 상시 판매 즉시구매 대상인지 확인한다(SALE-002). 경매 상품이나 품절 상품은 구매할 수 없다. */
+    /** 정찰제 즉시구매 대상인지 확인한다(SALE-002). 경매 상품이나 품절 상품은 구매할 수 없다. */
     public boolean isAvailableForDirectPurchase() {
         return saleType == SaleType.DIRECT_SALE && saleStatus == SaleStatus.ON_SALE;
     }
@@ -324,7 +324,7 @@ public class Product extends BaseTimeEntity {
      *
      * <p><b>{@code AUCTION_SCHEDULED}를 허용한다</b>(FE 요청 007) — 유찰된 상품은 이 상태로
      * 돌아오는데, 판매자 입장에서 "안 팔렸으니 설명을 고쳐 다시 걸자"가 자연스러운 흐름이다.
-     * 막아 두면 상시 판매로 전환했다가 되돌리는 우회로를 강요하게 된다.
+     * 막아 두면 정찰제로 전환했다가 되돌리는 우회로를 강요하게 된다.
      *
      * <p><b>{@code AUCTION_IN_PROGRESS}는 계속 막는다.</b> 입찰이 붙는 도중에 상품 정보가 바뀌면
      * 입찰자가 보고 판단한 것과 실제로 받는 물건이 달라진다. {@code SOLD}도 마찬가지로 막힌다.

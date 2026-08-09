@@ -142,7 +142,7 @@ public class PointService {
         return charge(memberId, amount, charge.getId());
     }
 
-    /** 상시 판매 즉시구매 결제(SALE-002) — available 부족 시 거부, 성공하면 tradeEscrow로 보관한다. */
+    /** 정찰제 즉시구매 결제(SALE-002) — available 부족 시 거부, 성공하면 tradeEscrow로 보관한다. */
     @Transactional
     public void pay(Long buyerId, Long amount, Long orderId) {
         PointAccount account = getOrCreateAccount(buyerId);

@@ -25,7 +25,7 @@ import lombok.NoArgsConstructor;
 /**
  * 주문. 스키마는 {@code docs/db/schema.sql}의 {@code orders} 테이블이 단일 기준이다.
  *
- * <p>생성 경로는 둘이다 — {@link #createDirectSale}(SALE-002, 상시 판매 즉시구매, {@code auction}이
+ * <p>생성 경로는 둘이다 — {@link #createDirectSale}(SALE-002, 정찰제 즉시구매, {@code auction}이
  * NULL)과 {@link #createAuctionWin}(AUCT-012, 경매 낙찰). 후자는 경매 마감 스케줄러가 부르며
  * 구매자의 결제 동작 없이 만들어진다 — 이유는 그 메서드 주석 참고.
  * 상태 전이 메서드는 전제조건을 검증하지 않는다 — 검증은 {@code OrderService}가 한다
@@ -106,7 +106,7 @@ public class Order extends BaseTimeEntity {
     }
 
     /**
-     * 상시 판매 즉시구매 주문 생성(SALE-002). 결제(포인트 보관)는 서비스가 처리하고, 이 주문은
+     * 정찰제 즉시구매 주문 생성(SALE-002). 결제(포인트 보관)는 서비스가 처리하고, 이 주문은
      * 항상 PAID로 시작한다.
      *
      * @param live 라이브 시청 화면에서 산 경우 그 방송. <b>라이브 밖에서 샀으면 {@code null}</b> —

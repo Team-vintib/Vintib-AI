@@ -61,6 +61,10 @@ export interface LinkAccountSessionPayload {
 }
 
 // docs/requests/FE/036-google-oauth-signin-contract.md
+export interface GoogleOAuthConfigResponse {
+  clientId: string
+}
+
 export interface GoogleAuthRequest {
   code: string
   redirectUri: string

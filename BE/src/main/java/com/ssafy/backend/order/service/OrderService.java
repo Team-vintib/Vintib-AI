@@ -38,7 +38,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 주문 조회, 상시 판매 주문 생성, 배송지·송장,
+ * 주문 조회, 정찰제 주문 생성, 배송지·송장,
  * 구매 확정·정산({@link #confirmOrder}/{@link #autoConfirmDueOrders}).
  * 세금계산서 발행은 {@code InvoiceService}가 담당한다.
  */
@@ -76,7 +76,7 @@ public class OrderService {
     }
 
     /**
-     * 상시 판매 즉시구매. 결제(포인트 보관), 주문 생성, 상품 SOLD 처리를 한 트랜잭션으로 묶는다.
+     * 정찰제 즉시구매. 결제(포인트 보관), 주문 생성, 상품 SOLD 처리를 한 트랜잭션으로 묶는다.
      * 결제는 {@link PointService#pay}가 처리하며 잔액 부족이면 여기서 예외가 전파돼 전체가 롤백된다.
      */
     @Transactional

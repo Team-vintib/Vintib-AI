@@ -71,7 +71,7 @@ public interface ProductQueryPort {
      * 그대로 흘러갈 뿐 라이브 쪽에서 분기하지 않는다.
      *
      * @param brandName      브랜드명. 브랜드 미지정 상품은 {@code null}
-     * @param price          상시 판매가. 경매 예정 상품은 아직 가격이 없어 {@code null}
+     * @param price          정찰제가. 경매 예정 상품은 아직 가격이 없어 {@code null}
      * @param saleType       {@code DIRECT_SALE} / {@code AUCTION}. 판매 방식 미정이면 {@code null}
      * @param saleStatus     판매 상태. {@code DRAFT} / {@code ON_SALE} / {@code AUCTION_SCHEDULED} /
      *                       {@code AUCTION_IN_PROGRESS} / {@code SOLD}. <b>판매 방식과 별개 축이다</b> —

@@ -117,8 +117,15 @@ const applyCallbackError = (title: string, message: string) => {
   errorMessage.value = message
 }
 
-const retryAuth = () => {
-  startGoogleOAuth(oauthSource.value)
+const retryAuth = async () => {
+  try {
+    await startGoogleOAuth(oauthSource.value)
+  } catch (error: unknown) {
+    applyCallbackError(
+      'Google 인증을 완료하지 못했습니다.',
+      error instanceof Error ? error.message : '네트워크 연결을 확인한 뒤 다시 시도해 주세요.',
+    )
+  }
 }
 
 const fallbackPath = computed(() =>
