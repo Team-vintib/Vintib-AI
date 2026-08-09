@@ -19,7 +19,6 @@ import ProductDetailSkeleton from '@/domains/product/components/ProductDetailSke
 import ProductDetailStatePanel from '@/domains/product/components/ProductDetailStatePanel.vue'
 import ProductImageGallery from '@/domains/product/components/ProductImageGallery.vue'
 import ProductPriceDistribution from '@/domains/product/components/ProductPriceDistribution.vue'
-import ProductPriceEstimateCard from '@/domains/product/components/ProductPriceEstimateCard.vue'
 import ProductPurchaseSummary from '@/domains/product/components/ProductPurchaseSummary.vue'
 import ProductSellerLivePanel from '@/domains/product/components/ProductSellerLivePanel.vue'
 import ProductSimilarRecommendation from '@/domains/product/components/ProductSimilarRecommendation.vue'
@@ -454,8 +453,6 @@ onBeforeUnmount(() => {
           @view-seller="handleViewSeller"
         />
       </div>
-
-      <ProductPriceEstimateCard :estimate="product.priceEstimate" />
 
       <ProductPriceDistribution
         :current-product-id="product.id"
