@@ -1,4 +1,9 @@
-"""기존(시드) 상품의 의류 임베딩을 벡터DB에 채우는 1회성 백필 도구.
+"""기존(시드) 상품의 의류 임베딩을 벡터DB에 채우는 백필 도구.
+
+**주기 실행 전제(CH034 v2)**: 신규 등록 상품은 품질검수 워커가 실시간으로 임베딩을 채우지만,
+그 시점에 워커가 안 돌고 있었던 상품은 이 스크립트를 주기적으로(예: 매일 밤) 다시 돌려야
+빠짐없이 채워진다. 그래서 기본적으로 **이미 임베딩이 있는 상품은 스킵**한다 — 매번 전체를
+재추론하면 주기 실행 때마다 GPU 낭비가 크다. 강제로 다시 계산하려면 `--force`.
 
 **품질검수 큐(`POST /quality/inspections`)를 거치지 않는다.** 백필은 하자 탐지·점수·
 오버레이가 전혀 필요 없는데, 그 큐에 태우면 BE+Redis+AI 게이트웨이+GPU 워커가 전부 떠
@@ -98,6 +103,11 @@ def eligible_products(products: list[dict]) -> list[dict]:
     return [p for p in products if p["saleStatus"] in VISIBLE_SALE_STATUS]
 
 
+def has_existing_embedding(product_id: int) -> bool:
+    """이미 이 상품의 임베딩이 저장돼 있는지. 주기 실행 시 재추론을 건너뛸지 판단하는 데 쓴다."""
+    return embedding_store.fetch_garment_embedding(product_id) is not None
+
+
 def backfill_one(
     segmenter, product_id: int, image_urls: list[str], category_id: int | None
 ) -> bool:
@@ -149,6 +159,11 @@ def main() -> None:
     parser.add_argument(
         "--dry-run", action="store_true", help="대상 목록만 출력하고 임베딩/저장은 하지 않는다"
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="이미 임베딩이 있는 상품도 다시 계산한다(기본은 스킵 — 주기 실행 시 GPU 낭비 방지)",
+    )
     args = parser.parse_args()
 
     with httpx.Client(timeout=10.0) as client:
@@ -158,7 +173,10 @@ def main() -> None:
 
         if args.dry_run:
             for product in products:
-                print(f"  product_id={product['id']}")
+                note = ""
+                if has_existing_embedding(product["id"]):
+                    note = " (임베딩 있음, --force 없으면 스킵)"
+                print(f"  product_id={product['id']}{note}")
             print("[backfill] --dry-run: 임베딩을 계산하지 않았다.")
             return
 
@@ -166,9 +184,17 @@ def main() -> None:
         embedding_store.init_schema()
         segmenter = build_segmenter(args.backend)
 
-        succeeded, skipped = 0, 0
+        succeeded, skipped, already_embedded = 0, 0, 0
         for product in products:
             product_id = product["id"]
+
+            if not args.force and has_existing_embedding(product_id):
+                already_embedded += 1
+                print(
+                    f"[backfill] product_id={product_id} 이미 임베딩 있음, 스킵(--force로 강제 가능)"
+                )
+                continue
+
             try:
                 detail = fetch_product_detail(client, args.be_base_url, product_id)
             except httpx.HTTPError as exc:
@@ -189,7 +215,10 @@ def main() -> None:
                 skipped += 1
                 print(f"[backfill] product_id={product_id} 옷을 찾지 못해 스킵")
 
-        print(f"[backfill] 완료 — 저장 {succeeded}건, 스킵 {skipped}건")
+        print(
+            f"[backfill] 완료 — 저장 {succeeded}건, 스킵 {skipped}건, "
+            f"이미 임베딩 있어 건너뜀 {already_embedded}건"
+        )
 
 
 if __name__ == "__main__":

@@ -169,7 +169,15 @@ class HuggingFaceClassifier(AbuseClassifier):
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
             tokenizer = AutoTokenizer.from_pretrained(self._model_id)
-            model = AutoModelForSequenceClassification.from_pretrained(self._model_id)
+            # low_cpu_mem_usage=False로 명시 -- accelerate가 설치돼 있으면 transformers가
+            # 기본으로 meta 디바이스에 지연 초기화(low_cpu_mem_usage=True)를 켜는데, 이
+            # 조합에서 일부 텐서가 실제 디바이스로 안 옮겨지고 meta에 남아
+            # "Tensor on device cpu is not on the expected device meta!"로 터지는 걸
+            # 프로덕션에서 실측했다. 이 모델은 작아서(base급) 메모리 절약형 로딩이 애초에
+            # 필요 없다.
+            model = AutoModelForSequenceClassification.from_pretrained(
+                self._model_id, low_cpu_mem_usage=False
+            )
             model.eval()
             self._bundle = (tokenizer, model)
         return self._bundle
@@ -199,8 +207,49 @@ class HuggingFaceClassifier(AbuseClassifier):
         return AbuseResult(score=round(score, 4), label=label)
 
 
+# --- 하이브리드(사전 + 모델) -------------------------------------------------
+
+
+_MODEL_MIN_LENGTH = 5  # 이 미만이면(정규화 기준) 모델을 안 태운다 -- 아래 클래스독스트링 참고
+
+
+class HybridClassifier(AbuseClassifier):
+    """사전(RuleBasedClassifier)과 모델(HuggingFaceClassifier)을 OR로 결합한다.
+
+    실측(로컬, 2026-08-09): KcELECTRA 단독으로는 "병신같은 방송이네"(명백한 욕설)조차
+    0.3185로 임계값(0.5)을 못 넘기고, "ㅂㅅ 이게 뭐야"도 0.4991로 아슬아슬하게 놓쳤다 --
+    문맥이 짧으면 모델 확신도가 애매해지는 것으로 보인다. 반면 rule_based는 사전 단어를
+    항상 확정적으로(0.9/0.75) 잡는다. 그래서 rule_based가 먼저 걸러보고(빠르고 확실한
+    경우), 안 걸리면 모델로 넘겨서(사전에 없는 은근한 모욕/혐오까지) 서로의 약점을
+    메운다. rule_based가 이미 걸렸으면 모델 호출(느림, ~30-250ms) 자체를 생략한다.
+
+    **추가 실측(같은 날): 모델이 짧은 입력에서 훨씬 심하게 오탐한다.** "ㅇ"(0.8482),
+    "ㅋㅋ"(0.7865), "넵"(0.8536) 전부 ABUSIVE로 잘못 판정했다 -- 실시간 채팅에서 가장
+    흔한 반응들이라 이대로면 채팅 자체가 못 쓰게 된다. 그래서 정규화 후 텍스트 길이가
+    `_MODEL_MIN_LENGTH` 미만이면 모델을 아예 안 태우고 clean으로 본다 -- 그만큼 짧은
+    욕설은 이미 rule_based 사전/초성체 목록이 커버한다(예: "씹"/"좆"은 1글자, "지랄"/
+    "닥쳐"/"꺼져"는 2글자로 전부 사전에 있음).
+    """
+
+    def __init__(self, rule_classifier: AbuseClassifier, model_classifier: AbuseClassifier) -> None:
+        self._rule = rule_classifier
+        self._model = model_classifier
+
+    def score(self, text: str) -> AbuseResult:
+        rule_result = self._rule.score(text)
+        if rule_result.score >= registry.ABUSE_THRESHOLD:
+            return rule_result
+        if len(normalize(text)) < _MODEL_MIN_LENGTH:
+            return rule_result
+        return self._model.score(text)
+
+
 def build_classifier(key: str | None = None) -> AbuseClassifier:
-    """레지스트리 키로 분류기를 만든다. 미등록 키는 조립 시점에 바로 실패시킨다."""
+    """레지스트리 키로 분류기를 만든다. 미등록 키는 조립 시점에 바로 실패시킨다.
+
+    모델 기반 백엔드는 항상 rule_based와 하이브리드로 묶는다(위 HybridClassifier 참고) --
+    모델 단독으로는 사전에 있는 뻔한 욕설도 놓치는 게 실측으로 확인됐다.
+    """
     resolved = key or registry.ACTIVE_CLASSIFIER
     try:
         model_id = registry.CLASSIFIER_BACKENDS[resolved]
@@ -208,4 +257,4 @@ def build_classifier(key: str | None = None) -> AbuseClassifier:
         raise ValueError(f"등록되지 않은 분류기 백엔드입니다: {resolved!r}") from exc
     if model_id is None:
         return RuleBasedClassifier()
-    return HuggingFaceClassifier(model_id)
+    return HybridClassifier(RuleBasedClassifier(), HuggingFaceClassifier(model_id))

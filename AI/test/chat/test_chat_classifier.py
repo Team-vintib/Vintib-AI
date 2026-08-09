@@ -8,6 +8,7 @@ import pytest
 from app.chat import registry
 from app.chat.classifier import (
     HuggingFaceClassifier,
+    HybridClassifier,
     RuleBasedClassifier,
     build_classifier,
     jamo_runs,
@@ -78,9 +79,13 @@ def test_result_label_names_the_matched_rule():
 # --- 백엔드 스왑 ----------------------------------------------------------
 
 
-def test_default_backend_is_kcelectra():
-    # CH030: recall이 너무 낮은 rule_based 대신 KcELECTRA-base-hate가 기본이다.
-    assert isinstance(build_classifier(), HuggingFaceClassifier)
+def test_default_backend_is_hybrid_of_rule_and_kcelectra():
+    # CH030: recall이 너무 낮은 rule_based 단독 대신 KcELECTRA-base-hate가 기본이다.
+    # 하이브리드(뒤 테스트 참고): 모델 단독은 사전에 있는 뻔한 욕설도 놓치는 게
+    # 실측으로 확인돼, rule_based와 OR로 묶는다.
+    classifier = build_classifier()
+    assert isinstance(classifier, HybridClassifier)
+    assert isinstance(classifier._model, HuggingFaceClassifier)
 
 
 def test_rule_based_still_available_as_fallback():
@@ -88,11 +93,62 @@ def test_rule_based_still_available_as_fallback():
     assert isinstance(build_classifier("rule_based"), RuleBasedClassifier)
 
 
-def test_model_backed_key_builds_hf_adapter_without_loading():
+def test_model_backed_key_builds_hybrid_without_loading():
     # 어댑터 생성 시점에는 transformers를 건드리지 않는다(지연 import) — CI에서도 안전하다.
-    assert isinstance(build_classifier("kcelectra_base_hate"), HuggingFaceClassifier)
+    classifier = build_classifier("kcelectra_base_hate")
+    assert isinstance(classifier, HybridClassifier)
+    assert isinstance(classifier._rule, RuleBasedClassifier)
+    assert isinstance(classifier._model, HuggingFaceClassifier)
+
+
+def test_hybrid_defers_to_rule_based_when_it_matches():
+    # rule_based가 걸리면 모델을 아예 안 부른다(느린 모델 호출 생략) -- 모델 대신 더미를
+    # 넣어서, 호출됐다면 바로 터지게 해서 "안 불렸다"를 검증한다.
+    class ExplodingModel:
+        def score(self, text: str):  # pragma: no cover - 호출되면 안 됨
+            raise AssertionError("rule_based가 이미 걸렸는데 모델까지 호출됨")
+
+    classifier = HybridClassifier(RuleBasedClassifier(), ExplodingModel())
+    result = classifier.score("병신같은 방송이네")
+    assert result.score >= registry.ABUSE_THRESHOLD
+
+
+def test_hybrid_falls_back_to_model_when_rule_based_misses():
+    class StubModel:
+        def score(self, text: str):
+            from app.chat.classifier import AbuseResult
+
+            return AbuseResult(score=0.9, label="hate")
+
+    classifier = HybridClassifier(RuleBasedClassifier(), StubModel())
+    # 사전/초성체 어디에도 안 걸리는 문장이어야 모델로 넘어간다.
+    result = classifier.score("저 사람은 옷 고르는 안목이 부족한 편이다")
+    assert result.score == 0.9
+    assert result.label == "hate"
 
 
 def test_unknown_backend_fails_fast():
     with pytest.raises(ValueError, match="등록되지 않은 분류기"):
         build_classifier("does_not_exist")
+
+
+@pytest.mark.parametrize("text", ["ㅇ", "ㅋㅋ", "넵"])
+def test_hybrid_skips_model_for_short_clean_text(text):
+    # 실측: KcELECTRA가 "ㅇ"/"ㅋㅋ"/"넵" 같은 흔한 짧은 반응을 전부 ABUSIVE로 오탐했다.
+    # 사전/초성체에 안 걸리는 짧은 입력은 모델을 아예 안 태우고 clean으로 본다 --
+    # 호출되면 바로 터지는 더미로 "모델이 안 불렸다"를 검증한다.
+    class ExplodingModel:
+        def score(self, text: str):  # pragma: no cover - 호출되면 안 됨
+            raise AssertionError("짧은 입력인데 모델까지 호출됨")
+
+    classifier = HybridClassifier(RuleBasedClassifier(), ExplodingModel())
+    result = classifier.score(text)
+    assert result.score == 0.0
+    assert result.label == "clean"
+
+
+def test_hybrid_still_catches_short_dictionary_abuse():
+    # 길이 게이트는 모델 호출만 건너뛴다 -- 짧아도 사전/초성체에 걸리면 그대로 차단된다.
+    classifier = HybridClassifier(RuleBasedClassifier(), None)
+    result = classifier.score("ㅂㅅ")
+    assert result.score >= registry.ABUSE_THRESHOLD

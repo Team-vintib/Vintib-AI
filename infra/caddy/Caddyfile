@@ -74,6 +74,15 @@ i15a108.p.ssafy.io {
 		reverse_proxy ai:8000
 	}
 
+	# 등록 AI 착용컷용 고정 모델 참조 사진(app/main.py가 StaticFiles로 마운트).
+	# 이 규칙이 없으면 catch-all(frontend)로 새서 index.html이 대신 응답된다 —
+	# 그 결과 워커의 download_image()가 "cannot identify image file"로 매번(100%)
+	# 실패했다(재시도로 못 고치는 이유: 네트워크 문제가 아니라 라우팅 누락이라 매번
+	# 똑같이 실패함, S15P11A108-568 관련 실측).
+	handle /personas/* {
+		reverse_proxy ai:8000
+	}
+
 	# 라이브 댓글 관리(욕설·도배 판정, 반복질문 답변) — 동기 REST, /ai 큐를 안 거친다.
 	# 판정 자체는 rule-based라 가벼워 게이트웨이 컨테이너 안에서 바로 처리한다.
 	handle /chat/* {

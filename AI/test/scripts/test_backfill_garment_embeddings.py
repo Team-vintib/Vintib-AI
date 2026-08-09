@@ -15,6 +15,7 @@ from scripts.backfill_garment_embeddings import (
     eligible_products,
     fetch_all_products,
     fetch_product_detail,
+    has_existing_embedding,
 )
 
 
@@ -31,6 +32,22 @@ class TestCategoryValue:
 
     def test_none_id_returns_none(self):
         assert category_value(None) is None
+
+
+class TestHasExistingEmbedding:
+    """주기 실행 시 이미 임베딩 있는 상품을 재추론하지 않기 위한 판단(CH034 v2)."""
+
+    def test_true_when_embedding_record_exists(self, monkeypatch):
+        monkeypatch.setattr(
+            backfill.embedding_store, "fetch_garment_embedding", lambda product_id: object()
+        )
+        assert has_existing_embedding(1) is True
+
+    def test_false_when_no_embedding_record(self, monkeypatch):
+        monkeypatch.setattr(
+            backfill.embedding_store, "fetch_garment_embedding", lambda product_id: None
+        )
+        assert has_existing_embedding(1) is False
 
 
 class TestEligibleProducts:
