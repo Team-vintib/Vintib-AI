@@ -13,6 +13,7 @@ import type {
   AiQualityAnalysis,
   ProductAiModelCut,
   ProductDetailViewData,
+  ProductPriceEstimate,
   SimilarProductPricePoint,
 } from '@/domains/product/types/productDetail.types'
 import type {
@@ -113,6 +114,7 @@ interface ProductDetailDto extends ProductListDto {
   similarProducts?: SimilarProductPricePoint[] | null
   aiQualityAnalysis?: AiQualityAnalysis | null
   aiModelCut?: ProductAiModelCut | null
+  priceEstimate?: ProductPriceEstimate | null
   updatedAt: string
 }
 
@@ -915,6 +917,7 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
       })),
     aiQualityAnalysis: product.aiQualityAnalysis ?? null,
     aiModelCut: product.aiModelCut ?? null,
+    priceEstimate: product.priceEstimate ?? null,
   }
 }
 
