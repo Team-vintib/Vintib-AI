@@ -44,8 +44,7 @@
 - [x] `productApi.ts`: `ProductCreateRequest`/`ProductUpdateRequest`의 `brandId`→`brand`,
       `findBrandId` 제거, `ProductUpdateRequest`에 `matchKey` 추가, `submitProduct` PATCH에
       `matchKey` 포함
-- [ ] `npm run type-check`, `npm run lint` 통과 — **이 환경에 npm/node가 없어 직접 실행 못 함,
-      사용자가 로컬에서 확인 필요**
+- [x] `npm run type-check`, `npm run lint` 통과 (node LTS 24.19.0 설치 후 확인, 둘 다 통과)
 - [x] `docs/requests/FE/042-pricing-matchkey-forwarding.md`에서 반영 완료된 1·2번 제거, 3번(상세
       페이지 표시, 범위 밖)만 남김
 
