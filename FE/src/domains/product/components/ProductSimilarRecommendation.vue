@@ -8,18 +8,9 @@ import { useWishStore } from '@/domains/product/stores/wishStore'
 
 import type { ProductListItem } from '@/domains/product/types/productList.types'
 
-const props = withDefaults(
-  defineProps<{
-    productId: number
-    // 같은 카테고리로 좁혀 추천한다. 없으면 추천을 띄우지 않는다(getSimilarProducts 참고).
-    categoryId?: number | null
-    brand?: string
-  }>(),
-  {
-    categoryId: null,
-    brand: '',
-  },
-)
+const props = defineProps<{
+  productId: number
+}>()
 
 const authStore = useAuthStore()
 const wishStore = useWishStore()
@@ -50,10 +41,7 @@ const load = async (productId: number) => {
   currentPage.value = 0
 
   try {
-    const list = await getSimilarProducts(productId, {
-      categoryId: props.categoryId,
-      brand: props.brand,
-    })
+    const list = await getSimilarProducts(productId)
     products.value = list
     wishStore.hydrateProducts(list)
     loadState.value = 'loaded'
@@ -94,9 +82,8 @@ const handleToggleLike = async (productId: number) => {
   }
 }
 
-// 상세를 불러오는 동안에는 categoryId가 아직 없다 — 그 값이 채워지는 시점에도 다시 부른다.
 watch(
-  () => [props.productId, props.categoryId],
+  () => props.productId,
   () => {
     void load(props.productId)
   },

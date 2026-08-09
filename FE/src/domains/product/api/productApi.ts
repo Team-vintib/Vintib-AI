@@ -287,51 +287,30 @@ export const getProductList = async ({
   }
 }
 
-const SIMILAR_PRODUCT_LIMIT = 8
+const SIMILAR_PRODUCT_MOCK_LIMIT = 8
 
 /**
  * 상품 상세 하단 유사 상품 추천 목록.
  *
- * 유사 상품 전용 엔드포인트는 없다. 상품 상세 응답의 `similarProducts`는 `id/title/price`뿐이라
- * 카드(브랜드·이미지·등급·판매방식·찜)를 못 채우므로, **같은 카테고리로 좁힌 상품 목록 API**를
- * 쓴다. BE의 유사 판정 기준(같은 카테고리 + 같은 브랜드 우선)을 그대로 따라 정렬한다.
- *
- * 카테고리를 모르면(상세에 categoryId가 없는 예전 응답 등) 빈 목록을 돌려준다 — 카테고리 없이
- * 전체 목록을 긁어오면 "유사"라고 부를 수 없는 결과가 섞인다.
+ * `GET /products/{id}/similar`(CH034) — AI CLIP 임베딩 배치 캐시를 BE가 미리 계산해두고,
+ * 부족하면 카테고리/브랜드 SQL로 보충해 반환한다. FE는 categoryId/brand를 몰라도 되고
+ * (BE가 상품 자신의 값으로 알아서 판단), 정렬도 이미 유사도 순으로 와 있어 FE에서 다시
+ * 정렬하지 않는다.
  */
-export const getSimilarProducts = async (
-  productId: number,
-  options: { categoryId?: number | null; brand?: string } = {},
-): Promise<ProductListItem[]> => {
+export const getSimilarProducts = async (productId: number): Promise<ProductListItem[]> => {
   if (!PRODUCT_API_ENABLED) {
     return PRODUCT_LIST_MOCK_DATA.filter((product) => product.id !== productId).slice(
       0,
-      SIMILAR_PRODUCT_LIMIT,
+      SIMILAR_PRODUCT_MOCK_LIMIT,
     )
   }
 
-  const { categoryId, brand } = options
+  const response = await http.get<ApiResponse<{ productId: number; items: ProductListDto[] }>>(
+    `/products/${productId}/similar`,
+  )
+  const { items } = unwrapApiData(response.data)
 
-  if (categoryId === null || categoryId === undefined) {
-    return []
-  }
-
-  const { items } = await getProductList({
-    categoryIds: [categoryId],
-    size: 20,
-    sort: 'LATEST',
-  })
-
-  return items
-    .filter((product) => product.id !== productId && product.saleStatus !== 'SOLD')
-    .sort((first, second) => {
-      // 같은 브랜드를 앞으로. 그 외에는 목록 API가 준 최신순을 유지한다.
-      const firstIsSameBrand = Boolean(brand) && first.brand === brand
-      const secondIsSameBrand = Boolean(brand) && second.brand === brand
-
-      return Number(secondIsSameBrand) - Number(firstIsSameBrand)
-    })
-    .slice(0, SIMILAR_PRODUCT_LIMIT)
+  return Promise.all(items.map(toProductListItem))
 }
 
 export const getProductDetail = async (productId: number): Promise<ProductDetailViewData> => {
