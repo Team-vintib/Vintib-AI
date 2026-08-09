@@ -97,6 +97,16 @@ class PricingRequest(BaseModel):
     category: GarmentCategory | None = Field(
         default=None, description="있으면 쿼리를 좁힌다. 없어도 동작한다"
     )
+    category_id: int | None = Field(
+        default=None,
+        description=(
+            "BE 원본 categoryId(숫자, 소분류 24~126). `category`(AI 6종 GarmentCategory)와"
+            " 별개다 — `internal_text` comps 백엔드가 product_corpus(BE categoryId 기준으로"
+            " 채워짐)와 같은 카테고리 체계로 매칭 키를 만드는 데 쓴다. 없으면 internal_text는"
+            " 매칭을 포기한다(카테고리 체계가 다르면 코퍼스와 절대 일치할 수 없어서 시도 자체가"
+            " 무의미하다)."
+        ),
+    )
     condition_score: float = Field(
         ge=0.0, le=100.0, description="품질검수 InspectionResult.condition_score 를 그대로"
     )

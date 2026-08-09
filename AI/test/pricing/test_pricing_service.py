@@ -28,7 +28,14 @@ class _StubSource(CompsSource):
         self.received_product_id: int | None = None
 
     def fetch(
-        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+        self,
+        query: str,
+        *,
+        image_url: str | None = None,
+        product_id: int | None = None,
+        product_name: str | None = None,
+        brand: str | None = None,
+        category_id: int | None = None,
     ) -> CompsFetch:
         self.received_image_url = image_url
         self.received_product_id = product_id
