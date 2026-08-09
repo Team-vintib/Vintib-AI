@@ -58,6 +58,7 @@ COMMENT ON COLUMN product.condition_grade IS '중고 상태 등급. ⚠️ 등�
 COMMENT ON COLUMN product.size_label      IS '사이즈 표기(S/M/L, 95/100 등). 브랜드마다 달라 문자열로 둔다.';
 COMMENT ON COLUMN product.color           IS '색상(자유 문자열).';
 COMMENT ON COLUMN product.material        IS '소재(자유 문자열).';
+COMMENT ON COLUMN product.match_key       IS '"동일 상품" 판정 키(AI 시세 조회). AI가 상품명+브랜드+카테고리로 계산해 FE 경유로 저장 — BE는 계산하지 않는다.';
 COMMENT ON COLUMN product.measurements    IS '실측 치수(cm). 항목(총장/어깨너비 등)이 상품마다 달라 JSONB로 저장.';
 COMMENT ON COLUMN product.sale_type       IS 'DIRECT_SALE(상시 판매) | AUCTION(경매)';
 COMMENT ON COLUMN product.sale_status     IS 'DRAFT | ON_SALE | AUCTION_SCHEDULED | AUCTION_IN_PROGRESS | SOLD';
