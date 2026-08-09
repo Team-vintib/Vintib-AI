@@ -25,7 +25,13 @@ async def lifespan(app: FastAPI):
     # 메시지가 그 지연을 그대로 떠안지 않도록 기동 시점에 미리 로드해둔다.
     # get_chat_service()는 @lru_cache 싱글턴이라 여기서 한 번 호출해두면 이후 요청은
     # 캐시된 인스턴스를 그대로 재사용한다.
-    get_chat_service()
+    print("[startup] 채팅 욕설 판정기 로딩 중...")
+    service = get_chat_service()
+    # 생성만으론 모델이 실제로 로드되지 않는다(HuggingFaceClassifier가 지연 로드) --
+    # 여기서 빈 문자열로 한 번 실제 호출해서 로딩 자체를 강제한다. 실패하면 배포
+    # 직후 로그로 바로 보이도록 여기서 그대로 예외를 띄운다(삼키지 않음).
+    service._classifier.score("")
+    print("[startup] 채팅 욕설 판정기 로딩 완료")
     yield
 
 
