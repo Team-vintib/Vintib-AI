@@ -79,6 +79,26 @@ def test_non_spam_score_stays_below_one():
 # --- 상태 저장소 스왑 -----------------------------------------------------
 
 
+def test_registry_defaults_are_5s_window_6_messages():
+    # -571 후속 튜닝값 고정. "10초에 10개"는 너무 느슨해서(초당 1개 페이스로도 안 걸림)
+    # "5초에 6개"로 좁혔다 -- 실제 SpamDetector 동작은 아래
+    # test_default_registry_values_trip_flooding_within_5_seconds가 end-to-end로 검증한다.
+    assert registry.SPAM_WINDOW_SECONDS == 5.0
+    assert registry.SPAM_MAX_MESSAGES == 6
+    assert registry.SPAM_DUPLICATE_COUNT == 6
+
+
+def test_default_registry_values_trip_flooding_within_5_seconds():
+    # 파라미터를 안 넘겨서 registry 기본값을 그대로 쓴다 -- 등록된 튜닝값이 실제로
+    # SpamDetector에 반영되는지까지 확인.
+    detector = _detector()
+    for i in range(6):
+        assert detector.check(1, f"메시지 {i}", now=BASE + i * 0.5).is_spam is False
+    result = detector.check(1, "메시지 6", now=BASE + 3.0)
+    assert result.is_spam is True
+    assert result.reason == "rate_limit"
+
+
 def test_default_store_is_in_memory():
     assert isinstance(build_state_store(), InMemoryStateStore)
     assert registry.ACTIVE_STATE_STORE == "memory"
