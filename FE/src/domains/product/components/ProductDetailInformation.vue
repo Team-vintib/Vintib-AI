@@ -11,6 +11,7 @@ const description = computed(() => props.product.description.trim())
 
 const specItems = computed(() =>
   [
+    { label: '브랜드', value: props.product.brand },
     { label: '표기 사이즈', value: props.product.sizeLabel },
     { label: '색상', value: props.product.color },
     { label: '소재', value: props.product.material },
