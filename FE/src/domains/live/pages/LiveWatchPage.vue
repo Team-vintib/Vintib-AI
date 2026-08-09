@@ -26,7 +26,12 @@ import LiveSelectedProduct from '@/domains/live/components/LiveSelectedProduct.v
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchHeader from '@/domains/live/components/LiveWatchHeader.vue'
 import LiveWatchState from '@/domains/live/components/LiveWatchState.vue'
-import { addWish, getWishProductIds, removeWish } from '@/domains/product/api/productApi'
+import {
+  addWish,
+  getProductDetail,
+  getWishProductIds,
+  removeWish,
+} from '@/domains/product/api/productApi'
 import { useWishStore } from '@/domains/product/stores/wishStore'
 import { getPointBalance } from '@/domains/point/api/pointApi'
 import { dispatchPointBalanceUpdated } from '@/domains/point/utils/pointBalanceEvents'
@@ -49,6 +54,7 @@ import type {
   LiveWatchViewData,
   ProductSoldMessage,
 } from '@/domains/live/types/liveWatch.types'
+import type { ProductDetailViewData } from '@/domains/product/types/productDetail.types'
 import type { LiveTryOnMockScenario } from '@/domains/tryon/types/liveTryOn.types'
 
 const LIVE_WATCH_MOCK_SCENARIOS: LiveWatchMockScenario[] = [
@@ -197,6 +203,32 @@ const selectedProduct = computed(
   () => live.value?.products.find((product) => product.id === selectedProductId.value) ?? null,
 )
 
+// 라이브 상품 응답(LiveProductResponse)에는 사이즈·색상이 없어서 "선택한 상품 정보"의 칸이 빈다.
+// BE에 필드 추가를 요청하는 대신 이미 공개된 GET /products/{id}를 상품 전환 시점에 한 번씩만 불러
+// 채운다(HS042). 한 번 받은 상품은 다시 부르지 않는다.
+const productDetailById = ref<Record<number, ProductDetailViewData>>({})
+
+const selectedProductDetail = computed(() =>
+  selectedProductId.value === null
+    ? null
+    : (productDetailById.value[selectedProductId.value] ?? null),
+)
+
+watch(
+  selectedProductId,
+  async (productId) => {
+    if (productId === null || productDetailById.value[productId]) return
+
+    try {
+      const detail = await getProductDetail(productId)
+      productDetailById.value[productId] = detail
+    } catch {
+      // 부가 정보일 뿐이라 실패해도 라이브 화면은 그대로 둔다 — 라이브 응답 값으로만 표시된다.
+    }
+  },
+  { immediate: true },
+)
+
 const purchaseProduct = computed(
   () => live.value?.products.find((product) => product.id === purchaseProductId.value) ?? null,
 )
@@ -290,6 +322,7 @@ const loadLiveWatch = async () => {
   clearRealtimeSubscriptions()
   live.value = null
   selectedProductId.value = null
+  productDetailById.value = {}
   purchaseProductId.value = null
   isPurchaseDialogOpen.value = false
   purchaseMessage.value = ''
@@ -839,6 +872,7 @@ onBeforeUnmount(() => {
           :products="live.products"
           :current-product-id="live.currentProductId"
           :selected-product-id="selectedProductId"
+          hide-brand-when-empty
           @select="selectQueueProduct"
         />
 
@@ -910,6 +944,7 @@ onBeforeUnmount(() => {
               </button>
               <LiveSelectedProduct
                 :product="selectedProduct"
+                :detail="selectedProductDetail"
                 :is-wished="isSelectedProductWished"
                 :is-wish-pending="pendingWishProductId === selectedProductId"
                 :wish-message="wishMessage"

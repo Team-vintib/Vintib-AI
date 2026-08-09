@@ -1,14 +1,72 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 import AppInlineNotice from '@/shared/components/AppInlineNotice.vue'
 
 import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
+import type { ProductDetailViewData } from '@/domains/product/types/productDetail.types'
 
-defineProps<{
+// detail: 선택 상품의 상품 상세(GET /products/{id}) 결과. 라이브 응답에는 사이즈·색상이 없어서
+// 부족한 항목을 이걸로 채운다. 아직 안 왔거나 조회에 실패하면 null이고, 그 경우 라이브 값만 쓴다.
+const props = defineProps<{
   product: LiveWatchProduct | null
+  detail: ProductDetailViewData | null
   isWished: boolean
   isWishPending: boolean
   wishMessage: string
 }>()
+
+const formatMeasurements = (measurements: Record<string, number> | undefined) => {
+  const entries = Object.entries(measurements ?? {}).filter(
+    ([label, value]) => label.trim() && Number.isFinite(value) && value > 0,
+  )
+
+  return entries.map(([label, value]) => `${label} ${value}cm`).join(' · ')
+}
+
+// 값이 빈 항목은 행 자체를 만들지 않는다(상품 상세 화면의 specItems와 같은 규칙).
+// '정보 준비 중'처럼 아직 안 나온 정보인 척하는 문구는 쓰지 않는다.
+const specItems = computed(() => {
+  const live = props.product
+  if (!live) return []
+
+  const detail = props.detail
+
+  return [
+    { label: '브랜드', value: detail?.brand ?? '' },
+    { label: '사이즈', value: detail?.sizeLabel ?? '' },
+    { label: '색상', value: detail?.color ?? '' },
+    { label: '소재', value: detail?.material || live.material || '' },
+    { label: '상태', value: detail?.conditionLabel || live.condition || '' },
+    {
+      label: '실측',
+      value: formatMeasurements(detail?.measurements) || live.measurements || '',
+    },
+  ]
+    .map((item) => ({ ...item, value: item.value.trim() }))
+    .filter((item) => item.value)
+})
+
+// 하자는 개수로만 보여준다 — 다른 항목과 같은 좁은 칸에 들어가야 하고, 판매자가 쓴 문장 전체는
+// 상품 상세에서 읽으면 된다. 0건이면 "없음"을 명시한다: BE 계약상 하자 목록이 비어 있는 건
+// "등록된 하자가 없다"는 뜻이고, 중고 거래에서 이건 구매자에게 의미 있는 정보다.
+// 다만 상세를 아직 못 받았고 라이브 값도 없으면 단정하지 않고 숨긴다 — BE가 상품 행을 못 찾은
+// 경우에도 모든 필드가 null로 오기 때문에 "없음"이 거짓이 될 수 있다.
+const defectLabel = computed(() => {
+  const detail = props.detail
+
+  if (detail) {
+    const count = detail.sellerDisclosedDefects.filter((defect) => defect.title.trim()).length
+
+    return count > 0 ? `${count}개` : '없음'
+  }
+
+  // 라이브 응답의 defectSummary는 하자 항목을 쉼표로 이어 붙인 한 줄이라 쉼표로 나눠 센다.
+  const summary = props.product?.defectSummary?.trim()
+  if (!summary) return ''
+
+  return `${summary.split(',').filter((item) => item.trim()).length}개`
+})
 
 defineEmits<{
   viewProduct: [productId: number]
@@ -38,22 +96,14 @@ defineEmits<{
           <strong>{{ product.title }}</strong>
         </div>
 
-        <dl class="live-selected-product__details">
-          <div>
-            <dt>소재</dt>
-            <dd>{{ product.material || '정보 준비 중' }}</dd>
+        <dl v-if="specItems.length || defectLabel" class="live-selected-product__details">
+          <div v-for="item in specItems" :key="item.label">
+            <dt>{{ item.label }}</dt>
+            <dd>{{ item.value }}</dd>
           </div>
-          <div>
-            <dt>상태</dt>
-            <dd>{{ product.condition || '정보 준비 중' }}</dd>
-          </div>
-          <div>
-            <dt>실측</dt>
-            <dd>{{ product.measurements || '정보 준비 중' }}</dd>
-          </div>
-          <div>
+          <div v-if="defectLabel">
             <dt>하자</dt>
-            <dd>{{ product.defectSummary || '정보 준비 중' }}</dd>
+            <dd>{{ defectLabel }}</dd>
           </div>
         </dl>
 
@@ -158,7 +208,8 @@ defineEmits<{
 
 .live-selected-product__details > div {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr);
+  /* '브랜드:'·'사이즈:'처럼 3글자 라벨이 들어와 46px로는 잘린다. */
+  grid-template-columns: 58px minmax(0, 1fr);
   gap: 4px;
 }
 
@@ -182,6 +233,7 @@ defineEmits<{
 .live-selected-product__details dd {
   color: var(--color-live-text-primary);
 }
+
 
 .live-selected-product__actions {
   display: flex;
