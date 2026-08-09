@@ -207,8 +207,37 @@ class HuggingFaceClassifier(AbuseClassifier):
         return AbuseResult(score=round(score, 4), label=label)
 
 
+# --- 하이브리드(사전 + 모델) -------------------------------------------------
+
+
+class HybridClassifier(AbuseClassifier):
+    """사전(RuleBasedClassifier)과 모델(HuggingFaceClassifier)을 OR로 결합한다.
+
+    실측(로컬, 2026-08-09): KcELECTRA 단독으로는 "병신같은 방송이네"(명백한 욕설)조차
+    0.3185로 임계값(0.5)을 못 넘기고, "ㅂㅅ 이게 뭐야"도 0.4991로 아슬아슬하게 놓쳤다 --
+    문맥이 짧으면 모델 확신도가 애매해지는 것으로 보인다. 반면 rule_based는 사전 단어를
+    항상 확정적으로(0.9/0.75) 잡는다. 그래서 rule_based가 먼저 걸러보고(빠르고 확실한
+    경우), 안 걸리면 모델로 넘겨서(사전에 없는 은근한 모욕/혐오까지) 서로의 약점을
+    메운다. rule_based가 이미 걸렸으면 모델 호출(느림, ~30-250ms) 자체를 생략한다.
+    """
+
+    def __init__(self, rule_classifier: AbuseClassifier, model_classifier: AbuseClassifier) -> None:
+        self._rule = rule_classifier
+        self._model = model_classifier
+
+    def score(self, text: str) -> AbuseResult:
+        rule_result = self._rule.score(text)
+        if rule_result.score >= registry.ABUSE_THRESHOLD:
+            return rule_result
+        return self._model.score(text)
+
+
 def build_classifier(key: str | None = None) -> AbuseClassifier:
-    """레지스트리 키로 분류기를 만든다. 미등록 키는 조립 시점에 바로 실패시킨다."""
+    """레지스트리 키로 분류기를 만든다. 미등록 키는 조립 시점에 바로 실패시킨다.
+
+    모델 기반 백엔드는 항상 rule_based와 하이브리드로 묶는다(위 HybridClassifier 참고) --
+    모델 단독으로는 사전에 있는 뻔한 욕설도 놓치는 게 실측으로 확인됐다.
+    """
     resolved = key or registry.ACTIVE_CLASSIFIER
     try:
         model_id = registry.CLASSIFIER_BACKENDS[resolved]
@@ -216,4 +245,4 @@ def build_classifier(key: str | None = None) -> AbuseClassifier:
         raise ValueError(f"등록되지 않은 분류기 백엔드입니다: {resolved!r}") from exc
     if model_id is None:
         return RuleBasedClassifier()
-    return HuggingFaceClassifier(model_id)
+    return HybridClassifier(RuleBasedClassifier(), HuggingFaceClassifier(model_id))
