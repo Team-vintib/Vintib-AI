@@ -11,6 +11,7 @@ import com.ssafy.backend.global.client.dto.ProductClassifyJobRequest;
 import com.ssafy.backend.global.client.dto.QualityInspectionJobRequest;
 import com.ssafy.backend.global.client.dto.RegistrationModelCutJobRequest;
 import com.ssafy.backend.global.client.dto.SeedChatDocumentRequest;
+import com.ssafy.backend.global.client.dto.SimilarProductAiResponse;
 import com.ssafy.backend.global.client.dto.TryOnJobRequest;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -168,6 +169,19 @@ public class AiClient {
                 .body(new SeedChatDocumentRequest(content))
                 .retrieve()
                 .toBodilessEntity();
+    }
+
+    /**
+     * {@code GET /recommend/products/{productId}/similar} — CLIP 임베딩 기반 유사 상품 후보
+     * 조회(CH034). {@code SimilarProductCacheService}(배치)에서만 호출한다 — 상품 상세
+     * 서빙 경로(`ProductService`/`SimilarProductQueryService`)는 이 메서드를 부르지 않는다,
+     * AI 서버 상태가 상품 상세 응답에 영향을 주면 안 되기 때문이다.
+     */
+    public SimilarProductAiResponse getSimilarProducts(Long productId, int k) {
+        return aiRestClient.get()
+                .uri("/recommend/products/{productId}/similar?k={k}", productId, k)
+                .retrieve()
+                .body(SimilarProductAiResponse.class);
     }
 
     /**
