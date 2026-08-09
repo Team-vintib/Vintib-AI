@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import type { LiveWatchProduct } from '@/domains/live/types/liveWatch.types'
 
-defineProps<{
-  products: LiveWatchProduct[]
-  currentProductId: number | null
-  selectedProductId: number | null
-}>()
+// hideBrandWhenEmpty: 브랜드가 없을 때 그 줄을 아예 그리지 않는다. 시청자 화면에서만 켠다 —
+// 판매자 방송 화면은 이 큐를 공유하므로 기본값(현행 '브랜드 정보 준비 중')을 유지한다.
+withDefaults(
+  defineProps<{
+    products: LiveWatchProduct[]
+    currentProductId: number | null
+    selectedProductId: number | null
+    hideBrandWhenEmpty?: boolean
+  }>(),
+  { hideBrandWhenEmpty: false },
+)
 
 defineEmits<{
   select: [productId: number]
@@ -58,7 +64,9 @@ const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
 
         <span class="live-product-queue__content">
           <strong>{{ product.title }}</strong>
-          <span>{{ product.brandName || '브랜드 정보 준비 중' }}</span>
+          <span v-if="product.brandName || !hideBrandWhenEmpty">
+            {{ product.brandName || '브랜드 정보 준비 중' }}
+          </span>
           <span class="live-product-queue__price">{{ formatPrice(product) }}</span>
         </span>
       </button>
