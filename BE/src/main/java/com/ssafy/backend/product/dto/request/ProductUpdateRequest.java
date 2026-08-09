@@ -47,5 +47,11 @@ public record ProductUpdateRequest(
                 description = "AI 시세 조회가 계산한 '동일 상품' 판정 키. FE가 GET /ai/jobs/{jobId} "
                         + "폴링 결과(product_match_key)를 그대로 전달한다. null이면 미반영",
                 example = "1:501-리바이스:97")
-        String matchKey) {
+        String matchKey,
+
+        @Schema(
+                description = "확정 등급으로 조회한 AI 시세 산정 결과(PricingResult) 원본(CH003)."
+                        + " FE가 GET /ai/jobs/{jobId} 폴링 결과를 그대로 전달한다 — 상품 상세는 이 값을"
+                        + " 저장해뒀다가 그대로 보여주고 LLM을 다시 호출하지 않는다. null이면 미반영")
+        Map<String, Object> priceEstimateSnapshot) {
 }
