@@ -130,10 +130,11 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
           <div class="ai-analysis__image-frame">
             <img :src="currentImage.analyzedImageUrl" :alt="currentImage.analyzedImageAlt" />
             <span
-              v-for="(finding, findingIndex) in currentImage.findings"
+              v-for="finding in currentImage.findings"
               v-show="finding.box"
-              :key="finding.id"
+              :key="finding.key"
               class="ai-analysis__box"
+              :class="{ 'ai-analysis__box--excluded': finding.isExcluded }"
               :style="
                 finding.box && {
                   left: `${finding.box.x}%`,
@@ -143,7 +144,7 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
                 }
               "
             >
-              <span class="ai-analysis__box-badge">{{ findingIndex + 1 }}</span>
+              <span class="ai-analysis__box-badge">{{ finding.no }}</span>
             </span>
           </div>
         </figure>
@@ -157,7 +158,7 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
       >
         <button
           v-for="(image, dotIndex) in images"
-          :key="image.id"
+          :key="image.label"
           type="button"
           class="ai-analysis__dot"
           :class="{ 'ai-analysis__dot--active': dotIndex === currentIndex }"
@@ -169,14 +170,21 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 
       <div class="ai-analysis__description">
         <h3>AI 분석 설명</h3>
-        <p>{{ currentImage.summary }}</p>
 
         <ul v-if="currentImage.findings.length">
-          <li v-for="(finding, index) in currentImage.findings" :key="finding.id">
-            <span class="ai-analysis__box-badge">{{ index + 1 }}</span>
+          <li
+            v-for="finding in currentImage.findings"
+            :key="finding.key"
+            :class="{ 'ai-analysis__finding--excluded': finding.isExcluded }"
+          >
+            <span class="ai-analysis__box-badge">{{ finding.no }}</span>
             <div>
               <strong>{{ finding.type }} · {{ finding.location }}</strong>
-              <p>{{ finding.description }}</p>
+              <!-- AI가 설명 문장을 못 만들면(신뢰도 낮은 '의심' 항목 등) 아예 그리지 않는다. -->
+              <p v-if="finding.description">{{ finding.description }}</p>
+              <span v-if="finding.isExcluded" class="ai-analysis__excluded-note">
+                판매자가 하자가 아니라고 확인한 항목입니다
+              </span>
             </div>
           </li>
         </ul>
@@ -443,6 +451,36 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
   bottom: 100%;
   margin-right: 1px;
   margin-bottom: 1px;
+}
+
+/* 판매자가 "하자 아님"으로 확인한 항목 — 등록 화면(--excluded)과 같은 톤으로 죽여서 보여준다.
+   응답에서 빼지 않는 건 번호(no)가 등록 화면과 어긋나지 않게 하기 위해서다(요청 043 §2). */
+.ai-analysis__box--excluded {
+  border-color: var(--color-border-strong);
+  background: transparent;
+}
+
+.ai-analysis__box--excluded .ai-analysis__box-badge,
+.ai-analysis__finding--excluded .ai-analysis__box-badge {
+  background: var(--color-text-muted);
+}
+
+.ai-analysis__description li.ai-analysis__finding--excluded {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.ai-analysis__finding--excluded strong {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+.ai-analysis__excluded-note {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
 }
 
 .ai-analysis__dots {
