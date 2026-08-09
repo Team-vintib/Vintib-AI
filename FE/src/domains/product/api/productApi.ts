@@ -11,6 +11,8 @@ import type {
 } from '@/domains/product/types/productList.types'
 import type {
   AiQualityAnalysis,
+  AiQualityAnalysisStatus,
+  AiQualityFindingBox,
   ProductAiModelCut,
   ProductDetailViewData,
   ProductPriceEstimate,
@@ -112,10 +114,38 @@ interface ProductDetailDto extends ProductListDto {
     thumbnailUrl: string
   } | null
   similarProducts?: SimilarProductPricePoint[] | null
-  aiQualityAnalysis?: AiQualityAnalysis | null
+  aiQualityAnalysis?: AiQualityAnalysisDto | null
   aiModelCut?: ProductAiModelCut | null
   priceEstimate?: ProductPriceEstimate | null
   updatedAt: string
+}
+
+// 상품 상세의 AI 분석(요청 043 §2) — BE가 AI 검수 원본에서 조립해 주는 그대로의 모양이다.
+// 화면용 타입(AiQualityAnalysis)과 다른 점이 있어 매핑을 거친다: location이 부위 코드고,
+// alt는 아예 없으며, summary는 화면에서 쓰지 않는다.
+interface AiQualityFindingDto {
+  key: string
+  type: string | null
+  // 원본 부위 코드(COLLAR, HEM_RIGHT 등). 한글 변환은 FE 몫이다.
+  location: string | null
+  description: string | null
+  no: number
+  box: AiQualityFindingBox | null
+  isExcluded: boolean
+}
+
+interface AiQualityAnalysisImageDto {
+  label: string
+  originalImageUrl: string | null
+  analyzedImageUrl: string | null
+  summary: string | null
+  findings: AiQualityFindingDto[]
+}
+
+interface AiQualityAnalysisDto {
+  status: AiQualityAnalysisStatus
+  images: AiQualityAnalysisImageDto[]
+  disclaimer: string
 }
 
 interface ProductCreateRequest {
@@ -894,9 +924,38 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
         title: defect,
         description: '',
       })),
-    aiQualityAnalysis: product.aiQualityAnalysis ?? null,
+    aiQualityAnalysis: toAiQualityAnalysis(product.aiQualityAnalysis),
     aiModelCut: product.aiModelCut ?? null,
     priceEstimate: product.priceEstimate ?? null,
+  }
+}
+
+// BE 응답을 화면용 타입으로 옮긴다. 부위 코드를 한글로 바꾸고, BE가 주지 않는 alt를 label로
+// 만들어 채운다. summary는 findings 목록과 내용이 겹쳐 화면에 쓰지 않으므로 여기서 버린다.
+const toAiQualityAnalysis = (
+  analysis: AiQualityAnalysisDto | null | undefined,
+): AiQualityAnalysis | null => {
+  if (!analysis) return null
+
+  return {
+    status: analysis.status,
+    disclaimer: analysis.disclaimer,
+    images: (analysis.images ?? []).map((image) => ({
+      label: image.label,
+      originalImageUrl: image.originalImageUrl ?? '',
+      originalImageAlt: `${image.label} 원본 이미지`,
+      analyzedImageUrl: image.analyzedImageUrl ?? image.originalImageUrl ?? '',
+      analyzedImageAlt: `${image.label} AI 검수 이미지`,
+      findings: (image.findings ?? []).map((finding) => ({
+        key: finding.key,
+        no: finding.no,
+        type: finding.type?.trim() || '',
+        location: finding.location ? mapAiSectionToLabel(finding.location) : '',
+        description: finding.description?.trim() || null,
+        box: finding.box ?? null,
+        isExcluded: finding.isExcluded,
+      })),
+    })),
   }
 }
 

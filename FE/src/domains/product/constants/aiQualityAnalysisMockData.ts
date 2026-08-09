@@ -15,54 +15,60 @@ import type {
 
 interface MockAnalysisScenario {
   label: string
-  summary: string
-  findings: (Omit<AiQualityFinding, 'id'> & { id: string })[]
+  findings: AiQualityFinding[]
 }
 
 const MOCK_ANALYSIS_SCENARIOS: MockAnalysisScenario[] = [
   {
     label: '앞면',
-    summary: '앞면 전체는 상태가 양호합니다. 가슴 부근의 잔보풀과 밑단 오염 후보가 탐지되었습니다.',
     findings: [
       {
-        id: 'front-1',
+        key: 'pilling_0_5_1',
+        no: 1,
         type: '보풀',
         location: '가슴 중앙',
         description: '섬유 뭉침으로 보이는 잔보풀이 관찰됩니다.',
         box: { x: 42, y: 28, width: 18, height: 15 },
+        isExcluded: false,
       },
       {
-        id: 'front-2',
+        // AI가 설명을 못 주는 경우(신뢰도 낮은 '의심' 항목)를 재현한다 — 설명 줄이 안 그려진다.
+        key: 'stain_0_7_1',
+        no: 2,
         type: '오염 후보',
-        location: '좌측 밑단',
-        description: '옅은 얼룩으로 보이는 색 변화가 있습니다. 실물 확인을 권장합니다.',
+        location: '왼쪽 밑단',
+        description: null,
         box: { x: 14, y: 66, width: 22, height: 16 },
+        isExcluded: false,
       },
     ],
   },
   {
     label: '뒷면',
-    summary: '뒷면 칼라 안쪽에서 변색 후보가 탐지되었습니다. 그 외 큰 손상은 없습니다.',
     findings: [
       {
-        id: 'back-1',
+        // 판매자가 "하자 아님"으로 확인한 항목 — 회색·취소선으로 죽여서 표시된다.
+        key: 'discoloration_1_2_1',
+        no: 1,
         type: '변색 후보',
-        location: '칼라 안쪽',
+        location: '목깃',
         description: '착용 흔적으로 보이는 옅은 변색이 있습니다.',
         box: { x: 38, y: 10, width: 26, height: 13 },
+        isExcluded: true,
       },
     ],
   },
   {
     label: '소매 디테일',
-    summary: '소매 끝단에서 마모가 탐지되었습니다. 사용감이 있는 부위입니다.',
     findings: [
       {
-        id: 'sleeve-1',
+        key: 'fray_2_6_1',
+        no: 1,
         type: '마모',
-        location: '소매 끝단',
+        location: '오른쪽 소매',
         description: '반복 착용으로 인한 마모가 관찰됩니다.',
         box: { x: 58, y: 68, width: 28, height: 21 },
+        isExcluded: false,
       },
     ],
   },
@@ -88,13 +94,11 @@ export const buildMockAiQualityAnalysis = (
     const source = productImages[index % productImages.length]
 
     return {
-      id: `ai-analysis-${index}`,
       label: scenario.label,
       originalImageUrl: source.url,
       originalImageAlt: `${scenario.label} 원본 이미지`,
       analyzedImageUrl: source.url,
       analyzedImageAlt: `${scenario.label} AI 검수 이미지`,
-      summary: scenario.summary,
       findings: scenario.findings.map((finding) => ({ ...finding })),
     }
   })
