@@ -1,15 +1,16 @@
 """악성(욕설/혐오/인신공격) 분류기 — 인터페이스 + 규칙 기반 기본 구현 + HF 어댑터.
 
-기본값이 규칙 기반인 이유: CI는 `requirements-dev.txt`만 설치해서 torch/transformers가 없다
-(`AI/CLAUDE.md` CI 규칙). 규칙 기반을 기본으로 두면 전체 파이프라인 테스트가 CI에서 **스킵 없이**
-그대로 돌고, 실모델은 `registry.ACTIVE_CLASSIFIER` 키 하나로 바꿔 끼운다.
+**CH030부터 기본(`registry.ACTIVE_CLASSIFIER`)은 `kcelectra_base_hate`다.** 규칙 기반은
+recall 16.7%로 실서비스엔 너무 낮아서(욕설 10건 중 8건 이상 놓침) KcELECTRA-base-hate
+(accuracy 99.5%/recall 98.8%, CPU 추론 p95 253ms 실측 — `AI/requirements.txt`에 이제
+torch/transformers 포함)로 교체했다. `RuleBasedClassifier`는 삭제하지 않고 그대로
+남겨뒀다 — `registry.ACTIVE_CLASSIFIER = "rule_based"`로 한 줄만 되돌리면 원복된다.
 
 규칙 기반이 커버하는 우회 패턴: 공백/문장부호 삽입, 같은 글자 반복 패딩, 초성체.
-(모음 늘이기 "시이이발" 같은 변형은 커버하지 않는다 — 실모델 전환 시 해소 대상.)
-`classifier_benchmark.ipynb` 실측에서 현 baseline `kor_unsmile`이 이런 우회를 절반 가까이
-놓쳤기 때문에(악성 recall 58.3%), 목업 단계에서도 정규화 전처리는 넣어 둔다.
+(모음 늘이기 "시이이발" 같은 변형은 커버하지 않는다.)
 
-설계: .claude/plans/ai/003-live-comment-moderation-prototype.md
+설계: .claude/plans/ai/003-live-comment-moderation-prototype.md,
+docs/plans/AI/CH030-chat-hate-classifier-swap.md
 """
 
 from __future__ import annotations

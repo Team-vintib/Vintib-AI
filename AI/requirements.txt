@@ -18,3 +18,9 @@ Pillow==11.3.0
 # 쓰는 HTTP 클라이언트. torch가 아니라 순수 HTTP라 서빙 경로에 둬도 되는 경량 의존성이다.
 # app/pricing/gms.py·retail.py가 직접 import한다 — requirements-dev.txt와 같은 버전으로 고정.
 httpx==0.28.1
+# 채팅 욕설 판정기(app/chat/classifier.py HuggingFaceClassifier, KcELECTRA-base-hate,
+# CH030)용. 서빙 컨테이너에 처음 들어가는 실제 추론 모델 의존성이다 — GPU 없이 CPU로
+# 돌리므로 CPU 전용 torch wheel을 쓴다(이미지 크기/기동 메모리 증가 감수).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.7.1
+transformers==4.51.3
