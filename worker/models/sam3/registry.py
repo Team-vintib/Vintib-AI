@@ -69,8 +69,12 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         # (위 dedupe_cross_type과 같은 이유 — CH034 결정을 뒤집는 게 아니라 비교 테스트용).
         "dedupe_same_type": False,
         "same_type_containment_min": 0.8,
-        "min_area_ratio": 0.0015,
-        "max_defect_area_ratio": 0.35,
+        # hotfix/472: 검증 노트북(SAM3 경로)엔 면적 필터가 아예 없다 — qc_shared.MIN_AREA_RATIO는
+        # CLIPSeg용 probs_to_instances()에서만 쓰이고 SAM3는 인스턴스를 직접 받아 그 경로를
+        # 안 탄다. 비교를 위해 사실상 무제한(0.0 / 1.0)으로 풀어 둔다 — segmenter.py:407/409의
+        # 필터 코드 자체는 그대로 두고 값만 무력화한 것.
+        "min_area_ratio": 0.0,
+        "max_defect_area_ratio": 1.0,
     },
     # facebook/sam3 PCS(Promptable Concept Segmentation). AI/validation/QUAL/sam3-condition-check/
     # sam3_qc_test_masking.ipynb 스파이크의 마지막 실험값을 그대로 가져왔다.
@@ -108,8 +112,12 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         # (위 dedupe_cross_type과 같은 이유 — CH034 결정을 뒤집는 게 아니라 비교 테스트용).
         "dedupe_same_type": False,
         "same_type_containment_min": 0.8,
-        "min_area_ratio": 0.0015,
-        "max_defect_area_ratio": 0.35,
+        # hotfix/472: 검증 노트북(SAM3 경로)엔 면적 필터가 아예 없다 — qc_shared.MIN_AREA_RATIO는
+        # CLIPSeg용 probs_to_instances()에서만 쓰이고 SAM3는 인스턴스를 직접 받아 그 경로를
+        # 안 탄다. 비교를 위해 사실상 무제한(0.0 / 1.0)으로 풀어 둔다 — segmenter.py:407/409의
+        # 필터 코드 자체는 그대로 두고 값만 무력화한 것.
+        "min_area_ratio": 0.0,
+        "max_defect_area_ratio": 1.0,
     },
 }
 # 기본값. 워커는 `QUALITY_BACKEND` 환경변수로 이 값을 덮어쓴다.
