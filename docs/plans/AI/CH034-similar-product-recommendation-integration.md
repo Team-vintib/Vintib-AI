@@ -111,9 +111,23 @@ CLAUDE.md의 파트 분리 규율(AI가 BE 코드를 직접 수정하지 않는�
       이번 변경과 무관함을 개별 확인함)
 - [x] `docs/requests/BE/042-...md` 반영 완료로 삭제, `006-be-request-index.md`에 기록
 
+## FE 구현 (2026-08-09, 사용자 승인 하에 이 세션에서 예외적으로 직접 진행)
+
+- [x] `productApi.ts::getSimilarProducts()` — `GET /products/{id}/similar` 실연동으로 교체.
+      `categoryId`/`brand` 파라미터 제거(BE가 상품 자신의 값으로 알아서 판단하니 FE가 몰라도
+      됨), 클라이언트 정렬 로직도 제거(BE가 이미 유사도 순으로 정렬해 옴).
+- [x] `ProductSimilarRecommendation.vue` — `categoryId`/`brand` props 제거, `productId`만 받음.
+- [x] `ProductDetailView.vue` — 호출부에서 제거된 props 전달 정리.
+- [x] `npm run type-check`/`npm run lint` 통과 확인.
+- FE 유닛 테스트는 이 리포에 아직 관례가 없어(전체 0건) 추가하지 않음 — 기존 관례 그대로.
+- 실제 브라우저 클릭스루는 이 환경에 BE/AI 전체 스택(Postgres 등)이 떠 있지 않아 못 함 —
+  type-check/lint만 확인됨. 실제 렌더링 확인은 배포 환경에서 필요.
+
 ## 확인이 필요한 미결정 사항
 
 - 캐시 테이블 스키마는 정규화 테이블(product_id, similar_product_id, score, rank)로 구현—
   필요시 BE가 나중에 재검토 가능.
-- FE `ProductSimilarRecommendation.vue`/`getSimilarProducts()` 개편은 이번 범위 밖 — 필요해지면
-  별도 요청 문서로 정리한다.
+- 캐시 배치 수동 트리거(당일 시연용) 필요 여부는 사용자 확인 대기 중.
+- FE `toProductListItem()`의 브랜드 매핑(`product.brandName`/`brandId`)이 BE의 현재 응답
+  필드(`brand: string`, c07ed500 이후)와 안 맞아 브랜드가 항상 빈 값으로 보이는 기존 버그를
+  발견함(이번 작업 범위 밖, 이 유사 상품 카드에도 그대로 영향 — 별도로 다룰지 확인 필요).
