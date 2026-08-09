@@ -59,7 +59,7 @@ public class DemoLiveSeeder implements ApplicationRunner {
                     "가을 신상 라이브 ♥️ 스트릿하면서도 빈티지한 룩북 추천해드려요 😎😎`",
                     LocalDateTime.now().plusDays(1).withHour(21).withMinute(0).withSecond(0).withNano(0)),
             new ScheduledLiveSeed(
-                    "여성 빈   티지 원피스 컬렉션",
+                    "여성 빈티지 원피스 컬렉션",
                     "빈티지 원피스·스커트 위주로 보여드립니다 ! 여신 누나들 예약해두기 💙💙",
                     LocalDateTime.now().plusDays(2).withHour(21).withMinute(0).withSecond(0).withNano(0)));
 
