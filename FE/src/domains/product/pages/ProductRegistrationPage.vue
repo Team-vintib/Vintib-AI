@@ -19,8 +19,10 @@ import {
   type ProductAiModelCutStatusDto,
 } from '@/domains/product/api/productApi'
 import {
+  AI_PRICE_GRADE_SCORES,
   estimateRegistrationPrice,
   type ProductAiPriceEstimate,
+  type ProductAiPriceEstimateInput,
   type ProductRegistrationPriceGrade,
 } from '@/domains/product/api/productAiApi'
 import { submitProductRegistrationDraft } from '@/domains/product/api/productRegistrationApi'
@@ -217,6 +219,7 @@ const createInitialDraft = (): ProductRegistrationDraft => ({
   directSalePrice: '',
   linkedLiveId: '',
   draftProductId: null,
+  priceMatchKey: null,
 })
 
 const draft = reactive<ProductRegistrationDraft>(createInitialDraft())
@@ -1249,12 +1252,17 @@ const applyAiPriceEstimates = (estimates: ProductAiPriceEstimate[]) => {
   priceRecommendationBuckets.value = confirmedEstimate
     ? buildPriceRecommendationBuckets(confirmedEstimate.compPrices)
     : []
+
+  // CH001: 4개 등급 모두 같은 matchKey를 반환하니(브랜드+제목+카테고리로만 계산됨) 아무
+  // 응답에서나 가져다 쓴다(042).
+  draft.priceMatchKey = estimates.find((estimate) => estimate.matchKey !== null)?.matchKey ?? null
 }
 
 const resetAiPriceRecommendation = () => {
   aiPriceStatus.value = 'idle'
   recommendedPrices.value = []
   priceRecommendationBuckets.value = []
+  draft.priceMatchKey = null
 }
 
 // AI 가격 추천(028)은 등급 4개를 각각 job으로 조회해야 하는데, AI 쪽 동시 처리 상한이 2건이라
@@ -1266,11 +1274,16 @@ const triggerAiPriceRecommendation = async () => {
 
   aiPriceStatus.value = 'loading'
 
-  const input = {
+  // 등급마다 "이 상태등급이라면"을 가정한 입력이라(BE PriceEstimateRequest.conditionScore/
+  // conditionGrade가 필수), conditionScore/conditionGrade만 등급별로 다르고 나머지는 공통이다.
+  const buildInput = (grade: ProductRegistrationPriceGrade): ProductAiPriceEstimateInput => ({
+    productId: draft.draftProductId ?? undefined,
     productName: draft.name.trim(),
-    category: categoryMajorId.value || undefined,
+    categoryId: Number(draft.categoryId) || undefined,
     brand: draft.brand.trim() || undefined,
-  }
+    conditionScore: AI_PRICE_GRADE_SCORES[grade],
+    conditionGrade: grade,
+  })
 
   try {
     const estimates: ProductAiPriceEstimate[] = []
@@ -1278,7 +1291,7 @@ const triggerAiPriceRecommendation = async () => {
     for (let batchStart = 0; batchStart < PRICE_GRADES.length; batchStart += 2) {
       const batch = PRICE_GRADES.slice(batchStart, batchStart + 2)
       const batchResults = await Promise.all(
-        batch.map((grade) => estimateRegistrationPrice(grade, input)),
+        batch.map((grade) => estimateRegistrationPrice(grade, buildInput(grade))),
       )
       estimates.push(...batchResults)
     }
