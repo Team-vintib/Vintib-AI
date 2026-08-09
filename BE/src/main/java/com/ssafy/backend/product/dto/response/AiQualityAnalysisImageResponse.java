@@ -11,7 +11,7 @@ public record AiQualityAnalysisImageResponse(
                         + " originalImageUrl과 항상 같다 — FE가 findings[].box로 오버레이한다.",
                 example = "https://.../products/1/front.jpg")
                 String analyzedImageUrl,
-        @Schema(description = "이 사진에 대한 한 줄 요약. 등록 흐름 데이터만으로는 채울 수 없어 항상 null")
+        @Schema(description = "이 사진에 대한 AI 한 줄 요약(원본 image_summaries 그대로, CH002)")
                 String summary,
         List<AiQualityFindingResponse> findings) {
 }

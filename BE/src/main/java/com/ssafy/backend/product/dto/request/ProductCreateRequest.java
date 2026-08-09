@@ -2,7 +2,6 @@ package com.ssafy.backend.product.dto.request;
 
 import com.ssafy.backend.product.entity.AiModelGender;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
@@ -47,10 +46,6 @@ public record ProductCreateRequest(
 
         @Schema(description = "판매자가 직접 입력한 하자 목록. 선택 입력", example = "[\"소매 끝 실밥 풀림\"]")
         List<String> defects,
-
-        @Schema(description = "AI 품질 검수에서 사용자가 하자로 인정하고 확정한 finding 목록. 선택 입력")
-        @Valid
-        List<AiQualityFindingRequest> aiQualityFindings,
 
         @Schema(description = "마네킹 사진 기반 AI 착용컷 사용 여부", example = "true")
         boolean aiModelEnabled,

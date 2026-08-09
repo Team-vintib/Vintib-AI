@@ -13,6 +13,7 @@ import type {
   AiQualityAnalysis,
   ProductAiModelCut,
   ProductDetailViewData,
+  ProductPriceEstimate,
   SimilarProductPricePoint,
 } from '@/domains/product/types/productDetail.types'
 import type {
@@ -30,7 +31,6 @@ import {
   PRODUCT_CATEGORY_MOCK_DATA,
   PRODUCT_LIST_MOCK_DATA,
 } from '@/domains/product/constants/productListMockData'
-import { toPercentBox } from '@/domains/product/utils/qualityFindingBox'
 import { http } from '@/shared/api/http'
 import type { ApiResponse, PageMeta, PageResponse } from '@/shared/types/api.types'
 
@@ -114,17 +114,8 @@ interface ProductDetailDto extends ProductListDto {
   similarProducts?: SimilarProductPricePoint[] | null
   aiQualityAnalysis?: AiQualityAnalysis | null
   aiModelCut?: ProductAiModelCut | null
+  priceEstimate?: ProductPriceEstimate | null
   updatedAt: string
-}
-
-// 등록 화면에서 판매자가 "하자로 인정"하고 확정한 AI 품질 검수 finding 1건 — BE의
-// AiQualityFindingRequest.java 그대로(SY043). AI 원본 스키마(key/defectType/severity/
-// confidence 등)는 저장 대상이 아니고, 인정하지 않은(isActualDefect=false) finding은 애초에
-// 보내지 않는다 — BE에는 "인정/제외" 개념 자체가 없고 인정된 것만 받는다.
-interface ProductCreateAiQualityFindingRequest {
-  photoRole: 'FRONT' | 'BACK'
-  description: string
-  box: { x: number; y: number; width: number; height: number } | null
 }
 
 interface ProductCreateRequest {
@@ -140,7 +131,6 @@ interface ProductCreateRequest {
   defects: string[] | null
   aiModelEnabled: boolean
   aiModelGender: 'MALE' | 'FEMALE' | null
-  aiQualityFindings: ProductCreateAiQualityFindingRequest[]
 }
 
 interface ProductCreateResponse extends Partial<ProductListDto> {
@@ -149,9 +139,9 @@ interface ProductCreateResponse extends Partial<ProductListDto> {
 
 // PATCH /products/{id}(부분 수정)이 실제로 받는 필드 — BE의 ProductUpdateRequest.java 그대로.
 // aiModelEnabled/aiModelGender는 이 엔드포인트에 없다 — '기본 정보' 스텝을 나갈 때 이미
-// 확정돼 draft 생성 시점(POST)에 실려 갔으므로 여기서 다시 보낼 필요가 없다. aiQualityFindings는
-// 046 반영 후 이 엔드포인트도 받는다 — 판매자가 하자를 인정/제외하는 시점 자체가 DRAFT 생성
-// 이후라, 최종 확정값은 PATCH로만 보낼 수 있다.
+// 확정돼 draft 생성 시점(POST)에 실려 갔으므로 여기서 다시 보낼 필요가 없다.
+// excludedQualityFindingKeys는 판매자가 하자를 인정/제외하는 시점 자체가 DRAFT 생성 이후라,
+// 최종 확정값은 PATCH로만 보낼 수 있다(CH002 — 인정된 것만 보내던 이전 방식을 대체).
 interface ProductUpdateRequest {
   title: string
   description: string
@@ -166,7 +156,13 @@ interface ProductUpdateRequest {
   // CH001/042: pricing 스텝의 AI 가격 추천 폴링 결과(product_match_key). 계산 전이면
   // null — BE는 null이면 미반영(기존 값 유지, null로 덮어쓰지 않음)한다.
   matchKey: string | null
-  aiQualityFindings: ProductCreateAiQualityFindingRequest[]
+  // CH002: 판매자가 "하자 아님"으로 표시한 finding의 key 목록. BE는 원본 검수 결과를 그대로
+  // 갖고 있어서(quality_inspection_result) 이 key들만 있으면 상세 화면에서 isExcluded로
+  // 표시할 수 있다. null이면 미반영, 빈 배열이면 제외 목록 전부 해제.
+  excludedQualityFindingKeys: string[] | null
+  // CH003: pricing 스텝에서 확정 등급으로 조회한 AI 시세 산정 결과(PricingResult) 원본.
+  // 상품 상세는 이 스냅샷을 그대로 보여주고 LLM을 다시 호출하지 않는다. null이면 미반영.
+  priceEstimateSnapshot: Record<string, unknown> | null
 }
 
 interface ProductImageUploadUrlResponse {
@@ -655,7 +651,6 @@ export const createDraftProduct = async (
     defects: resolveRegistrationDefects(draft),
     aiModelEnabled: draft.aiModelEnabled,
     aiModelGender: draft.aiModelEnabled ? draft.aiModelGender : null,
-    aiQualityFindings: resolveRegistrationAiQualityFindings(draft),
   } satisfies ProductCreateRequest)
 
   return getCreatedProductId(unwrapApiData(createResponse.data))
@@ -693,7 +688,8 @@ export const submitProduct = async (
       measurements: resolveRegistrationMeasurements(draft),
       defects: resolveRegistrationDefects(draft),
       matchKey: draft.priceMatchKey,
-      aiQualityFindings: resolveRegistrationAiQualityFindings(draft),
+      excludedQualityFindingKeys: resolveExcludedQualityFindingKeys(draft),
+      priceEstimateSnapshot: draft.priceEstimateSnapshot,
     } satisfies ProductUpdateRequest)
   } else {
     productId = await createDraftProduct(draft, options)
@@ -900,6 +896,7 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
       })),
     aiQualityAnalysis: product.aiQualityAnalysis ?? null,
     aiModelCut: product.aiModelCut ?? null,
+    priceEstimate: product.priceEstimate ?? null,
   }
 }
 
@@ -1014,32 +1011,12 @@ const resolveRegistrationDefects = (draft: ProductRegistrationDraft) => {
   return description ? [description] : []
 }
 
-// imageIndex는 항상 앞면=0/뒷면=1 고정 순서다(등록 시 FE가 그 순서로 업로드).
-const toFindingPhotoRole = (imageIndex: number): 'FRONT' | 'BACK' =>
-  imageIndex === 0 ? 'FRONT' : 'BACK'
-
-// 판매자가 "하자 제외"로 뒤집지 않은(=하자로 인정한) finding만 제출한다 — BE에는 인정/제외
-// 개념 자체가 없고(SY043), 인정한 것만 photoRole/description/box로 저장한다.
-const resolveRegistrationAiQualityFindings = (
-  draft: ProductRegistrationDraft,
-): ProductCreateAiQualityFindingRequest[] =>
+// 판매자가 "하자 아님"으로 뒤집은(=isActualDefect false) finding의 key만 제출한다(CH002).
+// BE는 원본 검수 결과(quality_inspection_result)를 이미 통째로 갖고 있어서, 이 key들만
+// 있으면 상세 화면에서 isExcluded로 표시할 수 있다 — 나머지 필드를 다시 보낼 필요가 없다.
+const resolveExcludedQualityFindingKeys = (draft: ProductRegistrationDraft): string[] =>
   draft.aiPhotoResults.flatMap((result) =>
-    result.findings
-      .filter((finding) => finding.isActualDefect)
-      .map((finding) => {
-        const percentBox = toPercentBox(finding.bbox)
-
-        return {
-          photoRole: toFindingPhotoRole(finding.imageIndex),
-          description: finding.description?.trim() || finding.label,
-          box: {
-            x: Math.round(percentBox.x),
-            y: Math.round(percentBox.y),
-            width: Math.round(percentBox.width),
-            height: Math.round(percentBox.height),
-          },
-        }
-      }),
+    result.findings.filter((finding) => !finding.isActualDefect).map((finding) => finding.key),
   )
 
 export const getCategoryCode = (categoryName: string) => {

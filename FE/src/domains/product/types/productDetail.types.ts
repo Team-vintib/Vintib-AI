@@ -73,6 +73,25 @@ export interface AiQualityAnalysis {
   disclaimer: string
 }
 
+// CH003: 등록 시 확정 등급으로 조회한 AI 시세 산정 결과(원본 PricingResult에서 BE가 추린
+// 값). 산정 전 상품이면 상세 응답 자체에서 null.
+export interface ProductPriceEstimateComp {
+  title: string
+  price: number
+  source: string
+  url: string
+}
+
+export interface ProductPriceEstimate {
+  priced: boolean
+  priceRange: { min: number; mid: number; max: number } | null
+  confidence: number | null
+  confidenceLevel: string | null
+  rationale: string | null
+  compsUsed: ProductPriceEstimateComp[]
+  notes: string[]
+}
+
 export type ProductAiModelCutStatus = 'NONE' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
 
 export interface ProductAiModelCut {
@@ -104,4 +123,5 @@ export interface ProductDetailViewData {
   sellerDisclosedDefects: SellerDisclosedDefect[]
   aiQualityAnalysis: AiQualityAnalysis | null
   aiModelCut: ProductAiModelCut | null
+  priceEstimate: ProductPriceEstimate | null
 }

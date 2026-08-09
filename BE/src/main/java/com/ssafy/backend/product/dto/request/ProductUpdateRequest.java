@@ -1,7 +1,6 @@
 package com.ssafy.backend.product.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.util.List;
@@ -30,12 +29,12 @@ public record ProductUpdateRequest(
         List<String> defects,
 
         @Schema(
-                description = "AI 품질 검수에서 사용자가 하자로 인정하고 확정한 finding 목록 전체 교체."
-                        + " null이면 미반영, 빈 배열이면 기존 finding을 전부 삭제한다. DRAFT로 먼저 만든"
-                        + " 상품처럼 등록(POST) 시점에는 확정 전이라 못 보낸 finding을 최종 제출(PATCH)"
-                        + " 시점에 보낼 때 쓴다.")
-        @Valid
-        List<AiQualityFindingRequest> aiQualityFindings,
+                description = "판매자가 \"하자 아님\"으로 표시한 AI 품질 검수 finding의 key 목록(CH002)."
+                        + " 원본(quality_inspection_result)은 그대로 두고 이 key들만 상세 응답에서"
+                        + " isExcluded=true로 표시한다. 전체 교체 — null이면 미반영, 빈 배열이면 기존"
+                        + " 제외 목록을 전부 해제한다. 검수 job이 등록(POST) 이후에 끝나므로 PATCH 전용이다.",
+                example = "[\"hole_tear_0_2_1\"]")
+        List<String> excludedQualityFindingKeys,
 
         @Schema(
                 description = "정찰제 가격 조정. null이면 미반영. 경매 상품(saleType=AUCTION)은 가격 개념이"
@@ -48,5 +47,11 @@ public record ProductUpdateRequest(
                 description = "AI 시세 조회가 계산한 '동일 상품' 판정 키. FE가 GET /ai/jobs/{jobId} "
                         + "폴링 결과(product_match_key)를 그대로 전달한다. null이면 미반영",
                 example = "1:501-리바이스:97")
-        String matchKey) {
+        String matchKey,
+
+        @Schema(
+                description = "확정 등급으로 조회한 AI 시세 산정 결과(PricingResult) 원본(CH003)."
+                        + " FE가 GET /ai/jobs/{jobId} 폴링 결과를 그대로 전달한다 — 상품 상세는 이 값을"
+                        + " 저장해뒀다가 그대로 보여주고 LLM을 다시 호출하지 않는다. null이면 미반영")
+        Map<String, Object> priceEstimateSnapshot) {
 }

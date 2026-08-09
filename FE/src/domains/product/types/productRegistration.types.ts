@@ -137,6 +137,10 @@ export interface ProductRegistrationDraft {
   // CH001: AI 가격 추천(pricing 스텝) 폴링 결과의 동일 상품 판정 키. 최종 제출 시
   // PATCH의 matchKey로 함께 보낸다(042). 조회 전이거나 internal_text가 아니면 null.
   priceMatchKey: string | null
+  // CH003: 확정 등급으로 조회한 AI 시세 산정 결과(PricingResult) 원본. 최종 제출 시 PATCH의
+  // priceEstimateSnapshot으로 그대로 전달한다 — 상품 상세가 LLM을 다시 호출하지 않고 이
+  // 스냅샷을 그대로 보여준다. 조회 전이거나 priced=false면 null.
+  priceEstimateSnapshot: Record<string, unknown> | null
 }
 
 export interface ProductRegistrationSubmitResult {

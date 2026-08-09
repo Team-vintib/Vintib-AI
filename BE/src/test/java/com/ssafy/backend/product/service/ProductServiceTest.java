@@ -15,7 +15,6 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
-import com.ssafy.backend.product.dto.request.AiQualityFindingRequest;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductListFilterParams;
 import com.ssafy.backend.product.dto.request.ProductSortType;
@@ -29,7 +28,7 @@ import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductDefect;
 import com.ssafy.backend.product.entity.ProductImageRole;
-import com.ssafy.backend.product.entity.ProductQualityFinding;
+import com.ssafy.backend.product.entity.QualityInspectionStatus;
 import com.ssafy.backend.product.entity.SaleStatus;
 import com.ssafy.backend.product.entity.SaleType;
 import com.ssafy.backend.product.dto.response.ProductMarketPriceResponse;
@@ -40,7 +39,6 @@ import com.ssafy.backend.product.port.dto.CompletedOrderSummary;
 import com.ssafy.backend.product.port.dto.LinkedLiveSummary;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductDefectRepository;
-import com.ssafy.backend.product.repository.ProductQualityFindingRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.List;
 import java.util.Map;
@@ -81,9 +79,6 @@ class ProductServiceTest {
     private ProductDefectRepository productDefectRepository;
 
     @Mock
-    private ProductQualityFindingRepository productQualityFindingRepository;
-
-    @Mock
     private SocialQueryPort socialQueryPort;
 
     @Mock
@@ -104,7 +99,7 @@ class ProductServiceTest {
     void setUp() {
         productService = new ProductService(
                 productRepository, memberRepository, productImageService, categoryRepository,
-                productDefectRepository, productQualityFindingRepository,
+                productDefectRepository,
                 socialQueryPort, liveQueryPort, orderQueryPort, aiClient);
     }
 
@@ -116,7 +111,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, null, false, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, false, null);
 
         ProductResponse response = productService.createProduct(SELLER_ID, request);
 
@@ -146,7 +141,6 @@ class ProductServiceTest {
                 "데님",
                 Map.of("총장", 70),
                 List.of("소매 끝 실밥 풀림", "안감 얼룩"),
-                null,
                 false,
                 null);
 
@@ -173,7 +167,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, null, false, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, false, null);
 
         productService.createProduct(SELLER_ID, request);
 
@@ -185,7 +179,7 @@ class ProductServiceTest {
         when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.empty());
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", null, CATEGORY_ID, null, null, null, null, null, null, null, null, null, false, null);
+                "빈티지 자켓", null, CATEGORY_ID, null, null, null, null, null, null, null, null, false, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class);
@@ -199,7 +193,7 @@ class ProductServiceTest {
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(false);
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, null, false, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, false, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class)
@@ -213,7 +207,7 @@ class ProductServiceTest {
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, null, true, null);
+                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, true, null);
 
         assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
                 .isInstanceOf(CustomException.class)
@@ -229,7 +223,7 @@ class ProductServiceTest {
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null, null,
+                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null,
                 true, com.ssafy.backend.product.entity.AiModelGender.FEMALE);
 
         ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
@@ -239,48 +233,6 @@ class ProductServiceTest {
         assertThat(captor.getValue().isAiModelEnabled()).isTrue();
         assertThat(captor.getValue().getAiModelGender())
                 .isEqualTo(com.ssafy.backend.product.entity.AiModelGender.FEMALE);
-    }
-
-    @Test
-    void 등록_시_확정한_AI_품질_검수_finding을_저장한다() {
-        when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.of(seller));
-        when(seller.getId()).thenReturn(SELLER_ID);
-        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
-        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", 78.0, "M", null, null, null, null,
-                List.of(new AiQualityFindingRequest(
-                        ProductImageRole.FRONT, "소매 끝단 마모 의심",
-                        new AiQualityFindingRequest.Box(58, 18, 24, 18))),
-                false, null);
-
-        productService.createProduct(SELLER_ID, request);
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<ProductQualityFinding>> captor = ArgumentCaptor.forClass(List.class);
-        verify(productQualityFindingRepository).saveAll(captor.capture());
-        List<ProductQualityFinding> saved = captor.getValue();
-        assertThat(saved).hasSize(1);
-        assertThat(saved.get(0).getPhotoRole()).isEqualTo(ProductImageRole.FRONT);
-        assertThat(saved.get(0).getDescription()).isEqualTo("소매 끝단 마모 의심");
-        assertThat(saved.get(0).getBox()).containsEntry("x", 58).containsEntry("width", 24);
-    }
-
-    @Test
-    void ADDITIONAL_사진에는_AI_품질_검수_finding을_등록할_수_없다() {
-        when(memberRepository.findById(SELLER_ID)).thenReturn(Optional.of(seller));
-        when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(true);
-        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        ProductCreateRequest request = new ProductCreateRequest(
-                "빈티지 자켓", "설명", CATEGORY_ID, "리바이스", "A급", null, "M", null, null, null, null,
-                List.of(new AiQualityFindingRequest(ProductImageRole.ADDITIONAL, "얼룩", null)),
-                false, null);
-
-        assertThatThrownBy(() -> productService.createProduct(SELLER_ID, request))
-                .isInstanceOf(CustomException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AI_QUALITY_FINDING_INVALID_PHOTO_ROLE);
     }
 
     @Test
@@ -543,7 +495,7 @@ class ProductServiceTest {
     }
 
     @Test
-    void 등록된_finding이_없으면_AI_품질_검수_상태는_NOT_REQUESTED다() {
+    void 검수_job_자체가_없으면_AI_품질_검수_상태는_NOT_REQUESTED다() {
         when(seller.getId()).thenReturn(SELLER_ID);
         when(seller.getNickname()).thenReturn("판매자");
         Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
@@ -556,21 +508,62 @@ class ProductServiceTest {
     }
 
     @Test
-    void finding이_있으면_사진role별로_묶여_원본_이미지_URL과_함께_내려간다() {
+    void 검수_job이_진행중이면_AI_품질_검수_상태는_ANALYZING이다() {
         when(seller.getId()).thenReturn(SELLER_ID);
         when(seller.getNickname()).thenReturn("판매자");
         Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        product.startQualityInspectionJob("job-1");
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
-        ProductQualityFinding frontFinding = ProductQualityFinding.builder()
-                .product(product)
-                .photoRole(ProductImageRole.FRONT)
-                .description("소매 끝단 마모 의심")
-                .box(Map.of("x", 58, "y", 18, "width", 24, "height", 18))
-                .sortOrder((short) 0)
-                .build();
-        when(productQualityFindingRepository.findAllByProductIdOrderBySortOrderAsc(1L))
-                .thenReturn(List.of(frontFinding));
+        ProductDetailResponse response = productService.getProductDetail(SELLER_ID, 1L);
+
+        assertThat(response.aiQualityAnalysis().status()).isEqualTo(AiQualityAnalysisStatus.ANALYZING);
+    }
+
+    @Test
+    void 검수_job이_실패하면_AI_품질_검수_상태는_FAILED다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(seller.getNickname()).thenReturn("판매자");
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        product.failQualityInspectionJob();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductDetailResponse response = productService.getProductDetail(SELLER_ID, 1L);
+
+        assertThat(response.aiQualityAnalysis().status()).isEqualTo(AiQualityAnalysisStatus.FAILED);
+    }
+
+    @Test
+    void 검수가_끝났는데_인정된_finding이_0건이면_NO_FINDINGS다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(seller.getNickname()).thenReturn("판매자");
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        product.completeQualityInspectionJob(Map.of("findings", List.of()));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductDetailResponse response = productService.getProductDetail(SELLER_ID, 1L);
+
+        assertThat(response.aiQualityAnalysis().status()).isEqualTo(AiQualityAnalysisStatus.NO_FINDINGS);
+        assertThat(response.aiQualityAnalysis().images()).isEmpty();
+    }
+
+    @Test
+    void finding이_있으면_원본_그대로_사진role별로_묶여_내려간다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(seller.getNickname()).thenReturn("판매자");
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        Map<String, Object> qualityResult = Map.of(
+                "findings", List.of(Map.of(
+                        "key", "hole_tear_0_9_1",
+                        "label", "구멍·찢어짐",
+                        "section", "HEM_RIGHT",
+                        "description", "구멍이 생긴 부분이 확인됩니다.",
+                        "no", 1,
+                        "image_index", 0,
+                        "bbox", List.of(0.58, 0.18, 0.82, 0.36))),
+                "image_summaries", List.of(Map.of("image_index", 0, "summary", "1. 오른쪽 밑단 구멍·찢어짐")));
+        product.completeQualityInspectionJob(qualityResult);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
         when(productImageService.getImages(1L)).thenReturn(List.of(
                 new ProductImageResponse(1L, "https://s3.example/front.jpg", (short) 0, true, ProductImageRole.FRONT),
                 new ProductImageResponse(2L, "https://s3.example/etc.jpg", (short) 1, false, ProductImageRole.ADDITIONAL)));
@@ -583,9 +576,45 @@ class ProductServiceTest {
         assertThat(frontImage.label()).isEqualTo("앞면");
         assertThat(frontImage.originalImageUrl()).isEqualTo("https://s3.example/front.jpg");
         assertThat(frontImage.analyzedImageUrl()).isEqualTo("https://s3.example/front.jpg");
-        assertThat(frontImage.summary()).isNull();
+        assertThat(frontImage.summary()).isEqualTo("1. 오른쪽 밑단 구멍·찢어짐");
         assertThat(frontImage.findings()).hasSize(1);
-        assertThat(frontImage.findings().get(0).description()).isEqualTo("소매 끝단 마모 의심");
+        var finding = frontImage.findings().get(0);
+        assertThat(finding.key()).isEqualTo("hole_tear_0_9_1");
+        assertThat(finding.type()).isEqualTo("구멍·찢어짐");
+        assertThat(finding.location()).isEqualTo("HEM_RIGHT");
+        assertThat(finding.description()).isEqualTo("구멍이 생긴 부분이 확인됩니다.");
+        assertThat(finding.no()).isEqualTo(1);
+        assertThat(finding.box().x()).isCloseTo(58.0, org.assertj.core.data.Offset.offset(0.001));
+        assertThat(finding.box().y()).isCloseTo(18.0, org.assertj.core.data.Offset.offset(0.001));
+        assertThat(finding.box().width()).isCloseTo(24.0, org.assertj.core.data.Offset.offset(0.001));
+        assertThat(finding.box().height()).isCloseTo(18.0, org.assertj.core.data.Offset.offset(0.001));
+        assertThat(finding.isExcluded()).isFalse();
+    }
+
+    @Test
+    void 제외된_key의_finding도_내려가되_isExcluded가_true다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        when(seller.getNickname()).thenReturn("판매자");
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        Map<String, Object> rawFinding = new java.util.HashMap<>();
+        rawFinding.put("key", "hole_tear_0_2_1");
+        rawFinding.put("label", "구멍·찢어짐");
+        rawFinding.put("section", "COLLAR");
+        rawFinding.put("description", null);
+        rawFinding.put("no", 1);
+        rawFinding.put("image_index", 0);
+        rawFinding.put("bbox", List.of(0.30, 0.19, 0.36, 0.22));
+        Map<String, Object> qualityResult = Map.of("findings", List.of(rawFinding));
+        product.completeQualityInspectionJob(qualityResult);
+        ReflectionTestUtils.setField(product, "excludedQualityFindingKeys", List.of("hole_tear_0_2_1"));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(productImageService.getImages(1L)).thenReturn(List.of());
+
+        ProductDetailResponse response = productService.getProductDetail(SELLER_ID, 1L);
+
+        var finding = response.aiQualityAnalysis().images().get(0).findings().get(0);
+        assertThat(finding.isExcluded()).isTrue();
+        assertThat(finding.description()).isNull();
     }
 
     @Test
@@ -600,7 +629,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null);
+                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null, null);
         ProductResponse response = productService.updateProduct(SELLER_ID, 1L, request);
 
         assertThat(response.title()).isEqualTo("수정된 제목");
@@ -615,7 +644,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                null, null, null, null, null, null, "블랙", "데님", Map.of("총장", 70), null, null, null, null);
+                null, null, null, null, null, null, "블랙", "데님", Map.of("총장", 70), null, null, null, null, null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         assertThat(product.getColor()).isEqualTo("블랙");
@@ -630,7 +659,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                null, null, null, null, null, null, null, null, null, null, null, null, "1:501-리바이스:97");
+                null, null, null, null, null, null, null, null, null, null, null, null, "1:501-리바이스:97", null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         assertThat(product.getMatchKey()).isEqualTo("1:501-리바이스:97");
@@ -644,7 +673,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null);
+                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null, null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         assertThat(product.getMatchKey()).isEqualTo("1:501-리바이스:97");
@@ -657,7 +686,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                null, null, null, null, null, null, null, null, null, List.of("얼룩"), null, null, null);
+                null, null, null, null, null, null, null, null, null, List.of("얼룩"), null, null, null, null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         verify(productDefectRepository).deleteAllByProductId(1L);
@@ -676,7 +705,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                null, null, null, null, null, null, null, null, null, List.of(), null, null, null);
+                null, null, null, null, null, null, null, null, null, List.of(), null, null, null, null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         verify(productDefectRepository).deleteAllByProductId(1L);
@@ -690,7 +719,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null);
+                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null, null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         verify(productDefectRepository, never()).deleteAllByProductId(any());
@@ -698,41 +727,46 @@ class ProductServiceTest {
     }
 
     @Test
-    void AI_품질_검수_finding을_보내면_기존_것을_지우고_새로_저장한다() {
+    void 제외_key_목록을_보내면_기존_것을_전체_교체한다() {
         when(seller.getId()).thenReturn(SELLER_ID);
         Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        ReflectionTestUtils.setField(product, "excludedQualityFindingKeys", List.of("stain_0_5_1"));
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
                 null, null, null, null, null, null, null, null, null, null,
-                List.of(new AiQualityFindingRequest(
-                        ProductImageRole.BACK, "밑단 오염",
-                        new AiQualityFindingRequest.Box(10, 20, 30, 40))),
-                null, null);
+                List.of("hole_tear_0_2_1"), null, null, null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
-        verify(productQualityFindingRepository).deleteAllByProductId(1L);
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<ProductQualityFinding>> captor = ArgumentCaptor.forClass(List.class);
-        verify(productQualityFindingRepository).saveAll(captor.capture());
-        assertThat(captor.getValue()).hasSize(1);
-        assertThat(captor.getValue().get(0).getPhotoRole()).isEqualTo(ProductImageRole.BACK);
-        assertThat(captor.getValue().get(0).getDescription()).isEqualTo("밑단 오염");
+        assertThat(product.getExcludedQualityFindingKeys()).containsExactly("hole_tear_0_2_1");
     }
 
     @Test
-    void AI_품질_검수_finding이_null이면_기존_finding을_건드리지_않는다() {
+    void 제외_key_목록이_null이면_기존_값을_건드리지_않는다() {
         when(seller.getId()).thenReturn(SELLER_ID);
         Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        ReflectionTestUtils.setField(product, "excludedQualityFindingKeys", List.of("stain_0_5_1"));
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null);
+                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null, null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
-        verify(productQualityFindingRepository, never()).deleteAllByProductId(any());
-        verify(productQualityFindingRepository, never()).saveAll(any());
+        assertThat(product.getExcludedQualityFindingKeys()).containsExactly("stain_0_5_1");
+    }
+
+    @Test
+    void 제외_key_목록을_빈_배열로_보내면_기존_제외_목록을_전부_해제한다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        ReflectionTestUtils.setField(product, "excludedQualityFindingKeys", List.of("stain_0_5_1"));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductUpdateRequest request = new ProductUpdateRequest(
+                null, null, null, null, null, null, null, null, null, null, List.of(), null, null, null);
+        productService.updateProduct(SELLER_ID, 1L, request);
+
+        assertThat(product.getExcludedQualityFindingKeys()).isEmpty();
     }
 
     @Test
@@ -742,7 +776,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null);
+                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.updateProduct(2L, 1L, request))
                 .isInstanceOf(CustomException.class);
@@ -756,7 +790,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null);
+                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.updateProduct(SELLER_ID, 1L, request))
                 .isInstanceOf(CustomException.class);
@@ -805,7 +839,7 @@ class ProductServiceTest {
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(false);
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                null, null, CATEGORY_ID, null, null, null, null, null, null, null, null, null, null);
+                null, null, CATEGORY_ID, null, null, null, null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.updateProduct(SELLER_ID, 1L, request))
                 .isInstanceOf(CustomException.class)
@@ -820,7 +854,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                null, null, null, null, null, null, null, null, null, null, null, 45_000L, null);
+                null, null, null, null, null, null, null, null, null, null, null, 45_000L, null, null);
         ProductResponse response = productService.updateProduct(SELLER_ID, 1L, request);
 
         assertThat(response.price()).isEqualTo(45_000L);
@@ -836,7 +870,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                null, null, null, null, null, null, null, null, null, null, null, 45_000L, null);
+                null, null, null, null, null, null, null, null, null, null, null, 45_000L, null, null);
 
         assertThatThrownBy(() -> productService.updateProduct(SELLER_ID, 1L, request))
                 .isInstanceOf(CustomException.class)
@@ -851,7 +885,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null);
+                "수정된 제목", null, null, null, null, null, null, null, null, null, null, null, null, null);
         ProductResponse response = productService.updateProduct(SELLER_ID, 1L, request);
 
         assertThat(response.price()).isEqualTo(50_000L);
