@@ -91,3 +91,42 @@ export const readImageFileAsDataUrl = (file: File, fallbackMessage: string) =>
     })
     reader.readAsDataURL(file)
   })
+
+// mock 모드는 이 base64 문자열을 그대로 localStorage에 저장한다. 원본 파일(최대 5MB)을
+// 그대로 넣으면 base64 인코딩만으로 ~6.7MB가 돼 브라우저 localStorage 용량 제한(보통
+// 5MB 안팎)을 그 자체로 넘어 저장이 실패한다 — 저장 전에 리사이즈·재압축해서 크기를 줄인다.
+const MOCK_STORED_IMAGE_MAX_DIMENSION_PX = 1024
+const MOCK_STORED_IMAGE_QUALITY = 0.82
+
+export const readImageFileAsCompressedDataUrl = (file: File, fallbackMessage: string) =>
+  new Promise<string>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file)
+    const image = new Image()
+
+    image.addEventListener('load', () => {
+      URL.revokeObjectURL(objectUrl)
+
+      const scale = Math.min(
+        1,
+        MOCK_STORED_IMAGE_MAX_DIMENSION_PX / Math.max(image.naturalWidth, image.naturalHeight),
+      )
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+
+      const context = canvas.getContext('2d')
+
+      if (!context) {
+        reject(new Error(fallbackMessage))
+        return
+      }
+
+      context.drawImage(image, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', MOCK_STORED_IMAGE_QUALITY))
+    })
+    image.addEventListener('error', () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error(fallbackMessage))
+    })
+    image.src = objectUrl
+  })
