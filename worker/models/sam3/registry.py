@@ -31,7 +31,8 @@ class SegmenterConfig(TypedDict):
     suppress_benign: bool  # 양성(주름·그림자·구조적 개구부) 억제 로직 on/off
     benign_containment: float  # 하자가 양성에 이만큼 잠기면 억제 후보로 본다
     dedupe_cross_type: bool  # 서로 다른 defect_type이 같은 실물 부위를 중복 검출했을 때 병합 on/off
-    cross_type_iou_min: float  # 이 이상 겹치면 confidence 낮은 쪽을 버린다(findings.py 참고)
+    cross_type_iou_min: float  # 대칭 IoU가 이 이상이면 병합(findings.py 참고)
+    cross_type_containment_min: float  # 포함 비율(둘 중 큰 쪽)이 이 이상이어도 병합 — 크기 차이 큰 쌍용
     dedupe_same_type: bool  # 같은 defect_type이 "박스 안에 박스"로 겹칠 때 병합 on/off
     same_type_containment_min: float  # 포함 비율(둘 중 큰 쪽)이 이 이상이면 병합(findings.py 참고)
     min_area_ratio: float  # 이 면적 비율 미달 인스턴스는 노이즈로 폐기
@@ -46,28 +47,47 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         "description": "목업 시나리오 기반 결정적 인스턴스 합성(의존성 없음)",
         "score_threshold": 0.30,
         "mask_threshold": 0.5,
-        "confident_threshold": 0.55,
+        # hotfix/472: 0.55 -> 0.40 — 어깨쪽처럼 confidence가 애매한 진짜 하자가 SUSPECTED로
+        # 강등돼 설명(VLM)도 안 붙는 사례가 있어 낮췄다. score_threshold(0.30)와 겹치지 않게
+        # 여유를 뒀다. 라벨링된 검증셋 없이 잡은 값이라 스윕 대상인 건 동일.
+        "confident_threshold": 0.40,
         "garment_score_threshold": 0.05,
         "garment_crop_pad_ratio": 0.06,
-        "garment_overlap_min": 0.6,
+        # hotfix/472: 0.6 -> 0.7 — 검증 노트북(qc_shared.GARMENT_OVERLAP_MIN)과 맞춘다.
+        # CH034 이전 값으로 되돌린 것— 재검증 끝나면 0.6 복귀 여부를 다시 판단한다.
+        "garment_overlap_min": 0.7,
         "suppress_benign": True,
-        "benign_containment": 0.6,
-        # CH034: 다른 유형끼리는 겹쳐도 드롭하지 않기로 정책 전환 — 각각 별도 finding·박스로
-        # 노출한다(사용자 결정, 2026-08-09). 실측 중복 쌍(scratch.jpg, DIRT_MARK/HOLE_TEAR가
-        # 거의 동일 위치를 중복 검출)이 다시 그대로 노출될 수 있다는 트레이드오프를 감수한다.
-        # `dedupe_cross_type_overlap()` 함수 자체는 남겨 뒀다 — 필요하면 이 값만 True로 되돌리면
-        # 된다(이전 임계치: cross_type_iou_min=0.7).
-        "dedupe_cross_type": False,
+        # hotfix/472: 0.6 -> 0.8 — 암홀 등 구조적 개구부는 겹치기만 하면(containment 비교 없이)
+        # 무조건 억제되는데(findings.py:suppress_benign), 어깨 쪽 실제 하자까지 같이 지워지는
+        # 사례가 있었다. 임계치를 높여 "거의 다 암홀 안에 있어야만" 억제되게 해 capture 범위를
+        # 좁힌다 — 프롬프트/마스크 자체를 바꾸는 게 아니라 억제 조건만 좁히는 방식.
+        "benign_containment": 0.8,
+        # hotfix/472: CH034가 오늘(2026-08-09) False로 껐던 걸 다시 True로 되돌렸다 — 검증
+        # 노트북(qc_shared.py)엔 same-type 병합이 아예 없고 cross-type dedup만 있어서, 노트북과
+        # 나란히 비교하려면 이 값이 켜져 있어야 한다. **CH034의 "사용자 결정"을 뒤집는 게
+        # 아니라 hotfix/472 비교 테스트 동안만 임시로 되돌린 것** — 비교 끝나면 False로
+        # 복귀할지 다시 판단할 것.
+        "dedupe_cross_type": True,
         "cross_type_iou_min": 0.7,
+        # hotfix/472: dirt_mark 프롬프트를 되살리며 추가 — stain/dirt_mark처럼 크기 차이가
+        # 큰 서로 다른 유형 쌍은 IoU만으로 못 잡혀서(작은 쪽이 큰 쪽에 거의 다 포함돼도
+        # 합집합 기준 IoU는 낮게 나옴), same_type_containment_min과 같은 값(0.8)으로
+        # 포함 비율 기준도 같이 본다(findings.py의 dedupe_cross_type_overlap 참고).
+        "cross_type_containment_min": 0.8,
         # ⚠️ 라벨링된 검증셋 없이 잡은 값 — 스윕 대상. 실측 중복(small_pro.jpg)은 작은
         # STAIN 박스가 큰 STAIN 박스에 97~100% 포함돼 있었다(IoU는 낮아도 포함 비율은
         # 매우 높음) — 그래서 IoU가 아니라 포함 비율을 쓴다(findings.py 참고). 0.8로
         # 여유를 둬서 부분적으로만 겹치는 "진짜 다른 두 하자"까지 합치는 위험을 줄인다.
-        # CH034: 이 임계치를 넘으면 이제 드롭이 아니라 **병합**(더 큰 박스 하나로)한다.
-        "dedupe_same_type": True,
+        # hotfix/472: 검증 노트북엔 same-type 병합 자체가 없어서 비교를 위해 임시로 끈다
+        # (위 dedupe_cross_type과 같은 이유 — CH034 결정을 뒤집는 게 아니라 비교 테스트용).
+        "dedupe_same_type": False,
         "same_type_containment_min": 0.8,
-        "min_area_ratio": 0.0015,
-        "max_defect_area_ratio": 0.35,
+        # hotfix/472: 검증 노트북(SAM3 경로)엔 면적 필터가 아예 없다 — qc_shared.MIN_AREA_RATIO는
+        # CLIPSeg용 probs_to_instances()에서만 쓰이고 SAM3는 인스턴스를 직접 받아 그 경로를
+        # 안 탄다. 비교를 위해 사실상 무제한(0.0 / 1.0)으로 풀어 둔다 — segmenter.py:407/409의
+        # 필터 코드 자체는 그대로 두고 값만 무력화한 것.
+        "min_area_ratio": 0.0,
+        "max_defect_area_ratio": 1.0,
     },
     # facebook/sam3 PCS(Promptable Concept Segmentation). AI/validation/QUAL/sam3-condition-check/
     # sam3_qc_test_masking.ipynb 스파이크의 마지막 실험값을 그대로 가져왔다.
@@ -82,28 +102,47 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         "description": "SAM3 Promptable Concept Segmentation. torch>=2.4/transformers>=5.0 필요",
         "score_threshold": 0.30,
         "mask_threshold": 0.5,
-        "confident_threshold": 0.55,
+        # hotfix/472: 0.55 -> 0.40 — 어깨쪽처럼 confidence가 애매한 진짜 하자가 SUSPECTED로
+        # 강등돼 설명(VLM)도 안 붙는 사례가 있어 낮췄다. score_threshold(0.30)와 겹치지 않게
+        # 여유를 뒀다. 라벨링된 검증셋 없이 잡은 값이라 스윕 대상인 건 동일.
+        "confident_threshold": 0.40,
         "garment_score_threshold": 0.05,
         "garment_crop_pad_ratio": 0.06,
-        "garment_overlap_min": 0.6,
+        # hotfix/472: 0.6 -> 0.7 — 검증 노트북(qc_shared.GARMENT_OVERLAP_MIN)과 맞춘다.
+        # CH034 이전 값으로 되돌린 것 — 재검증 끝나면 0.6 복귀 여부를 다시 판단한다.
+        "garment_overlap_min": 0.7,
         "suppress_benign": True,
-        "benign_containment": 0.6,
-        # CH034: 다른 유형끼리는 겹쳐도 드롭하지 않기로 정책 전환 — 각각 별도 finding·박스로
-        # 노출한다(사용자 결정, 2026-08-09). 실측 중복 쌍(scratch.jpg, DIRT_MARK/HOLE_TEAR가
-        # 거의 동일 위치를 중복 검출)이 다시 그대로 노출될 수 있다는 트레이드오프를 감수한다.
-        # `dedupe_cross_type_overlap()` 함수 자체는 남겨 뒀다 — 필요하면 이 값만 True로 되돌리면
-        # 된다(이전 임계치: cross_type_iou_min=0.7).
-        "dedupe_cross_type": False,
+        # hotfix/472: 0.6 -> 0.8 — 암홀 등 구조적 개구부는 겹치기만 하면(containment 비교 없이)
+        # 무조건 억제되는데(findings.py:suppress_benign), 어깨 쪽 실제 하자까지 같이 지워지는
+        # 사례가 있었다. 임계치를 높여 "거의 다 암홀 안에 있어야만" 억제되게 해 capture 범위를
+        # 좁힌다 — 프롬프트/마스크 자체를 바꾸는 게 아니라 억제 조건만 좁히는 방식.
+        "benign_containment": 0.8,
+        # hotfix/472: CH034가 오늘(2026-08-09) False로 껐던 걸 다시 True로 되돌렸다 — 검증
+        # 노트북(qc_shared.py)엔 same-type 병합이 아예 없고 cross-type dedup만 있어서, 노트북과
+        # 나란히 비교하려면 이 값이 켜져 있어야 한다. **CH034의 "사용자 결정"을 뒤집는 게
+        # 아니라 hotfix/472 비교 테스트 동안만 임시로 되돌린 것** — 비교 끝나면 False로
+        # 복귀할지 다시 판단할 것.
+        "dedupe_cross_type": True,
         "cross_type_iou_min": 0.7,
+        # hotfix/472: dirt_mark 프롬프트를 되살리며 추가 — stain/dirt_mark처럼 크기 차이가
+        # 큰 서로 다른 유형 쌍은 IoU만으로 못 잡혀서(작은 쪽이 큰 쪽에 거의 다 포함돼도
+        # 합집합 기준 IoU는 낮게 나옴), same_type_containment_min과 같은 값(0.8)으로
+        # 포함 비율 기준도 같이 본다(findings.py의 dedupe_cross_type_overlap 참고).
+        "cross_type_containment_min": 0.8,
         # ⚠️ 라벨링된 검증셋 없이 잡은 값 — 스윕 대상. 실측 중복(small_pro.jpg)은 작은
         # STAIN 박스가 큰 STAIN 박스에 97~100% 포함돼 있었다(IoU는 낮아도 포함 비율은
         # 매우 높음) — 그래서 IoU가 아니라 포함 비율을 쓴다(findings.py 참고). 0.8로
         # 여유를 둬서 부분적으로만 겹치는 "진짜 다른 두 하자"까지 합치는 위험을 줄인다.
-        # CH034: 이 임계치를 넘으면 이제 드롭이 아니라 **병합**(더 큰 박스 하나로)한다.
-        "dedupe_same_type": True,
+        # hotfix/472: 검증 노트북엔 same-type 병합 자체가 없어서 비교를 위해 임시로 끈다
+        # (위 dedupe_cross_type과 같은 이유 — CH034 결정을 뒤집는 게 아니라 비교 테스트용).
+        "dedupe_same_type": False,
         "same_type_containment_min": 0.8,
-        "min_area_ratio": 0.0015,
-        "max_defect_area_ratio": 0.35,
+        # hotfix/472: 검증 노트북(SAM3 경로)엔 면적 필터가 아예 없다 — qc_shared.MIN_AREA_RATIO는
+        # CLIPSeg용 probs_to_instances()에서만 쓰이고 SAM3는 인스턴스를 직접 받아 그 경로를
+        # 안 탄다. 비교를 위해 사실상 무제한(0.0 / 1.0)으로 풀어 둔다 — segmenter.py:407/409의
+        # 필터 코드 자체는 그대로 두고 값만 무력화한 것.
+        "min_area_ratio": 0.0,
+        "max_defect_area_ratio": 1.0,
     },
 }
 # 기본값. 워커는 `QUALITY_BACKEND` 환경변수로 이 값을 덮어쓴다.

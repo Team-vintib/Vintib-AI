@@ -50,11 +50,13 @@ def test_prompt_defect_types_are_all_in_taxonomy():
     assert len(types) == len(set(types)), "같은 하자 유형을 가리키는 프롬프트가 중복됩니다"
 
 
-def test_prompt_set_covers_every_defect_type():
+def test_prompt_set_covers_every_validated_defect_type():
+    """discoloration/pilling/fray는 hotfix/472로 미검증 상태라 프롬프트에서 뺐다 —
+    `DefectType` 전체가 아니라 검증된 3종(stain/dirt_mark/hole_tear)만 커버하면 된다."""
     types = {
         t for _, t in select_prompt_set(GarmentCategory.top_knit, BaseColor.light).defect_prompts
     }
-    assert types == set(DefectType)
+    assert types == {DefectType.stain, DefectType.dirt_mark, DefectType.hole_tear}
 
 
 def test_prompt_lookup_returns_matching_defect_type():
