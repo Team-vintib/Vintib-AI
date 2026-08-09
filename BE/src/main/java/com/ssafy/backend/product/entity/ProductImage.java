@@ -40,7 +40,6 @@ public class ProductImage {
     @Column(name = "is_primary", nullable = false)
     private boolean primary;
 
-    // SY043 — 기존 이미지(이 컬럼이 생기기 전에 등록된 것)는 전부 ADDITIONAL로 채운다(사용자 결정).
     // 새 이미지는 등록 요청에서 항상 명시적으로 받는다(ProductImageRegisterRequest.role, @NotNull).
     @ColumnDefault("'ADDITIONAL'")
     @Enumerated(EnumType.STRING)

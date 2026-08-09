@@ -114,9 +114,9 @@ class ProductListSoldExclusionTest {
 
     @Test
     void 판매중_경매예정_경매중_상품은_그대로_노출된다() {
-        Product 상시_판매 = 상품_등록("상시 판매 티셔츠");
-        상시_판매.registerDirectSale(30_000L);
-        productRepository.save(상시_판매);
+        Product 정찰제 = 상품_등록("정찰제 티셔츠");
+        정찰제.registerDirectSale(30_000L);
+        productRepository.save(정찰제);
 
         Product 경매_예정 = 상품_등록("경매 예정 가디건");
         경매_예정.scheduleAuction();

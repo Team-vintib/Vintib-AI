@@ -162,7 +162,7 @@ public class ProductService {
         productDefectRepository.saveAll(entities);
     }
 
-    // DRAFT(최초 등록) 또는 AUCTION_SCHEDULED(경매 예정 상품의 상시 판매 전환)에서 호출.
+    // DRAFT(최초 등록) 또는 AUCTION_SCHEDULED(경매 예정 상품의 정찰제 전환)에서 호출.
     @Transactional
     public ProductResponse registerDirectSale(Long sellerId, Long productId, ProductStatusUpdateRequest request) {
         Product product = productRepository.findById(productId)
@@ -180,7 +180,7 @@ public class ProductService {
         return ProductResponse.from(product);
     }
 
-    // DRAFT(최초 등록) 또는 ON_SALE(상시 판매 상품의 경매 전환)에서 호출.
+    // DRAFT(최초 등록) 또는 ON_SALE(정찰제 상품의 경매 전환)에서 호출.
     // 시작가/증액 단위/경매 시간은 경매 조건 설정에서 함.
     @Transactional
     public ProductResponse scheduleAuction(Long sellerId, Long productId) {
@@ -407,7 +407,7 @@ public class ProductService {
             saveQualityFindings(product, request.aiQualityFindings());
         }
 
-        // 가격은 상시 판매 상품에만 의미가 있다 — 경매 상품은 price가 항상 null이고
+        // 가격은 정찰제 상품에만 의미가 있다 — 경매 상품은 price가 항상 null이고
         // 시작가는 AUCT 쪽 Auction 엔티티가 별도로 갖는다.
         if (request.price() != null) {
             if (!product.isDirectSale()) {

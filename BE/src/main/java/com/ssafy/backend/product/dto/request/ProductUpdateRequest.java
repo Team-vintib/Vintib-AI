@@ -38,7 +38,7 @@ public record ProductUpdateRequest(
         List<AiQualityFindingRequest> aiQualityFindings,
 
         @Schema(
-                description = "상시 판매 가격 조정. null이면 미반영. 경매 상품(saleType=AUCTION)은 가격 개념이"
+                description = "정찰제 가격 조정. null이면 미반영. 경매 상품(saleType=AUCTION)은 가격 개념이"
                         + " 없어 반영하지 않고 400을 반환한다 — 경매 시작가는 별도 API(AUCT)에서 다룬다.",
                 example = "89000")
         @Positive

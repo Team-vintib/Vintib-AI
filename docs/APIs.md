@@ -18,6 +18,7 @@
 | 로그인 | POST | `/auth/signin` |  | AUTH-002 | ✓ |
 | 토큰 재발급 | POST | `/auth/reissue` |  | AUTH-002 | ✓ |
 | 로그아웃 | POST | `/auth/logout` | ✓ | AUTH-002 | ✓ |
+| 구글 로그인 설정 조회 | GET | `/auth/google/config` |  | AUTH-003 | ✓ |
 | 구글 로그인 | POST | `/auth/google` |  | AUTH-003 | ✓ |
 | 구글 계정 연동 확인 | POST | `/auth/google/link` |  | AUTH-003 | ✓ |
 
@@ -94,7 +95,7 @@
 | 상품 이미지 수정 | PATCH | `/products/{id}/images/{imageId}` | ✓ | PROD-001 | ✓ |
 | 상품 이미지 삭제 | DELETE | `/products/{id}/images/{imageId}` | ✓ | PROD-001 | ✓ |
 | 경매 상품 등록 및 경매 전환 | PATCH | `/products/{id}/auction-schedule` | ✓ | PROD-003, PROD-004 | ✓ |
-| 판매 가격 설정 및 상시 판매 등록 | PATCH | `/products/{id}/status` | ✓ | PROD-002, PROD-004, PROD-005 | ✓ |
+| 판매 가격 설정 및 정찰제 등록 | PATCH | `/products/{id}/status` | ✓ | PROD-002, PROD-004, PROD-005 | ✓ |
 | 상품 상세 조회 | GET | `/products/{id}` |  | PROD-006 | ✓ |
 | 상품 정보 수정 | PATCH | `/products/{id}` | ✓ | PROD-007 | ✓ |
 | 상품 삭제 | DELETE | `/products/{id}` | ✓ | PROD-007 | ✓ |
@@ -108,7 +109,7 @@
 >
 > 상세 응답의 `aiQualityAnalysis`는 등록/수정 시 보낸 `aiQualityFindings`(사용자가 인정한 하자 — `photoRole`/`description`/`box`)를 사진별로 묶어 그대로 반환한다. `status`는 `NOT_REQUESTED`/`NO_FINDINGS`/`COMPLETED` 3종뿐(진행 중·실패는 BE가 관측 불가). `aiQualityFindings`는 `defects`처럼 null=미반영, 값 전달 시 전체 교체.
 >
-> `PATCH /products/{id}`의 `price`는 상시 판매(`ON_SALE`)에만 적용된다(경매 상품은 400 — 경매 시작가는 `/auction-schedule`에서 다룬다).
+> `PATCH /products/{id}`의 `price`는 정찰제(`ON_SALE`)에만 적용된다(경매 상품은 400 — 경매 시작가는 `/auction-schedule`에서 다룬다).
 >
 > `POST /products/price-estimates`는 AI 가격 추천 트리거. 상품 생성 전에도 호출 가능하며 `jobId`만 반환한다 — 결과는 FE가 `GET /ai/jobs/{jobId}`로 직접 폴링한다.
 
@@ -171,7 +172,7 @@
 | 이름 | Method | Endpoint | 인증 필요 여부 | 관련 기능 ID | 구현 완료 여부 |
 | :--- | :--- | :--- | :---: | :--- | :---: |
 | 주문 목록 조회 | GET | `/users/{id}/orders` | ✓ | MY-003, MY-004 | ✓ |
-| 상시 판매 주문 생성 | POST | `/orders` | ✓ | SALE-001, SALE-002 | ✓ |
+| 정찰제 주문 생성 | POST | `/orders` | ✓ | SALE-001, SALE-002 | ✓ |
 | 주문 상세 조회 | GET | `/orders/{orderId}` | ✓ | MY-003 | ✓ |
 | 주문 배송지 조회 | GET | `/orders/{orderId}/address` | ✓ | ORDER-001 | ✓ |
 | 주문 배송지 등록, 수정 | PATCH | `/orders/{orderId}/address` | ✓ | ORDER-001 | ✓ |

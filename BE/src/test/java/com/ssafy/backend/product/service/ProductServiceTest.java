@@ -367,7 +367,7 @@ class ProductServiceTest {
 
     @Test
     void ON_SALE_상품을_경매_예정으로_전환한다() {
-        // 상시 판매 상품의 경매 전환(PROD-004) — DRAFT에서 경매 예정으로 등록하는 것과 같은 메서드를 쓴다.
+        // 정찰제 상품의 경매 전환(PROD-004) — DRAFT에서 경매 예정으로 등록하는 것과 같은 메서드를 쓴다.
         when(seller.getId()).thenReturn(SELLER_ID);
         Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
         product.registerDirectSale(50000L);
@@ -442,7 +442,7 @@ class ProductServiceTest {
 
     @Test
     void 상품_목록_조회시_공개_상태_상품이_매핑된다() {
-        Product onSale = Product.builder().seller(seller).title("상시 판매 상품").build();
+        Product onSale = Product.builder().seller(seller).title("정찰제 상품").build();
         onSale.registerDirectSale(10000L);
         Pageable pageable = PageRequest.of(0, 20);
         when(productRepository.findWithFilter(

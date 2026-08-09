@@ -5,6 +5,7 @@ import type {
   GoogleAuthRequest,
   GoogleAuthResponse,
   GoogleLinkRequest,
+  GoogleOAuthConfigResponse,
   LoginRequest,
   LoginResponse,
   ReissueTokenRequest,
@@ -76,12 +77,21 @@ export const logout = async () => {
   return data
 }
 
-// 구글 동의 화면 URL을 만든다(docs/requests/FE/036) — client_id는 공개값이라 FE가 직접 들고
-// 있는다. redirectUri는 호출부가 넘긴다 — 이 값이 이후 signInWithGoogle에 넘기는 값과 정확히
-// 같아야 한다(다르면 구글이 토큰 교환을 거부한다).
-export const getGoogleOAuthUrl = (redirectUri: string) => {
+// 구글 로그인 client_id 조회. 빌드 환경변수로 따로 들고 있지 않고 BE 설정값을 그대로 읽어온다.
+// 값의 출처를 BE 한 곳으로 좁혀 배포 빌드에 값이 빠지는 사고를 막는다.
+export const getGoogleOAuthConfig = async () => {
+  const { data } = await http.get<ApiResponse<GoogleOAuthConfigResponse>>('/auth/google/config', {
+    skipAuth: true,
+  })
+
+  return data
+}
+
+// 구글 동의 화면 URL을 만든다. redirectUri는 호출부가 넘긴다
+// 이후 signInWithGoogle에 넘기는 값과 정확히 같아야 한다(다르면 구글이 토큰 교환을 거부한다).
+export const getGoogleOAuthUrl = (redirectUri: string, clientId: string) => {
   const params = new URLSearchParams({
-    client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '',
+    client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     scope: 'openid email profile',

@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 /**
  * 방송별 유찰 상품 한 건(LIVE-006, FE `-440` 미낙찰 상품 처리).
  *
- * <p>판매자가 다음 행동(상시 판매 전환 / 그대로 두고 재경매)을 고를 수 있을 만큼만 담는다 —
+ * <p>판매자가 다음 행동(정찰제 전환 / 그대로 두고 재경매)을 고를 수 있을 만큼만 담는다 —
  * 상품 상세가 필요하면 {@code GET /api/products/{id}}를 연다.
  */
 public record LiveUnsoldProductResponse(

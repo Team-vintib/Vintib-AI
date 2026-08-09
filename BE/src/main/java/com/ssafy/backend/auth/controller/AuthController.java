@@ -9,6 +9,7 @@ import com.ssafy.backend.auth.dto.request.SignInRequest;
 import com.ssafy.backend.auth.dto.request.SignUpRequest;
 import com.ssafy.backend.auth.dto.response.EmailVerificationTokenResponse;
 import com.ssafy.backend.auth.dto.response.GoogleAuthResponse;
+import com.ssafy.backend.auth.dto.response.GoogleOAuthConfigResponse;
 import com.ssafy.backend.auth.dto.response.SignUpResponse;
 import com.ssafy.backend.auth.dto.response.TokenResponse;
 import com.ssafy.backend.auth.service.AuthService;
@@ -22,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -93,6 +95,16 @@ public class AuthController {
     public ResponseEntity<ApiResponse<TokenResponse>> signIn(@Valid @RequestBody SignInRequest request) {
         TokenResponse response = authService.signIn(request.email(), request.password());
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "구글 로그인 설정 조회", description = "구글 동의 화면 리다이렉트에 필요한 client_id를 내려준다. "
+            + "공개값이라 인증이 필요 없다 — FE가 빌드 환경변수로 따로 들고 있지 않고 이 API로 읽어가면 값 누락 사고를 막을 수 있다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
+    })
+    @GetMapping("/google/config")
+    public ResponseEntity<ApiResponse<GoogleOAuthConfigResponse>> googleOAuthConfig() {
+        return ResponseEntity.ok(ApiResponse.success(authService.getGoogleOAuthConfig()));
     }
 
     @Operation(summary = "구글 로그인", description = "구글 Authorization Code를 서버에서 직접 교환·검증한다. "

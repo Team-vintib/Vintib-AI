@@ -37,6 +37,8 @@ public class SecurityConfig {
             // 구글 로그인 — 로그인 자체이므로 JWT 인증 대상이 아니다.
             "/api/auth/google",
             "/api/auth/google/link",
+            // client_id 조회 — 비밀값이 아니라 로그인 시작 전에도 열려 있어야 한다.
+            "/api/auth/google/config",
             "/api/health",
             // deliveryapi.co.kr이 호출하는 배송 조회 웹훅 — JWT가 아니라 X-Webhook-Signature로 검증한다.
             "/api/webhooks/delivery",

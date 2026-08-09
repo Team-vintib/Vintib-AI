@@ -16,6 +16,7 @@ import { REFUND_REASON_LABELS, REFUND_STATUS_LABELS } from '@/domains/refund/con
 import type { RefundRequestInfo } from '@/domains/refund/types/refund.types'
 import { COURIER_OPTIONS } from '@/domains/shipping/constants/courierOptions'
 import { getShipment, registerShipment } from '@/domains/shipping/api/shipmentApi'
+import ShipmentProgressBar from '@/domains/shipping/components/ShipmentProgressBar.vue'
 import type { CourierCode, OrderShipmentInfo } from '@/domains/shipping/types/shipping.types'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
@@ -308,6 +309,8 @@ onMounted(() => {
             <h2 id="sale-delivery-title">배송 정보</h2>
             <button v-if="canRegisterShipment" type="button" @click="openShipmentForm">송장 등록</button>
           </div>
+
+          <ShipmentProgressBar :order-status="order.status" :shipment="shipment" />
 
           <form v-if="isShipmentFormOpen" class="my-sale-detail-form" @submit.prevent="submitShipment">
             <div class="my-sale-detail-form__field">

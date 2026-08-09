@@ -11,6 +11,7 @@ import { createRefund, getRefunds } from '@/domains/refund/api/refundApi'
 import { REFUND_REASON_OPTIONS, REFUND_STATUS_LABELS } from '@/domains/refund/constants/refundOptions'
 import type { RefundReason, RefundRequestInfo } from '@/domains/refund/types/refund.types'
 import { getShipment } from '@/domains/shipping/api/shipmentApi'
+import ShipmentProgressBar from '@/domains/shipping/components/ShipmentProgressBar.vue'
 import type { OrderShipmentInfo } from '@/domains/shipping/types/shipping.types'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
@@ -349,6 +350,7 @@ onMounted(() => {
           <div class="my-order-detail-section__title">
             <h2 id="delivery-title">배송 정보</h2>
           </div>
+          <ShipmentProgressBar :order-status="order.status" :shipment="shipment" />
           <dl v-if="shipment?.trackingNumber" class="my-order-detail-grid">
             <div>
               <dt>택배사</dt>
