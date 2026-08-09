@@ -220,6 +220,7 @@ const createInitialDraft = (): ProductRegistrationDraft => ({
   linkedLiveId: '',
   draftProductId: null,
   priceMatchKey: null,
+  priceEstimateSnapshot: null,
 })
 
 const draft = reactive<ProductRegistrationDraft>(createInitialDraft())
@@ -1259,6 +1260,12 @@ const applyAiPriceEstimates = (estimates: ProductAiPriceEstimate[]) => {
   // CH001: 4개 등급 모두 같은 matchKey를 반환하니(브랜드+제목+카테고리로만 계산됨) 아무
   // 응답에서나 가져다 쓴다(042).
   draft.priceMatchKey = estimates.find((estimate) => estimate.matchKey !== null)?.matchKey ?? null
+
+  // CH003: 상품 상세가 LLM 재호출 없이 그대로 보여줄 스냅샷 — 확정 등급 것만 저장한다.
+  // PricingResult는 필드가 고정된 인터페이스라 Record<string, unknown>(PATCH 전송용
+  // 범용 타입)로는 구조적으로 안 좁혀져 단언이 필요하다.
+  draft.priceEstimateSnapshot =
+    (confirmedEstimate?.rawResult as Record<string, unknown> | null | undefined) ?? null
 }
 
 const resetAiPriceRecommendation = () => {
@@ -1266,6 +1273,7 @@ const resetAiPriceRecommendation = () => {
   recommendedPrices.value = []
   priceRecommendationBuckets.value = []
   draft.priceMatchKey = null
+  draft.priceEstimateSnapshot = null
 }
 
 // AI 가격 추천(028)은 등급 4개를 각각 job으로 조회해야 하는데, AI 쪽 동시 처리 상한이 2건이라

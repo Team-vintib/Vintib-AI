@@ -80,4 +80,16 @@ export const buildMockProductDetail = (productId: number): ProductDetailViewData
   ],
   aiQualityAnalysis: buildMockAiQualityAnalysis(detailImages),
   aiModelCut: null,
+  priceEstimate: {
+    priced: true,
+    priceRange: { min: 78000, mid: 89000, max: 102000 },
+    confidence: 0.72,
+    confidenceLevel: 'MEDIUM',
+    rationale: '동일 브랜드·유사 상태의 중고 거래가를 기준으로 산정했습니다.',
+    compsUsed: [
+      { title: 'Maison Kitsuné 폭스 헤드 티셔츠 블랙 M', price: 85000, source: 'llm_web_search', url: '' },
+      { title: 'Maison Kitsuné 티셔츠 새 상품급', price: 98000, source: 'llm_web_search', url: '' },
+    ],
+    notes: [],
+  },
 })

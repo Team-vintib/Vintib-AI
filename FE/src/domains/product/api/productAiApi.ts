@@ -38,6 +38,10 @@ export interface ProductAiPriceEstimate {
   // CH030: `internal_text` 백엔드가 계산한 '동일 상품' 판정 키. 등급과 무관하게 동일 값이라
   // 아무 등급 응답에서나 가져다 쓰면 된다. `internal_text`가 아니면 null.
   matchKey: string | null
+  // CH003: PricingResult 원본 그대로 — 확정 등급 것만 골라 PATCH의 priceEstimateSnapshot으로
+  // 전달한다(상품 상세가 이 값을 그대로 저장해뒀다가 보여준다, LLM 재호출 없음). mock 모드는
+  // 실 PricingResult가 없어 null.
+  rawResult: PricingResult | null
 }
 
 export class ProductAiPriceEstimateUnavailableError extends Error {
@@ -54,10 +58,17 @@ interface PriceEstimateJobResponse {
 
 // `GET /ai/jobs/{jobId}`의 result. AI 게이트웨이를 BE를 거치지 않고 FE가 직접 폴링하므로
 // 이 안쪽 필드는 전부 snake_case다(quality-inspection처럼 BE가 캐멀케이스로 감싸주지 않음).
+// CH003: 이 객체를 통째로 PATCH의 priceEstimateSnapshot으로 BE에 전달하므로, 실제 AI
+// PricingResult 스키마에 있는 필드는(화면에서 안 쓰더라도) 임의로 빼지 않는다 — BE가
+// 상세 응답을 조립할 때(ProductPriceEstimateResponse) 여기 없는 값은 못 쓴다.
 interface PricingResult {
   priced: boolean
   price_range: { min: number; mid: number; max: number } | null
-  comps_used: { price: number }[]
+  confidence: number | null
+  confidence_level: string | null
+  rationale: string | null
+  comps_used: { title: string; price: number; source: string; url: string }[]
+  notes: string[]
   product_match_key: string | null
 }
 
@@ -74,7 +85,7 @@ export const estimateRegistrationPrice = async (
       throw new ProductAiPriceEstimateUnavailableError()
     }
 
-    return { ...mock, matchKey: null }
+    return { ...mock, matchKey: null, rawResult: null }
   }
 
   const jobResponse = await http.post<ApiResponse<PriceEstimateJobResponse>>(
@@ -101,5 +112,6 @@ export const estimateRegistrationPrice = async (
     priceRangeMid: result.price_range?.mid ?? null,
     compPrices: result.comps_used.map((comp) => comp.price),
     matchKey: result.product_match_key,
+    rawResult: result,
   }
 }
