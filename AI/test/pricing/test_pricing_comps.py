@@ -480,27 +480,24 @@ def _fake_corpus_candidate(product_id: int, **overrides):
     return CorpusCandidate(**base)
 
 
-def test_internal_text_without_product_id_reports_no_image():
+_TEXT_QUERY_KWARGS = {"product_name": "상품1042", "brand": "테스트브랜드", "category_id": 97}
+
+
+def test_internal_text_without_product_info_reports_no_image():
+    """product_name/category_id가 없으면(예: 상품명 자체를 못 받음) 매칭을 시도하지 않는다.
+
+    CH0xx: 예전엔 product_id로 BE를 재조회해서 title/brand/category_id를 얻었는데, DRAFT
+    상품은 그 조회가 항상 404였다(가격 산정이 필요한 바로 그 시점에 실패). 이제 요청에
+    실려온 값을 직접 쓰므로 BE 재조회 자체가 없다 — product_id는 자기 자신 제외 용도로만
+    남는다.
+    """
     result = InternalTextCompsSource().fetch("아무 쿼리")
     assert result.reason == ReasonCode.no_image_provided
 
 
-def test_internal_text_reports_insufficient_when_be_product_missing(monkeypatch):
-    from app.shared import be_client
-
-    monkeypatch.setattr(be_client, "fetch_product", lambda product_id, **k: None)
-
-    result = InternalTextCompsSource().fetch("q", product_id=1042)
-
-    assert result.items == []
-    assert result.reason == ReasonCode.insufficient_comps
-
-
 def test_internal_text_uses_strict_key_first(monkeypatch):
     from app.pricing import product_corpus
-    from app.shared import be_client
 
-    monkeypatch.setattr(be_client, "fetch_product", lambda product_id, **k: _fake_be_product(1042))
     monkeypatch.setattr(product_corpus, "get_brand_alias_map", lambda: {})
     seen_keys = []
 
@@ -510,7 +507,7 @@ def test_internal_text_uses_strict_key_first(monkeypatch):
 
     monkeypatch.setattr(product_corpus, "find_by_match_key", _fake_find)
 
-    result = InternalTextCompsSource().fetch("q", product_id=1042)
+    result = InternalTextCompsSource().fetch("q", product_id=1042, **_TEXT_QUERY_KWARGS)
 
     assert len(seen_keys) == 1  # 1차 키만으로 min_comps_for_pricing(3)를 채웠다 — 2차 조회 없음
     assert len(result.items) == 3
@@ -519,9 +516,7 @@ def test_internal_text_uses_strict_key_first(monkeypatch):
 
 def test_internal_text_falls_back_to_relaxed_key_when_strict_insufficient(monkeypatch):
     from app.pricing import product_corpus
-    from app.shared import be_client
 
-    monkeypatch.setattr(be_client, "fetch_product", lambda product_id, **k: _fake_be_product(1042))
     monkeypatch.setattr(product_corpus, "get_brand_alias_map", lambda: {})
     calls = []
 
@@ -533,7 +528,7 @@ def test_internal_text_falls_back_to_relaxed_key_when_strict_insufficient(monkey
 
     monkeypatch.setattr(product_corpus, "find_by_match_key", _fake_find)
 
-    result = InternalTextCompsSource().fetch("q", product_id=1042)
+    result = InternalTextCompsSource().fetch("q", product_id=1042, **_TEXT_QUERY_KWARGS)
 
     assert len(calls) == 2  # 1차 부족 → 2차(완화)로 재조회
     assert len(result.items) == 3
@@ -542,13 +537,11 @@ def test_internal_text_falls_back_to_relaxed_key_when_strict_insufficient(monkey
 
 def test_internal_text_reports_insufficient_when_no_candidates(monkeypatch):
     from app.pricing import product_corpus
-    from app.shared import be_client
 
-    monkeypatch.setattr(be_client, "fetch_product", lambda product_id, **k: _fake_be_product(1042))
     monkeypatch.setattr(product_corpus, "get_brand_alias_map", lambda: {})
     monkeypatch.setattr(product_corpus, "find_by_match_key", lambda *a, **k: [])
 
-    result = InternalTextCompsSource().fetch("q", product_id=1042)
+    result = InternalTextCompsSource().fetch("q", product_id=1042, **_TEXT_QUERY_KWARGS)
 
     assert result.items == []
     assert result.reason == ReasonCode.insufficient_comps
@@ -557,9 +550,7 @@ def test_internal_text_reports_insufficient_when_no_candidates(monkeypatch):
 
 def test_internal_text_converts_candidates_with_price_kind(monkeypatch):
     from app.pricing import product_corpus
-    from app.shared import be_client
 
-    monkeypatch.setattr(be_client, "fetch_product", lambda product_id, **k: _fake_be_product(1042))
     monkeypatch.setattr(product_corpus, "get_brand_alias_map", lambda: {})
     monkeypatch.setattr(
         product_corpus,
@@ -571,7 +562,7 @@ def test_internal_text_converts_candidates_with_price_kind(monkeypatch):
         ],
     )
 
-    result = InternalTextCompsSource().fetch("q", product_id=1042)
+    result = InternalTextCompsSource().fetch("q", product_id=1042, **_TEXT_QUERY_KWARGS)
 
     price_kinds = {item.price_kind for item in result.items}
     assert price_kinds == {"ASKING", "SOLD_DIRECT", "SOLD_AUCTION"}
@@ -580,9 +571,7 @@ def test_internal_text_converts_candidates_with_price_kind(monkeypatch):
 
 def test_internal_text_excludes_candidates_failing_hedge(monkeypatch):
     from app.pricing import product_corpus
-    from app.shared import be_client
 
-    monkeypatch.setattr(be_client, "fetch_product", lambda product_id, **k: _fake_be_product(1042))
     monkeypatch.setattr(product_corpus, "get_brand_alias_map", lambda: {})
     monkeypatch.setattr(
         product_corpus,
@@ -590,7 +579,7 @@ def test_internal_text_excludes_candidates_failing_hedge(monkeypatch):
         lambda *a, **k: [_fake_corpus_candidate(2, sale_status="AUCTION_IN_PROGRESS")],
     )
 
-    result = InternalTextCompsSource().fetch("q", product_id=1042)
+    result = InternalTextCompsSource().fetch("q", product_id=1042, **_TEXT_QUERY_KWARGS)
 
     assert result.items == []
     assert result.reason == ReasonCode.insufficient_comps
