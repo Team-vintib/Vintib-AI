@@ -72,6 +72,35 @@ def test_clean_comments_score_zero(text):
     assert result.label == "clean"
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "fuck this seller",
+        "what the FUCK is this price",  # 대문자 -- normalize()가 소문자화
+        "this is bullshit",  # 부분 문자열: "shit"
+        "you're such a bitch",
+        "asshole seller never responds",
+        "stop being a fucking asshole",
+    ],
+)
+def test_english_abuse_terms_exceed_threshold(text):
+    assert RuleBasedClassifier().score(text).score >= registry.ABUSE_THRESHOLD
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "this shirt looks great",  # "shit"의 상위 문자열이 아님(s-h-i-r-t) -- 오탐 방지 확인
+        "do you have a discount code",  # "cunt"와 글자 순서가 다름(c-o-u-n-t) -- 오탐 방지 확인
+        "thanks for the fast shipping",
+    ],
+)
+def test_english_clean_sentences_stay_clean(text):
+    result = RuleBasedClassifier().score(text)
+    assert result.score == 0.0
+    assert result.label == "clean"
+
+
 def test_result_label_names_the_matched_rule():
     assert RuleBasedClassifier().score("진짜 미친놈인가").label == "미친놈"
 
