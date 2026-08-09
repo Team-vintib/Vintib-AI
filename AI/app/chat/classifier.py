@@ -169,7 +169,15 @@ class HuggingFaceClassifier(AbuseClassifier):
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
             tokenizer = AutoTokenizer.from_pretrained(self._model_id)
-            model = AutoModelForSequenceClassification.from_pretrained(self._model_id)
+            # low_cpu_mem_usage=False로 명시 -- accelerate가 설치돼 있으면 transformers가
+            # 기본으로 meta 디바이스에 지연 초기화(low_cpu_mem_usage=True)를 켜는데, 이
+            # 조합에서 일부 텐서가 실제 디바이스로 안 옮겨지고 meta에 남아
+            # "Tensor on device cpu is not on the expected device meta!"로 터지는 걸
+            # 프로덕션에서 실측했다. 이 모델은 작아서(base급) 메모리 절약형 로딩이 애초에
+            # 필요 없다.
+            model = AutoModelForSequenceClassification.from_pretrained(
+                self._model_id, low_cpu_mem_usage=False
+            )
             model.eval()
             self._bundle = (tokenizer, model)
         return self._bundle
