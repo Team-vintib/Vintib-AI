@@ -14,6 +14,7 @@ import com.ssafy.backend.product.dto.response.ProductAiModelCutResponse;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
+import com.ssafy.backend.product.dto.response.ProductMarketPriceResponse;
 import com.ssafy.backend.product.dto.response.ProductQualityInspectionResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.product.service.ProductImageService;
@@ -159,6 +160,21 @@ public class ProductController {
             Authentication authentication, @PathVariable Long id) {
         Long viewerId = authentication != null ? (Long) authentication.getPrincipal() : null;
         ProductDetailResponse response = productService.getProductDetail(viewerId, id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "동일 상품 시세 조회",
+            description = "같은 matchKey(AI 시세 조회가 상품명·브랜드·카테고리로 판정)를 가진 다른 상품들의 "
+                    + "호가/완료거래가를 보여준다. 비회원도 조회 가능하다. matchKey가 아직 계산되지 않은 "
+                    + "상품이면 listings가 빈 배열로 온다(404 아님).")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @GetMapping("/{id}/market-price")
+    public ResponseEntity<ApiResponse<ProductMarketPriceResponse>> getMarketPrice(@PathVariable Long id) {
+        ProductMarketPriceResponse response = productService.getMarketPrice(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
