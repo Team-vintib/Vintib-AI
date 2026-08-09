@@ -164,6 +164,13 @@ public class Product extends BaseTimeEntity {
     @Column(name = "excluded_quality_finding_keys", columnDefinition = "jsonb")
     private List<String> excludedQualityFindingKeys;
 
+    // AI 시세 조회(PricingResult) 원본을 그대로 저장한다(CH003). FE가 등록 시 확정 등급으로
+    // 폴링한 결과를 그대로 전달해 저장해두고, 상세 조회는 LLM을 다시 호출하지 않고 이 스냅샷만
+    // 읽는다 — qualityInspectionResult와 같은 패턴.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "price_estimate_result", columnDefinition = "jsonb")
+    private Map<String, Object> priceEstimateResult;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -231,7 +238,8 @@ public class Product extends BaseTimeEntity {
             String material,
             Map<String, Integer> measurements,
             String matchKey,
-            List<String> excludedQualityFindingKeys) {
+            List<String> excludedQualityFindingKeys,
+            Map<String, Object> priceEstimateResult) {
         if (title != null) {
             this.title = title;
         }
@@ -264,6 +272,9 @@ public class Product extends BaseTimeEntity {
         }
         if (excludedQualityFindingKeys != null) {
             this.excludedQualityFindingKeys = excludedQualityFindingKeys;
+        }
+        if (priceEstimateResult != null) {
+            this.priceEstimateResult = priceEstimateResult;
         }
     }
 
