@@ -130,3 +130,25 @@ def test_hybrid_falls_back_to_model_when_rule_based_misses():
 def test_unknown_backend_fails_fast():
     with pytest.raises(ValueError, match="등록되지 않은 분류기"):
         build_classifier("does_not_exist")
+
+
+@pytest.mark.parametrize("text", ["ㅇ", "ㅋㅋ", "넵"])
+def test_hybrid_skips_model_for_short_clean_text(text):
+    # 실측: KcELECTRA가 "ㅇ"/"ㅋㅋ"/"넵" 같은 흔한 짧은 반응을 전부 ABUSIVE로 오탐했다.
+    # 사전/초성체에 안 걸리는 짧은 입력은 모델을 아예 안 태우고 clean으로 본다 --
+    # 호출되면 바로 터지는 더미로 "모델이 안 불렸다"를 검증한다.
+    class ExplodingModel:
+        def score(self, text: str):  # pragma: no cover - 호출되면 안 됨
+            raise AssertionError("짧은 입력인데 모델까지 호출됨")
+
+    classifier = HybridClassifier(RuleBasedClassifier(), ExplodingModel())
+    result = classifier.score(text)
+    assert result.score == 0.0
+    assert result.label == "clean"
+
+
+def test_hybrid_still_catches_short_dictionary_abuse():
+    # 길이 게이트는 모델 호출만 건너뛴다 -- 짧아도 사전/초성체에 걸리면 그대로 차단된다.
+    classifier = HybridClassifier(RuleBasedClassifier(), None)
+    result = classifier.score("ㅂㅅ")
+    assert result.score >= registry.ABUSE_THRESHOLD
