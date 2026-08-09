@@ -31,7 +31,7 @@ public class LiveProductController {
     private final LiveProductService liveProductService;
 
     @Operation(
-            summary = "라이브 상품 연결",
+            summary = "라이브 상품 등록",
             description = "라이브에 판매할 상품을 건다. **예정(SCHEDULED) 상태에서만 가능하다** — "
                     + "방송이 시작되면(LIVE) 편성을 더 이상 바꿀 수 없다(운영 정책). 개수 제한은 없다. "
                     + "호스트 본인이 등록한 상품만 연결할 수 있고, 이미 연결된 상품은 중복 연결되지 않는다.")
@@ -55,7 +55,7 @@ public class LiveProductController {
     }
 
     @Operation(
-            summary = "라이브 상품 연결 해제",
+            summary = "라이브 상품 해제",
             description = "라이브에서 상품을 제외한다. 기록은 남기고 목록에서만 빠진다(다시보기 타임라인 근거). "
                     + "연결과 같은 규칙으로 **예정(SCHEDULED) 상태에서만 가능하다.**")
     @ApiResponses({
@@ -75,7 +75,7 @@ public class LiveProductController {
     }
 
     @Operation(
-            summary = "라이브 연결 상품 목록 조회",
+            summary = "라이브 상품 목록 조회",
             description = "현재 라이브에 연결된 상품을 노출 순서대로 반환한다. 제외된 상품은 빠진다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
