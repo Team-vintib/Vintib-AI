@@ -18,6 +18,7 @@ import com.ssafy.backend.product.dto.response.ProductAiModelCutResponse;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductMarketPriceResponse;
+import com.ssafy.backend.product.dto.response.ProductPriceEstimateResponse;
 import com.ssafy.backend.product.dto.response.ProductQualityInspectionResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.global.response.PageResponse;
@@ -248,7 +249,14 @@ public class ProductService {
                 sellerProductCount,
                 linkedLive,
                 similarProducts,
-                buildAiQualityAnalysis(product, images));
+                buildAiQualityAnalysis(product, images),
+                buildPriceEstimate(product));
+    }
+
+    /** 등록 시 확정 등급으로 저장해둔 AI 시세 산정 스냅샷(CH003). 없으면(가격 산정 전) null. */
+    private ProductPriceEstimateResponse buildPriceEstimate(Product product) {
+        Map<String, Object> result = product.getPriceEstimateResult();
+        return result == null ? null : ProductPriceEstimateResponse.from(result);
     }
 
     /**
@@ -397,7 +405,8 @@ public class ProductService {
                 request.material(),
                 request.measurements(),
                 request.matchKey(),
-                request.excludedQualityFindingKeys());
+                request.excludedQualityFindingKeys(),
+                request.priceEstimateSnapshot());
 
         // defects는 null이면 미반영, non-null이면 전체 교체(빈 리스트면 전부 삭제).
         if (request.defects() != null) {
