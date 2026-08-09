@@ -499,7 +499,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request =
-                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null);
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null, null);
         ProductResponse response = productService.updateProduct(SELLER_ID, 1L, request);
 
         assertThat(response.title()).isEqualTo("수정된 제목");
@@ -514,12 +514,39 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                null, null, null, null, null, null, "블랙", "데님", Map.of("총장", 70), null);
+                null, null, null, null, null, null, "블랙", "데님", Map.of("총장", 70), null, null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         assertThat(product.getColor()).isEqualTo("블랙");
         assertThat(product.getMaterial()).isEqualTo("데님");
         assertThat(product.getMeasurements()).isEqualTo(Map.of("총장", 70));
+    }
+
+    @Test
+    void 본인_상품을_수정하면_matchKey가_반영된다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductUpdateRequest request = new ProductUpdateRequest(
+                null, null, null, null, null, null, null, null, null, null, "1:501-리바이스:97");
+        productService.updateProduct(SELLER_ID, 1L, request);
+
+        assertThat(product.getMatchKey()).isEqualTo("1:501-리바이스:97");
+    }
+
+    @Test
+    void matchKey가_null이면_기존_값을_건드리지_않는다() {
+        when(seller.getId()).thenReturn(SELLER_ID);
+        Product product = Product.builder().seller(seller).title("빈티지 자켓").build();
+        ReflectionTestUtils.setField(product, "matchKey", "1:501-리바이스:97");
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+
+        ProductUpdateRequest request =
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null, null);
+        productService.updateProduct(SELLER_ID, 1L, request);
+
+        assertThat(product.getMatchKey()).isEqualTo("1:501-리바이스:97");
     }
 
     @Test
@@ -529,7 +556,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request = new ProductUpdateRequest(
-                null, null, null, null, null, null, null, null, null, List.of("얼룩"));
+                null, null, null, null, null, null, null, null, null, List.of("얼룩"), null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         verify(productDefectRepository).deleteAllByProductId(1L);
@@ -548,7 +575,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request =
-                new ProductUpdateRequest(null, null, null, null, null, null, null, null, null, List.of());
+                new ProductUpdateRequest(null, null, null, null, null, null, null, null, null, List.of(), null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         verify(productDefectRepository).deleteAllByProductId(1L);
@@ -562,7 +589,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request =
-                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null);
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null, null);
         productService.updateProduct(SELLER_ID, 1L, request);
 
         verify(productDefectRepository, never()).deleteAllByProductId(any());
@@ -576,7 +603,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request =
-                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null);
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.updateProduct(2L, 1L, request))
                 .isInstanceOf(CustomException.class);
@@ -590,7 +617,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
 
         ProductUpdateRequest request =
-                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null);
+                new ProductUpdateRequest("수정된 제목", null, null, null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.updateProduct(SELLER_ID, 1L, request))
                 .isInstanceOf(CustomException.class);
@@ -639,7 +666,7 @@ class ProductServiceTest {
         when(categoryRepository.existsById(CATEGORY_ID)).thenReturn(false);
 
         ProductUpdateRequest request =
-                new ProductUpdateRequest(null, null, CATEGORY_ID, null, null, null, null, null, null, null);
+                new ProductUpdateRequest(null, null, CATEGORY_ID, null, null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> productService.updateProduct(SELLER_ID, 1L, request))
                 .isInstanceOf(CustomException.class)
