@@ -129,14 +129,14 @@ def refresh_category(category_id: int, *, page_size: int = 100) -> int:
             break
         for item in fetched.items:
             extracted = extractor.extract(
-                product_name=item.title, brand_id=item.brand_id, brand_alias_map=alias_map
+                product_name=item.title, brand_name=item.brand, brand_alias_map=alias_map
             )
             keys = build_match_keys(
                 tokens=extracted.tokens,
                 brand_id=extracted.brand_id,
                 category=str(item.category_id),
             )
-            _upsert(item, keys.strict, keys.relaxed)
+            _upsert(item, extracted.brand_id, keys.strict, keys.relaxed)
             updated += 1
         if not fetched.has_next:
             break
@@ -144,9 +144,16 @@ def refresh_category(category_id: int, *, page_size: int = 100) -> int:
     return updated
 
 
-def _upsert(item: be_client.BeProduct, match_key_strict: str, match_key_relaxed: str) -> None:
+def _upsert(
+    item: be_client.BeProduct, brand_id: int | None, match_key_strict: str, match_key_relaxed: str
+) -> None:
     """ "조회 후 갱신/삽입" 방식 upsert — postgres 전용 `ON CONFLICT` 없이 다이얼렉트 무관하게
-    동작한다(`store.py`처럼 SQLite로도 테스트 가능)."""
+    동작한다(`store.py`처럼 SQLite로도 테스트 가능).
+
+    `brand_id`는 BE의 원본 값이 아니라 1단계 추출기가 별칭 사전으로 이미 해석한 결과다 —
+    이 컬럼은 조회용이 아니라 "왜 이 match_key가 나왔는지" 디버깅용이라, 실제로 매칭 키
+    계산에 쓰인 값을 남겨야 의미가 있다.
+    """
     with Session(get_vector_engine()) as session:
         existing = session.execute(
             select(ProductCorpusItem).where(ProductCorpusItem.product_id == item.product_id)
@@ -155,7 +162,7 @@ def _upsert(item: be_client.BeProduct, match_key_strict: str, match_key_relaxed:
             existing = ProductCorpusItem(product_id=item.product_id)
             session.add(existing)
         existing.title = item.title
-        existing.brand_id = item.brand_id
+        existing.brand_id = brand_id
         existing.category_id = item.category_id
         existing.price = item.price
         existing.sale_type = item.sale_type
