@@ -62,6 +62,11 @@ public class DemoOrderSeeder implements ApplicationRunner {
     private static final List<String> BUYER_EMAILS = List.of(
             "vintib1@gmail.com", "vintib2@gmail.com", "vintib3@gmail.com", "vintib4@gmail.com");
 
+    // 사업자 데모 계정(DemoMemberSeeder의 BUSINESS_USERS). 판매 내역 화면에 "송장 미등록"
+    // 상태를 반드시 보여주기 위해 seedOrdersForBuyer와 별도로 최소 1건씩 보강한다.
+    private static final List<String> BUSINESS_SELLER_EMAILS =
+            List.of("vintibb1@gmail.com", "vintibb2@gmail.com");
+
     // 구매자 1명당, 상태 버킷 1개당 이 개수만큼 채운다 — 4명 × 4상태 × 1건 = 최대 16건,
     // 즉 구매자 1인당 최대 4건(정찰제·경매 절반씩 섞는다). "각자 3~4개 정도" 요구에 맞춘 값이다.
     private static final int ORDERS_PER_STATUS = 1;
@@ -91,6 +96,7 @@ public class DemoOrderSeeder implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         convertPriorityAuctionsToDirectSale();
         BUYER_EMAILS.forEach(this::seedOrdersForBuyer);
+        BUSINESS_SELLER_EMAILS.forEach(this::ensureUnshippedOrderForSeller);
     }
 
     /**
@@ -171,6 +177,48 @@ public class DemoOrderSeeder implements ApplicationRunner {
         if (seeded > 0) {
             log.info("시드 주문 생성: {} ({}건)", buyerEmail, seeded);
         }
+    }
+
+    /**
+     * 사업자 판매자에게 "송장 미등록"(PAID, {@code OrderShipment} 없음) 주문을 최소 1건 보강한다.
+     *
+     * <p>{@link #seedOrdersForBuyer}가 만드는 NO_ADDRESS 주문은 구매자 기준으로 후보 상품을
+     * 순서대로 배분하다 보니, 어느 판매자에게 배정될지가 우연에 맡겨진다 — 사업자 계정 둘 다에
+     * 배정된다는 보장이 없다. 판매 내역 화면에서 이 상태를 확인하려면 특정 판매자를 지정해야 하므로
+     * 여기서 별도로, 결정적으로 채운다. 멱등 — 그 판매자에게 이미 PAID 주문이 있으면 건너뛴다.
+     */
+    private void ensureUnshippedOrderForSeller(String sellerEmail) {
+        Member seller = memberRepository.findByEmail(sellerEmail).orElse(null);
+        if (seller == null) {
+            log.warn("판매자 미배송 주문 보강 시드 대상 회원이 없다: {}", sellerEmail);
+            return;
+        }
+        if (orderRepository.existsBySeller_IdAndStatus(seller.getId(), OrderStatus.PAID)) {
+            return;
+        }
+
+        Product product = productRepository.findAll().stream()
+                .filter(p -> p.isOwnedBy(seller.getId()))
+                .filter(Product::isAvailableForDirectPurchase)
+                .min(Comparator.comparing(Product::getId))
+                .orElse(null);
+        if (product == null) {
+            log.warn("판매자 미배송 주문 보강 시드용 판매 중 상품이 없다: {}", sellerEmail);
+            return;
+        }
+
+        Member buyer = memberRepository.findByEmail(BUYER_EMAILS.get(0)).orElse(null);
+        if (buyer == null) {
+            log.warn("판매자 미배송 주문 보강 시드용 구매자가 없다: {}", BUYER_EMAILS.get(0));
+            return;
+        }
+
+        Order order = orderRepository.save(
+                Order.createDirectSale(buyer, seller, product, null, product.getPrice()));
+        product.markSold();
+        productRepository.save(product);
+        log.info("판매자 미배송(송장 미등록) 주문 보강 시드: {} (orderId={}, productId={})",
+                sellerEmail, order.getId(), product.getId());
     }
 
     /** 정찰제 즉시구매 후보 — 본인 소유 제외 + 판매 중, 우선순위 상품 먼저 + id순. */
