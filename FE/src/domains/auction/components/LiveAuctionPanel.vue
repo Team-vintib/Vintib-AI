@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import {
-  getAuctionBids,
   getAuctionErrorMessage,
   getCurrentAuction,
   placeAuctionBid,
@@ -13,11 +12,7 @@ import { getPointBalance } from '@/domains/point/api/pointApi'
 import AppInlineNotice from '@/shared/components/AppInlineNotice.vue'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
 
-import type {
-  AuctionBidItem,
-  AuctionBidStatus,
-  AuctionSnapshot,
-} from '@/domains/auction/types/liveAuction.types'
+import type { AuctionSnapshot } from '@/domains/auction/types/liveAuction.types'
 import type { LiveWatchStatus } from '@/domains/live/types/liveWatch.types'
 
 const props = defineProps<{
@@ -42,12 +37,6 @@ const isBalanceLoading = ref(false)
 const clockNow = ref(Date.now())
 const snapshotReceivedAt = ref(Date.now())
 const remainingAtReceiptMs = ref(0)
-const bidHistory = ref<AuctionBidItem[]>([])
-const bidHistoryCursor = ref<number | null>(null)
-const hasMoreBidHistory = ref(false)
-const isBidHistoryLoading = ref(false)
-const bidHistoryError = ref('')
-let bidHistoryRequestId = 0
 
 const updateCountdownAnchor = (snapshot: AuctionSnapshot | null) => {
   snapshotReceivedAt.value = Date.now()
@@ -103,9 +92,9 @@ const canBid = computed(
     !isSubmitting.value,
 )
 
+// 슬라이더는 로그인 상태에서만 그려진다 — 비로그인 문구는 로그인 버튼이 대신한다.
 const sliderLabel = computed(() => {
   if (isSubmitting.value) return '입찰 처리 중'
-  if (!authStore.isAuthenticated) return '로그인 후 입찰 가능'
   if (props.snapshot?.status !== 'RUNNING') return '경매 진행 대기'
   if (remainingSeconds.value <= 0) return '경매 마감 확인 중'
   if (isHighestBidder.value) return '현재 최고 입찰자입니다'
@@ -178,69 +167,6 @@ const goToLogin = () => {
   })
 }
 
-const formatBidTime = (createdAt: string) => {
-  const date = new Date(createdAt)
-
-  return Number.isNaN(date.getTime())
-    ? createdAt
-    : new Intl.DateTimeFormat('ko-KR', {
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(date)
-}
-
-const getBidStatusLabel = (status: AuctionBidStatus) => {
-  const labels: Record<AuctionBidStatus, string> = {
-    ACTIVE: '최고가',
-    OUTBID: '갱신됨',
-    WON: '낙찰',
-    LOST: '종료',
-  }
-
-  return labels[status]
-}
-
-const loadBidHistory = async (append = false) => {
-  const auctionId = props.snapshot?.auctionId
-
-  if (!auctionId || isBidHistoryLoading.value) return
-
-  const cursor = append ? bidHistoryCursor.value : null
-  if (append && cursor === null) return
-
-  const requestId = ++bidHistoryRequestId
-  isBidHistoryLoading.value = true
-  bidHistoryError.value = ''
-
-  try {
-    const page = await getAuctionBids(auctionId, cursor ?? undefined)
-
-    if (requestId !== bidHistoryRequestId || props.snapshot?.auctionId !== auctionId) return
-
-    if (append) {
-      const existingIds = new Set(bidHistory.value.map((bid) => bid.bidId))
-      bidHistory.value = [
-        ...bidHistory.value,
-        ...page.content.filter((bid) => !existingIds.has(bid.bidId)),
-      ]
-    } else {
-      bidHistory.value = page.content
-    }
-
-    bidHistoryCursor.value = page.nextCursor
-    hasMoreBidHistory.value = page.hasNext
-  } catch (error) {
-    if (requestId === bidHistoryRequestId) {
-      bidHistoryError.value =
-        error instanceof Error ? error.message : '입찰 내역을 불러오지 못했습니다.'
-    }
-  } finally {
-    if (requestId === bidHistoryRequestId) {
-      isBidHistoryLoading.value = false
-    }
-  }
-}
-
 watch(
   () => props.snapshot,
   (snapshot, previousSnapshot) => {
@@ -253,26 +179,6 @@ watch(
       snapshot?.highestBidderId !== authStore.user.id
     ) {
       void loadAvailablePoints()
-    }
-  },
-  { immediate: true },
-)
-
-watch(
-  () => ({
-    auctionId: props.snapshot?.auctionId ?? null,
-    bidCount: props.snapshot?.bidCount ?? 0,
-  }),
-  ({ auctionId }) => {
-    bidHistoryRequestId += 1
-    isBidHistoryLoading.value = false
-    bidHistory.value = []
-    bidHistoryCursor.value = null
-    hasMoreBidHistory.value = false
-    bidHistoryError.value = ''
-
-    if (auctionId !== null) {
-      void loadBidHistory()
     }
   },
   { immediate: true },
@@ -377,10 +283,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="snapshot.extensionCount > 0" class="live-auction-panel__extension">
-        자동 연장 {{ snapshot.extensionCount }}회
-      </div>
-
       <div class="live-auction-panel__next">
         <span>다음 입찰가</span>
         <span class="live-auction-panel__next-value">
@@ -392,112 +294,61 @@ onBeforeUnmount(() => {
         </span>
       </div>
 
-      <div
-        class="live-auction-panel__slider"
-        :class="{ 'live-auction-panel__slider--disabled': !canBid }"
-        :style="{ '--slide-progress': `${slideValue}%` }"
-      >
-        <input
-          v-model.number="slideValue"
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          :disabled="!canBid"
-          :aria-label="`${snapshot.nextBidPrice.toLocaleString('ko-KR')}포인트 입찰`"
-          @change="completeSlide"
-        />
-        <span aria-hidden="true">{{ sliderLabel }}</span>
-      </div>
-
+      <!-- 비로그인이면 밀어도 입찰이 안 되므로 슬라이더 대신 로그인 버튼을 그 자리에 둔다.
+           죽은 슬라이더와 값이 '-'뿐인 포인트 줄까지 쌓이면 패널이 칸(260px)을 넘긴다. -->
       <button
         v-if="!authStore.isAuthenticated"
         class="live-auction-panel__login"
         type="button"
         @click="goToLogin"
       >
-        로그인
+        로그인하고 입찰하기
       </button>
 
-      <p class="live-auction-panel__balance">
-        사용 가능 포인트
-        <strong>{{
-          availablePoints === null ? '-' : `${availablePoints.toLocaleString('ko-KR')}P`
-        }}</strong>
-      </p>
+      <template v-else>
+        <div
+          class="live-auction-panel__slider"
+          :class="{ 'live-auction-panel__slider--disabled': !canBid }"
+          :style="{ '--slide-progress': `${slideValue}%` }"
+        >
+          <input
+            v-model.number="slideValue"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            :disabled="!canBid"
+            :aria-label="`${snapshot.nextBidPrice.toLocaleString('ko-KR')}포인트 입찰`"
+            @change="completeSlide"
+          />
+          <span aria-hidden="true">{{ sliderLabel }}</span>
+        </div>
+
+        <p class="live-auction-panel__balance">
+          사용 가능 포인트
+          <strong>{{
+            availablePoints === null ? '-' : `${availablePoints.toLocaleString('ko-KR')}P`
+          }}</strong>
+        </p>
+      </template>
       <AppInlineNotice v-if="bidError" variant="error">{{ bidError }}</AppInlineNotice>
     </template>
-
-    <details v-if="snapshot && snapshot.status !== 'READY'" class="live-auction-panel__history">
-      <summary>
-        <span>입찰 내역</span>
-        <span>{{ bidHistory.length.toLocaleString('ko-KR') }}건</span>
-      </summary>
-
-      <div class="live-auction-panel__history-body">
-        <p
-          v-if="isBidHistoryLoading && bidHistory.length === 0"
-          class="live-auction-panel__history-state"
-          role="status"
-        >
-          입찰 내역을 불러오는 중입니다.
-        </p>
-        <p
-          v-else-if="bidHistoryError && bidHistory.length === 0"
-          class="live-auction-panel__history-state live-auction-panel__history-state--error"
-          role="alert"
-        >
-          {{ bidHistoryError }}
-        </p>
-        <p v-else-if="bidHistory.length === 0" class="live-auction-panel__history-state">
-          아직 입찰 내역이 없습니다.
-        </p>
-
-        <ol v-else class="live-auction-panel__history-list">
-          <li
-            v-for="bid in bidHistory"
-            :key="bid.bidId"
-            :class="{ 'live-auction-panel__history-item--mine': bid.isMine }"
-          >
-            <span class="live-auction-panel__history-bidder">
-              {{ bid.bidderNickname }}
-              <small v-if="bid.isMine">내 입찰</small>
-            </span>
-            <strong>{{ bid.amount.toLocaleString('ko-KR') }}P</strong>
-            <span>{{ getBidStatusLabel(bid.status) }} · {{ formatBidTime(bid.createdAt) }}</span>
-          </li>
-        </ol>
-
-        <p
-          v-if="bidHistoryError && bidHistory.length > 0"
-          class="live-auction-panel__history-state live-auction-panel__history-state--error"
-          role="alert"
-        >
-          {{ bidHistoryError }}
-        </p>
-        <button
-          v-if="hasMoreBidHistory"
-          class="live-auction-panel__history-more"
-          type="button"
-          :disabled="isBidHistoryLoading"
-          @click="loadBidHistory(true)"
-        >
-          {{ isBidHistoryLoading ? '불러오는 중' : '이전 입찰 더 보기' }}
-        </button>
-      </div>
-    </details>
   </aside>
 </template>
 
 <style scoped lang="scss">
+/* 패널이 들어가는 칸은 260px 고정이다(LiveWatchPage `grid-template-rows`). 아래 여백·줄
+   높이는 그 안에 스크롤 없이 들어가도록 잡은 값이라, 키울 때는 합계를 다시 확인한다.
+   RUNNING·로그인 기준: 패딩 24 + 헤더 21 + 지표 84 + 다음 입찰가 26 + 슬라이더 44 +
+   포인트 18 + gap 8×4 = 249px. */
 .live-auction-panel {
   display: flex;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: 16px 18px;
+  gap: var(--space-2);
+  padding: 12px 18px;
   border-top: 1px solid var(--color-live-border);
   border-left: 1px solid var(--color-live-border);
   background: var(--color-surface-raised);
@@ -519,14 +370,14 @@ onBeforeUnmount(() => {
   text-transform: uppercase;
 }
 
-.live-auction-panel__status,
-.live-auction-panel__extension {
+.live-auction-panel__status {
   padding: 3px 8px;
   border-radius: var(--radius-badge);
   background: color-mix(in srgb, var(--color-auction) 18%, transparent);
   color: var(--color-auction);
   font-size: var(--font-size-badge);
   font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
 }
 
 .live-auction-panel__empty,
@@ -558,6 +409,7 @@ onBeforeUnmount(() => {
   display: block;
   color: var(--color-live-text-secondary);
   font-size: var(--font-size-2xs);
+  line-height: var(--line-height-tight);
 }
 
 .live-auction-panel__metrics strong {
@@ -566,8 +418,9 @@ onBeforeUnmount(() => {
   overflow: hidden;
   color: var(--color-live-text-primary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-md);
   font-variant-numeric: tabular-nums;
+  line-height: var(--line-height-comfortable);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -608,10 +461,6 @@ onBeforeUnmount(() => {
   color: var(--color-live-text-primary) !important;
 }
 
-.live-auction-panel__extension {
-  align-self: flex-start;
-}
-
 .live-auction-panel__next {
   display: flex;
   align-items: flex-end;
@@ -620,8 +469,9 @@ onBeforeUnmount(() => {
 
 .live-auction-panel__next strong {
   font-family: var(--font-mono);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-lg-plus);
   font-variant-numeric: tabular-nums;
+  line-height: var(--line-height-lg);
 }
 
 .live-auction-panel__slider {
@@ -690,123 +540,28 @@ onBeforeUnmount(() => {
   opacity: 0.65;
 }
 
+/* 비로그인일 때 슬라이더 자리를 그대로 이어받는다 — 모양을 슬라이더와 맞춰 둔다. */
 .live-auction-panel__login {
-  min-height: var(--button-height-2xs);
-  border: 1px solid var(--color-live-border);
-  border-radius: var(--radius-control);
+  min-height: var(--button-height-compact);
+  border: 1px solid var(--color-auction);
+  border-radius: 999px;
   background: var(--color-live-background);
-  color: var(--color-live-text-primary);
+  color: var(--color-auction);
   font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
 }
 
 .live-auction-panel__balance {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
+  line-height: var(--line-height-snug);
 }
 
 .live-auction-panel__balance strong {
   color: var(--color-live-text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.live-auction-panel__history {
-  flex-shrink: 0;
-  border-top: 1px solid var(--color-live-border);
-}
-
-.live-auction-panel__history summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-2) 0;
-  color: var(--color-live-text-primary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
-  cursor: pointer;
-}
-
-.live-auction-panel__history summary span:last-child {
-  color: var(--color-live-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-badge);
-  font-weight: var(--font-weight-regular);
-}
-
-.live-auction-panel__history-body {
-  display: grid;
-  gap: var(--space-2);
-  padding-bottom: var(--space-2);
-}
-
-.live-auction-panel__history-state {
-  color: var(--color-live-text-secondary);
-  font-size: var(--font-size-2xs);
-  line-height: var(--line-height-snug);
-}
-
-.live-auction-panel__history-state--error {
-  color: var(--color-error);
-}
-
-.live-auction-panel__history-list {
-  display: grid;
-  gap: 1px;
-}
-
-.live-auction-panel__history-list li {
-  display: grid;
-  min-width: 0;
-  align-items: center;
-  padding: 7px 8px;
-  border-radius: var(--radius-control);
-  background: var(--color-live-background);
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2px var(--space-2);
-}
-
-.live-auction-panel__history-list li > span:last-child {
-  grid-column: 1 / -1;
-  color: var(--color-live-text-secondary);
-  font-size: var(--font-size-badge);
-}
-
-.live-auction-panel__history-bidder {
-  overflow: hidden;
-  color: var(--color-live-text-primary);
-  font-size: var(--font-size-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.live-auction-panel__history-bidder small {
-  margin-left: var(--space-1);
-  color: var(--color-auction);
-  font-size: var(--font-size-badge);
-  font-weight: var(--font-weight-bold);
-}
-
-.live-auction-panel__history-list strong {
-  color: var(--color-live-text-primary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
-}
-
-.live-auction-panel__history-item--mine {
-  outline: 1px solid color-mix(in srgb, var(--color-auction) 45%, transparent);
-}
-
-.live-auction-panel__history-more {
-  min-height: var(--button-height-2xs);
-  border: 1px solid var(--color-live-border);
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--color-live-text-primary);
-  font-size: var(--font-size-xs);
-}
-
-.live-auction-panel__history-more:disabled {
-  cursor: wait;
-  opacity: 0.65;
 }
 </style>
