@@ -158,6 +158,9 @@ interface ProductUpdateRequest {
   // 갖고 있어서(quality_inspection_result) 이 key들만 있으면 상세 화면에서 isExcluded로
   // 표시할 수 있다. null이면 미반영, 빈 배열이면 제외 목록 전부 해제.
   excludedQualityFindingKeys: string[] | null
+  // CH003: pricing 스텝에서 확정 등급으로 조회한 AI 시세 산정 결과(PricingResult) 원본.
+  // 상품 상세는 이 스냅샷을 그대로 보여주고 LLM을 다시 호출하지 않는다. null이면 미반영.
+  priceEstimateSnapshot: Record<string, unknown> | null
 }
 
 interface ProductImageUploadUrlResponse {
@@ -705,6 +708,7 @@ export const submitProduct = async (
       defects: resolveRegistrationDefects(draft),
       matchKey: draft.priceMatchKey,
       excludedQualityFindingKeys: resolveExcludedQualityFindingKeys(draft),
+      priceEstimateSnapshot: draft.priceEstimateSnapshot,
     } satisfies ProductUpdateRequest)
   } else {
     productId = await createDraftProduct(draft, options)
