@@ -78,3 +78,5 @@ validation/CLASS/product-info-finetune/artifacts_finetune/
 # GPU 서버의 원본 실행 기록 노트북 — 정리된 aihub_pipeline_final_check.ipynb만 커밋한다.
 # 중복 정의(run/time 등)가 남아 있어 ruff .ipynb 린트도 통과 못 한다.
 validation/CLASS/product-info-finetune/aihub_pipeline_server.ipynb
+
+validation/QUAL/qc-pipeline-before-after/results
