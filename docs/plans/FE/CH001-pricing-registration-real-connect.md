@@ -37,16 +37,17 @@
 
 ## 구현 목록
 
-- [ ] `productAiApi.ts`: `ProductAiPriceEstimateInput` 재정의, `estimateRegistrationPrice` 실연동
+- [x] `productAiApi.ts`: `ProductAiPriceEstimateInput` 재정의, `estimateRegistrationPrice` 실연동
       (트리거 POST + `pollAiJob` 폴링 + 응답 매핑), `product_match_key` 반환값 추가
-- [ ] `ProductRegistrationPage.vue`: 트리거 input 실값 구성, `product_match_key` → draft 저장
-- [ ] `productRegistration.types.ts`: `priceMatchKey: string | null` 필드 추가
-- [ ] `productApi.ts`: `ProductCreateRequest`/`ProductUpdateRequest`의 `brandId`→`brand`,
+- [x] `ProductRegistrationPage.vue`: 트리거 input 실값 구성, `product_match_key` → draft 저장
+- [x] `productRegistration.types.ts`: `priceMatchKey: string | null` 필드 추가
+- [x] `productApi.ts`: `ProductCreateRequest`/`ProductUpdateRequest`의 `brandId`→`brand`,
       `findBrandId` 제거, `ProductUpdateRequest`에 `matchKey` 추가, `submitProduct` PATCH에
       `matchKey` 포함
-- [ ] `npm run type-check`, `npm run lint` 통과
-- [ ] 반영 완료 후 `docs/requests/FE/042-pricing-matchkey-forwarding.md` 삭제(1·2번만 — 3번은
-      범위 밖이라 문서에 남겨야 하면 별도 처리)
+- [ ] `npm run type-check`, `npm run lint` 통과 — **이 환경에 npm/node가 없어 직접 실행 못 함,
+      사용자가 로컬에서 확인 필요**
+- [x] `docs/requests/FE/042-pricing-matchkey-forwarding.md`에서 반영 완료된 1·2번 제거, 3번(상세
+      페이지 표시, 범위 밖)만 남김
 
 ## 확인이 필요한 미결정 사항
 
