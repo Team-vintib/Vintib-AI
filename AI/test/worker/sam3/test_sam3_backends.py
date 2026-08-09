@@ -71,6 +71,13 @@ def test_every_backend_declares_a_description_and_benign_switch(backend):
     assert isinstance(config["dedupe_cross_type"], bool)
 
 
+@pytest.mark.parametrize("backend", _BACKENDS)
+def test_cross_type_dedup_is_off_by_default(backend):
+    # CH034: 다른 유형 간 중복은 더 이상 드롭하지 않는다 — 각각 별도 finding·박스로 노출한다.
+    config = registry.SEGMENTER_BACKENDS[backend]
+    assert config["dedupe_cross_type"] is False
+
+
 def test_segmenter_config_defaults_to_active_backend():
     assert registry.segmenter_config() is registry.SEGMENTER_BACKENDS[registry.ACTIVE_SEGMENTER]
 
