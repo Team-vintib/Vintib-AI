@@ -28,6 +28,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     /** 마이페이지 요약 — 판매 건수. */
     long countBySeller_Id(Long sellerId);
 
+    /** 데모 주문 시드(DemoOrderSeeder) — 판매자에게 특정 상태 주문이 이미 있는지(멱등 체크). */
+    boolean existsBySeller_IdAndStatus(Long sellerId, OrderStatus status);
+
     /**
      * 자동 구매 확정 배치 대상 조회(ORDER-003) — {@code ix_orders_auto_confirm} 부분 인덱스를 탄다.
      * 환불 요청이 진행 중인 주문은 제외한다 — 배치가 한 건이라도 예외를 던지면 트랜잭션 전체가

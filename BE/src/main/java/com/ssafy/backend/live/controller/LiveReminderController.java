@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>{@link LiveController}와 경로 prefix가 달라 별도 컨트롤러로 분리한다.
  */
-@Tag(name = "라이브(Lives)", description = "라이브 방송 개설/조회 API")
+@Tag(name = "라이브 / 채팅(Lives)", description = "라이브 방송 개설/조회 API")
 @RestController
 @RequestMapping("/api/lives/{liveId}/reminders")
 @RequiredArgsConstructor

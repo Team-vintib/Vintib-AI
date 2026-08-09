@@ -51,7 +51,7 @@ public class LiveController {
     private final SimpMessagingTemplate messagingTemplate;
 
     @Operation(
-            summary = "예약 라이브 개설",
+            summary = "라이브 예약 개설",
             description = "방송 예정 시각을 지정해 라이브를 예약 개설한다. 생성 직후 상태는 SCHEDULED이며, "
                     + "방송 예정 시각은 반드시 미래여야 한다.")
     @ApiResponses({
@@ -69,7 +69,7 @@ public class LiveController {
     }
 
     @Operation(
-            summary = "즉시 라이브 개설",
+            summary = "라이브 즉시 개설",
             description = "예약 없이 곧바로 방송을 시작한다. 생성 직후 상태는 LIVE이며, 시작 시각은 서버 시각으로 기록된다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "개설 성공"),
@@ -137,7 +137,7 @@ public class LiveController {
     }
 
     @Operation(
-            summary = "라이브 시청 정보 조회",
+            summary = "라이브 상세 조회",
             description = "라이브 방 정보와 편성된 상품 목록을 함께 반환한다. **비회원도 조회할 수 있다.** "
                     + "영상 접속 토큰은 별도 발급 API가 담당한다. "
                     + "`currentViewerCount`는 현재 동시 시청자 수의 **초기값**이다 — 이후 변화는 "
@@ -159,7 +159,7 @@ public class LiveController {
     }
 
     @Operation(
-            summary = "지금 소개 중인 상품 변경",
+            summary = "현재 소개 상품 변경",
             description = "라이브에서 지금 소개 중인 상품을 바꾼다(FE `NOW` 배지의 원천). **호스트만 가능하다.** "
                     + "이 방송에 편성된 상품이어야 하며, `productId`를 `null`로 보내면 해제된다"
                     + "(잡담 구간 등 아무 상품도 소개하지 않는 상태).\n\n"
@@ -193,7 +193,7 @@ public class LiveController {
     }
 
     @Operation(
-            summary = "방송 상태 전이",
+            summary = "라이브 상태 변경 (종료 등)",
             description = "방송 상태를 바꾼다. 허용되는 전이는 예정→진행(LIVE), 예정→취소(CANCELED), "
                     + "진행→종료(ENDED) 세 가지다. 종료·취소된 방송은 더 이상 전이되지 않는다. "
                     + "전이 시각은 서버 시각으로 기록된다.\n\n"
