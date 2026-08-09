@@ -170,6 +170,9 @@ interface ProductUpdateRequest {
   material: string | null
   measurements: Record<string, number> | null
   defects: string[] | null
+  // CH001/042: pricing 스텝의 AI 가격 추천 폴링 결과(product_match_key). 계산 전이면
+  // null — BE는 null이면 미반영(기존 값 유지, null로 덮어쓰지 않음)한다.
+  matchKey: string | null
 }
 
 interface ProductImageUploadUrlResponse {
@@ -708,6 +711,7 @@ export const submitProduct = async (
       material: draft.material.trim() || null,
       measurements: resolveRegistrationMeasurements(draft),
       defects: resolveRegistrationDefects(draft),
+      matchKey: draft.priceMatchKey,
     } satisfies ProductUpdateRequest)
   } else {
     productId = await createDraftProduct(draft, options)
