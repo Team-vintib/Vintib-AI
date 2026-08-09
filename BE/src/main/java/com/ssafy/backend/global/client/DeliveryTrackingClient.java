@@ -55,7 +55,7 @@ public class DeliveryTrackingClient {
 
     /**
      * 웹훅 수신 엔드포인트를 deliveryapi.co.kr에 등록한다(1회성 인프라 설정, 수동 트리거 전용 —
-     * {@code DeliveryWebhookSetupController} 참고). 계정당 등록 가능한 엔드포인트가 최대 10개라
+     * {@code order.controller.DeliveryWebhookController} 참고). 계정당 등록 가능한 엔드포인트가 최대 10개라
      * 반복 호출하면 한도를 소진할 수 있으므로 앱 시작 시 자동으로 부르지 않는다.
      *
      * <p>{@code webhookSecret}을 우리가 미리 정해서 함께 보낸다 — 비워서 보내면 저쪽이 임의로

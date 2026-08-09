@@ -18,80 +18,60 @@ const notificationStore = useNotificationStore()
 const router = useRouter()
 const selectedCategory = ref<NotificationCategory>('ALL')
 const actionErrorMessage = ref('')
-const isMarkingCurrentFilterAsRead = ref(false)
 
-const filteredNotifications = computed(() =>
-  selectedCategory.value === 'ALL'
-    ? notificationStore.items
-    : notificationStore.items.filter((item) => item.category === selectedCategory.value),
-)
+/** UI의 'ALL'은 BE에 보낼 category가 없다는 뜻(생략 = 전체) — API 호출 직전에 null로 바꾼다. */
+const toApiCategory = (category: NotificationCategory) => (category === 'ALL' ? null : category)
 
-const isLoading = computed(() => notificationStore.isLoading)
-const hasLoadError = computed(() => notificationStore.hasLoadError)
+const isLoading = computed(() => notificationStore.isCategoryLoading)
+const hasLoadError = computed(() => notificationStore.hasCategoryLoadError)
 const isEmpty = computed(
-  () => notificationStore.loadState === 'success' && notificationStore.items.length === 0,
+  () =>
+    notificationStore.categoryLoadState === 'success' &&
+    selectedCategory.value === 'ALL' &&
+    notificationStore.categoryItems.length === 0,
 )
 const isFilterEmpty = computed(
   () =>
-    notificationStore.loadState === 'success' &&
-    notificationStore.items.length > 0 &&
-    filteredNotifications.value.length === 0,
+    notificationStore.categoryLoadState === 'success' &&
+    selectedCategory.value !== 'ALL' &&
+    notificationStore.categoryItems.length === 0,
 )
 const canLoadMore = computed(
-  () =>
-    selectedCategory.value === 'ALL' &&
-    notificationStore.loadState === 'success' &&
-    notificationStore.hasNext,
+  () => notificationStore.categoryLoadState === 'success' && notificationStore.categoryHasNext,
 )
-const currentFilterUnreadCount = computed(() =>
-  selectedCategory.value === 'ALL' ? notificationStore.unreadCount : filteredNotifications.value.length,
+const currentFilterUnreadCount = computed(() => notificationStore.categoryUnreadCount)
+const readAllButtonLabel = computed(() =>
+  notificationStore.isMarkingAllAsRead ? '처리 중' : '전체 읽음',
 )
-const readAllButtonLabel = computed(() => {
-  if (notificationStore.isMarkingAllAsRead || isMarkingCurrentFilterAsRead.value) {
-    return '처리 중'
-  }
-
-  return selectedCategory.value === 'ALL' ? '전체 읽음' : '전체 읽음'
-})
 
 const resultStatusMessage = computed(() => {
   if (isLoading.value) return '알림 목록을 불러오는 중입니다.'
-  if (hasLoadError.value) return notificationStore.errorMessage
+  if (hasLoadError.value) return notificationStore.categoryErrorMessage
 
-  return `${filteredNotifications.value.length}개의 읽지 않은 알림을 표시합니다.`
+  return `${notificationStore.categoryItems.length}개의 읽지 않은 알림을 표시합니다.`
 })
 
 const selectCategory = (category: NotificationCategory) => {
   selectedCategory.value = category
   actionErrorMessage.value = ''
+  void notificationStore.loadCategoryNotifications(toApiCategory(category), { page: 1 })
 }
 
 const handleRetry = () => {
-  void notificationStore.loadNotifications({ page: 1 })
+  void notificationStore.loadCategoryNotifications(toApiCategory(selectedCategory.value), { page: 1 })
 }
 
 const handleMarkAllAsRead = async () => {
-  if (currentFilterUnreadCount.value === 0 || isMarkingCurrentFilterAsRead.value) {
+  if (currentFilterUnreadCount.value === 0 || notificationStore.isMarkingAllAsRead) {
     return
   }
 
   actionErrorMessage.value = ''
-  isMarkingCurrentFilterAsRead.value = true
 
   try {
-    if (selectedCategory.value === 'ALL') {
-      await notificationStore.markAllAsRead()
-      return
-    }
-
-    const currentFilterItems = [...filteredNotifications.value]
-    await Promise.all(
-      currentFilterItems.map((notification) => notificationStore.markAsRead(notification.id)),
-    )
+    await notificationStore.markCategoryAsRead(toApiCategory(selectedCategory.value))
   } catch (error) {
     actionErrorMessage.value = normalizeApiError(error).message
-  } finally {
-    isMarkingCurrentFilterAsRead.value = false
   }
 }
 
@@ -99,7 +79,7 @@ const handleLoadMore = async () => {
   actionErrorMessage.value = ''
 
   try {
-    await notificationStore.loadNextPage()
+    await notificationStore.loadNextCategoryPage(toApiCategory(selectedCategory.value))
   } catch (error) {
     actionErrorMessage.value = normalizeApiError(error).message
   }
@@ -123,7 +103,7 @@ const handleSelectNotification = async (notification: NotificationItem) => {
 }
 
 onMounted(() => {
-  void notificationStore.loadNotifications({ page: 1 })
+  void notificationStore.loadCategoryNotifications(toApiCategory(selectedCategory.value), { page: 1 })
 })
 </script>
 
@@ -134,12 +114,7 @@ onMounted(() => {
         <button
           class="notification-page__read-all"
           type="button"
-          :disabled="
-            isLoading ||
-            currentFilterUnreadCount === 0 ||
-            notificationStore.isMarkingAllAsRead ||
-            isMarkingCurrentFilterAsRead
-          "
+          :disabled="isLoading || currentFilterUnreadCount === 0 || notificationStore.isMarkingAllAsRead"
           @click="handleMarkAllAsRead"
         >
           {{ readAllButtonLabel }}
@@ -174,7 +149,7 @@ onMounted(() => {
         v-else-if="hasLoadError"
         variant="error"
         title="알림을 불러오지 못했습니다"
-        :description="notificationStore.errorMessage"
+        :description="notificationStore.categoryErrorMessage"
         @action="handleRetry"
       />
 
@@ -195,7 +170,7 @@ onMounted(() => {
 
       <div v-else class="notification-page__list" aria-label="알림 목록">
         <NotificationCard
-          v-for="notification in filteredNotifications"
+          v-for="notification in notificationStore.categoryItems"
           :key="notification.id"
           :notification="notification"
           :disabled="notificationStore.readingIds.has(notification.id)"
@@ -205,14 +180,14 @@ onMounted(() => {
         <div v-if="canLoadMore" class="notification-page__pagination">
           <button
             type="button"
-            :disabled="notificationStore.isLoadingMore"
+            :disabled="notificationStore.categoryIsLoadingMore"
             @click="handleLoadMore"
           >
-            {{ notificationStore.isLoadingMore ? '불러오는 중' : '더 보기' }}
+            {{ notificationStore.categoryIsLoadingMore ? '불러오는 중' : '더 보기' }}
           </button>
           <p>
-            {{ notificationStore.items.length }}개 표시 중 · 전체
-            {{ notificationStore.totalElements }}개
+            {{ notificationStore.categoryItems.length }}개 표시 중 · 전체
+            {{ notificationStore.categoryTotalElements }}개
           </p>
         </div>
       </div>
