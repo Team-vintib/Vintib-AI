@@ -14,9 +14,9 @@ from sam3.contracts import DefectType
 from sam3.findings import (
     _section_no_of,
     dedupe_cross_type_overlap,
-    dedupe_same_type_containment,
     extract_findings,
     filter_by_garment,
+    merge_same_type_containment,
     suppress_benign,
 )
 from sam3.prompts import select_prompt_set
@@ -204,44 +204,81 @@ def test_dedupe_cross_type_overlap_ignores_same_type_overlap():
     assert dropped == []
 
 
-# --- dedupe_same_type_containment ---------------------------------------------
+# --- merge_same_type_containment ---------------------------------------------
 # small_pro.jpg 실측: 같은 STAIN 인스턴스 여러 개가 서로 97~100% 포함되는 "박스 안에 박스"
 # 사례에 대한 회귀 방지. IoU가 아니라 포함 비율을 쓰는 이유도 여기서 확인한다 — 작은
 # 박스가 큰 박스에 완전히 들어가도(포함 비율=1.0) 합집합 기준 IoU는 낮다.
+#
+# CH034부터는 드롭이 아니라 병합이다 — 병합 결과는 새로 만들어진 Instance라 원본과 객체
+# 동일성이 없다(`==`는 mask가 numpy 배열이라 바로 비교하면 ValueError가 난다). 그래서
+# 병합이 실제로 일어난 케이스는 `merged[0]`의 필드(mask/confidence)를 개별로 검증하고,
+# 병합이 안 일어나는 케이스(타입이 다르거나 임계치 미달)만 원본 객체 동일성(`in`)으로 검증한다.
 
 
-def test_dedupe_same_type_containment_drops_the_smaller_contained_instance():
+def test_merge_same_type_containment_merges_the_smaller_contained_instance():
     big = _instance(DefectType.stain, _mask_block(0, 7, 0, 7), confidence=0.91)
     small = _instance(DefectType.stain, _mask_block(1, 4, 1, 4), confidence=0.79)
-    kept, dropped = dedupe_same_type_containment([small, big], min_containment=0.8)
-    assert kept == [big]
-    assert dropped == [small]
+    merged, absorbed = merge_same_type_containment([small, big], min_containment=0.8)
+    assert len(merged) == 1
+    assert absorbed == [small]
+    # small은 big 안에 완전히 포함되므로 합집합 마스크는 big의 마스크와 같다.
+    assert np.array_equal(merged[0].mask, big.mask)
+    assert merged[0].bbox == big.bbox
+    assert merged[0].confidence == big.confidence
+    assert merged[0].defect_type == DefectType.stain
 
 
-def test_dedupe_same_type_containment_ignores_different_types():
+def test_merge_same_type_containment_ignores_different_types():
     # 타입이 다르면 이 함수의 비교 대상이 아니다 — 그건 dedupe_cross_type_overlap의 몫.
     big = _instance(DefectType.stain, _mask_block(0, 7, 0, 7), confidence=0.91)
     small = _instance(DefectType.hole_tear, _mask_block(1, 4, 1, 4), confidence=0.79)
-    kept, dropped = dedupe_same_type_containment([small, big], min_containment=0.8)
-    assert len(kept) == 2 and big in kept and small in kept
-    assert dropped == []
+    merged, absorbed = merge_same_type_containment([small, big], min_containment=0.8)
+    assert len(merged) == 2 and big in merged and small in merged
+    assert absorbed == []
 
 
-def test_dedupe_same_type_containment_keeps_both_when_below_threshold():
-    # 부분 겹침만 있으면(포함 비율이 임계치 미달) 둘 다 생존.
+def test_merge_same_type_containment_keeps_both_when_below_threshold():
+    # 부분 겹침만 있으면(포함 비율이 임계치 미달) 병합 없이 둘 다 생존.
     a = _instance(DefectType.stain, _mask_block(0, 5, 0, 5), confidence=0.90)
     b = _instance(DefectType.stain, _mask_block(3, 8, 3, 8), confidence=0.80)
-    kept, dropped = dedupe_same_type_containment([a, b], min_containment=0.8)
-    assert len(kept) == 2 and a in kept and b in kept
-    assert dropped == []
+    merged, absorbed = merge_same_type_containment([a, b], min_containment=0.8)
+    assert len(merged) == 2 and a in merged and b in merged
+    assert absorbed == []
 
 
-def test_dedupe_same_type_containment_prefers_larger_area_on_confidence_tie():
+def test_merge_same_type_containment_prefers_larger_area_as_base_on_confidence_tie():
     big = _instance(DefectType.stain, _mask_block(0, 7, 0, 7), confidence=0.80)
     small = _instance(DefectType.stain, _mask_block(1, 4, 1, 4), confidence=0.80)
-    kept, dropped = dedupe_same_type_containment([small, big], min_containment=0.8)
-    assert kept == [big]
-    assert dropped == [small]
+    merged, absorbed = merge_same_type_containment([small, big], min_containment=0.8)
+    assert len(merged) == 1
+    assert absorbed == [small]
+    assert np.array_equal(merged[0].mask, big.mask)
+    assert merged[0].confidence == 0.80
+
+
+def test_merge_same_type_containment_grows_the_bbox_to_the_union():
+    # 두 인스턴스가 서로 완전 포함 관계가 아니어도(각자 다른 영역을 커버) 합쳐지면 bbox는
+    # 둘을 모두 덮는 합집합이어야 한다 — "병합 시 더 큰 박스로 그린다"는 요구사항의 핵심.
+    left = Instance(
+        defect_type=DefectType.stain,
+        prompt="a stain on fabric",
+        confidence=0.85,
+        mask=_mask_block(2, 6, 0, 5),
+        bbox=(0.0, 0.2, 0.5, 0.7),
+    )
+    right = Instance(
+        defect_type=DefectType.stain,
+        prompt="a stain on fabric",
+        confidence=0.70,
+        mask=_mask_block(2, 6, 3, 9),
+        bbox=(0.3, 0.2, 0.9, 0.7),
+    )
+    # 포함 비율(양방향 중 큰 값) = |교집합|/|right| = 8/24 ≈ 0.33 — 0.3 임계치로 병합을 켠다.
+    merged, absorbed = merge_same_type_containment([right, left], min_containment=0.3)
+    assert len(merged) == 1
+    assert absorbed == [right]
+    assert merged[0].bbox == (0.0, 0.2, 0.9, 0.7)
+    assert merged[0].confidence == 0.85
 
 
 # --- extract_findings: kept_instances_by_image 불변식 -------------------------
@@ -279,15 +316,36 @@ def test_extract_findings_keeps_only_post_filter_instances_for_overlay():
     assert {f.defect_type for f in extracted.findings} == {DefectType.stain}
 
 
-def test_extract_findings_dedupes_cross_type_duplicates_before_numbering():
-    # scratch.jpg 실측 재현: 같은 자리를 DIRT_MARK/HOLE_TEAR 두 프롬프트가 동시에 잡은 경우,
-    # 낮은 confidence 쪽은 findings에도 kept_instances_by_image에도 남으면 안 된다.
+def test_extract_findings_keeps_cross_type_duplicates_by_default():
+    # CH034: 다른 유형 간 중복은 커밋 기본값(dedupe_cross_type=False)에서 드롭하지 않는다 —
+    # scratch.jpg 실측(DIRT_MARK/HOLE_TEAR가 같은 자리를 중복 검출)이 이제는 findings 2개로
+    # 그대로 노출돼야 한다.
     higher = _instance(DefectType.dirt_mark, _mask_at(4, 4), confidence=0.91)
     lower = _instance(DefectType.hole_tear, _mask_at(4, 4), confidence=0.79)
     result = _segmentation_result(0, [lower, higher], garment_mask=_full_mask())
     prompt_set = select_prompt_set(GarmentCategory.top_knit, BaseColor.light)
 
     extracted = extract_findings([result], prompt_set, segmenter_config("mock"))
+
+    assert {f.defect_type for f in extracted.findings} == {
+        DefectType.dirt_mark,
+        DefectType.hole_tear,
+    }
+    kept = extracted.kept_instances_by_image[0]
+    assert higher in kept and lower in kept
+
+
+def test_extract_findings_dedupes_cross_type_duplicates_when_enabled():
+    # dedupe_cross_type을 명시적으로 켰을 때는 여전히 낮은 confidence 쪽이 드롭돼야 한다 —
+    # 함수 자체(dedupe_cross_type_overlap)는 CH034에서 안 바뀌었고 기본값만 꺼졌다.
+    higher = _instance(DefectType.dirt_mark, _mask_at(4, 4), confidence=0.91)
+    lower = _instance(DefectType.hole_tear, _mask_at(4, 4), confidence=0.79)
+    result = _segmentation_result(0, [lower, higher], garment_mask=_full_mask())
+    prompt_set = select_prompt_set(GarmentCategory.top_knit, BaseColor.light)
+    config = dict(segmenter_config("mock"))
+    config["dedupe_cross_type"] = True
+
+    extracted = extract_findings([result], prompt_set, config)
 
     assert len(extracted.findings) == 1
     assert extracted.findings[0].defect_type == DefectType.dirt_mark
@@ -297,9 +355,9 @@ def test_extract_findings_dedupes_cross_type_duplicates_before_numbering():
     assert lower not in kept
 
 
-def test_extract_findings_dedupes_same_type_containment_before_numbering():
-    # small_pro.jpg 실측 재현: 같은 STAIN이 "박스 안에 박스"로 겹치면 작은 쪽은 findings에도
-    # kept_instances_by_image에도 남으면 안 된다.
+def test_extract_findings_merges_same_type_containment_before_numbering():
+    # small_pro.jpg 실측 재현: 같은 STAIN이 "박스 안에 박스"로 겹치면 병합된 finding 1개만
+    # 남아야 한다(CH034 — 예전에는 작은 쪽을 드롭했다).
     big = _instance(DefectType.stain, _mask_block(0, 7, 0, 7), confidence=0.91)
     small = _instance(DefectType.stain, _mask_block(1, 4, 1, 4), confidence=0.79)
     result = _segmentation_result(0, [small, big], garment_mask=_full_mask())
@@ -310,8 +368,8 @@ def test_extract_findings_dedupes_same_type_containment_before_numbering():
     assert len(extracted.findings) == 1
     assert extracted.findings[0].no == 1
     kept = extracted.kept_instances_by_image[0]
-    assert big in kept
-    assert small not in kept
+    assert len(kept) == 1
+    assert np.array_equal(kept[0].mask, big.mask)
 
 
 def test_extract_findings_skips_same_type_dedup_when_disabled():

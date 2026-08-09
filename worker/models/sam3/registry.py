@@ -52,16 +52,18 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         "garment_overlap_min": 0.6,
         "suppress_benign": True,
         "benign_containment": 0.6,
-        # ⚠️ 라벨링된 검증셋 없이 잡은 값(confident_threshold와 같은 한계) — 스윕 대상.
-        # 실측 중복 쌍(scratch.jpg)은 bbox가 1px 이내로 거의 동일해 IoU가 0.9대로 매우
-        # 높았다. 0.5보다 여유 있게 0.7로 잡아 "진짜 인접했지만 서로 다른 하자"까지
-        # 잘못 합칠 위험을 줄인다.
-        "dedupe_cross_type": True,
+        # CH034: 다른 유형끼리는 겹쳐도 드롭하지 않기로 정책 전환 — 각각 별도 finding·박스로
+        # 노출한다(사용자 결정, 2026-08-09). 실측 중복 쌍(scratch.jpg, DIRT_MARK/HOLE_TEAR가
+        # 거의 동일 위치를 중복 검출)이 다시 그대로 노출될 수 있다는 트레이드오프를 감수한다.
+        # `dedupe_cross_type_overlap()` 함수 자체는 남겨 뒀다 — 필요하면 이 값만 True로 되돌리면
+        # 된다(이전 임계치: cross_type_iou_min=0.7).
+        "dedupe_cross_type": False,
         "cross_type_iou_min": 0.7,
         # ⚠️ 라벨링된 검증셋 없이 잡은 값 — 스윕 대상. 실측 중복(small_pro.jpg)은 작은
         # STAIN 박스가 큰 STAIN 박스에 97~100% 포함돼 있었다(IoU는 낮아도 포함 비율은
         # 매우 높음) — 그래서 IoU가 아니라 포함 비율을 쓴다(findings.py 참고). 0.8로
         # 여유를 둬서 부분적으로만 겹치는 "진짜 다른 두 하자"까지 합치는 위험을 줄인다.
+        # CH034: 이 임계치를 넘으면 이제 드롭이 아니라 **병합**(더 큰 박스 하나로)한다.
         "dedupe_same_type": True,
         "same_type_containment_min": 0.8,
         "min_area_ratio": 0.0015,
@@ -86,16 +88,18 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         "garment_overlap_min": 0.6,
         "suppress_benign": True,
         "benign_containment": 0.6,
-        # ⚠️ 라벨링된 검증셋 없이 잡은 값(confident_threshold와 같은 한계) — 스윕 대상.
-        # 실측 중복 쌍(scratch.jpg)은 bbox가 1px 이내로 거의 동일해 IoU가 0.9대로 매우
-        # 높았다. 0.5보다 여유 있게 0.7로 잡아 "진짜 인접했지만 서로 다른 하자"까지
-        # 잘못 합칠 위험을 줄인다.
-        "dedupe_cross_type": True,
+        # CH034: 다른 유형끼리는 겹쳐도 드롭하지 않기로 정책 전환 — 각각 별도 finding·박스로
+        # 노출한다(사용자 결정, 2026-08-09). 실측 중복 쌍(scratch.jpg, DIRT_MARK/HOLE_TEAR가
+        # 거의 동일 위치를 중복 검출)이 다시 그대로 노출될 수 있다는 트레이드오프를 감수한다.
+        # `dedupe_cross_type_overlap()` 함수 자체는 남겨 뒀다 — 필요하면 이 값만 True로 되돌리면
+        # 된다(이전 임계치: cross_type_iou_min=0.7).
+        "dedupe_cross_type": False,
         "cross_type_iou_min": 0.7,
         # ⚠️ 라벨링된 검증셋 없이 잡은 값 — 스윕 대상. 실측 중복(small_pro.jpg)은 작은
         # STAIN 박스가 큰 STAIN 박스에 97~100% 포함돼 있었다(IoU는 낮아도 포함 비율은
         # 매우 높음) — 그래서 IoU가 아니라 포함 비율을 쓴다(findings.py 참고). 0.8로
         # 여유를 둬서 부분적으로만 겹치는 "진짜 다른 두 하자"까지 합치는 위험을 줄인다.
+        # CH034: 이 임계치를 넘으면 이제 드롭이 아니라 **병합**(더 큰 박스 하나로)한다.
         "dedupe_same_type": True,
         "same_type_containment_min": 0.8,
         "min_area_ratio": 0.0015,
