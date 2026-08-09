@@ -35,6 +35,7 @@ public class PriceEstimateService {
                 request.productName(),
                 request.brand(),
                 category,
+                request.categoryId(),
                 request.conditionScore(),
                 request.conditionGrade()));
 
