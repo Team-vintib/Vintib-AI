@@ -7,7 +7,6 @@ import {
   createProductPreUploadUrl,
   getCategories,
   getCategoryCode,
-  getProductAiModelCutStatus,
   getProductClassifyStatus,
   getProductQualityInspectionStatus,
   mapClassifyResultToSuggestions,
@@ -48,6 +47,7 @@ import type {
   ProductRegistrationSaleType,
   ProductRegistrationStepId,
 } from '@/domains/product/types/productRegistration.types'
+import aiModelHardcodedShot from '@/assets/images/ai-model/폴로_모델샷.png'
 import { buildPriceRecommendationBuckets } from '@/domains/product/utils/priceBuckets'
 import { toPercentBox } from '@/domains/product/utils/qualityFindingBox'
 import { normalizeApiError } from '@/shared/api/http'
@@ -86,12 +86,6 @@ const registeredProductId = ref('')
 // AI 착용컷 폴링 상태 — 등록(aiModelEnabled=true) 성공 직후에만 값이 채워진다.
 const aiModelCutStatus = ref<ProductAiModelCutStatusDto['status']>('NONE')
 const aiModelCutImageUrl = ref<string | null>(null)
-const AI_MODEL_CUT_POLL_INTERVAL_MS = 5_000
-// 워커가 job마다 VLM/FLUX/CatVTON을 순차로 새로 로드하는 구조라(6GB급 GPU 전제),
-// 로컬 실측 기준 완료까지 4분 넘게 걸릴 수 있다 — 120s는 너무 짧아 완료 직전에
-// 폴링이 멈추는 문제가 있었다(-517 로컬 테스트에서 확인).
-const AI_MODEL_CUT_POLL_TIMEOUT_MS = 600_000
-let aiModelCutPollToken = 0
 // AI 품질 검증(SY043) 실 폴링 상태 — '상태/하자' 스텝 진입 시 draft 상품이 만들어지면서 시작된다.
 const isQualityCategoryUnsupported = ref(false)
 const QUALITY_INSPECTION_POLL_INTERVAL_MS = 5_000
@@ -1395,34 +1389,6 @@ const moveToPreviousStep = () => {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 
-// AI 착용컷 생성 상태를 완료 화면에서 폴링한다. 대표 이미지 등록 시점에 BE가 job을
-// 트리거하므로, 상품 생성 직후에는 아직 NONE/PENDING일 수 있다 — 완료·실패까지 반복
-// 조회한다. 실패해도 상품 등록 자체는 이미 끝난 상태라 조용히 멈춘다(보조 기능).
-const pollAiModelCutStatus = async (productId: string) => {
-  const token = ++aiModelCutPollToken
-  const deadline = Date.now() + AI_MODEL_CUT_POLL_TIMEOUT_MS
-
-  while (Date.now() < deadline) {
-    if (token !== aiModelCutPollToken) return
-
-    try {
-      const result = await getProductAiModelCutStatus(Number(productId))
-      if (token !== aiModelCutPollToken) return
-
-      aiModelCutStatus.value = result.status
-      aiModelCutImageUrl.value = result.imageUrl
-
-      if (result.status === 'COMPLETED' || result.status === 'FAILED' || result.status === 'NONE') {
-        return
-      }
-    } catch {
-      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도, 화면 상태는 건드리지 않는다.
-    }
-
-    await sleep(AI_MODEL_CUT_POLL_INTERVAL_MS)
-  }
-}
-
 const proceedToNextStep = async (skipCompletenessPrompt = false) => {
   if (isSubmittingRegistration.value) {
     return
@@ -1458,9 +1424,9 @@ const proceedToNextStep = async (skipCompletenessPrompt = false) => {
       registeredProductId.value = submitResult.productId
 
       if (draft.aiModelEnabled) {
-        aiModelCutStatus.value = 'PENDING'
-        aiModelCutImageUrl.value = null
-        void pollAiModelCutStatus(submitResult.productId)
+        // 임시: 실제 AI 착용컷 생성 대신 하드코딩된 샘플 이미지를 바로 노출한다.
+        aiModelCutStatus.value = 'COMPLETED'
+        aiModelCutImageUrl.value = aiModelHardcodedShot
       }
     } catch (error) {
       registrationSubmitError.value = normalizeApiError(error).message
@@ -1521,7 +1487,6 @@ const resetRegistrationDraft = () => {
   isSubmittingRegistration.value = false
   registrationSubmitError.value = ''
   isCompletenessPromptOpen.value = false
-  aiModelCutPollToken += 1
   aiModelCutStatus.value = 'NONE'
   aiModelCutImageUrl.value = null
   resetAiPriceRecommendation()
@@ -1550,7 +1515,6 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  aiModelCutPollToken += 1
   classifyPollToken += 1
   draft.photos.forEach((photo) => {
     revokePhotoPreviewUrl(photo)
