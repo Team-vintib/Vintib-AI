@@ -138,11 +138,35 @@ class LlmAttributeExtractor(AttributeExtractor):
         return ExtractedAttributes(tokens=sorted(set(tokens)), brand_id=resolved_brand)
 
 
+# 프롬프트 안 예시(few-shot) — comps.py::_comps_prompt()와 같은 이유(quality_vlm/
+# prompts.py CH019 실측)로 넣는다. 한글/영어가 섞인 상품명 둘 다 예시로 보여서, "핵심
+# 키워드"의 기준(모델/디자인 식별자만, 색상·사이즈·컨디션은 전부 제외)을 지시문 서술보다
+# 훨씬 명확하게 전달한다 — 지시문만으로는 색상("그레이")이나 사이즈가 keywords에 섞여
+# 들어오는 걸 실측 없이도 예상할 수 있다(비슷한 문제를 CH019가 VLM 설명에서 실측했다).
+_EXTRACTION_FEW_SHOT: tuple[tuple[str, str], ...] = (
+    (
+        "메종키츠네 폭스헤드 자수 니트 그레이 S",
+        '{"brand": "메종키츠네", "keywords": ["폭스헤드", "니트"]}',
+    ),
+    (
+        "Nike Air Force 1 White 270 새제품 미착용",
+        '{"brand": "Nike", "keywords": ["Air Force 1", "270"]}',
+    ),
+)
+
+
 def _extraction_prompt(product_name: str) -> str:
+    examples = "\n".join(
+        f"상품명: '{name}'\n답변: {answer}" for name, answer in _EXTRACTION_FEW_SHOT
+    )
     return (
+        "목적: 이 상품명에서 **동일 상품 판정**(다른 판매자가 올린 같은 상품을 찾기)에 쓸"
+        " 브랜드와 핵심 식별 키워드만 뽑는 것이다 — 같은 브랜드의 다른 모델과 구분되는"
+        " 정보만 남기고, 색상·사이즈·컨디션(새제품/미착용 등)·마케팅 문구는 전부 제외한다.\n\n"
+        "아래는 좋은 답변 예시다.\n"
+        f"{examples}\n\n"
         f"다음은 중고거래 상품명이다: '{product_name}'\n"
-        "이 상품명에서 브랜드와, 이 상품을 다른 비슷한 상품과 구분해주는 핵심 모델명/"
-        "식별 키워드만 뽑아라. 사이즈·컨디션(새제품/미착용 등)·마케팅 문구는 제외한다.\n"
+        "위 예시처럼 브랜드와 핵심 모델/식별 키워드만 뽑아라.\n"
         "JSON 객체 하나로만 답해라. 설명 문장은 쓰지 마라.\n"
         '형식: {"brand": "브랜드명 또는 빈 문자열", "keywords": ["키워드1", "키워드2"]}'
     )

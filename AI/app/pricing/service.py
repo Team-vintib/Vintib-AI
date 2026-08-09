@@ -79,7 +79,12 @@ class PricingService:
         started = time.perf_counter()
         query = build_query(request.product_name, request.brand, request.category)
         fetched = self._comps_source.fetch(
-            query, image_url=request.image_url, product_id=request.product_id
+            query,
+            image_url=request.image_url,
+            product_id=request.product_id,
+            product_name=request.product_name,
+            brand=request.brand,
+            category_id=request.category_id,
         )
         self._log_observation(query, fetched.items)
         retail_items, retail_notes = (
