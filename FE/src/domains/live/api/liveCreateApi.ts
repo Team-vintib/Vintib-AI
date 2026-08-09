@@ -2,7 +2,6 @@ import { http } from '@/shared/api/http'
 
 import type { LiveCreateProduct } from '@/domains/live/types/liveCreate.types'
 import {
-  getBrands,
   getCategories,
   getProductPrimaryImageUrl,
   type CategoryDto,
@@ -52,7 +51,7 @@ interface LiveCreateProductDto {
   id: number
   sellerId: number
   categoryId?: number | null
-  brandId?: number | null
+  brand?: string | null
   title: string
   conditionGrade?: string | null
   saleType?: string | null
@@ -110,18 +109,13 @@ export const getLiveCreateProducts = async (sellerId: number): Promise<LiveCreat
   }
 
   const sellerProducts = data.data.content.filter((product) => product.sellerId === sellerId)
-  // ProductResponse(`GET /products`)는 categoryId/brandId만 내려주고 이름은 안 준다 —
-  // 상품 등록 화면과 동일하게 마스터 목록을 받아 여기서 이름으로 변환한다.
-  const [categories, brands] = await Promise.all([
-    getCategories().catch(() => []),
-    getBrands().catch(() => []),
-  ])
+  // ProductResponse(`GET /products`)는 categoryId만 내려주고 이름은 안 준다 — 상품 등록
+  // 화면과 동일하게 카테고리 마스터 목록을 받아 여기서 이름으로 변환한다. 브랜드는
+  // S15P11A108-327로 FK가 아니라 자유 텍스트(`brand`)가 돼서 그대로 쓰면 된다.
+  const categories = await getCategories().catch(() => [])
   const categoryById = new Map(categories.map((category) => [category.id, category]))
-  const brandNameById = new Map(brands.map((brand) => [brand.id, brand.name]))
 
-  return Promise.all(
-    sellerProducts.map((product) => toLiveCreateProduct(product, categoryById, brandNameById)),
-  )
+  return Promise.all(sellerProducts.map((product) => toLiveCreateProduct(product, categoryById)))
 }
 
 // 상품의 categoryId는 소분류(depth 3)라 이름만 보여주면 "니트"처럼 뭐가 뭔지 알기 어렵다 —
@@ -141,11 +135,10 @@ const buildCategoryLabel = (categoryId: number, categoryById: Map<number, Catego
 const toLiveCreateProduct = async (
   product: LiveCreateProductDto,
   categoryById: Map<number, CategoryDto>,
-  brandNameById: Map<number, string>,
 ): Promise<LiveCreateProduct> => ({
   id: product.id,
   name: product.title,
-  brand: (product.brandId && brandNameById.get(product.brandId)) || '-',
+  brand: product.brand?.trim() || null,
   category:
     (product.categoryId && buildCategoryLabel(product.categoryId, categoryById)) || '카테고리 미상',
   condition: product.conditionGrade || product.saleStatus || '상태 미상',
