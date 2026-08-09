@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 상품 편성은 각 계정이 API로 직접 하도록 비워 둔다.
  *
  * <p><b>썸네일은 전용 이미지를 쓴다.</b> 상품 이미지에서 유도하던 이전 방식 대신, 라이브
- * 전용으로 {@code vintib-public/live/live (1).jpg} ~ {@code live (4).jpg} 4장을 수동
+ * 전용으로 {@code vintib-public/live/live (1).png} ~ {@code live (4).png} 4장을 수동
  * 업로드해 두고 그 키만 문자열로 채운다({@code docs/sync-images-to-prod.md}의 products 업로드
  * 절차와 같은 방식, 폴더만 {@code live/}). {@code LiveProduct} 레코드를 만들지 않으므로 위
  * 편성 충돌과는 무관하다.
@@ -63,9 +63,9 @@ public class DemoLiveSeeder implements ApplicationRunner {
                     "빈티지 원피스·스커트 위주로 보여드립니다 ! 여신 누나들 예약해두기 💙💙",
                     LocalDateTime.now().plusDays(2).withHour(21).withMinute(0).withSecond(0).withNano(0)));
 
-    // BUSINESS1_LIVES[0]→live (1).jpg, [1]→live (2).jpg, BUSINESS2_LIVES[0]→live (3).jpg, [1]→live (4).jpg.
-    private static final List<String> BUSINESS1_THUMBNAILS = List.of("live (1).jpg", "live (2).jpg");
-    private static final List<String> BUSINESS2_THUMBNAILS = List.of("live (3).jpg", "live (4).jpg");
+    // BUSINESS1_LIVES[0]→live (1).png, [1]→live (2).png, BUSINESS2_LIVES[0]→live (3).png, [1]→live (4).png.
+    private static final List<String> BUSINESS1_THUMBNAILS = List.of("live (1).png", "live (2).png");
+    private static final List<String> BUSINESS2_THUMBNAILS = List.of("live (3).png", "live (4).png");
 
     private final MemberRepository memberRepository;
     private final LiveRepository liveRepository;
