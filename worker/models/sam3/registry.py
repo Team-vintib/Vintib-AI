@@ -46,14 +46,21 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         "description": "목업 시나리오 기반 결정적 인스턴스 합성(의존성 없음)",
         "score_threshold": 0.30,
         "mask_threshold": 0.5,
-        "confident_threshold": 0.55,
+        # hotfix/472: 0.55 -> 0.40 — 어깨쪽처럼 confidence가 애매한 진짜 하자가 SUSPECTED로
+        # 강등돼 설명(VLM)도 안 붙는 사례가 있어 낮췄다. score_threshold(0.30)와 겹치지 않게
+        # 여유를 뒀다. 라벨링된 검증셋 없이 잡은 값이라 스윕 대상인 건 동일.
+        "confident_threshold": 0.40,
         "garment_score_threshold": 0.05,
         "garment_crop_pad_ratio": 0.06,
         # hotfix/472: 0.6 -> 0.7 — 검증 노트북(qc_shared.GARMENT_OVERLAP_MIN)과 맞춘다.
         # CH034 이전 값으로 되돌린 것— 재검증 끝나면 0.6 복귀 여부를 다시 판단한다.
         "garment_overlap_min": 0.7,
         "suppress_benign": True,
-        "benign_containment": 0.6,
+        # hotfix/472: 0.6 -> 0.8 — 암홀 등 구조적 개구부는 겹치기만 하면(containment 비교 없이)
+        # 무조건 억제되는데(findings.py:suppress_benign), 어깨 쪽 실제 하자까지 같이 지워지는
+        # 사례가 있었다. 임계치를 높여 "거의 다 암홀 안에 있어야만" 억제되게 해 capture 범위를
+        # 좁힌다 — 프롬프트/마스크 자체를 바꾸는 게 아니라 억제 조건만 좁히는 방식.
+        "benign_containment": 0.8,
         # hotfix/472: CH034가 오늘(2026-08-09) False로 껐던 걸 다시 True로 되돌렸다 — 검증
         # 노트북(qc_shared.py)엔 same-type 병합이 아예 없고 cross-type dedup만 있어서, 노트북과
         # 나란히 비교하려면 이 값이 켜져 있어야 한다. **CH034의 "사용자 결정"을 뒤집는 게
@@ -89,14 +96,21 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         "description": "SAM3 Promptable Concept Segmentation. torch>=2.4/transformers>=5.0 필요",
         "score_threshold": 0.30,
         "mask_threshold": 0.5,
-        "confident_threshold": 0.55,
+        # hotfix/472: 0.55 -> 0.40 — 어깨쪽처럼 confidence가 애매한 진짜 하자가 SUSPECTED로
+        # 강등돼 설명(VLM)도 안 붙는 사례가 있어 낮췄다. score_threshold(0.30)와 겹치지 않게
+        # 여유를 뒀다. 라벨링된 검증셋 없이 잡은 값이라 스윕 대상인 건 동일.
+        "confident_threshold": 0.40,
         "garment_score_threshold": 0.05,
         "garment_crop_pad_ratio": 0.06,
         # hotfix/472: 0.6 -> 0.7 — 검증 노트북(qc_shared.GARMENT_OVERLAP_MIN)과 맞춘다.
         # CH034 이전 값으로 되돌린 것 — 재검증 끝나면 0.6 복귀 여부를 다시 판단한다.
         "garment_overlap_min": 0.7,
         "suppress_benign": True,
-        "benign_containment": 0.6,
+        # hotfix/472: 0.6 -> 0.8 — 암홀 등 구조적 개구부는 겹치기만 하면(containment 비교 없이)
+        # 무조건 억제되는데(findings.py:suppress_benign), 어깨 쪽 실제 하자까지 같이 지워지는
+        # 사례가 있었다. 임계치를 높여 "거의 다 암홀 안에 있어야만" 억제되게 해 capture 범위를
+        # 좁힌다 — 프롬프트/마스크 자체를 바꾸는 게 아니라 억제 조건만 좁히는 방식.
+        "benign_containment": 0.8,
         # hotfix/472: CH034가 오늘(2026-08-09) False로 껐던 걸 다시 True로 되돌렸다 — 검증
         # 노트북(qc_shared.py)엔 same-type 병합이 아예 없고 cross-type dedup만 있어서, 노트북과
         # 나란히 비교하려면 이 값이 켜져 있어야 한다. **CH034의 "사용자 결정"을 뒤집는 게
