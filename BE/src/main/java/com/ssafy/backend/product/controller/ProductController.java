@@ -19,9 +19,11 @@ import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
 import com.ssafy.backend.product.dto.response.ProductMarketPriceResponse;
 import com.ssafy.backend.product.dto.response.ProductQualityInspectionResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
+import com.ssafy.backend.product.dto.response.SimilarProductsResponse;
 import com.ssafy.backend.product.service.PriceEstimateService;
 import com.ssafy.backend.product.service.ProductImageService;
 import com.ssafy.backend.product.service.ProductService;
+import com.ssafy.backend.product.service.SimilarProductQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -55,6 +57,7 @@ public class ProductController {
     private final ProductService productService;
     private final ProductImageService productImageService;
     private final PriceEstimateService priceEstimateService;
+    private final SimilarProductQueryService similarProductQueryService;
 
     @Operation(
             summary = "상품 기본 정보 저장",
@@ -178,6 +181,21 @@ public class ProductController {
     @GetMapping("/{id}/market-price")
     public ResponseEntity<ApiResponse<ProductMarketPriceResponse>> getMarketPrice(@PathVariable Long id) {
         ProductMarketPriceResponse response = productService.getMarketPrice(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "유사 상품 추천 조회",
+            description = "CLIP 이미지 임베딩 기반 유사 상품(AI, CH034)을 배치로 미리 계산해둔 캐시에서 조회한다. "
+                    + "요청 시점에 AI를 호출하지 않는다 — AI 서버 상태가 이 응답에 영향을 주지 않는다. "
+                    + "캐시 결과가 부족하거나 없으면 기존 카테고리/브랜드 기반 SQL로 채운다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @GetMapping("/{id}/similar")
+    public ResponseEntity<ApiResponse<SimilarProductsResponse>> getSimilarProducts(@PathVariable Long id) {
+        SimilarProductsResponse response = similarProductQueryService.getSimilarProducts(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
