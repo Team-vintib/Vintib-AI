@@ -47,21 +47,34 @@ const specItems = computed(() => {
     .filter((item) => item.value)
 })
 
-// 하자는 개수로만 보여준다 — 다른 항목과 같은 좁은 칸에 들어가야 하고, 판매자가 쓴 문장 전체는
-// 상품 상세에서 읽으면 된다. 0건이면 "없음"을 명시한다: BE 계약상 하자 목록이 비어 있는 건
-// "등록된 하자가 없다"는 뜻이고, 중고 거래에서 이건 구매자에게 의미 있는 정보다.
+// 판매자가 직접 고지한 하자와 AI 검수가 찾은 하자는 출처가 다르다 — 둘 다 실제 하자라 합쳐 센다.
+// AI 쪽은 판매자가 "하자 아님"으로 뒤집은 항목(isExcluded)을 뺀다. BE가 그 항목까지 응답에 담는 건
+// 번호를 등록 화면과 맞추기 위해서일 뿐이라(요청 043 §2), 개수에는 넣으면 안 된다.
+const defectCount = computed(() => {
+  const detail = props.detail
+  if (!detail) return null
+
+  const disclosed = detail.sellerDisclosedDefects.filter((defect) => defect.title.trim()).length
+  const aiDetected = (detail.aiQualityAnalysis?.images ?? []).reduce(
+    (total, image) => total + image.findings.filter((finding) => !finding.isExcluded).length,
+    0,
+  )
+
+  return disclosed + aiDetected
+})
+
+// 하자는 개수로만 보여준다 — 다른 항목과 같은 좁은 칸에 들어가야 하고, 자세한 내용은 상품 상세에서
+// 읽으면 된다. 0건이면 "없음"을 명시한다: 중고 거래에서 하자가 없다는 건 구매자에게 의미 있는 정보다.
 // 다만 상세를 아직 못 받았고 라이브 값도 없으면 단정하지 않고 숨긴다 — BE가 상품 행을 못 찾은
 // 경우에도 모든 필드가 null로 오기 때문에 "없음"이 거짓이 될 수 있다.
 const defectLabel = computed(() => {
-  const detail = props.detail
-
-  if (detail) {
-    const count = detail.sellerDisclosedDefects.filter((defect) => defect.title.trim()).length
-
+  const count = defectCount.value
+  if (count !== null) {
     return count > 0 ? `${count}개` : '없음'
   }
 
-  // 라이브 응답의 defectSummary는 하자 항목을 쉼표로 이어 붙인 한 줄이라 쉼표로 나눠 센다.
+  // 상세를 아직 못 받았을 때의 임시 표시. 라이브 응답의 defectSummary는 판매자 고지 하자를
+  // 쉼표로 이어 붙인 한 줄이라 쉼표로 나눠 센다(AI 하자는 여기에 없다).
   const summary = props.product?.defectSummary?.trim()
   if (!summary) return ''
 
