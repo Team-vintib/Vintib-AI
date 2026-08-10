@@ -50,10 +50,12 @@ def test_every_backend_carries_its_own_thresholds(backend):
 
 
 @pytest.mark.parametrize("backend", _BACKENDS)
-def test_score_threshold_leaves_room_for_a_suspected_band(backend):
-    # 채택 임계치가 DETECTED 임계치보다 높으면 SUSPECTED 구간이 사라진다.
+def test_score_threshold_no_longer_exceeds_the_detected_threshold(backend):
+    # hotfix/472: confident_threshold를 score_threshold와 같은 값(0.30)으로 내려 SUSPECTED
+    # 강등을 사실상 무력화했다 — 이전엔 이 둘 사이에 SUSPECTED 구간이 있어야 한다고 검증했지만,
+    # 지금은 그 구간이 의도적으로 없다(같아도 된다).
     config = registry.SEGMENTER_BACKENDS[backend]
-    assert config["score_threshold"] < config["confident_threshold"]
+    assert config["score_threshold"] <= config["confident_threshold"]
 
 
 @pytest.mark.parametrize("backend", _BACKENDS)
@@ -72,10 +74,11 @@ def test_every_backend_declares_a_description_and_benign_switch(backend):
 
 
 @pytest.mark.parametrize("backend", _BACKENDS)
-def test_cross_type_dedup_is_off_by_default(backend):
-    # CH034: 다른 유형 간 중복은 더 이상 드롭하지 않는다 — 각각 별도 finding·박스로 노출한다.
+def test_cross_type_dedup_is_on_by_default(backend):
+    # hotfix/472: CH034가 껐던 걸(2026-08-09) 다시 켰다 — 실측(어깨/소매에서 크기만 다른
+    # 박스가 다른 유형으로 중복 검출)상 꺼두면 중복이 그대로 노출되는 문제가 재확인됐다.
     config = registry.SEGMENTER_BACKENDS[backend]
-    assert config["dedupe_cross_type"] is False
+    assert config["dedupe_cross_type"] is True
 
 
 def test_segmenter_config_defaults_to_active_backend():

@@ -46,10 +46,11 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         "description": "목업 시나리오 기반 결정적 인스턴스 합성(의존성 없음)",
         "score_threshold": 0.30,
         "mask_threshold": 0.5,
-        # hotfix/472: 0.55 -> 0.40 — 어깨쪽처럼 confidence가 애매한 진짜 하자가 SUSPECTED로
-        # 강등돼 설명(VLM)도 안 붙는 사례가 있어 낮췄다. score_threshold(0.30)와 겹치지 않게
-        # 여유를 뒀다. 라벨링된 검증셋 없이 잡은 값이라 스윕 대상인 건 동일.
-        "confident_threshold": 0.40,
+        # hotfix/472: 0.55 -> 0.30(= score_threshold) — 0.40으로 낮췄는데도 어깨쪽 실측
+        # confidence(0.3962)가 여전히 못 넘어서 SUSPECTED로 남았다. score_threshold와
+        # 같은 값으로 내려 사실상 이 강등 자체를 무력화한다(인스턴스로 살아남았으면 곧바로
+        # DETECTED) — `_status_of()` 코드는 그대로 두고 값만 무력화하는 방식.
+        "confident_threshold": 0.30,
         "garment_score_threshold": 0.05,
         "garment_crop_pad_ratio": 0.06,
         # hotfix/472: 0.6 -> 0.7 — 검증 노트북(qc_shared.GARMENT_OVERLAP_MIN)과 맞춘다.
@@ -72,9 +73,10 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         # STAIN 박스가 큰 STAIN 박스에 97~100% 포함돼 있었다(IoU는 낮아도 포함 비율은
         # 매우 높음) — 그래서 IoU가 아니라 포함 비율을 쓴다(findings.py 참고). 0.8로
         # 여유를 둬서 부분적으로만 겹치는 "진짜 다른 두 하자"까지 합치는 위험을 줄인다.
-        # hotfix/472: 검증 노트북엔 same-type 병합 자체가 없어서 비교를 위해 임시로 끈다
-        # (위 dedupe_cross_type과 같은 이유 — CH034 결정을 뒤집는 게 아니라 비교 테스트용).
-        "dedupe_same_type": False,
+        # hotfix/472: 노트북과 맞추려고 잠시 껐었는데(2026-08-09), 실측(어깨 STAIN 3건이
+        # 서로 포함 관계)에서 이 병합이 실제로 필요하다는 게 재확인돼 다시 켠다 — 이번엔
+        # 노트북 비교용이 아니라 프로덕션 자체의 개선으로 되돌리는 것(CH034 원래 의도 유지).
+        "dedupe_same_type": True,
         "same_type_containment_min": 0.8,
         # hotfix/472: 검증 노트북(SAM3 경로)엔 면적 필터가 아예 없다 — qc_shared.MIN_AREA_RATIO는
         # CLIPSeg용 probs_to_instances()에서만 쓰이고 SAM3는 인스턴스를 직접 받아 그 경로를
@@ -96,10 +98,11 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         "description": "SAM3 Promptable Concept Segmentation. torch>=2.4/transformers>=5.0 필요",
         "score_threshold": 0.30,
         "mask_threshold": 0.5,
-        # hotfix/472: 0.55 -> 0.40 — 어깨쪽처럼 confidence가 애매한 진짜 하자가 SUSPECTED로
-        # 강등돼 설명(VLM)도 안 붙는 사례가 있어 낮췄다. score_threshold(0.30)와 겹치지 않게
-        # 여유를 뒀다. 라벨링된 검증셋 없이 잡은 값이라 스윕 대상인 건 동일.
-        "confident_threshold": 0.40,
+        # hotfix/472: 0.55 -> 0.30(= score_threshold) — 0.40으로 낮췄는데도 어깨쪽 실측
+        # confidence(0.3962)가 여전히 못 넘어서 SUSPECTED로 남았다. score_threshold와
+        # 같은 값으로 내려 사실상 이 강등 자체를 무력화한다(인스턴스로 살아남았으면 곧바로
+        # DETECTED) — `_status_of()` 코드는 그대로 두고 값만 무력화하는 방식.
+        "confident_threshold": 0.30,
         "garment_score_threshold": 0.05,
         "garment_crop_pad_ratio": 0.06,
         # hotfix/472: 0.6 -> 0.7 — 검증 노트북(qc_shared.GARMENT_OVERLAP_MIN)과 맞춘다.
@@ -122,9 +125,10 @@ SEGMENTER_BACKENDS: dict[str, SegmenterConfig] = {
         # STAIN 박스가 큰 STAIN 박스에 97~100% 포함돼 있었다(IoU는 낮아도 포함 비율은
         # 매우 높음) — 그래서 IoU가 아니라 포함 비율을 쓴다(findings.py 참고). 0.8로
         # 여유를 둬서 부분적으로만 겹치는 "진짜 다른 두 하자"까지 합치는 위험을 줄인다.
-        # hotfix/472: 검증 노트북엔 same-type 병합 자체가 없어서 비교를 위해 임시로 끈다
-        # (위 dedupe_cross_type과 같은 이유 — CH034 결정을 뒤집는 게 아니라 비교 테스트용).
-        "dedupe_same_type": False,
+        # hotfix/472: 노트북과 맞추려고 잠시 껐었는데(2026-08-09), 실측(어깨 STAIN 3건이
+        # 서로 포함 관계)에서 이 병합이 실제로 필요하다는 게 재확인돼 다시 켠다 — 이번엔
+        # 노트북 비교용이 아니라 프로덕션 자체의 개선으로 되돌리는 것(CH034 원래 의도 유지).
+        "dedupe_same_type": True,
         "same_type_containment_min": 0.8,
         # hotfix/472: 검증 노트북(SAM3 경로)엔 면적 필터가 아예 없다 — qc_shared.MIN_AREA_RATIO는
         # CLIPSeg용 probs_to_instances()에서만 쓰이고 SAM3는 인스턴스를 직접 받아 그 경로를

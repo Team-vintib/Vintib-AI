@@ -316,10 +316,10 @@ def test_extract_findings_keeps_only_post_filter_instances_for_overlay():
     assert {f.defect_type for f in extracted.findings} == {DefectType.stain}
 
 
-def test_extract_findings_keeps_cross_type_duplicates_by_default():
-    # CH034: 다른 유형 간 중복은 커밋 기본값(dedupe_cross_type=False)에서 드롭하지 않는다 —
-    # scratch.jpg 실측(DIRT_MARK/HOLE_TEAR가 같은 자리를 중복 검출)이 이제는 findings 2개로
-    # 그대로 노출돼야 한다.
+def test_extract_findings_dedupes_cross_type_duplicates_by_default():
+    # hotfix/472: dedupe_cross_type을 다시 기본 True로 되돌렸다(CH034가 껐던 걸 복귀) —
+    # scratch.jpg 실측(DIRT_MARK/HOLE_TEAR가 같은 자리를 중복 검출)처럼 겹치는 쌍은 이제
+    # 기본 설정만으로 낮은 confidence 쪽이 드롭돼야 한다.
     higher = _instance(DefectType.dirt_mark, _mask_at(4, 4), confidence=0.91)
     lower = _instance(DefectType.hole_tear, _mask_at(4, 4), confidence=0.79)
     result = _segmentation_result(0, [lower, higher], garment_mask=_full_mask())
@@ -327,12 +327,11 @@ def test_extract_findings_keeps_cross_type_duplicates_by_default():
 
     extracted = extract_findings([result], prompt_set, segmenter_config("mock"))
 
-    assert {f.defect_type for f in extracted.findings} == {
-        DefectType.dirt_mark,
-        DefectType.hole_tear,
-    }
+    assert len(extracted.findings) == 1
+    assert extracted.findings[0].defect_type == DefectType.dirt_mark
     kept = extracted.kept_instances_by_image[0]
-    assert higher in kept and lower in kept
+    assert higher in kept
+    assert lower not in kept
 
 
 def test_extract_findings_dedupes_cross_type_duplicates_when_enabled():
