@@ -1,9 +1,9 @@
 """quality_vlm.describer 검증 — build_describer 스왑 지점, attach_descriptions 배선.
 
-무거운 VLM 추론 자체(Qwen3VlDescriber.describe())는 torch가 필요해 여기서 검증하지
-않는다 — CI에서 도는 건 MockDescriber 경로와 attach_descriptions의 순수 로직(필터링·
-실패 격리·불변성)뿐이다. 실제 생성 품질은 AI/validation/QUAL/vlm-description-check/
-vlm_description_check.ipynb에서 확인한다.
+무거운 VLM 추론 자체(Qwen3VlDescriber.describe_batch())는 torch가 필요해 여기서 검증하지
+않는다 — CI에서 도는 건 MockDescriber 경로와 attach_descriptions의 순수 로직(이미지별
+그룹핑·실패 격리·불변성)뿐이다. 실제 생성 품질은
+`worker/validation/quality_vlm_batch_prompt_check.ipynb`에서 확인한다.
 """
 
 from PIL import Image
@@ -12,8 +12,6 @@ from quality_vlm.describer import (
     DescriberNotReady,
     MockDescriber,
     Qwen3VlDescriber,
-    _crop_finding,
-    _expand_bbox_to_min_size,
     attach_descriptions,
     build_describer,
 )
@@ -27,6 +25,7 @@ _SIZE = (200, 200)  # (height, width)
 def _finding(
     key: str,
     *,
+    no: int = 1,
     status: FindingStatus = FindingStatus.detected,
     image_index: int = 0,
     section: GarmentSection = GarmentSection.waist_left,
@@ -47,7 +46,7 @@ def _finding(
         matched_prompt="a stain on fabric",
         statement_required=True,
         needs_seller_review=False,
-        no=1,
+        no=no,
         label=label,
     )
 
@@ -83,40 +82,11 @@ def test_build_describer_rejects_unknown_backend():
         build_describer("no_such_backend")
 
 
-def test_mock_describer_returns_label_based_static_text():
+def test_mock_describer_returns_label_based_static_text_keyed_by_no():
     describer = MockDescriber()
-    finding = _finding("k1", label="구멍/찢어짐")
-    assert describer.describe(None, finding) == "구멍/찢어짐 발견"
-
-
-# --- _expand_bbox_to_min_size / _crop_finding ---------------------------------
-
-
-def test_expand_bbox_to_min_size_enforces_floor():
-    # 작은 bbox(10x10)는 min_size(160)까지 확장돼야 한다.
-    bbox_px = (95.0, 95.0, 105.0, 105.0)
-    x1, y1, x2, y2 = _expand_bbox_to_min_size(
-        bbox_px, pad_ratio=0.6, min_size=160, image_size=(200, 200)
-    )
-    assert (x2 - x1) >= 160
-    assert (y2 - y1) >= 160
-
-
-def test_expand_bbox_to_min_size_clamps_to_image_bounds():
-    bbox_px = (0.0, 0.0, 10.0, 10.0)
-    x1, y1, x2, y2 = _expand_bbox_to_min_size(
-        bbox_px, pad_ratio=0.6, min_size=160, image_size=(50, 50)
-    )
-    assert x1 >= 0 and y1 >= 0
-    assert x2 <= 50 and y2 <= 50
-
-
-def test_crop_finding_returns_image_crop_from_normalized_bbox():
-    result = _segmentation_result()
-    finding = _finding("k1", bbox=(0.4, 0.4, 0.6, 0.6))
-    crop = _crop_finding(result.base_image, finding, result.size)
-    assert isinstance(crop, Image.Image)
-    assert crop.size[0] > 0 and crop.size[1] > 0
+    findings = [_finding("k1", no=1, label="구멍/찢어짐"), _finding("k2", no=2, label="오염")]
+    result = describer.describe_batch(None, findings)
+    assert result == {1: "구멍/찢어짐 발견", 2: "오염 발견"}
 
 
 # --- attach_descriptions -------------------------------------------------------
@@ -124,29 +94,44 @@ def test_crop_finding_returns_image_crop_from_normalized_bbox():
 
 class _RecordingDescriber(DefectDescriber):
     def __init__(self):
-        self.calls: list[str] = []
+        self.calls: list[int] = []
 
-    def describe(self, image, finding):
-        self.calls.append(finding.key)
-        return f"{finding.label} 설명"
+    def describe_batch(self, image, findings):
+        self.calls.append(image.size[0] if image else None)
+        return {f.no: f"{f.label} 설명" for f in findings}
 
 
 class _FailingDescriber(DefectDescriber):
-    def describe(self, image, finding):
+    def describe_batch(self, image, findings):
         raise RuntimeError("boom")
 
 
-def test_attach_descriptions_only_processes_detected_findings():
-    detected = _finding("detected", status=FindingStatus.detected)
-    suspected = _finding("suspected", status=FindingStatus.suspected)
+def test_attach_descriptions_processes_detected_and_suspected_findings():
+    # hotfix/472: DETECTED만 처리하던 v1 범위 제한을 없앴다 — SUSPECTED도 설명이 붙는다.
+    detected = _finding("detected", no=1, status=FindingStatus.detected)
+    suspected = _finding("suspected", no=2, status=FindingStatus.suspected)
     describer = _RecordingDescriber()
 
     out = attach_descriptions([_segmentation_result()], [detected, suspected], describer)
 
-    assert describer.calls == ["detected"]
     by_key = {f.key: f for f in out}
     assert by_key["detected"].description == "얼룩 설명"
-    assert by_key["suspected"].description is None
+    assert by_key["suspected"].description == "얼룩 설명"
+
+
+def test_attach_descriptions_calls_describer_once_per_image_not_per_finding():
+    a = _finding("a", no=1, image_index=0)
+    b = _finding("b", no=2, image_index=0)
+    c = _finding("c", no=1, image_index=1)
+    describer = _RecordingDescriber()
+
+    attach_descriptions(
+        [_segmentation_result(image_index=0), _segmentation_result(image_index=1)],
+        [a, b, c],
+        describer,
+    )
+
+    assert len(describer.calls) == 2  # 이미지 2장 -> 호출 2번(finding 3건이어도)
 
 
 def test_attach_descriptions_leaves_original_findings_untouched():
@@ -160,17 +145,38 @@ def test_attach_descriptions_leaves_original_findings_untouched():
     assert out[0] is not finding
 
 
-def test_attach_descriptions_isolates_per_finding_failure():
-    ok = _finding("ok")
-    boom = _finding("boom")
-    describer = _FailingDescriber()
+def test_attach_descriptions_isolates_per_image_failure():
+    # 이미지 하나에서 describe_batch가 실패해도 다른 이미지의 finding은 영향받지 않는다.
+    ok = _finding("ok", no=1, image_index=0)
+    boom = _finding("boom", no=1, image_index=1)
 
-    out = attach_descriptions([_segmentation_result()], [ok, boom], describer)
+    class _MixedDescriber(DefectDescriber):
+        def describe_batch(self, image, findings):
+            if findings[0].image_index == 1:
+                raise RuntimeError("boom")
+            return {f.no: f"{f.label} 설명" for f in findings}
 
-    # 둘 다 describer가 실패하지만, 예외가 attach_descriptions 밖으로 새어나가지 않고
-    # 각 finding은 description=None으로 남아 나머지 처리를 막지 않는다.
-    assert len(out) == 2
-    assert all(f.description is None for f in out)
+    out = attach_descriptions(
+        [_segmentation_result(image_index=0), _segmentation_result(image_index=1)],
+        [ok, boom],
+        _MixedDescriber(),
+    )
+
+    by_key = {f.key: f for f in out}
+    assert by_key["ok"].description == "얼룩 설명"
+    assert by_key["boom"].description is None
+
+
+def test_attach_descriptions_leaves_missing_batch_number_as_none():
+    finding = _finding("k1", no=1)
+
+    class _IncompleteDescriber(DefectDescriber):
+        def describe_batch(self, image, findings):
+            return {}  # 이 번호는 못 받았다
+
+    out = attach_descriptions([_segmentation_result()], [finding], _IncompleteDescriber())
+
+    assert out[0].description is None
 
 
 def test_attach_descriptions_skips_finding_with_missing_image_result():

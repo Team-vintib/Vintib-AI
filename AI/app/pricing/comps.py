@@ -95,19 +95,30 @@ class CompsSource(ABC):
 
     `image_url`은 `internal_clip`(CH020, CLIP 이미지 유사도 검색)만 쓴다 — 텍스트 쿼리
     기반 백엔드(mock/llm_web_search)는 키워드를 받아도 무시한다. `product_id`는
-    `internal`(CH024, 실데이터 CLIP 임베딩 매칭)만 쓴다 — 이미 저장된 자기 임베딩을
-    조회하는 키다. 백엔드마다 필요한 입력이 다르다고 호출부(`service.py`)가 분기하게
-    만들지 않으려고 시그니처에 얹었다.
+    `internal`(CH024, 실데이터 CLIP 임베딩 매칭)이 이미 저장된 자기 임베딩을 조회하는 키로
+    쓰고, `internal_text`는 후보에서 자기 자신을 빼는 데만 쓴다(매칭 자체엔 안 씀).
+    `product_name`/`brand`/`category_id`는 `internal_text`(CH030) 전용이다 — BE 요청에
+    이미 있는 값을 그대로 받아써서, 등록 중(DRAFT) 상품처럼 BE 공개 API로 조회 안 되는
+    상품도 매칭할 수 있게 한다(원래는 `product_id`로 BE를 재조회했는데, DRAFT 상품은
+    본인 외엔 404라 가격 산정이 있어야 할 바로 그 시점에 항상 실패했다). 백엔드마다 필요한
+    입력이 다르다고 호출부(`service.py`)가 분기하게 만들지 않으려고 시그니처에 다 얹는다.
     """
 
     key: str
 
     @abstractmethod
     def fetch(
-        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+        self,
+        query: str,
+        *,
+        image_url: str | None = None,
+        product_id: int | None = None,
+        product_name: str | None = None,
+        brand: str | None = None,
+        category_id: int | None = None,
     ) -> CompsFetch:
-        """쿼리(+선택적 이미지/product_id)로 비교 매물을 모은다. 인프라 오류면
-        `CompsUnavailable`."""
+        """쿼리(+선택적 이미지/product_id/원본 상품 필드)로 비교 매물을 모은다. 인프라
+        오류면 `CompsUnavailable`."""
         raise NotImplementedError
 
 
@@ -121,7 +132,14 @@ class MockCompsSource(CompsSource):
     key = "mock"
 
     def fetch(
-        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+        self,
+        query: str,
+        *,
+        image_url: str | None = None,
+        product_id: int | None = None,
+        product_name: str | None = None,
+        brand: str | None = None,
+        category_id: int | None = None,
     ) -> CompsFetch:
         digest = hashlib.sha256(query.encode("utf-8")).digest()
         base = 40_000 + int.from_bytes(digest[:4], "big") % 60_000
@@ -154,7 +172,14 @@ class LlmWebSearchCompsSource(CompsSource):
         self._config = config or registry.comps_config(self.key)
 
     def fetch(
-        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+        self,
+        query: str,
+        *,
+        image_url: str | None = None,
+        product_id: int | None = None,
+        product_name: str | None = None,
+        brand: str | None = None,
+        category_id: int | None = None,
     ) -> CompsFetch:
         # 키 확인을 build가 아니라 fetch에서 하는 이유: 서비스 조립은 @lru_cache라
         # build 시점에 던지면 잘못 설정된 컨테이너가 모든 요청에 500을 뱉는다.
@@ -240,7 +265,14 @@ class InternalClipCompsSource(CompsSource):
         self._clip_config = registry.INTERNAL_CLIP_CONFIG
 
     def fetch(
-        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+        self,
+        query: str,
+        *,
+        image_url: str | None = None,
+        product_id: int | None = None,
+        product_name: str | None = None,
+        brand: str | None = None,
+        category_id: int | None = None,
     ) -> CompsFetch:
         if not image_url:
             return CompsFetch(
@@ -317,7 +349,14 @@ class InternalCompsSource(CompsSource):
         self._config = config or registry.comps_config(self.key)
 
     def fetch(
-        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+        self,
+        query: str,
+        *,
+        image_url: str | None = None,
+        product_id: int | None = None,
+        product_name: str | None = None,
+        brand: str | None = None,
+        category_id: int | None = None,
     ) -> CompsFetch:
         if product_id is None:
             return CompsFetch(
@@ -405,6 +444,12 @@ class InternalTextCompsSource(CompsSource):
     자유텍스트(상품명) → 브랜드+핵심 토큰 추출(당근마켓 1단계, CH031)은
     `attribute_extraction.build_attribute_extractor()`가 만드는 구현체(regex 기본값/llm
     옵트인)에 위임한다 — 이 클래스는 그 결과로 매칭 키만 조합한다.
+
+    ⚠️ **자기 상품 정보는 BE를 재조회하지 않고 요청에 실려온 `product_name`/`brand`/
+    `category_id`를 그대로 쓴다.** 예전엔 `product_id`로 `GET /api/products/{id}`를 다시
+    불렀는데, 그 엔드포인트는 DRAFT 상품을 본인 외엔 404로 막는다 — 가격 산정은 정확히
+    상품이 DRAFT인 등록 중 시점에 일어나므로, 그 방식은 실사용 시나리오에서 항상 실패했다
+    (실측 확인). `product_id`는 이제 코퍼스에서 자기 자신을 제외하는 용도로만 쓴다.
     """
 
     key = "internal_text"
@@ -413,12 +458,19 @@ class InternalTextCompsSource(CompsSource):
         self._config = config or registry.comps_config(self.key)
 
     def fetch(
-        self, query: str, *, image_url: str | None = None, product_id: int | None = None
+        self,
+        query: str,
+        *,
+        image_url: str | None = None,
+        product_id: int | None = None,
+        product_name: str | None = None,
+        brand: str | None = None,
+        category_id: int | None = None,
     ) -> CompsFetch:
-        if product_id is None:
+        if not product_name or category_id is None:
             return CompsFetch(
                 items=[],
-                notes=["상품 id가 없어 내부 시세 비교를 할 수 없습니다."],
+                notes=["상품명 또는 카테고리 정보가 없어 내부 시세 비교를 할 수 없습니다."],
                 reason=ReasonCode.no_image_provided,
             )
 
@@ -426,26 +478,17 @@ class InternalTextCompsSource(CompsSource):
 
         from app.pricing import attribute_extraction, hedge, product_corpus
         from app.pricing.product_match import build_match_keys
-        from app.shared import be_client
-
-        product = be_client.fetch_product(product_id, timeout=self._config["timeout_seconds"])
-        if product is None:
-            return CompsFetch(
-                items=[],
-                notes=["상품 정보를 조회할 수 없어 내부 시세 비교를 할 수 없습니다."],
-                reason=ReasonCode.insufficient_comps,
-            )
 
         extractor = attribute_extraction.build_attribute_extractor()
         extracted = extractor.extract(
-            product_name=product.title,
-            brand_name=product.brand,
+            product_name=product_name,
+            brand_name=brand,
             brand_alias_map=product_corpus.get_brand_alias_map(),
         )
         keys = build_match_keys(
             tokens=extracted.tokens,
             brand_id=extracted.brand_id,
-            category=str(product.category_id),
+            category=str(category_id),
         )
 
         candidates = product_corpus.find_by_match_key(
@@ -516,14 +559,36 @@ def build_comps_source(key: str | None = None) -> CompsSource:
 # --- 파싱 (네트워크 없이 테스트되는 순수 함수들) ------------------------------
 
 
+# 프롬프트 안 예시 하나(few-shot) — quality_vlm/prompts.py(CH019)가 실측으로 확인한 것과
+# 같은 문제(지시문만 있으면 모델이 경계 판단을 지어냄)에 대한 같은 처방이다. 브랜드가 한글로만
+# 주어져도 모델이 영문 표기까지 스스로 고려하게 만드는 것도 이 예시가 보여준다 — 국내 중고
+# 플랫폼(번개장터 등)은 명품·편집샵 브랜드를 영문 그대로 쓰는 매물이 흔해서, 한글 쿼리만
+# 그대로 검색하면 그런 매물을 놓친다.
+_COMPS_FEW_SHOT_QUERY = "메종키츠네 폭스헤드 니트 그레이"
+_COMPS_FEW_SHOT_ANSWER = (
+    '[{"title": "Maison Kitsune 폭스헤드 니트 그레이 M", "price": 95000, '
+    '"url": "https://web.joongna.com/product/123456", "listed_at": "2026-07-02", '
+    '"is_used": true}]'
+)
+
+
 def _comps_prompt(query: str) -> str:
     return (
-        f"'{query}' 의 **중고** 거래 시세를 웹에서 검색해라. "
-        "후르츠패밀리·번개장터·중고나라 등 중고 거래 매물을 우선한다.\n"
+        "너는 중고거래 시세 조사원이다. **목적은 이 상품과 동일한 상품(같은 브랜드 + 같은 "
+        "모델/디자인)의 실제 거래가를 찾는 것**이다 — 브랜드나 모델이 다르면 카테고리가 같아도"
+        " 시세 산정에 쓸모가 없으니 제외한다.\n\n"
+        f"검색 대상: '{query}'\n"
+        "후르츠패밀리·번개장터·중고나라 등 중고 거래 매물을 우선한다. 브랜드명이 한글로만"
+        " 주어졌으면 영어/원어 표기도 함께 고려해서 검색하고(국내 중고 플랫폼은 브랜드를 영문"
+        " 그대로 쓰는 매물이 많다), 반대로 영문이면 한글 표기도 같이 찾아본다.\n\n"
+        "아래는 좋은 답변 예시다.\n"
+        f"검색 대상: '{_COMPS_FEW_SHOT_QUERY}'\n"
+        f"답변: {_COMPS_FEW_SHOT_ANSWER}\n\n"
         "찾은 매물을 JSON 배열로만 답해라. 설명 문장은 쓰지 마라.\n"
         '형식: [{"title": "상품명", "price": 숫자(원, 쉼표 없이), "url": "링크", '
         '"listed_at": "YYYY-MM-DD 또는 빈 문자열", "is_used": true/false}]\n'
-        "가격을 확인할 수 없는 매물은 넣지 마라. 추측한 가격도 넣지 마라."
+        "가격을 확인할 수 없는 매물은 넣지 마라. 추측한 가격도 넣지 마라. 브랜드나 모델이"
+        " 다른(동일 상품이 아닌) 매물도 넣지 마라."
     )
 
 

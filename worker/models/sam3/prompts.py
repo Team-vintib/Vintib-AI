@@ -104,15 +104,24 @@ TEXTURE_BENIGN_PROMPTS: tuple[str, ...] = (
 BENIGN_PROMPTS: tuple[str, ...] = STRUCTURAL_BENIGN_PROMPTS + TEXTURE_BENIGN_PROMPTS
 
 # 하자 유형별 프롬프트. stain/dirt_mark/hole_tear 세 개는 LAB-12/LAB-46이 실측한 문구를
-# 그대로 쓴다(AI/validation/QUAL/qc_shared.py 의 "fabric" 세트와 동일 문자열). 나머지 셋은
-# 미검증 프롬프트다 — 짧은 명사구 스타일만 맞춰 둔다.
+# 그대로 쓴다(AI/validation/QUAL/qc_shared.py 의 "fabric" 세트와 동일 문자열).
+#
+# discoloration/pilling/fray(미검증 프롬프트)는 hotfix/472로 잠시 뺐다 — 검증 노트북
+# (sam3_qc_test_masking.ipynb)과 프로덕션 탐지 결과가 벌어지는 원인 중 하나가 프로덕션만
+# 이 3종을 추가로 돌리는 것이었다. `DefectType.discoloration`/`pilling`/`fray` 자체와
+# `registry.py`/`scoring.py`의 대응 항목은 그대로 둔다 — 나중에 재검증되면 여기 한 줄만
+# 다시 추가하면 된다.
+#
+# hotfix/472: dirt_mark("a dirty mark")는 한 차례 뺐다가 다시 되살렸다 — stain과 실물상
+# 같은 얼룩을 거의 항상 같이 잡는 문제(실측: 소매 STAIN bbox가 DIRT_MARK bbox에 크기만
+# 다르게 포함) 자체는 여전하지만, 프롬프트를 줄여 유형 구분(설명 다양성)을 잃는 대신
+# `findings.dedupe_cross_type_overlap()`에 포함 비율(containment) 기준을 추가해 크기
+# 차이가 큰 중복도 병합되게 했다(`registry.cross_type_containment_min` 참고) — 원인을
+# 프롬프트가 아니라 dedup 로직 쪽에서 고치는 쪽으로 방향을 바꿨다.
 _DEFECT_PROMPTS: tuple[tuple[str, DefectType], ...] = (
     ("a stain on fabric", DefectType.stain),
     ("a dirty mark", DefectType.dirt_mark),
     ("a hole or tear in fabric", DefectType.hole_tear),
-    ("a discolored faded area", DefectType.discoloration),
-    ("fabric pilling", DefectType.pilling),
-    ("a frayed edge", DefectType.fray),
 )
 
 

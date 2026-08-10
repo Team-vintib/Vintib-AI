@@ -15,6 +15,10 @@ public record PricingEstimateJobRequest(
         @JsonProperty("product_name") String productName,
         String brand,
         String category,
+        // AI 6종 GarmentCategory(category)와 별개로 BE 원본 categoryId도 그대로 보낸다 —
+        // internal_text comps 백엔드가 product_corpus(BE categoryId 기준 캐시)와 같은 체계로
+        // 매칭 키를 만드는 데 필요하다. 없으면 AI가 internal_text 매칭을 포기한다(CH0xx).
+        @JsonProperty("category_id") Long categoryId,
         @JsonProperty("condition_score") Double conditionScore,
         @JsonProperty("condition_grade") String conditionGrade) {
 }

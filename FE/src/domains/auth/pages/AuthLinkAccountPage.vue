@@ -113,13 +113,13 @@ const handleContinue = async () => {
       return
     }
 
-    authStore.setSession({
+    await authStore.establishSession({
       accessToken: response.data.accessToken,
       refreshToken: response.data.refreshToken,
-      user: { onboardingCompleted: response.data.onboardingCompleted ?? undefined },
+      id: response.data.id,
     })
     clearLinkAccountSession()
-    await moveAfterLink(response.data.onboardingCompleted)
+    await moveAfterLink()
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -151,8 +151,9 @@ const applyLinkAccountError = (code?: string, message?: string) => {
   submitError.value = message || '계정 연결을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
 }
 
-const moveAfterLink = async (onboardingCompleted: boolean | null) => {
-  if (onboardingCompleted === false) {
+const moveAfterLink = async () => {
+  // establishSession이 GET /api/users/{id}로 받아온 실제 온보딩 상태(037) 기준으로 분기한다.
+  if (authStore.user?.onboardingCompleted === false) {
     await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
     return
   }

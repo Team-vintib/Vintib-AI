@@ -72,6 +72,35 @@ def test_clean_comments_score_zero(text):
     assert result.label == "clean"
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "fuck this seller",
+        "what the FUCK is this price",  # 대문자 -- normalize()가 소문자화
+        "this is bullshit",  # 부분 문자열: "shit"
+        "you're such a bitch",
+        "asshole seller never responds",
+        "stop being a fucking asshole",
+    ],
+)
+def test_english_abuse_terms_exceed_threshold(text):
+    assert RuleBasedClassifier().score(text).score >= registry.ABUSE_THRESHOLD
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "this shirt looks great",  # "shit"의 상위 문자열이 아님(s-h-i-r-t) -- 오탐 방지 확인
+        "do you have a discount code",  # "cunt"와 글자 순서가 다름(c-o-u-n-t) -- 오탐 방지 확인
+        "thanks for the fast shipping",
+    ],
+)
+def test_english_clean_sentences_stay_clean(text):
+    result = RuleBasedClassifier().score(text)
+    assert result.score == 0.0
+    assert result.label == "clean"
+
+
 def test_result_label_names_the_matched_rule():
     assert RuleBasedClassifier().score("진짜 미친놈인가").label == "미친놈"
 
@@ -152,3 +181,56 @@ def test_hybrid_still_catches_short_dictionary_abuse():
     classifier = HybridClassifier(RuleBasedClassifier(), None)
     result = classifier.score("ㅂㅅ")
     assert result.score >= registry.ABUSE_THRESHOLD
+
+
+class _ExplodingModel:
+    """호출되면 바로 터지는 더미 -- "모델이 안 불렸다"를 검증하는 용도."""
+
+    def score(self, text: str):  # pragma: no cover - 호출되면 안 됨
+        raise AssertionError("화이트리스트에 걸려야 하는데 모델까지 호출됨")
+
+
+@pytest.mark.parametrize("text", ["ㅋㅋㅋㅋㅋ", "ㅋㅋㅋㅋㅋㅋㅋ", "ㅎㅎㅎㅎㅎㅎ"])
+def test_hybrid_collapses_repeats_before_length_gate(text):
+    # 실측: "ㅋㅋㅋㅋㅋ"(반복 접기 전 정규화 길이 5)는 길이 게이트를 피해 모델까지 가서
+    # 0.8645로 오탐했다. 반복 문자를 접은 길이로 게이트를 걸어야 한다 -- 실제 내용은
+    # "ㅋ" 하나뿐이니까.
+    classifier = HybridClassifier(RuleBasedClassifier(), _ExplodingModel())
+    result = classifier.score(text)
+    assert result.score == 0.0
+    assert result.label == "clean"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "이거 M 사이즈 있나요",
+        "이 색상도 있나요",
+        "그만 좀 하세요",
+        "도배 하지 마세요",
+        "광고 그만하세요",
+        "조용히 좀 해주세요",
+    ],
+)
+def test_hybrid_whitelists_safe_questions_and_moderation_requests(text):
+    # 실측: KcELECTRA가 정중한 질문/관리요청 문장까지 공격적으로 오인식했다(0.50~0.81).
+    # 같은 모델에서 진짜 은근한 모욕과 점수가 겹쳐서 임계값 조정으론 못 고치므로, 안전하다고
+    # 확인된 패턴 자체를 화이트리스트로 모델 호출 전에 우회시킨다.
+    classifier = HybridClassifier(RuleBasedClassifier(), _ExplodingModel())
+    result = classifier.score(text)
+    assert result.score == 0.0
+    assert result.label == "clean"
+
+
+def test_hybrid_whitelist_does_not_swallow_informal_indirect_insult():
+    # 화이트리스트는 정중한 "-나요/-까요" 질문형만 잡는다 -- 반말 의문형("~하냐")이나
+    # 서술형은 안 걸려서 사전에 없는 은근한 모욕은 여전히 모델로 넘어가야 한다.
+    class StubModel:
+        def score(self, text: str):
+            from app.chat.classifier import AbuseResult
+
+            return AbuseResult(score=0.9, label="offensive")
+
+    classifier = HybridClassifier(RuleBasedClassifier(), StubModel())
+    result = classifier.score("여자가 무슨 명품을 입고 방송을 하냐")
+    assert result.score == 0.9
