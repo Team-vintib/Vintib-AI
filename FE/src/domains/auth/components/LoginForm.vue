@@ -5,7 +5,6 @@ import { useRoute, useRouter } from 'vue-router'
 import googleLogoImage from '@/assets/images/google-logo.png'
 import { login } from '@/domains/auth/api/authApi'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import type { LoginResponse } from '@/domains/auth/types/auth.types'
 import { startGoogleOAuth } from '@/domains/auth/utils/googleOAuth'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/shared/constants/routes'
@@ -133,8 +132,8 @@ const handleSubmit = async () => {
       return
     }
 
-    authStore.setSession(response.data, form.rememberMe)
-    await moveAfterLogin(response.data)
+    await authStore.establishSession(response.data, form.rememberMe)
+    await moveAfterLogin()
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
 
@@ -175,24 +174,18 @@ const applyLoginError = (code?: string, message?: string) => {
   submitError.value = message || '이메일 또는 비밀번호를 확인해 주세요.'
 }
 
-const moveAfterLogin = async (loginResult: LoginResponse) => {
+const moveAfterLogin = async () => {
+  // establishSession이 GET /api/users/{id}로 받아온 실제 온보딩 상태(037) — 이 값으로
+  // 판단해야 재로그인 시에도 온보딩 미완료 회원을 온보딩 화면으로 돌려보낼 수 있다.
+  if (authStore.user?.onboardingCompleted === false) {
+    await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
+    return
+  }
+
   const redirectPath = getInternalRedirectPath()
 
   if (redirectPath) {
     await router.replace(redirectPath)
-    return
-  }
-
-  if (loginResult.nextStep === 'HOME') {
-    await router.replace(ROUTE_PATHS.HOME)
-    return
-  }
-
-  if (
-    loginResult.nextStep === 'ONBOARD_PROFILE' ||
-    loginResult.user?.onboardingCompleted === false
-  ) {
-    await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
     return
   }
 

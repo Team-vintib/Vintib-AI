@@ -87,14 +87,15 @@ const handleCallback = async () => {
       return
     }
 
-    authStore.setSession({
+    await authStore.establishSession({
       accessToken: response.data.accessToken,
       refreshToken: response.data.refreshToken,
-      user: { onboardingCompleted: response.data.onboardingCompleted ?? undefined },
+      id: response.data.id,
     })
     clearGoogleOAuthSource()
 
-    if (response.data.onboardingCompleted === false) {
+    // establishSession이 GET /api/users/{id}로 받아온 실제 온보딩 상태(037) 기준으로 분기한다.
+    if (authStore.user?.onboardingCompleted === false) {
       await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
       return
     }
