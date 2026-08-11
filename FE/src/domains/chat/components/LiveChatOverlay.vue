@@ -617,7 +617,7 @@ function isSuppressedRealtimeError(body: unknown) {
 .live-chat-overlay__collapsed {
   display: flex;
   position: absolute;
-  bottom: 20px;
+  bottom: 12px;
   left: 20px;
   align-items: center;
   gap: var(--space-2);
@@ -663,8 +663,8 @@ function isSuppressedRealtimeError(body: unknown) {
 .live-chat-overlay__reactions {
   display: flex;
   position: absolute;
-  bottom: 20px;
-  left: 372px;
+  bottom: 12px;
+  left: 432px;
   flex-direction: column;
   gap: var(--space-2);
   pointer-events: auto;
@@ -709,8 +709,8 @@ function isSuppressedRealtimeError(body: unknown) {
 
 .live-chat-overlay__reaction-burst {
   position: absolute;
-  bottom: 20px;
-  left: 372px;
+  bottom: 12px;
+  left: 432px;
   width: 76px;
   height: 156px;
   pointer-events: none;
@@ -732,12 +732,15 @@ function isSuppressedRealtimeError(body: unknown) {
   will-change: opacity, transform;
 }
 
+/* 채팅은 라이브에서 가장 자주 읽는 영역이라 창·글씨를 키워 잡았다. 폭을 바꾸면 아래
+   `__reactions`·`__reaction-burst`의 left(= 20 + 폭 + 12)도 같이 맞춰야 이모지 열이
+   패널 오른쪽에 붙는다. */
 .live-chat-overlay__panel {
   position: absolute;
-  bottom: 20px;
+  bottom: 12px;
   left: 20px;
-  width: 340px;
-  padding: 14px;
+  width: 400px;
+  padding: 16px;
   border: 1px solid var(--overlay-hairline);
   border-radius: var(--radius-control);
   background: rgba(8, 8, 8, 0.68);
@@ -746,7 +749,7 @@ function isSuppressedRealtimeError(body: unknown) {
 }
 
 .live-chat-overlay__messages {
-  height: 168px;
+  height: 220px;
   margin: 0 0 var(--space-2);
   overflow-y: auto;
   padding: 0 6px 0 0;
@@ -777,8 +780,8 @@ function isSuppressedRealtimeError(body: unknown) {
   flex: 0 0 auto;
   color: var(--color-live-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-badge);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
   letter-spacing: 0.06em;
   line-height: 1.5;
   text-transform: uppercase;
@@ -798,8 +801,8 @@ function isSuppressedRealtimeError(body: unknown) {
 
 .live-chat-overlay__message {
   color: #d8d4d0;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-light);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -827,8 +830,8 @@ function isSuppressedRealtimeError(body: unknown) {
   outline: 0;
   background: transparent;
   color: var(--color-live-text-primary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-light);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
   line-height: var(--line-height-snug);
   flex: 1;
 }
@@ -874,7 +877,11 @@ function isSuppressedRealtimeError(body: unknown) {
   }
 
   .live-chat-overlay__panel {
-    width: min(288px, calc(100% - 96px));
+    width: min(340px, calc(100% - 88px));
+  }
+
+  .live-chat-overlay__messages {
+    height: 180px;
   }
 
   .live-chat-overlay__reaction-burst {
