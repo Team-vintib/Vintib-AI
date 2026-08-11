@@ -808,11 +808,12 @@ onBeforeUnmount(() => {
   background: var(--color-live-background);
 }
 
+/* 상품 큐는 시청 화면과 같은 컴포넌트라 카드 크기도 같다 — 사이드바 폭도 맞춰 둔다. */
 .live-broadcast-page__body {
   display: grid;
   min-height: calc(100vh - var(--button-height-major));
   height: calc(100vh - var(--button-height-major));
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
 }
 
 /* 시청 화면과 동일: 영상(위) / 방송 정보·경매(아래) */
@@ -1084,7 +1085,7 @@ onBeforeUnmount(() => {
 .live-broadcast-loading__body {
   display: grid;
   min-height: calc(100vh - var(--button-height-major));
-  grid-template-columns: 240px minmax(0, 1fr) 360px;
+  grid-template-columns: 280px minmax(0, 1fr) 360px;
 }
 
 .live-broadcast-loading__body > aside {
@@ -1114,11 +1115,11 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1100px) {
   .live-broadcast-page__body {
-    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-columns: 240px minmax(0, 1fr);
   }
 
   .live-broadcast-loading__body {
-    grid-template-columns: 220px minmax(0, 1fr) 320px;
+    grid-template-columns: 240px minmax(0, 1fr) 320px;
   }
 }
 

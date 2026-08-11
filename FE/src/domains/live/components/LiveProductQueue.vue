@@ -105,7 +105,7 @@ const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
 .live-product-queue__header h2 {
   color: var(--color-live-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-2xs);
   font-weight: var(--font-weight-regular);
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -116,18 +116,21 @@ const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
   padding: 0 0 var(--space-3);
 }
 
+/* 카드 높이는 글씨 크기에 맞춰 잡은 값이다 — 제목 2줄(15px×1.35) + 브랜드 + 가격 + 상하
+   패딩 28px 기준. 글씨를 다시 키우면 여기도 같이 올려야 썸네일이 눌리지 않는다. */
 .live-product-queue__item {
   display: grid;
   width: 100%;
-  min-height: 90px;
+  min-height: 104px;
   min-width: 0;
   padding: 14px 16px;
   border: 0;
   border-bottom: 1px solid var(--color-live-surface);
   border-left: 3px solid transparent;
   background: transparent;
-  grid-template-columns: 45px minmax(0, 1fr);
+  grid-template-columns: 56px minmax(0, 1fr);
   gap: var(--space-3);
+  align-items: center;
   color: var(--color-live-text-primary);
   text-align: left;
   transition:
@@ -176,7 +179,7 @@ const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
   background: rgba(4, 6, 5, 0.62);
   color: var(--color-live-text-primary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs);
+  font-size: var(--font-size-badge);
   font-weight: var(--font-weight-medium);
   letter-spacing: 0.06em;
   white-space: nowrap;
@@ -186,13 +189,13 @@ const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
 .live-product-queue__image {
   display: grid;
   position: relative;
-  width: 45px;
-  height: 45px;
+  width: 56px;
+  height: 56px;
   overflow: hidden;
   border-radius: var(--radius-badge);
   background: var(--color-image-frame);
   color: var(--color-live-text-secondary);
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-xs);
   place-items: center;
 }
 
@@ -212,23 +215,26 @@ const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
   background: var(--color-accent);
   color: var(--color-primary-strong);
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs);
+  font-size: var(--font-size-badge);
   font-weight: var(--font-weight-medium);
   letter-spacing: 0.12em;
 }
 
+/* 제목이 1줄이든 2줄이든 카드 세로 가운데에 오게 한다 — 위로 쏠려 보이던 문제. */
 .live-product-queue__content {
   display: flex;
   min-width: 0;
   flex-direction: column;
+  justify-content: center;
+  gap: 2px;
 }
 
 .live-product-queue__content strong {
   display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-strong);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
   line-height: 1.35;
   letter-spacing: -0.01em;
   -webkit-box-orient: vertical;
@@ -238,8 +244,8 @@ const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
 .live-product-queue__content > span {
   overflow: hidden;
   color: var(--color-live-text-secondary);
-  font-size: var(--font-size-badge);
-  line-height: var(--line-height-tight);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -248,7 +254,7 @@ const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
   margin-top: 4px;
   color: var(--color-text-caption);
   font-family: var(--font-mono);
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-xs);
   letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
 }
@@ -286,13 +292,13 @@ const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
 
 .live-product-queue__empty strong {
   color: var(--color-live-text-primary);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-caption);
 }
 
 .live-product-queue__empty p {
-  max-width: 170px;
+  max-width: 200px;
   margin-top: 5px;
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-xs);
   line-height: var(--line-height-xs);
 }
 
@@ -314,7 +320,7 @@ const isSold = (product: LiveWatchProduct) => product.saleStatus === 'SOLD'
   }
 
   .live-product-queue__item {
-    flex: 0 0 215px;
+    flex: 0 0 260px;
   }
 
   .live-product-queue__item + .live-product-queue__item {

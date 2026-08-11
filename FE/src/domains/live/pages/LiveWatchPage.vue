@@ -1115,10 +1115,12 @@ onBeforeUnmount(() => {
   opacity: 0.92;
 }
 
+/* 사이드바 폭은 상품 큐 카드(썸네일 56px + 제목 15px 2줄)를 담는 값이다. 아래 로딩
+   스켈레톤의 첫 칸과 항상 같은 값을 써야 로딩→본화면 전환에서 칸이 튀지 않는다. */
 .live-watch-page__body {
   display: grid;
   min-height: calc(100vh - var(--button-height-major));
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
 }
 
 .live-watch-page__content {
@@ -1229,7 +1231,7 @@ onBeforeUnmount(() => {
 .live-watch-loading__body {
   display: grid;
   min-height: calc(100vh - var(--button-height-major));
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
 }
 
 .live-watch-loading__body > aside {
