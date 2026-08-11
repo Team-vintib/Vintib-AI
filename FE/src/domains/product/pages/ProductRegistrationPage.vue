@@ -1613,96 +1613,6 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
-          <section
-            v-if="currentStep.id === 'photos'"
-            class="product-registration__section product-registration__ai-model"
-            :class="{ 'product-registration__ai-model--disabled': !isAiModelSettingsAvailable }"
-            aria-labelledby="product-registration-ai-model-title"
-          >
-            <div class="product-registration__section-header">
-              <div>
-                <h3 id="product-registration-ai-model-title">AI 착용컷 설정</h3>
-                <p>
-                  업로드한 상품 사진을 바탕으로 AI 마네킹 착용 이미지를 생성해
-                  상품 상세 페이지에 추가로 보여줄 수 있어요.
-                </p>
-              </div>
-            </div>
-
-            <p
-              v-if="!isAiModelSettingsAvailable"
-              class="product-registration__ai-model-disabled-message"
-            >
-              앞면과 뒷면 이미지를 모두 등록하면 AI 착용컷을 설정할 수 있어요.
-            </p>
-
-            <div
-              class="product-registration__segmented"
-              role="radiogroup"
-              aria-label="AI 착용컷 사용 여부"
-            >
-              <button
-                type="button"
-                class="product-registration__option"
-                :class="{ 'product-registration__option--selected': !draft.aiModelEnabled }"
-                :disabled="!isAiModelSettingsAvailable"
-                :aria-pressed="!draft.aiModelEnabled"
-                @click="selectAiModelUsage(false)"
-              >
-                사용 안 함
-              </button>
-              <button
-                type="button"
-                class="product-registration__option"
-                :class="{ 'product-registration__option--selected': draft.aiModelEnabled }"
-                :disabled="!isAiModelSettingsAvailable"
-                :aria-pressed="draft.aiModelEnabled"
-                @click="selectAiModelUsage(true)"
-              >
-                사용함
-              </button>
-            </div>
-
-            <div v-if="draft.aiModelEnabled" class="product-registration__ai-model-choice">
-              <span>AI 모델 선택</span>
-              <div
-                class="product-registration__segmented"
-                role="radiogroup"
-                aria-label="AI 모델 선택"
-              >
-                <button
-                  type="button"
-                  class="product-registration__option"
-                  :class="{ 'product-registration__option--selected': draft.aiModelGender === 'FEMALE' }"
-                  :aria-pressed="draft.aiModelGender === 'FEMALE'"
-                  @click="selectAiModelGender('FEMALE')"
-                >
-                  여성
-                </button>
-                <button
-                  type="button"
-                  class="product-registration__option"
-                  :class="{ 'product-registration__option--selected': draft.aiModelGender === 'MALE' }"
-                  :aria-pressed="draft.aiModelGender === 'MALE'"
-                  @click="selectAiModelGender('MALE')"
-                >
-                  남성
-                </button>
-              </div>
-              <span
-                v-if="aiModelStepError"
-                class="product-registration__field-error"
-                role="alert"
-              >
-                {{ aiModelStepError }}
-              </span>
-              <p class="product-registration__field-hint">
-                AI 착용컷은 실제 착용 사진이 아닌 AI 생성 예시 이미지이며,
-                상품 상세 페이지에서 보조 이미지로 표시돼요.
-              </p>
-            </div>
-          </section>
-
           <form
             v-if="currentStep.id === 'photos' && canShowBasicInfoSection"
             class="product-registration__form"
@@ -1769,6 +1679,7 @@ onBeforeUnmount(() => {
                 <select
                   id="product-registration-color"
                   class="product-registration__select"
+                  :class="{ 'product-registration__select--ai-suggested': isColorAiSuggested }"
                   v-model="draft.color"
                   required
                   :aria-invalid="basicStepErrors.color ? 'true' : 'false'"
@@ -1836,6 +1747,7 @@ onBeforeUnmount(() => {
                 <select
                   id="product-registration-category-major"
                   class="product-registration__select"
+                  :class="{ 'product-registration__select--ai-suggested': isCategoryAiSuggested }"
                   v-model="categoryMajorId"
                   required
                   :disabled="majorCategoryOptions.length === 0"
@@ -2000,6 +1912,86 @@ onBeforeUnmount(() => {
               </div>
             </fieldset>
           </form>
+
+          <section
+            v-if="currentStep.id === 'photos' && canShowAttributesSection"
+            class="product-registration__section product-registration__ai-model"
+            aria-labelledby="product-registration-ai-model-title"
+          >
+            <div class="product-registration__section-header">
+              <div>
+                <h3 id="product-registration-ai-model-title">AI 착용컷 설정</h3>
+                <p>
+                  업로드한 상품 사진을 바탕으로 AI 마네킹 착용 이미지를 생성해
+                  상품 상세 페이지에 추가로 보여줄 수 있어요.
+                </p>
+              </div>
+            </div>
+
+            <div
+              class="product-registration__segmented"
+              role="radiogroup"
+              aria-label="AI 착용컷 사용 여부"
+            >
+              <button
+                type="button"
+                class="product-registration__option"
+                :class="{ 'product-registration__option--selected': !draft.aiModelEnabled }"
+                :aria-pressed="!draft.aiModelEnabled"
+                @click="selectAiModelUsage(false)"
+              >
+                사용 안 함
+              </button>
+              <button
+                type="button"
+                class="product-registration__option"
+                :class="{ 'product-registration__option--selected': draft.aiModelEnabled }"
+                :aria-pressed="draft.aiModelEnabled"
+                @click="selectAiModelUsage(true)"
+              >
+                사용함
+              </button>
+            </div>
+
+            <div v-if="draft.aiModelEnabled" class="product-registration__ai-model-choice">
+              <span>AI 모델 선택</span>
+              <div
+                class="product-registration__segmented"
+                role="radiogroup"
+                aria-label="AI 모델 선택"
+              >
+                <button
+                  type="button"
+                  class="product-registration__option"
+                  :class="{ 'product-registration__option--selected': draft.aiModelGender === 'FEMALE' }"
+                  :aria-pressed="draft.aiModelGender === 'FEMALE'"
+                  @click="selectAiModelGender('FEMALE')"
+                >
+                  여성
+                </button>
+                <button
+                  type="button"
+                  class="product-registration__option"
+                  :class="{ 'product-registration__option--selected': draft.aiModelGender === 'MALE' }"
+                  :aria-pressed="draft.aiModelGender === 'MALE'"
+                  @click="selectAiModelGender('MALE')"
+                >
+                  남성
+                </button>
+              </div>
+              <span
+                v-if="aiModelStepError"
+                class="product-registration__field-error"
+                role="alert"
+              >
+                {{ aiModelStepError }}
+              </span>
+              <p class="product-registration__field-hint">
+                AI 착용컷은 실제 착용 사진이 아닌 AI 생성 예시 이미지이며,
+                상품 상세 페이지에서 보조 이미지로 표시돼요.
+              </p>
+            </div>
+          </section>
 
           <form
             v-else-if="currentStep.id === 'condition'"
@@ -2759,9 +2751,9 @@ onBeforeUnmount(() => {
 
 .product-registration__steps li:not(:last-child)::after {
   position: absolute;
-  top: 17px;
-  left: calc(50% + 24px);
-  width: calc(100% - 48px);
+  top: 22px;
+  left: calc(50% + 29px);
+  width: calc(100% - 58px);
   height: 2px;
   background: var(--color-border);
   content: '';
@@ -2775,23 +2767,23 @@ onBeforeUnmount(() => {
   position: relative;
   z-index: var(--z-layer-1);
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border: 1px solid var(--color-border-input);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-muted);
   flex: 0 0 auto;
   font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
   place-items: center;
 }
 
 .product-registration__steps strong {
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-snug);
+  line-height: var(--line-height-comfortable);
   overflow-wrap: anywhere;
   word-break: keep-all;
 }
@@ -3079,6 +3071,7 @@ onBeforeUnmount(() => {
   font: inherit;
   transition:
     border-color var(--transition-base),
+    background-color var(--transition-base),
     box-shadow var(--transition-base);
 }
 
@@ -3101,6 +3094,16 @@ onBeforeUnmount(() => {
   min-height: 112px;
   padding: var(--space-3) var(--space-4);
   resize: vertical;
+}
+
+.product-registration__select--ai-suggested {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.product-registration__select--ai-suggested option {
+  color: var(--color-text-inverse);
 }
 
 .product-registration__price-input {
@@ -3216,19 +3219,6 @@ onBeforeUnmount(() => {
   margin-top: var(--space-1);
 }
 
-.product-registration__ai-model--disabled {
-  background: var(--color-surface-secondary);
-}
-
-.product-registration__ai-model-disabled-message {
-  padding: var(--space-3) var(--space-4);
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-control);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-button-small);
-  line-height: var(--line-height-control);
-}
-
 .product-registration__segmented {
   display: grid;
   gap: var(--space-3);
@@ -3261,12 +3251,16 @@ onBeforeUnmount(() => {
   background: var(--color-surface);
   color: var(--color-text-primary);
   font-weight: var(--font-weight-bold);
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 .product-registration__option--selected {
   border-color: var(--color-primary);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
 }
 
 .product-registration__option:disabled {
