@@ -8,12 +8,7 @@ import {
 } from '@/domains/tryon/constants/liveTryOnMockData'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { getMyTryOnProfile, saveMyTryOnProfile } from '@/domains/tryon/api/tryOnProfileApi'
-import {
-  createTryOnResult,
-  getTryOnResultDetail,
-  isTryOnResultApiEnabled,
-  saveTryOnResult,
-} from '@/domains/tryon/api/tryOnResultApi'
+import { saveTryOnResult } from '@/domains/tryon/api/tryOnResultApi'
 import { normalizeApiError } from '@/shared/api/http'
 import AppInlineNotice from '@/shared/components/AppInlineNotice.vue'
 
@@ -56,17 +51,10 @@ const isProfileLoading = ref(Boolean(authStore.user?.id))
 const fileError = ref('')
 const isResultSaved = ref(false)
 const isSavingResult = ref(false)
-// 새 시착 사진을 고르면 BE 프로필 저장이 끝나야 실 생성(createTryOnResult)이 그 사진을 쓴다 —
-// 저장이 끝나기 전에 "생성" 버튼을 누르면 옛 프로필 사진으로 시착이 생성될 수 있어 막는다.
-const isSavingProfilePhoto = ref(false)
 const shouldFailNextGeneration = ref(props.mockScenario === 'error')
 let previewObjectUrl: string | null = null
 let generationTimer: number | null = null
 let generationSequence = 0
-const TRYON_POLL_INTERVAL_MS = 2_000
-const TRYON_POLL_TIMEOUT_MS = 60_000
-
-const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 
 const displayedSourcePhoto = computed(() => generationPhotoUrl.value ?? selectedPhotoUrl.value)
 
@@ -167,8 +155,6 @@ const handleFileChange = async (event: Event) => {
     return
   }
 
-  isSavingProfilePhoto.value = true
-
   try {
     const nextProfile = await saveMyTryOnProfile(
       {
@@ -185,8 +171,6 @@ const handleFileChange = async (event: Event) => {
     tryOnProfile.value = nextProfile
   } catch (error) {
     fileError.value = normalizeApiError(error).message
-  } finally {
-    isSavingProfilePhoto.value = false
   }
 }
 
@@ -229,67 +213,8 @@ const startMockGeneration = (currentGeneration: number) => {
   }, LIVE_TRY_ON_GENERATION_DELAY_MS)
 }
 
-// 로그인한 회원이 실 API 모드일 때만 진짜 AI 시착 job을 접수·폴링한다. 비로그인이거나
-// mock 모드(로컬 개발, ?tryon= QA 시나리오 등)에서는 기존 mock 생성 흐름을 그대로 쓴다.
-const startRealGeneration = async (currentGeneration: number) => {
-  const shouldFail = shouldFailNextGeneration.value
-  shouldFailNextGeneration.value = false
-
-  if (shouldFail) {
-    if (currentGeneration === generationSequence) panelState.value = 'ERROR'
-    return
-  }
-
-  try {
-    let latest = await createTryOnResult(authStore.user?.id, props.product.id)
-    if (currentGeneration !== generationSequence) return
-
-    const deadline = Date.now() + TRYON_POLL_TIMEOUT_MS
-
-    while (
-      currentGeneration === generationSequence &&
-      latest.status !== 'SUCCESS' &&
-      latest.status !== 'FAILED' &&
-      Date.now() < deadline
-    ) {
-      await sleep(TRYON_POLL_INTERVAL_MS)
-      if (currentGeneration !== generationSequence) return
-
-      try {
-        latest = await getTryOnResultDetail(authStore.user?.id, latest.id)
-      } catch {
-        // 일시적 오류일 수 있다 — 다음 폴링에서 재시도.
-        continue
-      }
-      if (currentGeneration !== generationSequence) return
-    }
-
-    if (currentGeneration !== generationSequence) return
-
-    if (latest.status !== 'SUCCESS' || !latest.imageUrl) {
-      panelState.value = 'ERROR'
-      return
-    }
-
-    await preloadImage(latest.imageUrl)
-    if (currentGeneration !== generationSequence) return
-
-    generatedResult.value = latest
-    // BE의 POST /users/{id}/tryons가 접수와 동시에 결과를 저장한다(별도 저장 endpoint 없음,
-    // saveTryOnResult 참고) — 이미 저장된 결과이므로 "저장하기" 버튼을 누를 필요가 없다.
-    isResultSaved.value = true
-    panelState.value = 'RESULT'
-  } catch (error) {
-    if (currentGeneration !== generationSequence) return
-
-    fileError.value = normalizeApiError(error).message
-    panelState.value = 'ERROR'
-  }
-}
-
 const startGeneration = () => {
   if (!selectedPhotoUrl.value || panelState.value === 'GENERATING') return
-  if (isSavingProfilePhoto.value) return
 
   clearGenerationTimer()
   const currentGeneration = generationSequence
@@ -300,11 +225,7 @@ const startGeneration = () => {
   isSavingResult.value = false
   generatedResult.value = null
 
-  if (isTryOnResultApiEnabled() && authStore.user?.id) {
-    void startRealGeneration(currentGeneration)
-  } else {
-    startMockGeneration(currentGeneration)
-  }
+  startMockGeneration(currentGeneration)
 }
 
 const saveResult = async () => {
@@ -487,10 +408,6 @@ onBeforeUnmount(() => {
           {{ fileError }}
         </AppInlineNotice>
 
-        <AppInlineNotice v-if="isSavingProfilePhoto" class="live-try-on-panel__notice" variant="info">
-          등록 사진을 저장하는 중이에요. 잠시만 기다려 주세요.
-        </AppInlineNotice>
-
         <div class="live-try-on-panel__actions">
           <button
             type="button"
@@ -499,13 +416,8 @@ onBeforeUnmount(() => {
           >
             이미지 변경
           </button>
-          <button
-            type="button"
-            class="live-try-on-panel__button--primary"
-            :disabled="isSavingProfilePhoto"
-            @click="startGeneration"
-          >
-            {{ isSavingProfilePhoto ? '사진 저장 중' : 'AI 시착 시작' }}
+          <button type="button" class="live-try-on-panel__button--primary" @click="startGeneration">
+            AI 시착 시작
           </button>
         </div>
       </section>
