@@ -14,6 +14,10 @@ const props = withDefaults(
     tryOnDisabled?: boolean
     tryOnOpen?: boolean
     showTryOn?: boolean
+    // 우측 패널 진입 버튼 — 경매가 걸렸으면 '경매 참여', 아니면 '상품 보기' 하나만 띄운다.
+    showAuctionJoin?: boolean
+    showProductOpen?: boolean
+    productOpenDisabled?: boolean
     connectionLabel?: string
     showReminder?: boolean
     reminderActive?: boolean
@@ -23,6 +27,9 @@ const props = withDefaults(
     tryOnDisabled: false,
     tryOnOpen: false,
     showTryOn: true,
+    showAuctionJoin: false,
+    showProductOpen: false,
+    productOpenDisabled: false,
     connectionLabel: '',
     showReminder: false,
     reminderActive: false,
@@ -31,6 +38,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   openTryOn: []
+  openAuction: []
+  openProduct: []
   toggleReminder: []
 }>()
 
@@ -167,25 +176,59 @@ const stageMessage = computed(() => {
       {{ reminderActive ? '알림 받는 중' : '시작 알림 받기' }}
     </button>
 
-    <button
-      v-if="showTryOn && !tryOnOpen"
-      class="live-video-stage__try-on"
-      type="button"
-      :disabled="tryOnDisabled"
-      aria-label="선택한 상품 AI 시착"
-      :title="
-        tryOnDisabled
-          ? '라이브 중 선택한 상품이 있을 때 AI 시착을 이용할 수 있습니다.'
-          : '선택한 상품 AI 시착 열기'
-      "
-      @click="emit('openTryOn')"
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="m12 3 1.35 4.15L17.5 8.5l-4.15 1.35L12 14l-1.35-4.15L6.5 8.5l4.15-1.35L12 3Z" />
-        <path d="m18.5 14 0.8 2.2 2.2 0.8-2.2 0.8-0.8 2.2-0.8-2.2-2.2-0.8 2.2-0.8 0.8-2.2Z" />
-      </svg>
-      AI 시착
-    </button>
+    <!-- 우하단 액션 더미 — 경매 참여가 위, AI 시착이 아래. 한쪽이 안 뜨면 남은 하나가
+         그대로 우하단에 붙는다. -->
+    <div class="live-video-stage__actions">
+      <button
+        v-if="showProductOpen"
+        class="live-video-stage__try-on"
+        type="button"
+        :disabled="productOpenDisabled"
+        title="선택한 상품 정보 열기"
+        @click="emit('openProduct')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 7h12l-1 13H7L6 7Z" />
+          <path d="M9 7a3 3 0 0 1 6 0" />
+        </svg>
+        상품 보기
+      </button>
+
+      <button
+        v-if="showAuctionJoin"
+        class="live-video-stage__auction"
+        type="button"
+        title="진행 중인 경매 열기"
+        @click="emit('openAuction')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m14 6-6 6 3 3 6-6-3-3Z" />
+          <path d="m16.5 3.5 4 4" />
+          <path d="M4 20h9" />
+        </svg>
+        경매 참여
+      </button>
+
+      <button
+        v-if="showTryOn && !tryOnOpen"
+        class="live-video-stage__try-on"
+        type="button"
+        :disabled="tryOnDisabled"
+        aria-label="선택한 상품 AI 시착"
+        :title="
+          tryOnDisabled
+            ? '라이브 중 선택한 상품이 있을 때 AI 시착을 이용할 수 있습니다.'
+            : '선택한 상품 AI 시착 열기'
+        "
+        @click="emit('openTryOn')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m12 3 1.35 4.15L17.5 8.5l-4.15 1.35L12 14l-1.35-4.15L6.5 8.5l4.15-1.35L12 3Z" />
+          <path d="m18.5 14 0.8 2.2 2.2 0.8-2.2 0.8-0.8 2.2-0.8-2.2-2.2-0.8 2.2-0.8 0.8-2.2Z" />
+        </svg>
+        AI 시착
+      </button>
+    </div>
   </section>
 </template>
 
@@ -315,12 +358,20 @@ const stageMessage = computed(() => {
   outline-offset: 2px;
 }
 
-.live-video-stage__try-on {
-  display: inline-flex;
+.live-video-stage__actions {
+  display: flex;
   position: absolute;
   z-index: var(--z-layer-2);
   right: var(--space-4);
   bottom: var(--space-4);
+  align-items: flex-end;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.live-video-stage__auction,
+.live-video-stage__try-on {
+  display: inline-flex;
   min-height: var(--button-height-compact);
   width: 108px;
   align-items: center;
@@ -337,6 +388,32 @@ const stageMessage = computed(() => {
   transition:
     background-color var(--transition-base),
     color var(--transition-base);
+}
+
+/* 경매 참여는 지금 눌러야 하는 행동이라 채워진 버튼으로 둔다(AI 시착은 테두리형). */
+.live-video-stage__auction {
+  border-color: var(--color-auction);
+  background: var(--color-auction);
+  color: var(--color-primary-strong);
+}
+
+.live-video-stage__auction:hover {
+  opacity: 0.92;
+}
+
+.live-video-stage__auction svg {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.live-video-stage__auction:focus-visible {
+  outline: 1px solid var(--color-primary-strong);
+  outline-offset: 2px;
 }
 
 .live-video-stage__try-on:hover:not(:disabled) {

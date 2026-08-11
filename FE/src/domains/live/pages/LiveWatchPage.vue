@@ -92,8 +92,14 @@ const purchasePointBalance = ref<number | null>(null)
 const purchaseInitialAddress = ref<OrderAddressInput | null>(null)
 const purchaseErrorMessage = ref('')
 const purchaseMessage = ref('')
+// 영상 오른쪽 패널 하나를 상품/경매/시착이 돌려 쓴다. 위쪽 "상품 소개"는 어느 모드에서도
+// 그대로 남고 아래 내용만 바뀐다 — 지금 무슨 상품을 보고 있는지 놓치지 않게 하려는 배치.
+type SidePanelMode = 'product' | 'auction'
+
+const isSidePanelOpen = ref(false)
+const sidePanelMode = ref<SidePanelMode>('product')
+// AI 시착은 패널 안이 아니라 화면을 덮는 별도 창으로 띄운다.
 const isTryOnOpen = ref(false)
-const isInfoCollapsed = ref(false)
 const now = ref(Date.now())
 const auctionSnapshot = ref<AuctionSnapshot | null>(null)
 const isAuctionLoading = ref(false)
@@ -251,6 +257,14 @@ const isSelectedProductOnAuction = computed(() => {
   )
 })
 
+// 경매 스냅샷은 라이브에 하나뿐이라 다른 상품의 낙찰·유찰 결과까지 들고 있다. 지금 고른 상품의
+// 경매가 아니면 없는 것으로 본다 — 안 그러면 A상품 유찰 결과가 B상품 화면에 그대로 남는다.
+const selectedProductAuction = computed(() => {
+  const snapshot = auctionSnapshot.value
+
+  return snapshot && snapshot.productId === selectedProductId.value ? snapshot : null
+})
+
 // 패널은 시청자가 고른 상품을 기준으로 가른다. 경매 상품이 아니면 정찰제 구매 패널을 띄우고,
 // saleType이 null로 와도 가격이 붙어 있으면 정찰제로 본다 — 실제 구매 가능 여부는
 // LiveDirectSalePanel이 saleStatus/price로 다시 막는다.
@@ -326,6 +340,8 @@ const loadLiveWatch = async () => {
   purchaseProductId.value = null
   isPurchaseDialogOpen.value = false
   purchaseMessage.value = ''
+  isSidePanelOpen.value = false
+  sidePanelMode.value = 'product'
   isTryOnOpen.value = false
   loadState.value = 'loading'
   errorMessage.value = ''
@@ -455,6 +471,7 @@ const enterStartedAuction = () => {
 
   if (started) {
     selectedProductId.value = started.productId
+    openAuctionPanel()
   }
 }
 
@@ -664,11 +681,29 @@ const toggleWish = async () => {
   }
 }
 
+const openSidePanel = (mode: SidePanelMode) => {
+  sidePanelMode.value = mode
+  isSidePanelOpen.value = true
+}
+
+const openAuctionPanel = () => {
+  isTryOnOpen.value = false
+  openSidePanel('auction')
+}
+
 const openTryOn = () => {
   if (!isTryOnAvailable.value) return
 
   isTryOnOpen.value = true
 }
+
+// 보고 있던 상품에 경매가 걸리면(판매자가 시작) 열려 있는 패널을 경매로 돌린다.
+// 시착 중일 때는 뺏지 않는다 — 사용자가 직접 '경매 참여'를 누르게 둔다.
+watch(isSelectedProductOnAuction, (isOnAuction) => {
+  if (isOnAuction && isSidePanelOpen.value && sidePanelMode.value === 'product') {
+    sidePanelMode.value = 'auction'
+  }
+})
 
 const updateViewerCount = (viewerCount: number) => {
   if (!live.value) return
@@ -809,6 +844,10 @@ watch(isTryOnAvailable, (isAvailable) => {
 watch(selectedProductId, () => {
   wishMessage.value = ''
   purchaseMessage.value = ''
+  // 우측 패널은 고른 상품을 따라간다 — 그 상품에 경매가 걸려 있으면 경매, 아니면 상품 정보.
+  // 시착은 이전 상품 기준이라 함께 닫는다.
+  sidePanelMode.value = selectedProductAuction.value ? 'auction' : 'product'
+  isTryOnOpen.value = false
 })
 
 const elapsedTimer = window.setInterval(() => {
@@ -832,9 +871,7 @@ onBeforeUnmount(() => {
         <aside></aside>
         <main>
           <div></div>
-          <div></div>
         </main>
-        <aside></aside>
       </div>
     </div>
 
@@ -868,7 +905,10 @@ onBeforeUnmount(() => {
       />
 
       <div class="live-watch-page__body">
+        <!-- 사이드바는 상품 큐만 쓴다 — 상품 상세·구매 수단은 영상 오른쪽 패널로 모았다.
+             큐는 화면 높이를 다 쓰고, 상품이 넘치면 이 칸 안에서만 스크롤한다. -->
         <LiveProductQueue
+          class="live-watch-page__queue"
           :products="live.products"
           :current-product-id="live.currentProductId"
           :selected-product-id="selectedProductId"
@@ -876,24 +916,28 @@ onBeforeUnmount(() => {
           @select="selectQueueProduct"
         />
 
-        <main
-          class="live-watch-page__content"
-          :class="{ 'live-watch-page__content--info-collapsed': isInfoCollapsed }"
-        >
+        <main class="live-watch-page__content">
           <div
             class="live-watch-page__stage"
-            :class="{ 'live-watch-page__stage--try-on': isTryOnOpen }"
+            :class="{
+              'live-watch-page__stage--side': isSidePanelOpen || isTryOnOpen,
+            }"
           >
+            <!-- 패널이 닫혀 있을 때만 진입 버튼을 띄운다. 경매가 걸린 상품이면 '경매 참여',
+                 아니면 '상품 보기' 하나만 남겨 시선을 나누지 않는다. -->
             <LiveVideoStage
               :title="live.title"
               :poster-url="live.posterUrl"
               :status="live.status"
               :live-id="live.id"
-              :try-on-disabled="!isTryOnAvailable"
-              :try-on-open="isTryOnOpen"
+              :show-try-on="false"
+              :show-product-open="!isSidePanelOpen && !isSelectedProductOnAuction"
+              :product-open-disabled="selectedProduct === null"
+              :show-auction-join="!isSidePanelOpen && isSelectedProductOnAuction"
               :show-reminder="live.status === 'SCHEDULED'"
               :reminder-active="live.isReminderSet"
-              @open-try-on="openTryOn"
+              @open-product="openSidePanel('product')"
+              @open-auction="openAuctionPanel"
               @toggle-reminder="handleToggleReminder"
             >
               <template #overlay>
@@ -907,14 +951,100 @@ onBeforeUnmount(() => {
               </template>
             </LiveVideoStage>
 
-            <LiveTryOnPanel
-              v-if="selectedProduct"
-              v-show="isTryOnOpen"
-              class="live-watch-page__try-on"
-              :product="selectedProduct"
-              :mock-scenario="tryOnMockScenario"
-              @close="isTryOnOpen = false"
-            />
+            <!-- 영상 오른쪽 패널. 평소엔 상품 소개 + (정찰제 구매 | 경매)이고,
+                 AI 시착을 열면 그 내용이 통째로 빠지고 같은 칸을 시착이 다 쓴다. -->
+            <aside v-if="isSidePanelOpen || isTryOnOpen" class="live-watch-page__side">
+              <div class="live-watch-page__side-bar">
+                <strong>{{
+                  isTryOnOpen ? 'AI 시착' : sidePanelMode === 'auction' ? '실시간 경매' : '상품 정보'
+                }}</strong>
+                <button
+                  type="button"
+                  class="live-watch-page__side-icon"
+                  aria-label="패널 닫기"
+                  title="패널 닫기"
+                  @click="isSidePanelOpen = false"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div
+                class="live-watch-page__side-body"
+                :class="{ 'live-watch-page__side-body--full': isTryOnOpen }"
+              >
+                <LiveTryOnPanel
+                  v-if="isTryOnOpen && selectedProduct"
+                  class="live-watch-page__side-content"
+                  :product="selectedProduct"
+                  :mock-scenario="tryOnMockScenario"
+                  @close="isTryOnOpen = false"
+                />
+
+                <template v-else>
+                <LiveSelectedProduct
+                  :product="selectedProduct"
+                  :detail="selectedProductDetail"
+                  :compact="sidePanelMode === 'auction'"
+                  :is-wished="isSelectedProductWished"
+                  :is-wish-pending="pendingWishProductId === selectedProductId"
+                  :wish-message="wishMessage"
+                  @view-product="goToProduct"
+                  @toggle-wish="toggleWish"
+                />
+
+                <LiveAuctionPanel
+                  v-if="sidePanelMode === 'auction'"
+                  class="live-watch-page__side-content"
+                  :snapshot="selectedProductAuction"
+                  :live-status="live.status"
+                  :is-loading="isAuctionLoading"
+                  :load-error="auctionLoadError"
+                  @snapshot-change="applyAuctionSnapshot"
+                />
+
+                <LiveDirectSalePanel
+                  v-else-if="selectedProduct && isDirectSaleSelected"
+                  class="live-watch-page__side-content"
+                  :product="selectedProduct"
+                  :live-status="live.status"
+                  :is-host="live.isHost"
+                  :message="purchaseMessage"
+                  @purchase="openDirectPurchase"
+                />
+
+                <!-- 경매 예정 상품 — 정찰제 슬라이더와 같은 모양이되 밀 수 없게 회색으로 잠근다. -->
+                <div
+                  v-else-if="selectedProduct && isAuctionProduct(selectedProduct)"
+                  class="live-watch-page__side-content live-watch-page__auction-note"
+                >
+                  <span class="live-watch-page__auction-slider" role="img" aria-label="경매 예정">
+                    <span class="live-watch-page__auction-thumb" aria-hidden="true"></span>
+                    <span>경매 예정</span>
+                  </span>
+                </div>
+                </template>
+              </div>
+
+              <!-- 시착 중이면 되돌아갈 곳(경매 중이면 바로 경매)을, 아니면 시착으로 갈 버튼을 둔다. -->
+              <button
+                v-if="isTryOnOpen"
+                type="button"
+                class="live-watch-page__side-switch"
+                :class="{ 'live-watch-page__side-switch--auction': isSelectedProductOnAuction }"
+                @click="isSelectedProductOnAuction ? openAuctionPanel() : (isTryOnOpen = false)"
+              >
+                {{ isSelectedProductOnAuction ? '경매 참여' : '상품 정보' }}
+              </button>
+              <button
+                v-else-if="isTryOnAvailable"
+                type="button"
+                class="live-watch-page__side-switch"
+                @click="openTryOn"
+              >
+                AI 시착
+              </button>
+            </aside>
 
             <LiveAuctionResultOverlay
               v-if="auctionWin"
@@ -931,59 +1061,6 @@ onBeforeUnmount(() => {
             />
           </div>
 
-          <div class="live-watch-page__details">
-            <div v-show="!isInfoCollapsed" class="live-watch-page__details-body">
-              <button
-                type="button"
-                class="live-watch-page__details-close"
-                aria-label="정보 패널 접기"
-                title="정보 패널 접기"
-                @click="isInfoCollapsed = true"
-              >
-                ×
-              </button>
-              <LiveSelectedProduct
-                :product="selectedProduct"
-                :detail="selectedProductDetail"
-                :is-wished="isSelectedProductWished"
-                :is-wish-pending="pendingWishProductId === selectedProductId"
-                :wish-message="wishMessage"
-                @view-product="goToProduct"
-                @toggle-wish="toggleWish"
-              />
-              <LiveDirectSalePanel
-                v-if="selectedProduct && isDirectSaleSelected"
-                :product="selectedProduct"
-                :live-status="live.status"
-                :is-host="live.isHost"
-                :message="purchaseMessage"
-                @purchase="openDirectPurchase"
-              />
-              <LiveAuctionPanel
-                v-else
-                :snapshot="auctionSnapshot"
-                :live-status="live.status"
-                :is-loading="isAuctionLoading"
-                :load-error="auctionLoadError"
-                @snapshot-change="applyAuctionSnapshot"
-              />
-            </div>
-
-            <button
-              v-show="isInfoCollapsed"
-              type="button"
-              class="live-watch-page__details-reopen"
-              aria-label="정보 패널 펼치기"
-              title="정보 패널 펼치기"
-              @click="isInfoCollapsed = false"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 11v5" />
-                <circle cx="12" cy="7.8" r="0.9" fill="currentColor" stroke="none" />
-              </svg>
-            </button>
-          </div>
         </main>
       </div>
     </div>
@@ -1042,8 +1119,11 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped lang="scss">
+/* 라이브는 한 화면 안에서 끝나야 한다 — 페이지가 세로로 늘어나 스크롤이 생기지 않도록
+   높이를 뷰포트에 고정하고, 넘치는 부분은 각 칸이 자기 안에서 스크롤한다(상품 큐 등). */
 .live-watch-page {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--color-live-background);
 }
 
@@ -1115,23 +1195,173 @@ onBeforeUnmount(() => {
   opacity: 0.92;
 }
 
+/* 사이드바 폭은 상품 큐 카드(썸네일 56px + 제목 15px 2줄)를 담는 값이다. 아래 로딩
+   스켈레톤의 첫 칸과 항상 같은 값을 써야 로딩→본화면 전환에서 칸이 튀지 않는다. */
 .live-watch-page__body {
   display: grid;
-  min-height: calc(100vh - var(--button-height-major));
-  grid-template-columns: 220px minmax(0, 1fr);
+  height: calc(100vh - var(--button-height-major));
+  min-height: 0;
+  grid-template-columns: 280px minmax(0, 1fr);
 }
 
+/* 큐가 사이드바 전체를 쓴다 — 상품이 화면을 넘치면 이 칸 안에서만 스크롤한다. */
+.live-watch-page__queue {
+  min-height: 0;
+}
+
+/* 우측 패널 — 제목 줄 / 내용(상품 소개 + 모드별) / 전환 버튼 3단. */
+.live-watch-page__side {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border-left: 1px solid var(--color-live-border);
+  background: var(--color-live-background);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.live-watch-page__side-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 10px 10px 10px 16px;
+  border-bottom: 1px solid var(--color-live-border);
+  background: var(--color-live-surface);
+}
+
+.live-watch-page__side-bar strong {
+  margin-right: auto;
+  color: var(--color-live-text-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+}
+
+.live-watch-page__side-icon {
+  display: grid;
+  width: var(--badge-height-lg);
+  height: var(--badge-height-lg);
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-live-text-primary);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  place-items: center;
+}
+
+.live-watch-page__side-icon:hover {
+  background: rgba(242, 240, 237, 0.12);
+}
+
+.live-watch-page__side-icon:focus-visible {
+  outline: 2px solid var(--color-primary-strong);
+  outline-offset: 2px;
+}
+
+.live-watch-page__side-icon svg {
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+/* 상품 소개가 남는 세로 공간을 흡수하고(사진이 늘어난다), 구매·경매 블록은 제 높이만 쓴다.
+   그래야 아래쪽에 죽은 여백이 남지 않는다. */
+.live-watch-page__side-body {
+  display: grid;
+  min-height: 0;
+  overflow-y: auto;
+  grid-template-rows: minmax(0, 1fr) auto;
+  scrollbar-color: var(--overlay-scrollbar) transparent;
+  scrollbar-width: thin;
+}
+
+/* AI 시착은 이 칸을 통째로 쓴다 — 상품 소개·구매/경매는 그동안 빠진다. */
+.live-watch-page__side-body--full {
+  align-content: stretch;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.live-watch-page__side-content {
+  min-height: 0;
+}
+
+.live-watch-page__side-switch {
+  min-height: var(--button-height-compact);
+  margin: 0 16px 16px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-accent);
+  font-size: var(--font-size-button-small);
+  font-weight: var(--font-weight-bold);
+}
+
+.live-watch-page__side-switch:hover {
+  background: var(--color-accent);
+  color: var(--color-primary-strong);
+}
+
+.live-watch-page__side-switch--auction {
+  border-color: var(--color-auction);
+  background: var(--color-auction);
+  color: var(--color-primary-strong);
+}
+
+.live-watch-page__side-switch--auction:hover {
+  background: var(--color-auction);
+  color: var(--color-primary-strong);
+  opacity: 0.92;
+}
+
+/* 경매 예정 자리 — 정찰제의 '밀어서 구매'와 같은 모양(손잡이 포함)이되,
+   회색으로 잠가 밀 수 없는 상태임을 모양만으로 알린다. */
+.live-watch-page__auction-note {
+  padding: 0 15px 15px;
+}
+
+.live-watch-page__auction-slider {
+  display: grid;
+  position: relative;
+  height: var(--button-height-compact);
+  overflow: hidden;
+  border: 1px solid var(--color-live-border);
+  border-radius: 999px;
+  background: var(--color-live-background);
+  opacity: 0.65;
+  place-items: center;
+}
+
+.live-watch-page__auction-slider > span {
+  padding-left: 42px;
+  color: var(--color-live-text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.live-watch-page__auction-thumb {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-live-border);
+  box-shadow: 0 0 0 2px var(--color-live-background);
+  transform: translateY(-50%);
+}
+
+/* 영상이 세로를 전부 쓴다 — 하단 정보/경매 칸은 사이드바와 우측 패널로 옮겨 없앴다. */
 .live-watch-page__content {
   display: grid;
   min-width: 0;
   min-height: 0;
   height: calc(100vh - var(--button-height-major));
-  grid-template-rows: minmax(340px, 1fr) 260px;
-  transition: grid-template-rows 0.2s ease;
-}
-
-.live-watch-page__content--info-collapsed {
-  grid-template-rows: minmax(340px, 1fr) 56px;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .live-watch-page__stage {
@@ -1140,77 +1370,17 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  /* grid-template-columns에는 transition을 걸지 않는다 — minmax(0,1fr)가 섞인 트랙은
+     보간이 되지 않아 값이 옛 폭에 멈춘 채 남는다(접기 눌러도 칸이 안 줄어듦). */
   grid-template-columns: minmax(0, 1fr);
 }
 
-.live-watch-page__stage--try-on {
-  grid-template-columns: minmax(0, 1fr) 530px;
+/* 상품/경매/시착이 돌려 쓰는 오른쪽 칸. 영상이 최대한 넓게 남도록 내용이 들어가는 선까지만 준다. */
+.live-watch-page__stage--side {
+  grid-template-columns: minmax(0, 1fr) 440px;
 }
 
-.live-watch-page__details {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
-}
-
-.live-watch-page__details-body {
-  display: grid;
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  grid-template-columns: minmax(0, 1fr) 380px;
-}
-
-.live-watch-page__details-close {
-  display: grid;
-  position: absolute;
-  z-index: var(--z-layer-2);
-  top: 8px;
-  right: 8px;
-  width: var(--badge-height-lg);
-  height: var(--badge-height-lg);
-  border: 0;
-  border-radius: 50%;
-  background: rgba(8, 8, 8, 0.7);
-  color: var(--color-live-text-primary);
-  font-size: var(--font-size-lg);
-  line-height: 1;
-  place-items: center;
-  backdrop-filter: blur(8px);
-}
-
-.live-watch-page__details-reopen {
-  display: grid;
-  position: absolute;
-  z-index: var(--z-layer-2);
-  right: 12px;
-  bottom: 12px;
-  width: 48px;
-  height: 48px;
-  border: 2px solid var(--color-error);
-  border-radius: 50%;
-  background: rgba(8, 8, 8, 0.7);
-  color: var(--color-live-text-primary);
-  place-items: center;
-  backdrop-filter: blur(8px);
-}
-
-.live-watch-page__details-reopen svg {
-  width: 26px;
-  height: 26px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
-}
-
-.live-watch-page__details-close:focus-visible,
-.live-watch-page__details-reopen:focus-visible {
-  outline: 2px solid var(--color-primary-strong);
-  outline-offset: 2px;
-}
-
+/* 접었을 때 — 제목 줄만 남으므로 칸도 같이 좁힌다. */
 .live-watch-loading {
   min-height: 100vh;
   background: var(--color-live-background);
@@ -1229,7 +1399,7 @@ onBeforeUnmount(() => {
 .live-watch-loading__body {
   display: grid;
   min-height: calc(100vh - var(--button-height-major));
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
 }
 
 .live-watch-loading__body > aside {
@@ -1239,7 +1409,7 @@ onBeforeUnmount(() => {
 
 .live-watch-loading__body > main {
   display: grid;
-  grid-template-rows: minmax(340px, 1fr) 290px;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .live-watch-loading__body > main > div {
@@ -1250,11 +1420,6 @@ onBeforeUnmount(() => {
   animation: live-watch-shimmer 1.6s infinite linear;
 }
 
-.live-watch-loading__body > main > div + div {
-  border-top: 1px solid var(--color-live-border);
-  background-color: var(--color-live-surface);
-}
-
 @keyframes live-watch-shimmer {
   to {
     background-position-x: -200%;
@@ -1262,12 +1427,8 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1100px) {
-  .live-watch-page__stage--try-on {
-    grid-template-columns: minmax(0, 1fr) minmax(400px, 50%);
-  }
-
-  .live-watch-page__details-body {
-    grid-template-columns: minmax(0, 1fr) 320px;
+  .live-watch-page__stage--side {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 44%);
   }
 }
 
@@ -1279,11 +1440,11 @@ onBeforeUnmount(() => {
 
   .live-watch-page__content {
     height: auto;
-    grid-template-rows: var(--surface-min-height-lg) auto;
+    grid-template-rows: var(--surface-min-height-lg);
   }
 
   .live-watch-page__stage,
-  .live-watch-page__stage--try-on {
+  .live-watch-page__stage--side {
     display: block;
   }
 
@@ -1291,14 +1452,12 @@ onBeforeUnmount(() => {
     height: 100%;
   }
 
-  .live-watch-page__try-on {
+  /* 좁은 화면에서는 옆에 붙일 자리가 없어 영상 위에 덮어 띄운다. */
+  .live-watch-page__side {
     position: absolute;
     z-index: 4;
     inset: 0;
-  }
-
-  .live-watch-page__details-body {
-    grid-template-columns: minmax(0, 1fr);
+    height: auto;
   }
 
   .live-watch-loading__body > aside {
@@ -1308,7 +1467,7 @@ onBeforeUnmount(() => {
   }
 
   .live-watch-loading__body > main {
-    grid-template-rows: var(--surface-min-height-lg) 180px;
+    grid-template-rows: var(--surface-min-height-lg);
   }
 }
 

@@ -35,12 +35,6 @@ const canPurchase = computed(
   () => props.liveStatus === 'LIVE' && isOnSale.value && authStore.isAuthenticated && !props.isHost,
 )
 
-const statusLabel = computed(() => {
-  if (props.product.saleStatus === 'SOLD') return '판매 완료'
-  if (isOnSale.value) return '상시 판매'
-  return '판매 준비 중'
-})
-
 const sliderLabel = computed(() => {
   if (props.isHost) return '내 상품은 구매할 수 없습니다'
   if (!authStore.isAuthenticated) return '로그인 후 구매 가능'
@@ -75,22 +69,8 @@ watch(
 
 <template>
   <aside class="live-direct-sale-panel" aria-labelledby="live-direct-sale-title">
-    <div class="live-direct-sale-panel__header">
-      <h2 id="live-direct-sale-title">정찰제 구매</h2>
-    </div>
-
-    <span
-      class="live-direct-sale-panel__status"
-      :class="{ 'live-direct-sale-panel__status--sold': product.saleStatus === 'SOLD' }"
-    >
-      {{ statusLabel }}
-    </span>
-
-    <div class="live-direct-sale-panel__product">
-      <span>선택 상품</span>
-      <strong>{{ product.title }}</strong>
-    </div>
-
+    <!-- 상품명·판매 상태는 바로 위 "선택한 상품 정보"에 이미 떠 있다 — 여기는 가격과
+         구매 수단만 남긴다. -->
     <div class="live-direct-sale-panel__price">
       <span>판매 가격</span>
       <strong>
@@ -134,87 +114,37 @@ watch(
     <AppInlineNotice v-if="message" variant="success">
       {{ message }}
     </AppInlineNotice>
-    <p class="live-direct-sale-panel__guide">
-      밀기 완료 후 배송지와 보유 포인트를 확인하고 결제합니다.
-    </p>
   </aside>
 </template>
 
 <style scoped lang="scss">
+/* 상품 큐 아래 사이드바(280px)에서 "선택한 상품 정보" 설명 바로 밑에 이어 붙는다 —
+   구분선이나 별도 배경 없이 같은 덩어리로 보이게 둔다. */
 .live-direct-sale-panel {
   display: flex;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: 16px 18px;
-  border-top: 1px solid var(--color-live-border);
-  border-left: 1px solid var(--color-live-border);
-  background: var(--color-surface-raised);
+  gap: var(--space-2);
+  padding: 0 15px 15px;
 }
 
-.live-direct-sale-panel__header,
 .live-direct-sale-panel__price {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
 }
 
-.live-direct-sale-panel__price {
-  justify-content: space-between;
-}
-
-.live-direct-sale-panel h2 {
-  color: var(--color-accent);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
-  font-weight: var(--font-weight-regular);
-  letter-spacing: 0.2em;
-  line-height: var(--line-height-tight);
-  text-transform: uppercase;
-}
-
-.live-direct-sale-panel__status {
-  display: inline-block;
-  width: fit-content;
-  padding: 3px 8px;
-  border-radius: var(--radius-badge);
-  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
-  color: var(--color-accent);
-  font-size: var(--font-size-badge);
-  font-weight: var(--font-weight-bold);
-}
-
-.live-direct-sale-panel__status--sold {
-  background: var(--color-live-background);
-  color: var(--color-live-text-secondary);
-}
-
-.live-direct-sale-panel__product {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
-.live-direct-sale-panel__product span,
-.live-direct-sale-panel__price span,
-.live-direct-sale-panel__guide {
+.live-direct-sale-panel__price span {
   color: var(--color-live-text-secondary);
   font-size: var(--font-size-2xs);
-}
-
-.live-direct-sale-panel__product strong {
-  overflow: hidden;
-  color: var(--color-live-text-primary);
-  font-size: var(--font-size-caption);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .live-direct-sale-panel__price strong {
   color: var(--color-accent);
   font-family: var(--font-mono);
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-lg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -291,10 +221,5 @@ watch(
   background: var(--color-live-background);
   color: var(--color-live-text-primary);
   font-size: var(--font-size-xs);
-}
-
-.live-direct-sale-panel__guide {
-  margin-top: auto;
-  line-height: var(--line-height-snug);
 }
 </style>
