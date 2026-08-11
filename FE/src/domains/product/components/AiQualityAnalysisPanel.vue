@@ -559,7 +559,9 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 
 .ai-analysis__finding-location {
   justify-self: start;
-  margin-left: calc(22px + var(--space-2));
+  /* 태그 자체 좌측 padding(space-2)이 하자 유형/설명과 같은 시작 위치를 채워주므로,
+     박스는 배지 너비만큼만 민다(22px + space-2 padding = 하자 유형 시작 위치). */
+  margin-left: 22px;
   padding: 2px var(--space-2);
   border-radius: 999px;
   background: var(--color-surface-secondary);
@@ -569,14 +571,9 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
   white-space: nowrap;
 }
 
-.ai-analysis__description li strong {
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-body);
-}
-
 .ai-analysis__description li p {
   margin-top: 2px;
+  margin-left: calc(22px + var(--space-2));
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-regular);
