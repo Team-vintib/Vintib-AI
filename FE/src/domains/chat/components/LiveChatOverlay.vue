@@ -536,15 +536,9 @@ function isSuppressedRealtimeError(body: unknown) {
       </button>
       <ul ref="messageList" class="live-chat-overlay__messages" aria-live="polite">
         <li v-for="message in messages" :key="message.id">
-          <span
-            class="live-chat-overlay__author"
-            :class="{
-              'live-chat-overlay__author--host': message.role === 'HOST',
-              'live-chat-overlay__author--ai': message.role === 'AI',
-            }"
-          >
-            {{ message.author }}
-          </span>
+          <!-- 아이디는 누구든 같은 서체·크기·굵기·색으로 그린다(판매자·AI 강조 없음).
+               AI 자동답변은 작성자 이름이 'AI 채팅 도우미'라 이름 자체로 구분된다. -->
+          <span class="live-chat-overlay__author">{{ message.author }}</span>
           <span class="live-chat-overlay__message">{{ message.body }}</span>
         </li>
       </ul>
@@ -830,27 +824,15 @@ function isSuppressedRealtimeError(body: unknown) {
   margin-top: 9px;
 }
 
-/* 아이디도 본문과 같은 서체를 쓴다 — 모노(IBM Plex Mono)에는 한글 글리프가 없어서 한글
-   닉네임이 대체 폰트로 떨어지며 본문과 서체가 달라 보였다. 자간·대문자 변환도 한글에는
-   효과가 없어 함께 걷어낸다. 굵게와 HOST 색 구분만으로 충분히 갈린다. */
+/* 아이디는 본문과 같은 서체를 쓰고, 누구의 아이디든 완전히 같게 그린다 — 모노
+   (IBM Plex Mono)에는 한글 글리프가 없어 한글 닉네임이 대체 폰트로 떨어지며 본문과
+   서체가 달라 보였다. 자간·대문자 변환도 한글에는 효과가 없어 함께 걷어냈다. */
 .live-chat-overlay__author {
   flex: 0 0 auto;
   color: var(--color-live-text-secondary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   line-height: 1.5;
-}
-
-.live-chat-overlay__author--host {
-  color: var(--color-live-text-primary);
-}
-
-/* AI 자동답변(CHAT-002)은 판매자 발언처럼 보이면 안 된다 — 배지 형태로 확실히 구분한다. */
-.live-chat-overlay__author--ai {
-  padding: 1px 6px;
-  border-radius: var(--radius-badge);
-  background: var(--color-accent);
-  color: var(--color-live-text-primary);
 }
 
 .live-chat-overlay__message {
