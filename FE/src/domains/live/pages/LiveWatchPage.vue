@@ -98,7 +98,6 @@ type SidePanelMode = 'product' | 'auction'
 
 const isSidePanelOpen = ref(false)
 const sidePanelMode = ref<SidePanelMode>('product')
-const isSidePanelCollapsed = ref(false)
 // AI 시착은 패널 안이 아니라 화면을 덮는 별도 창으로 띄운다.
 const isTryOnOpen = ref(false)
 const now = ref(Date.now())
@@ -343,7 +342,6 @@ const loadLiveWatch = async () => {
   purchaseMessage.value = ''
   isSidePanelOpen.value = false
   sidePanelMode.value = 'product'
-  isSidePanelCollapsed.value = false
   isTryOnOpen.value = false
   loadState.value = 'loading'
   errorMessage.value = ''
@@ -685,7 +683,6 @@ const toggleWish = async () => {
 
 const openSidePanel = (mode: SidePanelMode) => {
   sidePanelMode.value = mode
-  isSidePanelCollapsed.value = false
   isSidePanelOpen.value = true
 }
 
@@ -923,10 +920,7 @@ onBeforeUnmount(() => {
           <div
             class="live-watch-page__stage"
             :class="{
-              'live-watch-page__stage--side':
-                (isSidePanelOpen || isTryOnOpen) && !isSidePanelCollapsed,
-              'live-watch-page__stage--side-narrow':
-                (isSidePanelOpen || isTryOnOpen) && isSidePanelCollapsed,
+              'live-watch-page__stage--side': isSidePanelOpen || isTryOnOpen,
             }"
           >
             <!-- 패널이 닫혀 있을 때만 진입 버튼을 띄운다. 경매가 걸린 상품이면 '경매 참여',
@@ -967,18 +961,6 @@ onBeforeUnmount(() => {
                 <button
                   type="button"
                   class="live-watch-page__side-icon"
-                  :aria-expanded="!isSidePanelCollapsed"
-                  :aria-label="isSidePanelCollapsed ? '패널 크게' : '패널 줄이기'"
-                  :title="isSidePanelCollapsed ? '패널 크게' : '패널 줄이기'"
-                  @click="isSidePanelCollapsed = !isSidePanelCollapsed"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path :d="isSidePanelCollapsed ? 'm7 14 5-5 5 5' : 'm7 10 5 5 5-5'" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  class="live-watch-page__side-icon"
                   aria-label="패널 닫기"
                   title="패널 닫기"
                   @click="isSidePanelOpen = false"
@@ -988,7 +970,6 @@ onBeforeUnmount(() => {
               </div>
 
               <div
-                v-show="!isSidePanelCollapsed"
                 class="live-watch-page__side-body"
                 :class="{ 'live-watch-page__side-body--full': isTryOnOpen }"
               >
@@ -1056,7 +1037,7 @@ onBeforeUnmount(() => {
                 {{ isSelectedProductOnAuction ? '경매 참여' : '상품 정보' }}
               </button>
               <button
-                v-else-if="isTryOnAvailable && !isSidePanelCollapsed"
+                v-else-if="isTryOnAvailable"
                 type="button"
                 class="live-watch-page__side-switch"
                 @click="openTryOn"
@@ -1400,15 +1381,6 @@ onBeforeUnmount(() => {
 }
 
 /* 접었을 때 — 제목 줄만 남으므로 칸도 같이 좁힌다. */
-.live-watch-page__stage--side-narrow {
-  grid-template-columns: minmax(0, 1fr) 260px;
-}
-
-.live-watch-page__stage--side-narrow .live-watch-page__side {
-  align-self: start;
-  height: auto;
-}
-
 .live-watch-loading {
   min-height: 100vh;
   background: var(--color-live-background);
@@ -1472,8 +1444,7 @@ onBeforeUnmount(() => {
   }
 
   .live-watch-page__stage,
-  .live-watch-page__stage--side,
-  .live-watch-page__stage--side-narrow {
+  .live-watch-page__stage--side {
     display: block;
   }
 
