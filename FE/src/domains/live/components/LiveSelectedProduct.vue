@@ -102,6 +102,25 @@ defineEmits<{
           :alt="`${product.title} 상품 이미지`"
         />
         <span v-else aria-hidden="true">상품</span>
+
+        <!-- 찜은 사진 위 아이콘 하나로 끝낸다 — 좁은 사이드바에서 버튼 한 줄을 따로 쓰지 않는다.
+             글자가 없어지므로 상태는 aria-label/title로 전한다. -->
+        <button
+          class="live-selected-product__wish"
+          :class="{ 'live-selected-product__wish--active': isWished }"
+          type="button"
+          :aria-pressed="isWished"
+          :aria-label="isWished ? '찜 해제' : '찜하기'"
+          :title="isWishPending ? '처리 중' : isWished ? '찜 해제' : '찜하기'"
+          :disabled="isWishPending"
+          @click="$emit('toggleWish')"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M20.3 5.7a5.1 5.1 0 0 0-7.2 0L12 6.8l-1.1-1.1a5.1 5.1 0 0 0-7.2 7.2L12 21l8.3-8.1a5.1 5.1 0 0 0 0-7.2Z"
+            />
+          </svg>
+        </button>
       </div>
 
       <div class="live-selected-product__content">
@@ -120,23 +139,6 @@ defineEmits<{
           </div>
         </dl>
 
-        <div class="live-selected-product__actions">
-          <button
-            class="live-selected-product__wish"
-            :class="{ 'live-selected-product__wish--active': isWished }"
-            type="button"
-            :aria-pressed="isWished"
-            :disabled="isWishPending"
-            @click="$emit('toggleWish')"
-          >
-            <svg v-if="!isWishPending" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M20.3 5.7a5.1 5.1 0 0 0-7.2 0L12 6.8l-1.1-1.1a5.1 5.1 0 0 0-7.2 7.2L12 21l8.3-8.1a5.1 5.1 0 0 0 0-7.2Z"
-              />
-            </svg>
-            {{ isWishPending ? '처리 중' : isWished ? '찜함' : '찜' }}
-          </button>
-        </div>
         <AppInlineNotice v-if="wishMessage" class="live-selected-product__wish-message">
           {{ wishMessage }}
         </AppInlineNotice>
@@ -151,7 +153,7 @@ defineEmits<{
 
 <style scoped lang="scss">
 .live-selected-product {
-  padding: 15px;
+  padding: 15px 15px 10px;
   border-top: 1px solid var(--color-live-border);
   background: var(--color-live-background);
 }
@@ -170,11 +172,11 @@ defineEmits<{
   line-height: var(--line-height-tight);
 }
 
+/* 이 패널은 상품 큐 아래 사이드바(280px) 안에 들어간다 — 사진 위, 설명 아래 세로 배치. */
 .live-selected-product__body {
   display: grid;
-  align-items: center;
-  grid-template-columns: 180px minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
 }
 
 .live-selected-product__identity {
@@ -187,8 +189,9 @@ defineEmits<{
 
 .live-selected-product__image {
   display: grid;
-  width: 180px;
-  height: 180px;
+  position: relative;
+  width: 100%;
+  height: 132px;
   overflow: hidden;
   border-radius: var(--radius-control);
   background: var(--color-live-surface-raised);
@@ -206,31 +209,33 @@ defineEmits<{
 .live-selected-product__identity strong {
   display: -webkit-box;
   overflow: hidden;
-  font-size: var(--font-size-2xl);
-  line-height: 30px;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: 20px;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
+/* 사이드바 폭에서는 2열이 안 들어간다 — 라벨:값 한 줄씩 쌓는다. */
 .live-selected-product__details {
   display: grid;
-  margin-top: 3px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px 12px;
+  margin-top: 6px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
 }
 
 .live-selected-product__details > div {
   display: grid;
-  /* '브랜드:'·'사이즈:'처럼 3글자 라벨이 들어와 46px로는 잘린다. */
-  grid-template-columns: 58px minmax(0, 1fr);
+  /* '브랜드:'·'사이즈:'처럼 3글자 라벨이 들어와 46px 아래로는 잘린다. */
+  grid-template-columns: 46px minmax(0, 1fr);
   gap: 4px;
 }
 
 .live-selected-product__details dt,
 .live-selected-product__details dd {
   overflow: hidden;
-  font-size: var(--font-size-md);
-  line-height: 22px;
+  font-size: var(--font-size-xs);
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -248,62 +253,42 @@ defineEmits<{
 }
 
 
-.live-selected-product__actions {
-  display: flex;
-  align-items: center;
-  margin-top: 7px;
-  gap: var(--space-2);
-}
-
-.live-selected-product__actions button {
-  display: inline-flex;
-  height: 40px;
-  min-height: 0;
-  align-items: center;
-  justify-content: center;
+/* 찜: 사진 오른쪽 아래 하트 아이콘 하나. */
+.live-selected-product__wish {
+  display: grid;
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border: 1px solid var(--color-live-border);
-  border-radius: var(--radius-control);
-  background: var(--color-live-surface-raised);
+  border: 0;
+  border-radius: 50%;
+  background: rgba(8, 8, 8, 0.62);
   color: var(--color-live-text-primary);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-demibold);
-  line-height: 1;
-  white-space: nowrap;
+  place-items: center;
+  backdrop-filter: blur(6px);
 }
 
-.live-selected-product__actions button:hover {
-  border-color: var(--color-live-text-secondary);
+.live-selected-product__wish:hover {
+  background: rgba(8, 8, 8, 0.8);
 }
 
-.live-selected-product__actions .live-selected-product__wish {
-  width: auto;
-  min-width: 37px;
-  padding: 0 18px;
-  gap: 8px;
-  background: transparent;
-}
-
-.live-selected-product__actions .live-selected-product__wish:disabled {
+.live-selected-product__wish:disabled {
   cursor: wait;
-  opacity: 0.65;
-}
-
-.live-selected-product__wish-message {
-  margin-top: 5px;
+  opacity: 0.6;
 }
 
 .live-selected-product__wish svg {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
   stroke-linejoin: round;
   stroke-width: 1.7;
 }
 
-.live-selected-product__actions .live-selected-product__wish--active {
-  border-color: var(--color-live);
+.live-selected-product__wish--active {
   color: #f06a73;
 }
 
@@ -311,30 +296,25 @@ defineEmits<{
   fill: currentColor;
 }
 
-.live-selected-product__actions button:focus-visible {
+.live-selected-product__wish:focus-visible {
   outline: var(--focus-ring-width) solid var(--color-ai);
   outline-offset: 2px;
+}
+
+.live-selected-product__wish-message {
+  margin-top: 5px;
 }
 
 .live-selected-product__empty {
   display: grid;
   min-height: 68px;
+  padding: 0 var(--space-3);
   border: 1px dashed var(--color-live-border);
   border-radius: var(--radius-control);
   color: var(--color-live-text-secondary);
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+  text-align: center;
   place-items: center;
-}
-
-@media (max-width: 1180px) {
-  .live-selected-product__details {
-    column-gap: var(--space-2);
-  }
-}
-
-@media (max-width: 720px) {
-  .live-selected-product__body {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

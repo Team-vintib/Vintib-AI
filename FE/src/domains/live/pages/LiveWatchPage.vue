@@ -868,13 +868,54 @@ onBeforeUnmount(() => {
       />
 
       <div class="live-watch-page__body">
-        <LiveProductQueue
-          :products="live.products"
-          :current-product-id="live.currentProductId"
-          :selected-product-id="selectedProductId"
-          hide-brand-when-empty
-          @select="selectQueueProduct"
-        />
+        <!-- 사이드바: 상품 큐(남는 공간, 넘치면 스크롤) 아래에 선택 상품 정보와 구매 수단을 붙인다.
+             영상 아래 가로 패널로 흩어져 있던 정보를 한 줄기로 모아 시선 이동을 줄인다. -->
+        <aside class="live-watch-page__sidebar">
+          <LiveProductQueue
+            class="live-watch-page__queue"
+            :products="live.products"
+            :current-product-id="live.currentProductId"
+            :selected-product-id="selectedProductId"
+            hide-brand-when-empty
+            @select="selectQueueProduct"
+          />
+
+          <div class="live-watch-page__product">
+            <LiveSelectedProduct
+              :product="selectedProduct"
+              :detail="selectedProductDetail"
+              :is-wished="isSelectedProductWished"
+              :is-wish-pending="pendingWishProductId === selectedProductId"
+              :wish-message="wishMessage"
+              @view-product="goToProduct"
+              @toggle-wish="toggleWish"
+            />
+
+            <LiveDirectSalePanel
+              v-if="selectedProduct && isDirectSaleSelected"
+              :product="selectedProduct"
+              :live-status="live.status"
+              :is-host="live.isHost"
+              :message="purchaseMessage"
+              @purchase="openDirectPurchase"
+            />
+
+            <!-- 경매 상품은 밀어서 살 수 없다 — 정찰제 슬라이더와 같은 자리·같은 모양을 두되
+                 회색으로 잠가 "여기서는 못 산다"를 모양으로 알린다.
+                 (경매 참여 진입은 경매 패널이 옮겨오는 다음 작업에서 붙인다) -->
+            <div
+              v-else-if="selectedProduct && isAuctionProduct(selectedProduct)"
+              class="live-watch-page__auction-note"
+            >
+              <span class="live-watch-page__auction-slider" role="img" :aria-label="
+                isSelectedProductOnAuction ? '경매 진행 중' : '경매 예정'
+              ">
+                <span class="live-watch-page__auction-thumb" aria-hidden="true"></span>
+                <span>{{ isSelectedProductOnAuction ? '경매 진행 중' : '경매 예정' }}</span>
+              </span>
+            </div>
+          </div>
+        </aside>
 
         <main
           class="live-watch-page__content"
@@ -942,25 +983,7 @@ onBeforeUnmount(() => {
               >
                 ×
               </button>
-              <LiveSelectedProduct
-                :product="selectedProduct"
-                :detail="selectedProductDetail"
-                :is-wished="isSelectedProductWished"
-                :is-wish-pending="pendingWishProductId === selectedProductId"
-                :wish-message="wishMessage"
-                @view-product="goToProduct"
-                @toggle-wish="toggleWish"
-              />
-              <LiveDirectSalePanel
-                v-if="selectedProduct && isDirectSaleSelected"
-                :product="selectedProduct"
-                :live-status="live.status"
-                :is-host="live.isHost"
-                :message="purchaseMessage"
-                @purchase="openDirectPurchase"
-              />
               <LiveAuctionPanel
-                v-else
                 :snapshot="auctionSnapshot"
                 :live-status="live.status"
                 :is-loading="isAuctionLoading"
@@ -1042,8 +1065,11 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped lang="scss">
+/* 라이브는 한 화면 안에서 끝나야 한다 — 페이지가 세로로 늘어나 스크롤이 생기지 않도록
+   높이를 뷰포트에 고정하고, 넘치는 부분은 각 칸이 자기 안에서 스크롤한다(상품 큐 등). */
 .live-watch-page {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--color-live-background);
 }
 
@@ -1119,8 +1145,72 @@ onBeforeUnmount(() => {
    스켈레톤의 첫 칸과 항상 같은 값을 써야 로딩→본화면 전환에서 칸이 튀지 않는다. */
 .live-watch-page__body {
   display: grid;
-  min-height: calc(100vh - var(--button-height-major));
+  height: calc(100vh - var(--button-height-major));
+  min-height: 0;
   grid-template-columns: 280px minmax(0, 1fr);
+}
+
+/* 큐가 남는 공간을 모두 쓰고(넘치면 자기 안에서 스크롤), 선택 상품 정보는 아래에 고정된다. */
+.live-watch-page__sidebar {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+/* 선택 상품 정보가 먼저 제 높이를 가져가고(그 안에서 스크롤이 생기지 않게), 큐가 남는
+   공간을 쓰면서 넘치는 카드는 큐 안에서 스크롤한다. 큐는 최대 3장까지만 자리를 차지하고,
+   화면이 짧아도 최소 1장은 보이게 남겨 둔다. */
+.live-watch-page__queue {
+  min-height: calc(var(--badge-height-lg) + 104px);
+  max-height: calc(var(--badge-height-lg) + 104px * 3);
+  flex: 1 1 auto;
+}
+
+.live-watch-page__product {
+  min-height: 0;
+  flex: 0 0 auto;
+  overflow-y: auto;
+  border-right: 1px solid var(--color-live-border);
+  scrollbar-color: var(--overlay-scrollbar) transparent;
+  scrollbar-width: thin;
+}
+
+/* 경매 상품 자리 — 정찰제의 '밀어서 구매'와 같은 위치·같은 모양(손잡이 포함)을 두되,
+   회색으로 잠가 밀 수 없는 상태임을 모양만으로 알린다. */
+.live-watch-page__auction-note {
+  padding: 0 15px 15px;
+}
+
+.live-watch-page__auction-slider {
+  display: grid;
+  position: relative;
+  height: var(--button-height-compact);
+  overflow: hidden;
+  border: 1px solid var(--color-live-border);
+  border-radius: 999px;
+  background: var(--color-live-background);
+  opacity: 0.65;
+  place-items: center;
+}
+
+.live-watch-page__auction-slider > span {
+  padding-left: 42px;
+  color: var(--color-live-text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.live-watch-page__auction-thumb {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-live-border);
+  box-shadow: 0 0 0 2px var(--color-live-background);
+  transform: translateY(-50%);
 }
 
 .live-watch-page__content {
