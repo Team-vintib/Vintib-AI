@@ -830,15 +830,15 @@ function isSuppressedRealtimeError(body: unknown) {
   margin-top: 9px;
 }
 
+/* 아이디도 본문과 같은 서체를 쓴다 — 모노(IBM Plex Mono)에는 한글 글리프가 없어서 한글
+   닉네임이 대체 폰트로 떨어지며 본문과 서체가 달라 보였다. 자간·대문자 변환도 한글에는
+   효과가 없어 함께 걷어낸다. 굵게와 HOST 색 구분만으로 충분히 갈린다. */
 .live-chat-overlay__author {
   flex: 0 0 auto;
   color: var(--color-live-text-secondary);
-  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
-  letter-spacing: 0.06em;
   line-height: 1.5;
-  text-transform: uppercase;
 }
 
 .live-chat-overlay__author--host {
