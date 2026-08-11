@@ -214,9 +214,9 @@ watch(
 
 .price-distribution__heading h2 {
   color: var(--color-text-primary);
-  font-size: var(--font-size-md-plus);
+  font-size: var(--font-size-2xl-plus);
   font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-body);
+  line-height: var(--line-height-2xl-plus);
 }
 
 .price-distribution__heading p {

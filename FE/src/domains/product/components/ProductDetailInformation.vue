@@ -97,11 +97,9 @@ const hasInformation = computed(
 
 .detail-information > h2 {
   color: var(--color-text-primary);
-  font-family: var(--font-display);
   font-size: var(--font-size-2xl-plus);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-2xl-plus);
 }
 
 .detail-information__description {
@@ -135,12 +133,10 @@ const hasInformation = computed(
 }
 
 .detail-information__specs dt {
-  color: var(--color-text-muted);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
-  font-weight: var(--font-weight-regular);
-  letter-spacing: 0.04em;
-  line-height: var(--line-height-control);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
 }
 
 .detail-information__specs dd {
@@ -199,8 +195,6 @@ const hasInformation = computed(
 }
 
 .detail-information__seller-note {
-  display: flex;
-  gap: var(--space-4);
   margin-top: var(--space-8);
   padding: var(--space-4) var(--space-5);
   border: 1px solid var(--color-border);
@@ -209,7 +203,8 @@ const hasInformation = computed(
 }
 
 .detail-information__seller-note strong {
-  flex: 0 0 auto;
+  display: block;
+  margin-bottom: var(--space-3);
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-body);
@@ -217,8 +212,7 @@ const hasInformation = computed(
 
 .detail-information__seller-note ul {
   display: grid;
-  min-width: 0;
-  gap: var(--space-2);
+  gap: var(--space-3);
   list-style: none;
 }
 
@@ -226,18 +220,19 @@ const hasInformation = computed(
   min-width: 0;
 }
 
+/* 상세정보 설명(.detail-information__description)과 같은 글씨체·정렬로 맞춘다. */
 .detail-information__seller-note p,
 .detail-information__seller-note span {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-regular);
-  line-height: var(--line-height-snug);
+  line-height: var(--line-height-body);
+  text-align: left;
 }
 
 .detail-information__seller-note span {
   display: block;
-  margin-top: 2px;
-  color: var(--color-text-muted);
+  margin-top: var(--space-1);
 }
 
 @media (max-width: 720px) {

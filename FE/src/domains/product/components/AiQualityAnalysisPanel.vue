@@ -177,15 +177,16 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
             :key="finding.key"
             :class="{ 'ai-analysis__finding--excluded': finding.isExcluded }"
           >
-            <span class="ai-analysis__box-badge">{{ finding.no }}</span>
-            <div>
-              <strong>{{ finding.type }} · {{ finding.location }}</strong>
-              <!-- AI가 설명 문장을 못 만들면(신뢰도 낮은 '의심' 항목 등) 아예 그리지 않는다. -->
-              <p v-if="finding.description">{{ finding.description }}</p>
-              <span v-if="finding.isExcluded" class="ai-analysis__excluded-note">
-                판매자가 하자가 아니라고 확인한 항목입니다
-              </span>
+            <div class="ai-analysis__finding-title">
+              <span class="ai-analysis__box-badge">{{ finding.no }}</span>
+              <strong>{{ finding.type }}</strong>
             </div>
+            <span class="ai-analysis__finding-location">{{ finding.location }}</span>
+            <!-- AI가 설명 문장을 못 만들면(신뢰도 낮은 '의심' 항목 등) 아예 그리지 않는다. -->
+            <p v-if="finding.description">{{ finding.description }}</p>
+            <span v-if="finding.isExcluded" class="ai-analysis__excluded-note">
+              판매자가 하자가 아니라고 확인한 항목입니다
+            </span>
           </li>
         </ul>
 
@@ -255,11 +256,7 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 }
 
 .ai-analysis__tab-heading h2 {
-  display: flex;
-  align-self: stretch;
-  align-items: center;
-  border-bottom: 2px solid var(--color-primary);
-  color: var(--color-primary);
+  color: var(--color-text-primary);
   font-size: var(--font-size-2xl-plus);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-2xl-plus);
@@ -478,6 +475,7 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 .ai-analysis__excluded-note {
   display: block;
   margin-top: 2px;
+  margin-left: calc(22px + var(--space-2));
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-snug);
@@ -540,21 +538,42 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 }
 
 .ai-analysis__description li {
-  display: flex;
-  gap: var(--space-3);
+  display: grid;
+  gap: var(--space-1);
   padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
 }
 
-.ai-analysis__description li strong {
+.ai-analysis__finding-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ai-analysis__finding-title strong {
+  color: var(--color-text-primary);
   font-size: var(--font-size-body);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.ai-analysis__finding-location {
+  justify-self: start;
+  /* 태그 자체 좌측 padding(space-2)이 하자 유형/설명과 같은 시작 위치를 채워주므로,
+     박스는 배지 너비만큼만 민다(22px + space-2 padding = 하자 유형 시작 위치). */
+  margin-left: 22px;
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
 }
 
 .ai-analysis__description li p {
   margin-top: 2px;
+  margin-left: calc(22px + var(--space-2));
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-regular);

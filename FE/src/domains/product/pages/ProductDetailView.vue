@@ -631,9 +631,10 @@ onBeforeUnmount(() => {
 
 .product-detail__ai-model-cut-title {
   margin-bottom: var(--space-4);
-  font-size: var(--font-size-md-plus);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-2xl-plus);
   font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-snug);
+  line-height: var(--line-height-2xl-plus);
 }
 
 .product-detail__ai-model-cut-status {
