@@ -8,13 +8,19 @@ import type { ProductDetailViewData } from '@/domains/product/types/productDetai
 
 // detail: 선택 상품의 상품 상세(GET /products/{id}) 결과. 라이브 응답에는 사이즈·색상이 없어서
 // 부족한 항목을 이걸로 채운다. 아직 안 왔거나 조회에 실패하면 null이고, 그 경우 라이브 값만 쓴다.
-const props = defineProps<{
-  product: LiveWatchProduct | null
-  detail: ProductDetailViewData | null
-  isWished: boolean
-  isWishPending: boolean
-  wishMessage: string
-}>()
+// compact: 사진과 제목만 남긴다(스펙 목록 숨김). 경매 탭처럼 아래에 들어갈 내용이 많아
+// 스크롤 없이 한 화면에 담아야 할 때 쓴다.
+const props = withDefaults(
+  defineProps<{
+    product: LiveWatchProduct | null
+    detail: ProductDetailViewData | null
+    isWished: boolean
+    isWishPending: boolean
+    wishMessage: string
+    compact?: boolean
+  }>(),
+  { compact: false },
+)
 
 const formatMeasurements = (measurements: Record<string, number> | undefined) => {
   const entries = Object.entries(measurements ?? {}).filter(
@@ -128,7 +134,10 @@ defineEmits<{
           <strong>{{ product.title }}</strong>
         </div>
 
-        <dl v-if="specItems.length || defectLabel" class="live-selected-product__details">
+        <dl
+          v-if="!compact && (specItems.length || defectLabel)"
+          class="live-selected-product__details"
+        >
           <div v-for="item in specItems" :key="item.label">
             <dt>{{ item.label }}</dt>
             <dd>{{ item.value }}</dd>
@@ -153,30 +162,35 @@ defineEmits<{
 
 <style scoped lang="scss">
 .live-selected-product {
-  padding: 15px 15px 10px;
-  border-top: 1px solid var(--color-live-border);
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  padding: 14px 16px;
   background: var(--color-live-background);
 }
 
+/* 제목("선택한 상품 정보")은 패널 제목 줄과 겹쳐 군더더기라 숨긴다. 스크린리더에는 남는다. */
 .live-selected-product__heading {
-  display: flex;
-  min-height: 15px;
-  align-items: center;
-  margin-bottom: 10px;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
-.live-selected-product__heading h2 {
-  color: var(--color-live-text-secondary);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-demibold);
-  line-height: var(--line-height-tight);
-}
-
-/* 이 패널은 상품 큐 아래 사이드바(280px) 안에 들어간다 — 사진 위, 설명 아래 세로 배치. */
+/* 우측 패널(440px) 위쪽 칸 — 사진이 폭을 가득 쓰고, 남는 세로 공간도 사진이 흡수한다.
+   사진 높이를 고정하면 구매/경매 버튼과 하단 버튼 사이에 큰 빈 칸이 남는다. */
 .live-selected-product__body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.live-selected-product__content {
+  flex: 0 0 auto;
 }
 
 .live-selected-product__identity {
@@ -191,7 +205,8 @@ defineEmits<{
   display: grid;
   position: relative;
   width: 100%;
-  height: 132px;
+  min-height: 120px;
+  flex: 1 1 auto;
   overflow: hidden;
   border-radius: var(--radius-control);
   background: var(--color-live-surface-raised);
@@ -209,9 +224,9 @@ defineEmits<{
 .live-selected-product__identity strong {
   display: -webkit-box;
   overflow: hidden;
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-semibold);
-  line-height: 20px;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: 24px;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -226,16 +241,16 @@ defineEmits<{
 
 .live-selected-product__details > div {
   display: grid;
-  /* '브랜드:'·'사이즈:'처럼 3글자 라벨이 들어와 46px 아래로는 잘린다. */
-  grid-template-columns: 46px minmax(0, 1fr);
-  gap: 4px;
+  /* '브랜드:'·'사이즈:'처럼 3글자 라벨이 들어와 52px 아래로는 잘린다. */
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 6px;
 }
 
 .live-selected-product__details dt,
 .live-selected-product__details dd {
   overflow: hidden;
-  font-size: var(--font-size-xs);
-  line-height: 18px;
+  font-size: var(--font-size-caption);
+  line-height: 21px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

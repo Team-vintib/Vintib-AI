@@ -15,6 +15,8 @@ import { ROUTE_NAMES } from '@/shared/constants/routes'
 import type { AuctionSnapshot } from '@/domains/auction/types/liveAuction.types'
 import type { LiveWatchStatus } from '@/domains/live/types/liveWatch.types'
 
+// 제목 줄·닫기·접기는 이 패널을 담는 우측 패널(LiveWatchPage `__side`)이 맡는다.
+// 여기는 경매 정보와 입찰만 그린다.
 const props = defineProps<{
   snapshot: AuctionSnapshot | null
   liveStatus: LiveWatchStatus
@@ -202,10 +204,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <aside class="live-auction-panel" aria-labelledby="live-auction-title">
-    <div class="live-auction-panel__header">
-      <h2 id="live-auction-title">실시간 경매</h2>
-      <span v-if="snapshot" class="live-auction-panel__status">
+  <aside class="live-auction-panel" aria-label="실시간 경매">
+    <div v-if="snapshot" class="live-auction-panel__header">
+      <span class="live-auction-panel__status">
         {{
           snapshot.status === 'RUNNING'
             ? '진행 중'
@@ -220,6 +221,7 @@ onBeforeUnmount(() => {
       </span>
     </div>
 
+    <div class="live-auction-panel__body">
     <div v-if="isLoading" class="live-auction-panel__empty" role="status">
       <strong>경매 정보를 불러오는 중입니다.</strong>
     </div>
@@ -333,49 +335,50 @@ onBeforeUnmount(() => {
       </template>
       <AppInlineNotice v-if="bidError" variant="error">{{ bidError }}</AppInlineNotice>
     </template>
+    </div>
   </aside>
 </template>
 
 <style scoped lang="scss">
-/* 패널이 들어가는 칸은 260px 고정이다(LiveWatchPage `grid-template-rows`). 아래 여백·줄
-   높이는 그 안에 스크롤 없이 들어가도록 잡은 값이라, 키울 때는 합계를 다시 확인한다.
-   RUNNING·로그인 기준: 패딩 24 + 헤더 21 + 지표 84 + 다음 입찰가 26 + 슬라이더 44 +
-   포인트 18 + gap 8×4 = 249px. */
+/* 우측 패널 안, 상품 소개 아래 칸에 들어간다 — 제목 줄·닫기·접기는 바깥이 그린다. */
 .live-auction-panel {
   display: flex;
   min-width: 0;
   min-height: 0;
-  overflow-y: auto;
+  height: 100%;
   flex-direction: column;
   gap: var(--space-2);
-  padding: 12px 18px;
-  border-top: 1px solid var(--color-live-border);
-  border-left: 1px solid var(--color-live-border);
-  background: var(--color-surface-raised);
+  padding: 0 16px 16px;
+}
+
+/* 스크롤을 두지 않는다 — 입찰 슬라이더가 화면 밖으로 밀리면 입찰 자체를 못 한다.
+   내용이 늘면 글씨·간격을 줄여 맞춘다. */
+.live-auction-panel__body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .live-auction-panel__header {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--space-2);
 }
 
-.live-auction-panel h2 {
-  color: var(--color-accent);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
-  font-weight: var(--font-weight-regular);
-  letter-spacing: 0.2em;
-  line-height: var(--line-height-tight);
-  text-transform: uppercase;
+.live-auction-panel__header .live-auction-panel__status {
+  margin-right: auto;
 }
+
 
 .live-auction-panel__status {
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: var(--radius-badge);
   background: color-mix(in srgb, var(--color-auction) 18%, transparent);
   color: var(--color-auction);
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-tight);
 }
@@ -397,6 +400,8 @@ onBeforeUnmount(() => {
   font-size: var(--font-size-caption);
 }
 
+/* 경매 정보는 멀리서도 읽혀야 하지만, 입찰 슬라이더까지 스크롤 없이 한 화면에 들어가야 한다 —
+   라벨은 작게 두고 값만 굵게 키우되 줄 간격은 조인다. */
 .live-auction-panel__metrics {
   display: grid;
   gap: 8px var(--space-4);
@@ -408,7 +413,7 @@ onBeforeUnmount(() => {
 .live-auction-panel__balance {
   display: block;
   color: var(--color-live-text-secondary);
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-xs);
   line-height: var(--line-height-tight);
 }
 
@@ -418,9 +423,10 @@ onBeforeUnmount(() => {
   overflow: hidden;
   color: var(--color-live-text-primary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
-  line-height: var(--line-height-comfortable);
+  line-height: var(--line-height-lg);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -470,8 +476,9 @@ onBeforeUnmount(() => {
 .live-auction-panel__next strong {
   font-family: var(--font-mono);
   font-size: var(--font-size-lg-plus);
+  font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
-  line-height: var(--line-height-lg);
+  line-height: var(--line-height-lg-plus);
 }
 
 .live-auction-panel__slider {
