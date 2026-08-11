@@ -27,6 +27,7 @@ import com.ssafy.backend.order.repository.OrderShipmentRepository;
 import com.ssafy.backend.point.service.PointService;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.repository.ProductRepository;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -47,6 +48,14 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class OrderService {
+
+    /**
+     * 웹훅 구독 실패 건의 지연 폴백 시뮬레이션 폭 —
+     * {@link com.ssafy.backend.order.scheduler.ShipmentFallbackDeliveryScheduler}가
+     * {@code shippedAt}으로부터 이만큼 지난 건을 찾아 배송완료 처리한다. 운영 정책 미확정이라
+     * 데모/로컬 용도로 짧게 잡는다.
+     */
+    static final Duration FALLBACK_DELAY = Duration.ofMinutes(5);
 
     private final OrderRepository orderRepository;
     private final OrderShipmentRepository orderShipmentRepository;
@@ -182,7 +191,9 @@ public class OrderService {
     /**
      * 송장 등록 — 판매자만, PAID 상태 + 배송지 등록 완료 후에만 가능하다.
      * deliveryapi.co.kr 웹훅 구독에 성공하면 배송완료는 {@link #updateShipmentTracking}(웹훅 수신)로만
-     * 반영된다. 구독에 실패하면(자격증명 없음, API 오류 등) 즉시-확정 방식으로 폴백.
+     * 반영된다. 구독에 실패하면(자격증명 없음, API 오류 등) {@link #deliverDueFallbackShipments}
+     * 지연 폴백 배치의 대상이 된다 — 등록 즉시 완료 처리하지 않는다(등록 시각이 배송완료 시각으로
+     * 둔갑하는 문제를 막기 위함).
      */
     @Transactional
     public OrderShipmentResponse registerShipment(Long orderId, Long sellerId, OrderShipmentRegisterRequest request) {
@@ -209,12 +220,27 @@ public class OrderService {
                 order.getId());
 
         boolean subscribed = deliveryTrackingClient.subscribe(request.courierCode(), request.trackingNumber(), orderId);
+        shipment.markWebhookSubscribed(subscribed);
         if (!subscribed) {
-            log.warn("배송 조회 웹훅 구독 실패, 즉시-확정 폴백으로 처리한다(orderId={})", orderId);
-            deliver(order, shipment, now);
+            log.warn("배송 조회 웹훅 구독 실패, 지연 폴백 대상으로 등록한다(orderId={})", orderId);
         }
 
         return OrderShipmentResponse.from(shipment);
+    }
+
+    /**
+     * 지연 폴백 배치({@link com.ssafy.backend.order.scheduler.ShipmentFallbackDeliveryScheduler}) —
+     * 웹훅 구독에 실패해 진행 상태를 알 방법이 없는 건 중, 송장 등록 후 {@link #FALLBACK_DELAY}가
+     * 지난 것을 찾아 배송완료 처리한다. 이때 {@code deliveredAt}은 이 배치가 실행된 시각이라
+     * 송장 등록 시각과 달라진다(등록 즉시 완료로 보이던 기존 버그 수정).
+     */
+    @Transactional
+    public void deliverDueFallbackShipments() {
+        LocalDateTime cutoff = LocalDateTime.now().minus(FALLBACK_DELAY);
+        List<OrderShipment> dueShipments = orderShipmentRepository
+                .findByOrder_StatusAndWebhookSubscribedFalseAndShippedAtLessThanEqual(OrderStatus.SHIPPING, cutoff);
+        LocalDateTime deliveredAt = LocalDateTime.now();
+        dueShipments.forEach(shipment -> deliver(shipment.getOrder(), shipment, deliveredAt));
     }
 
     /**
@@ -241,9 +267,9 @@ public class OrderService {
     private void deliver(Order order, OrderShipment shipment, LocalDateTime deliveredAt) {
         order.markDelivered(deliveredAt);
         shipment.markDelivered(deliveredAt);
-        // 즉시-확정 폴백 경로(구독 실패)는 웹훅이 없어 trackingStatus를 아무도 안 채운다 —
+        // 지연 폴백 배치 경로(구독 실패)는 웹훅이 없어 trackingStatus를 아무도 안 채운다 —
         // 여기서 맞춰준다. 웹훅 경로는 updateShipmentTracking()이 이미 DELIVERED로 채워둔
-        // 뒤라 멱등하게 덮어쓸 뿐이다(045).
+        // 뒤라 멱등하게 덮어쓸 뿐이다.
         shipment.updateTrackingStatus(TrackingStatus.DELIVERED);
         notificationCommandPort.notify(
                 order.getBuyer(),

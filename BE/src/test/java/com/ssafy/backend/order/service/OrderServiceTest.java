@@ -267,7 +267,7 @@ class OrderServiceTest {
     }
 
     @Test
-    void 웹훅_구독에_실패하면_즉시_배송완료로_폴백한다() {
+    void 웹훅_구독에_실패하면_즉시_확정하지_않고_지연_폴백_대상으로만_표시한다() {
         Order realOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
         when(buyer.getId()).thenReturn(BUYER_ID);
         when(seller.getId()).thenReturn(SELLER_ID);
@@ -278,12 +278,35 @@ class OrderServiceTest {
 
         orderService.registerShipment(ORDER_ID, SELLER_ID, new OrderShipmentRegisterRequest(CourierCode.CJ, "123456789012"));
 
-        assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
-        assertThat(realOrder.getAutoConfirmAt()).isAfter(LocalDateTime.now().plusDays(2));
-        // 웹훅이 없는 폴백 경로라 trackingStatus를 채워줄 이가 없었다 — deliver()가 직접 맞춘다.
-        assertThat(shipment.getTrackingStatus()).isEqualTo(TrackingStatus.DELIVERED);
+        // 등록 즉시 완료 처리하지 않는다 — 지연 폴백 배치(deliverDueFallbackShipments)가 나중에 처리한다.
+        assertThat(realOrder.getStatus()).isEqualTo(OrderStatus.SHIPPING);
+        assertThat(realOrder.getAutoConfirmAt()).isNull();
+        assertThat(shipment.isWebhookSubscribed()).isFalse();
+        assertThat(shipment.getDeliveredAt()).isNull();
         verify(notificationCommandPort).notify(
                 eq(buyer), eq("SHIPMENT_STARTED"), any(), any(), eq("ORDER"), any());
+        verify(notificationCommandPort, org.mockito.Mockito.never()).notify(
+                eq(buyer), eq("SHIPMENT_COMPLETED"), any(), any(), any(), any());
+    }
+
+    @Test
+    void 지연_폴백_배치는_지연시간이_지난_웹훅_미구독_건만_배송완료로_확정한다() {
+        Order dueOrder = Order.createDirectSale(buyer, seller, realDirectSaleProduct(), null, 50_000L);
+        dueOrder.markShipping();
+        OrderShipment dueShipment = newShipmentFor(dueOrder);
+        dueShipment.registerTracking(CourierCode.CJ, "123456789012", LocalDateTime.now().minusMinutes(10));
+        dueShipment.markWebhookSubscribed(false);
+        when(orderShipmentRepository.findByOrder_StatusAndWebhookSubscribedFalseAndShippedAtLessThanEqual(
+                eq(OrderStatus.SHIPPING), any(LocalDateTime.class)))
+                .thenReturn(List.of(dueShipment));
+
+        orderService.deliverDueFallbackShipments();
+
+        assertThat(dueOrder.getStatus()).isEqualTo(OrderStatus.DELIVERED);
+        assertThat(dueOrder.getAutoConfirmAt()).isAfter(LocalDateTime.now().plusDays(2));
+        // deliveredAt은 배치 처리 시각이지 registerTracking에 넣었던 shippedAt(10분 전)이 아니다.
+        assertThat(dueShipment.getDeliveredAt()).isAfter(LocalDateTime.now().minusMinutes(1));
+        assertThat(dueShipment.getTrackingStatus()).isEqualTo(TrackingStatus.DELIVERED);
         verify(notificationCommandPort).notify(
                 eq(buyer), eq("SHIPMENT_COMPLETED"), any(), any(), eq("ORDER"), any());
     }
