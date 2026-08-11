@@ -6,7 +6,6 @@ import com.ssafy.backend.global.exception.CustomException;
 import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
-import com.ssafy.backend.product.dto.request.AiQualityFindingRequest;
 import com.ssafy.backend.product.dto.request.ProductCreateRequest;
 import com.ssafy.backend.product.dto.request.ProductListFilterParams;
 import com.ssafy.backend.product.dto.request.ProductSortType;
@@ -18,6 +17,8 @@ import com.ssafy.backend.product.dto.response.AiQualityFindingResponse;
 import com.ssafy.backend.product.dto.response.ProductAiModelCutResponse;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
+import com.ssafy.backend.product.dto.response.ProductMarketPriceResponse;
+import com.ssafy.backend.product.dto.response.ProductPriceEstimateResponse;
 import com.ssafy.backend.product.dto.response.ProductQualityInspectionResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.global.response.PageResponse;
@@ -28,18 +29,20 @@ import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
 import com.ssafy.backend.product.entity.ProductDefect;
 import com.ssafy.backend.product.entity.ProductImageRole;
-import com.ssafy.backend.product.entity.ProductQualityFinding;
 import com.ssafy.backend.product.entity.QualityInspectionStatus;
 import com.ssafy.backend.product.entity.SaleStatus;
+import com.ssafy.backend.product.port.OrderQueryPort;
+import com.ssafy.backend.product.port.dto.CompletedOrderSummary;
 import com.ssafy.backend.product.repository.CategoryRepository;
 import com.ssafy.backend.product.repository.ProductDefectRepository;
-import com.ssafy.backend.product.repository.ProductQualityFindingRepository;
 import com.ssafy.backend.product.port.LiveQueryPort;
 import com.ssafy.backend.product.port.SocialQueryPort;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,14 +63,17 @@ public class ProductService {
     // 그래프용 표본으로 충분한 개수. 상세 조회 왕복마다 전수 조회하지 않도록 상한을 둔다.
     private static final int SIMILAR_PRODUCT_LIMIT = 20;
 
+    // "동일 상품 시세"(CH001) 매물 수 상한 — findSimilarProducts와 같은 기준.
+    private static final int MARKET_PRICE_LIMIT = 20;
+
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
     private final ProductImageService productImageService;
     private final CategoryRepository categoryRepository;
     private final ProductDefectRepository productDefectRepository;
-    private final ProductQualityFindingRepository productQualityFindingRepository;
     private final SocialQueryPort socialQueryPort;
     private final LiveQueryPort liveQueryPort;
+    private final OrderQueryPort orderQueryPort;
     private final AiClient aiClient;
 
     @Transactional
@@ -103,38 +109,8 @@ public class ProductService {
 
         Product saved = productRepository.save(product);
         saveDefects(saved, request.defects());
-        saveQualityFindings(saved, request.aiQualityFindings());
 
         return ProductResponse.from(saved);
-    }
-
-    // 등록 시 사용자가 인정·확정한 AI 품질 검수 finding을 순서대로 저장.
-    private void saveQualityFindings(Product product, List<AiQualityFindingRequest> findings) {
-        if (findings == null || findings.isEmpty()) {
-            return;
-        }
-        List<ProductQualityFinding> entities = new ArrayList<>();
-        for (int i = 0; i < findings.size(); i++) {
-            AiQualityFindingRequest finding = findings.get(i);
-            if (finding.photoRole() != ProductImageRole.FRONT && finding.photoRole() != ProductImageRole.BACK) {
-                throw new CustomException(ErrorCode.AI_QUALITY_FINDING_INVALID_PHOTO_ROLE);
-            }
-            entities.add(ProductQualityFinding.builder()
-                    .product(product)
-                    .photoRole(finding.photoRole())
-                    .description(finding.description())
-                    .box(toBoxMap(finding.box()))
-                    .sortOrder((short) i)
-                    .build());
-        }
-        productQualityFindingRepository.saveAll(entities);
-    }
-
-    private Map<String, Integer> toBoxMap(AiQualityFindingRequest.Box box) {
-        if (box == null) {
-            return null;
-        }
-        return Map.of("x", box.x(), "y", box.y(), "width", box.width(), "height", box.height());
     }
 
     // 등록 시점에 판매자가 입력한 하자 목록 순서대로 저장.
@@ -273,23 +249,51 @@ public class ProductService {
                 sellerProductCount,
                 linkedLive,
                 similarProducts,
-                buildAiQualityAnalysis(productId, images));
+                buildAiQualityAnalysis(product, images),
+                buildPriceEstimate(product));
+    }
+
+    /** 등록 시 확정 등급으로 저장해둔 AI 시세 산정 스냅샷(CH003). 없으면(가격 산정 전) null. */
+    private ProductPriceEstimateResponse buildPriceEstimate(Product product) {
+        Map<String, Object> result = product.getPriceEstimateResult();
+        return result == null ? null : ProductPriceEstimateResponse.from(result);
     }
 
     /**
-     * 상품 상세 "AI 분석" 탭. 등록 시 저장해둔 finding을 사진(FRONT/BACK)별로 묶어 낸다.
+     * 상품 상세 "AI 분석" 탭(CH002). 별도 저장 테이블 없이
+     * {@link Product#getQualityInspectionResult()} 원본(AI가 완료 시점에 캐시해둔 JSON)에서
+     * 매 조회마다 조립한다 — {@code section}/{@code no}/{@code description} 등을 축소 저장하지
+     * 않고 원본을 그대로 쓰므로, 상세 화면 번호·부위가 등록 화면과 항상 일치한다.
      *
-     * <p><b>{@code NOT_REQUESTED}와 {@code NO_FINDINGS}를 구분하지 않는다.</b> "요청 자체가
-     * 없었다"와 "요청은 했는데 인정된 하자가 0건"은 저장 형태(finding row 0개)가 똑같아서
-     * 구분할 수 없다 — 둘 다 FE에서 캐러셀을 안 그리는 결과는 같으므로 구분 없이
-     * {@code NOT_REQUESTED}로 합친다.
+     * <p>상태는 {@link Product#getQualityInspectionStatus()}를 그대로 매핑한다 — 예전엔 finding
+     * row 유무로만 추측해서 {@code ANALYZING}/{@code FAILED}를 만들 수 없었지만(SY043), 이제
+     * job 상태 자체를 갖고 있어 정확히 구분된다.
      */
-    private AiQualityAnalysisResponse buildAiQualityAnalysis(Long productId, List<ProductImageResponse> images) {
-        List<ProductQualityFinding> findings =
-                productQualityFindingRepository.findAllByProductIdOrderBySortOrderAsc(productId);
-        if (findings.isEmpty()) {
+    @SuppressWarnings("unchecked")
+    private AiQualityAnalysisResponse buildAiQualityAnalysis(Product product, List<ProductImageResponse> images) {
+        QualityInspectionStatus status = product.getQualityInspectionStatus();
+        if (status == QualityInspectionStatus.NONE) {
             return AiQualityAnalysisResponse.notRequested();
         }
+        if (status == QualityInspectionStatus.PENDING || status == QualityInspectionStatus.PROCESSING) {
+            return AiQualityAnalysisResponse.analyzing();
+        }
+        if (status == QualityInspectionStatus.FAILED) {
+            return AiQualityAnalysisResponse.failed();
+        }
+
+        Map<String, Object> result = product.getQualityInspectionResult();
+        List<Map<String, Object>> findings = result == null
+                ? List.of()
+                : (List<Map<String, Object>>) result.getOrDefault("findings", List.of());
+        if (findings.isEmpty()) {
+            return AiQualityAnalysisResponse.noFindings();
+        }
+
+        List<String> excludedKeys = Objects.requireNonNullElse(
+                product.getExcludedQualityFindingKeys(), List.<String>of());
+        List<Map<String, Object>> imageSummaries =
+                (List<Map<String, Object>>) result.getOrDefault("image_summaries", List.of());
 
         Map<ProductImageRole, String> imageUrlByRole = images.stream()
                 .filter(image -> image.role() == ProductImageRole.FRONT || image.role() == ProductImageRole.BACK)
@@ -297,19 +301,87 @@ public class ProductService {
 
         List<AiQualityAnalysisImageResponse> imageResponses = new ArrayList<>();
         for (ProductImageRole role : List.of(ProductImageRole.FRONT, ProductImageRole.BACK)) {
+            // AI는 photoRole을 모르고 image_index(앞=0/뒤=1)만 안다 — role↔image_index 변환.
+            int imageIndex = role == ProductImageRole.FRONT ? 0 : 1;
+
             List<AiQualityFindingResponse> roleFindings = findings.stream()
-                    .filter(finding -> finding.getPhotoRole() == role)
-                    .map(AiQualityFindingResponse::from)
+                    .filter(finding -> imageIndex == asInt(finding.get("image_index")))
+                    .map(finding -> AiQualityFindingResponse.from(
+                            finding, excludedKeys.contains(finding.get("key"))))
                     .toList();
             if (roleFindings.isEmpty()) {
                 continue;
             }
+
+            String summary = imageSummaries.stream()
+                    .filter(entry -> imageIndex == asInt(entry.get("image_index")))
+                    .map(entry -> (String) entry.get("summary"))
+                    .findFirst()
+                    .orElse(null);
             String url = imageUrlByRole.get(role);
             imageResponses.add(new AiQualityAnalysisImageResponse(
-                    role == ProductImageRole.FRONT ? "앞면" : "뒷면", url, url, null, roleFindings));
+                    role == ProductImageRole.FRONT ? "앞면" : "뒷면", url, url, summary, roleFindings));
         }
 
-        return AiQualityAnalysisResponse.completed(imageResponses);
+        return imageResponses.isEmpty()
+                ? AiQualityAnalysisResponse.noFindings()
+                : AiQualityAnalysisResponse.completed(imageResponses);
+    }
+
+    private static int asInt(Object value) {
+        return value instanceof Number number ? number.intValue() : -1;
+    }
+
+    /**
+     * "동일 상품 시세"(CH001, 047·025 반영) — 같은 {@code matchKey}를 가진 다른 상품들의
+     * 호가/완료거래가. {@code matchKey}가 아직 없으면(가격 책정 전 상품) 빈 목록을 준다 —
+     * 404가 아니라 "판정 근거 없음"으로 다룬다(AI 쪽 comps 없음과 같은 원칙).
+     */
+    public ProductMarketPriceResponse getMarketPrice(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        List<Product> listingProducts = product.getMatchKey() == null
+                ? List.of()
+                : productRepository.findByMatchKeyAndIdNot(
+                        product.getMatchKey(), productId, PageRequest.of(0, MARKET_PRICE_LIMIT));
+
+        List<Long> orderLookupIds = new ArrayList<>(listingProducts.stream().map(Product::getId).toList());
+        orderLookupIds.add(productId);
+        Map<Long, CompletedOrderSummary> completedOrderByProductId = orderQueryPort
+                .findCompletedOrders(orderLookupIds).stream()
+                .collect(Collectors.toMap(
+                        CompletedOrderSummary::productId, Function.identity(), (first, second) -> first));
+
+        List<ProductMarketPriceResponse.Item> listings = listingProducts.stream()
+                .map(p -> toMarketPriceItem(p, completedOrderByProductId))
+                .filter(Objects::nonNull)
+                .toList();
+
+        return new ProductMarketPriceResponse(
+                productId,
+                product.getMatchKey(),
+                toMarketPriceItem(product, completedOrderByProductId),
+                listings);
+    }
+
+    /** ON_SALE(호가)/SOLD(완료거래)가 아니면 아직 시세로 쓸 가격이 없다 — null을 돌려준다. */
+    private ProductMarketPriceResponse.Item toMarketPriceItem(
+            Product product, Map<Long, CompletedOrderSummary> completedOrderByProductId) {
+        if (product.getSaleStatus() == SaleStatus.ON_SALE) {
+            return new ProductMarketPriceResponse.Item(
+                    product.getId(), product.getTitle(), product.getPrice(), "ASKING");
+        }
+        if (product.getSaleStatus() == SaleStatus.SOLD) {
+            CompletedOrderSummary order = completedOrderByProductId.get(product.getId());
+            if (order == null) {
+                return null; // 완료거래 근거를 못 찾음 — 시세로 안 쓴다
+            }
+            String priceKind = order.auctionWin() ? "SOLD_AUCTION" : "SOLD_DIRECT";
+            return new ProductMarketPriceResponse.Item(
+                    product.getId(), product.getTitle(), order.orderPrice(), priceKind);
+        }
+        return null;
     }
 
     @Transactional
@@ -331,18 +403,15 @@ public class ProductService {
                 request.sizeLabel(),
                 request.color(),
                 request.material(),
-                request.measurements());
+                request.measurements(),
+                request.matchKey(),
+                request.excludedQualityFindingKeys(),
+                request.priceEstimateSnapshot());
 
         // defects는 null이면 미반영, non-null이면 전체 교체(빈 리스트면 전부 삭제).
         if (request.defects() != null) {
             productDefectRepository.deleteAllByProductId(productId);
             saveDefects(product, request.defects());
-        }
-
-        // aiQualityFindings도 같은 규칙 — DRAFT 우선 생성 상품은 확정 시점(PATCH)에만 값이 온다(046).
-        if (request.aiQualityFindings() != null) {
-            productQualityFindingRepository.deleteAllByProductId(productId);
-            saveQualityFindings(product, request.aiQualityFindings());
         }
 
         // 가격은 정찰제 상품에만 의미가 있다 — 경매 상품은 price가 항상 null이고

@@ -40,9 +40,25 @@ class Settings(BaseSettings):
 
     public_base_url: str = "https://i15a108.p.ssafy.io"  # 추가 필요
 
+    # BE 공개 REST API(컨테이너 내부망). 가격책정 internal 백엔드·게이트웨이의 임베딩 카테고리
+    # 태깅(CH024)이 상품 상세(`GET /api/products/{id}`)를 조회하는 데 쓴다 — DB 뷰·읽기 전용
+    # 계정 없이도 BE가 이미 공개로 내는 필드(brandId/price/saleType/saleStatus 등)로 충분하다.
+    be_base_url: str = "http://backend:8080"
+
     # 추천 아티팩트(사전계산 그래프) 루트 디렉터리. 비어 있으면
     # app/recommend/artifacts/ 를 기본값으로 사용한다.
     recommend_artifact_dir: str = ""
+
+    # 가격 책정(app/pricing/) comps 백엔드 스왑(CH030). **커밋 기본값은 항상 mock이어야
+    # 한다**(test/pricing/test_pricing_registry.py::test_committed_defaults_are_mock가
+    # 강제한다) — 실백엔드 전환은 배포 환경변수로만 한다(코드 커밋 X). GMS를 쓰는
+    # llm_web_search는 이 방식으로도 켜지 않는다(AI/CLAUDE.md 하드 룰, 사용자만 직접 실행).
+    pricing_comps_source: str = "mock"
+
+    # 동일 상품 매칭 1단계(속성 추출) 백엔드 스왑(CH031). **커밋 기본값은 항상 regex여야
+    # 한다**(test_pricing_registry.py::test_committed_defaults_are_regex가 강제) — llm
+    # 전환도 배포 환경변수로만 한다. GMS를 쓰므로 하드 룰 대상, 사용자만 직접 실행.
+    pricing_attribute_extractor: str = "regex"
 
 
 settings = Settings()  # 추가 필요

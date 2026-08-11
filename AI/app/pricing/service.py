@@ -78,7 +78,14 @@ class PricingService:
         """
         started = time.perf_counter()
         query = build_query(request.product_name, request.brand, request.category)
-        fetched = self._comps_source.fetch(query, image_url=request.image_url)
+        fetched = self._comps_source.fetch(
+            query,
+            image_url=request.image_url,
+            product_id=request.product_id,
+            product_name=request.product_name,
+            brand=request.brand,
+            category_id=request.category_id,
+        )
         self._log_observation(query, fetched.items)
         retail_items, retail_notes = (
             self._fetch_retail(query)
@@ -122,17 +129,19 @@ class PricingService:
             notes=list(fetched.notes),
             retail_items=retail_items,
             retail_notes=retail_notes,
+            product_match_key=fetched.product_match_key,
             latency_ms=round((time.perf_counter() - started) * 1000, 3),
         )
 
     def _log_observation(self, query: str, items: list[CompItem]) -> None:
-        """실제 검색 결과를 관측 로그(CH017)에 적재한다. mock·internal_clip은 합성 데이터라
-        적재하지 않는다(internal_clip 코퍼스가 실제 GMS 관측 원장에 섞이면 안 된다, CH020).
+        """실제 검색 결과를 관측 로그(CH017)에 적재한다. mock·internal_clip·internal은
+        GMS 웹검색 결과가 아니라 적재하지 않는다(`pricing_search_observation`은 실제 GMS
+        관측 원장이라 다른 출처가 섞이면 안 된다, CH020·CH024).
 
         **여기서 나는 예외는 가격 산정을 막지 않는다** — `_fetch_retail()`과 같은 계약이다.
         관측 로그는 캐시·사후 검수용 부가 기능일 뿐 가격 산정의 필수 입력이 아니다.
         """
-        if self._comps_source.key in {"mock", "internal_clip"} or not items:
+        if self._comps_source.key in {"mock", "internal_clip", "internal"} or not items:
             return
         try:
             store.save_observations(query, self._comps_source.key, items)

@@ -18,6 +18,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     /** 카테고리로 상품을 찾는다. 라이브 목록의 카테고리 필터가 쓴다. */
     List<Product> findByCategoryIdIn(Collection<Long> categoryIds);
 
+    /**
+     * 유사 상품 캐시 배치({@code SimilarProductCacheScheduler}, CH034)가 갱신 대상을 고를 때
+     * 쓴다. id만 뽑는다 — 배치가 상품을 대량으로 순회할 수 있어 엔티티 전체를 로드하지 않는다.
+     */
+    @Query("select p.id from Product p where p.saleStatus in :statuses")
+    List<Long> findIdsBySaleStatusIn(@Param("statuses") Collection<SaleStatus> statuses);
+
     /** 판매자의 공개 상품 수(DRAFT 제외) — 상품 상세의 판매자 통계에 쓴다. */
     long countBySeller_IdAndSaleStatusNot(Long sellerId, SaleStatus excludedStatus);
 
@@ -69,6 +76,27 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             @Param("categoryId") Long categoryId,
             @Param("excludeProductId") Long excludeProductId,
             @Param("brand") String brand,
+            Pageable pageable);
+
+    /**
+     * "동일 상품 시세"(CH001, 047) — 같은 {@code match_key}를 가진 다른 상품들.
+     *
+     * <p>{@code ON_SALE}(호가)·{@code SOLD}(완료거래)만 대상이다 — {@code DRAFT}/
+     * {@code AUCTION_SCHEDULED}/{@code AUCTION_IN_PROGRESS}는 아직 확정된 가격이 없어
+     * 시세 근거로 쓰지 않는다. {@code findSimilarProducts}와 같은 형태이지만 카테고리 exact
+     * match 대신 {@code match_key} exact match를 쓴다 — match_key 자체가 이미 브랜드+
+     * 상품명+카테고리를 합친 판정 키라 브랜드 타이브레이크가 필요 없다.
+     */
+    @Query("""
+            SELECT p FROM Product p
+            WHERE p.matchKey = :matchKey
+              AND p.id <> :excludeProductId
+              AND p.saleStatus IN ('ON_SALE', 'SOLD')
+            ORDER BY p.createdAt DESC
+            """)
+    List<Product> findByMatchKeyAndIdNot(
+            @Param("matchKey") String matchKey,
+            @Param("excludeProductId") Long excludeProductId,
             Pageable pageable);
 
     /**

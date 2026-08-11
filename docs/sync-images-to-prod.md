@@ -101,8 +101,7 @@ sudo docker exec vintib-minio sh -c \
    rm -rf /tmp/tmp"
 
 # 확인은 개수(mc ls | wc -l)가 아니라 stat으로 — 실제 객체 존재를 직접 본다
-  sudo docker exec vintib-minio sh -c \
-    "mc alias set self http://localhost:9000 '$MINIO_USER' '$MINIO_PASS' && mc stat self/vintib-public/products/1.jpg"
+sudo docker exec vintib-minio sh -c 'mc alias set self http://localhost:9000 "$MINIO_USER" "$MINIO_PASS" && mc stat "self/vintib-public/lives/live (1).png"'
 ```
 
 ## 4. 정리

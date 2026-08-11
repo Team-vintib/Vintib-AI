@@ -408,6 +408,7 @@
 | `shipped_at` | `timestamptz` |  |  |  | 발송 시각. 송장 등록 시점. |
 | `delivered_at` | `timestamptz` |  |  |  | 배송 완료 시각. orders.auto_confirm_at 계산 기준. |
 | `tracking_status` | `varchar(20)` |  |  |  | 배송 진행 상태(SY034). 웹훅 수신 때마다 갱신, 첫 수신 전에는 NULL. |
+| `webhook_subscribed` | `boolean` | NOT NULL | `false` |  | 배송 조회 웹훅 구독 성공 여부(SY034 8차). FALSE인 건만 지연 폴백 배치 대상. |
 
 **CHECK 제약**
 
@@ -431,6 +432,7 @@
 | `order_price` | `bigint` | NOT NULL |  |  | 결제 금액(원). |
 | `status` | `varchar(30)` | NOT NULL | `'PAID'` |  | PAID → SHIPPING → DELIVERED → CONFIRMED → SETTLED (+ REFUNDED / CANCELED) |
 | `auto_confirm_at` | `timestamptz` |  |  |  | 자동 구매 확정 예정 시각(배송 완료 + 3일). 배송 완료 시점에 채워 넣고 스케줄러가 이 컬럼으로 대상을 찾는다. |
+| `settled_at` | `timestamptz` |  |  |  |  |
 | `refund_requested` | `boolean` | NOT NULL | `false` |  | 진행 중인(REQUESTED) 환불 요청이 있으면 true. 송장 등록·구매 확정(수동/자동)을 막는 용도. |
 | `created_at` | `timestamptz` | NOT NULL | `now()` |  | 생성 시각. |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` |  | 최종 수정 시각. |
@@ -561,6 +563,7 @@
 | `size_label` | `varchar(50)` |  |  |  | 사이즈 표기(S/M/L, 95/100 등). 브랜드마다 달라 문자열로 둔다. |
 | `color` | `varchar(50)` |  |  |  | 색상(자유 문자열). |
 | `material` | `varchar(50)` |  |  |  | 소재(자유 문자열). |
+| `match_key` | `varchar(300)` |  |  |  | "동일 상품" 판정 키(AI 시세 조회). AI가 상품명+브랜드+카테고리로 계산해 FE 경유로 저장 — BE는 계산하지 않는다. |
 | `measurements` | `jsonb` |  |  |  | 실측 치수(cm). 항목(총장/어깨너비 등)이 상품마다 달라 JSONB로 저장. |
 | `sale_type` | `varchar(20)` |  |  |  | DIRECT_SALE(정찰제) \| AUCTION(경매) |
 | `sale_status` | `varchar(30)` | NOT NULL | `'DRAFT'` |  | DRAFT \| ON_SALE \| AUCTION_SCHEDULED \| AUCTION_IN_PROGRESS \| SOLD |

@@ -13,13 +13,6 @@ const currentIndex = ref(0)
 
 const currentImage = computed(() => images.value[currentIndex.value] ?? images.value[0])
 
-// 검수 이미지 위에 얹는 빨간 네모(탐지 위치) 좌표만 추린다.
-const currentBoxes = computed(() =>
-  (currentImage.value?.findings ?? [])
-    .map((finding) => finding.box)
-    .filter((box): box is NonNullable<typeof box> => Boolean(box)),
-)
-
 // 상품(=분석 대상)이 바뀌면 첫 장으로 되돌린다.
 watch(
   () => props.analysis,
@@ -137,16 +130,22 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
           <div class="ai-analysis__image-frame">
             <img :src="currentImage.analyzedImageUrl" :alt="currentImage.analyzedImageAlt" />
             <span
-              v-for="(box, boxIndex) in currentBoxes"
-              :key="boxIndex"
+              v-for="finding in currentImage.findings"
+              v-show="finding.box"
+              :key="finding.key"
               class="ai-analysis__box"
-              :style="{
-                left: `${box.x}%`,
-                top: `${box.y}%`,
-                width: `${box.width}%`,
-                height: `${box.height}%`,
-              }"
-            />
+              :class="{ 'ai-analysis__box--excluded': finding.isExcluded }"
+              :style="
+                finding.box && {
+                  left: `${finding.box.x}%`,
+                  top: `${finding.box.y}%`,
+                  width: `${finding.box.width}%`,
+                  height: `${finding.box.height}%`,
+                }
+              "
+            >
+              <span class="ai-analysis__box-badge">{{ finding.no }}</span>
+            </span>
           </div>
         </figure>
       </div>
@@ -159,7 +158,7 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
       >
         <button
           v-for="(image, dotIndex) in images"
-          :key="image.id"
+          :key="image.label"
           type="button"
           class="ai-analysis__dot"
           :class="{ 'ai-analysis__dot--active': dotIndex === currentIndex }"
@@ -171,14 +170,21 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 
       <div class="ai-analysis__description">
         <h3>AI 분석 설명</h3>
-        <p>{{ currentImage.summary }}</p>
 
         <ul v-if="currentImage.findings.length">
-          <li v-for="(finding, index) in currentImage.findings" :key="finding.id">
-            <span>{{ index + 1 }}</span>
+          <li
+            v-for="finding in currentImage.findings"
+            :key="finding.key"
+            :class="{ 'ai-analysis__finding--excluded': finding.isExcluded }"
+          >
+            <span class="ai-analysis__box-badge">{{ finding.no }}</span>
             <div>
               <strong>{{ finding.type }} · {{ finding.location }}</strong>
-              <p>{{ finding.description }}</p>
+              <!-- AI가 설명 문장을 못 만들면(신뢰도 낮은 '의심' 항목 등) 아예 그리지 않는다. -->
+              <p v-if="finding.description">{{ finding.description }}</p>
+              <span v-if="finding.isExcluded" class="ai-analysis__excluded-note">
+                판매자가 하자가 아니라고 확인한 항목입니다
+              </span>
             </div>
           </li>
         </ul>
@@ -398,26 +404,83 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
 }
 
 .ai-analysis__image-frame {
+  // bbox %가 원본 이미지 전체 기준이라, aspect-ratio 고정 + object-fit:cover로 잘라 보여주면
+  // 잘리기 전 좌표와 화면에 보이는 이미지가 어긋난다(등록 화면과 동일하게 원본 비율 그대로
+  // 표시해야 좌표가 맞는다).
   position: relative;
-  overflow: hidden;
-  aspect-ratio: 4 / 5;
+  overflow: visible;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-media);
   background: var(--color-surface-secondary);
 }
 
 .ai-analysis__image-frame img {
+  display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  border-radius: var(--radius-media);
 }
 
 .ai-analysis__box {
   position: absolute;
   border: 2px solid var(--color-error);
-  border-radius: 4px;
-  box-shadow: var(--shadow-ring);
+  border-radius: 2px;
+  background: rgb(196 61 70 / 12%);
   pointer-events: none;
+}
+
+.ai-analysis__box-badge {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-error);
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+// 검수 이미지 위 마커일 때만 네모 밖 좌상단 모서리에 겹쳐 띄운다(등록 화면과 동일한 배치).
+.ai-analysis__box .ai-analysis__box-badge {
+  position: absolute;
+  right: 100%;
+  bottom: 100%;
+  margin-right: 1px;
+  margin-bottom: 1px;
+}
+
+/* 판매자가 "하자 아님"으로 확인한 항목 — 등록 화면(--excluded)과 같은 톤으로 죽여서 보여준다.
+   응답에서 빼지 않는 건 번호(no)가 등록 화면과 어긋나지 않게 하기 위해서다(요청 043 §2). */
+.ai-analysis__box--excluded {
+  border-color: var(--color-border-strong);
+  background: transparent;
+}
+
+.ai-analysis__box--excluded .ai-analysis__box-badge,
+.ai-analysis__finding--excluded .ai-analysis__box-badge {
+  background: var(--color-text-muted);
+}
+
+.ai-analysis__description li.ai-analysis__finding--excluded {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.ai-analysis__finding--excluded strong {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+.ai-analysis__excluded-note {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-snug);
 }
 
 .ai-analysis__dots {
@@ -482,20 +545,6 @@ const statusClass = computed(() => props.analysis.status.toLowerCase().replace('
   padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-}
-
-.ai-analysis__description li > span {
-  display: grid;
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--color-error);
-  color: var(--color-text-inverse);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-extrabold);
-  line-height: var(--line-height-snug);
-  place-items: center;
 }
 
 .ai-analysis__description li strong {

@@ -15,6 +15,17 @@ public record AiQualityAnalysisResponse(
         return new AiQualityAnalysisResponse(AiQualityAnalysisStatus.NOT_REQUESTED, List.of(), DISCLAIMER);
     }
 
+    // CH002부터 원본(quality_inspection_result)에서 직접 조립하면서 Product.qualityInspectionStatus를
+    // 그대로 쓸 수 있게 됐다 — 예전엔 finding row 유무로만 상태를 추측해서 ANALYZING/FAILED를 BE가
+    // 만들 수 없었는데(SY043), 이제 job 상태를 그대로 반영한다.
+    public static AiQualityAnalysisResponse analyzing() {
+        return new AiQualityAnalysisResponse(AiQualityAnalysisStatus.ANALYZING, List.of(), DISCLAIMER);
+    }
+
+    public static AiQualityAnalysisResponse failed() {
+        return new AiQualityAnalysisResponse(AiQualityAnalysisStatus.FAILED, List.of(), DISCLAIMER);
+    }
+
     public static AiQualityAnalysisResponse noFindings() {
         return new AiQualityAnalysisResponse(AiQualityAnalysisStatus.NO_FINDINGS, List.of(), DISCLAIMER);
     }

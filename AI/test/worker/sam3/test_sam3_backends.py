@@ -18,6 +18,7 @@ _RATIO_FIELDS = (
     "garment_overlap_min",
     "benign_containment",
     "cross_type_iou_min",
+    "cross_type_containment_min",
     "min_area_ratio",
     "max_defect_area_ratio",
 )
@@ -69,6 +70,14 @@ def test_every_backend_declares_a_description_and_benign_switch(backend):
     assert config["description"], f"{backend}: 설명이 비어 있습니다"
     assert isinstance(config["suppress_benign"], bool)
     assert isinstance(config["dedupe_cross_type"], bool)
+
+
+@pytest.mark.parametrize("backend", _BACKENDS)
+def test_cross_type_dedup_is_on_by_default(backend):
+    # hotfix/472: CH034가 껐던 걸(2026-08-09) 다시 켰다 — 실측(어깨/소매에서 크기만 다른
+    # 박스가 다른 유형으로 중복 검출)상 꺼두면 중복이 그대로 노출되는 문제가 재확인됐다.
+    config = registry.SEGMENTER_BACKENDS[backend]
+    assert config["dedupe_cross_type"] is True
 
 
 def test_segmenter_config_defaults_to_active_backend():

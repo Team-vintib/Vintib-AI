@@ -26,7 +26,12 @@ import LiveSelectedProduct from '@/domains/live/components/LiveSelectedProduct.v
 import LiveVideoStage from '@/domains/live/components/LiveVideoStage.vue'
 import LiveWatchHeader from '@/domains/live/components/LiveWatchHeader.vue'
 import LiveWatchState from '@/domains/live/components/LiveWatchState.vue'
-import { addWish, getWishProductIds, removeWish } from '@/domains/product/api/productApi'
+import {
+  addWish,
+  getProductDetail,
+  getWishProductIds,
+  removeWish,
+} from '@/domains/product/api/productApi'
 import { useWishStore } from '@/domains/product/stores/wishStore'
 import { getPointBalance } from '@/domains/point/api/pointApi'
 import { dispatchPointBalanceUpdated } from '@/domains/point/utils/pointBalanceEvents'
@@ -49,6 +54,7 @@ import type {
   LiveWatchViewData,
   ProductSoldMessage,
 } from '@/domains/live/types/liveWatch.types'
+import type { ProductDetailViewData } from '@/domains/product/types/productDetail.types'
 import type { LiveTryOnMockScenario } from '@/domains/tryon/types/liveTryOn.types'
 
 const LIVE_WATCH_MOCK_SCENARIOS: LiveWatchMockScenario[] = [
@@ -87,6 +93,7 @@ const purchaseInitialAddress = ref<OrderAddressInput | null>(null)
 const purchaseErrorMessage = ref('')
 const purchaseMessage = ref('')
 const isTryOnOpen = ref(false)
+const isInfoCollapsed = ref(false)
 const now = ref(Date.now())
 const auctionSnapshot = ref<AuctionSnapshot | null>(null)
 const isAuctionLoading = ref(false)
@@ -196,6 +203,32 @@ const selectedProduct = computed(
   () => live.value?.products.find((product) => product.id === selectedProductId.value) ?? null,
 )
 
+// 라이브 상품 응답(LiveProductResponse)에는 사이즈·색상이 없어서 "선택한 상품 정보"의 칸이 빈다.
+// BE에 필드 추가를 요청하는 대신 이미 공개된 GET /products/{id}를 상품 전환 시점에 한 번씩만 불러
+// 채운다(HS042). 한 번 받은 상품은 다시 부르지 않는다.
+const productDetailById = ref<Record<number, ProductDetailViewData>>({})
+
+const selectedProductDetail = computed(() =>
+  selectedProductId.value === null
+    ? null
+    : (productDetailById.value[selectedProductId.value] ?? null),
+)
+
+watch(
+  selectedProductId,
+  async (productId) => {
+    if (productId === null || productDetailById.value[productId]) return
+
+    try {
+      const detail = await getProductDetail(productId)
+      productDetailById.value[productId] = detail
+    } catch {
+      // 부가 정보일 뿐이라 실패해도 라이브 화면은 그대로 둔다 — 라이브 응답 값으로만 표시된다.
+    }
+  },
+  { immediate: true },
+)
+
 const purchaseProduct = computed(
   () => live.value?.products.find((product) => product.id === purchaseProductId.value) ?? null,
 )
@@ -289,6 +322,7 @@ const loadLiveWatch = async () => {
   clearRealtimeSubscriptions()
   live.value = null
   selectedProductId.value = null
+  productDetailById.value = {}
   purchaseProductId.value = null
   isPurchaseDialogOpen.value = false
   purchaseMessage.value = ''
@@ -838,10 +872,14 @@ onBeforeUnmount(() => {
           :products="live.products"
           :current-product-id="live.currentProductId"
           :selected-product-id="selectedProductId"
+          hide-brand-when-empty
           @select="selectQueueProduct"
         />
 
-        <main class="live-watch-page__content">
+        <main
+          class="live-watch-page__content"
+          :class="{ 'live-watch-page__content--info-collapsed': isInfoCollapsed }"
+        >
           <div
             class="live-watch-page__stage"
             :class="{ 'live-watch-page__stage--try-on': isTryOnOpen }"
@@ -894,30 +932,57 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="live-watch-page__details">
-            <LiveSelectedProduct
-              :product="selectedProduct"
-              :is-wished="isSelectedProductWished"
-              :is-wish-pending="pendingWishProductId === selectedProductId"
-              :wish-message="wishMessage"
-              @view-product="goToProduct"
-              @toggle-wish="toggleWish"
-            />
-            <LiveDirectSalePanel
-              v-if="selectedProduct && isDirectSaleSelected"
-              :product="selectedProduct"
-              :live-status="live.status"
-              :is-host="live.isHost"
-              :message="purchaseMessage"
-              @purchase="openDirectPurchase"
-            />
-            <LiveAuctionPanel
-              v-else
-              :snapshot="auctionSnapshot"
-              :live-status="live.status"
-              :is-loading="isAuctionLoading"
-              :load-error="auctionLoadError"
-              @snapshot-change="applyAuctionSnapshot"
-            />
+            <div v-show="!isInfoCollapsed" class="live-watch-page__details-body">
+              <button
+                type="button"
+                class="live-watch-page__details-close"
+                aria-label="정보 패널 접기"
+                title="정보 패널 접기"
+                @click="isInfoCollapsed = true"
+              >
+                ×
+              </button>
+              <LiveSelectedProduct
+                :product="selectedProduct"
+                :detail="selectedProductDetail"
+                :is-wished="isSelectedProductWished"
+                :is-wish-pending="pendingWishProductId === selectedProductId"
+                :wish-message="wishMessage"
+                @view-product="goToProduct"
+                @toggle-wish="toggleWish"
+              />
+              <LiveDirectSalePanel
+                v-if="selectedProduct && isDirectSaleSelected"
+                :product="selectedProduct"
+                :live-status="live.status"
+                :is-host="live.isHost"
+                :message="purchaseMessage"
+                @purchase="openDirectPurchase"
+              />
+              <LiveAuctionPanel
+                v-else
+                :snapshot="auctionSnapshot"
+                :live-status="live.status"
+                :is-loading="isAuctionLoading"
+                :load-error="auctionLoadError"
+                @snapshot-change="applyAuctionSnapshot"
+              />
+            </div>
+
+            <button
+              v-show="isInfoCollapsed"
+              type="button"
+              class="live-watch-page__details-reopen"
+              aria-label="정보 패널 펼치기"
+              title="정보 패널 펼치기"
+              @click="isInfoCollapsed = false"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 11v5" />
+                <circle cx="12" cy="7.8" r="0.9" fill="currentColor" stroke="none" />
+              </svg>
+            </button>
           </div>
         </main>
       </div>
@@ -1062,6 +1127,11 @@ onBeforeUnmount(() => {
   min-height: 0;
   height: calc(100vh - var(--button-height-major));
   grid-template-rows: minmax(340px, 1fr) 260px;
+  transition: grid-template-rows 0.2s ease;
+}
+
+.live-watch-page__content--info-collapsed {
+  grid-template-rows: minmax(340px, 1fr) 56px;
 }
 
 .live-watch-page__stage {
@@ -1078,10 +1148,67 @@ onBeforeUnmount(() => {
 }
 
 .live-watch-page__details {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.live-watch-page__details-body {
   display: grid;
   min-width: 0;
   min-height: 0;
+  height: 100%;
   grid-template-columns: minmax(0, 1fr) 380px;
+}
+
+.live-watch-page__details-close {
+  display: grid;
+  position: absolute;
+  z-index: var(--z-layer-2);
+  top: 8px;
+  right: 8px;
+  width: var(--badge-height-lg);
+  height: var(--badge-height-lg);
+  border: 0;
+  border-radius: 50%;
+  background: rgba(8, 8, 8, 0.7);
+  color: var(--color-live-text-primary);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  place-items: center;
+  backdrop-filter: blur(8px);
+}
+
+.live-watch-page__details-reopen {
+  display: grid;
+  position: absolute;
+  z-index: var(--z-layer-2);
+  right: 12px;
+  bottom: 12px;
+  width: 48px;
+  height: 48px;
+  border: 2px solid var(--color-error);
+  border-radius: 50%;
+  background: rgba(8, 8, 8, 0.7);
+  color: var(--color-live-text-primary);
+  place-items: center;
+  backdrop-filter: blur(8px);
+}
+
+.live-watch-page__details-reopen svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.live-watch-page__details-close:focus-visible,
+.live-watch-page__details-reopen:focus-visible {
+  outline: 2px solid var(--color-primary-strong);
+  outline-offset: 2px;
 }
 
 .live-watch-loading {
@@ -1139,7 +1266,7 @@ onBeforeUnmount(() => {
     grid-template-columns: minmax(0, 1fr) minmax(400px, 50%);
   }
 
-  .live-watch-page__details {
+  .live-watch-page__details-body {
     grid-template-columns: minmax(0, 1fr) 320px;
   }
 }
@@ -1170,7 +1297,7 @@ onBeforeUnmount(() => {
     inset: 0;
   }
 
-  .live-watch-page__details {
+  .live-watch-page__details-body {
     grid-template-columns: minmax(0, 1fr);
   }
 

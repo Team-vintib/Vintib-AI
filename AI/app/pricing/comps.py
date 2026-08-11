@@ -28,6 +28,8 @@ __all__ = [
     "CompsSource",
     "CompsUnavailable",
     "InternalClipCompsSource",
+    "InternalCompsSource",
+    "InternalTextCompsSource",
     "LlmWebSearchCompsSource",
     "MockCompsSource",
     "build_comps_source",
@@ -65,6 +67,9 @@ class CompsFetch:
     # 응답 스키마에 노출하려면 별도 승인이 필요하다.
     finish_reason: str | None = None  # Gemini candidates[0].finishReason. 네트워크 미접촉이면 None
     truncated: bool = False  # finish_reason이 MAX_TOKENS라 부분 복구했으면 True
+    # CH030: `internal_text`가 계산한 "동일 상품" 1차(엄격) 매칭 키. `PricingResult.
+    # product_match_key`로 그대로 노출된다 — BE 계약 필드라 다른 백엔드는 None으로 둔다.
+    product_match_key: str | None = None
 
 
 def build_query(
@@ -89,15 +94,31 @@ class CompsSource(ABC):
     """comps 수집기 인터페이스. **모델 교체는 이 구현체를 갈아끼우는 것으로 끝난다.**
 
     `image_url`은 `internal_clip`(CH020, CLIP 이미지 유사도 검색)만 쓴다 — 텍스트 쿼리
-    기반 백엔드(mock/llm_web_search)는 키워드를 받아도 무시한다. 백엔드마다 필요한 입력이
-    다르다고 호출부(`service.py`)가 분기하게 만들지 않으려고 시그니처에 얹었다.
+    기반 백엔드(mock/llm_web_search)는 키워드를 받아도 무시한다. `product_id`는
+    `internal`(CH024, 실데이터 CLIP 임베딩 매칭)이 이미 저장된 자기 임베딩을 조회하는 키로
+    쓰고, `internal_text`는 후보에서 자기 자신을 빼는 데만 쓴다(매칭 자체엔 안 씀).
+    `product_name`/`brand`/`category_id`는 `internal_text`(CH030) 전용이다 — BE 요청에
+    이미 있는 값을 그대로 받아써서, 등록 중(DRAFT) 상품처럼 BE 공개 API로 조회 안 되는
+    상품도 매칭할 수 있게 한다(원래는 `product_id`로 BE를 재조회했는데, DRAFT 상품은
+    본인 외엔 404라 가격 산정이 있어야 할 바로 그 시점에 항상 실패했다). 백엔드마다 필요한
+    입력이 다르다고 호출부(`service.py`)가 분기하게 만들지 않으려고 시그니처에 다 얹는다.
     """
 
     key: str
 
     @abstractmethod
-    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
-        """쿼리(+선택적 이미지)로 비교 매물을 모은다. 인프라 오류면 `CompsUnavailable`."""
+    def fetch(
+        self,
+        query: str,
+        *,
+        image_url: str | None = None,
+        product_id: int | None = None,
+        product_name: str | None = None,
+        brand: str | None = None,
+        category_id: int | None = None,
+    ) -> CompsFetch:
+        """쿼리(+선택적 이미지/product_id/원본 상품 필드)로 비교 매물을 모은다. 인프라
+        오류면 `CompsUnavailable`."""
         raise NotImplementedError
 
 
@@ -110,7 +131,16 @@ class MockCompsSource(CompsSource):
 
     key = "mock"
 
-    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
+    def fetch(
+        self,
+        query: str,
+        *,
+        image_url: str | None = None,
+        product_id: int | None = None,
+        product_name: str | None = None,
+        brand: str | None = None,
+        category_id: int | None = None,
+    ) -> CompsFetch:
         digest = hashlib.sha256(query.encode("utf-8")).digest()
         base = 40_000 + int.from_bytes(digest[:4], "big") % 60_000
         items = [
@@ -141,7 +171,16 @@ class LlmWebSearchCompsSource(CompsSource):
     def __init__(self, config: registry.CompsSourceConfig | None = None) -> None:
         self._config = config or registry.comps_config(self.key)
 
-    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
+    def fetch(
+        self,
+        query: str,
+        *,
+        image_url: str | None = None,
+        product_id: int | None = None,
+        product_name: str | None = None,
+        brand: str | None = None,
+        category_id: int | None = None,
+    ) -> CompsFetch:
         # 키 확인을 build가 아니라 fetch에서 하는 이유: 서비스 조립은 @lru_cache라
         # build 시점에 던지면 잘못 설정된 컨테이너가 모든 요청에 500을 뱉는다.
         # 여기서 던지면 job result의 error로 내려가 BE가 원인을 본다.
@@ -225,7 +264,16 @@ class InternalClipCompsSource(CompsSource):
         self._config = config or registry.comps_config(self.key)
         self._clip_config = registry.INTERNAL_CLIP_CONFIG
 
-    def fetch(self, query: str, *, image_url: str | None = None) -> CompsFetch:
+    def fetch(
+        self,
+        query: str,
+        *,
+        image_url: str | None = None,
+        product_id: int | None = None,
+        product_name: str | None = None,
+        brand: str | None = None,
+        category_id: int | None = None,
+    ) -> CompsFetch:
         if not image_url:
             return CompsFetch(
                 items=[],
@@ -277,6 +325,221 @@ class InternalClipCompsSource(CompsSource):
         )
 
 
+class InternalCompsSource(CompsSource):
+    """실데이터 CLIP 임베딩 매칭(CH024).
+
+    `app/recommend/similar/`가 쓰는 실제 pgvector 코퍼스(`product_garment_embedding`,
+    `app.recommend.personalize.embedding_store`)를 그대로 재사용한다 — 품질검수가 끝난
+    상품마다 자동으로 쌓이는 실데이터다(CH020의 AI-Hub 합성 코퍼스와 다르다). 후보
+    product_id의 가격·브랜드·판매방식·판매상태는 BE 공개 API(`app.shared.be_client`)로
+    조회한다 — CH016이 요청했던 DB 뷰·읽기 전용 계정이 필요 없다, BE가 그 필드를 이미
+    공개로 낸다.
+
+    **쿼리 임베딩을 요청 시점에 새로 계산하지 않는다** — `product_id`로 **이미 저장된**
+    자기 임베딩만 조회한다. 대상 상품이 아직 품질검수를 거치지 않았으면(임베딩 없음)
+    `NO_IMAGE_PROVIDED`로 정상 처리한다(`app/recommend/similar/service.py`가 "임베딩
+    없으면 빈 결과, 에러 아님"으로 다루는 것과 같은 원칙). 이 컨테이너엔 torch/SAM3가
+    없어(`docs/infra-architecture.md` §6) 요청 시점 임베딩 계산 자체가 불가능하다 —
+    `internal_clip`(CH020)과 다른 점이다.
+    """
+
+    key = "internal"
+
+    def __init__(self, config: registry.CompsSourceConfig | None = None) -> None:
+        self._config = config or registry.comps_config(self.key)
+
+    def fetch(
+        self,
+        query: str,
+        *,
+        image_url: str | None = None,
+        product_id: int | None = None,
+        product_name: str | None = None,
+        brand: str | None = None,
+        category_id: int | None = None,
+    ) -> CompsFetch:
+        if product_id is None:
+            return CompsFetch(
+                items=[],
+                notes=["상품 id가 없어 내부 시세 비교를 할 수 없습니다."],
+                reason=ReasonCode.no_image_provided,
+            )
+
+        from datetime import UTC, datetime
+
+        from app.pricing import hedge
+        from app.recommend.personalize import embedding_store
+        from app.shared import be_client
+
+        if embedding_store.fetch_garment_embedding(product_id) is None:
+            return CompsFetch(
+                items=[],
+                notes=["아직 이 상품의 의류 임베딩이 없습니다(품질검수 완료 전일 수 있습니다)."],
+                reason=ReasonCode.no_image_provided,
+            )
+
+        matches = embedding_store.find_similar(product_id, self._config["max_comps"])
+        if not matches:
+            return CompsFetch(
+                items=[],
+                notes=["유사도 기준을 넘는 내부 매물이 없습니다."],
+                reason=ReasonCode.insufficient_comps,
+            )
+
+        candidates = []
+        for match in matches:
+            product = be_client.fetch_product(
+                match.product_id, timeout=self._config["timeout_seconds"]
+            )
+            if product is None:
+                continue
+            candidates.append(
+                hedge.InternalCandidate(
+                    product_id=product.product_id,
+                    title=product.title,
+                    price=product.price,
+                    sale_type=product.sale_type,
+                    sale_status=product.sale_status,
+                    created_at=product.created_at,
+                )
+            )
+
+        kept, notes = hedge.apply_hedge_filters(candidates, now=datetime.now(UTC))
+        if not kept:
+            return CompsFetch(
+                items=[],
+                notes=[*notes, "정제 후 남은 내부 매물이 없습니다."],
+                reason=ReasonCode.insufficient_comps,
+            )
+
+        items = [
+            CompItem(
+                title=c.title,
+                price=c.price,
+                source=self.key,
+                is_used=True,  # 세컨핸드 플랫폼 등록 매물이라 기본적으로 중고다
+                price_kind=c.price_kind,
+            )
+            for c in kept
+            if c.price is not None
+        ]
+        return CompsFetch(items=items, notes=notes)
+
+
+class InternalTextCompsSource(CompsSource):
+    """이미지 임베딩 없이 텍스트(상품명+브랜드+카테고리)만으로 "동일 상품"을 판정하는 내부
+    조회(CH030).
+
+    `InternalCompsSource`(CH024)와 하단 파이프라인(hedge 필터·BE 조회·CompItem 조립)은
+    같다 — 다른 건 후보를 찾는 방식뿐이다. CLIP 임베딩 유사도 대신 `app/pricing/
+    product_match.py`의 정규화 매칭 키로 `app/pricing/product_corpus.py` 코퍼스(BE 목록
+    API를 pull해 만든 자체 캐시)를 조회한다.
+
+    1차(엄격) 키로 먼저 찾고, 표본이 `min_comps_for_pricing` 미만이면 2차(완화, 브랜드+
+    카테고리만)로 재조회한다 — 사용자가 지정한 폴백 순서. 1차 키는 `CompsFetch.
+    product_match_key`로 돌려준다 — BE가 상품 저장 시 `product.match_key`에 그대로
+    반영하면, 구매자 화면은 이 값으로 DB 조회만 해서 동일 상품 시세를 보여줄 수 있다
+    (RAG/AI 호출 없음, CH030 §5).
+
+    자유텍스트(상품명) → 브랜드+핵심 토큰 추출(당근마켓 1단계, CH031)은
+    `attribute_extraction.build_attribute_extractor()`가 만드는 구현체(regex 기본값/llm
+    옵트인)에 위임한다 — 이 클래스는 그 결과로 매칭 키만 조합한다.
+
+    ⚠️ **자기 상품 정보는 BE를 재조회하지 않고 요청에 실려온 `product_name`/`brand`/
+    `category_id`를 그대로 쓴다.** 예전엔 `product_id`로 `GET /api/products/{id}`를 다시
+    불렀는데, 그 엔드포인트는 DRAFT 상품을 본인 외엔 404로 막는다 — 가격 산정은 정확히
+    상품이 DRAFT인 등록 중 시점에 일어나므로, 그 방식은 실사용 시나리오에서 항상 실패했다
+    (실측 확인). `product_id`는 이제 코퍼스에서 자기 자신을 제외하는 용도로만 쓴다.
+    """
+
+    key = "internal_text"
+
+    def __init__(self, config: registry.CompsSourceConfig | None = None) -> None:
+        self._config = config or registry.comps_config(self.key)
+
+    def fetch(
+        self,
+        query: str,
+        *,
+        image_url: str | None = None,
+        product_id: int | None = None,
+        product_name: str | None = None,
+        brand: str | None = None,
+        category_id: int | None = None,
+    ) -> CompsFetch:
+        if not product_name or category_id is None:
+            return CompsFetch(
+                items=[],
+                notes=["상품명 또는 카테고리 정보가 없어 내부 시세 비교를 할 수 없습니다."],
+                reason=ReasonCode.no_image_provided,
+            )
+
+        from datetime import UTC, datetime
+
+        from app.pricing import attribute_extraction, hedge, product_corpus
+        from app.pricing.product_match import build_match_keys
+
+        extractor = attribute_extraction.build_attribute_extractor()
+        extracted = extractor.extract(
+            product_name=product_name,
+            brand_name=brand,
+            brand_alias_map=product_corpus.get_brand_alias_map(),
+        )
+        keys = build_match_keys(
+            tokens=extracted.tokens,
+            brand_id=extracted.brand_id,
+            category=str(category_id),
+        )
+
+        candidates = product_corpus.find_by_match_key(
+            keys.strict, exclude_product_id=product_id, limit=self._config["max_comps"]
+        )
+        if len(candidates) < self._config["min_comps_for_pricing"]:
+            candidates = product_corpus.find_by_match_key(
+                keys.relaxed, exclude_product_id=product_id, limit=self._config["max_comps"]
+            )
+        if not candidates:
+            return CompsFetch(
+                items=[],
+                notes=["동일 상품으로 판정되는 다른 매물이 없습니다."],
+                reason=ReasonCode.insufficient_comps,
+                product_match_key=keys.strict,
+            )
+
+        internal_candidates = [
+            hedge.InternalCandidate(
+                product_id=c.product_id,
+                title=c.title,
+                price=c.price,
+                sale_type=c.sale_type,
+                sale_status=c.sale_status,
+                created_at=c.created_at,
+            )
+            for c in candidates
+        ]
+        kept, notes = hedge.apply_hedge_filters(internal_candidates, now=datetime.now(UTC))
+        if not kept:
+            return CompsFetch(
+                items=[],
+                notes=[*notes, "정제 후 남은 내부 매물이 없습니다."],
+                reason=ReasonCode.insufficient_comps,
+                product_match_key=keys.strict,
+            )
+
+        items = [
+            CompItem(
+                title=c.title,
+                price=c.price,
+                source=self.key,
+                is_used=True,  # 세컨핸드 플랫폼 등록 매물이라 기본적으로 중고다
+                price_kind=c.price_kind,
+            )
+            for c in kept
+            if c.price is not None
+        ]
+        return CompsFetch(items=items, notes=notes, product_match_key=keys.strict)
+
+
 def build_comps_source(key: str | None = None) -> CompsSource:
     """활성 comps 백엔드 구현체를 만든다."""
     resolved = key or registry.ACTIVE_COMPS_SOURCE
@@ -286,20 +549,46 @@ def build_comps_source(key: str | None = None) -> CompsSource:
         return LlmWebSearchCompsSource()
     if resolved == "internal_clip":
         return InternalClipCompsSource()
+    if resolved == "internal":
+        return InternalCompsSource()
+    if resolved == "internal_text":
+        return InternalTextCompsSource()
     raise ValueError(f"등록되지 않은 comps 백엔드입니다: {resolved!r}")
 
 
 # --- 파싱 (네트워크 없이 테스트되는 순수 함수들) ------------------------------
 
 
+# 프롬프트 안 예시 하나(few-shot) — quality_vlm/prompts.py(CH019)가 실측으로 확인한 것과
+# 같은 문제(지시문만 있으면 모델이 경계 판단을 지어냄)에 대한 같은 처방이다. 브랜드가 한글로만
+# 주어져도 모델이 영문 표기까지 스스로 고려하게 만드는 것도 이 예시가 보여준다 — 국내 중고
+# 플랫폼(번개장터 등)은 명품·편집샵 브랜드를 영문 그대로 쓰는 매물이 흔해서, 한글 쿼리만
+# 그대로 검색하면 그런 매물을 놓친다.
+_COMPS_FEW_SHOT_QUERY = "메종키츠네 폭스헤드 니트 그레이"
+_COMPS_FEW_SHOT_ANSWER = (
+    '[{"title": "Maison Kitsune 폭스헤드 니트 그레이 M", "price": 95000, '
+    '"url": "https://web.joongna.com/product/123456", "listed_at": "2026-07-02", '
+    '"is_used": true}]'
+)
+
+
 def _comps_prompt(query: str) -> str:
     return (
-        f"'{query}' 의 **중고** 거래 시세를 웹에서 검색해라. "
-        "후르츠패밀리·번개장터·중고나라 등 중고 거래 매물을 우선한다.\n"
+        "너는 중고거래 시세 조사원이다. **목적은 이 상품과 동일한 상품(같은 브랜드 + 같은 "
+        "모델/디자인)의 실제 거래가를 찾는 것**이다 — 브랜드나 모델이 다르면 카테고리가 같아도"
+        " 시세 산정에 쓸모가 없으니 제외한다.\n\n"
+        f"검색 대상: '{query}'\n"
+        "후르츠패밀리·번개장터·중고나라 등 중고 거래 매물을 우선한다. 브랜드명이 한글로만"
+        " 주어졌으면 영어/원어 표기도 함께 고려해서 검색하고(국내 중고 플랫폼은 브랜드를 영문"
+        " 그대로 쓰는 매물이 많다), 반대로 영문이면 한글 표기도 같이 찾아본다.\n\n"
+        "아래는 좋은 답변 예시다.\n"
+        f"검색 대상: '{_COMPS_FEW_SHOT_QUERY}'\n"
+        f"답변: {_COMPS_FEW_SHOT_ANSWER}\n\n"
         "찾은 매물을 JSON 배열로만 답해라. 설명 문장은 쓰지 마라.\n"
         '형식: [{"title": "상품명", "price": 숫자(원, 쉼표 없이), "url": "링크", '
         '"listed_at": "YYYY-MM-DD 또는 빈 문자열", "is_used": true/false}]\n'
-        "가격을 확인할 수 없는 매물은 넣지 마라. 추측한 가격도 넣지 마라."
+        "가격을 확인할 수 없는 매물은 넣지 마라. 추측한 가격도 넣지 마라. 브랜드나 모델이"
+        " 다른(동일 상품이 아닌) 매물도 넣지 마라."
     )
 
 

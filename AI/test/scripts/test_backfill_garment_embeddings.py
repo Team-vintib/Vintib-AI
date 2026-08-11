@@ -11,28 +11,43 @@ import httpx
 from scripts import backfill_garment_embeddings as backfill
 from scripts.backfill_garment_embeddings import (
     backfill_one,
+    category_value,
     eligible_products,
     fetch_all_products,
     fetch_product_detail,
-    subcategory_value,
+    has_existing_embedding,
 )
 
 
-class TestSubcategoryValue:
-    def test_maps_known_id_to_subcategory(self):
-        # taxonomy.CATEGORY_ID_MAP[(Gender.men, Subcategory.jacket)] == 24 (taxonomy.py 검산값)
-        assert subcategory_value(24) == "JACKET"
+class TestCategoryValue:
+    """CH024 Q4 — BE categoryId를 taxonomy로 변환하지 않고 그대로(문자열) 쓴다.
 
-    def test_bag_and_dress_ids_also_map(self):
-        # 가방/원피스도 taxonomy.py엔 있다 — 품질검수 GarmentCategory(6종)와 달리 스킵 대상이 아니다.
-        # taxonomy 검산값: (women, jumpsuit) == 91.
-        assert subcategory_value(91) == "JUMPSUIT"
+    실사용 경로(`app/gateway/router.py`)와 값 체계를 통일하기 위해서다 — 예전엔 이 스크립트만
+    `product_classifier.taxonomy`로 역산한 Subcategory 문자열을 저장해, 실사용 경로가 저장하던
+    품질검수 `GarmentCategory`와 같은 컬럼에 서로 다른 체계가 섞이는 버그가 있었다.
+    """
+
+    def test_returns_id_as_string(self):
+        assert category_value(24) == "24"
 
     def test_none_id_returns_none(self):
-        assert subcategory_value(None) is None
+        assert category_value(None) is None
 
-    def test_unknown_id_returns_none(self):
-        assert subcategory_value(999999) is None
+
+class TestHasExistingEmbedding:
+    """주기 실행 시 이미 임베딩 있는 상품을 재추론하지 않기 위한 판단(CH034 v2)."""
+
+    def test_true_when_embedding_record_exists(self, monkeypatch):
+        monkeypatch.setattr(
+            backfill.embedding_store, "fetch_garment_embedding", lambda product_id: object()
+        )
+        assert has_existing_embedding(1) is True
+
+    def test_false_when_no_embedding_record(self, monkeypatch):
+        monkeypatch.setattr(
+            backfill.embedding_store, "fetch_garment_embedding", lambda product_id: None
+        )
+        assert has_existing_embedding(1) is False
 
 
 class TestEligibleProducts:
@@ -131,7 +146,7 @@ class TestBackfillOne:
                 "product_id": 1,
                 "embedding": [0.1, 0.2],
                 "model_id": backfill.EMBEDDING_MODEL_ID,
-                "category": "JACKET",
+                "category": "24",
             }
         ]
 

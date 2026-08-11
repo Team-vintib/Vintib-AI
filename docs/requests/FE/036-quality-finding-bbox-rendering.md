@@ -36,11 +36,6 @@
 지금 제출되는 `conditionGrade`는 판매자가 수동 선택한 S/A/B/C이고, AI가 준 `condition_score`/`condition_grade`를
 받아 두었다가 각 단계 제출 payload에 싣는 흐름이 없다(현재는 `findings[].key` + 필드만 전달). `docs/requests/BE/041` 참고.
 
-### 3. "하자 아님" 저장 엔드포인트 미확정 (BE와 협의 필요)
-
-판매자가 "아니다"로 답한 상태(`isActualDefect=false`)를 저장/조회하는 엔드포인트·필드가 아직 확정 안 됨.
-`key`를 앵커로 쓰는 것까지만 정해졌다. FE에서 필요한 형태(예: PATCH에 `key` 배열)가 있으면 `docs/requests/BE/`에 요청.
-
 ## 계약 참고 (실연동 시)
 
 `GET /ai/jobs/{job_id}` `status: "success"` → `result.findings[]` 항목:

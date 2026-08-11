@@ -109,12 +109,11 @@
   `webhookSecret`(우리가 미리 정한 값)을 함께 보낸다. `DELIVERY_API_WEBHOOK_SECRET`이 비어 있으면
   호출 자체를 막는다(`DELIVERY_WEBHOOK_SECRET_REQUIRED`) — 비워 보내면 저쪽이 임의 생성한
   시크릿으로 검증 테스트 POST에 서명하는데 우리가 그 값을 알 방법이 없어 등록이 항상 실패하는
-  문제를 이미 겪었다(§4 참고).
+  문제를 이미 겪었다.
 - `global.delivery.DeliveryWebhookSetupController`: `POST /api/internal/delivery/webhook-endpoint`
   신규. 일반 로그인 인증만 요구하고(별도 권한 체계 없음) `PUBLIC_ENDPOINTS`에는 넣지 않는다 —
   개발자가 필요할 때만 Swagger UI 등에서 직접 호출하는 용도라 항상 열려 있을 필요가 없다.
-- `ErrorCode`에 `DELIVERY_WEBHOOK_SECRET_REQUIRED`(O009), `DELIVERY_ENDPOINT_REGISTRATION_FAILED`
-  (O010) 추가.
+- `ErrorCode`에 `DELIVERY_WEBHOOK_SECRET_REQUIRED`(O009), `DELIVERY_ENDPOINT_REGISTRATION_FAILED` 추가.
 
 ## 구현 목록
 
@@ -148,13 +147,48 @@
 
 ### 7. 웹훅 엔드포인트 등록 API화 (2026-08-06 추가)
 
-- [x] `ErrorCode`에 `DELIVERY_WEBHOOK_SECRET_REQUIRED`(O009), `DELIVERY_ENDPOINT_REGISTRATION_FAILED`(O010) 추가
+- [x] `ErrorCode`에 `DELIVERY_WEBHOOK_SECRET_REQUIRED`(O009), `DELIVERY_ENDPOINT_REGISTRATION_FAILED` 추가
 - [x] `WebhookEndpointResponse` 추가, `DeliveryTrackingClient.registerEndpoint(url, name)` 구현
       (webhookSecret 비어있으면 호출 전에 막음) + 테스트
 - [x] `global.delivery.DeliveryWebhookSetupController` — `POST /api/internal/delivery/webhook-endpoint`
       (인증 필요, PUBLIC_ENDPOINTS 미포함)
 - [x] `README.md` 디렉터리 구조에 `global/delivery/` 반영
 - [x] `./gradlew build`로 최종 검증
+
+### 8. 즉시-확정 폴백 → 지연 폴백 배치로 변경 (2026-08-11 추가)
+
+**배경**: 즉시-확정 폴백(웹훅 구독 실패 시 그 자리에서 바로 `deliver(order, shipment, now)`)이
+버그로 드러났다 — 구매 상세 화면에서 송장 등록과 동시에 배송 상태 바가 "배송완료"로 뛰고,
+`deliveredAt`도 실제 완료 시각이 아니라 송장 등록 시각 그대로였다. `deliveryapi.co.kr` 자격증명이
+없는 로컬/CI 환경에서는 항상 이 폴백을 타기 때문에 매번 재현됐다.
+
+사용자 결정: 즉시 확정 대신, 기존 `OrderAutoConfirmScheduler`(배송완료 3일 후 자동 구매확정,
+`ORDER-003`)와 같은 모양의 배치로 지연 시뮬레이션한다.
+
+- `OrderShipment`에 `webhook_subscribed BOOLEAN NOT NULL DEFAULT FALSE` 추가 — 웹훅 구독 성공
+  건(진짜 웹훅을 기다리는 중)과 실패 건(폴백 대상)을 구분한다. `trackingStatus`만으로는 둘 다
+  `null`이라 구분이 안 된다.
+- `OrderService.registerShipment()`에서 `deliver()` 즉시 호출 제거, `shipment.markWebhookSubscribed
+  (subscribed)`로 결과만 저장. 구독 성공/실패 모두 `order.markShipping()`까지만 하고 끝.
+- `OrderService.deliverDueFallbackShipments()` 신규 — `webhookSubscribed=false`이고 `shippedAt`이
+  `FALLBACK_DELAY`(5분, 운영 정책 미확정이라 데모/로컬용으로 짧게 잡음) 이상 지난 건을 찾아 기존
+  `deliver(...)`를 배치 처리 시각으로 호출한다. `deliveredAt`이 이제 등록 시각과 달라진다.
+- `order/scheduler/ShipmentFallbackDeliveryScheduler` 신규 — `OrderAutoConfirmScheduler`와 동일한
+  `@Scheduled(fixedDelay=...)` 패턴, 1분 주기로 위 메서드를 호출한다.
+- `DemoOrderSeeder`의 `SHIPPING` 스테이지 데모 주문은 `shippedAt`이 이미 과거로 시딩돼 있어 이
+  배치가 그대로 두면 바로 완료 처리해버린다 — `markWebhookSubscribed(true)`를 강제로 호출해
+  스케줄러 대상에서 제외했다(데모 데이터는 "배송중" 스테이지로 고정돼야 하므로).
+- `docs/db/schema.sql`/`comments.sql`에 컬럼 반영 + `regen.sh`로 `data-dictionary.md` 재생성.
+
+- [x] `OrderShipment`: `webhookSubscribed` 컬럼 + `markWebhookSubscribed()` 추가
+- [x] `OrderService.registerShipment()`: 즉시 `deliver()` 호출 제거, `markWebhookSubscribed(subscribed)`로 대체
+- [x] `OrderShipmentRepository`: 지연 대상 조회 파생 쿼리 추가
+- [x] `OrderService.deliverDueFallbackShipments()` 추가(`FALLBACK_DELAY` 상수 포함)
+- [x] `order/scheduler/ShipmentFallbackDeliveryScheduler` 추가
+- [x] `DemoOrderSeeder`: `SHIPPING` 스테이지에서 `markWebhookSubscribed(true)` 호출 추가
+- [x] 관련 테스트 추가/갱신
+- [x] `docs/db/schema.sql`/`comments.sql` 갱신 + `regen.sh`
+- [x] `.claude/skills/BE:verify`로 최종 검증
 
 ## 확인 필요 사항 (해결됨/남은 것)
 

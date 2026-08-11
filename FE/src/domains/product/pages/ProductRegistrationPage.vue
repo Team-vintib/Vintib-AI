@@ -5,7 +5,6 @@ import { useRouter } from 'vue-router'
 import {
   createDraftProduct,
   createProductPreUploadUrl,
-  getBrands,
   getCategories,
   getCategoryCode,
   getProductAiModelCutStatus,
@@ -16,13 +15,14 @@ import {
   triggerProductClassify,
   uploadProductImages,
   uploadToPreUploadUrl,
-  type BrandDto,
   type CategoryDto,
   type ProductAiModelCutStatusDto,
 } from '@/domains/product/api/productApi'
 import {
+  AI_PRICE_GRADE_SCORES,
   estimateRegistrationPrice,
   type ProductAiPriceEstimate,
+  type ProductAiPriceEstimateInput,
   type ProductRegistrationPriceGrade,
 } from '@/domains/product/api/productAiApi'
 import { submitProductRegistrationDraft } from '@/domains/product/api/productRegistrationApi'
@@ -86,17 +86,18 @@ const registeredProductId = ref('')
 // AI 착용컷 폴링 상태 — 등록(aiModelEnabled=true) 성공 직후에만 값이 채워진다.
 const aiModelCutStatus = ref<ProductAiModelCutStatusDto['status']>('NONE')
 const aiModelCutImageUrl = ref<string | null>(null)
-const AI_MODEL_CUT_POLL_INTERVAL_MS = 5_000
-// 워커가 job마다 VLM/FLUX/CatVTON을 순차로 새로 로드하는 구조라(6GB급 GPU 전제),
-// 로컬 실측 기준 완료까지 4분 넘게 걸릴 수 있다 — 120s는 너무 짧아 완료 직전에
-// 폴링이 멈추는 문제가 있었다(-517 로컬 테스트에서 확인).
-const AI_MODEL_CUT_POLL_TIMEOUT_MS = 600_000
+const AI_MODEL_CUT_POLL_INTERVAL_MS = 3_000
+const AI_MODEL_CUT_POLL_TIMEOUT_MS = 120_000
+// 등록 완료 화면을 벗어나거나(초기화) 재등록하면 이 값을 올려, 뒤늦게 끝난 이전 폴링이
+// 다음 상품의 상태를 덮어쓰지 않도록 막는다.
 let aiModelCutPollToken = 0
-// AI 품질 검증(SY043) 실 폴링 상태 — '상태/하자' 스텝 진입 시 draft 상품이 만들어지면서 시작된다.
+// AI 품질 검증(SY043) 상태 — '상태/하자' 스텝 진입 시 draft 상품이 만들어지면서 채워진다.
 const isQualityCategoryUnsupported = ref(false)
-const QUALITY_INSPECTION_POLL_INTERVAL_MS = 5_000
-const QUALITY_INSPECTION_POLL_TIMEOUT_MS = 600_000
-let qualityInspectionPollToken = 0
+const QUALITY_INSPECTION_POLL_INTERVAL_MS = 3_000
+const QUALITY_INSPECTION_POLL_TIMEOUT_MS = 120_000
+// 대기 중(sleep) 사진이 바뀌어 resetQualityDraftState가 불리면 이 값을 올려, 뒤늦게 끝난
+// 이전 호출이 결과를 덮어쓰지 않도록 막는다.
+let qualityInspectionSequence = 0
 // 카테고리/색상 자동 분류(사전업로드, docs/requests/FE/042) 폴링 상태.
 const CLASSIFY_POLL_INTERVAL_MS = 3_000
 const CLASSIFY_POLL_TIMEOUT_MS = 120_000
@@ -104,7 +105,6 @@ let classifyPollToken = 0
 const isSubmittingRegistration = ref(false)
 const registrationSubmitError = ref('')
 const isCompletenessPromptOpen = ref(false)
-const brands = ref<BrandDto[]>([])
 const categories = ref<CategoryDto[]>([])
 const categoryMajorId = ref('')
 interface CategorySelectOption {
@@ -192,7 +192,8 @@ const updateMinorCategory = () => {
 const priceRecommendationBuckets = ref<ProductRegistrationPriceBucket[]>([])
 const recommendedPrices = ref<ProductRegistrationRecommendedPrice[]>([])
 const aiPriceStatus = ref<'idle' | 'loading' | 'completed' | 'failed'>('idle')
-const PRICE_GRADES: ProductRegistrationPriceGrade[] = ['S', 'A', 'B', 'C']
+// 낮은 등급→높은 등급 순으로 둬서, 가격 오름차순인 히스토그램 x축과 마커 위치가 맞도록 한다.
+const PRICE_GRADES: ProductRegistrationPriceGrade[] = ['C', 'B', 'A', 'S']
 
 const createInitialDraft = (): ProductRegistrationDraft => ({
   photos: [],
@@ -220,6 +221,8 @@ const createInitialDraft = (): ProductRegistrationDraft => ({
   directSalePrice: '',
   linkedLiveId: '',
   draftProductId: null,
+  priceMatchKey: null,
+  priceEstimateSnapshot: null,
 })
 
 const draft = reactive<ProductRegistrationDraft>(createInitialDraft())
@@ -1018,8 +1021,8 @@ const resetQualityDraftState = () => {
   draft.aiPhotoResults = []
   currentAiResultIndex.value = 0
   isQualityCategoryUnsupported.value = false
-  // 아직 도는 검수 폴링이 있어도 그 결과를 더는 반영하지 않는다(토큰 불일치로 무시됨).
-  qualityInspectionPollToken += 1
+  // 대기 중인 beginQualityInspection 호출(하드코딩 결과 지연 중)이 있어도 더는 반영하지 않는다.
+  qualityInspectionSequence += 1
   // 사진이 바뀌면 이미 만든 draft 상품(있다면)의 이미지와 어긋난다 — 다음 '상태/하자' 진입 시
   // 새 사진으로 처음부터 다시 검수하도록 draft 자체를 버린다. 그 draft 상품은 BE에 DRAFT
   // 상태로 고아처럼 남지만 목록에 노출되지 않아 별도 정리 대상은 아니다.
@@ -1174,65 +1177,89 @@ const beginQualityInspection = async () => {
 
   isQualityCategoryUnsupported.value = false
   draft.aiQualityStatus = 'loading'
+  const currentSequence = ++qualityInspectionSequence
 
   try {
     const productId = await createDraftProduct(draft, {
-      brands: brands.value,
       categories: categories.value,
     })
-    draft.draftProductId = productId
+    // 업로드가 끝난 뒤에 id를 기록한다. 먼저 기록하면 업로드가 실패해도 "이미 다 올렸다"는
+    // 표시만 남아, 최종 등록이 사진 업로드를 건너뛰고 0장짜리 상품을 만들어 버린다(-310에서
+    // role이 필수가 되면서 실제로 그렇게 등록된 상품이 있었다).
     await uploadProductImages(productId, draft.photos)
-    void pollQualityInspectionStatus(productId)
+    if (currentSequence !== qualityInspectionSequence) return
+    draft.draftProductId = productId
+
+    const frontPhoto = frontPhotos.value[0]
+    const backPhoto = backPhotos.value[0]
+    const photoIdByImageIndex: Record<number, string> = {}
+    if (frontPhoto) photoIdByImageIndex[0] = frontPhoto.id
+    if (backPhoto) photoIdByImageIndex[1] = backPhoto.id
+
+    const deadline = Date.now() + QUALITY_INSPECTION_POLL_TIMEOUT_MS
+    let status: Awaited<ReturnType<typeof getProductQualityInspectionStatus>> = {
+      status: 'PENDING',
+      result: null,
+    }
+
+    while (
+      currentSequence === qualityInspectionSequence &&
+      status.status !== 'COMPLETED' &&
+      status.status !== 'FAILED' &&
+      Date.now() < deadline
+    ) {
+      try {
+        status = await getProductQualityInspectionStatus(productId)
+      } catch {
+        // 일시적 오류일 수 있다 — 다음 폴링에서 재시도.
+      }
+      if (currentSequence !== qualityInspectionSequence) return
+
+      if (status.status === 'COMPLETED' || status.status === 'FAILED') break
+
+      await sleep(QUALITY_INSPECTION_POLL_INTERVAL_MS)
+    }
+
+    if (currentSequence !== qualityInspectionSequence) return
+
+    if (status.status !== 'COMPLETED' || !status.result) {
+      draft.aiQualityStatus = 'failed'
+      return
+    }
+
+    draft.aiPhotoResults = mapQualityInspectionResultToPhotoResults(
+      status.result,
+      photoIdByImageIndex,
+    )
+    currentAiResultIndex.value = 0
+    draft.aiQualityStatus = 'completed'
   } catch (error) {
     console.error('[ProductRegistrationPage] AI 품질 검증 시작 실패', error)
     draft.aiQualityStatus = 'failed'
   }
 }
 
-// BE가 이미지 등록 시점에 이미 검수를 트리거해두므로, FE는 결과만 반복 조회한다
-// (pollAiModelCutStatus와 같은 패턴 — 토큰 기반 취소, 완료/실패/미지원까지 반복).
-const pollQualityInspectionStatus = async (productId: number) => {
-  const token = ++qualityInspectionPollToken
-  const deadline = Date.now() + QUALITY_INSPECTION_POLL_TIMEOUT_MS
+// AI 착용컷(docs/requests/BE/039) job의 상태/결과를 완료·실패까지 백그라운드로 폴링한다.
+// 등록 제출은 이미 끝난 뒤라(완료 화면으로 이동) 결과가 나오는 대로 상태만 갱신하면 된다.
+const pollAiModelCutResult = async (productId: number, token: number) => {
+  const deadline = Date.now() + AI_MODEL_CUT_POLL_TIMEOUT_MS
 
   while (Date.now() < deadline) {
-    if (token !== qualityInspectionPollToken) return
+    if (token !== aiModelCutPollToken) return
 
     try {
-      const status = await getProductQualityInspectionStatus(productId)
-      if (token !== qualityInspectionPollToken) return
+      const status = await getProductAiModelCutStatus(productId)
+      if (token !== aiModelCutPollToken) return
 
-      if (status.status === 'NONE') {
-        isQualityCategoryUnsupported.value = true
-        draft.aiQualityStatus = 'failed'
-        return
-      }
+      aiModelCutStatus.value = status.status
+      aiModelCutImageUrl.value = status.imageUrl
 
-      if (status.status === 'FAILED') {
-        draft.aiQualityStatus = 'failed'
-        return
-      }
-
-      if (status.status === 'COMPLETED' && status.result) {
-        const frontPhoto = frontPhotos.value[0]
-        const backPhoto = backPhotos.value[0]
-        const photoIdByImageIndex: Record<number, string> = {}
-        if (frontPhoto) photoIdByImageIndex[0] = frontPhoto.id
-        if (backPhoto) photoIdByImageIndex[1] = backPhoto.id
-
-        draft.aiPhotoResults = mapQualityInspectionResultToPhotoResults(
-          status.result,
-          photoIdByImageIndex,
-        )
-        currentAiResultIndex.value = 0
-        draft.aiQualityStatus = 'completed'
-        return
-      }
+      if (status.status === 'COMPLETED' || status.status === 'FAILED') return
     } catch {
-      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도, 화면 상태는 건드리지 않는다.
+      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도.
     }
 
-    await sleep(QUALITY_INSPECTION_POLL_INTERVAL_MS)
+    await sleep(AI_MODEL_CUT_POLL_INTERVAL_MS)
   }
 }
 
@@ -1253,12 +1280,24 @@ const applyAiPriceEstimates = (estimates: ProductAiPriceEstimate[]) => {
   priceRecommendationBuckets.value = confirmedEstimate
     ? buildPriceRecommendationBuckets(confirmedEstimate.compPrices)
     : []
+
+  // CH001: 4개 등급 모두 같은 matchKey를 반환하니(브랜드+제목+카테고리로만 계산됨) 아무
+  // 응답에서나 가져다 쓴다(042).
+  draft.priceMatchKey = estimates.find((estimate) => estimate.matchKey !== null)?.matchKey ?? null
+
+  // CH003: 상품 상세가 LLM 재호출 없이 그대로 보여줄 스냅샷 — 확정 등급 것만 저장한다.
+  // PricingResult는 필드가 고정된 인터페이스라 Record<string, unknown>(PATCH 전송용
+  // 범용 타입)로는 구조적으로 안 좁혀져 단언이 필요하다.
+  draft.priceEstimateSnapshot =
+    (confirmedEstimate?.rawResult as Record<string, unknown> | null | undefined) ?? null
 }
 
 const resetAiPriceRecommendation = () => {
   aiPriceStatus.value = 'idle'
   recommendedPrices.value = []
   priceRecommendationBuckets.value = []
+  draft.priceMatchKey = null
+  draft.priceEstimateSnapshot = null
 }
 
 // AI 가격 추천(028)은 등급 4개를 각각 job으로 조회해야 하는데, AI 쪽 동시 처리 상한이 2건이라
@@ -1270,11 +1309,16 @@ const triggerAiPriceRecommendation = async () => {
 
   aiPriceStatus.value = 'loading'
 
-  const input = {
+  // 등급마다 "이 상태등급이라면"을 가정한 입력이라(BE PriceEstimateRequest.conditionScore/
+  // conditionGrade가 필수), conditionScore/conditionGrade만 등급별로 다르고 나머지는 공통이다.
+  const buildInput = (grade: ProductRegistrationPriceGrade): ProductAiPriceEstimateInput => ({
+    productId: draft.draftProductId ?? undefined,
     productName: draft.name.trim(),
-    category: categoryMajorId.value || undefined,
+    categoryId: Number(draft.categoryId) || undefined,
     brand: draft.brand.trim() || undefined,
-  }
+    conditionScore: AI_PRICE_GRADE_SCORES[grade],
+    conditionGrade: grade,
+  })
 
   try {
     const estimates: ProductAiPriceEstimate[] = []
@@ -1282,7 +1326,7 @@ const triggerAiPriceRecommendation = async () => {
     for (let batchStart = 0; batchStart < PRICE_GRADES.length; batchStart += 2) {
       const batch = PRICE_GRADES.slice(batchStart, batchStart + 2)
       const batchResults = await Promise.all(
-        batch.map((grade) => estimateRegistrationPrice(grade, input)),
+        batch.map((grade) => estimateRegistrationPrice(grade, buildInput(grade))),
       )
       estimates.push(...batchResults)
     }
@@ -1374,34 +1418,6 @@ const moveToPreviousStep = () => {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 
-// AI 착용컷 생성 상태를 완료 화면에서 폴링한다. 대표 이미지 등록 시점에 BE가 job을
-// 트리거하므로, 상품 생성 직후에는 아직 NONE/PENDING일 수 있다 — 완료·실패까지 반복
-// 조회한다. 실패해도 상품 등록 자체는 이미 끝난 상태라 조용히 멈춘다(보조 기능).
-const pollAiModelCutStatus = async (productId: string) => {
-  const token = ++aiModelCutPollToken
-  const deadline = Date.now() + AI_MODEL_CUT_POLL_TIMEOUT_MS
-
-  while (Date.now() < deadline) {
-    if (token !== aiModelCutPollToken) return
-
-    try {
-      const result = await getProductAiModelCutStatus(Number(productId))
-      if (token !== aiModelCutPollToken) return
-
-      aiModelCutStatus.value = result.status
-      aiModelCutImageUrl.value = result.imageUrl
-
-      if (result.status === 'COMPLETED' || result.status === 'FAILED' || result.status === 'NONE') {
-        return
-      }
-    } catch {
-      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도, 화면 상태는 건드리지 않는다.
-    }
-
-    await sleep(AI_MODEL_CUT_POLL_INTERVAL_MS)
-  }
-}
-
 const proceedToNextStep = async (skipCompletenessPrompt = false) => {
   if (isSubmittingRegistration.value) {
     return
@@ -1432,7 +1448,6 @@ const proceedToNextStep = async (skipCompletenessPrompt = false) => {
 
     try {
       const submitResult = await submitProductRegistrationDraft(draft, {
-        brands: brands.value,
         categories: categories.value,
       })
       registeredProductId.value = submitResult.productId
@@ -1440,7 +1455,8 @@ const proceedToNextStep = async (skipCompletenessPrompt = false) => {
       if (draft.aiModelEnabled) {
         aiModelCutStatus.value = 'PENDING'
         aiModelCutImageUrl.value = null
-        void pollAiModelCutStatus(submitResult.productId)
+        const token = ++aiModelCutPollToken
+        void pollAiModelCutResult(Number(submitResult.productId), token)
       }
     } catch (error) {
       registrationSubmitError.value = normalizeApiError(error).message
@@ -1519,12 +1535,8 @@ const moveToRegisteredProduct = () => {
 
 const loadProductMasterData = async () => {
   try {
-    const [brandResponse, categoryResponse] = await Promise.all([getBrands(), getCategories()])
-
-    brands.value = brandResponse
-    categories.value = categoryResponse
+    categories.value = await getCategories()
   } catch {
-    brands.value = []
     categories.value = []
   }
 }
@@ -1534,8 +1546,9 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  aiModelCutPollToken += 1
   classifyPollToken += 1
+  qualityInspectionSequence += 1
+  aiModelCutPollToken += 1
   draft.photos.forEach((photo) => {
     revokePhotoPreviewUrl(photo)
   })

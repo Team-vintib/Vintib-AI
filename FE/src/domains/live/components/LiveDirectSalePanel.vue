@@ -77,13 +77,14 @@ watch(
   <aside class="live-direct-sale-panel" aria-labelledby="live-direct-sale-title">
     <div class="live-direct-sale-panel__header">
       <h2 id="live-direct-sale-title">정찰제 구매</h2>
-      <span
-        class="live-direct-sale-panel__status"
-        :class="{ 'live-direct-sale-panel__status--sold': product.saleStatus === 'SOLD' }"
-      >
-        {{ statusLabel }}
-      </span>
     </div>
+
+    <span
+      class="live-direct-sale-panel__status"
+      :class="{ 'live-direct-sale-panel__status--sold': product.saleStatus === 'SOLD' }"
+    >
+      {{ statusLabel }}
+    </span>
 
     <div class="live-direct-sale-panel__product">
       <span>선택 상품</span>
@@ -156,8 +157,11 @@ watch(
 .live-direct-sale-panel__price {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
+}
+
+.live-direct-sale-panel__price {
+  justify-content: space-between;
 }
 
 .live-direct-sale-panel h2 {
@@ -171,6 +175,8 @@ watch(
 }
 
 .live-direct-sale-panel__status {
+  display: inline-block;
+  width: fit-content;
   padding: 3px 8px;
   border-radius: var(--radius-badge);
   background: color-mix(in srgb, var(--color-accent) 18%, transparent);

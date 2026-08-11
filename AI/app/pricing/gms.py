@@ -39,8 +39,9 @@ def generate_content(
     prompt: str,
     timeout: float = 90.0,
     max_output_tokens: int = 0,
+    use_search: bool = True,
 ) -> dict:
-    """`POST /models/{model}:generateContent` 1회, `google_search` 그라운딩 포함.
+    """`POST /models/{model}:generateContent` 1회, 기본은 `google_search` 그라운딩 포함.
 
     응답 JSON을 그대로 돌려준다 — 그라운딩 여부 판정(`groundingMetadata`)과 텍스트 추출은
     `comps.py`가 한다. 무거운 import(`httpx`)를 함수 안에 두는 이유는 모듈 로딩 시점을 늦추기
@@ -49,13 +50,16 @@ def generate_content(
     `max_output_tokens`(0이면 지정 안 함)를 CH017에서 추가했다 — 이전에는 상한이 없어 응답이
     중간에 잘려도 알 방법이 없었다. `finishReason`(`STOP`/`MAX_TOKENS` 등)은 응답 JSON에
     그대로 들어 있으므로 이 함수에서 추출하지 않는다 — 판정은 `comps.py`의 몫이다.
+
+    `use_search=False`(CH031)는 웹검색이 필요 없는 호출용이다 — 예: 속성 추출(주어진
+    상품명 텍스트만 파싱, 외부 사실 확인 불필요). 그라운딩 도구를 아예 안 붙이면 그만큼
+    호출이 단순해지고, `comps.py`처럼 그라운딩 여부를 사후 검사할 필요도 없다.
     """
     import httpx
 
-    body: dict = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "tools": [{"google_search": {}}],
-    }
+    body: dict = {"contents": [{"parts": [{"text": prompt}]}]}
+    if use_search:
+        body["tools"] = [{"google_search": {}}]
     if max_output_tokens > 0:
         body["generationConfig"] = {"maxOutputTokens": max_output_tokens}
     try:

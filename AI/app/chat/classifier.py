@@ -1,15 +1,16 @@
 """악성(욕설/혐오/인신공격) 분류기 — 인터페이스 + 규칙 기반 기본 구현 + HF 어댑터.
 
-기본값이 규칙 기반인 이유: CI는 `requirements-dev.txt`만 설치해서 torch/transformers가 없다
-(`AI/CLAUDE.md` CI 규칙). 규칙 기반을 기본으로 두면 전체 파이프라인 테스트가 CI에서 **스킵 없이**
-그대로 돌고, 실모델은 `registry.ACTIVE_CLASSIFIER` 키 하나로 바꿔 끼운다.
+**CH030부터 기본(`registry.ACTIVE_CLASSIFIER`)은 `kcelectra_base_hate`다.** 규칙 기반은
+recall 16.7%로 실서비스엔 너무 낮아서(욕설 10건 중 8건 이상 놓침) KcELECTRA-base-hate
+(accuracy 99.5%/recall 98.8%, CPU 추론 p95 253ms 실측 — `AI/requirements.txt`에 이제
+torch/transformers 포함)로 교체했다. `RuleBasedClassifier`는 삭제하지 않고 그대로
+남겨뒀다 — `registry.ACTIVE_CLASSIFIER = "rule_based"`로 한 줄만 되돌리면 원복된다.
 
 규칙 기반이 커버하는 우회 패턴: 공백/문장부호 삽입, 같은 글자 반복 패딩, 초성체.
-(모음 늘이기 "시이이발" 같은 변형은 커버하지 않는다 — 실모델 전환 시 해소 대상.)
-`classifier_benchmark.ipynb` 실측에서 현 baseline `kor_unsmile`이 이런 우회를 절반 가까이
-놓쳤기 때문에(악성 recall 58.3%), 목업 단계에서도 정규화 전처리는 넣어 둔다.
+(모음 늘이기 "시이이발" 같은 변형은 커버하지 않는다.)
 
-설계: .claude/plans/ai/003-live-comment-moderation-prototype.md
+설계: .claude/plans/ai/003-live-comment-moderation-prototype.md,
+docs/plans/AI/CH030-chat-hate-classifier-swap.md
 """
 
 from __future__ import annotations
@@ -42,7 +43,10 @@ class AbuseClassifier(ABC):
 # --- 규칙 기반 기본 구현 ---------------------------------------------------
 
 # 욕설/혐오/인신공격 사전. 목업 수준의 최소 셋이다 — 실서비스는 모델로 교체하는 것이 전제다.
-# 인접 중복 글자가 있는 표제어는 넣지 않는다(정규화가 중복을 접기 때문).
+# 인접 중복 글자가 있는 표제어는 되도록 넣지 않는다(정규화가 중복을 접기 때문에 `collapsed`
+# 경로로는 안 잡힌다) -- 다만 영단어 상당수가 구조적으로 겹자음을 포함해서(asshole/nigger 등)
+# 전부 피할 수는 없다. 그런 표제어도 `plain`(원문 그대로) 경로로는 정상 매칭된다 -- 반복
+# 글자를 늘여서 우회한 경우("assss")만 `collapsed` 보정 혜택을 못 받는 정도의 제한이다.
 _ABUSE_TERMS: tuple[str, ...] = (
     "시발",
     "씨발",
@@ -67,6 +71,21 @@ _ABUSE_TERMS: tuple[str, ...] = (
     "꼴값",
     "죽어라",
     "찌질",
+    # 영어 욕설/혐오 표현(-571 후속). normalize()가 이미 영문을 소문자화해서 담으므로
+    # 표제어도 소문자로 등록한다 -- 부분 문자열 매칭이라 "fuck"이 "fucking"/"motherfucker"도,
+    # "shit"이 "bullshit"/"shithead"도 함께 잡는다.
+    "fuck",
+    "shit",
+    "bitch",
+    "asshole",
+    "bastard",
+    "cunt",
+    "slut",
+    "whore",
+    "nigger",
+    "nigga",
+    "faggot",
+    "retard",
 )
 
 # 초성체 우회. 사용자가 **낱자 자모를 직접 입력한** 경우에만 검사한다.
@@ -168,7 +187,15 @@ class HuggingFaceClassifier(AbuseClassifier):
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
             tokenizer = AutoTokenizer.from_pretrained(self._model_id)
-            model = AutoModelForSequenceClassification.from_pretrained(self._model_id)
+            # low_cpu_mem_usage=False로 명시 -- accelerate가 설치돼 있으면 transformers가
+            # 기본으로 meta 디바이스에 지연 초기화(low_cpu_mem_usage=True)를 켜는데, 이
+            # 조합에서 일부 텐서가 실제 디바이스로 안 옮겨지고 meta에 남아
+            # "Tensor on device cpu is not on the expected device meta!"로 터지는 걸
+            # 프로덕션에서 실측했다. 이 모델은 작아서(base급) 메모리 절약형 로딩이 애초에
+            # 필요 없다.
+            model = AutoModelForSequenceClassification.from_pretrained(
+                self._model_id, low_cpu_mem_usage=False
+            )
             model.eval()
             self._bundle = (tokenizer, model)
         return self._bundle
@@ -198,8 +225,79 @@ class HuggingFaceClassifier(AbuseClassifier):
         return AbuseResult(score=round(score, 4), label=label)
 
 
+# --- 하이브리드(사전 + 모델) -------------------------------------------------
+
+
+_MODEL_MIN_LENGTH = (
+    5  # 이 미만이면(반복 접힌 정규화 기준) 모델을 안 태운다 -- 아래 클래스독스트링 참고
+)
+
+# 명백히 정상인 질문/관리요청 문장은 모델을 안 태운다(정규화된 문자열 대상, 공백 없음).
+# "-나요"/"-까요"로 끝나는 정중한 질문형과, 도배/광고/소음 항의처럼 흔한 관리 요청 문구만
+# 좁게 잡았다 -- 반말 의문형("~하냐")이나 서술형은 안 걸리므로 은근한 모욕 탐지(모델 경로)는
+# 그대로 유지된다. 실측(2026-08-09): "이거 M 사이즈 있나요"(0.5041)/"그만 좀 하세요"(0.7442)/
+# "도배 하지 마세요"(0.8118)가 전부 모델 단독으로 ABUSIVE 판정됐는데, 같은 모델에서 진짜
+# 은근한 모욕인 "저 사람은 옷 고르는 안목이 부족한 편이다"도 0.8115로 점수가 거의 같아서
+# 임계값 조정으로는 구분이 안 된다(임계값을 올리면 이것도 같이 놓친다) -- 그래서 임계값
+# 대신 이 문장들이 안전하다고 알려진 패턴 자체를 화이트리스트로 우회시킨다.
+# 알려진 한계(사용자 확인 후 채택): 이 패턴을 흉내 낸 모욕("그렇게 못생겼나요?", "그만 좀
+# 죽어주세요")은 사전에도 안 걸리고 이 화이트리스트에도 걸려서 빠져나갈 수 있다 -- 새 우회
+# 패턴이 발견되면 여기 추가하는 식으로 계속 다듬어야 한다(whack-a-mole, 근본 해결 아님).
+_SAFE_QUESTION_SUFFIX_PATTERN = re.compile(r"(나요|까요)$")
+_SAFE_MODERATION_REQUEST_PATTERN = re.compile(
+    r"(그만좀?(해주세요|하세요)|도배하지(말아주세요|마세요)|광고(그만하세요|하지마세요)|조용히좀?해주세요)"
+)
+
+
+class HybridClassifier(AbuseClassifier):
+    """사전(RuleBasedClassifier)과 모델(HuggingFaceClassifier)을 OR로 결합한다.
+
+    실측(로컬, 2026-08-09): KcELECTRA 단독으로는 "병신같은 방송이네"(명백한 욕설)조차
+    0.3185로 임계값(0.5)을 못 넘기고, "ㅂㅅ 이게 뭐야"도 0.4991로 아슬아슬하게 놓쳤다 --
+    문맥이 짧으면 모델 확신도가 애매해지는 것으로 보인다. 반면 rule_based는 사전 단어를
+    항상 확정적으로(0.9/0.75) 잡는다. 그래서 rule_based가 먼저 걸러보고(빠르고 확실한
+    경우), 안 걸리면 모델로 넘겨서(사전에 없는 은근한 모욕/혐오까지) 서로의 약점을
+    메운다. rule_based가 이미 걸렸으면 모델 호출(느림, ~30-250ms) 자체를 생략한다.
+
+    **추가 실측(같은 날): 모델이 짧은 입력에서 훨씬 심하게 오탐한다.** "ㅇ"(0.8482),
+    "ㅋㅋ"(0.7865), "넵"(0.8536) 전부 ABUSIVE로 잘못 판정했다 -- 실시간 채팅에서 가장
+    흔한 반응들이라 이대로면 채팅 자체가 못 쓰게 된다. 그래서 반복 문자를 접은 뒤 길이가
+    `_MODEL_MIN_LENGTH` 미만이면 모델을 아예 안 태우고 clean으로 본다 -- 그만큼 짧은
+    욕설은 이미 rule_based 사전/초성체 목록이 커버한다(예: "씹"/"좆"은 1글자, "지랄"/
+    "닥쳐"/"꺼져"는 2글자로 전부 사전에 있음). 반복 문자를 접는 이유: "ㅋㅋㅋㅋㅋ"(정규화
+    길이 5)처럼 접기 전 길이만 보면 게이트를 피해가는 도배성 반복 문자가 있었다 -- 실제
+    내용은 "ㅋ" 하나뿐인데 모델까지 태워져 똑같이 오탐(0.8645)했다.
+
+    **세 번째 실측(같은 날): 모델이 정중한 질문/관리요청 문장까지 공격적으로 오인식한다.**
+    위 `_SAFE_*_PATTERN` 독스트링 참고.
+    """
+
+    def __init__(self, rule_classifier: AbuseClassifier, model_classifier: AbuseClassifier) -> None:
+        self._rule = rule_classifier
+        self._model = model_classifier
+
+    def score(self, text: str) -> AbuseResult:
+        rule_result = self._rule.score(text)
+        if rule_result.score >= registry.ABUSE_THRESHOLD:
+            return rule_result
+
+        normalized = normalize(text)
+        if len(_collapse_repeats(normalized)) < _MODEL_MIN_LENGTH:
+            return rule_result
+        if _SAFE_QUESTION_SUFFIX_PATTERN.search(normalized):
+            return rule_result
+        if _SAFE_MODERATION_REQUEST_PATTERN.search(normalized):
+            return rule_result
+
+        return self._model.score(text)
+
+
 def build_classifier(key: str | None = None) -> AbuseClassifier:
-    """레지스트리 키로 분류기를 만든다. 미등록 키는 조립 시점에 바로 실패시킨다."""
+    """레지스트리 키로 분류기를 만든다. 미등록 키는 조립 시점에 바로 실패시킨다.
+
+    모델 기반 백엔드는 항상 rule_based와 하이브리드로 묶는다(위 HybridClassifier 참고) --
+    모델 단독으로는 사전에 있는 뻔한 욕설도 놓치는 게 실측으로 확인됐다.
+    """
     resolved = key or registry.ACTIVE_CLASSIFIER
     try:
         model_id = registry.CLASSIFIER_BACKENDS[resolved]
@@ -207,4 +305,4 @@ def build_classifier(key: str | None = None) -> AbuseClassifier:
         raise ValueError(f"등록되지 않은 분류기 백엔드입니다: {resolved!r}") from exc
     if model_id is None:
         return RuleBasedClassifier()
-    return HuggingFaceClassifier(model_id)
+    return HybridClassifier(RuleBasedClassifier(), HuggingFaceClassifier(model_id))

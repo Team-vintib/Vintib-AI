@@ -52,11 +52,8 @@ let loadRequestId = 0
 
 const aiModelCutStatus = ref<ProductAiModelCutStatus>('NONE')
 const aiModelCutImageUrl = ref<string | null>(null)
-let aiModelCutPollToken = 0
-// 워커가 job마다 VLM/FLUX/CatVTON을 순차로 새로 로드하는 구조라(6GB급 GPU 전제) 완료까지
-// 4분 넘게 걸릴 수 있다(-517 로컬 테스트에서 확인) — ProductRegistrationPage.vue와 동일한 값.
-const AI_MODEL_CUT_POLL_INTERVAL_MS = 5_000
-const AI_MODEL_CUT_POLL_TIMEOUT_MS = 600_000
+const AI_MODEL_CUT_POLL_INTERVAL_MS = 3_000
+const AI_MODEL_CUT_POLL_TIMEOUT_MS = 120_000
 
 const isPurchaseDialogOpen = ref(false)
 const purchasePointBalance = ref<number | null>(null)
@@ -72,7 +69,6 @@ const isLiked = computed(() =>
 )
 
 // 상품 상세 상품을 AI 시착 패널(LiveTryOnPanel)이 받는 형태로 어댑트.
-// LiveTryOnPanel(TRYON-004)은 mock 생성 흐름을 유지한 채 재사용한다.
 const tryOnProduct = computed<LiveWatchProduct | null>(() => {
   if (!product.value) return null
 
@@ -113,36 +109,6 @@ const galleryImages = computed(() => {
   ]
 })
 
-const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
-
-// 등록 시 켠 AI 착용컷의 생성 상태를 상품 상세 마지막에 보여준다. 아직 안 끝났으면
-// ProductRegistrationPage.vue의 완료 화면과 동일한 폴링 패턴으로 완료·실패까지 반복
-// 조회한다. 실패해도 상품 상세 자체는 이미 정상 표시된 상태라 조용히 멈춘다(보조 기능).
-const pollAiModelCutStatus = async (productId: number) => {
-  const token = ++aiModelCutPollToken
-  const deadline = Date.now() + AI_MODEL_CUT_POLL_TIMEOUT_MS
-
-  while (Date.now() < deadline) {
-    if (token !== aiModelCutPollToken) return
-
-    try {
-      const result = await getProductAiModelCutStatus(productId)
-      if (token !== aiModelCutPollToken) return
-
-      aiModelCutStatus.value = result.status
-      aiModelCutImageUrl.value = result.imageUrl
-
-      if (result.status === 'COMPLETED' || result.status === 'FAILED' || result.status === 'NONE') {
-        return
-      }
-    } catch {
-      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도, 화면 상태는 건드리지 않는다.
-    }
-
-    await sleep(AI_MODEL_CUT_POLL_INTERVAL_MS)
-  }
-}
-
 const loadProductDetail = async () => {
   const productId = Number(route.params.productId)
   const requestId = ++loadRequestId
@@ -152,7 +118,6 @@ const loadProductDetail = async () => {
   actionMessage.value = ''
   purchaseSuccessOrderId.value = null
   clearTimeout(actionMessageTimer)
-  aiModelCutPollToken += 1
   aiModelCutStatus.value = 'NONE'
   aiModelCutImageUrl.value = null
 
@@ -183,13 +148,40 @@ const loadProductDetail = async () => {
         nextProduct.aiModelCut.status === 'PENDING' ||
         nextProduct.aiModelCut.status === 'PROCESSING'
       ) {
-        void pollAiModelCutStatus(nextProduct.id)
+        void pollAiModelCutResult(productId, requestId)
       }
     }
   } catch (error) {
     if (requestId !== loadRequestId) return
 
     loadState.value = error instanceof ProductDetailNotFoundError ? 'not-found' : 'error'
+  }
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+
+// AI 착용컷이 아직 생성 중(PENDING/PROCESSING)일 때 완료·실패까지 폴링한다. requestId는
+// loadProductDetail 호출 시점의 loadRequestId 스냅샷 — 그 사이 다른 상품으로 이동하면
+// (loadRequestId 증가) 폴링을 스스로 멈춘다.
+const pollAiModelCutResult = async (productId: number, requestId: number) => {
+  const deadline = Date.now() + AI_MODEL_CUT_POLL_TIMEOUT_MS
+
+  while (Date.now() < deadline) {
+    if (requestId !== loadRequestId) return
+
+    try {
+      const status = await getProductAiModelCutStatus(productId)
+      if (requestId !== loadRequestId) return
+
+      aiModelCutStatus.value = status.status
+      aiModelCutImageUrl.value = status.imageUrl
+
+      if (status.status === 'COMPLETED' || status.status === 'FAILED') return
+    } catch {
+      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도.
+    }
+
+    await sleep(AI_MODEL_CUT_POLL_INTERVAL_MS)
   }
 }
 
@@ -385,7 +377,6 @@ watch(isTryOnOpen, (open) => {
 
 onBeforeUnmount(() => {
   loadRequestId += 1
-  aiModelCutPollToken += 1
   clearTimeout(actionMessageTimer)
   window.removeEventListener('keydown', handleTryOnKeydown)
 })
@@ -454,9 +445,34 @@ onBeforeUnmount(() => {
         />
       </div>
 
+      <section
+        v-if="aiModelCutStatus !== 'NONE'"
+        class="product-detail__ai-model-cut"
+        aria-label="AI 모델 시착 이미지"
+      >
+        <h2 class="product-detail__ai-model-cut-title">AI 모델 시착</h2>
+
+        <div class="product-detail__ai-model-cut-status" role="status">
+          <template v-if="aiModelCutStatus === 'PENDING' || aiModelCutStatus === 'PROCESSING'">
+            <span class="product-detail__ai-model-cut-spinner" aria-hidden="true"></span>
+            <p>생성중입니다. 완료되면 여기에 표시됩니다.</p>
+          </template>
+          <template v-else-if="aiModelCutStatus === 'COMPLETED' && aiModelCutImageUrl">
+            <img
+              :src="aiModelCutImageUrl"
+              alt="AI 모델 시착 이미지"
+              class="product-detail__ai-model-cut-image"
+            />
+          </template>
+          <template v-else-if="aiModelCutStatus === 'FAILED'">
+            <p>AI 모델 시착 이미지 생성에 실패했습니다.</p>
+          </template>
+        </div>
+      </section>
+
       <ProductPriceDistribution
         :current-product-id="product.id"
-        :current-price="product.price"
+        :current-price="product.saleType === 'AUCTION' ? null : product.price"
         :products="product.similarProducts"
         @view-product="handleViewSimilarProduct"
       />
@@ -482,31 +498,6 @@ onBeforeUnmount(() => {
         :analysis="product.aiQualityAnalysis"
       />
       <ProductSimilarRecommendation :product-id="product.id" />
-
-      <section
-        v-if="aiModelCutStatus !== 'NONE'"
-        class="product-detail__ai-model-cut"
-        aria-label="AI 모델 시착 이미지"
-      >
-        <h2 class="product-detail__ai-model-cut-title">AI 모델 시착</h2>
-
-        <div class="product-detail__ai-model-cut-status" role="status">
-          <template v-if="aiModelCutStatus === 'PENDING' || aiModelCutStatus === 'PROCESSING'">
-            <span class="product-detail__ai-model-cut-spinner" aria-hidden="true"></span>
-            <p>생성중입니다. 완료되면 여기에 표시됩니다.</p>
-          </template>
-          <template v-else-if="aiModelCutStatus === 'COMPLETED' && aiModelCutImageUrl">
-            <img
-              :src="aiModelCutImageUrl"
-              alt="AI 모델 시착 이미지"
-              class="product-detail__ai-model-cut-image"
-            />
-          </template>
-          <template v-else-if="aiModelCutStatus === 'FAILED'">
-            <p>AI 모델 시착 이미지 생성에 실패했습니다.</p>
-          </template>
-        </div>
-      </section>
     </article>
 
     <div
@@ -520,7 +511,9 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="product-try-on-popup__expand"
-          :aria-label="isTryOnExpanded ? 'AI 시착 팝업 작게 보기' : 'AI 시착 팝업 전체 화면으로 보기'"
+          :aria-label="
+            isTryOnExpanded ? 'AI 시착 팝업 작게 보기' : 'AI 시착 팝업 전체 화면으로 보기'
+          "
           @click="toggleTryOnExpanded"
         >
           <svg v-if="!isTryOnExpanded" viewBox="0 0 24 24" aria-hidden="true">

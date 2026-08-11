@@ -41,6 +41,8 @@ public record ProductDetailResponse(
         @Schema(description = "같은 카테고리 유사 상품 목록. 같은 브랜드 상품이 앞쪽에 온다")
                 List<SimilarProductResponse> similarProducts,
         @Schema(description = "AI 품질 검수 결과(등록 시점에 확정된 값)") AiQualityAnalysisResponse aiQualityAnalysis,
+        @Schema(description = "AI 시세 추천 결과(등록 시 확정 등급 기준, CH003). 산정 전 상품이면 null")
+                ProductPriceEstimateResponse priceEstimate,
         @Schema(example = "2026-07-29T12:00:00") LocalDateTime createdAt,
         @Schema(example = "2026-07-29T12:00:00") LocalDateTime updatedAt) {
 
@@ -54,7 +56,8 @@ public record ProductDetailResponse(
             Long sellerProductCount,
             LinkedLiveSummaryResponse linkedLive,
             List<SimilarProductResponse> similarProducts,
-            AiQualityAnalysisResponse aiQualityAnalysis) {
+            AiQualityAnalysisResponse aiQualityAnalysis,
+            ProductPriceEstimateResponse priceEstimate) {
         return new ProductDetailResponse(
                 product.getId(),
                 product.getSeller().getId(),
@@ -84,6 +87,7 @@ public record ProductDetailResponse(
                 ProductAiModelCutResponse.from(product),
                 similarProducts,
                 aiQualityAnalysis,
+                priceEstimate,
                 product.getCreatedAt(),
                 product.getUpdatedAt());
     }

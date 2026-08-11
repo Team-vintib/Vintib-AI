@@ -127,6 +127,9 @@ CREATE TABLE product (
     size_label      VARCHAR(50),
     color           VARCHAR(50),
     material        VARCHAR(50),
+    -- "동일 상품" 판정 키(AI 시세 조회). AI가 상품명+브랜드+카테고리로 계산해 돌려준
+    -- 값을 FE가 그대로 넘겨 저장한다 — BE는 계산하지 않는다. 아직 계산 전이면 NULL.
+    match_key       VARCHAR(300),
     measurements    JSONB,                           -- 실측 치수(cm). 항목이 상품마다 달라 고정 컬럼 대신 JSONB
     sale_type       VARCHAR(20),                     -- 정찰제 / 경매. 기본 정보 저장 시점에는 NULL,
                                                        -- 판매 채널을 정하는 API(판매 가격 설정/경매 조건 설정)
@@ -499,11 +502,14 @@ CREATE TABLE order_shipment (
     tracking_number VARCHAR(50),
     shipped_at      TIMESTAMPTZ,
     -- 더 이상 송장 등록 시점에 즉시 채우지 않는다 — deliveryapi.co.kr 웹훅으로 실제 배송완료
-    -- 신호를 받았을 때만 채운다(웹훅 구독 실패 시에는 예외적으로 즉시 채우는 폴백을 쓴다).
+    -- 신호를 받았을 때만 채운다. 웹훅 구독 실패 건은 ShipmentFallbackDeliveryScheduler가
+    -- shipped_at으로부터 일정 시간(OrderService.FALLBACK_DELAY) 뒤 지연 폴백 처리한다.
     delivered_at    TIMESTAMPTZ,
-    -- 배송 진행 상태(SY034). 웹훅이 올 때마다(DELIVERED가 아니어도) 갱신 — 송장 등록 직후
+    -- 배송 진행 상태. 웹훅이 올 때마다(DELIVERED가 아니어도) 갱신 — 송장 등록 직후
     -- 첫 웹훅을 받기 전에는 NULL.
     tracking_status VARCHAR(20),
+    -- 배송 조회 웹훅 구독 성공 여부. 실패 건만 지연 폴백 배치 대상이 된다.
+    webhook_subscribed BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT ck_order_shipment_courier CHECK (courier IN (
         'LOTTE', 'CJ', 'HANJIN', 'POST', 'KYUNGDONG',
         'DAESIN', 'LOGEN', 'HAPDONG', 'COUPANG', 'WOORI'

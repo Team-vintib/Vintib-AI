@@ -63,6 +63,8 @@ class CompsSourceKey(str, Enum):
     mock = "mock"
     llm_web_search = "llm_web_search"
     internal_clip = "internal_clip"
+    internal = "internal"
+    internal_text = "internal_text"
 
 
 class RetailSourceKey(str, Enum):
@@ -94,6 +96,16 @@ class PricingRequest(BaseModel):
     brand: str | None = Field(default=None, max_length=100, description="있으면 쿼리에 덧붙인다")
     category: GarmentCategory | None = Field(
         default=None, description="있으면 쿼리를 좁힌다. 없어도 동작한다"
+    )
+    category_id: int | None = Field(
+        default=None,
+        description=(
+            "BE 원본 categoryId(숫자, 소분류 24~126). `category`(AI 6종 GarmentCategory)와"
+            " 별개다 — `internal_text` comps 백엔드가 product_corpus(BE categoryId 기준으로"
+            " 채워짐)와 같은 카테고리 체계로 매칭 키를 만드는 데 쓴다. 없으면 internal_text는"
+            " 매칭을 포기한다(카테고리 체계가 다르면 코퍼스와 절대 일치할 수 없어서 시도 자체가"
+            " 무의미하다)."
+        ),
     )
     condition_score: float = Field(
         ge=0.0, le=100.0, description="품질검수 InspectionResult.condition_score 를 그대로"
@@ -149,6 +161,13 @@ class CompItem(BaseModel):
     is_used: bool | None = Field(
         default=None,
         description="중고 여부. **판별 불가면 None이다** — False로 뭉개면 신품과 구별이 사라진다",
+    )
+    price_kind: str | None = Field(
+        default=None,
+        description=(
+            "CH030: 호가/완료거래 태그(ASKING/SOLD_DIRECT/SOLD_AUCTION). `internal`/"
+            "`internal_text` 백엔드만 채운다 — 나머지는 이 구분이 없어 None"
+        ),
     )
 
 
@@ -220,3 +239,12 @@ class PricingResult(BaseModel):
         default_factory=list, description="신상품가 조회 한계·주의 문구. notes(comps용)와 분리"
     )
     latency_ms: float = Field(description="comps 수집 + 산정 소요 시간")
+    product_match_key: str | None = Field(
+        default=None,
+        description=(
+            "CH030: `internal_text` 백엔드가 계산한 '동일 상품' 판정 키(1차/엄격). BE가 상품"
+            "저장 시 `product.match_key` 컬럼에 그대로 반영하면, 구매자 화면은 이 값으로 DB "
+            "조회만 해서 동일 상품 시세를 보여줄 수 있다(RAG/AI 호출 없음). `internal_text`가 "
+            "아니면 None"
+        ),
+    )

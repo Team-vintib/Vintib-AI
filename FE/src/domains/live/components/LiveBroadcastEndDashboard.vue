@@ -17,7 +17,7 @@ const props = withDefaults(
     isLoading: boolean
     errorMessage: string
     // 편성 상품 목록(GET /lives/{id}). 방송 요약 응답에는 판매 방식·등록가가 없어서
-    // productId로 이어 붙여 채운다(요청: docs/requests/BE/045).
+    // productId로 이어 붙여 채운다(요청: docs/requests/BE/047).
     products?: LiveWatchProduct[]
   }>(),
   {

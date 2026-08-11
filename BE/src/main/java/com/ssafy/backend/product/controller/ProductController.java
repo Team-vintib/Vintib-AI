@@ -16,11 +16,14 @@ import com.ssafy.backend.product.dto.response.ProductAiModelCutResponse;
 import com.ssafy.backend.product.dto.response.ProductDetailResponse;
 import com.ssafy.backend.product.dto.response.ProductImageResponse;
 import com.ssafy.backend.product.dto.response.ProductImageUploadUrlResponse;
+import com.ssafy.backend.product.dto.response.ProductMarketPriceResponse;
 import com.ssafy.backend.product.dto.response.ProductQualityInspectionResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
+import com.ssafy.backend.product.dto.response.SimilarProductsResponse;
 import com.ssafy.backend.product.service.PriceEstimateService;
 import com.ssafy.backend.product.service.ProductImageService;
 import com.ssafy.backend.product.service.ProductService;
+import com.ssafy.backend.product.service.SimilarProductQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -54,6 +57,7 @@ public class ProductController {
     private final ProductService productService;
     private final ProductImageService productImageService;
     private final PriceEstimateService priceEstimateService;
+    private final SimilarProductQueryService similarProductQueryService;
 
     @Operation(
             summary = "상품 기본 정보 저장",
@@ -166,6 +170,36 @@ public class ProductController {
     }
 
     @Operation(
+            summary = "동일 상품 시세 조회",
+            description = "같은 matchKey(AI 시세 조회가 상품명·브랜드·카테고리로 판정)를 가진 다른 상품들의 "
+                    + "호가/완료거래가를 보여준다. 비회원도 조회 가능하다. matchKey가 아직 계산되지 않은 "
+                    + "상품이면 listings가 빈 배열로 온다(404 아님).")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @GetMapping("/{id}/market-price")
+    public ResponseEntity<ApiResponse<ProductMarketPriceResponse>> getMarketPrice(@PathVariable Long id) {
+        ProductMarketPriceResponse response = productService.getMarketPrice(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
+            summary = "유사 상품 추천 조회",
+            description = "CLIP 이미지 임베딩 기반 유사 상품(AI, CH034)을 배치로 미리 계산해둔 캐시에서 조회한다. "
+                    + "요청 시점에 AI를 호출하지 않는다 — AI 서버 상태가 이 응답에 영향을 주지 않는다. "
+                    + "캐시 결과가 부족하거나 없으면 기존 카테고리/브랜드 기반 SQL로 채운다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
+    })
+    @GetMapping("/{id}/similar")
+    public ResponseEntity<ApiResponse<SimilarProductsResponse>> getSimilarProducts(@PathVariable Long id) {
+        SimilarProductsResponse response = similarProductQueryService.getSimilarProducts(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(
             summary = "AI 착용컷 생성 상태/결과 조회",
             description = "판매자가 등록 시 AI 착용컷을 켠 상품의 생성 상태 조회. "
                     + "PENDING/PROCESSING이면 이 호출 시점에 AI 쪽 최신 상태 다시 확인.")
@@ -218,7 +252,7 @@ public class ProductController {
     @Operation(
             summary = "상품 정보 수정",
             description = "제목/설명/카테고리/브랜드/상태등급/사이즈/색상/소재/실측/가격 부분 수정. 요청에 포함된 필드만 반영. "
-                    + "하자(defects)·AI 품질 검수 finding(aiQualityFindings)은 둘 다 null이면 미반영, "
+                    + "하자(defects)·AI 품질 검수 제외 key 목록(excludedQualityFindingKeys)은 둘 다 null이면 미반영, "
                     + "값을 보내면 기존 목록 전체 교체(빈 배열이면 전부 삭제). "
                     + "가격(price)은 정찰제(saleType=DIRECT_SALE) 상품만 수정 가능. — 경매 상품에 보내면 400. "
                     + "DRAFT/ON_SALE/AUCTION_SCHEDULED 상태의 상품만 수정 가능.")

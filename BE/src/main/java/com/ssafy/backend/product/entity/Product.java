@@ -15,6 +15,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -91,6 +92,12 @@ public class Product extends BaseTimeEntity {
     @Column(length = 50)
     private String material;
 
+    // "동일 상품" 판정 키(AI 시세 조회, CH030). 상품명+브랜드+카테고리 텍스트로 AI가 계산해
+    // 돌려준 값을 FE가 폴링해서 그대로 넘겨준다 — BE는 저장·조회만 한다(직접 계산 안 함).
+    // 같은 값을 가진 상품끼리 GET /api/products/{id}/market-price에서 "동일 상품"으로 묶인다.
+    @Column(name = "match_key", length = 300)
+    private String matchKey;
+
     // 치수 항목(총장/어깨너비/가슴단면/소매길이 등)이 상품마다 달라 고정 컬럼 대신 JSONB로 담는다.
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
@@ -149,6 +156,20 @@ public class Product extends BaseTimeEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "quality_inspection_result", columnDefinition = "jsonb")
     private Map<String, Object> qualityInspectionResult;
+
+    // 판매자가 "하자 아님"으로 표시한 finding의 key 목록(CH002). qualityInspectionResult
+    // 원본은 절대 건드리지 않고 이 목록으로 "제외 표시"만 얹는다 — 그래서 상세 화면 번호·부위가
+    // 등록 화면과 항상 정확히 일치한다(원본을 축소 저장하던 이전 방식은 SY043 §2, 이번에 대체).
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "excluded_quality_finding_keys", columnDefinition = "jsonb")
+    private List<String> excludedQualityFindingKeys;
+
+    // AI 시세 조회(PricingResult) 원본을 그대로 저장한다(CH003). FE가 등록 시 확정 등급으로
+    // 폴링한 결과를 그대로 전달해 저장해두고, 상세 조회는 LLM을 다시 호출하지 않고 이 스냅샷만
+    // 읽는다 — qualityInspectionResult와 같은 패턴.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "price_estimate_result", columnDefinition = "jsonb")
+    private Map<String, Object> priceEstimateResult;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
@@ -215,7 +236,10 @@ public class Product extends BaseTimeEntity {
             String sizeLabel,
             String color,
             String material,
-            Map<String, Integer> measurements) {
+            Map<String, Integer> measurements,
+            String matchKey,
+            List<String> excludedQualityFindingKeys,
+            Map<String, Object> priceEstimateResult) {
         if (title != null) {
             this.title = title;
         }
@@ -242,6 +266,15 @@ public class Product extends BaseTimeEntity {
         }
         if (measurements != null) {
             this.measurements = measurements;
+        }
+        if (matchKey != null) {
+            this.matchKey = matchKey;
+        }
+        if (excludedQualityFindingKeys != null) {
+            this.excludedQualityFindingKeys = excludedQualityFindingKeys;
+        }
+        if (priceEstimateResult != null) {
+            this.priceEstimateResult = priceEstimateResult;
         }
     }
 

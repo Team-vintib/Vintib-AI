@@ -1,7 +1,11 @@
 import { http } from '@/shared/api/http'
 
 import type { LiveCreateProduct } from '@/domains/live/types/liveCreate.types'
-import { getProductPrimaryImageUrl } from '@/domains/product/api/productApi'
+import {
+  getCategories,
+  getProductPrimaryImageUrl,
+  type CategoryDto,
+} from '@/domains/product/api/productApi'
 import type { ApiResponse } from '@/shared/types/api.types'
 
 export type LiveCreateStatus = 'LIVE' | 'SCHEDULED' | 'ENDED' | 'CANCELED'
@@ -46,8 +50,8 @@ interface BackendPageResponse<T> {
 interface LiveCreateProductDto {
   id: number
   sellerId: number
-  categoryName?: string | null
-  brandName?: string | null
+  categoryId?: number | null
+  brand?: string | null
   title: string
   conditionGrade?: string | null
   saleType?: string | null
@@ -105,15 +109,38 @@ export const getLiveCreateProducts = async (sellerId: number): Promise<LiveCreat
   }
 
   const sellerProducts = data.data.content.filter((product) => product.sellerId === sellerId)
+  // ProductResponse(`GET /products`)는 categoryId만 내려주고 이름은 안 준다 — 상품 등록
+  // 화면과 동일하게 카테고리 마스터 목록을 받아 여기서 이름으로 변환한다. 브랜드는
+  // S15P11A108-327로 FK가 아니라 자유 텍스트(`brand`)가 돼서 그대로 쓰면 된다.
+  const categories = await getCategories().catch(() => [])
+  const categoryById = new Map(categories.map((category) => [category.id, category]))
 
-  return Promise.all(sellerProducts.map(toLiveCreateProduct))
+  return Promise.all(sellerProducts.map((product) => toLiveCreateProduct(product, categoryById)))
 }
 
-const toLiveCreateProduct = async (product: LiveCreateProductDto): Promise<LiveCreateProduct> => ({
+// 상품의 categoryId는 소분류(depth 3)라 이름만 보여주면 "니트"처럼 뭐가 뭔지 알기 어렵다 —
+// 부모(대분류)까지 같이 "아우터 > 니트"로 붙여 보여준다.
+const buildCategoryLabel = (categoryId: number, categoryById: Map<number, CategoryDto>) => {
+  const leaf = categoryById.get(categoryId)
+
+  if (!leaf) {
+    return null
+  }
+
+  const parent = leaf.parentId ? categoryById.get(leaf.parentId) : null
+
+  return parent ? `${parent.name} > ${leaf.name}` : leaf.name
+}
+
+const toLiveCreateProduct = async (
+  product: LiveCreateProductDto,
+  categoryById: Map<number, CategoryDto>,
+): Promise<LiveCreateProduct> => ({
   id: product.id,
   name: product.title,
-  brand: product.brandName || '브랜드 미상',
-  category: product.categoryName || '카테고리 미상',
+  brand: product.brand?.trim() || null,
+  category:
+    (product.categoryId && buildCategoryLabel(product.categoryId, categoryById)) || '카테고리 미상',
   condition: product.conditionGrade || product.saleStatus || '상태 미상',
   price: product.price ?? 0,
   isAuctionScheduled: product.saleType === 'AUCTION' || product.saleStatus === 'AUCTION_SCHEDULED',

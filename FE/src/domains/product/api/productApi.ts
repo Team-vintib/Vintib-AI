@@ -11,8 +11,11 @@ import type {
 } from '@/domains/product/types/productList.types'
 import type {
   AiQualityAnalysis,
+  AiQualityAnalysisStatus,
+  AiQualityFindingBox,
   ProductAiModelCut,
   ProductDetailViewData,
+  ProductPriceEstimate,
   SimilarProductPricePoint,
 } from '@/domains/product/types/productDetail.types'
 import type {
@@ -20,6 +23,7 @@ import type {
   ProductRegistrationAiPhotoResult,
   ProductRegistrationDraft,
   ProductRegistrationPhotoDraft,
+  ProductRegistrationPhotoRole,
   ProductRegistrationSubmitResult,
 } from '@/domains/product/types/productRegistration.types'
 import { mapAiColorKeyToOptionId } from '@/domains/product/constants/aiColorPalette'
@@ -37,12 +41,7 @@ const PRODUCT_API_ENABLED = import.meta.env.VITE_PRODUCT_API_ENABLED !== 'false'
 
 type ProductSaleTypeDto = 'DIRECT_SALE' | 'AUCTION'
 type ProductSaleStatusDto =
-  | 'DRAFT'
-  | 'ON_SALE'
-  | 'AUCTION_SCHEDULED'
-  | 'AUCTION_IN_PROGRESS'
-  | 'AUCTION_FAILED'
-  | 'SOLD'
+  'DRAFT' | 'ON_SALE' | 'AUCTION_SCHEDULED' | 'AUCTION_IN_PROGRESS' | 'AUCTION_FAILED' | 'SOLD'
 
 export interface BrandDto {
   id: number
@@ -69,8 +68,7 @@ interface ProductListDto {
   sellerId: number
   categoryId: number
   categoryName?: string | null
-  brandId: number | null
-  brandName?: string | null
+  brand: string | null
   title: string
   description: string | null
   conditionGrade: ProductConditionGrade | null
@@ -116,36 +114,45 @@ interface ProductDetailDto extends ProductListDto {
     thumbnailUrl: string
   } | null
   similarProducts?: SimilarProductPricePoint[] | null
-  aiQualityAnalysis?: AiQualityAnalysis | null
+  aiQualityAnalysis?: AiQualityAnalysisDto | null
   aiModelCut?: ProductAiModelCut | null
+  priceEstimate?: ProductPriceEstimate | null
   updatedAt: string
 }
 
-// BE 확인 필요 — 등록 화면에서 사용자가 확정한 AI 품질 검증 결과를 담을 필드다.
-// 현재 POST /products는 이 필드를 받지 않는다. 필드명은 docs/requests/BE/041-quality-inspection-integration.md
-// §2가 확정한 AI findings 스키마를 그대로 따른다(BE가 041에서 요구한 "key별 판매자 응답"과
-// 019가 요구하는 "findings 원본"을 둘 다 만족할 수 있도록 원본 필드 전체 + isActualDefect를 함께 보낸다 —
-// 최종적으로 뭘 저장할지는 041 갱신본에서 BE 확인 예정). BE가 반영하기 전까지는 보내도 무시될 뿐이라
-// 안전하게 앞서 채워둔다.
-interface ProductCreateAiQualityFindingRequest {
+// 상품 상세의 AI 분석(요청 043 §2) — BE가 AI 검수 원본에서 조립해 주는 그대로의 모양이다.
+// 화면용 타입(AiQualityAnalysis)과 다른 점이 있어 매핑을 거친다: location이 부위 코드고,
+// alt는 아예 없으며, summary는 화면에서 쓰지 않는다.
+interface AiQualityFindingDto {
   key: string
-  defectType: string
-  label: string
-  imageIndex: number
-  no: number
-  bbox: [number, number, number, number]
-  severity: string
-  statementRequired: boolean
+  type: string | null
+  // 원본 부위 코드(COLLAR, HEM_RIGHT 등). 한글 변환은 FE 몫이다.
+  location: string | null
   description: string | null
-  // 판매자가 "하자 제외"로 뒤집지 않은(=하자로 인정한) 항목인지.
-  isActualDefect: boolean
+  no: number
+  box: AiQualityFindingBox | null
+  isExcluded: boolean
+}
+
+interface AiQualityAnalysisImageDto {
+  label: string
+  originalImageUrl: string | null
+  analyzedImageUrl: string | null
+  summary: string | null
+  findings: AiQualityFindingDto[]
+}
+
+interface AiQualityAnalysisDto {
+  status: AiQualityAnalysisStatus
+  images: AiQualityAnalysisImageDto[]
+  disclaimer: string
 }
 
 interface ProductCreateRequest {
   title: string
   description: string
   categoryId: number | null
-  brandId: number | null
+  brand: string | null
   conditionGrade: ProductConditionGrade | ''
   sizeLabel: string
   color: string | null
@@ -154,7 +161,6 @@ interface ProductCreateRequest {
   defects: string[] | null
   aiModelEnabled: boolean
   aiModelGender: 'MALE' | 'FEMALE' | null
-  aiQualityFindings: ProductCreateAiQualityFindingRequest[]
 }
 
 interface ProductCreateResponse extends Partial<ProductListDto> {
@@ -162,18 +168,31 @@ interface ProductCreateResponse extends Partial<ProductListDto> {
 }
 
 // PATCH /products/{id}(부분 수정)이 실제로 받는 필드 — BE의 ProductUpdateRequest.java 그대로.
-// aiModelEnabled/aiModelGender/aiQualityFindings는 이 엔드포인트에 없다(docs/requests/BE/046 참고).
+// aiModelEnabled/aiModelGender는 이 엔드포인트에 없다 — '기본 정보' 스텝을 나갈 때 이미
+// 확정돼 draft 생성 시점(POST)에 실려 갔으므로 여기서 다시 보낼 필요가 없다.
+// excludedQualityFindingKeys는 판매자가 하자를 인정/제외하는 시점 자체가 DRAFT 생성 이후라,
+// 최종 확정값은 PATCH로만 보낼 수 있다(CH002 — 인정된 것만 보내던 이전 방식을 대체).
 interface ProductUpdateRequest {
   title: string
   description: string
   categoryId: number | null
-  brandId: number | null
+  brand: string | null
   conditionGrade: ProductConditionGrade | ''
   sizeLabel: string
   color: string | null
   material: string | null
   measurements: Record<string, number> | null
   defects: string[] | null
+  // CH001/042: pricing 스텝의 AI 가격 추천 폴링 결과(product_match_key). 계산 전이면
+  // null — BE는 null이면 미반영(기존 값 유지, null로 덮어쓰지 않음)한다.
+  matchKey: string | null
+  // CH002: 판매자가 "하자 아님"으로 표시한 finding의 key 목록. BE는 원본 검수 결과를 그대로
+  // 갖고 있어서(quality_inspection_result) 이 key들만 있으면 상세 화면에서 isExcluded로
+  // 표시할 수 있다. null이면 미반영, 빈 배열이면 제외 목록 전부 해제.
+  excludedQualityFindingKeys: string[] | null
+  // CH003: pricing 스텝에서 확정 등급으로 조회한 AI 시세 산정 결과(PricingResult) 원본.
+  // 상품 상세는 이 스냅샷을 그대로 보여주고 LLM을 다시 호출하지 않는다. null이면 미반영.
+  priceEstimateSnapshot: Record<string, unknown> | null
 }
 
 interface ProductImageUploadUrlResponse {
@@ -182,10 +201,24 @@ interface ProductImageUploadUrlResponse {
   expiresInSeconds: number
 }
 
+// 이미지 용도(BE `ProductImageRole`, -310). FRONT/BACK은 AI 품질 검수용 앞·뒤 사진이고
+// 상품당 한 장씩만 등록된다. **필수 필드라 빠지면 등록이 400으로 거절된다.**
+type ProductImageRoleDto = 'FRONT' | 'BACK' | 'ADDITIONAL'
+
 interface ProductImageRegisterRequest {
   key: string
   sortOrder: number
   isPrimary: boolean
+  role: ProductImageRoleDto
+}
+
+const PRODUCT_IMAGE_ROLE_DTO_BY_DRAFT_ROLE: Record<
+  ProductRegistrationPhotoRole,
+  ProductImageRoleDto
+> = {
+  front: 'FRONT',
+  back: 'BACK',
+  additional: 'ADDITIONAL',
 }
 
 interface ProductListParams {
@@ -201,7 +234,6 @@ interface ProductListParams {
 }
 
 interface ProductSubmitOptions {
-  brands?: BrandDto[]
   categories?: CategoryDto[]
 }
 
@@ -256,7 +288,9 @@ export const getProductList = async ({
     }
   }
 
-  const response = await http.get<ApiResponse<PageResponse<ProductListDto> | BackendPageResponse<ProductListDto>>>('/products', {
+  const response = await http.get<
+    ApiResponse<PageResponse<ProductListDto> | BackendPageResponse<ProductListDto>>
+  >('/products', {
     params: {
       page: Math.max(page - 1, 0),
       size,
@@ -279,14 +313,30 @@ export const getProductList = async ({
   }
 }
 
-// 유사 상품 추천 목록. 실제 유사 판정·목록 API는 미구현(유사 기준도 BE 소관, docs/requests/BE 참고) →
-// 현재는 mock(목록 mock에서 현재 상품 제외). BE 엔드포인트가 확정되면 이 자리를 실제 호출로 교체한다.
+const SIMILAR_PRODUCT_MOCK_LIMIT = 8
+
+/**
+ * 상품 상세 하단 유사 상품 추천 목록.
+ *
+ * `GET /products/{id}/similar`(CH034) — AI CLIP 임베딩 배치 캐시를 BE가 미리 계산해두고,
+ * 부족하면 카테고리/브랜드 SQL로 보충해 반환한다. FE는 categoryId/brand를 몰라도 되고
+ * (BE가 상품 자신의 값으로 알아서 판단), 정렬도 이미 유사도 순으로 와 있어 FE에서 다시
+ * 정렬하지 않는다.
+ */
 export const getSimilarProducts = async (productId: number): Promise<ProductListItem[]> => {
-  if (PRODUCT_API_ENABLED) {
-    return []
+  if (!PRODUCT_API_ENABLED) {
+    return PRODUCT_LIST_MOCK_DATA.filter((product) => product.id !== productId).slice(
+      0,
+      SIMILAR_PRODUCT_MOCK_LIMIT,
+    )
   }
 
-  return PRODUCT_LIST_MOCK_DATA.filter((product) => product.id !== productId).slice(0, 8)
+  const response = await http.get<ApiResponse<{ productId: number; items: ProductListDto[] }>>(
+    `/products/${productId}/similar`,
+  )
+  const { items } = unwrapApiData(response.data)
+
+  return Promise.all(items.map(toProductListItem))
 }
 
 export const getProductDetail = async (productId: number): Promise<ProductDetailViewData> => {
@@ -616,13 +666,13 @@ export const getWishProductIds = async (userId: number) => {
 // submitProduct의 신규 분기와 로직을 공유한다 — 상품 생성 시점만 앞당겨졌을 뿐 필드는 동일하다.
 export const createDraftProduct = async (
   draft: ProductRegistrationDraft,
-  { brands = [], categories = [] }: ProductSubmitOptions = {},
+  { categories = [] }: ProductSubmitOptions = {},
 ): Promise<number> => {
   const createResponse = await http.post<ApiResponse<ProductCreateResponse>>('/products', {
     title: draft.name.trim(),
     description: draft.description.trim(),
     categoryId: findCategoryId(draft, categories),
-    brandId: findBrandId(draft.brand, brands),
+    brand: draft.brand.trim() || null,
     conditionGrade: draft.conditionGrade,
     sizeLabel: draft.size,
     color: resolveRegistrationColor(draft),
@@ -631,7 +681,6 @@ export const createDraftProduct = async (
     defects: resolveRegistrationDefects(draft),
     aiModelEnabled: draft.aiModelEnabled,
     aiModelGender: draft.aiModelEnabled ? draft.aiModelGender : null,
-    aiQualityFindings: resolveRegistrationAiQualityFindings(draft),
   } satisfies ProductCreateRequest)
 
   return getCreatedProductId(unwrapApiData(createResponse.data))
@@ -645,23 +694,32 @@ export const submitProduct = async (
 
   if (draft.draftProductId) {
     // SY043: '상태/하자' 스텝 진입 시 이미 DRAFT 상품+이미지가 만들어져 있다 — 나머지
-    // 필드만 부분 수정하고 이미지는 재업로드하지 않는다. PATCH가 aiModelEnabled/aiModelGender를
-    // 안 받지만, 이 값들은 '기본 정보' 스텝을 나갈 때 이미 확정돼 draft 생성 시점에
-    // 실려 갔으므로 다시 보낼 필요가 없다(docs/requests/BE/046 참고).
+    // 필드만 부분 수정한다. PATCH가 aiModelEnabled/aiModelGender를 안 받지만, 이 값들은
+    // '기본 정보' 스텝을 나갈 때 이미 확정돼 draft 생성 시점에 실려 갔으므로 다시 보낼
+    // 필요가 없다(docs/requests/BE/046 참고).
+    //
+    // 다만 "이미 올라가 있겠지"라고 믿지는 않는다 — 사전 업로드가 실패해도 draftProductId는
+    // 남아 있어서, 사진 0장인 상품이 그대로 등록 완료되던 문제가 있었다. 실제 상태를 확인하고
+    // 비어 있으면 여기서 올린다.
     productId = draft.draftProductId
-    const { brands = [], categories = [] } = options
+    const { categories = [] } = options
+
+    await ensureProductImages(productId, draft.photos)
 
     await http.patch<ApiResponse<ProductCreateResponse>>(`/products/${productId}`, {
       title: draft.name.trim(),
       description: draft.description.trim(),
       categoryId: findCategoryId(draft, categories),
-      brandId: findBrandId(draft.brand, brands),
+      brand: draft.brand.trim() || null,
       conditionGrade: draft.conditionGrade,
       sizeLabel: draft.size,
       color: resolveRegistrationColor(draft),
       material: draft.material.trim() || null,
       measurements: resolveRegistrationMeasurements(draft),
       defects: resolveRegistrationDefects(draft),
+      matchKey: draft.priceMatchKey,
+      excludedQualityFindingKeys: resolveExcludedQualityFindingKeys(draft),
+      priceEstimateSnapshot: draft.priceEstimateSnapshot,
     } satisfies ProductUpdateRequest)
   } else {
     productId = await createDraftProduct(draft, options)
@@ -699,22 +757,56 @@ const getCreatedProductId = (product: ProductCreateResponse) => {
   return productId
 }
 
+/**
+ * 상품에 이미지가 붙어 있는지 확인하고, 없으면 지금 올린다.
+ *
+ * 등록 마지막 단계에서 부르는 안전망이다. 사전 업로드(검수 스텝)가 실패한 채로 등록이 끝나면
+ * 사진 없는 상품이 만들어지는데, 사용자는 그 사실을 알 방법이 없다.
+ */
+const ensureProductImages = async (productId: number, photos: ProductRegistrationPhotoDraft[]) => {
+  let hasImages: boolean
+
+  try {
+    hasImages = (await getProductDetail(productId)).images.length > 0
+  } catch {
+    // 상세 조회가 실패하면(간헐적 500 — docs/requests/BE/029) 붙어 있는지 알 수 없다.
+    // 이때 무작정 다시 올리면 이미지가 중복되므로 그대로 둔다. 사전 업로드가 실패한 경우는
+    // draftProductId가 남지 않아 애초에 이 경로로 오지 않는다.
+    return
+  }
+
+  if (hasImages) return
+
+  await uploadProductImages(productId, photos)
+}
+
+/**
+ * 등록 화면의 사진을 상품에 붙인다. 사진 한 장마다 세 단계를 돈다.
+ *   ① presigned URL 발급 → ② S3에 PUT → ③ 서버에 "이 key가 이 상품 이미지"라고 등록
+ *
+ * **올릴 파일이 하나도 없으면 예외를 던진다.** 예전에는 조용히 건너뛰어서, 사진이 한 장도 없는
+ * 상품이 등록 완료까지 가버렸다(실제로 106·109번 상품이 그렇게 만들어졌다).
+ */
 export const uploadProductImages = async (
   productId: number,
   photos: ProductRegistrationPhotoDraft[],
 ) => {
-  const orderedPhotos = [...photos].sort((left, right) => {
-    if (left.isRepresentative !== right.isRepresentative) {
-      return left.isRepresentative ? -1 : 1
-    }
+  const orderedPhotos = [...photos]
+    .filter((photo) => Boolean(photo.file))
+    .sort((left, right) => {
+      if (left.isRepresentative !== right.isRepresentative) {
+        return left.isRepresentative ? -1 : 1
+      }
 
-    return photos.indexOf(left) - photos.indexOf(right)
-  })
+      return photos.indexOf(left) - photos.indexOf(right)
+    })
+
+  if (orderedPhotos.length === 0) {
+    throw new Error('업로드할 상품 사진이 없습니다. 사진을 다시 선택해 주세요.')
+  }
 
   for (const [index, photo] of orderedPhotos.entries()) {
-    if (!photo.file) {
-      continue
-    }
+    if (!photo.file) continue
 
     const uploadUrlResponse = await http.post<ApiResponse<ProductImageUploadUrlResponse>>(
       `/products/${productId}/images/upload-url`,
@@ -737,6 +829,7 @@ export const uploadProductImages = async (
         key: uploadData.key,
         sortOrder: index,
         isPrimary: photo.isRepresentative,
+        role: PRODUCT_IMAGE_ROLE_DTO_BY_DRAFT_ROLE[photo.role],
       },
     )
   }
@@ -774,7 +867,7 @@ const toProductListItem = async (product: ProductListDto): Promise<ProductListIt
 
   return {
     id: product.id,
-    brand: product.brandName || fallbackBrandLabel(product.brandId),
+    brand: product.brand || '',
     name: product.title,
     price: product.price ?? 0,
     conditionGrade: normalizeConditionGrade(product.conditionGrade),
@@ -801,10 +894,11 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
 
   return {
     id: product.id,
-    brand: product.brandName?.trim() || '',
+    brand: product.brand?.trim() || '',
     title: product.title,
     description: product.description?.trim() || '',
     category: product.categoryName?.trim() || '',
+    categoryId: product.categoryId ?? null,
     conditionLabel: toConditionLabel(product.conditionGrade),
     sizeLabel: product.sizeLabel?.trim() || '',
     material: product.material?.trim() || '',
@@ -830,8 +924,38 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
         title: defect,
         description: '',
       })),
-    aiQualityAnalysis: product.aiQualityAnalysis ?? null,
+    aiQualityAnalysis: toAiQualityAnalysis(product.aiQualityAnalysis),
     aiModelCut: product.aiModelCut ?? null,
+    priceEstimate: product.priceEstimate ?? null,
+  }
+}
+
+// BE 응답을 화면용 타입으로 옮긴다. 부위 코드를 한글로 바꾸고, BE가 주지 않는 alt를 label로
+// 만들어 채운다. summary는 findings 목록과 내용이 겹쳐 화면에 쓰지 않으므로 여기서 버린다.
+const toAiQualityAnalysis = (
+  analysis: AiQualityAnalysisDto | null | undefined,
+): AiQualityAnalysis | null => {
+  if (!analysis) return null
+
+  return {
+    status: analysis.status,
+    disclaimer: analysis.disclaimer,
+    images: (analysis.images ?? []).map((image) => ({
+      label: image.label,
+      originalImageUrl: image.originalImageUrl ?? '',
+      originalImageAlt: `${image.label} 원본 이미지`,
+      analyzedImageUrl: image.analyzedImageUrl ?? image.originalImageUrl ?? '',
+      analyzedImageAlt: `${image.label} AI 검수 이미지`,
+      findings: (image.findings ?? []).map((finding) => ({
+        key: finding.key,
+        no: finding.no,
+        type: finding.type?.trim() || '',
+        location: finding.location ? mapAiSectionToLabel(finding.location) : '',
+        description: finding.description?.trim() || null,
+        box: finding.box ?? null,
+        isExcluded: finding.isExcluded,
+      })),
+    })),
   }
 }
 
@@ -880,9 +1004,7 @@ const toProductSaleType = (saleType: ProductSaleTypeDto): ProductSaleType =>
 
 // 목록 필터 탭 id(FE 표시용 'DIRECT')를 BE 계약(010)의 saleType 값으로 변환한다.
 // 'ALL'은 전체 조회라 파라미터를 보내지 않는다.
-const toSaleTypeParam = (
-  saleType: ProductSaleTypeTab['id'],
-): ProductSaleTypeDto | undefined => {
+const toSaleTypeParam = (saleType: ProductSaleTypeTab['id']): ProductSaleTypeDto | undefined => {
   if (saleType === 'ALL') {
     return undefined
   }
@@ -902,22 +1024,8 @@ const getSortedProductImages = (product: Pick<ProductDetailDto, 'images'>) =>
     return left.sortOrder - right.sortOrder
   })
 
-const fallbackBrandLabel = (brandId: number | null) =>
-  brandId ? `브랜드 #${brandId}` : ''
-
 const fallbackCategoryLabel = (categoryId: number | null) =>
   categoryId ? `카테고리 #${categoryId}` : ''
-
-const findBrandId = (brandName: string, brands: BrandDto[]) => {
-  const normalizedBrandName = brandName.trim().toLowerCase()
-  const matchedBrand = brands.find(
-    (brand) =>
-      brand.name.toLowerCase() === normalizedBrandName ||
-      brand.nameEn?.toLowerCase() === normalizedBrandName,
-  )
-
-  return matchedBrand?.id ?? null
-}
 
 const findCategoryId = (draft: ProductRegistrationDraft, categories: CategoryDto[]) => {
   const numericCategoryId = Number(draft.categoryId)
@@ -926,8 +1034,8 @@ const findCategoryId = (draft: ProductRegistrationDraft, categories: CategoryDto
     return numericCategoryId
   }
 
-  const matchedCategory = categories.find((category) =>
-    getCategoryCode(category.name) === draft.categoryId,
+  const matchedCategory = categories.find(
+    (category) => getCategoryCode(category.name) === draft.categoryId,
   )
 
   return matchedCategory?.id ?? null
@@ -962,24 +1070,12 @@ const resolveRegistrationDefects = (draft: ProductRegistrationDraft) => {
   return description ? [description] : []
 }
 
-// 사용자가 "하자 제외"로 뒤집지 않은(=하자로 인정한) finding만 제출한다.
-// 판매자가 인정/제외한 것 둘 다 보낸다 — 041이 "아니다로 처리된 것"도 알아야 한다고 명시했다.
-const resolveRegistrationAiQualityFindings = (
-  draft: ProductRegistrationDraft,
-): ProductCreateAiQualityFindingRequest[] =>
+// 판매자가 "하자 아님"으로 뒤집은(=isActualDefect false) finding의 key만 제출한다(CH002).
+// BE는 원본 검수 결과(quality_inspection_result)를 이미 통째로 갖고 있어서, 이 key들만
+// 있으면 상세 화면에서 isExcluded로 표시할 수 있다 — 나머지 필드를 다시 보낼 필요가 없다.
+const resolveExcludedQualityFindingKeys = (draft: ProductRegistrationDraft): string[] =>
   draft.aiPhotoResults.flatMap((result) =>
-    result.findings.map((finding) => ({
-      key: finding.key,
-      defectType: finding.defectType,
-      label: finding.label,
-      imageIndex: finding.imageIndex,
-      no: finding.no,
-      bbox: finding.bbox,
-      severity: finding.severity,
-      statementRequired: finding.statementRequired,
-      description: finding.description,
-      isActualDefect: finding.isActualDefect,
-    })),
+    result.findings.filter((finding) => !finding.isActualDefect).map((finding) => finding.key),
   )
 
 export const getCategoryCode = (categoryName: string) => {
