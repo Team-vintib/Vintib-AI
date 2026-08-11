@@ -147,16 +147,16 @@ watch(
 .similar-recommend__head {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: var(--space-4);
   margin-bottom: var(--space-4);
 }
 
 .similar-recommend__head h2 {
   color: var(--color-text-primary);
-  font-size: var(--font-size-lg-plus);
+  font-size: var(--font-size-2xl-plus);
   font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-lg-plus);
+  line-height: var(--line-height-2xl-plus);
 }
 
 .similar-recommend__carousel {

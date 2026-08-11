@@ -322,7 +322,14 @@ const SIMILAR_PRODUCT_MOCK_LIMIT = 8
  * 부족하면 카테고리/브랜드 SQL로 보충해 반환한다. FE는 categoryId/brand를 몰라도 되고
  * (BE가 상품 자신의 값으로 알아서 판단), 정렬도 이미 유사도 순으로 와 있어 FE에서 다시
  * 정렬하지 않는다.
+ *
+ * 임시: 위 API가 지금은 같은 상품만 반복 반환해(확인 필요 — 유사도 계산/배치 캐시 쪽으로
+ * 추정), 화면 확인용으로 상품 5개(41/42/17/43/1)를 고정 노출한다. 실제 목록 조회
+ * (`GET /products`)로 해당 상품을 찾아 채우며, 대상 상품 자신은 제외한다. 유사 상품 API가
+ * 정상화되면 이 하드코딩은 제거하고 위 엔드포인트로 되돌린다.
  */
+const HARDCODED_SIMILAR_PRODUCT_IDS = [41, 42, 17, 43, 1]
+
 export const getSimilarProducts = async (productId: number): Promise<ProductListItem[]> => {
   if (!PRODUCT_API_ENABLED) {
     return PRODUCT_LIST_MOCK_DATA.filter((product) => product.id !== productId).slice(
@@ -331,12 +338,22 @@ export const getSimilarProducts = async (productId: number): Promise<ProductList
     )
   }
 
-  const response = await http.get<ApiResponse<{ productId: number; items: ProductListDto[] }>>(
-    `/products/${productId}/similar`,
-  )
-  const { items } = unwrapApiData(response.data)
+  const targetIds = HARDCODED_SIMILAR_PRODUCT_IDS.filter((id) => id !== productId)
 
-  return Promise.all(items.map(toProductListItem))
+  // getProductList()는 조회된 상품 전부를 ProductListItem으로 변환하며 그 과정에서
+  // 대표 이미지가 없는 상품마다 추가 요청을 보낸다. 여기서는 5개만 필요하므로, 목록 DTO를
+  // 직접 조회해 대상 ID만 골라낸 뒤 그 5개에 대해서만 변환한다.
+  const response = await http.get<
+    ApiResponse<PageResponse<ProductListDto> | BackendPageResponse<ProductListDto>>
+  >('/products', { params: { page: 0, size: 100, sort: 'LATEST' } })
+  const { items } = normalizePageResponse(unwrapApiData(response.data))
+  const dtoById = new Map(items.map((dto) => [dto.id, dto]))
+
+  const matchedDtos = targetIds
+    .map((id) => dtoById.get(id))
+    .filter((dto): dto is ProductListDto => Boolean(dto))
+
+  return Promise.all(matchedDtos.map(toProductListItem))
 }
 
 export const getProductDetail = async (productId: number): Promise<ProductDetailViewData> => {

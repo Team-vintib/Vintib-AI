@@ -97,11 +97,9 @@ const hasInformation = computed(
 
 .detail-information > h2 {
   color: var(--color-text-primary);
-  font-family: var(--font-display);
   font-size: var(--font-size-2xl-plus);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-2xl-plus);
 }
 
 .detail-information__description {
