@@ -109,9 +109,9 @@ const hasInformation = computed(
   border-radius: var(--radius-card);
   background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-regular);
-  line-height: var(--line-height-body);
+  line-height: var(--line-height-relaxed);
 }
 
 .detail-information__specs {
@@ -134,9 +134,9 @@ const hasInformation = computed(
 
 .detail-information__specs dt {
   color: var(--color-text-primary);
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-body);
+  line-height: var(--line-height-relaxed);
 }
 
 .detail-information__specs dd {
@@ -174,12 +174,12 @@ const hasInformation = computed(
 }
 
 .detail-information__sizes dt {
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-regular);
   letter-spacing: 0.08em;
-  line-height: var(--line-height-xs);
+  line-height: var(--line-height-snug);
   text-transform: uppercase;
 }
 
