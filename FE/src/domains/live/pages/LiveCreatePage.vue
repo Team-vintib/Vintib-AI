@@ -58,7 +58,6 @@ const thumbnailError = ref('')
 const liveCreateProducts = ref<LiveCreateProduct[]>([])
 const cameraPreviewElement = ref<HTMLVideoElement | null>(null)
 const cameraPreviewStream = ref<MediaStream | null>(null)
-const microphonePreviewStream = ref<MediaStream | null>(null)
 const deviceState = reactive<LiveDeviceState>({
   camera: 'idle',
   microphone: 'idle',
@@ -265,16 +264,13 @@ const stopCameraPreview = () => {
   })
   cameraPreviewStream.value = null
 
-  microphonePreviewStream.value?.getTracks().forEach((track) => {
-    track.stop()
-  })
-  microphonePreviewStream.value = null
-
   if (cameraPreviewElement.value) {
     cameraPreviewElement.value.srcObject = null
   }
 }
 
+// 오디오는 현재 방송에 실제로 태우지 않는다 — 마이크는 별도로 검사하지 않고,
+// 카메라 확인이 끝나면 그대로 통과한 것으로 본다.
 const runDeviceTest = async () => {
   if (isDeviceTesting.value) {
     return
@@ -304,28 +300,9 @@ const runDeviceTest = async () => {
     }
 
     deviceState.camera = cameraStream.getVideoTracks().length > 0 ? 'success' : 'failed'
-
-    if (deviceState.camera !== 'success') {
-      return
-    }
-
-    deviceState.microphone = 'testing'
-
-    const microphoneStream = await navigator.mediaDevices.getUserMedia({
-      video: false,
-      audio: true,
-    })
-
-    microphonePreviewStream.value = microphoneStream
-    deviceState.microphone = microphoneStream.getAudioTracks().length > 0 ? 'success' : 'failed'
+    deviceState.microphone = deviceState.camera
   } catch {
-    if (deviceState.camera === 'testing') {
-      stopCameraPreview()
-      deviceState.camera = 'failed'
-      deviceState.microphone = 'idle'
-      return
-    }
-
+    deviceState.camera = 'failed'
     deviceState.microphone = 'failed'
   }
 }
@@ -841,9 +818,6 @@ onMounted(() => {
 
             <p class="live-create__device-message" role="status">
               <span v-if="deviceState.camera === 'testing'">카메라 화면을 확인하고 있습니다.</span>
-              <span v-else-if="deviceState.microphone === 'testing'"
-                >마이크 입력을 확인하고 있습니다.</span
-              >
               <span v-else-if="isDeviceReady">장비 확인이 완료되었습니다. 다음 단계로 이동할 수 있습니다.</span>
               <span
                 v-else-if="deviceState.camera === 'failed' || deviceState.microphone === 'failed'"
