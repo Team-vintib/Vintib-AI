@@ -1772,6 +1772,7 @@ onBeforeUnmount(() => {
                   카테고리 소분류
                   <span class="product-registration__required" aria-hidden="true"> * </span>
                   <span class="product-registration__required-text"> 필수 입력 </span>
+                  <span v-if="isCategoryAiSuggested" class="product-registration__ai-badge">AI 추천</span>
                 </span>
                 <p class="product-registration__field-hint product-registration__field-hint--spacer" aria-hidden="true">
                   정확한 카테고리는 구매자가 상품을 쉽게 찾는 데 도움이 돼요.
@@ -1779,6 +1780,7 @@ onBeforeUnmount(() => {
                 <select
                   id="product-registration-category-minor"
                   class="product-registration__select"
+                  :class="{ 'product-registration__select--ai-suggested': isCategoryAiSuggested }"
                   v-model="draft.categoryId"
                   required
                   :disabled="!categoryMajorId || minorCategoryOptions.length === 0"
@@ -3096,10 +3098,11 @@ onBeforeUnmount(() => {
   resize: vertical;
 }
 
-.product-registration__select--ai-suggested {
+.product-registration__field .product-registration__select--ai-suggested {
   border-color: var(--color-primary);
   background-color: var(--color-primary);
   color: var(--color-text-inverse);
+  font-weight: var(--font-weight-bold);
 }
 
 .product-registration__select--ai-suggested option {
