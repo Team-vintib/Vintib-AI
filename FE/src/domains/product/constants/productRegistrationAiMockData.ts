@@ -12,8 +12,10 @@ export interface MockAiPriceEstimate {
 // docs/requests/BE/028-pricing-async.md의 comps_used는 등급(condition)과 무관하게 같은
 // 매물 목록을 근거로 삼고, 등급별 계수만 price_range에 반영된다 — mock도 동일하게 comps
 // 가격 목록은 4등급이 공유하고 등급별 계수만 다르게 곱한다.
-const MOCK_COMP_PRICES = [42_000, 51_000, 55_000, 63_000, 71_000]
-const MOCK_COMP_MEDIAN = 55_000
+const MOCK_COMP_PRICES = [
+  28_000, 44_000, 46_000, 48_000, 49_000, 51_000, 53_000, 68_000, 72_000, 85_000, 91_000, 100_000,
+]
+const MOCK_COMP_MEDIAN = 52_000
 const MOCK_GRADE_COEFFICIENTS: Record<MockAiPriceEstimate['grade'], number> = {
   S: 1.25,
   A: 1.1,

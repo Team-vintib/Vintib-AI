@@ -97,6 +97,8 @@ export interface ProductRegistrationAiColorSuggestion {
 export interface ProductRegistrationPriceBucket {
   id: string
   label: string
+  // 만원 단위로 반올림한 x축 지점 값(예: 5 → 5만원). 등급 마커를 실제 값 위치에 정렬하는 데 쓴다.
+  manValue: number
   productCount: number
 }
 
