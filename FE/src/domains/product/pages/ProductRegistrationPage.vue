@@ -1561,7 +1561,7 @@ onBeforeUnmount(() => {
                 id="product-front-photo"
                 class="product-registration__photo-uploader"
                 title="상품 이미지 1"
-                :description="'의류는 앞면을,\n그 외 상품은 전체 형태가 잘 보이도록 촬영해 주세요.'"
+                :description="'의류는 앞면을,\n그 외 상품은 전체가 잘 보이도록 촬영해 주세요.'"
                 required
                 :requirement-label="frontPhotoCountLabel"
                 :requirement-met="frontPhotos.length > 0"
@@ -1615,7 +1615,7 @@ onBeforeUnmount(() => {
 
           <form
             v-if="currentStep.id === 'photos' && canShowBasicInfoSection"
-            class="product-registration__form"
+            class="product-registration__form product-registration__form--basic-info"
             aria-label="상품 기본 정보 입력"
           >
             <p class="product-registration__optional-note">
@@ -1813,7 +1813,7 @@ onBeforeUnmount(() => {
 
           <form
             v-if="currentStep.id === 'photos' && canShowAttributesSection"
-            class="product-registration__form"
+            class="product-registration__form product-registration__form--basic-info"
             aria-label="상품 사이즈와 소재 입력"
           >
             <div class="product-registration__form-grid">
@@ -1822,7 +1822,7 @@ onBeforeUnmount(() => {
                   사이즈
                 </span>
                 <p class="product-registration__field-hint">
-                  구매자가 상품의 착용 크기를 판단하는 데 도움이 돼요.
+                  구매자가 상품의 크기를 판단하는 데 도움이 돼요.
                 </p>
                 <select
                   id="product-registration-size"
@@ -3017,8 +3017,8 @@ onBeforeUnmount(() => {
   margin-left: var(--space-2);
   padding: 1px var(--space-2);
   border-radius: var(--radius-badge);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
+  background: var(--color-accent);
+  color: #ffffff;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
@@ -3077,6 +3077,48 @@ onBeforeUnmount(() => {
     box-shadow var(--transition-base);
 }
 
+// 기본 정보 입력 단계(상품 기본 정보 / 사이즈·소재)만 글씨 크기를 키운다 — 기존 타이포 스케일
+// 토큰(main.scss)만 써서 배율 체계는 그대로 유지한다. 소제목(필드 라벨/legend)은 패널
+// 본제목(h2, font-size-2xl)과 같은 크기까지 올리고, 나머지 텍스트도 같은 비율로 키운다.
+.product-registration__form--basic-info .product-registration__optional-note {
+  font-size: var(--font-size-lg);
+}
+
+.product-registration__form--basic-info .product-registration__field span:first-child {
+  font-size: var(--font-size-2xl);
+}
+
+.product-registration__form--basic-info .product-registration__field-hint {
+  font-size: var(--font-size-lg);
+  white-space: normal;
+}
+
+.product-registration__form--basic-info .product-registration__field-error {
+  font-size: var(--font-size-md-plus);
+}
+
+.product-registration__form--basic-info .product-registration__ai-badge {
+  font-size: var(--font-size-md);
+}
+
+.product-registration__form--basic-info .product-registration__field input,
+.product-registration__form--basic-info .product-registration__field select,
+.product-registration__form--basic-info .product-registration__field textarea {
+  font-size: var(--font-size-lg-plus);
+}
+
+.product-registration__form--basic-info .product-registration__fieldset legend {
+  font-size: var(--font-size-2xl);
+}
+
+.product-registration__form--basic-info .product-registration__fieldset > p {
+  font-size: var(--font-size-lg);
+}
+
+.product-registration__form--basic-info .product-registration__field-empty {
+  font-size: var(--font-size-lg);
+}
+
 .product-registration__field input,
 .product-registration__field select {
   height: var(--button-height-standard);
@@ -3098,15 +3140,31 @@ onBeforeUnmount(() => {
   resize: vertical;
 }
 
+@keyframes product-registration-ai-suggested-flash-in {
+  0% {
+    box-shadow: 0 0 0 6px rgba(242, 240, 237, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(242, 240, 237, 0);
+  }
+}
+
 .product-registration__field .product-registration__select--ai-suggested {
   border-color: var(--color-primary);
   background-color: var(--color-primary);
   color: var(--color-text-inverse);
   font-weight: var(--font-weight-bold);
+  animation: product-registration-ai-suggested-flash-in 0.6s ease-out;
 }
 
 .product-registration__select--ai-suggested option {
   color: var(--color-text-inverse);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-registration__field .product-registration__select--ai-suggested {
+    animation: none;
+  }
 }
 
 .product-registration__price-input {
@@ -3220,6 +3278,34 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-model {
   margin-top: var(--space-1);
+}
+
+// AI 착용컷 설정 섹션(제목/AI 모델 선택 라벨/설명)도 기본 정보 입력과 같은 비율로 키운다.
+.product-registration__section.product-registration__ai-model h3 {
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-2xl);
+}
+
+.product-registration__ai-model .product-registration__section-header p {
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-lg);
+}
+
+.product-registration__ai-model .product-registration__ai-model-choice > span:first-child {
+  font-size: var(--font-size-2xl);
+}
+
+.product-registration__ai-model .product-registration__option {
+  font-size: var(--font-size-lg-plus);
+}
+
+.product-registration__ai-model .product-registration__field-hint {
+  font-size: var(--font-size-lg);
+  white-space: normal;
+}
+
+.product-registration__ai-model .product-registration__field-error {
+  font-size: var(--font-size-md-plus);
 }
 
 .product-registration__segmented {
