@@ -61,9 +61,9 @@ export const connectLiveVideo = async (
   await room.connect(serverUrl, token)
 
   if (role === 'PUBLISHER') {
-    // 방송자: 카메라/마이크 송출 + 자기 화면 프리뷰(자기 소리는 음소거해 에코 방지).
+    // 방송자: 카메라만 송출한다 — 오디오 검수는 하지 않고, 현재는 마이크 송출 자체를 하지 않는다.
     videoEl.muted = true
-    await room.localParticipant.enableCameraAndMicrophone()
+    await room.localParticipant.setCameraEnabled(true)
     const cameraTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.videoTrack
     cameraTrack?.attach(videoEl)
   } else {
