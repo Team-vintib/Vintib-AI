@@ -1615,7 +1615,7 @@ onBeforeUnmount(() => {
 
           <form
             v-if="currentStep.id === 'photos' && canShowBasicInfoSection"
-            class="product-registration__form product-registration__form--basic-info"
+            class="product-registration__form"
             aria-label="상품 기본 정보 입력"
           >
             <p class="product-registration__optional-note">
@@ -1813,7 +1813,7 @@ onBeforeUnmount(() => {
 
           <form
             v-if="currentStep.id === 'photos' && canShowAttributesSection"
-            class="product-registration__form product-registration__form--basic-info"
+            class="product-registration__form"
             aria-label="상품 사이즈와 소재 입력"
           >
             <div class="product-registration__form-grid">
@@ -2979,7 +2979,7 @@ onBeforeUnmount(() => {
 
 .product-registration__field-error {
   color: var(--color-error);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-md-plus);
   line-height: var(--line-height-control);
 }
 
@@ -3002,7 +3002,7 @@ onBeforeUnmount(() => {
 
 .product-registration__field span:first-child {
   color: var(--color-text-primary);
-  font-size: var(--font-size-button-small);
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-control);
 }
@@ -3019,7 +3019,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-badge);
   background: var(--color-accent);
   color: #ffffff;
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -3037,19 +3037,14 @@ onBeforeUnmount(() => {
 
 .product-registration__field-hint {
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-lg);
   font-style: normal;
   line-height: var(--line-height-snug);
+  white-space: normal;
 }
 
 .product-registration__field-hint--spacer {
   visibility: hidden;
-}
-
-@media (min-width: 961px) {
-  .product-registration__field-hint {
-    white-space: nowrap;
-  }
 }
 
 .product-registration__optional-note {
@@ -3058,7 +3053,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-button-small);
+  font-size: var(--font-size-lg);
   line-height: var(--line-height-control);
 }
 
@@ -3071,52 +3066,11 @@ onBeforeUnmount(() => {
   background: var(--color-surface);
   color: var(--color-text-primary);
   font: inherit;
+  font-size: var(--font-size-lg-plus);
   transition:
     border-color var(--transition-base),
     background-color var(--transition-base),
     box-shadow var(--transition-base);
-}
-
-// 기본 정보 입력 단계(상품 기본 정보 / 사이즈·소재)만 글씨 크기를 키운다 — 기존 타이포 스케일
-// 토큰(main.scss)만 써서 배율 체계는 그대로 유지한다. 소제목(필드 라벨/legend)은 패널
-// 본제목(h2, font-size-2xl)과 같은 크기까지 올리고, 나머지 텍스트도 같은 비율로 키운다.
-.product-registration__form--basic-info .product-registration__optional-note {
-  font-size: var(--font-size-lg);
-}
-
-.product-registration__form--basic-info .product-registration__field span:first-child {
-  font-size: var(--font-size-2xl);
-}
-
-.product-registration__form--basic-info .product-registration__field-hint {
-  font-size: var(--font-size-lg);
-  white-space: normal;
-}
-
-.product-registration__form--basic-info .product-registration__field-error {
-  font-size: var(--font-size-md-plus);
-}
-
-.product-registration__form--basic-info .product-registration__ai-badge {
-  font-size: var(--font-size-md);
-}
-
-.product-registration__form--basic-info .product-registration__field input,
-.product-registration__form--basic-info .product-registration__field select,
-.product-registration__form--basic-info .product-registration__field textarea {
-  font-size: var(--font-size-lg-plus);
-}
-
-.product-registration__form--basic-info .product-registration__fieldset legend {
-  font-size: var(--font-size-2xl);
-}
-
-.product-registration__form--basic-info .product-registration__fieldset > p {
-  font-size: var(--font-size-lg);
-}
-
-.product-registration__form--basic-info .product-registration__field-empty {
-  font-size: var(--font-size-lg);
 }
 
 .product-registration__field input,
@@ -3222,14 +3176,14 @@ onBeforeUnmount(() => {
 .product-registration__fieldset legend {
   padding: 0 var(--space-1);
   color: var(--color-text-primary);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-body);
 }
 
 .product-registration__fieldset > p {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-button-small);
+  font-size: var(--font-size-lg);
   line-height: var(--line-height-control);
 }
 
@@ -3239,6 +3193,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
   text-align: center;
 }
 
@@ -3253,9 +3208,9 @@ onBeforeUnmount(() => {
 
 .product-registration__section h3 {
   color: var(--color-text-primary);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-lg);
+  line-height: var(--line-height-2xl);
 }
 
 .product-registration__section-header {
@@ -3272,40 +3227,12 @@ onBeforeUnmount(() => {
 
 .product-registration__section-header p {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-button-small);
-  line-height: var(--line-height-control);
-}
-
-.product-registration__ai-model {
-  margin-top: var(--space-1);
-}
-
-// AI 착용컷 설정 섹션(제목/AI 모델 선택 라벨/설명)도 기본 정보 입력과 같은 비율로 키운다.
-.product-registration__section.product-registration__ai-model h3 {
-  font-size: var(--font-size-2xl);
-  line-height: var(--line-height-2xl);
-}
-
-.product-registration__ai-model .product-registration__section-header p {
   font-size: var(--font-size-lg);
   line-height: var(--line-height-lg);
 }
 
-.product-registration__ai-model .product-registration__ai-model-choice > span:first-child {
-  font-size: var(--font-size-2xl);
-}
-
-.product-registration__ai-model .product-registration__option {
-  font-size: var(--font-size-lg-plus);
-}
-
-.product-registration__ai-model .product-registration__field-hint {
-  font-size: var(--font-size-lg);
-  white-space: normal;
-}
-
-.product-registration__ai-model .product-registration__field-error {
-  font-size: var(--font-size-md-plus);
+.product-registration__ai-model {
+  margin-top: var(--space-1);
 }
 
 .product-registration__segmented {
@@ -3321,7 +3248,7 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-model-choice > span:first-child {
   color: var(--color-text-primary);
-  font-size: var(--font-size-button-small);
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-control);
 }
@@ -3339,6 +3266,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
+  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-bold);
   transition:
     border-color var(--transition-base),
@@ -3400,13 +3328,15 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-result-toolbar strong {
   color: var(--color-text-primary);
+  font-size: var(--font-size-lg-plus);
+  font-weight: var(--font-weight-bold);
   text-align: center;
 }
 
 .product-registration__ai-guide {
   padding: 0 var(--space-1);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-s);
+  font-size: var(--font-size-lg);
   line-height: var(--line-height-snug);
 }
 
@@ -3479,7 +3409,7 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-no-findings {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-lg);
 }
 
 .product-registration__ai-card-badge {
@@ -3492,7 +3422,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: var(--color-error);
   color: var(--color-primary);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
   line-height: 1;
 }
@@ -3516,7 +3446,7 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-card-defect {
   color: var(--color-text-primary);
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-bold);
 }
 
@@ -3532,7 +3462,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
   white-space: nowrap;
 }
@@ -3540,7 +3470,7 @@ onBeforeUnmount(() => {
 .product-registration__ai-card p {
   margin-left: calc(22px + var(--space-2));
   color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-md);
   line-height: var(--line-height-control);
 }
 
@@ -3584,13 +3514,13 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-result-actions > span {
   color: var(--color-text-primary);
-  font-size: var(--font-size-button-small);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
 }
 
 .product-registration__ai-confirm-hint {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-lg);
   text-align: right;
 }
 
@@ -3605,11 +3535,13 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
   text-align: center;
 }
 
 .product-registration__ai-empty strong {
   color: var(--color-text-primary);
+  font-size: var(--font-size-lg-plus);
 }
 
 .product-registration__ai-spinner {

@@ -34,7 +34,7 @@
           "needs_seller_review": false,
           "no": 1,
           "label": "얼룩",
-          "description": "어깨 위쪽에 희미한 얼룩이 보입니다."
+          "description": "어깨에 검정 얼룩이 보입니다."
         },
         {
           "key": "dirt_mark_0_2_1",
@@ -52,7 +52,7 @@
           "needs_seller_review": false,
           "no": 2,
           "label": "얼룩",
-          "description": "목깃 안쪽에 작은 얼룩이 확인됩니다."
+          "description": "목깃 안쪽에 얼룩이 확인됩니다."
         },
         {
           "key": "dirt_mark_0_2_2",
@@ -69,8 +69,8 @@
           "statement_required": false,
           "needs_seller_review": false,
           "no": 3,
-          "label": "얼룩",
-          "description": "목깃 안쪽에 작은 얼룩이 확인됩니다."
+          "label": "오염",
+          "description": "목깃 안쪽에 오염이 확인됩니다."
         },
         {
           "key": "hole_tear_1_2_1",
@@ -88,7 +88,7 @@
           "needs_seller_review": true,
           "no": 1,
           "label": "구멍·찢어짐",
-          "description": "흰색 티셔츠의 오른쪽 가슴 부근에 흰색 끝이 드러나는 작은 찢어짐이 확인됩니다."
+          "description": "오른쪽 가슴 부근에 작은 찢어짐이 확인됩니다."
         }
       ],
       "section_scores": [
