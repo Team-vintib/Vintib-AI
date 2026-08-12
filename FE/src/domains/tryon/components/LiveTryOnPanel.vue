@@ -20,13 +20,17 @@ import type {
 import type { TryOnProfile } from '@/domains/tryon/types/tryOnProfile.types'
 import type { TryOnResult } from '@/domains/tryon/types/tryOnResult.types'
 
+// hideHeader: 이 패널을 담는 쪽이 이미 제목·닫기를 그리고 있을 때 켠다(라이브 우측 패널).
+// 상품 상세처럼 단독으로 뜨는 곳에서는 제 헤더가 있어야 해서 기본값은 false다.
 const props = withDefaults(
   defineProps<{
     product: LiveWatchProduct
     mockScenario?: LiveTryOnMockScenario
+    hideHeader?: boolean
   }>(),
   {
     mockScenario: 'ready',
+    hideHeader: false,
   },
 )
 
@@ -312,7 +316,7 @@ onBeforeUnmount(() => {
 
 <template>
   <aside class="live-try-on-panel" aria-labelledby="live-try-on-title">
-    <header class="live-try-on-panel__header">
+    <header v-if="!hideHeader" class="live-try-on-panel__header">
       <div>
         <h2 id="live-try-on-title">AI 시착</h2>
         <p><span>시착 상품</span><b aria-hidden="true">·</b>{{ product.title }}</p>

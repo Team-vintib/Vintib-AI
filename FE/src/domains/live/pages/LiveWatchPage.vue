@@ -978,6 +978,7 @@ onBeforeUnmount(() => {
                   class="live-watch-page__side-content"
                   :product="selectedProduct"
                   :mock-scenario="tryOnMockScenario"
+                  hide-header
                   @close="isTryOnOpen = false"
                 />
 
