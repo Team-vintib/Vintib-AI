@@ -61,12 +61,22 @@ export const buildMockProductDetail = (productId: number): ProductDetailViewData
   },
   measurements: { 어깨: 46, 가슴: 54, 소매: 63, 총장: 66 },
   similarProducts: [
-    { id: 501, title: 'Alpha MA-1 플라이트 재킷', price: 132000 },
-    { id: 502, title: '80s 무톤 레더 재킷', price: 264000 },
-    { id: 503, title: 'Schott 페리코 라이더', price: 342000 },
-    { id: 504, title: '빈티지 카페레이서 재킷', price: 198000 },
-    { id: 505, title: '더블 라이더 레더 재킷', price: 225000 },
-    { id: 506, title: '워크웨어 덕 자켓', price: 96000 },
+    // 0–2만원대
+    { id: 501, title: '베이직 크루넥 반팔 티셔츠', price: 12000 },
+    { id: 502, title: '오버사이즈 화이트 무지 티', price: 15000 },
+    { id: 503, title: '빈티지 워싱 그래픽 티셔츠', price: 18000 },
+    // 4–6만원대
+    { id: 504, title: '90s USA 밴드 티셔츠', price: 45000 },
+    { id: 505, title: '레트로 프린팅 반팔 티', price: 52000 },
+    { id: 506, title: '헤비웨이트 옥스포드 티셔츠', price: 58000 },
+    // 6–8만원대
+    { id: 507, title: 'Champion 리버스 위브 티셔츠', price: 65000 },
+    { id: 508, title: '빈티지 스트라이프 헨리넥 티', price: 72000 },
+    { id: 509, title: '코듀로이 카라 반팔 티셔츠', price: 78000 },
+    // 10–12만원대
+    { id: 510, title: 'Supreme 박스로고 티셔츠', price: 105000 },
+    { id: 511, title: 'Stussy 빈티지 아카이브 티', price: 112000 },
+    { id: 512, title: '90s Polo Ralph Lauren 티셔츠', price: 118000 },
   ],
   sellerDisclosedDefects: [
     {
