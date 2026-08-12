@@ -47,6 +47,7 @@ import type {
   ProductRegistrationSaleType,
   ProductRegistrationStepId,
 } from '@/domains/product/types/productRegistration.types'
+import type { ProductConditionGrade } from '@/domains/product/types/productList.types'
 import aiModelHardcodedShot from '@/assets/images/ai-model/폴로_모델샷.png'
 import qualityInspectionHardcodedResponse from '@/domains/product/constants/qualityInspectionHardcodedResult.json'
 import { buildPriceRecommendationBuckets } from '@/domains/product/utils/priceBuckets'
@@ -191,6 +192,9 @@ const updateMinorCategory = () => {
 
 const priceRecommendationBuckets = ref<ProductRegistrationPriceBucket[]>([])
 const recommendedPrices = ref<ProductRegistrationRecommendedPrice[]>([])
+// 막대 하나 안에서 등급별 구성비를 나누려면 구간(bucket)에 뭉친 개수뿐 아니라 원본 comp
+// 가격 각각이 필요하다 — priceRecommendationBuckets에는 개수만 있어 별도로 들고 있는다.
+const priceCompPrices = ref<number[]>([])
 const aiPriceStatus = ref<'idle' | 'loading' | 'completed' | 'failed'>('idle')
 // 낮은 등급→높은 등급 순으로 둬서, 가격 오름차순인 히스토그램 x축과 마커 위치가 맞도록 한다.
 const PRICE_GRADES: ProductRegistrationPriceGrade[] = ['C', 'B', 'A', 'S']
@@ -426,6 +430,102 @@ const updateDirectSalePrice = (event: Event) => {
 const maxPriceBucketCount = computed(() =>
   Math.max(1, ...priceRecommendationBuckets.value.map((bucket) => bucket.productCount)),
 )
+// 실제 만원 단위 지점 개수만큼만 그리드 열을 만든다 — 고정 열 개수를 쓰면 지점 수가 그보다
+// 적을 때 그래프 오른쪽 끝이 항상 빈 채로 남는다.
+const priceBucketGridStyle = computed(() => ({
+  gridTemplateColumns: `repeat(${Math.max(priceRecommendationBuckets.value.length, 1)}, minmax(0, 1fr))`,
+}))
+// Y축 중간 눈금이 최댓값과 같은 수로 반올림되면(예: 최댓값 1 → 중간값도 1) "1, 1, 0"처럼
+// 중복돼 보인다 — 그럴 땐 중간 눈금을 비워 최댓값/0만 남긴다.
+const priceYAxisMidTick = computed(() => {
+  const midTick = Math.round(maxPriceBucketCount.value / 2)
+
+  return midTick > 0 && midTick < maxPriceBucketCount.value ? midTick : null
+})
+// 막대 높이(%)를 구한다 — 막대 채움과 hover 툴팁 위치가 같은 값을 쓴다.
+const priceBarHeightPercent = (bucket: ProductRegistrationPriceBucket) =>
+  (bucket.productCount / maxPriceBucketCount.value) * 100
+// x축을 막대 가운데가 아니라 막대 사이 "경계"에 표기한다 — 막대 N개면 경계 눈금은 N+1개
+// (예: 3~10만원 막대 8개 → 3,4,5,...,10,11 경계 9개). 막대 하나가 두 경계 사이 구간을
+// 나타내는 히스토그램 구조가 된다. 눈금은 .price-bars 안에 절대 위치로 그려 막대 그리드와
+// 같은 좌표계를 쓰므로 정렬이 어긋날 일이 없다(padding을 따로 두지 않는 이유이기도 하다).
+const priceAxisTicks = computed(() => {
+  const buckets = priceRecommendationBuckets.value
+
+  if (buckets.length === 0) {
+    return []
+  }
+
+  const boundaryValues = [
+    ...buckets.map((bucket) => bucket.manValue),
+    buckets[buckets.length - 1].manValue + 1,
+  ]
+
+  return boundaryValues.map((value, index) => ({
+    value,
+    leftPercent: (index / buckets.length) * 100,
+  }))
+})
+// 등급 색(포인트 컬러 혼합 비율) — C급이 가장 옅고 S급으로 갈수록 진해진다. 막대 세그먼트와
+// 하단 범례가 이 값을 함께 쓴다.
+const priceGradeColor = (grade: ProductConditionGrade) => {
+  const index = recommendedPrices.value.findIndex((item) => item.grade === grade)
+  const tintPercent = index === -1 ? 0 : 15 + index * 20
+
+  return `color-mix(in srgb, var(--color-accent) ${tintPercent}%, var(--color-primary))`
+}
+// 범례("색상 | 등급")용 목록.
+const priceGradeLegend = computed(() =>
+  recommendedPrices.value.map((grade) => ({ grade: grade.grade, label: grade.label })),
+)
+// comps 각각엔 등급 정보가 없다(028 — comps_used는 등급과 무관하게 4등급이 공유하는 같은
+// 매물 목록). 그래서 comp 가격을 4개 등급 추천가 중 가장 가까운 것에 매칭해 "이 구간 상품 중
+// 몇 개가 어느 등급에 가까운 가격대인지"를 근사값으로 보여준다 — 실제 판매자가 매긴 등급이
+// 아니라 가격 근접도 기반 추정치라는 점에 유의.
+const priceNearestGrade = (price: number) => {
+  const grades = recommendedPrices.value
+
+  if (grades.length === 0) {
+    return null
+  }
+
+  return grades.reduce((nearest, grade) =>
+    Math.abs(price - grade.price) < Math.abs(price - nearest.price) ? grade : nearest,
+  )
+}
+const priceBarSegmentsByBucketId = computed(() => {
+  const segmentsByBucketId = new Map<
+    string,
+    { grade: ProductConditionGrade; label: string; count: number }[]
+  >()
+
+  priceRecommendationBuckets.value.forEach((bucket) => {
+    const countByGrade = new Map<ProductConditionGrade, number>()
+
+    priceCompPrices.value
+      .filter((price) => Math.round(price / 10_000) === bucket.manValue)
+      .forEach((price) => {
+        const nearest = priceNearestGrade(price)
+
+        if (!nearest) return
+
+        countByGrade.set(nearest.grade, (countByGrade.get(nearest.grade) ?? 0) + 1)
+      })
+
+    segmentsByBucketId.set(
+      bucket.id,
+      recommendedPrices.value
+        .map((grade) => ({
+          grade: grade.grade,
+          label: grade.label,
+          count: countByGrade.get(grade.grade) ?? 0,
+        }))
+        .filter((segment) => segment.count > 0),
+    )
+  })
+
+  return segmentsByBucketId
+})
 const pricingStepErrors = computed(() => ({
   saleType:
     pricingStepTouched.saleType && !draft.saleType
@@ -1229,6 +1329,7 @@ const applyAiPriceEstimates = (estimates: ProductAiPriceEstimate[]) => {
   priceRecommendationBuckets.value = confirmedEstimate
     ? buildPriceRecommendationBuckets(confirmedEstimate.compPrices)
     : []
+  priceCompPrices.value = confirmedEstimate?.compPrices ?? []
 
   // CH001: 4개 등급 모두 같은 matchKey를 반환하니(브랜드+제목+카테고리로만 계산됨) 아무
   // 응답에서나 가져다 쓴다(042).
@@ -1245,6 +1346,7 @@ const resetAiPriceRecommendation = () => {
   aiPriceStatus.value = 'idle'
   recommendedPrices.value = []
   priceRecommendationBuckets.value = []
+  priceCompPrices.value = []
   draft.priceMatchKey = null
   draft.priceEstimateSnapshot = null
 }
@@ -1561,7 +1663,7 @@ onBeforeUnmount(() => {
                 id="product-front-photo"
                 class="product-registration__photo-uploader"
                 title="상품 이미지 1"
-                :description="'의류는 앞면을,\n그 외 상품은 전체 형태가 잘 보이도록 촬영해 주세요.'"
+                :description="'의류는 앞면을,\n그 외 상품은 전체가 잘 보이도록 촬영해 주세요.'"
                 required
                 :requirement-label="frontPhotoCountLabel"
                 :requirement-met="frontPhotos.length > 0"
@@ -1822,7 +1924,7 @@ onBeforeUnmount(() => {
                   사이즈
                 </span>
                 <p class="product-registration__field-hint">
-                  구매자가 상품의 착용 크기를 판단하는 데 도움이 돼요.
+                  구매자가 상품의 크기를 판단하는 데 도움이 돼요.
                 </p>
                 <select
                   id="product-registration-size"
@@ -2317,40 +2419,65 @@ onBeforeUnmount(() => {
                   <div class="product-registration__price-chart-body">
                     <div class="product-registration__price-y-scale" aria-hidden="true">
                       <span>{{ maxPriceBucketCount }}</span>
-                      <span>{{ Math.round(maxPriceBucketCount / 2) }}</span>
+                      <span>{{ priceYAxisMidTick ?? '' }}</span>
                       <span>0</span>
                     </div>
-                    <div class="product-registration__price-bars">
+                    <div class="product-registration__price-bars" :style="priceBucketGridStyle">
+                      <div class="product-registration__price-gridlines" aria-hidden="true">
+                        <span /><span /><span />
+                      </div>
                       <div
                         v-for="bucket in priceRecommendationBuckets"
                         :key="bucket.id"
                         class="product-registration__price-bar"
                       >
-                        <strong>{{ bucket.productCount }}</strong>
+                        <template v-if="bucket.productCount > 0">
+                          <strong>{{ bucket.productCount }}</strong>
+                          <div
+                            class="product-registration__price-bar-fill"
+                            :style="{ height: `${priceBarHeightPercent(bucket)}%` }"
+                          >
+                            <span
+                              v-for="segment in priceBarSegmentsByBucketId.get(bucket.id)"
+                              :key="segment.grade"
+                              class="product-registration__price-bar-segment"
+                              :style="{
+                                flexGrow: segment.count,
+                                backgroundColor: priceGradeColor(segment.grade),
+                              }"
+                            />
+                          </div>
+                          <span
+                            class="product-registration__price-bar-tooltip"
+                            :style="{ bottom: `${priceBarHeightPercent(bucket)}%` }"
+                          >
+                            {{ bucket.label }}만원 · {{ bucket.productCount }}개
+                          </span>
+                        </template>
+                      </div>
+                      <div class="product-registration__price-axis-ticks" aria-hidden="true">
                         <span
-                          class="product-registration__price-bar-fill"
-                          :style="{ height: `${(bucket.productCount / maxPriceBucketCount) * 100}%` }"
-                        />
+                          v-for="tick in priceAxisTicks"
+                          :key="tick.value"
+                          :style="{ left: `${tick.leftPercent}%` }"
+                        >
+                          {{ tick.value }}
+                        </span>
                       </div>
-                      <div
-                        v-for="(recommendation, index) in recommendedPrices"
-                        :key="recommendation.grade"
-                        class="product-registration__price-marker"
-                        :style="{ left: `${18 + index * 16}%` }"
-                      >
-                        <span>{{ recommendation.label }}</span>
-                      </div>
+                      <span class="product-registration__price-axis-unit">(만 원)</span>
                     </div>
                   </div>
-                  <div class="product-registration__price-axis product-registration__price-axis--x">
-                    <span
-                      v-for="bucket in priceRecommendationBuckets"
-                      :key="bucket.id"
-                    >
-                      {{ bucket.label }}
-                    </span>
-                  </div>
                 </div>
+
+                <ul class="product-registration__price-band-legend">
+                  <li v-for="grade in priceGradeLegend" :key="grade.grade">
+                    <span
+                      class="product-registration__price-band-legend-swatch"
+                      :style="{ backgroundColor: priceGradeColor(grade.grade) }"
+                    />
+                    <span>{{ grade.label }}</span>
+                  </li>
+                </ul>
 
                 <dl class="product-registration__price-recommendations">
                   <div
@@ -2979,7 +3106,7 @@ onBeforeUnmount(() => {
 
 .product-registration__field-error {
   color: var(--color-error);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-md-plus);
   line-height: var(--line-height-control);
 }
 
@@ -3002,7 +3129,7 @@ onBeforeUnmount(() => {
 
 .product-registration__field span:first-child {
   color: var(--color-text-primary);
-  font-size: var(--font-size-button-small);
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-control);
 }
@@ -3017,9 +3144,9 @@ onBeforeUnmount(() => {
   margin-left: var(--space-2);
   padding: 1px var(--space-2);
   border-radius: var(--radius-badge);
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  font-size: var(--font-size-xs);
+  background: var(--color-accent);
+  color: #ffffff;
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -3037,19 +3164,14 @@ onBeforeUnmount(() => {
 
 .product-registration__field-hint {
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-lg);
   font-style: normal;
   line-height: var(--line-height-snug);
+  white-space: normal;
 }
 
 .product-registration__field-hint--spacer {
   visibility: hidden;
-}
-
-@media (min-width: 961px) {
-  .product-registration__field-hint {
-    white-space: nowrap;
-  }
 }
 
 .product-registration__optional-note {
@@ -3058,7 +3180,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-button-small);
+  font-size: var(--font-size-lg);
   line-height: var(--line-height-control);
 }
 
@@ -3071,6 +3193,7 @@ onBeforeUnmount(() => {
   background: var(--color-surface);
   color: var(--color-text-primary);
   font: inherit;
+  font-size: var(--font-size-lg-plus);
   transition:
     border-color var(--transition-base),
     background-color var(--transition-base),
@@ -3098,15 +3221,31 @@ onBeforeUnmount(() => {
   resize: vertical;
 }
 
+@keyframes product-registration-ai-suggested-flash-in {
+  0% {
+    box-shadow: 0 0 0 6px rgba(242, 240, 237, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(242, 240, 237, 0);
+  }
+}
+
 .product-registration__field .product-registration__select--ai-suggested {
   border-color: var(--color-primary);
   background-color: var(--color-primary);
   color: var(--color-text-inverse);
   font-weight: var(--font-weight-bold);
+  animation: product-registration-ai-suggested-flash-in 0.6s ease-out;
 }
 
 .product-registration__select--ai-suggested option {
   color: var(--color-text-inverse);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-registration__field .product-registration__select--ai-suggested {
+    animation: none;
+  }
 }
 
 .product-registration__price-input {
@@ -3164,14 +3303,14 @@ onBeforeUnmount(() => {
 .product-registration__fieldset legend {
   padding: 0 var(--space-1);
   color: var(--color-text-primary);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-body);
 }
 
 .product-registration__fieldset > p {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-button-small);
+  font-size: var(--font-size-lg);
   line-height: var(--line-height-control);
 }
 
@@ -3181,6 +3320,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
   text-align: center;
 }
 
@@ -3195,9 +3335,9 @@ onBeforeUnmount(() => {
 
 .product-registration__section h3 {
   color: var(--color-text-primary);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-lg);
+  line-height: var(--line-height-2xl);
 }
 
 .product-registration__section-header {
@@ -3214,8 +3354,8 @@ onBeforeUnmount(() => {
 
 .product-registration__section-header p {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-button-small);
-  line-height: var(--line-height-control);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-lg);
 }
 
 .product-registration__ai-model {
@@ -3235,7 +3375,7 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-model-choice > span:first-child {
   color: var(--color-text-primary);
-  font-size: var(--font-size-button-small);
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-control);
 }
@@ -3253,6 +3393,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
+  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-bold);
   transition:
     border-color var(--transition-base),
@@ -3314,13 +3455,15 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-result-toolbar strong {
   color: var(--color-text-primary);
+  font-size: var(--font-size-lg-plus);
+  font-weight: var(--font-weight-bold);
   text-align: center;
 }
 
 .product-registration__ai-guide {
   padding: 0 var(--space-1);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-s);
+  font-size: var(--font-size-lg);
   line-height: var(--line-height-snug);
 }
 
@@ -3393,7 +3536,7 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-no-findings {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-lg);
 }
 
 .product-registration__ai-card-badge {
@@ -3406,7 +3549,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: var(--color-error);
   color: var(--color-primary);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
   line-height: 1;
 }
@@ -3430,7 +3573,7 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-card-defect {
   color: var(--color-text-primary);
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-bold);
 }
 
@@ -3446,7 +3589,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
   white-space: nowrap;
 }
@@ -3454,7 +3597,7 @@ onBeforeUnmount(() => {
 .product-registration__ai-card p {
   margin-left: calc(22px + var(--space-2));
   color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-md);
   line-height: var(--line-height-control);
 }
 
@@ -3498,13 +3641,13 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-result-actions > span {
   color: var(--color-text-primary);
-  font-size: var(--font-size-button-small);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
 }
 
 .product-registration__ai-confirm-hint {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-lg);
   text-align: right;
 }
 
@@ -3519,11 +3662,13 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
   text-align: center;
 }
 
 .product-registration__ai-empty strong {
   color: var(--color-text-primary);
+  font-size: var(--font-size-lg-plus);
 }
 
 .product-registration__ai-spinner {
@@ -3563,7 +3708,7 @@ onBeforeUnmount(() => {
 
 .product-registration__price-axis {
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -3572,17 +3717,50 @@ onBeforeUnmount(() => {
   justify-content: flex-start;
 }
 
-.product-registration__price-axis--x {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  margin-left: 36px;
-  text-align: center;
-}
-
 .product-registration__price-chart-body {
   display: grid;
   gap: var(--space-3);
   grid-template-columns: 24px minmax(0, 1fr);
+  margin-bottom: var(--space-12);
+}
+
+// x축 눈금을 막대 가운데가 아니라 막대 사이 "경계"에 찍는다. .price-bars 안의 절대 위치
+// 요소라 막대 그리드와 좌표계가 같아서(같은 padding/gap 문제가 아예 생기지 않는다) 정렬이
+// 항상 정확하다. 막대 그리드 쪽 padding-left/right를 0으로 둔 이유이기도 하다.
+//
+// top: 100% + margin-top으로 위치를 잡는 이유: 이전엔 bottom에 음수 px를 줘서 배치했는데,
+// 눈금 줄과 단위 라벨 줄의 실제 줄 높이(line-height)를 감안하지 않아 "11"과 "(만 원)"이
+// 겹쳐 보였다. top: 100%(막대 바닥 기준 0)에서 margin-top만큼 내려가는 방식이 각 줄이
+// 차지하는 높이를 누적해서 계산하기 쉬워 겹칠 일이 없다.
+.product-registration__price-axis-ticks {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  margin-top: var(--space-2);
+}
+
+.product-registration__price-axis-ticks span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-xs);
+  white-space: nowrap;
+}
+
+.product-registration__price-axis-unit {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: calc(var(--space-2) + var(--line-height-xs) + var(--space-2));
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-height-xs);
+  white-space: nowrap;
 }
 
 .product-registration__price-y-scale {
@@ -3592,7 +3770,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   height: 220px;
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
   text-align: right;
 }
@@ -3602,10 +3780,29 @@ onBeforeUnmount(() => {
   display: grid;
   align-items: end;
   height: 220px;
-  gap: var(--space-3);
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  padding: var(--space-4) var(--space-2) 0;
+  gap: 0;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: var(--space-4) 0 0;
   border-bottom: 1px solid var(--color-border-strong);
+}
+
+// 1순위: 상품 분포 막대.
+.product-registration__price-gridlines {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.product-registration__price-gridlines span {
+  height: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--color-text-muted) 18%, transparent);
+}
+
+.product-registration__price-gridlines span:last-child {
+  border-top: none;
 }
 
 .product-registration__price-bar {
@@ -3616,46 +3813,83 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   height: 100%;
   min-width: 0;
+  border-right: 1px solid color-mix(in srgb, var(--color-border-strong) 60%, transparent);
 }
 
 .product-registration__price-bar-fill {
-  display: block;
+  display: flex;
+  flex-direction: column-reverse;
   width: 100%;
-  min-height: 12px;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  background: color-mix(in srgb, var(--color-live) 18%, var(--color-surface));
+  overflow: hidden;
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
+  background: var(--color-primary);
+  transition: filter var(--transition-base);
 }
 
-.product-registration__price-bar strong {
+.product-registration__price-bar-segment {
+  flex-shrink: 0;
+  width: 100%;
+}
+
+.product-registration__price-bar:hover .product-registration__price-bar-fill {
+  filter: brightness(1.15);
+}
+
+.product-registration__price-bar > strong {
   display: block;
   width: 100%;
   margin-bottom: var(--space-1);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
   line-height: var(--line-height-xs);
   text-align: center;
 }
 
-.product-registration__price-marker {
+.product-registration__price-bar-tooltip {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--color-error);
+  left: 50%;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, calc(-100% - 8px));
+  transition: opacity var(--transition-base);
+  pointer-events: none;
 }
 
-.product-registration__price-marker span {
-  position: absolute;
-  top: -24px;
-  left: 50%;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  background: var(--color-error);
-  color: var(--color-text-inverse);
-  font-size: var(--font-size-2xs);
-  font-weight: var(--font-weight-bold);
-  white-space: nowrap;
-  transform: translateX(-50%);
+.product-registration__price-bar:hover .product-registration__price-bar-tooltip,
+.product-registration__price-bar:focus-within .product-registration__price-bar-tooltip {
+  opacity: 1;
+}
+
+// 배경 등급 구간 색이 무슨 등급인지 알려주는 색상-라벨 범례.
+.product-registration__price-band-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  list-style: none;
+}
+
+.product-registration__price-band-legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.product-registration__price-band-legend-swatch {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: var(--radius-control);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
 
 .product-registration__price-recommendations {
@@ -3675,12 +3909,13 @@ onBeforeUnmount(() => {
 
 .product-registration__price-recommendations dt {
   color: var(--color-error);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
 }
 
 .product-registration__price-recommendations dd {
   color: var(--color-text-primary);
+  font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
 }
 
