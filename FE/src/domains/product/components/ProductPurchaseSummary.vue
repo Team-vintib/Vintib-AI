@@ -171,10 +171,10 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 }
 
 .purchase-summary__breadcrumb {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-regular);
-  line-height: var(--line-height-snug);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-body);
 }
 
 .purchase-summary__title {
@@ -239,10 +239,10 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 
 .purchase-summary__seller p {
   margin-top: 2px;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-regular);
-  line-height: var(--line-height-snug);
+  line-height: var(--line-height-relaxed);
 }
 
 .purchase-summary__seller button {
@@ -251,7 +251,7 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);
   transition:
@@ -277,12 +277,12 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
 }
 
 .purchase-summary__quick-info dt {
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-badge);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-regular);
   letter-spacing: 0.06em;
-  line-height: var(--line-height-xs);
+  line-height: var(--line-height-snug);
   text-transform: uppercase;
 }
 
@@ -290,9 +290,9 @@ const sellerInitial = computed(() => sellerNickname.value.slice(0, 1).toUpperCas
   overflow: hidden;
   margin-top: var(--space-1);
   color: var(--color-text-primary);
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-body);
+  line-height: var(--line-height-lg);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

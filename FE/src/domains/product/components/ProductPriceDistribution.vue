@@ -221,23 +221,24 @@ watch(
 
 .price-distribution__heading p {
   margin-top: var(--space-1);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-regular);
-  line-height: var(--line-height-snug);
+  line-height: var(--line-height-body);
 }
 
+/* 내 상품이 어느 가격대인지 읽는 기준점이라 브랜드 색으로 세워 둔다. */
 .price-distribution__current-price {
   flex: 0 0 auto;
-  padding: 5px var(--space-3);
-  border: 1px solid var(--color-border-input);
+  padding: 6px var(--space-3);
+  border: 1px solid var(--color-accent);
   border-radius: var(--radius-badge);
-  background: transparent;
-  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent);
   font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
   letter-spacing: -0.01em;
   line-height: var(--line-height-snug);
   white-space: nowrap;
@@ -264,10 +265,10 @@ watch(
   display: block;
   margin-bottom: var(--space-2);
   font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-caption);
   font-variant-numeric: tabular-nums;
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-snug);
 }
 
 .price-distribution__bar-track {
@@ -291,8 +292,8 @@ watch(
 .price-distribution__band-label {
   display: block;
   margin-top: var(--space-2);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);
   white-space: nowrap;
@@ -302,21 +303,31 @@ watch(
   background: var(--color-text-muted);
 }
 
+/* 선택된 구간은 hover에서도 빨강을 유지한다 — 위 hover 규칙이 회색으로 덮어써서
+   이미 빨간 막대에 마우스를 올리면 회색으로 되돌아가 보였다. */
+.price-distribution__column--selected:not(:disabled):hover .price-distribution__bar {
+  background: var(--color-accent);
+  opacity: 0.85;
+}
+
+/* 내 상품이 속한 구간 — 흰색이면 "그냥 제일 큰 막대"와 구분이 안 돼 브랜드 색으로 뺀다. */
 .price-distribution__column--selected {
-  color: var(--color-primary);
+  color: var(--color-accent);
 }
 
 .price-distribution__column--selected .price-distribution__bar {
-  background: var(--color-primary);
+  background: var(--color-accent);
 }
 
 .price-distribution__column--selected .price-distribution__band-label {
-  color: var(--color-primary);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-bold);
 }
 
+/* 등록 상품이 0개인 구간 — 0.5는 라벨이 거의 안 읽혀 눈금 역할을 못 했다. */
 .price-distribution__column:disabled {
   cursor: default;
-  opacity: 0.5;
+  opacity: 0.78;
 }
 
 .price-distribution__column:focus-visible {
@@ -346,10 +357,10 @@ watch(
 .price-distribution__products-heading > div > span {
   display: block;
   margin-bottom: 2px;
-  color: var(--color-primary);
-  font-size: var(--font-size-2xs);
+  color: var(--color-accent);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-xs);
+  line-height: var(--line-height-snug);
 }
 
 .price-distribution__products-heading strong {
@@ -361,8 +372,8 @@ watch(
 }
 
 .price-distribution__products-heading > span {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);
 }
@@ -395,16 +406,16 @@ watch(
 
 .price-distribution__product > span {
   overflow: hidden;
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-snug);
+  line-height: var(--line-height-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .price-distribution__product > strong {
   font-family: var(--font-mono);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-body);
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-medium);
   letter-spacing: -0.02em;
@@ -423,8 +434,8 @@ watch(
 }
 
 .price-distribution__product:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .price-distribution__product:focus-visible {

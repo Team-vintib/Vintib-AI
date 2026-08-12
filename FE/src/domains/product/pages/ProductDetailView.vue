@@ -550,9 +550,14 @@ onBeforeUnmount(() => {
   outline-offset: 2px;
 }
 
+/* 갤러리 쪽 가로 폭을 줄여 사진이 과하게 크지 않게 하고, 남는 폭은 정보 영역이 가져간다.
+   min-height는 첫 화면을 이 영역으로 채우기 위한 값이다 — 아래 'AI 모델 시착' 제목이
+   슬쩍 걸쳐 보이면 스크롤이 덜 끝난 것처럼 보여서, 다음 섹션은 접힘선 아래로 내린다.
+   빼는 값은 헤더와 뒤로가기 줄까지의 높이다. */
 .product-detail__hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(390px, 0.92fr);
+  min-height: calc(100vh - 160px);
+  grid-template-columns: minmax(0, 0.88fr) minmax(420px, 1.12fr);
   align-items: start;
   gap: var(--space-12);
 }

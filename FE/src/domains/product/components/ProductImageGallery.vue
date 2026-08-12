@@ -124,29 +124,35 @@ const closeZoom = () => {
 </template>
 
 <style scoped lang="scss">
+/* 썸네일은 어떤 컷인지 알아볼 정도로는 키운다(72 → 92px). */
 .product-gallery {
   display: grid;
-  grid-template-columns: var(--thumbnail-size-sm) minmax(0, 1fr);
+  grid-template-columns: 92px minmax(0, 1fr);
   align-items: start;
   gap: var(--space-4);
   min-width: 0;
 }
 
+/* 4/5 세로 비율은 오른쪽 정보 영역(구매하기까지)보다 한참 아래로 내려가 페이지가 늘어졌다.
+   정사각으로 줄여 오른쪽 끝과 얼추 맞춘다. */
 .product-gallery__main {
   position: relative;
   display: grid;
   overflow: hidden;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 1 / 1;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-media);
   background: var(--color-image-frame);
   place-items: center;
 }
 
+/* cover는 상품을 잘라내 소매·밑단이 프레임 밖으로 나갔다 — 통째로 보여주고 남는 자리는
+   프레임 배경으로 두되, 가운데 정렬해서 한쪽으로 쏠리지 않게 한다. */
 .product-gallery__main-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   filter: saturate(0.88) contrast(1.04) brightness(0.95);
   transition: transform var(--transition-moderate);
 }
@@ -167,7 +173,7 @@ const closeZoom = () => {
 
 .product-gallery__thumbnail {
   overflow: hidden;
-  width: var(--thumbnail-size-sm);
+  width: 92px;
   aspect-ratio: 4 / 5;
   padding: 0;
   border: 1px solid var(--color-border);
@@ -208,6 +214,7 @@ const closeZoom = () => {
   transform: none;
   transform-origin: 50% 50%;
 }
+
 
 .product-gallery__zoom {
   position: absolute;
