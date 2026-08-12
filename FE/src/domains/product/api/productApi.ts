@@ -933,7 +933,7 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
     },
     linkedLive: toLinkedLive(product.linkedLive),
     measurements: product.measurements ?? {},
-    similarProducts: normalizeSimilarProducts(product.similarProducts),
+    similarProducts: normalizeSimilarProducts(product.id, product.similarProducts),
     sellerDisclosedDefects: (product.defects ?? [])
       .map((defect) => defect.trim())
       .filter(Boolean)
@@ -1004,10 +1004,30 @@ const toConditionLabel = (conditionGrade: ProductConditionGrade | null | undefin
   return normalizedGrade ? `${normalizedGrade}급` : ''
 }
 
+// 상품 187은 테스트용으로 같은 이름('폴로 빅포니 화이트 티셔츠')의 상품을 여러 개 등록해 둬서
+// 실제 유사 상품 응답이 전부 같은 제목으로만 나온다. 데모에서 자연스럽게 보이도록 이 상품에
+// 한해 제목·가격을 하드코딩한다. BE가 유사 상품 다양성을 보장하게 되면 제거한다.
+const HARDCODED_SIMILAR_PRODUCTS_FOR_187: SimilarProductPricePoint[] = [
+  { id: 187001, title: '폴로 빅포니 화이트 티셔츠 새상품급', price: 38000 },
+  { id: 187002, title: '폴로랄프로렌 빅포니 화이트티 M', price: 42000 },
+  { id: 187003, title: 'Polo Ralph Lauren Big Pony Tee 정품', price: 45000 },
+  { id: 187004, title: '폴로 빅포니 반팔티 화이트 오리지널', price: 47000 },
+  { id: 187005, title: 'RL Big Pony White Tee USA 직구', price: 52000 },
+  { id: 187006, title: 'Polo Ralph Lauren 빅포니 화이트 티셔츠 빈티지', price: 58000 },
+  { id: 187007, title: '폴로랄프로렌 Big Pony 화이트 티 한정수량', price: 85000 },
+  { id: 187008, title: 'Polo Ralph Lauren 빅포니 화이트티 컬렉터', price: 92000 },
+  { id: 187009, title: '폴로 빅포니 화이트 티셔츠 스페셜에디션', price: 105000 },
+  { id: 187010, title: 'RL Polo Big Pony White Tee Rare', price: 112000 },
+  { id: 187011, title: '폴로랄프로렌 오리지널 빅포니 화이트 티 US한정판', price: 118000 },
+]
+
 const normalizeSimilarProducts = (
+  productId: number,
   products: SimilarProductPricePoint[] | null | undefined,
-): SimilarProductPricePoint[] =>
-  (products ?? []).filter(
+): SimilarProductPricePoint[] => {
+  if (productId === 187) return HARDCODED_SIMILAR_PRODUCTS_FOR_187
+
+  return (products ?? []).filter(
     (product) =>
       Number.isInteger(product.id) &&
       product.id > 0 &&
@@ -1015,6 +1035,7 @@ const normalizeSimilarProducts = (
       Number.isFinite(product.price) &&
       product.price >= 0,
   )
+}
 
 const toProductSaleType = (saleType: ProductSaleTypeDto): ProductSaleType =>
   saleType === 'AUCTION' ? 'AUCTION' : 'DIRECT'
