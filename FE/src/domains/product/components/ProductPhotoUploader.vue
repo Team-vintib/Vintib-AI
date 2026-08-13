@@ -171,9 +171,9 @@ const handleFileChange = (event: Event) => {
   min-width: 0;
   gap: 4px;
   color: var(--color-text-primary);
-  font-size: var(--font-size-2xl);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-2xl);
+  line-height: var(--line-height-lg);
 }
 
 .product-photo-uploader__title-text {
@@ -184,7 +184,7 @@ const handleFileChange = (event: Event) => {
 .product-photo-uploader__header h3 em {
   flex: 0 0 auto;
   color: var(--color-text-primary);
-  font-size: var(--font-size-md-plus);
+  font-size: var(--font-size-button-small);
   font-style: normal;
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-control);
@@ -216,8 +216,8 @@ const handleFileChange = (event: Event) => {
 
 .product-photo-uploader__header p {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-lg);
-  line-height: var(--line-height-lg);
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
   white-space: pre-line;
 }
 
@@ -234,7 +234,7 @@ const handleFileChange = (event: Event) => {
   background: var(--color-surface);
   color: var(--color-text-primary);
   cursor: pointer;
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
 }
 
@@ -248,7 +248,7 @@ const handleFileChange = (event: Event) => {
 
 .product-photo-uploader__error {
   color: var(--color-error);
-  font-size: var(--font-size-md-plus);
+  font-size: var(--font-size-caption);
   line-height: var(--line-height-control);
 }
 
@@ -303,7 +303,7 @@ const handleFileChange = (event: Event) => {
   background: var(--overlay-scrim-strong);
   color: var(--color-text-primary);
   cursor: pointer;
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-control);
 }
@@ -345,7 +345,6 @@ const handleFileChange = (event: Event) => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-lg);
   text-align: center;
 }
 
