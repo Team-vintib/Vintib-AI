@@ -7,7 +7,9 @@ import {
   createProductPreUploadUrl,
   getCategories,
   getCategoryCode,
+  getProductAiModelCutStatus,
   getProductClassifyStatus,
+  getProductQualityInspectionStatus,
   mapClassifyResultToSuggestions,
   mapQualityInspectionResultToPhotoResults,
   triggerProductClassify,
@@ -15,7 +17,6 @@ import {
   uploadToPreUploadUrl,
   type CategoryDto,
   type ProductAiModelCutStatusDto,
-  type ProductQualityInspectionResultDto,
 } from '@/domains/product/api/productApi'
 import {
   AI_PRICE_GRADE_SCORES,
@@ -48,8 +49,6 @@ import type {
   ProductRegistrationStepId,
 } from '@/domains/product/types/productRegistration.types'
 import type { ProductConditionGrade } from '@/domains/product/types/productList.types'
-import aiModelHardcodedShot from '@/assets/images/ai-model/폴로_모델샷.png'
-import qualityInspectionHardcodedResponse from '@/domains/product/constants/qualityInspectionHardcodedResult.json'
 import { buildPriceRecommendationBuckets } from '@/domains/product/utils/priceBuckets'
 import { toPercentBox } from '@/domains/product/utils/qualityFindingBox'
 import { normalizeApiError } from '@/shared/api/http'
@@ -88,17 +87,18 @@ const registeredProductId = ref('')
 // AI 착용컷 폴링 상태 — 등록(aiModelEnabled=true) 성공 직후에만 값이 채워진다.
 const aiModelCutStatus = ref<ProductAiModelCutStatusDto['status']>('NONE')
 const aiModelCutImageUrl = ref<string | null>(null)
-// AI 품질 검증(SY043) 상태 — '상태/하자' 스텝 진입 시 draft 상품이 만들어지면서 채워진다.
+// BE(GET /products/{id}/ai-model-cut)를 이 간격으로 폴링한다(SY046).
+const AI_MODEL_CUT_POLL_INTERVAL_MS = 3_000
+const AI_MODEL_CUT_POLL_TIMEOUT_MS = 120_000
+let aiModelCutPollToken = 0
+// AI 품질 검증(SY043/SY046) 상태 — '상태/하자' 스텝 진입 시 draft 상품이 만들어지면서 채워진다.
 const isQualityCategoryUnsupported = ref(false)
-// 임시: 실제 검수 결과 대신 하드코딩된 샘플 결과를 노출한다. 실제 모델이 도는 것처럼 보이도록
-// 일정 시간 로딩 상태를 유지한 뒤 결과를 채운다. 원본은
-// src/domains/product/constants/qualityInspectionHardcodedResult.json.
-const QUALITY_INSPECTION_HARDCODED_DELAY_MS = 7_000
-// 대기 중(sleep) 사진이 바뀌어 resetQualityDraftState가 불리면 이 값을 올려, 뒤늦게 끝난
+// BE(GET /products/{id}/quality-inspection)를 이 간격으로 폴링한다.
+const QUALITY_INSPECTION_POLL_INTERVAL_MS = 3_000
+const QUALITY_INSPECTION_POLL_TIMEOUT_MS = 120_000
+// 대기 중(폴링) 사진이 바뀌어 resetQualityDraftState가 불리면 이 값을 올려, 뒤늦게 끝난
 // 이전 호출이 결과를 덮어쓰지 않도록 막는다.
 let qualityInspectionSequence = 0
-const QUALITY_INSPECTION_HARDCODED_RESULT = qualityInspectionHardcodedResponse.data
-  .result as unknown as ProductQualityInspectionResultDto
 // 카테고리/색상 자동 분류(사전업로드, docs/requests/FE/042) 폴링 상태.
 const CLASSIFY_POLL_INTERVAL_MS = 3_000
 const CLASSIFY_POLL_TIMEOUT_MS = 120_000
@@ -1265,10 +1265,10 @@ watch(classifyTriggerKey, () => {
   }
 })
 
-// AI 품질 검증(SY043) — '상태/하자' 스텝에 처음 진입할 때, 카테고리+앞/뒤 사진이 이미
+// AI 품질 검증(SY043/SY046) — '상태/하자' 스텝에 처음 진입할 때, 카테고리+앞/뒤 사진이 이미
 // 확정된 상태(스텝 이동 자체가 isIntroStepValid로 막혀 있어 name/color/category/aiModel
 // 설정까지 전부 끝나 있음이 보장된다)를 이용해 실제 DRAFT 상품+이미지를 만들고 진짜
-// 검수 job을 트리거한다. draft.draftProductId가 이미 있으면(스텝을 왔다갔다한 경우)
+// 검수 job을 트리거·폴링한다. draft.draftProductId가 이미 있으면(스텝을 왔다갔다한 경우)
 // 다시 만들지 않는다 — 사진 교체 후 재트리거는 이번 범위 밖(계획 문서 참고).
 const beginQualityInspection = async () => {
   if (draft.draftProductId || !isPhotoStepValid.value || !isCategorySelectionComplete.value) {
@@ -1290,26 +1290,71 @@ const beginQualityInspection = async () => {
     if (currentSequence !== qualityInspectionSequence) return
     draft.draftProductId = productId
 
-    // 실제 모델이 도는 것처럼 로딩 상태를 유지한다.
-    await sleep(QUALITY_INSPECTION_HARDCODED_DELAY_MS)
+    await pollQualityInspectionStatus(productId, currentSequence)
+  } catch (error) {
     if (currentSequence !== qualityInspectionSequence) return
 
-    const frontPhoto = frontPhotos.value[0]
-    const backPhoto = backPhotos.value[0]
-    const photoIdByImageIndex: Record<number, string> = {}
-    if (frontPhoto) photoIdByImageIndex[0] = frontPhoto.id
-    if (backPhoto) photoIdByImageIndex[1] = backPhoto.id
-
-    draft.aiPhotoResults = mapQualityInspectionResultToPhotoResults(
-      QUALITY_INSPECTION_HARDCODED_RESULT,
-      photoIdByImageIndex,
-    )
-    currentAiResultIndex.value = 0
-    draft.aiQualityStatus = 'completed'
-  } catch (error) {
     console.error('[ProductRegistrationPage] AI 품질 검증 시작 실패', error)
     draft.aiQualityStatus = 'failed'
   }
+}
+
+// BE가 앞/뒤 이미지 등록 시점에 자동으로 트리거한 검수 job을 대신 조회해 준다
+// (docs/requests/BE/041). status가 NONE이면 이 카테고리는 SAM3가 지원하지 않아 애초에 job이
+// 트리거되지 않은 것이다 — 실패가 아니라 "미지원 안내"로 구분해 보여준다.
+const pollQualityInspectionStatus = async (productId: number, token: number) => {
+  const deadline = Date.now() + QUALITY_INSPECTION_POLL_TIMEOUT_MS
+
+  while (Date.now() < deadline) {
+    if (token !== qualityInspectionSequence) return
+
+    try {
+      const status = await getProductQualityInspectionStatus(productId)
+      if (token !== qualityInspectionSequence) return
+
+      if (status.status === 'COMPLETED') {
+        if (!status.result) {
+          // BE 계약상 COMPLETED면 result가 항상 같이 온다 — 비어 있으면 응답이 이상한
+          // 것이므로 다음 폴링을 기다리지 않고 바로 실패로 처리한다.
+          draft.aiQualityStatus = 'failed'
+          return
+        }
+
+        const frontPhoto = frontPhotos.value[0]
+        const backPhoto = backPhotos.value[0]
+        const photoIdByImageIndex: Record<number, string> = {}
+        if (frontPhoto) photoIdByImageIndex[0] = frontPhoto.id
+        if (backPhoto) photoIdByImageIndex[1] = backPhoto.id
+
+        draft.aiPhotoResults = mapQualityInspectionResultToPhotoResults(
+          status.result,
+          photoIdByImageIndex,
+        )
+        currentAiResultIndex.value = 0
+        draft.aiQualityStatus = 'completed'
+        return
+      }
+
+      if (status.status === 'NONE') {
+        isQualityCategoryUnsupported.value = true
+        draft.aiQualityStatus = 'failed'
+        return
+      }
+
+      if (status.status === 'FAILED') {
+        draft.aiQualityStatus = 'failed'
+        return
+      }
+    } catch {
+      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도.
+    }
+
+    await sleep(QUALITY_INSPECTION_POLL_INTERVAL_MS)
+  }
+
+  if (token !== qualityInspectionSequence) return
+
+  draft.aiQualityStatus = 'failed'
 }
 
 const applyAiPriceEstimates = (estimates: ProductAiPriceEstimate[]) => {
@@ -1469,6 +1514,33 @@ const moveToPreviousStep = () => {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 
+// 등록 완료 직후(aiModelEnabled=true) BE가 트리거한 AI 착용컷 생성 job을 폴링한다
+// (docs/requests/BE/039). PENDING/PROCESSING 동안 반복 조회하고, COMPLETED/FAILED/NONE이면 멈춘다.
+const pollAiModelCutStatus = async (productId: number) => {
+  const token = ++aiModelCutPollToken
+  const deadline = Date.now() + AI_MODEL_CUT_POLL_TIMEOUT_MS
+
+  while (Date.now() < deadline) {
+    if (token !== aiModelCutPollToken) return
+
+    try {
+      const status = await getProductAiModelCutStatus(productId)
+      if (token !== aiModelCutPollToken) return
+
+      aiModelCutStatus.value = status.status
+      aiModelCutImageUrl.value = status.imageUrl
+
+      if (status.status !== 'PENDING' && status.status !== 'PROCESSING') {
+        return
+      }
+    } catch {
+      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도.
+    }
+
+    await sleep(AI_MODEL_CUT_POLL_INTERVAL_MS)
+  }
+}
+
 const proceedToNextStep = async (skipCompletenessPrompt = false) => {
   if (isSubmittingRegistration.value) {
     return
@@ -1504,9 +1576,8 @@ const proceedToNextStep = async (skipCompletenessPrompt = false) => {
       registeredProductId.value = submitResult.productId
 
       if (draft.aiModelEnabled) {
-        // 임시: 실제 AI 착용컷 생성 대신 하드코딩된 샘플 이미지를 바로 노출한다.
-        aiModelCutStatus.value = 'COMPLETED'
-        aiModelCutImageUrl.value = aiModelHardcodedShot
+        aiModelCutStatus.value = 'PENDING'
+        void pollAiModelCutStatus(Number(submitResult.productId))
       }
     } catch (error) {
       registrationSubmitError.value = normalizeApiError(error).message
@@ -1569,6 +1640,7 @@ const resetRegistrationDraft = () => {
   isCompletenessPromptOpen.value = false
   aiModelCutStatus.value = 'NONE'
   aiModelCutImageUrl.value = null
+  aiModelCutPollToken += 1
   resetAiPriceRecommendation()
 }
 
@@ -1596,6 +1668,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   classifyPollToken += 1
+  aiModelCutPollToken += 1
   draft.photos.forEach((photo) => {
     revokePhotoPreviewUrl(photo)
   })

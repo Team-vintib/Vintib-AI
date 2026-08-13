@@ -2,13 +2,12 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import aiModelHardcodedShot from '@/assets/images/ai-model/폴로_모델샷.png'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { getMyProfile } from '@/domains/my/api/myApi'
 import { createOrder, updateOrderAddress } from '@/domains/order/api/orderApi'
 import PurchaseConfirmDialog from '@/domains/order/components/PurchaseConfirmDialog.vue'
 import type { OrderAddressInput } from '@/domains/order/types/order.types'
-import { addWish, removeWish } from '@/domains/product/api/productApi'
+import { addWish, getProductAiModelCutStatus, removeWish } from '@/domains/product/api/productApi'
 import { useWishStore } from '@/domains/product/stores/wishStore'
 import {
   getProductDetailViewData,
@@ -19,6 +18,7 @@ import ProductDetailInformation from '@/domains/product/components/ProductDetail
 import ProductDetailSkeleton from '@/domains/product/components/ProductDetailSkeleton.vue'
 import ProductDetailStatePanel from '@/domains/product/components/ProductDetailStatePanel.vue'
 import ProductImageGallery from '@/domains/product/components/ProductImageGallery.vue'
+import ProductMarketPrice from '@/domains/product/components/ProductMarketPrice.vue'
 import ProductPriceDistribution from '@/domains/product/components/ProductPriceDistribution.vue'
 import ProductPurchaseSummary from '@/domains/product/components/ProductPurchaseSummary.vue'
 import ProductSellerLivePanel from '@/domains/product/components/ProductSellerLivePanel.vue'
@@ -53,6 +53,12 @@ let loadRequestId = 0
 
 const aiModelCutStatus = ref<ProductAiModelCutStatus>('NONE')
 const aiModelCutImageUrl = ref<string | null>(null)
+// BE(GET /products/{id}/ai-model-cut)를 이 간격으로 폴링한다(SY046). 상세 진입 시점에 아직
+// 생성 중(PENDING/PROCESSING)인 경우에만 돈다 — 상세 응답 자체가 COMPLETED/FAILED/NONE이면
+// 폴링하지 않는다.
+const AI_MODEL_CUT_POLL_INTERVAL_MS = 3_000
+const AI_MODEL_CUT_POLL_TIMEOUT_MS = 120_000
+let aiModelCutPollToken = 0
 
 const isPurchaseDialogOpen = ref(false)
 const purchasePointBalance = ref<number | null>(null)
@@ -109,6 +115,33 @@ const galleryImages = computed(() => {
   ]
 })
 
+const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+
+const pollAiModelCutStatus = async (productId: number) => {
+  const token = ++aiModelCutPollToken
+  const deadline = Date.now() + AI_MODEL_CUT_POLL_TIMEOUT_MS
+
+  while (Date.now() < deadline) {
+    if (token !== aiModelCutPollToken) return
+
+    try {
+      const status = await getProductAiModelCutStatus(productId)
+      if (token !== aiModelCutPollToken) return
+
+      aiModelCutStatus.value = status.status
+      aiModelCutImageUrl.value = status.imageUrl
+
+      if (status.status !== 'PENDING' && status.status !== 'PROCESSING') {
+        return
+      }
+    } catch {
+      // 일시적 오류일 수 있다 — 다음 폴링에서 재시도.
+    }
+
+    await sleep(AI_MODEL_CUT_POLL_INTERVAL_MS)
+  }
+}
+
 const loadProductDetail = async () => {
   const productId = Number(route.params.productId)
   const requestId = ++loadRequestId
@@ -120,6 +153,7 @@ const loadProductDetail = async () => {
   clearTimeout(actionMessageTimer)
   aiModelCutStatus.value = 'NONE'
   aiModelCutImageUrl.value = null
+  aiModelCutPollToken += 1
 
   if (!Number.isInteger(productId) || productId < 1) {
     loadState.value = 'not-found'
@@ -141,9 +175,12 @@ const loadProductDetail = async () => {
     selectedImageId.value = nextProduct.images[0]?.id ?? ''
 
     if (nextProduct.aiModelCut) {
-      // 임시: 실제 생성 결과 대신 하드코딩된 샘플 이미지를 바로 노출한다(ProductRegistrationPage.vue와 동일).
-      aiModelCutStatus.value = 'COMPLETED'
-      aiModelCutImageUrl.value = aiModelHardcodedShot
+      aiModelCutStatus.value = nextProduct.aiModelCut.status
+      aiModelCutImageUrl.value = nextProduct.aiModelCut.imageUrl
+
+      if (aiModelCutStatus.value === 'PENDING' || aiModelCutStatus.value === 'PROCESSING') {
+        void pollAiModelCutStatus(productId)
+      }
     }
   } catch (error) {
     if (requestId !== loadRequestId) return
@@ -344,6 +381,7 @@ watch(isTryOnOpen, (open) => {
 
 onBeforeUnmount(() => {
   loadRequestId += 1
+  aiModelCutPollToken += 1
   clearTimeout(actionMessageTimer)
   window.removeEventListener('keydown', handleTryOnKeydown)
 })
@@ -436,6 +474,8 @@ onBeforeUnmount(() => {
           </template>
         </div>
       </section>
+
+      <ProductMarketPrice :product-id="product.id" />
 
       <ProductPriceDistribution
         :current-product-id="product.id"
