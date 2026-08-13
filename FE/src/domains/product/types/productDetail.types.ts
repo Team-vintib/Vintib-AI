@@ -34,6 +34,24 @@ export interface SimilarProductPricePoint {
   price: number
 }
 
+// "동일 상품 시세"(SY046, docs/requests/FE/042 반영) — BE `GET /products/{id}/market-price`.
+// matchKey 기준 동일 상품 판정이라, 카테고리 기준인 SimilarProductPricePoint와는 별개 개념이다.
+export type ProductMarketPriceKind = 'ASKING' | 'SOLD_DIRECT' | 'SOLD_AUCTION'
+
+export interface ProductMarketPriceItem {
+  productId: number
+  title: string
+  price: number
+  priceKind: ProductMarketPriceKind
+}
+
+export interface ProductMarketPrice {
+  productId: number
+  matchKey: string | null
+  currentProduct: ProductMarketPriceItem | null
+  listings: ProductMarketPriceItem[]
+}
+
 export interface SellerDisclosedDefect {
   title: string
   description: string

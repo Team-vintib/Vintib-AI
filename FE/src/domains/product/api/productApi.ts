@@ -15,6 +15,7 @@ import type {
   AiQualityFindingBox,
   ProductAiModelCut,
   ProductDetailViewData,
+  ProductMarketPrice,
   ProductPriceEstimate,
   SimilarProductPricePoint,
 } from '@/domains/product/types/productDetail.types'
@@ -323,12 +324,17 @@ const SIMILAR_PRODUCT_MOCK_LIMIT = 8
  * (BE가 상품 자신의 값으로 알아서 판단), 정렬도 이미 유사도 순으로 와 있어 FE에서 다시
  * 정렬하지 않는다.
  *
- * 임시: 위 API가 지금은 같은 상품만 반복 반환해(확인 필요 — 유사도 계산/배치 캐시 쪽으로
- * 추정), 화면 확인용으로 상품 5개(41/42/17/43/1)를 고정 노출한다. 실제 목록 조회
- * (`GET /products`)로 해당 상품을 찾아 채우며, 대상 상품 자신은 제외한다. 유사 상품 API가
- * 정상화되면 이 하드코딩은 제거하고 위 엔드포인트로 되돌린다.
+ * SY046: 예전엔 이 응답이 같은 상품만 반복 반환하는 것처럼 보여 상품 ID 5개를 하드코딩해
+ * `GET /products`(페이지네이션 목록)에서 골라 쓰는 우회로 대체했었다. 그런데 이 엔드포인트의
+ * 실제 응답(`SimilarProductsResponse`)은 페이지네이션이 아니라 `{ productId, items }`
+ * 단일 목록이라 — 그 우회 코드가 기대한 목록 응답 모양과 애초에 달랐던 것으로 보인다.
+ * BE 서비스(`SimilarProductQueryService`) 코드 자체는 캐시 후보/SQL 폴백 모두 대상 상품을
+ * 제외하도록 구현돼 있어, 실제 엔드포인트로 되돌린다.
  */
-const HARDCODED_SIMILAR_PRODUCT_IDS = [41, 42, 17, 43, 1]
+interface SimilarProductsResponseDto {
+  productId: number
+  items: ProductListDto[]
+}
 
 export const getSimilarProducts = async (productId: number): Promise<ProductListItem[]> => {
   if (!PRODUCT_API_ENABLED) {
@@ -338,22 +344,12 @@ export const getSimilarProducts = async (productId: number): Promise<ProductList
     )
   }
 
-  const targetIds = HARDCODED_SIMILAR_PRODUCT_IDS.filter((id) => id !== productId)
+  const response = await http.get<ApiResponse<SimilarProductsResponseDto>>(
+    `/products/${productId}/similar`,
+  )
+  const { items } = unwrapApiData(response.data)
 
-  // getProductList()는 조회된 상품 전부를 ProductListItem으로 변환하며 그 과정에서
-  // 대표 이미지가 없는 상품마다 추가 요청을 보낸다. 여기서는 5개만 필요하므로, 목록 DTO를
-  // 직접 조회해 대상 ID만 골라낸 뒤 그 5개에 대해서만 변환한다.
-  const response = await http.get<
-    ApiResponse<PageResponse<ProductListDto> | BackendPageResponse<ProductListDto>>
-  >('/products', { params: { page: 0, size: 100, sort: 'LATEST' } })
-  const { items } = normalizePageResponse(unwrapApiData(response.data))
-  const dtoById = new Map(items.map((dto) => [dto.id, dto]))
-
-  const matchedDtos = targetIds
-    .map((id) => dtoById.get(id))
-    .filter((dto): dto is ProductListDto => Boolean(dto))
-
-  return Promise.all(matchedDtos.map(toProductListItem))
+  return Promise.all(items.map(toProductListItem))
 }
 
 export const getProductDetail = async (productId: number): Promise<ProductDetailViewData> => {
@@ -583,6 +579,17 @@ export const scheduleProductAuction = async (productId: number) => {
 
 export const getBrands = async () => {
   const response = await http.get<ApiResponse<BrandDto[]>>('/brands', { skipAuth: true })
+
+  return unwrapApiData(response.data)
+}
+
+// SY046: "동일 상품 시세"(docs/requests/FE/042 반영) — matchKey 기준 동일 상품의 호가/완료거래가.
+// "유사 상품 가격대"(SimilarProductPricePoint, ProductPriceDistribution.vue)와는 다른 별개 기능이다.
+export const getProductMarketPrice = async (productId: number) => {
+  const response = await http.get<ApiResponse<ProductMarketPrice>>(
+    `/products/${productId}/market-price`,
+    { skipAuth: true },
+  )
 
   return unwrapApiData(response.data)
 }
@@ -933,7 +940,7 @@ const toProductDetailViewData = (product: ProductDetailDto): ProductDetailViewDa
     },
     linkedLive: toLinkedLive(product.linkedLive),
     measurements: product.measurements ?? {},
-    similarProducts: normalizeSimilarProducts(product.id, product.similarProducts),
+    similarProducts: normalizeSimilarProducts(product.similarProducts),
     sellerDisclosedDefects: (product.defects ?? [])
       .map((defect) => defect.trim())
       .filter(Boolean)
@@ -1004,114 +1011,12 @@ const toConditionLabel = (conditionGrade: ProductConditionGrade | null | undefin
   return normalizedGrade ? `${normalizedGrade}급` : ''
 }
 
-// 상품 187은 테스트용으로 같은 이름('폴로 빅포니 화이트 티셔츠')의 상품을 여러 개 등록해 둬서
-// 실제 유사 상품 응답이 전부 같은 제목으로만 나온다. 데모에서 자연스럽게 보이도록 이 상품에
-// 한해 제목·가격을 하드코딩한다. BE가 유사 상품 다양성을 보장하게 되면 제거한다.
-// 가격 분포는 상품등록 AI 가격 추천 mock(productRegistrationAiMockData.ts)의 comp 분포를 그대로
-// 따른다(3~11만원, 총 93개) — 등록 화면 그래프와 상세 화면 시세 조회 그래프가 서로 다른 모양으로
-// 보이지 않도록 맞춰 둔 것이다.
-const HARDCODED_SIMILAR_PRODUCTS_FOR_187: SimilarProductPricePoint[] = [
-  { id: 187001, title: 'RL 빅포니 반팔티 화이트 단독판매', price: 27000 },
-  { id: 187002, title: '랄프로렌 빅포니 폴로 화이트 A급', price: 28500 },
-  { id: 187003, title: 'RL 빅포니 화이트 티셔츠 정품', price: 30000 },
-  { id: 187004, title: '폴로랄프로렌 빅포니 화이트티 꼼꼼체크완료', price: 31500 },
-  { id: 187005, title: '랄프로렌 빅포니 폴로 화이트 태그포함', price: 33000 },
-  { id: 187006, title: '폴로랄프로렌 빅포니 화이트 티셔츠 한정판매', price: 37000 },
-  { id: 187007, title: 'POLO 빅포니 로고 화이트티 빈티지 워싱', price: 38000 },
-  { id: 187008, title: '폴로랄프로렌 빅포니 로고 화이트티 M', price: 39000 },
-  { id: 187009, title: '랄프로렌 빅포니 로고 화이트티 스몰포니', price: 40000 },
-  { id: 187010, title: '폴로 Big Pony White Tee 급처', price: 41000 },
-  { id: 187011, title: '폴로 빅포니 화이트티 자수로고', price: 42000 },
-  { id: 187012, title: '랄프로렌 빅포니 화이트티 오버핏', price: 43000 },
-  { id: 187013, title: '폴로 빅포니 반팔티 화이트 레귤러핏', price: 47000 },
-  { id: 187014, title: 'RL 빅포니 폴로 화이트 어반아울렛구매', price: 47500 },
-  { id: 187015, title: '랄프로렌 빅포니 화이트티 클래식핏', price: 47500 },
-  { id: 187016, title: 'Polo Ralph Lauren 빅포니 로고 화이트티 빈티지', price: 48000 },
-  { id: 187017, title: 'POLO 빅포니 화이트티 새상품급', price: 48500 },
-  { id: 187018, title: 'Polo Ralph Lauren 빅포니 화이트 티셔츠 한정수량', price: 49000 },
-  { id: 187019, title: 'POLO 빅포니 화이트티 XL', price: 49000 },
-  { id: 187020, title: 'RL 빅포니 폴로 화이트 2000년대초반', price: 49500 },
-  { id: 187021, title: '랄프로렌 빅포니 반팔티 화이트 컨디션최상', price: 50000 },
-  { id: 187022, title: '폴로 빅포니 화이트티 오리지널', price: 50000 },
-  { id: 187023, title: 'POLO 빅포니 로고 화이트티 US한정판', price: 50500 },
-  { id: 187024, title: '랄프로렌 빅포니 화이트티 해외구매대행', price: 51000 },
-  { id: 187025, title: '폴로 빅포니 화이트 티셔츠 한정수량', price: 51000 },
-  { id: 187026, title: 'Polo Ralph Lauren 빅포니 반팔티 화이트 꼼꼼체크완료', price: 51500 },
-  { id: 187027, title: 'Polo Ralph Lauren Big Pony White Tee 태그포함', price: 52000 },
-  { id: 187028, title: 'RL Big Pony White Tee 새상품급', price: 52500 },
-  { id: 187029, title: '랄프로렌 Big Pony White Tee 클래식핏', price: 52500 },
-  { id: 187030, title: '폴로랄프로렌 빅포니 폴로 화이트 오버핏', price: 53000 },
-  { id: 187031, title: '랄프로렌 빅포니 반팔티 화이트 뉴욕한정', price: 57000 },
-  { id: 187032, title: 'Polo Ralph Lauren 빅포니 화이트티 새상품급', price: 57500 },
-  { id: 187033, title: '폴로랄프로렌 빅포니 반팔티 화이트 L사이즈', price: 58000 },
-  { id: 187034, title: 'POLO 빅포니 폴로 화이트 2000년대초반', price: 59000 },
-  { id: 187035, title: '폴로 빅포니 로고 화이트티 2000년대초반', price: 59500 },
-  { id: 187036, title: 'RL 빅포니 화이트 티셔츠 USA 직구', price: 60000 },
-  { id: 187037, title: '랄프로렌 빅포니 폴로 화이트 뉴욕한정', price: 60500 },
-  { id: 187038, title: '랄프로렌 빅포니 반팔티 화이트 리셀', price: 61000 },
-  { id: 187039, title: 'Polo Ralph Lauren 빅포니 화이트 티셔츠 빈티지 워싱', price: 62000 },
-  { id: 187040, title: '폴로 빅포니 로고 화이트티 미개봉', price: 62500 },
-  { id: 187041, title: '랄프로렌 빅포니 반팔티 화이트 정품', price: 63000 },
-  { id: 187042, title: '폴로 빅포니 반팔티 화이트 빈티지 워싱', price: 63000 },
-  { id: 187043, title: 'POLO 빅포니 화이트 티셔츠 희소템', price: 64000 },
-  { id: 187044, title: 'POLO 빅포니 반팔티 화이트 컨디션최상', price: 64500 },
-  { id: 187045, title: 'RL Big Pony White Tee 오버핏', price: 65500 },
-  { id: 187046, title: '폴로랄프로렌 빅포니 화이트티 USA 직구', price: 66000 },
-  { id: 187047, title: '폴로랄프로렌 빅포니 로고 화이트티 급처', price: 67000 },
-  { id: 187048, title: '폴로랄프로렌 빅포니 폴로 화이트 L사이즈', price: 67500 },
-  { id: 187049, title: '랄프로렌 빅포니 로고 화이트티 S사이즈', price: 68500 },
-  { id: 187050, title: '폴로 빅포니 반팔티 화이트 더블스티치', price: 69000 },
-  { id: 187051, title: 'RL 빅포니 화이트티 정가이하', price: 71000 },
-  { id: 187052, title: 'POLO 빅포니 화이트티 M', price: 72000 },
-  { id: 187053, title: '폴로랄프로렌 빅포니 화이트티 빈티지 워싱', price: 73000 },
-  { id: 187054, title: '폴로랄프로렌 빅포니 폴로 화이트 S사이즈', price: 74000 },
-  { id: 187055, title: '폴로 빅포니 화이트티 미개봉', price: 75000 },
-  { id: 187056, title: '폴로 빅포니 폴로 화이트 새상품급', price: 76000 },
-  { id: 187057, title: 'POLO 빅포니 화이트 티셔츠 B급', price: 77000 },
-  { id: 187058, title: '폴로랄프로렌 빅포니 폴로 화이트 XL', price: 77000 },
-  { id: 187059, title: 'Polo Ralph Lauren 빅포니 반팔티 화이트 해외구매대행', price: 77500 },
-  { id: 187060, title: '랄프로렌 빅포니 폴로 화이트 가격내림', price: 78000 },
-  { id: 187061, title: 'Polo Ralph Lauren 빅포니 화이트티 컨디션최상', price: 78500 },
-  { id: 187062, title: '랄프로렌 빅포니 로고 화이트티 박스포함', price: 79000 },
-  { id: 187063, title: '폴로 빅포니 화이트 티셔츠 한정판매', price: 79500 },
-  { id: 187064, title: 'RL 빅포니 반팔티 화이트 한정판매', price: 80000 },
-  { id: 187065, title: '랄프로렌 빅포니 로고 화이트티 리셀', price: 80000 },
-  { id: 187066, title: '폴로 Big Pony White Tee 국내매장구매', price: 80500 },
-  { id: 187067, title: '폴로 Big Pony White Tee A급', price: 81000 },
-  { id: 187068, title: 'RL 빅포니 로고 화이트티 A급', price: 81500 },
-  { id: 187069, title: 'RL 빅포니 화이트 티셔츠 클래식핏', price: 82000 },
-  { id: 187070, title: 'RL 빅포니 화이트티 한정수량', price: 82500 },
-  { id: 187071, title: '폴로랄프로렌 빅포니 화이트 티셔츠 컬렉터', price: 83000 },
-  { id: 187072, title: '랄프로렌 빅포니 화이트 티셔츠 컬렉터', price: 83000 },
-  { id: 187073, title: '폴로 빅포니 화이트 티셔츠 어반아울렛구매', price: 84000 },
-  { id: 187074, title: '랄프로렌 Big Pony White Tee 박스포함', price: 85000 },
-  { id: 187075, title: '랄프로렌 Big Pony White Tee 컨디션최상', price: 86000 },
-  { id: 187076, title: '랄프로렌 빅포니 반팔티 화이트 국내매장구매', price: 87000 },
-  { id: 187077, title: '폴로 빅포니 화이트 티셔츠 M', price: 88000 },
-  { id: 187078, title: 'Polo Ralph Lauren 빅포니 반팔티 화이트 컬렉터', price: 89000 },
-  { id: 187079, title: '랄프로렌 빅포니 폴로 화이트 박스포함', price: 91000 },
-  { id: 187080, title: '폴로 빅포니 화이트티 해외구매대행', price: 97000 },
-  { id: 187081, title: '랄프로렌 빅포니 화이트 티셔츠 급처', price: 97000 },
-  { id: 187082, title: 'POLO Big Pony White Tee 리셀', price: 98000 },
-  { id: 187083, title: '폴로 빅포니 폴로 화이트 USA 직구', price: 99500 },
-  { id: 187084, title: 'POLO 빅포니 반팔티 화이트 피크당일수령', price: 100500 },
-  { id: 187085, title: '폴로랄프로렌 빅포니 반팔티 화이트 B급', price: 102000 },
-  { id: 187086, title: 'POLO 빅포니 화이트 티셔츠 정품', price: 103000 },
-  { id: 187087, title: 'RL 빅포니 화이트티 미개봉', price: 107000 },
-  { id: 187088, title: '폴로랄프로렌 빅포니 반팔티 화이트 컬렉터', price: 108000 },
-  { id: 187089, title: '폴로랄프로렌 빅포니 반팔티 화이트 해외구매대행', price: 109000 },
-  { id: 187090, title: '폴로랄프로렌 Big Pony White Tee 빈티지 워싱', price: 110000 },
-  { id: 187091, title: '폴로 빅포니 반팔티 화이트 피크당일수령', price: 111000 },
-  { id: 187092, title: '랄프로렌 빅포니 화이트 티셔츠 리셀', price: 112000 },
-  { id: 187093, title: 'POLO 빅포니 폴로 화이트 가격내림', price: 113000 },
-]
-
+// SY046: 상품 187의 데모 시드 데이터(같은 제목 중복 등록)에 맞춘 하드코딩 특례는 제거하고,
+// 모든 상품에 대해 BE 상세 응답의 similarProducts를 그대로 쓴다. 특정 상품이 중복 제목으로
+// 보이는 건 시드 데이터 품질 문제라 FE가 고칠 범위가 아니다.
 const normalizeSimilarProducts = (
-  productId: number,
   products: SimilarProductPricePoint[] | null | undefined,
 ): SimilarProductPricePoint[] => {
-  if (productId === 187) return HARDCODED_SIMILAR_PRODUCTS_FOR_187
-
   return (products ?? []).filter(
     (product) =>
       Number.isInteger(product.id) &&

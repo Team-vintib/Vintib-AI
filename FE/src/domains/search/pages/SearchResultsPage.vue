@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import fallbackProductImage from '@/assets/images/products/product-denim-jacket.webp'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import { addWish, removeWish } from '@/domains/product/api/productApi'
+import { addWish, buildProductCategoryOptions, getCategories, removeWish } from '@/domains/product/api/productApi'
+import type { ProductCategoryOption } from '@/domains/product/types/productList.types'
 import { useWishStore } from '@/domains/product/stores/wishStore'
 import { searchUnified } from '@/domains/search/api/searchApi'
 import SearchLiveResultCard from '@/domains/search/components/SearchLiveResultCard.vue'
@@ -12,7 +13,6 @@ import SearchMemberResultCard from '@/domains/search/components/SearchMemberResu
 import SearchResultTabs from '@/domains/search/components/SearchResultTabs.vue'
 import SearchStatePanel from '@/domains/search/components/SearchStatePanel.vue'
 import {
-  SEARCH_CATEGORY_FILTER_OPTIONS,
   SEARCH_CONDITION_FILTER_OPTIONS,
   SEARCH_SALE_TYPE_FILTER_OPTIONS,
 } from '@/domains/search/constants/searchFilterOptions'
@@ -132,6 +132,40 @@ const hasSearchError = ref(false)
 const liveMessage = ref('')
 let searchRequestId = 0
 
+// 카테고리 필터 옵션(대분류, 실 categoryId 기반). checkbox는 대분류 id를 쓰고, 검색 호출 시
+// 그 아래 소분류까지 전부 펼쳐서(expandedQueryCategoryIds) 보낸다 — ProductListView.vue와 동일 패턴.
+const categoryOptions = ref<ProductCategoryOption[]>([])
+const isLoadingCategories = ref(true)
+
+const loadCategoryOptions = async () => {
+  isLoadingCategories.value = true
+
+  try {
+    const categories = await getCategories()
+
+    categoryOptions.value = buildProductCategoryOptions(categories)
+  } catch {
+    categoryOptions.value = []
+  } finally {
+    isLoadingCategories.value = false
+  }
+}
+
+const expandedQueryCategoryIds = computed(() => {
+  const selectedIds = new Set(queryCategoryIds.value.map(Number))
+
+  return [
+    ...new Set(
+      categoryOptions.value
+        .filter((option) => selectedIds.has(option.id))
+        .flatMap((option) => option.categoryIds),
+    ),
+  ]
+})
+
+const getCategoryOptionLabel = (categoryId: string) =>
+  categoryOptions.value.find((option) => String(option.id) === categoryId)?.label ?? categoryId
+
 wishStore.hydrateProducts(EMPTY_SEARCH_RESULTS.products)
 
 watch(queryKeyword, (keyword) => {
@@ -195,7 +229,7 @@ const selectedFilterChips = computed<SearchFilterChip[]>(() => {
     id: `category-${categoryId}`,
     kind: 'category' as const,
     value: categoryId,
-    label: getFilterOptionLabel(SEARCH_CATEGORY_FILTER_OPTIONS, categoryId),
+    label: getCategoryOptionLabel(categoryId),
   }))
   const conditionChips = queryConditionIds.value.map((conditionId) => ({
     id: `condition-${conditionId}`,
@@ -730,7 +764,7 @@ const loadSearchResults = async () => {
     const results = await searchUnified({
       keyword,
       type: activeTabId.value,
-      categories: queryCategoryIds.value,
+      categories: expandedQueryCategoryIds.value.map(String),
       conditions: queryConditionIds.value,
       saleTypes: querySaleTypeIds.value,
       minPrice: queryMinPrice.value,
@@ -801,6 +835,10 @@ watch(
   },
   { immediate: true },
 )
+
+onMounted(() => {
+  void loadCategoryOptions()
+})
 </script>
 
 <template>
@@ -840,15 +878,19 @@ watch(
               <summary>카테고리</summary>
 
               <div class="search-page__filter-group-body">
+                <p v-if="!categoryOptions.length" class="search-page__filter-empty">
+                  {{ isLoadingCategories ? '카테고리를 불러오는 중입니다.' : '선택할 수 있는 카테고리가 없습니다.' }}
+                </p>
+
                 <label
-                  v-for="option in SEARCH_CATEGORY_FILTER_OPTIONS"
+                  v-for="option in categoryOptions"
                   :key="option.id"
                   class="search-page__checkbox-option"
                 >
                   <input
                     type="checkbox"
-                    :checked="selectedCategoryIds.includes(option.id)"
-                    @change="handleCategoryChange($event, option.id)"
+                    :checked="selectedCategoryIds.includes(String(option.id))"
+                    @change="handleCategoryChange($event, String(option.id))"
                   />
                   <span>{{ option.label }}</span>
                 </label>
@@ -1362,6 +1404,12 @@ watch(
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-regular);
   line-height: var(--line-height-body);
+}
+
+.search-page__filter-empty {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-control);
 }
 
 .search-page__checkbox-option {
