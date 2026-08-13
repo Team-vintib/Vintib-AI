@@ -2880,9 +2880,9 @@ onBeforeUnmount(() => {
 
 .product-registration__steps li:not(:last-child)::after {
   position: absolute;
-  top: 22px;
-  left: calc(50% + 29px);
-  width: calc(100% - 58px);
+  top: 17px;
+  left: calc(50% + 24px);
+  width: calc(100% - 48px);
   height: 2px;
   background: var(--color-border);
   content: '';
@@ -2896,23 +2896,23 @@ onBeforeUnmount(() => {
   position: relative;
   z-index: var(--z-layer-1);
   display: grid;
-  width: 44px;
-  height: 44px;
+  width: 34px;
+  height: 34px;
   border: 1px solid var(--color-border-input);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-muted);
   flex: 0 0 auto;
   font-family: var(--font-mono);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-medium);
   place-items: center;
 }
 
 .product-registration__steps strong {
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-comfortable);
+  line-height: var(--line-height-snug);
   overflow-wrap: anywhere;
   word-break: keep-all;
 }
@@ -3106,7 +3106,7 @@ onBeforeUnmount(() => {
 
 .product-registration__field-error {
   color: var(--color-error);
-  font-size: var(--font-size-md-plus);
+  font-size: var(--font-size-caption);
   line-height: var(--line-height-control);
 }
 
@@ -3127,11 +3127,13 @@ onBeforeUnmount(() => {
   gap: var(--space-2);
 }
 
+/* 항목 이름은 사진 카드 제목·섹션 제목(h3)과 같은 크기로 둔다 — 같은 "이 항목이 무엇인가"
+   층위인데 라벨만 작으면 단계마다 글씨가 달라 보였다. */
 .product-registration__field span:first-child {
   color: var(--color-text-primary);
-  font-size: var(--font-size-2xl);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-control);
+  line-height: var(--line-height-lg);
 }
 
 .product-registration__field .product-registration__required,
@@ -3146,7 +3148,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-badge);
   background: var(--color-accent);
   color: #ffffff;
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -3164,7 +3166,7 @@ onBeforeUnmount(() => {
 
 .product-registration__field-hint {
   color: var(--color-text-muted);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xs);
   font-style: normal;
   line-height: var(--line-height-snug);
   white-space: normal;
@@ -3180,7 +3182,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-button-small);
   line-height: var(--line-height-control);
 }
 
@@ -3193,7 +3195,6 @@ onBeforeUnmount(() => {
   background: var(--color-surface);
   color: var(--color-text-primary);
   font: inherit;
-  font-size: var(--font-size-lg-plus);
   transition:
     border-color var(--transition-base),
     background-color var(--transition-base),
@@ -3303,14 +3304,14 @@ onBeforeUnmount(() => {
 .product-registration__fieldset legend {
   padding: 0 var(--space-1);
   color: var(--color-text-primary);
-  font-size: var(--font-size-2xl);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-body);
+  line-height: var(--line-height-lg);
 }
 
 .product-registration__fieldset > p {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-button-small);
   line-height: var(--line-height-control);
 }
 
@@ -3320,7 +3321,6 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-lg);
   text-align: center;
 }
 
@@ -3335,9 +3335,9 @@ onBeforeUnmount(() => {
 
 .product-registration__section h3 {
   color: var(--color-text-primary);
-  font-size: var(--font-size-2xl);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-2xl);
+  line-height: var(--line-height-lg);
 }
 
 .product-registration__section-header {
@@ -3354,8 +3354,8 @@ onBeforeUnmount(() => {
 
 .product-registration__section-header p {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-lg);
-  line-height: var(--line-height-lg);
+  font-size: var(--font-size-button-small);
+  line-height: var(--line-height-control);
 }
 
 .product-registration__ai-model {
@@ -3375,9 +3375,9 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-model-choice > span:first-child {
   color: var(--color-text-primary);
-  font-size: var(--font-size-2xl);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-control);
+  line-height: var(--line-height-lg);
 }
 
 .product-registration__option-grid {
@@ -3393,7 +3393,6 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-bold);
   transition:
     border-color var(--transition-base),
@@ -3455,7 +3454,6 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-result-toolbar strong {
   color: var(--color-text-primary);
-  font-size: var(--font-size-lg-plus);
   font-weight: var(--font-weight-bold);
   text-align: center;
 }
@@ -3463,7 +3461,7 @@ onBeforeUnmount(() => {
 .product-registration__ai-guide {
   padding: 0 var(--space-1);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-s);
   line-height: var(--line-height-snug);
 }
 
@@ -3536,7 +3534,7 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-no-findings {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-caption);
 }
 
 .product-registration__ai-card-badge {
@@ -3549,7 +3547,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: var(--color-error);
   color: var(--color-primary);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   line-height: 1;
 }
@@ -3573,7 +3571,7 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-card-defect {
   color: var(--color-text-primary);
-  font-size: var(--font-size-lg-plus);
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
 }
 
@@ -3589,7 +3587,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   white-space: nowrap;
 }
@@ -3597,7 +3595,7 @@ onBeforeUnmount(() => {
 .product-registration__ai-card p {
   margin-left: calc(22px + var(--space-2));
   color: var(--color-text-secondary);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-xs);
   line-height: var(--line-height-control);
 }
 
@@ -3641,13 +3639,13 @@ onBeforeUnmount(() => {
 
 .product-registration__ai-result-actions > span {
   color: var(--color-text-primary);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-button-small);
   font-weight: var(--font-weight-bold);
 }
 
 .product-registration__ai-confirm-hint {
   color: var(--color-text-secondary);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-caption);
   text-align: right;
 }
 
@@ -3662,13 +3660,11 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-lg);
   text-align: center;
 }
 
 .product-registration__ai-empty strong {
   color: var(--color-text-primary);
-  font-size: var(--font-size-lg-plus);
 }
 
 .product-registration__ai-spinner {
@@ -3708,7 +3704,7 @@ onBeforeUnmount(() => {
 
 .product-registration__price-axis {
   color: var(--color-text-muted);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -3745,7 +3741,7 @@ onBeforeUnmount(() => {
   top: 0;
   transform: translateX(-50%);
   color: var(--color-text-muted);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-xs);
   white-space: nowrap;
@@ -3757,7 +3753,7 @@ onBeforeUnmount(() => {
   right: 0;
   margin-top: calc(var(--space-2) + var(--line-height-xs) + var(--space-2));
   color: var(--color-text-muted);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-2xs);
   font-weight: var(--font-weight-light);
   line-height: var(--line-height-xs);
   white-space: nowrap;
@@ -3770,7 +3766,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   height: 220px;
   color: var(--color-text-muted);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   text-align: right;
 }
@@ -3840,7 +3836,7 @@ onBeforeUnmount(() => {
   width: 100%;
   margin-bottom: var(--space-1);
   color: var(--color-text-primary);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-xs);
   text-align: center;
@@ -3853,7 +3849,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-raised);
   color: var(--color-text-primary);
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-2xs);
   font-weight: var(--font-weight-semibold);
   white-space: nowrap;
   opacity: 0;
@@ -3880,7 +3876,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: var(--space-2);
   color: var(--color-text-secondary);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -3909,13 +3905,12 @@ onBeforeUnmount(() => {
 
 .product-registration__price-recommendations dt {
   color: var(--color-error);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
 }
 
 .product-registration__price-recommendations dd {
   color: var(--color-text-primary);
-  font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
 }
 
