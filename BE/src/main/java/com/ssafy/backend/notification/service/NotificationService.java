@@ -40,7 +40,7 @@ public class NotificationService {
     public PageResponse<NotificationItemResponse> getNotifications(
             Long memberId, boolean unreadOnly, NotificationCategory category, Pageable pageable) {
         // 알림함은 '안 읽은 것 먼저'가 기본 조회다(schema.sql ix_notification_member 인덱스 주석 근거).
-        // 클라이언트가 다른 sort를 보내도 무시한다 — ProductService.getProductList와 동일한 정책.
+        // 클라이언트가 다른 sort를 보내도 무시한다 — ProductQueryService.getProductList와 동일한 정책.
         Pageable sorted = PageRequest.of(
                 pageable.getPageNumber(),
                 pageable.getPageSize(),

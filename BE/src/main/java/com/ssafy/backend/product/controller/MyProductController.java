@@ -5,7 +5,7 @@ import com.ssafy.backend.global.exception.ErrorCode;
 import com.ssafy.backend.global.response.ApiResponse;
 import com.ssafy.backend.global.response.PageResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
-import com.ssafy.backend.product.service.ProductService;
+import com.ssafy.backend.product.service.ProductQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class MyProductController {
 
-    private final ProductService productService;
+    private final ProductQueryService productQueryService;
 
     @Operation(summary = "판매 상품 관리 목록 조회",
             description = "본인이 등록한 상품 전체를 등록일 최신순으로 조회한다. DRAFT 등 비공개 상태 상품도 포함된다.")
@@ -48,7 +48,7 @@ public class MyProductController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         requireSelf(authentication, userId);
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(ApiResponse.success(productService.getMyProducts(userId, pageable)));
+        return ResponseEntity.ok(ApiResponse.success(productQueryService.getMyProducts(userId, pageable)));
     }
 
     // path의 userId가 인증된 본인이 아니면 존재 자체를 드러내지 않고 403으로 막는다(IDOR 방지).

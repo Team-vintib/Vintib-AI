@@ -21,8 +21,10 @@ import com.ssafy.backend.product.dto.response.ProductQualityInspectionResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.product.dto.response.SimilarProductsResponse;
 import com.ssafy.backend.product.service.PriceEstimateService;
+import com.ssafy.backend.product.service.ProductAiJobStatusService;
+import com.ssafy.backend.product.service.ProductCommandService;
 import com.ssafy.backend.product.service.ProductImageService;
-import com.ssafy.backend.product.service.ProductService;
+import com.ssafy.backend.product.service.ProductQueryService;
 import com.ssafy.backend.product.service.SimilarProductQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -54,7 +56,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProductController {
 
-    private final ProductService productService;
+    private final ProductCommandService productCommandService;
+    private final ProductQueryService productQueryService;
+    private final ProductAiJobStatusService productAiJobStatusService;
     private final ProductImageService productImageService;
     private final PriceEstimateService priceEstimateService;
     private final SimilarProductQueryService similarProductQueryService;
@@ -63,7 +67,7 @@ public class ProductController {
             summary = "상품 기본 정보 저장",
             description = "카테고리/브랜드/제목/설명/상태등급/사이즈/색상/소재/실측/하자를 입력해 DRAFT 상태의 상품 생성. "
                     + "실측(measurements)과 하자(defects)는 선택 입력. "
-                    + "판매 방식(정찰제/경매)과 가격은 이 API에서 다루지 않고 이후 별도 API에서 설정.")
+                    + "판매 방식(정찰제/경매)과 가격 별도 API에서 설정.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "등록 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
@@ -74,14 +78,13 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
             Authentication authentication, @Valid @RequestBody ProductCreateRequest request) {
         Long sellerId = (Long) authentication.getPrincipal();
-        ProductResponse response = productService.createProduct(sellerId, request);
+        ProductResponse response = productCommandService.createProduct(sellerId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "판매 가격 설정 및 정찰제 등록",
-            description = "DRAFT(최초 등록) 또는 AUCTION_SCHEDULED(경매 예정 상품의 정찰제 전환, "
-                    + "상태 상품에 가격을 설정해 정찰제(ON_SALE) 상태로 전환.")
+            description = "DRAFT/AUCTION_SCHEDULED 상태 상품에 가격 설정. ON_SALE 상태로 전환.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "전환 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -98,15 +101,14 @@ public class ProductController {
             @PathVariable Long id,
             @Valid @RequestBody ProductStatusUpdateRequest request) {
         Long sellerId = (Long) authentication.getPrincipal();
-        ProductResponse response = productService.registerDirectSale(sellerId, id, request);
+        ProductResponse response = productCommandService.registerDirectSale(sellerId, id, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "경매 상품 등록 및 경매 전환",
-            description = "DRAFT(최초 등록) 또는 ON_SALE(정찰제 상품의 경매 전환) 상태 상품을 "
-                    + "경매 예정(AUCTION_SCHEDULED) 상태로 전환. "
-                    + "시작가·증액 단위·경매 시간은 경매 시작 전 별도 API로 설정한다.")
+            description = "DRAFT/ON_SALE 상태 상품을 AUCTION_SCHEDULED 상태로 전환. "
+                    + "시작가·증액 단위·경매 시간은 경매 시작 전 별도 API로 설정.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "등록 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "DRAFT/ON_SALE 상태가 아님"),
@@ -119,17 +121,15 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ProductResponse>> scheduleAuction(
             Authentication authentication, @PathVariable Long id) {
         Long sellerId = (Long) authentication.getPrincipal();
-        ProductResponse response = productService.scheduleAuction(sellerId, id);
+        ProductResponse response = productCommandService.scheduleAuction(sellerId, id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "상품 목록 조회",
             description = """
-                    공개된 상품 목록 조회. DRAFT 상태 상품은 제외.
-                    카테고리·상태등급·판매방식·가격 범위·판매자(sellerId) 필터를 조합할 수 있으며,
-                    각 파라미터를 생략하면 해당 조건을 건너뜀. sellerId는 공개 프로필에서
-                    특정 판매자의 상품만 보여줄 때 사용.
+                    공개된 상품 목록 조회. DRAFT 상태 상품 제외.
+                    카테고리·상태등급·판매방식·가격 범위·판매자(sellerId) 필터 조합 가능.
                     정렬: LATEST(기본값, 최신순) / PRICE_ASC(가격 낮은 순) / PRICE_DESC(가격 높은 순).
                     """)
     @ApiResponses({
@@ -149,14 +149,16 @@ public class ProductController {
         ProductListFilterParams filter =
                 new ProductListFilterParams(categoryIds, conditionGrades, saleType, minPrice, maxPrice, sort, sellerId);
         Pageable pageable = PageRequest.of(page, size);
-        PageResponse<ProductResponse> response = productService.getProductList(filter, pageable);
+        PageResponse<ProductResponse> response = productQueryService.getProductList(filter, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "상품 상세 조회",
-            description = "상품 상세 정보를 조회한다. 비회원도 조회 가능. "
-                    + "DRAFT 상태 상품은 판매자 본인만 조회할 수 있으며, 그 외에는 존재하지 않는 것처럼 404를 반환.")
+            description = """
+                    상품 상세 정보 조회. 비회원도 가능.
+                    DRAFT 상태 상품은 판매자 본인만 조회 가능. 그 외에는 404 반환.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품이 없거나 DRAFT 상품을 본인 외 사용자가 조회함")
@@ -165,30 +167,31 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ProductDetailResponse>> getProductDetail(
             Authentication authentication, @PathVariable Long id) {
         Long viewerId = authentication != null ? (Long) authentication.getPrincipal() : null;
-        ProductDetailResponse response = productService.getProductDetail(viewerId, id);
+        ProductDetailResponse response = productQueryService.getProductDetail(viewerId, id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "동일 상품 시세 조회",
-            description = "같은 matchKey(AI 시세 조회가 상품명·브랜드·카테고리로 판정)를 가진 다른 상품들의 "
-                    + "호가/완료거래가를 보여준다. 비회원도 조회 가능하다. matchKey가 아직 계산되지 않은 "
-                    + "상품이면 listings가 빈 배열로 온다(404 아님).")
+            description = """
+                    같은 matchKey를 가진 다른 상품들의 호가/완료거래가. 비회원도 조회 가능. 
+                    matchKey가 아직 계산되지 않은 상품이면 listings가 빈 배열 (404 아님).
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
     })
     @GetMapping("/{id}/market-price")
     public ResponseEntity<ApiResponse<ProductMarketPriceResponse>> getMarketPrice(@PathVariable Long id) {
-        ProductMarketPriceResponse response = productService.getMarketPrice(id);
+        ProductMarketPriceResponse response = productQueryService.getMarketPrice(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "유사 상품 추천 조회",
-            description = "CLIP 이미지 임베딩 기반 유사 상품(AI, CH034)을 배치로 미리 계산해둔 캐시에서 조회한다. "
-                    + "요청 시점에 AI를 호출하지 않는다 — AI 서버 상태가 이 응답에 영향을 주지 않는다. "
-                    + "캐시 결과가 부족하거나 없으면 기존 카테고리/브랜드 기반 SQL로 채운다.")
+            description = "CLIP 이미지 임베딩 기반 유사 상품을 배치로 미리 계산해둔 캐시에서 조회. "
+                    + "요청 시점에 AI를 호출 x, AI 서버 상태가 이 응답에 영향 x. "
+                    + "캐시 결과가 부족하거나 없으면 기존 카테고리/브랜드 기반 SQL로 채움.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
@@ -209,7 +212,7 @@ public class ProductController {
     })
     @GetMapping("/{id}/ai-model-cut")
     public ResponseEntity<ApiResponse<ProductAiModelCutResponse>> getAiModelCutStatus(@PathVariable Long id) {
-        ProductAiModelCutResponse response = productService.getAiModelCutStatus(id);
+        ProductAiModelCutResponse response = productAiJobStatusService.getAiModelCutStatus(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -225,7 +228,7 @@ public class ProductController {
     @GetMapping("/{id}/quality-inspection")
     public ResponseEntity<ApiResponse<ProductQualityInspectionResponse>> getQualityInspectionStatus(
             @PathVariable Long id) {
-        ProductQualityInspectionResponse response = productService.getQualityInspectionStatus(id);
+        ProductQualityInspectionResponse response = productAiJobStatusService.getQualityInspectionStatus(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -269,7 +272,7 @@ public class ProductController {
             @PathVariable Long id,
             @Valid @RequestBody ProductUpdateRequest request) {
         Long sellerId = (Long) authentication.getPrincipal();
-        ProductResponse response = productService.updateProduct(sellerId, id, request);
+        ProductResponse response = productCommandService.updateProduct(sellerId, id, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -287,7 +290,7 @@ public class ProductController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(Authentication authentication, @PathVariable Long id) {
         Long sellerId = (Long) authentication.getPrincipal();
-        productService.deleteProduct(sellerId, id);
+        productCommandService.deleteProduct(sellerId, id);
         return ResponseEntity.noContent().build();
     }
 

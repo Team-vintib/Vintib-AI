@@ -26,7 +26,7 @@ public class SimilarProductCacheService {
 
     /**
      * AI에 요청할 후보 개수. 서빙 시 실시간 판매상태 필터링으로 줄어들 걸 감안한 여유분 —
-     * 기존 SQL 폴백 상한({@code ProductService.SIMILAR_PRODUCT_LIMIT})과 맞춘 값이다.
+     * 기존 SQL 폴백 상한({@code ProductQueryService.SIMILAR_PRODUCT_LIMIT})과 맞춘 값이다.
      * pgvector 코사인 조회 하나라 늘려도 비용 차이가 거의 없고, 배치라 지연시간도 문제없다.
      */
     static final int CANDIDATE_K = 20;
