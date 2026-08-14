@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppFooter from '@/shared/components/AppFooter.vue'
+import AppWorkerOffNotice from '@/shared/components/AppWorkerOffNotice.vue'
 import GlobalNavigation from '@/shared/components/GlobalNavigation.vue'
 
 withDefaults(
@@ -14,7 +15,10 @@ withDefaults(
 
 <template>
   <div class="default-layout">
-    <GlobalNavigation />
+    <div class="default-layout__sticky-header">
+      <GlobalNavigation />
+      <AppWorkerOffNotice />
+    </div>
     <main
       class="default-layout__content"
       :style="{ '--default-layout-content-max-width': contentMaxWidth }"
@@ -32,6 +36,12 @@ withDefaults(
   min-height: 100vh;
   background: var(--color-page);
   color: var(--color-text-primary);
+}
+
+.default-layout__sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-top);
 }
 
 .default-layout__content {
