@@ -9,9 +9,7 @@ import com.ssafy.backend.member.entity.Member;
 import com.ssafy.backend.member.repository.MemberRepository;
 import com.ssafy.backend.product.entity.Category;
 import com.ssafy.backend.product.entity.Product;
-import com.ssafy.backend.product.entity.ProductDefect;
 import com.ssafy.backend.product.repository.CategoryRepository;
-import com.ssafy.backend.product.repository.ProductDefectRepository;
 import com.ssafy.backend.product.repository.ProductRepository;
 import java.util.List;
 import java.util.Map;
@@ -41,9 +39,6 @@ class ProductQueryAdapterTest {
 
     @Autowired
     private MemberRepository memberRepository;
-
-    @Autowired
-    private ProductDefectRepository productDefectRepository;
 
     private Member seller;
 
@@ -147,12 +142,12 @@ class ProductQueryAdapterTest {
     @Test
     void 하자_목록은_쉼표로_이어붙인_한_줄_요약으로_담긴다() {
         Category 자켓 = 소분류("자켓");
-        Product product = productRepository.save(
-                Product.builder().seller(seller).categoryId(자켓.getId()).title("빈티지 자켓").build());
-        productDefectRepository.save(
-                ProductDefect.builder().product(product).content("밑단 오염").sortOrder((short) 0).build());
-        productDefectRepository.save(
-                ProductDefect.builder().product(product).content("우측 소매 실밥 풀림").sortOrder((short) 1).build());
+        Product product = productRepository.save(Product.builder()
+                .seller(seller)
+                .categoryId(자켓.getId())
+                .title("빈티지 자켓")
+                .defects(List.of("밑단 오염", "우측 소매 실밥 풀림"))
+                .build());
 
         ProductCard card = productQueryPort.findCards(List.of(product.getId())).get(product.getId());
 

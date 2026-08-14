@@ -297,7 +297,7 @@
 | `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
 | `email` | `varchar(255)` | NOT NULL |  | UQ | 로그인 ID 겸 연락 수단. 경매 화면에는 노출하지 않는다. |
 | `password` | `varchar(255)` |  |  |  | 자체 로그인용 해시. SSO 전용 계정은 NULL. |
-| `google_id` | `varchar(100)` |  |  | UQ | 구글 로그인 연동 식별자(id_token의 sub, SY039). 미연동 회원은 NULL. |
+| `google_id` | `varchar(100)` |  |  | UQ | 구글 로그인 연동 식별자(id_token의 sub). 미연동 회원은 NULL. |
 | `nickname` | `varchar(30)` |  |  | UQ | 공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011). |
 | `name` | `varchar(50)` |  |  |  | 실명. 배송·정산용이며 외부 노출 금지. |
 | `phone_number` | `varchar(20)` |  |  |  | 연락처. 배송·정산 확인용이며 외부 노출 금지. |
@@ -407,7 +407,7 @@
 | `tracking_number` | `varchar(50)` |  |  |  | 운송장 번호. 판매자가 등록한다. |
 | `shipped_at` | `timestamptz` |  |  |  | 발송 시각. 송장 등록 시점. |
 | `delivered_at` | `timestamptz` |  |  |  | 배송 완료 시각. orders.auto_confirm_at 계산 기준. |
-| `tracking_status` | `varchar(20)` |  |  |  | 배송 진행 상태(SY034). 웹훅 수신 때마다 갱신, 첫 수신 전에는 NULL. |
+| `tracking_status` | `varchar(20)` |  |  |  | 배송 진행 상태. 웹훅 수신 때마다 갱신, 첫 수신 전에는 NULL. |
 | `webhook_subscribed` | `boolean` | NOT NULL | `false` |  | 배송 조회 웹훅 구독 성공 여부(SY034 8차). FALSE인 건만 지연 폴백 배치 대상. |
 
 **CHECK 제약**
@@ -565,6 +565,7 @@
 | `material` | `varchar(50)` |  |  |  | 소재(자유 문자열). |
 | `match_key` | `varchar(300)` |  |  |  | "동일 상품" 판정 키(AI 시세 조회). AI가 상품명+브랜드+카테고리로 계산해 FE 경유로 저장 — BE는 계산하지 않는다. |
 | `measurements` | `jsonb` |  |  |  | 실측 치수(cm). 항목(총장/어깨너비 등)이 상품마다 달라 JSONB로 저장. |
+| `defects` | `jsonb` |  |  |  | 판매자가 직접 입력한 하자 목록(SY047). 배열 순서가 곧 노출 순서. |
 | `sale_type` | `varchar(20)` |  |  |  | DIRECT_SALE(정찰제) \| AUCTION(경매) |
 | `sale_status` | `varchar(30)` | NOT NULL | `'DRAFT'` |  | DRAFT \| ON_SALE \| AUCTION_SCHEDULED \| AUCTION_IN_PROGRESS \| SOLD |
 | `price` | `bigint` |  |  |  | 정찰제가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002). |
@@ -590,19 +591,6 @@
 - `ix_product_seller` — `CREATE INDEX ix_product_seller ON public.product USING btree (seller_id, created_at DESC)`
 - `ix_product_status_created` — `CREATE INDEX ix_product_status_created ON public.product USING btree (sale_status, created_at DESC) WHERE (deleted_at IS NULL)`
 - `ix_product_title_trgm` — `CREATE INDEX ix_product_title_trgm ON public.product USING gin (title gin_trgm_ops)`
-
----
-
-### `product_defect`
-
-판매자가 직접 입력한 하자 목록 (PROD-001).
-
-| 컬럼 | 타입 | NULL | 기본값 | 키 | 설명 |
-| --- | --- | --- | --- | --- | --- |
-| `id` | `bigint` | NOT NULL |  | PK | PK. IDENTITY 자동 채번. |
-| `product_id` | `bigint` | NOT NULL |  | FK→product | 대상 상품. |
-| `content` | `text` | NOT NULL |  |  | 하자 내용(자유 문자열). |
-| `sort_order` | `smallint` | NOT NULL | `0` |  | 노출 순서. |
 
 ---
 

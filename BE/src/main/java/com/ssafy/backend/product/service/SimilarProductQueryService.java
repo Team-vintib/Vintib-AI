@@ -42,7 +42,7 @@ public class SimilarProductQueryService {
     /** 캐러셀 한 슬라이드 분량 — 이 개수까지는 SQL로 보충해서라도 채운다. */
     private static final int TARGET_DISPLAY_COUNT = 5;
 
-    /** 응답 상한. 기존 {@code ProductService.SIMILAR_PRODUCT_LIMIT}과 동일한 기준. */
+    /** 응답 상한. 기존 {@code ProductQueryService.SIMILAR_PRODUCT_LIMIT}과 동일한 기준. */
     private static final int RESPONSE_LIMIT = 20;
 
     // AI는 판매상태를 모른다 — 캐시된 후보든 SQL 폴백이든 항상 이 상태로 다시 걸러야 한다.

@@ -131,6 +131,7 @@ CREATE TABLE product (
     -- 값을 FE가 그대로 넘겨 저장한다 — BE는 계산하지 않는다. 아직 계산 전이면 NULL.
     match_key       VARCHAR(300),
     measurements    JSONB,                           -- 실측 치수(cm). 항목이 상품마다 달라 고정 컬럼 대신 JSONB
+    defects         JSONB,                           -- 판매자가 직접 입력한 하자 목록(SY047). 배열 순서 = 노출 순서
     sale_type       VARCHAR(20),                     -- 정찰제 / 경매. 기본 정보 저장 시점에는 NULL,
                                                        -- 판매 채널을 정하는 API(판매 가격 설정/경매 조건 설정)
                                                        -- 호출 시 확정.
@@ -167,14 +168,6 @@ CREATE TABLE product_image (
     image_key  VARCHAR(500) NOT NULL,
     sort_order SMALLINT     NOT NULL DEFAULT 0,
     is_primary BOOLEAN      NOT NULL DEFAULT FALSE
-);
-
--- 판매자가 직접 입력한 하자 목록
-CREATE TABLE product_defect (
-    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    product_id BIGINT      NOT NULL REFERENCES product (id),
-    content    TEXT        NOT NULL,
-    sort_order SMALLINT    NOT NULL DEFAULT 0
 );
 
 -- 찜
