@@ -67,7 +67,7 @@ public class ProductController {
             summary = "상품 기본 정보 저장",
             description = "카테고리/브랜드/제목/설명/상태등급/사이즈/색상/소재/실측/하자를 입력해 DRAFT 상태의 상품 생성. "
                     + "실측(measurements)과 하자(defects)는 선택 입력. "
-                    + "판매 방식(정찰제/경매)과 가격 별도 API에서 설정.")
+                    + "판매 방식(정찰제/경매)과 가격은 이 API에서 다루지 않고 이후 별도 API에서 설정.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "등록 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
@@ -107,8 +107,10 @@ public class ProductController {
 
     @Operation(
             summary = "경매 상품 등록 및 경매 전환",
-            description = "DRAFT/ON_SALE 상태 상품을 AUCTION_SCHEDULED 상태로 전환. "
-                    + "시작가·증액 단위·경매 시간은 경매 시작 전 별도 API로 설정.")
+            description = """
+                    DRAFT/ON_SALE 상태 상품을 AUCTION_SCHEDULED 상태로 전환.
+                    시작가·증액 단위·경매 시간은 경매 시작 전 별도 API로 설정.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "등록 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "DRAFT/ON_SALE 상태가 아님"),
@@ -189,9 +191,9 @@ public class ProductController {
 
     @Operation(
             summary = "유사 상품 추천 조회",
-            description = "CLIP 이미지 임베딩 기반 유사 상품을 배치로 미리 계산해둔 캐시에서 조회. "
-                    + "요청 시점에 AI를 호출 x, AI 서버 상태가 이 응답에 영향 x. "
-                    + "캐시 결과가 부족하거나 없으면 기존 카테고리/브랜드 기반 SQL로 채움.")
+            description = "CLIP 이미지 임베딩 기반 유사 상품(AI, CH034)을 배치로 미리 계산해둔 캐시에서 조회한다. "
+                    + "요청 시점에 AI를 호출하지 않는다 — AI 서버 상태가 이 응답에 영향을 주지 않는다. "
+                    + "캐시 결과가 부족하거나 없으면 기존 카테고리/브랜드 기반 SQL로 채운다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
@@ -204,8 +206,10 @@ public class ProductController {
 
     @Operation(
             summary = "AI 착용컷 생성 상태/결과 조회",
-            description = "판매자가 등록 시 AI 착용컷을 켠 상품의 생성 상태 조회. "
-                    + "PENDING/PROCESSING이면 이 호출 시점에 AI 쪽 최신 상태 다시 확인.")
+            description = """
+                        판매자가 등록 시 AI 착용컷을 켠 상품의 생성 상태 조회.
+                        PENDING/PROCESSING이면 이 호출 시점에 AI 쪽 최신 상태 다시 확인.
+                        """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
@@ -218,9 +222,11 @@ public class ProductController {
 
     @Operation(
             summary = "하자 검수 상태/결과 조회",
-            description = "앞/뒤 사진이 둘 다 등록되면 백그라운드로 도는 AI 하자 검수의 상태를 조회한다. "
-                    + "PENDING/PROCESSING이면 이 호출 시점에 AI 쪽 최신 상태를 다시 확인해 반영한다. "
-                    + "FE는 AI 게이트웨이를 직접 호출하지 않고 이 엔드포인트만 폴링한다.")
+            description = """
+                    앞/뒤 사진이 둘 다 등록되면 AI 하자 검수 상태 조회.
+                    PENDING/PROCESSING이면 AI 쪽 최신 상태를 다시 확인.
+                    FE는 AI 게이트웨이를 직접 호출하지 않고 이 엔드포인트만 폴링.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
@@ -234,10 +240,12 @@ public class ProductController {
 
     @Operation(
             summary = "AI 가격 추천 트리거",
-            description = "상품 등록 화면 \"AI 가격 추천\" 섹션용 경량 트리거. 실제로 생성된 상품이 없어도"
-                    + " 호출할 수 있다 — product_id는 아직 없으면 BE가 내부적으로 임시값을 채워 보낸다."
-                    + " AI 게이트웨이(POST /pricing/estimates)에 그대로 접수하고 job id만 돌려준다."
-                    + " 결과는 FE가 GET /ai/jobs/{jobId}를 직접 폴링해서 받는다(BE는 재조회하지 않는다).")
+            description = """
+                    상품 등록 화면 \"AI 가격 추천\" 섹션용 경량 트리거. 실제로 생성된 상품이 없어도 호출 가능.
+                    product_id 없으면 임시값 사용.
+                    AI 게이트웨이(POST /pricing/estimates)에 그대로 접수하고 job id만 리턴.
+                    결과는 FE가 GET /ai/jobs/{jobId}를 직접 폴링.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "접수 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
@@ -254,11 +262,13 @@ public class ProductController {
 
     @Operation(
             summary = "상품 정보 수정",
-            description = "제목/설명/카테고리/브랜드/상태등급/사이즈/색상/소재/실측/가격 부분 수정. 요청에 포함된 필드만 반영. "
-                    + "하자(defects)·AI 품질 검수 제외 key 목록(excludedQualityFindingKeys)은 둘 다 null이면 미반영, "
-                    + "값을 보내면 기존 목록 전체 교체(빈 배열이면 전부 삭제). "
-                    + "가격(price)은 정찰제(saleType=DIRECT_SALE) 상품만 수정 가능. — 경매 상품에 보내면 400. "
-                    + "DRAFT/ON_SALE/AUCTION_SCHEDULED 상태의 상품만 수정 가능.")
+            description = """
+                    제목/설명/카테고리/브랜드/상태등급/사이즈/색상/소재/실측/가격 부분 수정. 요청에 포함된 필드만 반영.
+                    하자, AI 품질 검수 제외 key 목록 은 둘 다 null이면 미반영,
+                    값을 보내면 기존 목록 전체 교체(빈 배열이면 전부 삭제).
+                    가격은 정찰제 상품만 수정 가능. — 경매 상품에 보내면 400.
+                    DRAFT/ON_SALE/AUCTION_SCHEDULED 상태의 상품만 수정 가능.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패 또는 수정 불가 상태"),
@@ -278,8 +288,10 @@ public class ProductController {
 
     @Operation(
             summary = "상품 삭제",
-            description = "상품을 소프트 삭제(deleted_at 기록, DB row는 유지). "
-                    + "DRAFT/ON_SALE 상태의 상품만 삭제할 수 있으며, 삭제 후에는 상세 조회 등에서 존재하지 않는 상품으로 취급.")
+            description = """
+                    상품을 소프트 삭제(deleted_at 기록, DB row는 유지).
+                    DRAFT/ON_SALE 상태의 상품만 삭제할 수 있으며, 삭제 후에는 상세 조회 등에서 존재하지 않는 상품으로 취급.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "삭제 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "삭제 불가 상태"),
@@ -296,8 +308,10 @@ public class ProductController {
 
     @Operation(
             summary = "상품 이미지 업로드 URL 발급",
-            description = "S3에 이미지를 직접 업로드할 수 있는 presigned URL 발급(5분 만료). "
-                    + "이미지 1개당 1회 호출하며, 업로드 후 등록 API를 호출해야 상품에 실제로 반영됨.")
+            description = """
+                    S3에 이미지를 직접 업로드할 수 있는 presigned URL 발급(5분 만료).
+                    이미지 1개당 1회 호출하며, 업로드 후 등록 API를 호출해야 상품에 실제로 반영됨.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "발급 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "지원하지 않는 이미지 형식"),
@@ -318,9 +332,11 @@ public class ProductController {
 
     @Operation(
             summary = "상품 이미지 등록",
-            description = "presigned URL로 S3 업로드를 마친 이미지를 상품에 등록. "
-                    + "업로드된 객체가 실제로 존재하는지, 용량 제한(10MB)을 넘지 않는지 서버가 다시 검증. "
-                    + "상품당 이미지는 최대 10장까지 등록할 수 있다.")
+            description = """
+                    presigned URL로 S3 업로드를 마친 이미지를 상품에 등록.
+                    업로드된 객체가 실제로 존재하는지, 용량 제한(10MB)을 넘지 않는지 서버가 다시 검증.
+                    상품당 이미지는 최대 10장까지 등록 가능.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "등록 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "업로드 미확인 또는 이미지 개수 초과"),
@@ -341,9 +357,10 @@ public class ProductController {
 
     @Operation(
             summary = "상품 이미지 수정",
-            description = "등록된 상품 이미지의 표시 순서(sortOrder)·대표 여부(isPrimary)를 수정. "
-                    + "요청에 포함된 필드만 반영하는 부분 수정. isPrimary를 true로 바꾸면 같은 상품의 "
-                    + "다른 이미지는 자동으로 대표에서 해제(상품당 대표 이미지는 항상 최대 1장).")
+            description = """
+                    등록된 상품 이미지의 표시 순서·대표 여부 수정. 요청에 포함된 필드만 반영하는 부분 수정.
+                    isPrimary를 true로 바꾸면 같은 상품의 다른 이미지는 자동으로 대표에서 해제.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
