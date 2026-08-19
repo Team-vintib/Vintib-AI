@@ -21,8 +21,10 @@ import com.ssafy.backend.product.dto.response.ProductQualityInspectionResponse;
 import com.ssafy.backend.product.dto.response.ProductResponse;
 import com.ssafy.backend.product.dto.response.SimilarProductsResponse;
 import com.ssafy.backend.product.service.PriceEstimateService;
+import com.ssafy.backend.product.service.ProductAiJobStatusService;
+import com.ssafy.backend.product.service.ProductCommandService;
 import com.ssafy.backend.product.service.ProductImageService;
-import com.ssafy.backend.product.service.ProductService;
+import com.ssafy.backend.product.service.ProductQueryService;
 import com.ssafy.backend.product.service.SimilarProductQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -54,7 +56,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProductController {
 
-    private final ProductService productService;
+    private final ProductCommandService productCommandService;
+    private final ProductQueryService productQueryService;
+    private final ProductAiJobStatusService productAiJobStatusService;
     private final ProductImageService productImageService;
     private final PriceEstimateService priceEstimateService;
     private final SimilarProductQueryService similarProductQueryService;
@@ -74,14 +78,13 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
             Authentication authentication, @Valid @RequestBody ProductCreateRequest request) {
         Long sellerId = (Long) authentication.getPrincipal();
-        ProductResponse response = productService.createProduct(sellerId, request);
+        ProductResponse response = productCommandService.createProduct(sellerId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "판매 가격 설정 및 정찰제 등록",
-            description = "DRAFT(최초 등록) 또는 AUCTION_SCHEDULED(경매 예정 상품의 정찰제 전환, "
-                    + "상태 상품에 가격을 설정해 정찰제(ON_SALE) 상태로 전환.")
+            description = "DRAFT/AUCTION_SCHEDULED 상태 상품에 가격 설정. ON_SALE 상태로 전환.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "전환 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -98,15 +101,16 @@ public class ProductController {
             @PathVariable Long id,
             @Valid @RequestBody ProductStatusUpdateRequest request) {
         Long sellerId = (Long) authentication.getPrincipal();
-        ProductResponse response = productService.registerDirectSale(sellerId, id, request);
+        ProductResponse response = productCommandService.registerDirectSale(sellerId, id, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "경매 상품 등록 및 경매 전환",
-            description = "DRAFT(최초 등록) 또는 ON_SALE(정찰제 상품의 경매 전환) 상태 상품을 "
-                    + "경매 예정(AUCTION_SCHEDULED) 상태로 전환. "
-                    + "시작가·증액 단위·경매 시간은 경매 시작 전 별도 API로 설정한다.")
+            description = """
+                    DRAFT/ON_SALE 상태 상품을 AUCTION_SCHEDULED 상태로 전환.
+                    시작가·증액 단위·경매 시간은 경매 시작 전 별도 API로 설정.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "등록 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "DRAFT/ON_SALE 상태가 아님"),
@@ -119,17 +123,15 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ProductResponse>> scheduleAuction(
             Authentication authentication, @PathVariable Long id) {
         Long sellerId = (Long) authentication.getPrincipal();
-        ProductResponse response = productService.scheduleAuction(sellerId, id);
+        ProductResponse response = productCommandService.scheduleAuction(sellerId, id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "상품 목록 조회",
             description = """
-                    공개된 상품 목록 조회. DRAFT 상태 상품은 제외.
-                    카테고리·상태등급·판매방식·가격 범위·판매자(sellerId) 필터를 조합할 수 있으며,
-                    각 파라미터를 생략하면 해당 조건을 건너뜀. sellerId는 공개 프로필에서
-                    특정 판매자의 상품만 보여줄 때 사용.
+                    공개된 상품 목록 조회. DRAFT 상태 상품 제외.
+                    카테고리·상태등급·판매방식·가격 범위·판매자(sellerId) 필터 조합 가능.
                     정렬: LATEST(기본값, 최신순) / PRICE_ASC(가격 낮은 순) / PRICE_DESC(가격 높은 순).
                     """)
     @ApiResponses({
@@ -149,14 +151,16 @@ public class ProductController {
         ProductListFilterParams filter =
                 new ProductListFilterParams(categoryIds, conditionGrades, saleType, minPrice, maxPrice, sort, sellerId);
         Pageable pageable = PageRequest.of(page, size);
-        PageResponse<ProductResponse> response = productService.getProductList(filter, pageable);
+        PageResponse<ProductResponse> response = productQueryService.getProductList(filter, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "상품 상세 조회",
-            description = "상품 상세 정보를 조회한다. 비회원도 조회 가능. "
-                    + "DRAFT 상태 상품은 판매자 본인만 조회할 수 있으며, 그 외에는 존재하지 않는 것처럼 404를 반환.")
+            description = """
+                    상품 상세 정보 조회. 비회원도 가능.
+                    DRAFT 상태 상품은 판매자 본인만 조회 가능. 그 외에는 404 반환.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품이 없거나 DRAFT 상품을 본인 외 사용자가 조회함")
@@ -165,22 +169,23 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ProductDetailResponse>> getProductDetail(
             Authentication authentication, @PathVariable Long id) {
         Long viewerId = authentication != null ? (Long) authentication.getPrincipal() : null;
-        ProductDetailResponse response = productService.getProductDetail(viewerId, id);
+        ProductDetailResponse response = productQueryService.getProductDetail(viewerId, id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "동일 상품 시세 조회",
-            description = "같은 matchKey(AI 시세 조회가 상품명·브랜드·카테고리로 판정)를 가진 다른 상품들의 "
-                    + "호가/완료거래가를 보여준다. 비회원도 조회 가능하다. matchKey가 아직 계산되지 않은 "
-                    + "상품이면 listings가 빈 배열로 온다(404 아님).")
+            description = """
+                    같은 matchKey를 가진 다른 상품들의 호가/완료거래가. 비회원도 조회 가능. 
+                    matchKey가 아직 계산되지 않은 상품이면 listings가 빈 배열 (404 아님).
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
     })
     @GetMapping("/{id}/market-price")
     public ResponseEntity<ApiResponse<ProductMarketPriceResponse>> getMarketPrice(@PathVariable Long id) {
-        ProductMarketPriceResponse response = productService.getMarketPrice(id);
+        ProductMarketPriceResponse response = productQueryService.getMarketPrice(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -201,23 +206,27 @@ public class ProductController {
 
     @Operation(
             summary = "AI 착용컷 생성 상태/결과 조회",
-            description = "판매자가 등록 시 AI 착용컷을 켠 상품의 생성 상태 조회. "
-                    + "PENDING/PROCESSING이면 이 호출 시점에 AI 쪽 최신 상태 다시 확인.")
+            description = """
+                        판매자가 등록 시 AI 착용컷을 켠 상품의 생성 상태 조회.
+                        PENDING/PROCESSING이면 이 호출 시점에 AI 쪽 최신 상태 다시 확인.
+                        """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
     })
     @GetMapping("/{id}/ai-model-cut")
     public ResponseEntity<ApiResponse<ProductAiModelCutResponse>> getAiModelCutStatus(@PathVariable Long id) {
-        ProductAiModelCutResponse response = productService.getAiModelCutStatus(id);
+        ProductAiModelCutResponse response = productAiJobStatusService.getAiModelCutStatus(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "하자 검수 상태/결과 조회",
-            description = "앞/뒤 사진이 둘 다 등록되면 백그라운드로 도는 AI 하자 검수의 상태를 조회한다. "
-                    + "PENDING/PROCESSING이면 이 호출 시점에 AI 쪽 최신 상태를 다시 확인해 반영한다. "
-                    + "FE는 AI 게이트웨이를 직접 호출하지 않고 이 엔드포인트만 폴링한다.")
+            description = """
+                    앞/뒤 사진이 둘 다 등록되면 AI 하자 검수 상태 조회.
+                    PENDING/PROCESSING이면 AI 쪽 최신 상태를 다시 확인.
+                    FE는 AI 게이트웨이를 직접 호출하지 않고 이 엔드포인트만 폴링.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "상품 없음")
@@ -225,16 +234,18 @@ public class ProductController {
     @GetMapping("/{id}/quality-inspection")
     public ResponseEntity<ApiResponse<ProductQualityInspectionResponse>> getQualityInspectionStatus(
             @PathVariable Long id) {
-        ProductQualityInspectionResponse response = productService.getQualityInspectionStatus(id);
+        ProductQualityInspectionResponse response = productAiJobStatusService.getQualityInspectionStatus(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "AI 가격 추천 트리거",
-            description = "상품 등록 화면 \"AI 가격 추천\" 섹션용 경량 트리거. 실제로 생성된 상품이 없어도"
-                    + " 호출할 수 있다 — product_id는 아직 없으면 BE가 내부적으로 임시값을 채워 보낸다."
-                    + " AI 게이트웨이(POST /pricing/estimates)에 그대로 접수하고 job id만 돌려준다."
-                    + " 결과는 FE가 GET /ai/jobs/{jobId}를 직접 폴링해서 받는다(BE는 재조회하지 않는다).")
+            description = """
+                    상품 등록 화면 \"AI 가격 추천\" 섹션용 경량 트리거. 실제로 생성된 상품이 없어도 호출 가능.
+                    product_id 없으면 임시값 사용.
+                    AI 게이트웨이(POST /pricing/estimates)에 그대로 접수하고 job id만 리턴.
+                    결과는 FE가 GET /ai/jobs/{jobId}를 직접 폴링.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "접수 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
@@ -251,11 +262,13 @@ public class ProductController {
 
     @Operation(
             summary = "상품 정보 수정",
-            description = "제목/설명/카테고리/브랜드/상태등급/사이즈/색상/소재/실측/가격 부분 수정. 요청에 포함된 필드만 반영. "
-                    + "하자(defects)·AI 품질 검수 제외 key 목록(excludedQualityFindingKeys)은 둘 다 null이면 미반영, "
-                    + "값을 보내면 기존 목록 전체 교체(빈 배열이면 전부 삭제). "
-                    + "가격(price)은 정찰제(saleType=DIRECT_SALE) 상품만 수정 가능. — 경매 상품에 보내면 400. "
-                    + "DRAFT/ON_SALE/AUCTION_SCHEDULED 상태의 상품만 수정 가능.")
+            description = """
+                    제목/설명/카테고리/브랜드/상태등급/사이즈/색상/소재/실측/가격 부분 수정. 요청에 포함된 필드만 반영.
+                    하자, AI 품질 검수 제외 key 목록 은 둘 다 null이면 미반영,
+                    값을 보내면 기존 목록 전체 교체(빈 배열이면 전부 삭제).
+                    가격은 정찰제 상품만 수정 가능. — 경매 상품에 보내면 400.
+                    DRAFT/ON_SALE/AUCTION_SCHEDULED 상태의 상품만 수정 가능.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청값 검증 실패 또는 수정 불가 상태"),
@@ -269,14 +282,16 @@ public class ProductController {
             @PathVariable Long id,
             @Valid @RequestBody ProductUpdateRequest request) {
         Long sellerId = (Long) authentication.getPrincipal();
-        ProductResponse response = productService.updateProduct(sellerId, id, request);
+        ProductResponse response = productCommandService.updateProduct(sellerId, id, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @Operation(
             summary = "상품 삭제",
-            description = "상품을 소프트 삭제(deleted_at 기록, DB row는 유지). "
-                    + "DRAFT/ON_SALE 상태의 상품만 삭제할 수 있으며, 삭제 후에는 상세 조회 등에서 존재하지 않는 상품으로 취급.")
+            description = """
+                    상품을 소프트 삭제(deleted_at 기록, DB row는 유지).
+                    DRAFT/ON_SALE 상태의 상품만 삭제할 수 있으며, 삭제 후에는 상세 조회 등에서 존재하지 않는 상품으로 취급.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "삭제 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "삭제 불가 상태"),
@@ -287,14 +302,16 @@ public class ProductController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(Authentication authentication, @PathVariable Long id) {
         Long sellerId = (Long) authentication.getPrincipal();
-        productService.deleteProduct(sellerId, id);
+        productCommandService.deleteProduct(sellerId, id);
         return ResponseEntity.noContent().build();
     }
 
     @Operation(
             summary = "상품 이미지 업로드 URL 발급",
-            description = "S3에 이미지를 직접 업로드할 수 있는 presigned URL 발급(5분 만료). "
-                    + "이미지 1개당 1회 호출하며, 업로드 후 등록 API를 호출해야 상품에 실제로 반영됨.")
+            description = """
+                    S3에 이미지를 직접 업로드할 수 있는 presigned URL 발급(5분 만료).
+                    이미지 1개당 1회 호출하며, 업로드 후 등록 API를 호출해야 상품에 실제로 반영됨.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "발급 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "지원하지 않는 이미지 형식"),
@@ -315,9 +332,11 @@ public class ProductController {
 
     @Operation(
             summary = "상품 이미지 등록",
-            description = "presigned URL로 S3 업로드를 마친 이미지를 상품에 등록. "
-                    + "업로드된 객체가 실제로 존재하는지, 용량 제한(10MB)을 넘지 않는지 서버가 다시 검증. "
-                    + "상품당 이미지는 최대 10장까지 등록할 수 있다.")
+            description = """
+                    presigned URL로 S3 업로드를 마친 이미지를 상품에 등록.
+                    업로드된 객체가 실제로 존재하는지, 용량 제한(10MB)을 넘지 않는지 서버가 다시 검증.
+                    상품당 이미지는 최대 10장까지 등록 가능.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "등록 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "업로드 미확인 또는 이미지 개수 초과"),
@@ -338,9 +357,10 @@ public class ProductController {
 
     @Operation(
             summary = "상품 이미지 수정",
-            description = "등록된 상품 이미지의 표시 순서(sortOrder)·대표 여부(isPrimary)를 수정. "
-                    + "요청에 포함된 필드만 반영하는 부분 수정. isPrimary를 true로 바꾸면 같은 상품의 "
-                    + "다른 이미지는 자동으로 대표에서 해제(상품당 대표 이미지는 항상 최대 1장).")
+            description = """
+                    등록된 상품 이미지의 표시 순서·대표 여부 수정. 요청에 포함된 필드만 반영하는 부분 수정.
+                    isPrimary를 true로 바꾸면 같은 상품의 다른 이미지는 자동으로 대표에서 해제.
+                    """)
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "수정 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),

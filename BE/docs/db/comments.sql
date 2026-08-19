@@ -61,6 +61,7 @@ COMMENT ON COLUMN product.color           IS '색상(자유 문자열).';
 COMMENT ON COLUMN product.material        IS '소재(자유 문자열).';
 COMMENT ON COLUMN product.match_key       IS '"동일 상품" 판정 키(AI 시세 조회). AI가 상품명+브랜드+카테고리로 계산해 FE 경유로 저장 — BE는 계산하지 않는다.';
 COMMENT ON COLUMN product.measurements    IS '실측 치수(cm). 항목(총장/어깨너비 등)이 상품마다 달라 JSONB로 저장.';
+COMMENT ON COLUMN product.defects         IS '판매자가 직접 입력한 하자 목록(SY047). 배열 순서가 곧 노출 순서.';
 COMMENT ON COLUMN product.sale_type       IS 'DIRECT_SALE(정찰제) | AUCTION(경매)';
 COMMENT ON COLUMN product.sale_status     IS 'DRAFT | ON_SALE | AUCTION_SCHEDULED | AUCTION_IN_PROGRESS | SOLD';
 COMMENT ON COLUMN product.price           IS '정찰제가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002).';
@@ -70,10 +71,6 @@ COMMENT ON COLUMN product.deleted_at      IS '삭제 시각. 주문 이력 보�
 COMMENT ON TABLE product_image IS '상품 이미지. 시착(TRYON-003) 입력으로도 쓰인다.';
 COMMENT ON COLUMN product_image.sort_order IS '노출 순서.';
 COMMENT ON COLUMN product_image.is_primary IS '대표 이미지 여부. 목록·썸네일에 쓴다.';
-
-COMMENT ON TABLE product_defect IS '판매자가 직접 입력한 하자 목록 (PROD-001).';
-COMMENT ON COLUMN product_defect.content    IS '하자 내용(자유 문자열).';
-COMMENT ON COLUMN product_defect.sort_order IS '노출 순서.';
 
 COMMENT ON TABLE wish   IS '찜 (MY-009). 추천(REC-001) 입력.';
 
