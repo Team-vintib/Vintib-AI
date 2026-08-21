@@ -13,7 +13,7 @@
 COMMENT ON TABLE member IS '서비스 회원. 판매자·구매자 구분 없이 한 테이블을 쓴다.';
 COMMENT ON COLUMN member.email             IS '로그인 ID 겸 연락 수단. 경매 화면에는 노출하지 않는다.';
 COMMENT ON COLUMN member.password          IS '자체 로그인용 해시. SSO 전용 계정은 NULL.';
-COMMENT ON COLUMN member.google_id         IS '구글 로그인 연동 식별자(id_token의 sub, SY039). 미연동 회원은 NULL.';
+COMMENT ON COLUMN member.google_id         IS '구글 로그인 연동 식별자(id_token의 sub). 미연동 회원은 NULL.';
 COMMENT ON COLUMN member.nickname          IS '공개 표시명. 최고 입찰자·낙찰자 표시에 쓰는 유일한 신원 정보 (AUCT-011).';
 COMMENT ON COLUMN member.name              IS '실명. 배송·정산용이며 외부 노출 금지.';
 COMMENT ON COLUMN member.member_type       IS 'GENERAL(일반) | BUSINESS(사업자)';
@@ -61,6 +61,7 @@ COMMENT ON COLUMN product.color           IS '색상(자유 문자열).';
 COMMENT ON COLUMN product.material        IS '소재(자유 문자열).';
 COMMENT ON COLUMN product.match_key       IS '"동일 상품" 판정 키(AI 시세 조회). AI가 상품명+브랜드+카테고리로 계산해 FE 경유로 저장 — BE는 계산하지 않는다.';
 COMMENT ON COLUMN product.measurements    IS '실측 치수(cm). 항목(총장/어깨너비 등)이 상품마다 달라 JSONB로 저장.';
+COMMENT ON COLUMN product.defects         IS '판매자가 직접 입력한 하자 목록(SY047). 배열 순서가 곧 노출 순서.';
 COMMENT ON COLUMN product.sale_type       IS 'DIRECT_SALE(정찰제) | AUCTION(경매)';
 COMMENT ON COLUMN product.sale_status     IS 'DRAFT | ON_SALE | AUCTION_SCHEDULED | AUCTION_IN_PROGRESS | SOLD';
 COMMENT ON COLUMN product.price           IS '정찰제가(원). 경매 예정 상품은 NULL — 가격대 필터에서 별도 처리한다 (SEARCH-002).';
@@ -70,10 +71,6 @@ COMMENT ON COLUMN product.deleted_at      IS '삭제 시각. 주문 이력 보�
 COMMENT ON TABLE product_image IS '상품 이미지. 시착(TRYON-003) 입력으로도 쓰인다.';
 COMMENT ON COLUMN product_image.sort_order IS '노출 순서.';
 COMMENT ON COLUMN product_image.is_primary IS '대표 이미지 여부. 목록·썸네일에 쓴다.';
-
-COMMENT ON TABLE product_defect IS '판매자가 직접 입력한 하자 목록 (PROD-001).';
-COMMENT ON COLUMN product_defect.content    IS '하자 내용(자유 문자열).';
-COMMENT ON COLUMN product_defect.sort_order IS '노출 순서.';
 
 COMMENT ON TABLE wish   IS '찜 (MY-009). 추천(REC-001) 입력.';
 
@@ -158,7 +155,8 @@ COMMENT ON COLUMN invoice.supply_amount        IS '공급가액. round(orders.or
 COMMENT ON COLUMN invoice.tax_amount           IS '부가세. orders.order_price - supply_amount.';
 COMMENT ON COLUMN invoice.total_amount         IS '합계금액. orders.order_price와 동일.';
 COMMENT ON COLUMN order_shipment.delivered_at    IS '배송 완료 시각. orders.auto_confirm_at 계산 기준.';
-COMMENT ON COLUMN order_shipment.tracking_status IS '배송 진행 상태(SY034). 웹훅 수신 때마다 갱신, 첫 수신 전에는 NULL.';
+COMMENT ON COLUMN order_shipment.tracking_status IS '배송 진행 상태. 웹훅 수신 때마다 갱신, 첫 수신 전에는 NULL.';
+COMMENT ON COLUMN order_shipment.webhook_subscribed IS '배송 조회 웹훅 구독 성공 여부(SY034 8차). FALSE인 건만 지연 폴백 배치 대상.';
 
 
 -- ---------- 채팅 ----------

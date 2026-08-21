@@ -85,6 +85,15 @@ public class OrderShipment {
     @Column(name = "tracking_status", length = 20)
     private TrackingStatus trackingStatus;
 
+    /**
+     * 배송 조회 웹훅 구독 성공 여부. 실패 건(자격증명 없는 로컬/CI 환경 등)만
+     * {@link com.ssafy.backend.order.scheduler.ShipmentFallbackDeliveryScheduler}가 지연 폴백 대상으로
+     * 집어간다 — {@code trackingStatus}만으로는 "웹훅 구독은 됐지만 첫 웹훅 전"과 "폴백 대상"을 구분할
+     * 수 없어(둘 다 null) 별도로 둔다.
+     */
+    @Column(name = "webhook_subscribed", nullable = false)
+    private boolean webhookSubscribed;
+
     @Builder
     private OrderShipment(
             Order order, String recipientName, String recipientPhone, String zipcode, String address1,
@@ -113,9 +122,14 @@ public class OrderShipment {
         this.shippedAt = shippedAt;
     }
 
-    /** 배송완료 웹훅 수신 또는 구독 실패 시 즉시-확정 폴백에서 호출한다. */
+    /** 배송완료 웹훅 수신 또는 지연 폴백 배치(구독 실패 건)에서 호출한다. */
     public void markDelivered(LocalDateTime deliveredAt) {
         this.deliveredAt = deliveredAt;
+    }
+
+    /** 배송 조회 웹훅 구독 결과 저장. 실패(false)면 지연 폴백 배치의 대상이 된다. */
+    public void markWebhookSubscribed(boolean webhookSubscribed) {
+        this.webhookSubscribed = webhookSubscribed;
     }
 
     /**

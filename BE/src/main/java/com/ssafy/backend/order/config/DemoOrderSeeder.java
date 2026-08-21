@@ -321,6 +321,10 @@ public class DemoOrderSeeder implements ApplicationRunner {
                 case NO_ADDRESS -> throw new IllegalStateException("unreachable");
             };
             shipment.registerTracking(CourierCode.CJ, generateTrackingNumber(product), shippedAt);
+            // 실제 웹훅 구독 여부와 무관하게 true로 고정 — false로 두면 ShipmentFallbackDeliveryScheduler가
+            // shippedAt이 이미 과거로 시딩된 이 건을 곧바로 배송완료 처리해버려, SHIPPING 스테이지로
+            // 고정해 보여주려던 데모 데이터의 의도가 깨진다.
+            shipment.markWebhookSubscribed(true);
             order.markShipping();
 
             if (stage == DemoOrderStage.DELIVERED || stage == DemoOrderStage.SETTLED) {

@@ -77,9 +77,9 @@ public class Product extends BaseTimeEntity {
     @Column(name = "condition_grade", length = 20)
     private String conditionGrade;
 
-    // AI 품질 검수가 매긴 원점수(0~100, SY043). 041-quality-inspection-integration.md 경고 그대로:
-    // 가중치·등급 경계가 근거 없는 임의값이라 가격책정 등 다른 로직이 이 값을 신뢰해 쓰면 안 된다
-    // — 상품 상세에 참고용으로 보여주는 것 외 용도로 참조하지 않는다.
+    // AI 품질 검수가 매긴 원점수(0~100).
+    // 가중치·등급 경계가 근거 없는 임의값이라 가격책정 등 다른 로직이 이 값을 신뢰해 쓰면 안 된다.
+    // 상품 상세에 참고용으로 보여주는 것 외 용도로 참조하지 않는다.
     @Column(name = "condition_score")
     private Double conditionScore;
 
@@ -92,7 +92,7 @@ public class Product extends BaseTimeEntity {
     @Column(length = 50)
     private String material;
 
-    // "동일 상품" 판정 키(AI 시세 조회, CH030). 상품명+브랜드+카테고리 텍스트로 AI가 계산해
+    // "동일 상품" 판정 키(AI 시세 조회). 상품명+브랜드+카테고리 텍스트로 AI가 계산해
     // 돌려준 값을 FE가 폴링해서 그대로 넘겨준다 — BE는 저장·조회만 한다(직접 계산 안 함).
     // 같은 값을 가진 상품끼리 GET /api/products/{id}/market-price에서 "동일 상품"으로 묶인다.
     @Column(name = "match_key", length = 300)
@@ -102,6 +102,13 @@ public class Product extends BaseTimeEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private Map<String, Integer> measurements;
+
+    // 판매자가 직접 입력한 하자 목록. 순서 있는 문자열 리스트라 measurements와 같은 이유로
+    // 고정 컬럼/자식 테이블 대신 JSONB로 담는다.
+    // 순서는 배열 순서 자체가 곧 노출 순서다.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private List<String> defects;
 
     // 판매 채널(정찰제/경매)은 이번 단계에서 정하지 않는다 — 판매 가격 설정 또는
     // 경매 조건 설정 API를 호출하는 시점에 비로소 결정된다.
@@ -152,19 +159,18 @@ public class Product extends BaseTimeEntity {
     private String qualityInspectionJobId;
 
     // AI 검수 결과(condition_score/findings 등) 원본을 그대로 저장한다. AI 쪽 job 결과는 Redis
-    // TTL 1시간 뒤 사라지므로, 완료 시점에 여기 캐시해두지 않으면 그 이후 조회에서 영영 잃는다.
+    // TTL  1시간 뒤 사라지므로, 완료 시점에여기 캐시해두지 않으면 그 이후 조회에서 영영 잃는다.
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "quality_inspection_result", columnDefinition = "jsonb")
     private Map<String, Object> qualityInspectionResult;
 
-    // 판매자가 "하자 아님"으로 표시한 finding의 key 목록(CH002). qualityInspectionResult
-    // 원본은 절대 건드리지 않고 이 목록으로 "제외 표시"만 얹는다 — 그래서 상세 화면 번호·부위가
-    // 등록 화면과 항상 정확히 일치한다(원본을 축소 저장하던 이전 방식은 SY043 §2, 이번에 대체).
+    // 판매자가 "하자 아님"으로 표시한 finding의 key 목록.
+    // qualityInspectionResult 원본은 절대 건드리지 않고 이 목록으로 "제외 표시"만 얹는다.
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "excluded_quality_finding_keys", columnDefinition = "jsonb")
     private List<String> excludedQualityFindingKeys;
 
-    // AI 시세 조회(PricingResult) 원본을 그대로 저장한다(CH003). FE가 등록 시 확정 등급으로
+    // AI 시세 조회(PricingResult) 원본을 그대로 저장한다. FE가 등록 시 확정 등급으로
     // 폴링한 결과를 그대로 전달해 저장해두고, 상세 조회는 LLM을 다시 호출하지 않고 이 스냅샷만
     // 읽는다 — qualityInspectionResult와 같은 패턴.
     @JdbcTypeCode(SqlTypes.JSON)
@@ -187,6 +193,7 @@ public class Product extends BaseTimeEntity {
             String color,
             String material,
             Map<String, Integer> measurements,
+            List<String> defects,
             boolean aiModelEnabled,
             AiModelGender aiModelGender) {
         this.seller = seller;
@@ -200,6 +207,7 @@ public class Product extends BaseTimeEntity {
         this.color = color;
         this.material = material;
         this.measurements = measurements;
+        this.defects = defects;
         this.aiModelEnabled = aiModelEnabled;
         this.aiModelGender = aiModelGender;
         this.saleStatus = SaleStatus.DRAFT;
@@ -237,6 +245,7 @@ public class Product extends BaseTimeEntity {
             String color,
             String material,
             Map<String, Integer> measurements,
+            List<String> defects,
             String matchKey,
             List<String> excludedQualityFindingKeys,
             Map<String, Object> priceEstimateResult) {
@@ -266,6 +275,9 @@ public class Product extends BaseTimeEntity {
         }
         if (measurements != null) {
             this.measurements = measurements;
+        }
+        if (defects != null) {
+            this.defects = defects;
         }
         if (matchKey != null) {
             this.matchKey = matchKey;
@@ -320,12 +332,12 @@ public class Product extends BaseTimeEntity {
         this.qualityInspectionStatus = QualityInspectionStatus.PROCESSING;
     }
 
-    /** 정찰제 즉시구매 대상인지 확인한다(SALE-002). 경매 상품이나 품절 상품은 구매할 수 없다. */
+    /** 정찰제 즉시구매 대상인지 확인한다. 경매 상품이나 품절 상품은 구매할 수 없다. */
     public boolean isAvailableForDirectPurchase() {
         return saleType == SaleType.DIRECT_SALE && saleStatus == SaleStatus.ON_SALE;
     }
 
-    /** 즉시구매 완료 처리(SALE-002). 재고가 1개뿐인 중고 상품이라 판매 완료로 바로 넘어간다. */
+    /** 즉시구매 완료 처리. 재고가 1개뿐인 중고 상품이라 판매 완료로 바로 넘어간다. */
     public void markSold() {
         this.saleStatus = SaleStatus.SOLD;
     }
@@ -343,14 +355,12 @@ public class Product extends BaseTimeEntity {
     }
 
     /**
-     * 상품 내용(제목·설명·사진 등)을 고칠 수 있는 상태인지.
+     * 상품 내용(제목·설명·사진 등)을 고칠 수 있는 상태.
      *
-     * <p><b>{@code AUCTION_SCHEDULED}를 허용한다</b>(FE 요청 007) — 유찰된 상품은 이 상태로
-     * 돌아오는데, 판매자 입장에서 "안 팔렸으니 설명을 고쳐 다시 걸자"가 자연스러운 흐름이다.
-     * 막아 두면 정찰제로 전환했다가 되돌리는 우회로를 강요하게 된다.
+     * 유찰된 상품은 {@code AUCTION_SCHEDULED} 상태로 돌아온다.
      *
-     * <p><b>{@code AUCTION_IN_PROGRESS}는 계속 막는다.</b> 입찰이 붙는 도중에 상품 정보가 바뀌면
-     * 입찰자가 보고 판단한 것과 실제로 받는 물건이 달라진다. {@code SOLD}도 마찬가지로 막힌다.
+     * 입찰이 붙는 도중에 상품 정보가 바뀌면 입찰자가 보고 판단한 것과 실제로 받는 물건이
+     * 달라지므로 {@code AUCTION_IN_PROGRESS}와 {@code SOLD}는 허용하지 않는다.
      */
     public boolean isEditable() {
         return saleStatus == SaleStatus.DRAFT
