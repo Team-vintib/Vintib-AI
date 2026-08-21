@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 
 import { logout, reissueToken } from '@/domains/auth/api/authApi'
 import type { AuthUser } from '@/domains/auth/types/auth.types'
+import { getMyProfile } from '@/domains/my/api/myApi'
 import { normalizeApiError } from '@/shared/api/http'
 import {
   type AuthStorageType,
@@ -11,12 +12,20 @@ import {
   writeStoredAuthSession,
 } from '@/shared/api/authTokenStorage'
 
-// LoginResponse의 user는 AuthUser 그대로, Google 로그인은 user 객체가 없어 onboardingCompleted
-// 같은 낱개 필드만 Partial<AuthUser> 형태로 조립해 넘긴다 — 그래서 user는 부분 타입으로 받는다.
+// setSession이 받는 user는 이미 알고 있는 낱개 필드만 부분적으로 넘길 때 쓴다(예: 토큰
+// 재발급 시 기존 값 유지). 로그인 "직후" 전체 프로필(닉네임/온보딩 상태 등)을 채우려면
+// user를 직접 조립하지 말고 establishSession(아래)을 쓴다 — GET /api/users/{id}를 호출해
+// 서버가 가진 실제 값으로 채운다(docs/requests/FE/037).
 type AuthSession = {
   accessToken?: string | null
   refreshToken?: string | null
   user?: Partial<AuthUser>
+}
+
+type LoginTokens = {
+  accessToken?: string | null
+  refreshToken?: string | null
+  id?: number | null
 }
 type JwtPayload = {
   email?: unknown
@@ -61,6 +70,32 @@ export const useAuthStore = defineStore('auth', () => {
     isSessionValidated.value = true
 
     clearStoredAuthSession()
+  }
+
+  // 로그인/가입/구글 인증 등 "방금 로그인됨"의 단일 진입점이다(037). 토큰부터 저장해 이후
+  // API 호출에 Authorization 헤더가 바로 붙게 한 다음, id로 전체 프로필(닉네임/온보딩
+  // 상태 등)을 조회해 반영한다. 프로필 조회가 실패해도 로그인 자체(토큰)는 유지한다 —
+  // 온보딩 게이트(라우터 가드·403 인터셉터)가 이후 안전망 역할을 한다.
+  const establishSession = async (tokens: LoginTokens, rememberMe = true) => {
+    setSession({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }, rememberMe)
+
+    if (!tokens.id) {
+      return
+    }
+
+    try {
+      const profile = await getMyProfile(tokens.id)
+
+      updateUser({
+        id: profile.id,
+        email: profile.email,
+        name: profile.name,
+        nickname: profile.nickname,
+        onboardingCompleted: profile.onboardingCompleted,
+      })
+    } catch {
+      // 프로필 조회 실패 — 토큰 기반 세션은 그대로 두고 조용히 넘어간다.
+    }
   }
 
   const updateUser = (nextUser: Partial<AuthUser>) => {
@@ -165,6 +200,7 @@ export const useAuthStore = defineStore('auth', () => {
     isValidatingSession,
     isOnboardingCompleted,
     setSession,
+    establishSession,
     clearSession,
     updateUser,
     logoutSession,

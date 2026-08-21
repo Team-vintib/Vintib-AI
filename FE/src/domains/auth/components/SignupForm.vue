@@ -12,7 +12,6 @@ import {
 import googleLogoImage from '@/assets/images/google-logo.png'
 import EmailVerificationField from '@/domains/auth/components/EmailVerificationField.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import type { LoginResponse, SignUpResponse } from '@/domains/auth/types/auth.types'
 import { startGoogleOAuth } from '@/domains/auth/utils/googleOAuth'
 import { normalizeApiError } from '@/shared/api/http'
 import { ROUTE_NAMES } from '@/shared/constants/routes'
@@ -550,7 +549,7 @@ const handleSubmit = async () => {
       return
     }
 
-    authStore.setSession(buildSignupSession(loginResponse.data, response.data), true)
+    await authStore.establishSession(loginResponse.data, true)
     await router.replace({ name: ROUTE_NAMES.ONBOARD_PROFILE })
   } catch (error: unknown) {
     const apiError = normalizeApiError(error)
@@ -560,20 +559,6 @@ const handleSubmit = async () => {
     isSubmitting.value = false
   }
 }
-
-const buildSignupSession = (
-  loginResult: LoginResponse,
-  signupResult: SignUpResponse,
-): LoginResponse => ({
-  ...loginResult,
-  user: {
-    id: loginResult.user?.id ?? signupResult.id,
-    email: loginResult.user?.email ?? signupResult.email,
-    name: loginResult.user?.name ?? signupResult.name,
-    onboardingCompleted:
-      loginResult.user?.onboardingCompleted ?? signupResult.onboardingCompleted ?? false,
-  },
-})
 
 const handleGoogleSignup = async () => {
   if (isSubmitting.value) {

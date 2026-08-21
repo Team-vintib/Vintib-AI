@@ -6,6 +6,7 @@ import {
   readStoredAuthSession,
   writeStoredAuthSession,
 } from '@/shared/api/authTokenStorage'
+import { ROUTE_PATHS } from '@/shared/constants/routes'
 import type { ApiErrorBody, ApiResponse } from '@/shared/types/api.types'
 
 const DEFAULT_TIMEOUT_MS = 10_000
@@ -56,6 +57,16 @@ http.interceptors.response.use(
   async (error: AxiosError<ApiResponse<unknown> | ApiErrorBody>) => {
     const originalRequest = error.config
     const apiError = getAxiosErrorBody(error)
+
+    // 온보딩 미완료 회원이 화이트리스트 밖 API를 호출하면 BE(OnboardingRequiredFilter)가
+    // 403 U004를 준다. 로그인 자체는 유효하므로 세션은 지우지 않고 온보딩 화면으로만 보낸다
+    // 라우터 가드가 화면 이동은 대부분 막아주지만, 공개 화면 안의
+    // 개별 액션(예: 상품 목록에서 찜하기)처럼 화면 자체는 requiresAuth가 아닌 경우를 위한
+    // 안전망이다.
+    if (error.response?.status === 403 && apiError.code === 'U004') {
+      redirectToOnboarding()
+      throw error
+    }
 
     if (
       !originalRequest ||
@@ -175,6 +186,21 @@ function redirectToLogin() {
 
   const redirect = `${window.location.pathname}${window.location.search}`
   window.location.assign(`/auth/login?redirect=${encodeURIComponent(redirect)}`)
+}
+
+const ONBOARDING_PATHS: string[] = [
+  ROUTE_PATHS.ONBOARD_PROFILE,
+  ROUTE_PATHS.ONBOARD_INTERESTS,
+  ROUTE_PATHS.ONBOARD_TRYON,
+  ROUTE_PATHS.ONBOARD_MEMBER_TYPE,
+]
+
+function redirectToOnboarding() {
+  if (typeof window === 'undefined' || ONBOARDING_PATHS.includes(window.location.pathname)) {
+    return
+  }
+
+  window.location.assign(ROUTE_PATHS.ONBOARD_PROFILE)
 }
 
 function isApiResponse(data: unknown): data is ApiResponse<unknown> {
