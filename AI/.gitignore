@@ -78,3 +78,10 @@ validation/CLASS/product-info-finetune/artifacts_finetune/
 # GPU 서버의 원본 실행 기록 노트북 — 정리된 aihub_pipeline_final_check.ipynb만 커밋한다.
 # 중복 정의(run/time 등)가 남아 있어 ruff .ipynb 린트도 통과 못 한다.
 validation/CLASS/product-info-finetune/aihub_pipeline_server.ipynb
+
+validation/QUAL/qc-pipeline-before-after/results
+
+# 1단계 스크립트(scripts/export_similar_product_samples.py)가 실제 상품 이미지·임베딩을
+# 내려받는 곳 — 실 사용자 데이터라 커밋하지 않는다. results/는 그걸로 그린 발표용 PNG.
+validation/REC/product-embedding-similarity-check/data/
+validation/REC/product-embedding-similarity-check/results/
